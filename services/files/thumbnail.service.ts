@@ -35,27 +35,24 @@ async function exists(p: string): Promise<boolean> {
 }
 
 /**
- * Return the absolute path to a cached WebP thumbnail of an image, generating
- * it on first request. Validates + symlink-guards the source via the
- * file-explorer service. Images only — throws for other categories.
+ * Render (or reuse a cached) WebP thumbnail for an already-resolved source.
+ * `cacheNamespace` segments + `cacheKeyInput` (hashed) namespace the cache; the
+ * source `mtimeMs` in the filename auto-invalidates on change. Shared by the
+ * patient-file and working-file entry points below.
  */
-export async function getThumbnail(
-  personId: string | number,
-  relPath: string,
-  width = 240
+async function renderThumb(
+  abs: string,
+  mtimeMs: number,
+  cacheNamespace: string[],
+  cacheKeyInput: string,
+  width: number
 ): Promise<string> {
   if (!ALLOWED_WIDTHS.has(width)) {
     throw new FileExplorerError('Unsupported thumbnail width', 400);
   }
 
-  // Validates id/path, guards symlink escape, rejects dirs/missing files.
-  const { abs, mtimeMs } = await resolveFileForServe(personId, relPath);
-  if (getFileCategory(relPath) !== 'image') {
-    throw new FileExplorerError('Thumbnails are only generated for images', 415);
-  }
-
-  const key = crypto.createHash('sha1').update(relPath).digest('hex');
-  const cacheDir = path.join(THUMB_CACHE_DIR, String(personId), String(width));
+  const key = crypto.createHash('sha1').update(cacheKeyInput).digest('hex');
+  const cacheDir = path.join(THUMB_CACHE_DIR, ...cacheNamespace, String(width));
   const cachePath = path.join(cacheDir, `${key}-${Math.round(mtimeMs)}.webp`);
 
   if (await exists(cachePath)) {
@@ -76,8 +73,7 @@ export async function getThumbnail(
   } catch (err) {
     await fs.rm(tmpPath, { force: true }).catch(() => {});
     log.warn('[Files] thumbnail generation failed', {
-      personId,
-      relPath,
+      source: cacheKeyInput,
       error: (err as Error).message,
     });
     // 415 → the client <img onError> falls back to a category icon.
@@ -85,4 +81,39 @@ export async function getThumbnail(
   }
 
   return cachePath;
+}
+
+/**
+ * Return the absolute path to a cached WebP thumbnail of an image, generating
+ * it on first request. Validates + symlink-guards the source via the
+ * file-explorer service. Images only — throws for other categories.
+ */
+export async function getThumbnail(
+  personId: string | number,
+  relPath: string,
+  width = 240
+): Promise<string> {
+  // Validates id/path, guards symlink escape, rejects dirs/missing files.
+  const { abs, mtimeMs } = await resolveFileForServe(personId, relPath);
+  if (getFileCategory(relPath) !== 'image') {
+    throw new FileExplorerError('Thumbnails are only generated for images', 415);
+  }
+  return renderThumb(abs, mtimeMs, [String(personId)], relPath, width);
+}
+
+/**
+ * Thumbnail for a patient WORKING file (`.iNN`, always JPEG). The caller
+ * (working-files route) has already validated `name` against the patient prefix
+ * and resolved `abs`/`mtimeMs`, so this skips patient-root resolution and the
+ * extension/category check (the `.iNN` extension isn't in the mime table, but
+ * the bytes are JPEG). Cached under a `working/{personId}` namespace.
+ */
+export async function getWorkingThumbnail(
+  personId: string | number,
+  name: string,
+  abs: string,
+  mtimeMs: number,
+  width = 240
+): Promise<string> {
+  return renderThumb(abs, mtimeMs, ['working', String(personId)], name, width);
 }

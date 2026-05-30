@@ -102,6 +102,20 @@ const SlotCanvas = ({ personId, slot, active, onCropChange, onZoomChange, onCrop
   useEffect(() => () => revoke(), []);
 
   if (!slot.sourceRelPath) {
+    // A saved (already-cropped) view with no live edit → show the baked image
+    // read-only. The slot's right-click menu offers Restore original / Remove.
+    if (slot.savedImageUrl) {
+      return (
+        <div className={styles.saved}>
+          <img
+            src={slot.savedImageUrl}
+            alt={labelForView(slot.view)}
+            className={styles.savedImg}
+            loading="lazy"
+          />
+        </div>
+      );
+    }
     return (
       <div className={styles.empty}>
         <img src="/images/logo.png" alt="" className={styles.emptyLogo} />
@@ -132,7 +146,7 @@ const SlotCanvas = ({ personId, slot, active, onCropChange, onZoomChange, onCrop
           restrictPosition={false}
           minZoom={0.2}
           maxZoom={3}
-          zoomSpeed={0.25}
+          zoomSpeed={0.1}
           showGrid={false}
           objectFit="cover"
           onCropChange={active ? onCropChange : noop}

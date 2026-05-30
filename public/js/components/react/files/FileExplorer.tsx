@@ -22,7 +22,7 @@ import { fetchJSON, postJSON, postFormData, deleteJSON } from '@/core/http';
 import { useToast } from '@/contexts/ToastContext';
 import { useConfirm } from '@/contexts/ConfirmContext';
 import Modal from '@/components/react/Modal';
-import type { ApiResponse, FileEntry, FileListing } from '@/types/api.types';
+import type { ApiResponse, FileEntry, FileListing, FileBatchDeleteResult } from '@/types/api.types';
 import { encodeRelPath, errorMessage } from './fileHelpers';
 import FileEntryTile from './FileEntryTile';
 import FilePreviewModal from './FilePreviewModal';
@@ -68,6 +68,8 @@ const FileExplorer = ({ personId, subPath }: Props) => {
   const [busy, setBusy] = useState(false);
   const [prompt, setPrompt] = useState<PromptState | null>(null);
   const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const promptInputRef = useRef<HTMLInputElement>(null);
@@ -80,6 +82,12 @@ const FileExplorer = ({ personId, subPath }: Props) => {
   useEffect(() => {
     localStorage.setItem(FLAT_KEY, flat ? '1' : '0');
   }, [flat]);
+
+  // Selection is keyed by relPath, which is only meaningful within one listing —
+  // drop it when the folder or flat/nested context changes.
+  useEffect(() => {
+    setSelected(new Set());
+  }, [currentPath, flat]);
 
   // ── Fetch listing (AbortController cancels in-flight on rapid nav) ──
   useEffect(() => {
@@ -244,6 +252,68 @@ const FileExplorer = ({ personId, subPath }: Props) => {
     [personId, confirm, toast, reload]
   );
 
+  // ── Selection (bulk) ──
+  const toggleSelect = useCallback((entry: FileEntry) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(entry.relPath)) next.delete(entry.relPath);
+      else next.add(entry.relPath);
+      return next;
+    });
+  }, []);
+
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false);
+    setSelected(new Set());
+  }, []);
+
+  // Every currently-listed entry is selected (respects flat view + truncation:
+  // "all" means everything shown, not everything on disk).
+  const allVisibleSelected =
+    entries.length > 0 && entries.every((e) => selected.has(e.relPath));
+
+  const toggleSelectAll = useCallback(() => {
+    setSelected(allVisibleSelected ? new Set() : new Set(entries.map((e) => e.relPath)));
+  }, [allVisibleSelected, entries]);
+
+  const doDeleteBatch = useCallback(async () => {
+    if (!personId) return;
+    // Intersect with the live listing so we never send stale relPaths.
+    const sel = entries.filter((e) => selected.has(e.relPath));
+    if (sel.length === 0) return;
+
+    const folders = sel.filter((e) => e.type === 'dir').length;
+    const files = sel.length - folders;
+    const parts: string[] = [];
+    if (folders) parts.push(`${folders} folder${folders === 1 ? '' : 's'}`);
+    if (files) parts.push(`${files} file${files === 1 ? '' : 's'}`);
+    const ok = await confirm(`Move ${parts.join(' and ')} to trash?`, {
+      title: 'Delete selected',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+
+    setBusy(true);
+    try {
+      const res = await postJSON<ApiResponse<FileBatchDeleteResult>>(
+        `/api/patients/${personId}/files/delete-batch`,
+        { paths: sel.map((e) => e.relPath) }
+      );
+      if (!res.success || !res.data) throw new Error(res.error || 'Delete failed');
+      const { succeeded, failed } = res.data;
+      if (failed === 0) toast.success(`Moved ${succeeded} item(s) to trash`);
+      else if (succeeded === 0) toast.error(`Failed to delete ${failed} item(s)`);
+      else toast.warning(`Moved ${succeeded} to trash, ${failed} failed`);
+      setSelected(new Set());
+      reload();
+    } catch (err) {
+      toast.error(errorMessage(err, 'Delete failed'));
+    } finally {
+      setBusy(false);
+    }
+  }, [personId, entries, selected, confirm, toast, reload]);
+
   // ── Drag & drop ──
   const onDrop = (e: DragEvent<HTMLDivElement>): void => {
     e.preventDefault();
@@ -294,53 +364,94 @@ const FileExplorer = ({ personId, subPath }: Props) => {
         })}
       </nav>
 
-      {/* Toolbar */}
-      <div className={styles.toolbar}>
-        <label className={styles.flatToggle}>
-          <input type="checkbox" checked={flat} onChange={(e) => setFlat(e.target.checked)} />
-          <span>Flat view (all subfolders)</span>
-        </label>
+      {/* Toolbar / selection bar */}
+      {selectMode ? (
+        <div className={styles.selectBar}>
+          <button type="button" className={styles.toolButton} onClick={exitSelectMode}>
+            <i className="fas fa-xmark" aria-hidden="true" /> Done
+          </button>
+          <span className={styles.selectCount}>{selected.size} selected</span>
 
-        <div className={styles.toolbarSpacer} />
+          <div className={styles.toolbarSpacer} />
 
-        <button
-          type="button"
-          className={styles.toolButton}
-          onClick={() => setView((v) => (v === 'grid' ? 'list' : 'grid'))}
-          title={view === 'grid' ? 'List view' : 'Grid view'}
-          aria-label="Toggle view"
-        >
-          <i className={`fas ${view === 'grid' ? 'fa-list' : 'fa-table-cells-large'}`} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className={styles.toolButton}
-          onClick={() => setPrompt({ mode: 'newFolder', value: '' })}
-          disabled={flat}
-          title={flat ? 'Switch off flat view to create folders' : 'New folder'}
-        >
-          <i className="fas fa-folder-plus" aria-hidden="true" /> New folder
-        </button>
-        <button
-          type="button"
-          className={styles.toolButton}
-          onClick={() => fileInputRef.current?.click()}
-          disabled={flat || busy}
-          title={flat ? 'Switch off flat view to upload' : 'Upload files'}
-        >
-          <i className="fas fa-upload" aria-hidden="true" /> Upload
-        </button>
-        <button type="button" className={styles.toolButton} onClick={reload} title="Refresh" aria-label="Refresh">
-          <i className="fas fa-rotate-right" aria-hidden="true" />
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className={styles.hiddenInput}
-          onChange={onFileInput}
-        />
-      </div>
+          <button
+            type="button"
+            className={styles.toolButton}
+            onClick={toggleSelectAll}
+            disabled={entries.length === 0}
+          >
+            <i
+              className={`fas ${allVisibleSelected ? 'fa-square' : 'fa-square-check'}`}
+              aria-hidden="true"
+            />{' '}
+            {allVisibleSelected ? 'Clear' : 'Select all'}
+          </button>
+          <button
+            type="button"
+            className={`${styles.toolButton} ${styles.dangerButton}`}
+            onClick={() => void doDeleteBatch()}
+            disabled={selected.size === 0 || busy}
+          >
+            <i className="fas fa-trash-can" aria-hidden="true" /> Delete
+          </button>
+        </div>
+      ) : (
+        <div className={styles.toolbar}>
+          <label className={styles.flatToggle}>
+            <input type="checkbox" checked={flat} onChange={(e) => setFlat(e.target.checked)} />
+            <span>Flat view (all subfolders)</span>
+          </label>
+
+          <div className={styles.toolbarSpacer} />
+
+          <button
+            type="button"
+            className={styles.toolButton}
+            onClick={() => setView((v) => (v === 'grid' ? 'list' : 'grid'))}
+            title={view === 'grid' ? 'List view' : 'Grid view'}
+            aria-label="Toggle view"
+          >
+            <i className={`fas ${view === 'grid' ? 'fa-list' : 'fa-table-cells-large'}`} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={styles.toolButton}
+            onClick={() => setSelectMode(true)}
+            disabled={entries.length === 0}
+            title="Select multiple"
+          >
+            <i className="fas fa-square-check" aria-hidden="true" /> Select
+          </button>
+          <button
+            type="button"
+            className={styles.toolButton}
+            onClick={() => setPrompt({ mode: 'newFolder', value: '' })}
+            disabled={flat}
+            title={flat ? 'Switch off flat view to create folders' : 'New folder'}
+          >
+            <i className="fas fa-folder-plus" aria-hidden="true" /> New folder
+          </button>
+          <button
+            type="button"
+            className={styles.toolButton}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={flat || busy}
+            title={flat ? 'Switch off flat view to upload' : 'Upload files'}
+          >
+            <i className="fas fa-upload" aria-hidden="true" /> Upload
+          </button>
+          <button type="button" className={styles.toolButton} onClick={reload} title="Refresh" aria-label="Refresh">
+            <i className="fas fa-rotate-right" aria-hidden="true" />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className={styles.hiddenInput}
+            onChange={onFileInput}
+          />
+        </div>
+      )}
 
       {listing?.truncated && (
         <div className={styles.notice}>
@@ -352,9 +463,9 @@ const FileExplorer = ({ personId, subPath }: Props) => {
       <div
         className={`${styles.scrollArea} ${dragActive ? styles.dragActive : ''}`}
         ref={scrollRef}
-        onDrop={flat ? undefined : onDrop}
-        onDragOver={flat ? undefined : onDragOver}
-        onDragLeave={flat ? undefined : onDragLeave}
+        onDrop={flat || selectMode ? undefined : onDrop}
+        onDragOver={flat || selectMode ? undefined : onDragOver}
+        onDragLeave={flat || selectMode ? undefined : onDragLeave}
       >
         {loading && <div className={styles.message}>Loading…</div>}
         {error && !loading && (
@@ -390,9 +501,12 @@ const FileExplorer = ({ personId, subPath }: Props) => {
                       entry={entry}
                       view={view}
                       showFullPath={flat}
+                      selectMode={selectMode}
+                      selected={selected.has(entry.relPath)}
                       onOpen={openEntry}
                       onRename={(en) => setPrompt({ mode: 'rename', target: en, value: en.name })}
                       onDelete={doDelete}
+                      onToggleSelect={toggleSelect}
                     />
                   ))}
                 </div>

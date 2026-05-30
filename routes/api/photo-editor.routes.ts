@@ -23,8 +23,12 @@ import {
 import {
   findOrCreateNativeTimePoint,
   upsertNativeTimePointImage,
+  getNativeTimePoint,
+  deleteNativeTimePointImage,
 } from '../../services/database/queries/native-timepoint-queries.js';
-import { renderSlotToWorking } from '../../services/imaging/photo-render.service.js';
+import { renderSlotToWorking, deleteWorkingView } from '../../services/imaging/photo-render.service.js';
+import { tagOriginalForView, untagOriginalForView } from '../../services/imaging/photo-original-tags.js';
+import { timepointFolderName } from '../../services/imaging/photo-cleanup.service.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
@@ -186,6 +190,7 @@ router.post(
 
       const written: string[] = [];
       const warnings: string[] = [];
+      const toTag: Array<{ view: string; sourceRelPath: string }> = [];
 
       for (const slot of slots) {
         const view = slot?.view;
@@ -222,6 +227,7 @@ router.post(
             null
           );
           written.push(filename);
+          toTag.push({ view, sourceRelPath: slot.sourceRelPath });
         } catch (err) {
           warnings.push(`${view ?? '?'}: ${(err as Error).message}`);
           log.warn('[PhotoEditor] slot render failed', {
@@ -229,6 +235,19 @@ router.post(
             view,
             error: (err as Error).message,
           });
+        }
+      }
+
+      // Tag each rendered original with its view so a later reopen can restore it
+      // for re-editing (our filesystem alternative to Dolphin's .v originals).
+      const folder = timepointFolderName(tpName, tpDate);
+      if (folder) {
+        for (const t of toTag) {
+          try {
+            await tagOriginalForView(Number(personId), folder, t.sourceRelPath, t.view);
+          } catch (err) {
+            log.warn('[PhotoEditor] tag original failed', { view: t.view, error: (err as Error).message });
+          }
         }
       }
 
@@ -243,6 +262,69 @@ router.post(
     } catch (err) {
       log.error('[PhotoEditor] render failed', { error: (err as Error).message });
       ErrorResponses.internalError(res, 'Failed to render photos', err as Error);
+    }
+  }
+);
+
+/**
+ * DELETE /:personId/view
+ * Remove ONE saved view: delete its cropped working file + its tblTimePointImages
+ * row, and untag the source original (rename `i{view}-NAME` back to `NAME`, so it
+ * returns to the sidebar). The ORIGINAL photo is kept — only the derived crop goes.
+ * Idempotent/best-effort: missing pieces are tolerated.
+ */
+router.delete(
+  '/:personId/view',
+  authorize(['admin', 'secretary']),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { personId } = req.params;
+      const { tpCode, tpName, tpDate, view } = req.body as {
+        tpCode?: number | string;
+        tpName?: string;
+        tpDate?: string;
+        view?: string;
+      };
+
+      if (!/^\d+$/.test(personId)) {
+        ErrorResponses.badRequest(res, 'Invalid patient id');
+        return;
+      }
+      if (tpCode === undefined || !/^\d+$/.test(String(tpCode))) {
+        ErrorResponses.badRequest(res, 'Invalid tpCode');
+        return;
+      }
+      if (typeof view !== 'string' || !/^i(10|12|13|20|21|22|23|24)$/.test(view)) {
+        ErrorResponses.badRequest(res, 'Invalid view code');
+        return;
+      }
+      const tpCodeNum = Number(tpCode);
+
+      // 1. Delete the cropped working file (idempotent).
+      await deleteWorkingView(Number(personId), tpCodeNum, view);
+
+      // 2. Delete the DB image row (resolve timePointId; skip if the timepoint is gone).
+      const tp = await getNativeTimePoint(Number(personId), tpCodeNum);
+      if (tp) {
+        await deleteNativeTimePointImage(tp.timePointId, view.slice(1));
+      }
+
+      // 3. Untag the source original so it returns to the sidebar (original kept).
+      const folder = tpName && tpDate ? timepointFolderName(tpName, tpDate) : null;
+      if (folder) {
+        await untagOriginalForView(Number(personId), folder, view);
+      }
+
+      log.info('[PhotoEditor] removed view', {
+        userId: req.session?.userId,
+        personId,
+        tpCode: tpCodeNum,
+        view,
+      });
+      sendSuccess(res, { removed: view });
+    } catch (err) {
+      log.error('[PhotoEditor] remove view failed', { error: (err as Error).message });
+      ErrorResponses.internalError(res, 'Failed to remove view', err as Error);
     }
   }
 );

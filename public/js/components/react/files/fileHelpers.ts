@@ -20,6 +20,22 @@ export function buildContentUrl(
   return `/api/patients/${personId}/files/content?${params.toString()}`;
 }
 
+/**
+ * Build a content URL for a patient WORKING file (the rendered `.iNN` views in
+ * the shared working/ dir). Addressed by bare `name`, not a path — matches
+ * `buildContentUrl`'s signature so the tile/preview components can take either.
+ */
+export function buildWorkingContentUrl(
+  personId: number,
+  name: string,
+  opts: ContentUrlOptions = {}
+): string {
+  const params = new URLSearchParams({ name });
+  if (opts.download) params.set('download', '1');
+  if (opts.thumb) params.set('thumb', String(opts.thumb));
+  return `/api/patients/${personId}/working-files/content?${params.toString()}`;
+}
+
 /** Encode a relPath for use in the router splat, preserving `/` separators. */
 export function encodeRelPath(relPath: string): string {
   return relPath

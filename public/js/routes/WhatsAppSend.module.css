@@ -5,8 +5,10 @@
 
 /* Main Layout - Account for fixed universal header */
 .mainLayout {
-  padding-top: calc(50px + 2rem);
-  min-height: calc(100vh - 50px);
+  /* #app-container already offsets the fixed header; keep only the 2rem breathing
+     room (was calc(50px + 2rem) — a double-pad on top of #app-container's offset). */
+  padding-top: 2rem;
+  min-height: calc(100vh - var(--header-height, 50px));
 }
 
 /* Mobile adjustments for sticky header */

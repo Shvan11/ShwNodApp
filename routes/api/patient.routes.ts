@@ -13,6 +13,7 @@
 import { Router, type Request, type Response } from 'express';
 import { sql, type RawBuilder } from 'kysely';
 import { log } from '../../utils/logger.js';
+import { isUniqueViolation } from '../../utils/pg-errors.js';
 import { getKysely } from '../../services/database/kysely.js';
 import {
   getPatientsPhones,
@@ -39,6 +40,23 @@ import { ErrorResponses } from '../../utils/error-response.js';
 import * as PatientService from '../../services/business/PatientService.js';
 import { PatientValidationError } from '../../services/business/PatientService.js';
 import * as PatientPortalService from '../../services/business/PatientPortalService.js';
+import {
+  getNativeTimePoint,
+  updateNativeTimePoint,
+  deleteNativeTimePoint,
+} from '../../services/database/queries/native-timepoint-queries.js';
+import { updatePhotoDate } from '../../services/database/queries/photo-session-queries.js';
+import {
+  deleteWorkingFilesForTimepoint,
+  timepointFolderName,
+} from '../../services/imaging/photo-cleanup.service.js';
+import {
+  renameEntry,
+  hardDelete,
+  entryExists,
+  sanitizeName,
+  FileExplorerError,
+} from '../../services/files/file-explorer.service.js';
 import type { PatientSearchQuery } from '../../types/api.types.js';
 
 const router = Router();
@@ -265,6 +283,216 @@ router.get(
         error: 'Failed to fetch time point images',
         message: (error as Error).message
       });
+    }
+  }
+);
+
+/**
+ * Check whether a time point's originals folder ({name}_{DD-MM-YYYY}) exists on
+ * disk. Used by the kebab menu to enable/disable "Open original folder" — the
+ * single stat runs only when the menu is opened, never on list load.
+ * GET /patients/:personId/timepoints/:tpCode/folder  ->  { folder, exists }
+ */
+router.get(
+  '/patients/:personId/timepoints/:tpCode/folder',
+  async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
+    try {
+      const personId = Number.parseInt(req.params.personId, 10);
+      const tpCode = Number.parseInt(req.params.tpCode, 10);
+      if (!Number.isInteger(personId) || !Number.isInteger(tpCode)) {
+        ErrorResponses.badRequest(res, 'Invalid patient id or time point code');
+        return;
+      }
+      const existing = await getNativeTimePoint(personId, tpCode);
+      if (!existing) {
+        ErrorResponses.notFound(res, 'Time point');
+        return;
+      }
+      const folder = timepointFolderName(existing.tpDescription ?? '', existing.tpDateTime);
+      const exists = folder ? await entryExists(personId, folder) : false;
+      res.json({ folder, exists });
+    } catch (error) {
+      log.error('Error checking time point folder:', error);
+      ErrorResponses.internalError(res, 'Failed to check time point folder', error as Error);
+    }
+  }
+);
+
+/** Parse 'YYYY-MM-DD' to a LOCAL-midnight Date (matches photo-editor.routes.ts). */
+function parseLocalDate(s: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/**
+ * Edit a time point's name and/or date.
+ * PUT /patients/:personId/timepoints/:tpCode
+ * Body: { tpDescription?: string, tpDateTime?: 'YYYY-MM-DD' }
+ *
+ * The rendered gallery photos are keyed by tpCode, so they are untouched. The
+ * originals folder ({name}_{DD-MM-YYYY}) is renamed to stay in sync, and for an
+ * Initial/Final time point a date change is mirrored into tblwork.
+ */
+router.put(
+  '/patients/:personId/timepoints/:tpCode',
+  authorize(['admin', 'secretary']),
+  async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
+    try {
+      const personId = Number.parseInt(req.params.personId, 10);
+      const tpCode = Number.parseInt(req.params.tpCode, 10);
+      if (!Number.isInteger(personId) || !Number.isInteger(tpCode)) {
+        ErrorResponses.badRequest(res, 'Invalid patient id or time point code');
+        return;
+      }
+
+      const { tpDescription, tpDateTime } = req.body as {
+        tpDescription?: string;
+        tpDateTime?: string;
+      };
+      if (tpDescription === undefined && tpDateTime === undefined) {
+        ErrorResponses.badRequest(res, 'Nothing to update: provide tpDescription and/or tpDateTime');
+        return;
+      }
+      if (tpDateTime !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(tpDateTime)) {
+        ErrorResponses.badRequest(res, 'Invalid tpDateTime (expected YYYY-MM-DD)');
+        return;
+      }
+
+      const existing = await getNativeTimePoint(personId, tpCode);
+      if (!existing) {
+        ErrorResponses.notFound(res, 'Time point');
+        return;
+      }
+
+      // Resolve the final (name, date) as a partial patch over the current row.
+      const finalName = (tpDescription ?? existing.tpDescription ?? '').trim();
+      const finalDate = tpDateTime ?? existing.tpDateTime;
+      if (!finalName) {
+        ErrorResponses.badRequest(res, 'Time point name cannot be empty');
+        return;
+      }
+      // The name becomes a folder segment on the share — reject unsafe characters.
+      try {
+        sanitizeName(finalName);
+      } catch {
+        ErrorResponses.badRequest(res, 'Name cannot contain path characters such as / \\ :');
+        return;
+      }
+
+      const result = await updateNativeTimePoint(personId, tpCode, finalName, finalDate);
+      if (!result.ok && result.conflict) {
+        ErrorResponses.conflict(res, 'Another time point already has that name and date');
+        return;
+      }
+
+      // Rename the originals folder if the (name, date)-derived folder changed.
+      const oldFolder = timepointFolderName(existing.tpDescription ?? '', existing.tpDateTime);
+      const newFolder = timepointFolderName(finalName, finalDate);
+      if (oldFolder && newFolder && oldFolder !== newFolder) {
+        try {
+          await renameEntry(personId, oldFolder, newFolder);
+          log.info('[TimePoint] renamed originals folder', { personId, from: oldFolder, to: newFolder });
+        } catch (err) {
+          if (err instanceof FileExplorerError && err.status === 404) {
+            // No originals folder for this time point — nothing to rename.
+          } else if (err instanceof FileExplorerError && err.status === 409) {
+            log.warn('[TimePoint] originals folder rename skipped — target exists', { personId, newFolder });
+          } else {
+            log.warn('[TimePoint] originals folder rename failed', {
+              personId,
+              from: oldFolder,
+              to: newFolder,
+              error: (err as Error).message,
+            });
+          }
+        }
+      }
+
+      // Keep tblwork's Initial/Final photo date in sync when the date changed.
+      const dateChanged = tpDateTime !== undefined && finalDate !== existing.tpDateTime;
+      const lname = finalName.toLowerCase();
+      if (dateChanged && (lname === 'initial' || lname === 'final')) {
+        const parsed = parseLocalDate(finalDate);
+        if (parsed) {
+          await updatePhotoDate(String(personId), lname === 'initial' ? 'IPhotoDate' : 'FPhotoDate', parsed);
+          log.info('[TimePoint] synced tblwork photo date', { personId, field: lname, date: finalDate });
+        }
+      }
+
+      res.json({ success: true, tpCode, tpDescription: finalName, tpDateTime: finalDate });
+    } catch (error) {
+      log.error('Error updating time point:', error);
+      ErrorResponses.internalError(res, 'Failed to update time point', error as Error);
+    }
+  }
+);
+
+/**
+ * Delete a time point and all of its on-disk artifacts (permanent).
+ * DELETE /patients/:personId/timepoints/:tpCode
+ *
+ * DB delete is authoritative (cascades to tblTimePointImages). Filesystem
+ * cleanup — the rendered working/ files and the originals folder — is
+ * best-effort so a missing file/folder never fails the request.
+ */
+router.delete(
+  '/patients/:personId/timepoints/:tpCode',
+  authorize(['admin', 'secretary']),
+  async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
+    try {
+      const personId = Number.parseInt(req.params.personId, 10);
+      const tpCode = Number.parseInt(req.params.tpCode, 10);
+      if (!Number.isInteger(personId) || !Number.isInteger(tpCode)) {
+        ErrorResponses.badRequest(res, 'Invalid patient id or time point code');
+        return;
+      }
+
+      // Scope controls how much is removed:
+      //   'cropped' — only the rendered working/ files (keep DB entry + originals folder)
+      //   'entry'   — working/ files + DB time-point row (keep originals folder)
+      //   'all'     — working/ files + DB row + originals folder (full, permanent)
+      const scope = String(req.query.scope ?? 'all');
+      if (scope !== 'all' && scope !== 'entry' && scope !== 'cropped') {
+        ErrorResponses.badRequest(res, "Invalid scope (expected 'all', 'entry', or 'cropped')");
+        return;
+      }
+
+      const existing = await getNativeTimePoint(personId, tpCode);
+      if (!existing) {
+        ErrorResponses.notFound(res, 'Time point');
+        return;
+      }
+
+      // Always remove the rendered (cropped) working files for this time point.
+      await deleteWorkingFilesForTimepoint(personId, tpCode);
+
+      // Remove the DB entry unless we're only clearing cropped photos.
+      if (scope === 'all' || scope === 'entry') {
+        await deleteNativeTimePoint(personId, tpCode);
+      }
+
+      // Remove the originals folder only for a full delete (best-effort).
+      if (scope === 'all') {
+        const folder = timepointFolderName(existing.tpDescription ?? '', existing.tpDateTime);
+        if (folder) {
+          try {
+            await hardDelete(personId, folder);
+          } catch (err) {
+            log.warn('[TimePoint] originals folder delete failed', {
+              personId,
+              folder,
+              error: (err as Error).message,
+            });
+          }
+        }
+      }
+
+      log.info('[TimePoint] deleted', { userId: req.session?.userId, personId, tpCode, scope });
+      res.json({ success: true, scope });
+    } catch (error) {
+      log.error('Error deleting time point:', error);
+      ErrorResponses.internalError(res, 'Failed to delete time point', error as Error);
     }
   }
 );
@@ -865,12 +1093,8 @@ router.put(
       await updatePatient(personId, updateData);
       res.json({ success: true, message: 'Patient updated successfully' });
     } catch (error) {
-      // Handle duplicate patient name error (SQL Server error 2601 for unique index violation)
-      const err = error as Error & { number?: number };
-      if (
-        err.number === 2601 ||
-        (err.message && err.message.includes('IX_Name_ID'))
-      ) {
+      // Duplicate patient name → pg unique violation on index IX_Name_ID (was mssql 2601).
+      if (isUniqueViolation(error, 'IX_Name_ID')) {
         log.warn(
           `Duplicate patient name attempted during update: ${patientData.PatientName}`
         );

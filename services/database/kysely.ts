@@ -1,10 +1,11 @@
 /**
- * PostgreSQL data-access foundation (Kysely + node-postgres).
+ * PostgreSQL data-access foundation (Kysely + node-postgres) — the app's LIVE data layer.
  *
- * Phase 1 scaffold of the SQL Server → PostgreSQL migration: owns the pg connection pool
- * and the Kysely query-builder instance. Inert until the app runs with DB_DRIVER=pg; the
- * legacy mssql facade (services/database/index.ts) stays the default during the transition.
- * Nothing imports this module yet, so it has zero effect on the running app today.
+ * Owns the singleton pg connection pool and the Kysely<Database> query-builder instance.
+ * Exposes getKysely() and withPgTransaction(), imported by all query modules under
+ * services/database/queries/* plus the converted routes/services. The mssql facade was
+ * retired in the Phase-9 cutover — services/database/index.ts is now only connection
+ * diagnostics + lifecycle. DB_DRIVER defaults to 'pg' and no longer changes runtime behavior.
  */
 import pg from 'pg';
 import type { Pool } from 'pg';

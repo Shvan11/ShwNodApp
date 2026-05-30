@@ -25,28 +25,47 @@ export function labelForView(view: PhotoViewCode): string {
   return PHOTO_TYPE_LABELS[view] ?? view.toUpperCase();
 }
 
+/**
+ * Client mirror of the server's `parseViewTag`
+ * (`services/imaging/photo-original-tags.ts`): a timepoint original tagged for a
+ * view is named `{viewCode}-{originalName}` (code prefix, hyphen, no spaces). Keep
+ * this regex in sync with the server one.
+ */
+const VIEW_TAG_RE = /^(i10|i12|i13|i20|i21|i22|i23|i24)-(.+)$/;
+export function parseOriginalViewTag(
+  name: string,
+): { view: PhotoViewCode; original: string } | null {
+  const m = VIEW_TAG_RE.exec(name);
+  return m ? { view: m[1] as PhotoViewCode, original: m[2] } : null;
+}
+
 export interface OutputDims {
   width: number;
   height: number;
 }
 
 /**
- * Fixed per-view output size at a ~1500px long edge. Aspect ratios are matched to
- * real Dolphin-rendered outputs sampled from \\CLINIC\Working (40 files/view):
+ * Per-view output spec. The ASPECT RATIOS are matched to real Dolphin-rendered
+ * outputs sampled from \\CLINIC\Working (40 files/view):
  *   facial (Profile/Rest/Smile)        AR ≈ 0.866  (13:15, portrait)
  *   intra-oral lateral + frontal       AR ≈ 1.856  (13:7,  wide landscape)
  *   occlusal (Upper/Lower)             AR ≈ 1.444  (13:9,  landscape)
+ * The magnitudes are only a nominal reference (~Dolphin's native working size,
+ * ~12–17 MP) — they are NOT a cap. At render time the service preserves the crop's
+ * NATIVE pixel resolution (no upscaling, no downscaling), so a saved view keeps the
+ * original's full quality, replacing the old fixed ~1500px (~1.9 MP) downscale that
+ * made saved photos a few hundred KB.
  * The existing grid adapts to whatever aspect we emit (via getImageSizes).
  */
 export const VIEW_OUTPUT: Record<PhotoViewCode, OutputDims> = {
-  i10: { width: 1300, height: 1500 },
-  i12: { width: 1300, height: 1500 },
-  i13: { width: 1300, height: 1500 },
-  i20: { width: 1500, height: 808 },
-  i21: { width: 1500, height: 808 },
-  i22: { width: 1500, height: 808 },
-  i23: { width: 1500, height: 1038 },
-  i24: { width: 1500, height: 1038 },
+  i10: { width: 3467, height: 4000 },
+  i12: { width: 3467, height: 4000 },
+  i13: { width: 3467, height: 4000 },
+  i20: { width: 4700, height: 2532 },
+  i21: { width: 4700, height: 2532 },
+  i22: { width: 4700, height: 2532 },
+  i23: { width: 4900, height: 3391 },
+  i24: { width: 4900, height: 3391 },
 };
 
 export function aspectForView(view: PhotoViewCode): number {
@@ -77,9 +96,24 @@ export interface SlotState {
   flipH: boolean;
   flipV: boolean;
   croppedAreaPixels: CropArea | null;
+  /** When set AND sourceRelPath is null, the slot shows this baked crop read-only. */
+  savedImageUrl: string | null;
+  /** True when a tagged source original still exists to reload for re-editing. */
+  canReEdit: boolean;
+  /** The tagged original to reload on "Restore original" (patient-root-relative path + clean name). */
+  reEditRelPath: string | null;
+  reEditName: string | null;
 }
 
 export type SlotMap = Record<PhotoViewCode, SlotState>;
+
+/** The read-only display + re-edit info seeded into a slot when a timepoint is opened. */
+export interface SlotHydration {
+  savedImageUrl: string | null;
+  canReEdit: boolean;
+  reEditRelPath: string | null;
+  reEditName: string | null;
+}
 
 export function makeInitialSlot(view: PhotoViewCode): SlotState {
   return {
@@ -92,6 +126,10 @@ export function makeInitialSlot(view: PhotoViewCode): SlotState {
     flipH: false,
     flipV: defaultFlipV(view),
     croppedAreaPixels: null,
+    savedImageUrl: null,
+    canReEdit: false,
+    reEditRelPath: null,
+    reEditName: null,
   };
 }
 

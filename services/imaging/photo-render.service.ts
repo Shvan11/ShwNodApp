@@ -24,7 +24,7 @@ const ALLOWED_VIEWS = new Set(['i10', 'i12', 'i13', 'i20', 'i21', 'i22', 'i23', 
 
 /** Cap absurd inputs/outputs (phone photos ~40 MP are well under this). */
 const MAX_INPUT_PIXELS = 300_000_000;
-const MAX_OUTPUT_EDGE = 5000;
+const MAX_OUTPUT_EDGE = 8000;
 
 export interface RenderSlotInput {
   personId: number;
@@ -77,8 +77,11 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
   if (!/^\d+$/.test(String(tpCode))) throw new FileExplorerError('Invalid timepoint code', 400);
   if (!ALLOWED_VIEWS.has(view)) throw new FileExplorerError(`Invalid view code: ${view}`, 400);
   if (!Number.isFinite(rotation)) throw new FileExplorerError('Invalid rotation', 400);
-  const outW = clampInt(output.width, 1, MAX_OUTPUT_EDGE);
-  const outH = clampInt(output.height, 1, MAX_OUTPUT_EDGE);
+  // VIEW_OUTPUT (from the client) supplies the per-view ASPECT only. The saved view
+  // keeps the crop's NATIVE pixel resolution — no upscaling, no downscaling — so it
+  // carries the original's full detail; see the outW/outH derivation below, once the
+  // crop rect R (and thus its native pixel size) is known.
+  const aspect = output.width / output.height;
 
   // Validate + symlink-guard the source under the patient root; images only.
   const { abs: sourceAbs } = await resolveFileForServe(personId, sourceRelPath);
@@ -118,7 +121,7 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
       };
     } else {
       // No crop supplied (slot never opened) → centre cover-crop to output aspect.
-      const targetAspect = outW / outH;
+      const targetAspect = aspect;
       let cw = rotW;
       let ch = Math.round(rotW / targetAspect);
       if (ch > rotH) {
@@ -129,6 +132,16 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
       const height = Math.max(1, Math.min(ch, rotH));
       R = { left: Math.round((rotW - width) / 2), top: Math.round((rotH - height) / 2), width, height };
     }
+
+    // Output = the crop's NATIVE pixel size: no upscaling, no downscaling. The extract
+    // hands us exactly R.width×R.height source pixels and we write them 1:1, so the saved
+    // view keeps the original's full resolution. Only a pathological zoom-out canvas (R
+    // far larger than the source) is bounded by MAX_OUTPUT_EDGE, scaling both sides
+    // together so the aspect ratio is preserved.
+    const longEdge = Math.max(R.width, R.height);
+    const fitScale = longEdge > MAX_OUTPUT_EDGE ? MAX_OUTPUT_EDGE / longEdge : 1;
+    const outW = Math.max(1, Math.round(R.width * fitScale));
+    const outH = Math.max(1, Math.round(R.height * fitScale));
 
     // The part of the requested rect that actually overlaps the image.
     const iLeft = Math.max(0, R.left);
@@ -163,6 +176,7 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
       const regionBuf = await pipeline
         .extract({ left: iLeft, top: iTop, width: iW, height: iH })
         .resize(dw, dh, { fit: 'fill' })
+        .png() // lossless intermediate — a bare .toBuffer() re-encodes JPEG (q80), a 2nd generation of loss
         .toBuffer();
       out = sharp({ create: { width: outW, height: outH, channels: 3, background: WHITE } }).composite([
         { input: regionBuf, left: dx, top: dy },
@@ -170,7 +184,7 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
     }
 
     await fs.mkdir(path.dirname(destAbs), { recursive: true });
-    await out.jpeg({ quality: 90, mozjpeg: true }).toFile(tmpPath);
+    await out.jpeg({ quality: 95, mozjpeg: true, chromaSubsampling: '4:4:4' }).toFile(tmpPath);
     await fs.rename(tmpPath, destAbs);
 
     log.info('[PhotoEditor] rendered view', { personId, tpCode, view, filename });
@@ -188,4 +202,19 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
   } finally {
     release();
   }
+}
+
+/**
+ * Delete a single rendered view file `working/{personId}0{tpCode}.{view}` (the
+ * cropped output) — backs the photo editor's per-view "Remove". Idempotent: a
+ * missing file is a no-op. Guards mirror renderSlotToWorking so only a valid
+ * (personId, tpCode, view) can ever form the path.
+ */
+export async function deleteWorkingView(personId: number, tpCode: number, view: string): Promise<void> {
+  if (!/^\d+$/.test(String(personId))) throw new FileExplorerError('Invalid patient id', 400);
+  if (!/^\d+$/.test(String(tpCode))) throw new FileExplorerError('Invalid timepoint code', 400);
+  if (!ALLOWED_VIEWS.has(view)) throw new FileExplorerError(`Invalid view code: ${view}`, 400);
+  const destAbs = pathResolver(`working/${personId}0${tpCode}.${view}`);
+  await fs.rm(destAbs, { force: true });
+  log.info('[PhotoEditor] deleted view', { personId, tpCode, view });
 }

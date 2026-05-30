@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import GridComponent from './GridComponent';
 import XraysComponent from './XraysComponent';
 import FileExplorer from './files/FileExplorer';
+import WorkingFilesView from './files/WorkingFilesView';
 import VisitsComponent from './VisitsComponent';
 import NewVisitComponent from './NewVisitComponent';
 import CompareComponent from './CompareComponent';
@@ -80,6 +81,9 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                         subPath={wildcardPath}
                     />
                 );
+
+            case 'working-files':
+                return <WorkingFilesView personId={personId} />;
 
             case 'visits':
                 // Visits can be shown at work level (with workId) or patient level (all visits)

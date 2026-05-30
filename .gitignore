@@ -175,13 +175,14 @@ public/photoswipe
 # MCP Configuration (may contain sensitive connection strings)
 .mcp.json
 
-# Database files (SQLite, session storage, runtime state)
+# Database / runtime state files
+# (sessions moved to PostgreSQL; *.db here only catches stray local SQLite, e.g. the
+#  external Archform DB if ever copied locally — see services/archform/archform-db.ts)
 *.db
 *.sqlite
 *.sqlite3
 data/*.db
 data/*.json
-data/sessions.db
 data/reverse-sync-state.json
 
 # Archived historical migrations (kept locally for reference, not tracked)

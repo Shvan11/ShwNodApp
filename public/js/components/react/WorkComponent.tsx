@@ -440,6 +440,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     if (deps.DiagnosisCount > 0) detailMessage += `• ${deps.DiagnosisCount} diagnosis(es)\n`;
                     if (deps.ImplantCount > 0) detailMessage += `• ${deps.ImplantCount} implant(s)\n`;
                     if (deps.ScrewCount > 0) detailMessage += `• ${deps.ScrewCount} screw(s)\n`;
+                    if (deps.AlignerSetCount > 0) detailMessage += `• ${deps.AlignerSetCount} aligner set(s)\n`;
 
                     detailMessage += '\n⚠️ Delete these records first, then try again.';
 

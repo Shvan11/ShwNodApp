@@ -3,7 +3,9 @@
 
 .mainContent {
     padding: 2rem 0;
-    min-height: calc(100vh - 80px);
+    /* Header offset via the shared token (was a hard-coded 80px that overflowed on
+       mobile, where the offset is larger). */
+    min-height: calc(100vh - var(--header-height, 50px));
     background: var(--bg-light);
 }
 

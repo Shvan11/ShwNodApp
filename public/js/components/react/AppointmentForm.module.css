@@ -9,7 +9,10 @@
     background: var(--gray-50);
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    /* Renders INSIDE PatientShell (already header-offset by #app-container). Fill the
+       shell content box: 100vh − header − shell breadcrumb clearance + bottom paddings
+       (2.125 + 0.75 + 0.5rem). A bare 100vh overflowed by ~96px. */
+    min-height: calc(100vh - var(--header-height, 50px) - 3.375rem);
 }
 
 /* Page Header - HIDDEN (using universal header instead) */

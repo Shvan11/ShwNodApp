@@ -935,6 +935,15 @@ export async function updateAlignerSet(
 
   try {
     await withPgTransaction(async (trx) => {
+      // AlignerDrID is NOT NULL. Only assign it when a real doctor id is supplied;
+      // otherwise omit the column so the UPDATE leaves the existing value intact,
+      // rather than binding NULL/'' — which throw 23502 / 22P02 under PG. (The old
+      // SQL Server path silently bound NULL here: a latent bug PG now enforces.)
+      const rawDrId = AlignerDrID as number | string | null | undefined;
+      const drId =
+        rawDrId === null || rawDrId === undefined || rawDrId === ''
+          ? undefined
+          : Number(rawDrId);
       await trx
         .updateTable('tblAlignerSets')
         .set((eb) => ({
@@ -945,9 +954,9 @@ export async function updateAlignerSet(
           UpperAlignersCount: newUpperCount,
           LowerAlignersCount: newLowerCount,
           Days: Days ?? null,
-          // AlignerDrID is NOT NULL; the original statement bound null when absent (a
-          // latent SQL Server bug). Preserve that by binding the raw value via sql<number>.
-          AlignerDrID: sql<number>`${AlignerDrID ?? null}`,
+          ...(drId !== undefined && Number.isFinite(drId)
+            ? { AlignerDrID: drId }
+            : {}),
           SetUrl: SetUrl || null,
           SetPdfUrl: SetPdfUrl || null,
           SetVideo: SetVideo || null,

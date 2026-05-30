@@ -108,3 +108,103 @@ export async function upsertNativeTimePointImage(
     )
     .execute();
 }
+
+export interface NativeTimePointRow {
+  timePointId: number;
+  tpDescription: string | null;
+  /** PG `date` → 'YYYY-MM-DD' string at runtime (see kysely.ts pg parser). */
+  tpDateTime: string;
+}
+
+/**
+ * Fetch a single timepoint by (PersonID, tpCode) — its id, name and date.
+ * Returns null if the patient has no timepoint with that code. Used by the
+ * edit/delete routes to read the *old* name/date (to locate the originals
+ * folder) and to 404 cleanly.
+ */
+export async function getNativeTimePoint(
+  personId: number,
+  tpCode: number
+): Promise<NativeTimePointRow | null> {
+  const row = await getKysely()
+    .selectFrom('tblTimePoints')
+    .where('PersonID', '=', personId)
+    .where('tpCode', '=', tpCode)
+    .select((eb) => [
+      'TimePointID as timePointId',
+      'tpDescription',
+      eb.ref('tpDateTime').$castTo<string>().as('tpDateTime'),
+    ])
+    .executeTakeFirst();
+  return (row as NativeTimePointRow | undefined) ?? null;
+}
+
+export interface UpdateTimePointResult {
+  ok: boolean;
+  /** true when another tpCode for this patient already holds the target (name, date). */
+  conflict?: boolean;
+}
+
+/**
+ * Update a timepoint's name + date. `tpDateTime` is a 'YYYY-MM-DD' string bound
+ * as a `date` (no UTC shift). Inside a transaction, first reject if a *different*
+ * timepoint for this patient already has the target (tpDescription, tpDateTime) —
+ * that pair drives the originals-folder name, so a clash would make two timepoints
+ * fight over one folder.
+ */
+export async function updateNativeTimePoint(
+  personId: number,
+  tpCode: number,
+  tpDescription: string,
+  tpDateTime: string
+): Promise<UpdateTimePointResult> {
+  return withPgTransaction(async (trx) => {
+    const clash = await trx
+      .selectFrom('tblTimePoints')
+      .where('PersonID', '=', personId)
+      .where('tpCode', '!=', tpCode)
+      .where('tpDescription', '=', tpDescription)
+      .where('tpDateTime', '=', sql<Date>`${tpDateTime}`)
+      .select('TimePointID')
+      .limit(1)
+      .executeTakeFirst();
+    if (clash) return { ok: false, conflict: true };
+
+    await trx
+      .updateTable('tblTimePoints')
+      .set({ tpDescription, tpDateTime: sql<Date>`${tpDateTime}` })
+      .where('PersonID', '=', personId)
+      .where('tpCode', '=', tpCode)
+      .execute();
+    log.info('Updated native timepoint', { personId, tpCode, tpDescription, tpDateTime });
+    return { ok: true };
+  });
+}
+
+/**
+ * Delete a timepoint by (PersonID, tpCode). The `tblTimePointImages` FK is
+ * `ON DELETE CASCADE`, so its image rows go with it in one statement.
+ */
+export async function deleteNativeTimePoint(personId: number, tpCode: number): Promise<void> {
+  await getKysely()
+    .deleteFrom('tblTimePoints')
+    .where('PersonID', '=', personId)
+    .where('tpCode', '=', tpCode)
+    .execute();
+  log.info('Deleted native timepoint', { personId, tpCode });
+}
+
+/**
+ * Delete one view-image row by (TimePointID, ImageType) — the per-view "Remove" in
+ * the photo editor. Idempotent: deleting a non-existent row affects 0 rows.
+ *
+ * @param imageType 2-digit view code, e.g. '10' (the view code minus the leading 'i')
+ */
+export async function deleteNativeTimePointImage(timePointId: number, imageType: string): Promise<void> {
+  await getKysely()
+    .deleteFrom('tblTimePointImages')
+    .where('TimePointID', '=', timePointId)
+    .where('ImageType', '=', imageType)
+    .execute();
+  log.info('Deleted native timepoint image', { timePointId, imageType });
+}

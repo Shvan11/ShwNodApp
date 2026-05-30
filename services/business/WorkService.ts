@@ -13,6 +13,7 @@
  */
 
 import { log } from '../../utils/logger.js';
+import { isUniqueViolation } from '../../utils/pg-errors.js';
 import {
   addWork,
   getActiveWork,
@@ -89,6 +90,7 @@ export interface WorkDependencies {
   DiagnosisCount: number;
   ImplantCount: number;
   ScrewCount: number;
+  AlignerSetCount: number;
 }
 
 /**
@@ -309,13 +311,6 @@ async function formatDuplicateActiveWorkError(
 }
 
 /**
- * SQL error with number property
- */
-interface SqlError extends Error {
-  number?: number;
-}
-
-/**
  * Validate and create a new work record
  * @param workData - Work data object
  * @returns Created work record with workId
@@ -356,12 +351,9 @@ export async function validateAndCreateWork(
     );
     return result;
   } catch (error) {
-    const sqlError = error as SqlError;
-    // Handle duplicate active work constraint violation
-    if (
-      sqlError.number === 2601 &&
-      sqlError.message.includes('UNQ_tblWork_Active')
-    ) {
+    // Duplicate active-work unique violation (partial index UNQ_tblWork_Active).
+    // pg reports this as SQLSTATE 23505 + constraint name — NOT the old mssql 2601.
+    if (isUniqueViolation(error, 'UNQ_tblWork_Active')) {
       const errorDetails = await formatDuplicateActiveWorkError(
         workData.PersonID
       );
@@ -415,12 +407,9 @@ export async function validateAndCreateWorkWithInvoice(
     );
     return result;
   } catch (error) {
-    const sqlError = error as SqlError;
-    // Handle duplicate active work constraint violation
-    if (
-      sqlError.number === 2601 &&
-      sqlError.message.includes('UNQ_tblWork_Active')
-    ) {
+    // Duplicate active-work unique violation (partial index UNQ_tblWork_Active).
+    // pg reports this as SQLSTATE 23505 + constraint name — NOT the old mssql 2601.
+    if (isUniqueViolation(error, 'UNQ_tblWork_Active')) {
       const errorDetails = await formatDuplicateActiveWorkError(
         workData.PersonID
       );
@@ -500,6 +489,8 @@ export async function checkWorkDependencies(
       dependencyMessages.push(`${deps.ImplantCount} implant(s)`);
     if (deps.ScrewCount > 0)
       dependencyMessages.push(`${deps.ScrewCount} screw(s)`);
+    if (deps.AlignerSetCount > 0)
+      dependencyMessages.push(`${deps.AlignerSetCount} aligner set(s)`);
 
     throw new WorkValidationError(
       'Cannot delete work with existing records',

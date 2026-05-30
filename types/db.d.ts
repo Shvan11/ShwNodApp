@@ -9,6 +9,18 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S, I | undefined, U>
   : ColumnType<T, T | undefined, T>;
 
+export type Json = JsonValue;
+
+export type JsonArray = JsonValue[];
+
+export type JsonObject = {
+  [x: string]: JsonValue | undefined;
+};
+
+export type JsonPrimitive = boolean | number | string | null;
+
+export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
+
 export type Numeric = ColumnType<string, number | string, number | string>;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
@@ -76,6 +88,18 @@ export interface Pgmigrations {
   id: Generated<number>;
   name: string;
   run_on: Timestamp;
+}
+
+export interface PortalSessions {
+  expire: Timestamp;
+  sess: Json;
+  sid: string;
+}
+
+export interface StaffSessions {
+  expire: Timestamp;
+  sess: Json;
+  sid: string;
 }
 
 export interface SyncQueue {
@@ -737,6 +761,8 @@ export interface DB {
   DocumentTypes: DocumentTypes;
   Patients: Patients;
   pgmigrations: Pgmigrations;
+  portal_sessions: PortalSessions;
+  staff_sessions: StaffSessions;
   SyncQueue: SyncQueue;
   tbCities: TbCities;
   tblAddress: TblAddress;

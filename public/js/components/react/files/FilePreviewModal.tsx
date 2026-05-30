@@ -6,17 +6,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import Modal from '@/components/react/Modal';
 import type { FileEntry } from '@/types/api.types';
-import { buildContentUrl } from './fileHelpers';
+import { buildContentUrl, type ContentUrlOptions } from './fileHelpers';
 import styles from './FileExplorer.module.css';
+
+type UrlBuilder = (personId: number, relPath: string, opts?: ContentUrlOptions) => string;
 
 interface Props {
   personId: number;
   files: FileEntry[];
   startIndex: number;
+  /** Override how content/download URLs are built (default: patient files). */
+  buildUrl?: UrlBuilder;
   onClose: () => void;
 }
 
-const FilePreviewModal = ({ personId, files, startIndex, onClose }: Props) => {
+const FilePreviewModal = ({ personId, files, startIndex, buildUrl = buildContentUrl, onClose }: Props) => {
   const [index, setIndex] = useState(startIndex);
   const entry = files[index];
 
@@ -38,8 +42,8 @@ const FilePreviewModal = ({ personId, files, startIndex, onClose }: Props) => {
 
   if (!entry) return null;
 
-  const src = buildContentUrl(personId, entry.relPath);
-  const downloadUrl = buildContentUrl(personId, entry.relPath, { download: true });
+  const src = buildUrl(personId, entry.relPath);
+  const downloadUrl = buildUrl(personId, entry.relPath, { download: true });
 
   return (
     <Modal isOpen onClose={onClose} ariaLabelledBy="file-preview-title" contentClassName={styles.previewModal}>

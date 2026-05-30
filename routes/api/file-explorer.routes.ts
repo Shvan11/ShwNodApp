@@ -16,6 +16,7 @@ import { createReadStream, promises as fsp } from 'fs';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendError, sendSuccess } from '../../utils/error-response.js';
 import { authorize } from '../../middleware/auth.js';
+import { timeouts } from '../../middleware/timeout.js';
 import { getFileMimeType } from '../../utils/file-mime.js';
 import {
   FileExplorerError,
@@ -25,12 +26,17 @@ import {
   createFolder,
   renameEntry,
   softDelete,
+  softDeleteBatch,
   validateUploadTargetDir,
   getUploadStagingDir,
   finalizeUpload,
   type FileEntry,
 } from '../../services/files/file-explorer.service.js';
-import { getThumbnail } from '../../services/files/thumbnail.service.js';
+import { getThumbnail, getWorkingThumbnail } from '../../services/files/thumbnail.service.js';
+import {
+  listPatientWorkingFiles,
+  resolveWorkingFile,
+} from '../../services/files/working-files.service.js';
 
 const router = Router();
 
@@ -195,6 +201,88 @@ router.get(
 );
 
 // ===========================================
+// WORKING FILES  (read-only — this patient's rendered .iNN views in the shared working/ dir)
+// ===========================================
+
+router.get(
+  '/patients/:personId/working-files',
+  async (req: Request<PersonIdParams>, res: Response): Promise<void> => {
+    try {
+      const { personId } = req.params;
+      const entries = await listPatientWorkingFiles(personId);
+      log.info('[Files] working-list', {
+        userId: req.session?.userId,
+        personId,
+        count: entries.length,
+      });
+      // Shape mirrors FileListing so the client can reuse the file-explorer types.
+      sendSuccess(res, { path: 'working', parent: null, flat: false, truncated: false, entries });
+    } catch (err) {
+      handleError(res, err, 'working-list');
+    }
+  }
+);
+
+router.get(
+  '/patients/:personId/working-files/content',
+  async (req: Request<PersonIdParams>, res: Response): Promise<void> => {
+    try {
+      const { personId } = req.params;
+      const name = queryString(req.query.name);
+      const download = isTruthy(req.query.download);
+      const thumbRaw = queryString(req.query.thumb);
+
+      // Strictly validated to `{personId}0…​.iNN` — no separators, no traversal.
+      const { abs, mtimeMs } = await resolveWorkingFile(personId, name);
+
+      // ── Thumbnail branch ──
+      if (thumbRaw && thumbRaw !== '0') {
+        const width = parseInt(thumbRaw, 10);
+        const thumbPath = await getWorkingThumbnail(
+          personId,
+          name,
+          abs,
+          mtimeMs,
+          isNaN(width) ? 240 : width
+        );
+        res.setHeader('Content-Type', 'image/webp');
+        res.sendFile(
+          thumbPath,
+          { dotfiles: 'allow', cacheControl: true, lastModified: true, maxAge: 7 * 24 * 60 * 60 * 1000 },
+          (err) => {
+            if (err && !res.headersSent) ErrorResponses.serverError(res, 'Failed to serve thumbnail');
+          }
+        );
+        return;
+      }
+
+      // ── Full file branch (working `.iNN` images are JPEG bytes) ──
+      log.info('[Files] working-content', { userId: req.session?.userId, personId, name, download });
+      const sendOpts = {
+        dotfiles: 'allow' as const,
+        acceptRanges: true,
+        cacheControl: true,
+        lastModified: true,
+      };
+      const onDone = (err: Error | undefined): void => {
+        if (!err || res.headersSent) return;
+        streamFileFallback(req, res, abs, 'image/jpeg', download, name).catch(() => {
+          if (!res.headersSent) ErrorResponses.serverError(res, 'Failed to serve file');
+        });
+      };
+      if (download) {
+        res.download(abs, name, sendOpts, onDone);
+      } else {
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.sendFile(abs, sendOpts, onDone);
+      }
+    } catch (err) {
+      handleError(res, err, 'working-content');
+    }
+  }
+);
+
+// ===========================================
 // UPLOAD  (write — admin/secretary)
 // ===========================================
 
@@ -337,6 +425,60 @@ router.delete(
       sendSuccess(res, { path: relPath }, 'Moved to trash');
     } catch (err) {
       handleError(res, err, 'delete');
+    }
+  }
+);
+
+// ===========================================
+// BATCH DELETE  (write — soft delete many to one .trash stamp dir)
+// ===========================================
+
+/** Matches the service's listing cap — a "select all" can't exceed it. */
+const MAX_BATCH_DELETE = 5000;
+
+router.post(
+  '/patients/:personId/files/delete-batch',
+  authorize(['admin', 'secretary']),
+  timeouts.long, // bulk renames over SMB can exceed the global 30s gate
+  async (
+    req: Request<PersonIdParams, unknown, { paths?: unknown }>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { personId } = req.params;
+      const { paths } = req.body || {};
+
+      if (!Array.isArray(paths) || paths.length === 0) {
+        ErrorResponses.badRequest(res, 'paths must be a non-empty array');
+        return;
+      }
+      if (paths.length > MAX_BATCH_DELETE) {
+        ErrorResponses.badRequest(res, `Cannot delete more than ${MAX_BATCH_DELETE} items at once`);
+        return;
+      }
+      const relPaths = paths.filter((p): p is string => typeof p === 'string' && p.length > 0);
+      if (relPaths.length === 0) {
+        ErrorResponses.badRequest(res, 'No valid paths supplied');
+        return;
+      }
+
+      const result = await softDeleteBatch(personId, relPaths);
+      log.info('[Files] delete-batch', {
+        userId: req.session?.userId,
+        personId,
+        requested: relPaths.length,
+        succeeded: result.succeeded,
+        failed: result.failed,
+      });
+      sendSuccess(
+        res,
+        result,
+        result.failed === 0
+          ? `Moved ${result.succeeded} item(s) to trash`
+          : `Moved ${result.succeeded}, ${result.failed} failed`
+      );
+    } catch (err) {
+      handleError(res, err, 'delete-batch');
     }
   }
 );

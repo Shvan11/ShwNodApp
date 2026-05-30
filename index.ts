@@ -35,7 +35,8 @@ import publicVideoRoutes from './routes/public/video.routes.js';
 import portalRoutes from './routes/portal.js';
 import whatsappService from './services/messaging/whatsapp.js';
 import session from 'express-session';
-import SQLiteStore from 'connect-sqlite3';
+import pgSession from 'connect-pg-simple';
+import { getPgPool } from './services/database/kysely.js';
 import driveClient from './services/google-drive/google-drive-client.js';
 import messageState from './services/state/messageState.js';
 import { MessageStatus } from './services/messaging/message-status.js';
@@ -143,7 +144,12 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     // ===== ADDED: Session configuration for authentication =====
     log.info('🔐 Setting up session management...');
-    const SQLiteStoreSession = SQLiteStore(session);
+    // Sessions live in PostgreSQL (connect-pg-simple) — single durable backing store,
+    // sharing the existing pg pool. The legacy connect-sqlite3 store (./data/sessions.db,
+    // ./data/portal-sessions.db) was retired; tables owned by migrations/pg, NOT created
+    // at runtime (createTableIfMissing: false). See docs/postgres-migration-plan.md.
+    const PgSessionStore = pgSession(session);
+    const sessionPool = getPgPool();
 
     // SESSION_SECRET is required — no hardcoded fallback. A weak/known secret
     // makes session forgery trivial for anyone with source-code access.
@@ -157,9 +163,10 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     const isProduction = process.env.NODE_ENV === 'production';
     const staffSession = session({
-      store: new SQLiteStoreSession({
-        db: 'sessions.db',
-        dir: './data'
+      store: new PgSessionStore({
+        pool: sessionPool,
+        tableName: 'staff_sessions',
+        createTableIfMissing: false
       }),
       secret: sessionSecret,
       resave: false,
@@ -179,7 +186,7 @@ async function initializeApplication(): Promise<AppInitResult> {
     });
 
     // Skip staff session entirely on portal paths — portalSession runs there
-    // and overwriting req.session would waste a SQLite read per request.
+    // and overwriting req.session would waste a session-store read per request.
     app.use((req, res, next) => {
       if (req.path === '/portal'
         || req.path.startsWith('/portal/')
@@ -191,9 +198,10 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     // Patient portal session - separate cookie and store; scoped to portal paths
     const portalSession = session({
-      store: new SQLiteStoreSession({
-        db: 'portal-sessions.db',
-        dir: './data'
+      store: new PgSessionStore({
+        pool: sessionPool,
+        tableName: 'portal_sessions',
+        createTableIfMissing: false
       }),
       secret: portalSessionSecret,
       resave: false,
@@ -226,9 +234,9 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     // Public UI assets — no auth required
     app.use('/photoswipe', express.static('./public/photoswipe/'));
-    // NOTE: do NOT mount ./data as static — it holds sessions.db / portal-sessions.db
-    // and reverse-sync-state.json. Templates under ./data/templates are read via
-    // fs.readFile in the receipt service, never served over HTTP.
+    // NOTE: do NOT mount ./data as static — it holds reverse-sync-state.json (and
+    // formerly the SQLite session DBs, now migrated to PostgreSQL). Templates under
+    // ./data/templates are read via fs.readFile in the receipt service, never served over HTTP.
     app.use('/images', express.static('./public/images')); // Serve images directory for production mode
 
     // Set up the in-process event bus that fans real-time updates into the

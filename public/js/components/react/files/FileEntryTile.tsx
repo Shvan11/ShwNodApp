@@ -1,11 +1,23 @@
 /**
  * One file/folder entry, rendered as a grid tile or a list row. Image entries
  * show a lazily-loaded server thumbnail (falling back to an icon on error).
+ *
+ * In selection mode the whole tile becomes a checkbox: clicking toggles
+ * selection instead of opening/previewing, and the per-entry action buttons are
+ * hidden (bulk actions live in the explorer's selection bar).
  */
 import { useState, type MouseEvent } from 'react';
 import type { FileEntry } from '@/types/api.types';
-import { buildContentUrl, categoryIcon, formatSize, formatDate } from './fileHelpers';
+import {
+  buildContentUrl,
+  categoryIcon,
+  formatSize,
+  formatDate,
+  type ContentUrlOptions,
+} from './fileHelpers';
 import styles from './FileExplorer.module.css';
+
+type UrlBuilder = (personId: number, relPath: string, opts?: ContentUrlOptions) => string;
 
 interface Props {
   personId: number;
@@ -13,12 +25,33 @@ interface Props {
   view: 'grid' | 'list';
   /** Flat mode: show the full relative subpath instead of just the name. */
   showFullPath?: boolean;
+  /** Selection mode: tile toggles selection instead of opening. */
+  selectMode?: boolean;
+  selected?: boolean;
+  /** Read-only: hide rename/delete (download stays). Used by the working-files view. */
+  readOnly?: boolean;
+  /** Override how content/thumbnail/download URLs are built (default: patient files). */
+  buildUrl?: UrlBuilder;
   onOpen: (entry: FileEntry) => void;
   onRename: (entry: FileEntry) => void;
   onDelete: (entry: FileEntry) => void;
+  onToggleSelect: (entry: FileEntry) => void;
 }
 
-const FileEntryTile = ({ personId, entry, view, showFullPath, onOpen, onRename, onDelete }: Props) => {
+const FileEntryTile = ({
+  personId,
+  entry,
+  view,
+  showFullPath,
+  selectMode,
+  selected,
+  readOnly,
+  buildUrl = buildContentUrl,
+  onOpen,
+  onRename,
+  onDelete,
+  onToggleSelect,
+}: Props) => {
   const [thumbFailed, setThumbFailed] = useState(false);
   const isDir = entry.type === 'dir';
   const showThumb = entry.category === 'image' && !thumbFailed;
@@ -28,10 +61,15 @@ const FileEntryTile = ({ personId, entry, view, showFullPath, onOpen, onRename, 
     e.stopPropagation();
   };
 
+  const activate = (): void => {
+    if (selectMode) onToggleSelect(entry);
+    else onOpen(entry);
+  };
+
   const visual = showThumb ? (
     <img
       className={styles.thumb}
-      src={buildContentUrl(personId, entry.relPath, { thumb: 240 })}
+      src={buildUrl(personId, entry.relPath, { thumb: 240 })}
       loading="lazy"
       alt=""
       onError={() => setThumbFailed(true)}
@@ -42,21 +80,34 @@ const FileEntryTile = ({ personId, entry, view, showFullPath, onOpen, onRename, 
 
   const meta = [formatSize(entry.size), formatDate(entry.modified)].filter(Boolean).join(' · ');
 
+  const selectedClass =
+    selectMode && selected ? (view === 'grid' ? styles.tileSelected : styles.rowSelected) : '';
+
   return (
     <div
-      className={view === 'grid' ? styles.tile : styles.row}
-      onClick={() => onOpen(entry)}
-      onDoubleClick={() => onOpen(entry)}
-      role="button"
+      className={`${view === 'grid' ? styles.tile : styles.row} ${selectedClass}`.trim()}
+      onClick={activate}
+      onDoubleClick={selectMode ? undefined : () => onOpen(entry)}
+      role={selectMode ? 'checkbox' : 'button'}
+      aria-checked={selectMode ? !!selected : undefined}
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onOpen(entry);
+          activate();
         }
       }}
       title={label}
     >
+      {selectMode && (
+        <span
+          className={`${styles.selectCheck} ${selected ? styles.selectCheckOn : ''}`}
+          aria-hidden="true"
+        >
+          {selected && <i className="fas fa-check" />}
+        </span>
+      )}
+
       <div className={styles.entryVisual}>{visual}</div>
 
       <div className={styles.entryInfo}>
@@ -64,36 +115,42 @@ const FileEntryTile = ({ personId, entry, view, showFullPath, onOpen, onRename, 
         {meta && <span className={styles.entryMeta}>{meta}</span>}
       </div>
 
-      <div className={styles.entryActions} onClick={stop}>
-        {!isDir && (
-          <a
-            className={styles.iconButton}
-            href={buildContentUrl(personId, entry.relPath, { download: true })}
-            title="Download"
-            aria-label={`Download ${entry.name}`}
-          >
-            <i className="fas fa-download" aria-hidden="true" />
-          </a>
-        )}
-        <button
-          type="button"
-          className={styles.iconButton}
-          onClick={() => onRename(entry)}
-          title="Rename"
-          aria-label={`Rename ${entry.name}`}
-        >
-          <i className="fas fa-pen" aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className={`${styles.iconButton} ${styles.danger}`}
-          onClick={() => onDelete(entry)}
-          title="Delete"
-          aria-label={`Delete ${entry.name}`}
-        >
-          <i className="fas fa-trash-can" aria-hidden="true" />
-        </button>
-      </div>
+      {!selectMode && (
+        <div className={styles.entryActions} onClick={stop}>
+          {!isDir && (
+            <a
+              className={styles.iconButton}
+              href={buildUrl(personId, entry.relPath, { download: true })}
+              title="Download"
+              aria-label={`Download ${entry.name}`}
+            >
+              <i className="fas fa-download" aria-hidden="true" />
+            </a>
+          )}
+          {!readOnly && (
+            <>
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={() => onRename(entry)}
+                title="Rename"
+                aria-label={`Rename ${entry.name}`}
+              >
+                <i className="fas fa-pen" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className={`${styles.iconButton} ${styles.danger}`}
+                onClick={() => onDelete(entry)}
+                title="Delete"
+                aria-label={`Delete ${entry.name}`}
+              >
+                <i className="fas fa-trash-can" aria-hidden="true" />
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };

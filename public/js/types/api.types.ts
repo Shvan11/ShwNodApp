@@ -311,3 +311,17 @@ export interface FileListing {
     truncated: boolean;
     entries: FileEntry[];
 }
+
+/** One entry's outcome in a bulk soft-delete. */
+export interface FileDeleteResult {
+    relPath: string;
+    ok: boolean;
+    error?: string;
+}
+
+/** POST /api/patients/:id/files/delete-batch → ApiResponse<FileBatchDeleteResult>. */
+export interface FileBatchDeleteResult {
+    results: FileDeleteResult[];
+    succeeded: number;
+    failed: number;
+}

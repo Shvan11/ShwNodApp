@@ -65,7 +65,9 @@ body:has(.appointment-calendar) {
     display: flex;
     flex-direction: column;
     width: 100%;
-    height: calc(100vh - 50px);
+    /* Header offset via the shared token so the calendar isn't clipped on mobile,
+       where the wrapped header is taller than 50px (#app-container pads the same). */
+    height: calc(100vh - var(--header-height, 50px));
     background: var(--calendar-background);
     overflow: hidden;
     font-family: var(--font-primary);
@@ -973,7 +975,7 @@ body:has(.appointment-calendar) {
 /* Mobile: day view is forced in JS; the grid collapses to a single column */
 @media (max-width: 768px) {
     .appointment-calendar {
-        height: 100vh;
+        height: calc(100vh - var(--header-height, 50px));
     }
 
     .cal-bar {

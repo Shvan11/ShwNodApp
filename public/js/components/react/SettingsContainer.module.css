@@ -3,10 +3,13 @@
 .container {
     margin: 0;
     padding: 0;
-    padding-top: var(--header-height, 50px);
+    /* No header padding here — #app-container already offsets the fixed header;
+       adding it again pushed settings content down by a second header height. */
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    /* #app-container already offsets for the header, so subtract it here instead of
+       a bare 100vh (which double-counts and adds a phantom scroll). */
+    min-height: calc(100vh - var(--header-height, 50px));
     background: linear-gradient(
         to bottom,
         var(--color-white) 0,
@@ -130,8 +133,7 @@
 
 @media (max-width: 768px) {
     .container {
-        padding-top: var(--header-height, 50px);
-        min-height: 100vh;
+        min-height: calc(100vh - var(--header-height, 50px));
     }
 
     .content {

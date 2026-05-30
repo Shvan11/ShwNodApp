@@ -15,8 +15,8 @@
  *    returned `Date`). `AdditionDate` is a `timestamp` and still returns a `Date`.
  *    Declared return interfaces are preserved (callers unchanged) — see FLAGS.
  */
-import { sql } from 'kysely';
-import { getKysely, withPgTransaction } from '../kysely.js';
+import { sql, type Kysely } from 'kysely';
+import { getKysely, withPgTransaction, type Database } from '../kysely.js';
 import { enqueueWorkIfAligner } from '../../sync/sync-queue.js';
 import { toDateOnly } from '../../../utils/date.js';
 
@@ -165,6 +165,7 @@ interface DependencyCheck {
   DiagnosisCount: number;
   ImplantCount: number;
   ScrewCount: number;
+  AlignerSetCount: number;
 }
 
 interface ValidationResult {
@@ -269,7 +270,8 @@ export async function getWorksByPatient(personId: number): Promise<Work[]> {
       'k4.KeyWord',
       'k5.KeyWord',
     ])
-    .orderBy('w.AdditionDate', 'desc')
+    // NULLS LAST so undated (legacy) works sort to the bottom, matching SQL Server.
+    .orderBy('w.AdditionDate', sql`desc nulls last`)
     .execute() as Promise<Work[]>;
 }
 
@@ -423,36 +425,39 @@ export async function getWorkDetailsList(workId: number): Promise<WorkItem[]> {
 export const getWorkItems = getWorkDetailsList;
 
 export async function addWorkDetail(workDetailData: WorkItemData): Promise<{ ID: number } | null> {
-  const db = getKysely();
-  const inserted = await db
-    .insertInto('tblWorkItems')
-    .values({
-      WorkID: workDetailData.WorkID,
-      FillingType: workDetailData.FillingType || null,
-      FillingDepth: workDetailData.FillingDepth || null,
-      CanalsNo: workDetailData.CanalsNo || null,
-      WorkingLength: workDetailData.WorkingLength || null,
-      ImplantLength: workDetailData.ImplantLength ?? null,
-      ImplantDiameter: workDetailData.ImplantDiameter ?? null,
-      ImplantManufacturerID: workDetailData.ImplantManufacturerID || null,
-      Material: workDetailData.Material || null,
-      LabName: workDetailData.LabName || null,
-      ItemCost: workDetailData.ItemCost || null,
-      StartDate: (workDetailData.StartDate as Date | string | null) || null,
-      CompletedDate: (workDetailData.CompletedDate as Date | string | null) || null,
-      Note: workDetailData.Note || null,
-    })
-    .returning('ID')
-    .executeTakeFirst();
+  // One transaction: the item insert + its teeth write commit together, so a failed
+  // teeth insert can't leave a half-written item behind.
+  return withPgTransaction(async (trx) => {
+    const inserted = await trx
+      .insertInto('tblWorkItems')
+      .values({
+        WorkID: workDetailData.WorkID,
+        FillingType: workDetailData.FillingType || null,
+        FillingDepth: workDetailData.FillingDepth || null,
+        CanalsNo: workDetailData.CanalsNo || null,
+        WorkingLength: workDetailData.WorkingLength || null,
+        ImplantLength: workDetailData.ImplantLength ?? null,
+        ImplantDiameter: workDetailData.ImplantDiameter ?? null,
+        ImplantManufacturerID: workDetailData.ImplantManufacturerID || null,
+        Material: workDetailData.Material || null,
+        LabName: workDetailData.LabName || null,
+        ItemCost: workDetailData.ItemCost || null,
+        StartDate: (workDetailData.StartDate as Date | string | null) || null,
+        CompletedDate: (workDetailData.CompletedDate as Date | string | null) || null,
+        Note: workDetailData.Note || null,
+      })
+      .returning('ID')
+      .executeTakeFirst();
 
-  const result = inserted ? { ID: inserted.ID } : null;
+    const result = inserted ? { ID: inserted.ID } : null;
 
-  // If teeth are provided, add them to junction table
-  if (result && result.ID && workDetailData.TeethIds && workDetailData.TeethIds.length > 0) {
-    await setWorkItemTeeth(result.ID, workDetailData.TeethIds);
-  }
+    // If teeth are provided, add them to junction table (same trx → atomic with the insert)
+    if (result && result.ID && workDetailData.TeethIds && workDetailData.TeethIds.length > 0) {
+      await setWorkItemTeeth(result.ID, workDetailData.TeethIds, trx);
+    }
 
-  return result;
+    return result;
+  });
 }
 
 // Alias for new naming convention
@@ -462,38 +467,41 @@ export async function updateWorkDetail(
   detailId: number,
   workDetailData: Omit<WorkItemData, 'WorkID'>
 ): Promise<{ success: boolean; rowCount: number }> {
-  const db = getKysely();
-  const updateResult = await db
-    .updateTable('tblWorkItems')
-    .set({
-      FillingType: workDetailData.FillingType || null,
-      FillingDepth: workDetailData.FillingDepth || null,
-      CanalsNo: workDetailData.CanalsNo || null,
-      WorkingLength: workDetailData.WorkingLength || null,
-      ImplantLength: workDetailData.ImplantLength ?? null,
-      ImplantDiameter: workDetailData.ImplantDiameter ?? null,
-      ImplantManufacturerID: workDetailData.ImplantManufacturerID || null,
-      Material: workDetailData.Material || null,
-      LabName: workDetailData.LabName || null,
-      ItemCost: workDetailData.ItemCost || null,
-      StartDate: (workDetailData.StartDate as Date | string | null) || null,
-      CompletedDate: (workDetailData.CompletedDate as Date | string | null) || null,
-      Note: workDetailData.Note || null,
-    })
-    .where('ID', '=', detailId)
-    .executeTakeFirst();
+  // One transaction: the item update + its teeth replacement commit together, so a
+  // failed teeth insert can't strip the item's teeth with no rollback.
+  return withPgTransaction(async (trx) => {
+    const updateResult = await trx
+      .updateTable('tblWorkItems')
+      .set({
+        FillingType: workDetailData.FillingType || null,
+        FillingDepth: workDetailData.FillingDepth || null,
+        CanalsNo: workDetailData.CanalsNo || null,
+        WorkingLength: workDetailData.WorkingLength || null,
+        ImplantLength: workDetailData.ImplantLength ?? null,
+        ImplantDiameter: workDetailData.ImplantDiameter ?? null,
+        ImplantManufacturerID: workDetailData.ImplantManufacturerID || null,
+        Material: workDetailData.Material || null,
+        LabName: workDetailData.LabName || null,
+        ItemCost: workDetailData.ItemCost || null,
+        StartDate: (workDetailData.StartDate as Date | string | null) || null,
+        CompletedDate: (workDetailData.CompletedDate as Date | string | null) || null,
+        Note: workDetailData.Note || null,
+      })
+      .where('ID', '=', detailId)
+      .executeTakeFirst();
 
-  const result = {
-    success: true,
-    rowCount: Number(updateResult.numUpdatedRows),
-  };
+    const result = {
+      success: true,
+      rowCount: Number(updateResult.numUpdatedRows),
+    };
 
-  // If teeth are provided, update the junction table
-  if (workDetailData.TeethIds !== undefined) {
-    await setWorkItemTeeth(detailId, workDetailData.TeethIds || []);
-  }
+    // If teeth are provided, update the junction table (same trx → atomic with the update)
+    if (workDetailData.TeethIds !== undefined) {
+      await setWorkItemTeeth(detailId, workDetailData.TeethIds || [], trx);
+    }
 
-  return result;
+    return result;
+  });
 }
 
 // Alias for new naming convention
@@ -736,6 +744,15 @@ export async function deleteWork(
         .select(eb.fn.countAll<number>().as('c'))
         .where('WorkID', '=', workId)
         .as('ScrewCount'),
+      // Aligner sets hang off WorkID too; without this the work was deletable while
+      // its aligner sets remained (orphaned — there is no DB-level cascade guarding it
+      // until the FK_tblAlignerSets_tblwork migration). Block the delete so the user
+      // gets the WORK_HAS_DEPENDENCIES warning instead of losing aligner records.
+      eb
+        .selectFrom('tblAlignerSets')
+        .select(eb.fn.countAll<number>().as('c'))
+        .where('WorkID', '=', workId)
+        .as('AlignerSetCount'),
     ])
     .executeTakeFirstOrThrow();
 
@@ -746,6 +763,7 @@ export async function deleteWork(
     DiagnosisCount: Number(dependencyCheck.DiagnosisCount),
     ImplantCount: Number(dependencyCheck.ImplantCount),
     ScrewCount: Number(dependencyCheck.ScrewCount),
+    AlignerSetCount: Number(dependencyCheck.AlignerSetCount),
   };
 
   // Return dependency information if any exist
@@ -755,7 +773,8 @@ export async function deleteWork(
     counts.ItemCount > 0 ||
     counts.DiagnosisCount > 0 ||
     counts.ImplantCount > 0 ||
-    counts.ScrewCount > 0
+    counts.ScrewCount > 0 ||
+    counts.AlignerSetCount > 0
   ) {
     return {
       canDelete: false,
@@ -788,7 +807,10 @@ export async function getActiveWork(personId: number): Promise<Work | null> {
       'wt.WorkType as TypeName',
       'ws.StatusName',
     ])
-    .orderBy('w.AdditionDate', 'desc')
+    // NULLS LAST: PG sorts NULLs first on DESC (SQL Server sorted them last), so a
+    // legacy Status=1 row with a NULL AdditionDate would otherwise be picked as "the"
+    // active work ahead of real-dated rows. Keep dated works winning the LIMIT 1.
+    .orderBy('w.AdditionDate', sql`desc nulls last`)
     .limit(1)
     .executeTakeFirst();
 
@@ -886,12 +908,29 @@ export async function getToothNumbers(
   return q.orderBy('SortOrder').execute() as Promise<ToothNumber[]>;
 }
 
+/**
+ * Replace a work item's tooth associations (DELETE existing + INSERT new).
+ *
+ * The DELETE+INSERT must be atomic: if the INSERT fails (e.g. a bad ToothID trips
+ * FK_WorkItemTeeth_Tooth, or a connection blip) after the DELETE has committed, the
+ * item would be left with its teeth permanently stripped and no rollback. When a
+ * caller's transaction is supplied (`executor`) we reuse it so the item write and the
+ * teeth write commit together; otherwise we open our own transaction for the pair.
+ */
 export async function setWorkItemTeeth(
+  workItemId: number,
+  teethIds: number[],
+  executor?: Kysely<Database>
+): Promise<{ success: boolean; count: number }> {
+  if (executor) return replaceWorkItemTeeth(executor, workItemId, teethIds);
+  return withPgTransaction((trx) => replaceWorkItemTeeth(trx, workItemId, teethIds));
+}
+
+async function replaceWorkItemTeeth(
+  db: Kysely<Database>,
   workItemId: number,
   teethIds: number[]
 ): Promise<{ success: boolean; count: number }> {
-  const db = getKysely();
-
   // First, delete existing teeth for this work item
   await db.deleteFrom('tblWorkItemTeeth').where('WorkItemID', '=', workItemId).execute();
 

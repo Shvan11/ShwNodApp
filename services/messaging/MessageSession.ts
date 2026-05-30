@@ -6,6 +6,7 @@
  */
 
 import { log } from '../../utils/logger.js';
+import { toDateOnly } from '../../utils/date.js';
 
 // ===========================================
 // SESSION TYPES
@@ -258,7 +259,7 @@ export class MessageSession {
     // Validate that appointment belongs to this session's date
     const appointmentDateStr =
       appointmentDate instanceof Date
-        ? appointmentDate.toISOString().slice(0, 10)
+        ? toDateOnly(appointmentDate)
         : appointmentDate;
 
     if (appointmentDateStr !== this.date) {

@@ -426,6 +426,126 @@ export async function softDelete(personId: string | number, relPath: string): Pr
   await fs.rename(abs, path.join(trashDir, path.basename(abs)));
 }
 
+/** One entry's outcome in a {@link softDeleteBatch}. */
+export interface BatchDeleteItemResult {
+  relPath: string;
+  ok: boolean;
+  /** Present when ok === false. */
+  error?: string;
+}
+
+export interface BatchDeleteResult {
+  results: BatchDeleteItemResult[];
+  succeeded: number;
+  failed: number;
+}
+
+/**
+ * Soft-delete many entries into ONE shared trash stamp dir
+ * (`clinic1/.trash/{personId}/{timestamp}/`), so the whole batch lands together
+ * and could be restored as a unit. Each entry rides the same guards as
+ * `softDelete` (in-root + symlink-escape, patient-root refused); a per-item
+ * failure is captured rather than aborting the batch. Basename collisions
+ * inside the shared dir (two same-named files from different subfolders) are
+ * de-duped with a ` (n)` suffix so the second never clobbers the first. The
+ * stamp dir is removed if nothing landed, to avoid littering empty folders.
+ *
+ * Moving a folder is a single rename regardless of subtree size (same SMB
+ * volume), so batch cost scales with the number of selected entries, not their
+ * contents.
+ */
+export async function softDeleteBatch(
+  personId: string | number,
+  relPaths: string[]
+): Promise<BatchDeleteResult> {
+  if (!/^\d+$/.test(String(personId))) {
+    throw new FileExplorerError('Invalid patient id', 400);
+  }
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const trashDir = path.join(TRASH_ROOT, String(personId), stamp);
+  await fs.mkdir(trashDir, { recursive: true });
+
+  // Reserve a unique landing name per item. The check+reserve is synchronous
+  // (no await between `has` and `add`), so concurrent workers can't race it.
+  const usedNames = new Set<string>();
+  const reserveName = (base: string): string => {
+    if (!usedNames.has(base)) {
+      usedNames.add(base);
+      return base;
+    }
+    const ext = path.extname(base);
+    const stem = base.slice(0, base.length - ext.length);
+    let i = 1;
+    let candidate = `${stem} (${i})${ext}`;
+    while (usedNames.has(candidate)) {
+      candidate = `${stem} (${++i})${ext}`;
+    }
+    usedNames.add(candidate);
+    return candidate;
+  };
+
+  const results = await mapLimit(relPaths, 16, async (relPath): Promise<BatchDeleteItemResult> => {
+    try {
+      const { root, abs } = resolveSafe(personId, relPath);
+      if (abs === root) {
+        throw new FileExplorerError('Cannot delete the patient root', 400);
+      }
+      await realpathGuard(abs, root);
+      await fs.rename(abs, path.join(trashDir, reserveName(path.basename(abs))));
+      return { relPath, ok: true };
+    } catch (err) {
+      return {
+        relPath,
+        ok: false,
+        error: err instanceof FileExplorerError ? err.message : 'Delete failed',
+      };
+    }
+  });
+
+  const succeeded = results.filter((r) => r.ok).length;
+  if (succeeded === 0) {
+    await fs.rm(trashDir, { recursive: true, force: true }).catch(() => {});
+  }
+  return { results, succeeded, failed: results.length - succeeded };
+}
+
+/**
+ * Existence check for an entry under the patient root. Pure existence (one
+ * `stat`); `resolveSafe` still enforces containment, so it can't probe outside
+ * the patient folder. ENOENT → false. Cheap enough for an on-demand check.
+ */
+export async function entryExists(personId: string | number, relPath: string): Promise<boolean> {
+  const { abs } = resolveSafe(personId, relPath);
+  try {
+    await fs.stat(abs);
+    return true;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw err;
+  }
+}
+
+/**
+ * Hard delete — permanently remove the entry (recursive). Unlike `softDelete`
+ * (which moves to `.trash`), this is unrecoverable. Same guards: in-root +
+ * symlink-escape, and the patient root itself is refused. Idempotent: a missing
+ * target is a no-op (so callers can delete "the folder if it exists" cleanly).
+ */
+export async function hardDelete(personId: string | number, relPath: string): Promise<void> {
+  const { root, abs } = resolveSafe(personId, relPath);
+  if (abs === root) {
+    throw new FileExplorerError('Cannot delete the patient root', 400);
+  }
+  try {
+    await realpathGuard(abs, root);
+  } catch (err) {
+    if (err instanceof FileExplorerError && err.status === 404) return; // already gone
+    throw err;
+  }
+  await fs.rm(abs, { recursive: true, force: true });
+}
+
 // ===========================================
 // UPLOAD (multer helpers — staged in-place to dodge EXDEV)
 // ===========================================

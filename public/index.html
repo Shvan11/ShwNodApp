@@ -89,42 +89,16 @@
             min-height: 50px;
         }
 
-        /* App container - offset for fixed header */
+        /* App container - top padding clears the fixed header. The offset is the
+           responsive --header-height token (defined in css/base/variables.css);
+           full-height page shells subtract the same token from 100vh so the header
+           is never counted twice → no phantom scrollbar. #app-container is React-
+           rendered after window load, so variables.css is always present; the 50px
+           fallback is belt-and-braces. */
         #app-container {
             padding: 0;
             margin: 0;
-            padding-top: 50px;
-        }
-
-        /* Mobile responsive padding to prevent header overlap */
-        @media (max-width: 1024px) {
-            #app-container {
-                padding-top: 80px;
-            }
-        }
-
-        @media (max-width: 768px) {
-            #app-container {
-                padding-top: 110px;
-            }
-        }
-
-        @media (max-width: 640px) {
-            #app-container {
-                padding-top: 100px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            #app-container {
-                padding-top: 95px;
-            }
-        }
-
-        @media (max-width: 375px) {
-            #app-container {
-                padding-top: 90px;
-            }
+            padding-top: var(--header-height, 50px);
         }
 
         /* Smooth transitions between routes */

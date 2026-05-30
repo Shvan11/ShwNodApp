@@ -1,7 +1,10 @@
 /* ===== PATIENT SHELL LAYOUT ===== */
 
 .patientShellContainer {
-    min-height: 100vh;
+    /* Full viewport MINUS the fixed-header offset that #app-container already pads
+       (--header-height, in css/base/variables.css). A bare 100vh here would
+       double-count the header and add a phantom scrollbar on every patient page. */
+    min-height: calc(100vh - var(--header-height, 50px));
     background: var(--gray-50);
     padding-top: 0;
 }
@@ -9,7 +12,9 @@
 /* Main Content Area - Always with left margin for narrow sidebar */
 .mainContentArea {
     margin-left: 70px;
-    min-height: calc(100vh - 50px);
+    /* Same header offset as the shell so it fills the area without overflowing it
+       (was a hard-coded 100vh - 50px, which broke once the offset grew on mobile). */
+    min-height: calc(100vh - var(--header-height, 50px));
     padding: 0 0.75rem 0.75rem 0.75rem;
     padding-top: calc(0.375rem + 0.375rem + 0.875rem + 0.5rem); /* Breadcrumb height + margin */
     transition: margin-left 0.3s ease;

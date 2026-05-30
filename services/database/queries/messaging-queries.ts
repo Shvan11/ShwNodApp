@@ -14,6 +14,7 @@
 import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
 import { arabicDay } from '../../../utils/arabic-day.js';
+import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 
 // Type definitions
@@ -412,7 +413,7 @@ export async function getWhatsAppMessages(
       const dd = daysFromToday(date);
       if (dd !== 1 && dd !== 2) return [[], [], [], []] as [string[], string[], number[], string[]];
 
-      const dateStr = typeof date === 'string' ? date.slice(0, 10) : parseLocalDate(date).toISOString().slice(0, 10);
+      const dateStr = typeof date === 'string' ? date.slice(0, 10) : toDateOnly(date);
       const aDay = arabicDay(dateStr);
       const eDay = englishDay(dateStr);
       const aMes =
@@ -597,7 +598,7 @@ export async function getWhatsAppDeliveryStatus(
 
   return dbCircuitBreaker
     .execute(async () => {
-      const dateStr = typeof date === 'string' ? date.slice(0, 10) : parseLocalDate(date).toISOString().slice(0, 10);
+      const dateStr = typeof date === 'string' ? date.slice(0, 10) : toDateOnly(date);
       const rows = await getKysely()
         .selectFrom('tblappointments as a')
         .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
@@ -649,7 +650,7 @@ export async function getSmsMessages(date: Date | string): Promise<SmsMessage[]>
       const dd = daysFromToday(date);
       if (dd < 0 || dd > 3) return [];
 
-      const dateStr = typeof date === 'string' ? date.slice(0, 10) : parseLocalDate(date).toISOString().slice(0, 10);
+      const dateStr = typeof date === 'string' ? date.slice(0, 10) : toDateOnly(date);
       const aDay = arabicDay(dateStr);
       const eDay = englishDay(dateStr);
       // A_Mes is only set for DD 1/2 (else NULL → Arabic message empty, as in the proc).
@@ -733,7 +734,7 @@ export async function getSmsIds(date: Date | string): Promise<SmsIdMessage[]> {
 
   return dbCircuitBreaker
     .execute(async () => {
-      const dateStr = typeof date === 'string' ? date.slice(0, 10) : parseLocalDate(date).toISOString().slice(0, 10);
+      const dateStr = typeof date === 'string' ? date.slice(0, 10) : toDateOnly(date);
       const rows = await getKysely()
         .selectFrom('tblappointments')
         .where('AppDay', '=', sql<Date>`${dateStr}::date`)
@@ -782,7 +783,7 @@ export async function getMessageStatusByDate(date: Date | string): Promise<Messa
 
   return dbCircuitBreaker
     .execute(async () => {
-      const dateStr = typeof date === 'string' ? date.slice(0, 10) : parseLocalDate(date).toISOString().slice(0, 10);
+      const dateStr = typeof date === 'string' ? date.slice(0, 10) : toDateOnly(date);
       const rows = await getKysely()
         .selectFrom('tblappointments as a')
         .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')

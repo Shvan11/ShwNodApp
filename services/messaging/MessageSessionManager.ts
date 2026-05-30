@@ -12,6 +12,7 @@ import {
   WhatsAppServiceInterface,
 } from './MessageSession.js';
 import { log } from '../../utils/logger.js';
+import { toDateOnly } from '../../utils/date.js';
 
 // ===========================================
 // MANAGER TYPES
@@ -147,7 +148,7 @@ export class MessageSessionManager {
     whatsappService: WhatsAppServiceInterface
   ): MessageSession {
     // Normalize date to YYYY-MM-DD format
-    const normalizedDate = date instanceof Date ? date.toISOString().slice(0, 10) : date;
+    const normalizedDate = date instanceof Date ? toDateOnly(date) : date;
 
     // Check if we already have an active session for this date
     if (this.activeSessions.has(normalizedDate)) {
@@ -288,7 +289,7 @@ export class MessageSessionManager {
    * Complete a session for a specific date
    */
   completeSession(date: Date | string): void {
-    const normalizedDate = date instanceof Date ? date.toISOString().slice(0, 10) : date;
+    const normalizedDate = date instanceof Date ? toDateOnly(date) : date;
 
     const session = this.activeSessions.get(normalizedDate);
     if (!session) {

@@ -33,6 +33,25 @@
   background: #111;
 }
 
+/* A saved (already-cropped) view shown read-only on reopen — fills the cell like
+   the cropper does. object-fit:cover + explicit height override the global
+   `img { height: auto }` reset so a saved view never distorts. */
+.saved {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--background-tertiary);
+}
+
+.savedImg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+
 /* react-easy-crop sizes its media with cover classes that set ONE dimension to
    100% and leave the other `auto` (aspect-preserving). The global reset
    `img { max-width: 100%; height: auto }` leaks its `max-width` through (no cover

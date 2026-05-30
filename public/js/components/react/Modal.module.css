@@ -14,6 +14,27 @@
     outline: none;
 }
 
+/*
+ * Default modal surface. Wrapped in @layer so it sits BELOW every consumer's
+ * contentClassName in the cascade: any modal that declares its own background /
+ * border-radius / box-shadow / padding (the long-standing convention — see
+ * ConfirmDialog, LabelPreviewModal, Videos `.playerModal`, the Stand modals, …)
+ * overrides these untouched, regardless of stylesheet order. Modals that DON'T
+ * set a surface (historically the file-explorer image preview + name prompt)
+ * now fall back to this instead of rendering with a transparent, see-through
+ * background. Unlayered rules always beat layered ones, so this can't regress
+ * a modal that styles itself.
+ */
+@layer modal {
+    .content {
+        box-sizing: border-box;
+        background: var(--background-primary, #fff);
+        color: var(--text-color, inherit);
+        border-radius: var(--radius-lg, 12px);
+        box-shadow: var(--shadow-lg, 0 8px 32px rgba(0, 0, 0, 0.2));
+    }
+}
+
 @keyframes modalOverlayFadeIn {
     from { opacity: 0; }
     to { opacity: 1; }

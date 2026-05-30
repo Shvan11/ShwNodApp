@@ -9,7 +9,9 @@
     background: var(--gray-50);
     color: var(--text-color);
     line-height: 1.6;
-    min-height: 100vh;
+    /* Subtract the fixed-header offset (--header-height) that #app-container pads;
+       a bare 100vh double-counts the header → phantom page scroll. */
+    min-height: calc(100vh - var(--header-height, 50px));
     display: flex;
     flex-direction: column;
 }

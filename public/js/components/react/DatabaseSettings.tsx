@@ -4,13 +4,11 @@ import Modal from './Modal';
 import styles from './DatabaseSettings.module.css';
 
 interface DatabaseConfig {
-    DB_SERVER: string;
-    DB_INSTANCE: string;
-    DB_DATABASE: string;
-    DB_USER: string;
-    DB_PASSWORD: string;
-    DB_ENCRYPT: string;
-    DB_TRUST_CERTIFICATE: string;
+    PG_HOST: string;
+    PG_PORT: string;
+    PG_DATABASE: string;
+    PG_USER: string;
+    PG_PASSWORD: string;
     [key: string]: string;
 }
 
@@ -36,13 +34,11 @@ interface DatabaseSettingsProps {
 
 const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
     const [config, setConfig] = useState<DatabaseConfig>({
-        DB_SERVER: '',
-        DB_INSTANCE: '',
-        DB_DATABASE: '',
-        DB_USER: '',
-        DB_PASSWORD: '',
-        DB_ENCRYPT: 'false',
-        DB_TRUST_CERTIFICATE: 'true'
+        PG_HOST: '',
+        PG_PORT: '5432',
+        PG_DATABASE: '',
+        PG_USER: '',
+        PG_PASSWORD: ''
     });
     const [pendingChanges, setPendingChanges] = useState<PendingChanges>({});
     const [isLoading, setIsLoading] = useState(false);
@@ -119,7 +115,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
             const testConfig = { ...config, ...pendingChanges };
 
             // Check if password is masked (security feature)
-            if (testConfig.DB_PASSWORD === '••••••••') {
+            if (testConfig.PG_PASSWORD === '••••••••') {
                 setConnectionStatus({
                     success: false,
                     message: 'Cannot test with masked password',
@@ -285,40 +281,40 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                             <h4><i className="fas fa-server"></i> Connection Information</h4>
 
                             <div className={styles.settingGroup}>
-                                <label htmlFor="db_server">Database Server</label>
+                                <label htmlFor="pg_host">Host</label>
                                 <input
                                     type="text"
-                                    id="db_server"
-                                    value={getCurrentValue('DB_SERVER')}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('DB_SERVER', e.target.value)}
-                                    placeholder="e.g., localhost, CLINIC"
-                                    className={pendingChanges.DB_SERVER !== undefined ? styles.pendingChange : ''}
+                                    id="pg_host"
+                                    value={getCurrentValue('PG_HOST')}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('PG_HOST', e.target.value)}
+                                    placeholder="e.g., localhost"
+                                    className={pendingChanges.PG_HOST !== undefined ? styles.pendingChange : ''}
                                 />
-                                <div className={styles.settingDescription}>SQL Server name or IP address</div>
+                                <div className={styles.settingDescription}>PostgreSQL server host or IP address</div>
                             </div>
 
                             <div className={styles.settingGroup}>
-                                <label htmlFor="db_instance">Instance Name</label>
+                                <label htmlFor="pg_port">Port</label>
                                 <input
                                     type="text"
-                                    id="db_instance"
-                                    value={getCurrentValue('DB_INSTANCE')}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('DB_INSTANCE', e.target.value)}
-                                    placeholder="e.g., SQLEXPRESS, DOLPHIN"
-                                    className={pendingChanges.DB_INSTANCE !== undefined ? styles.pendingChange : ''}
+                                    id="pg_port"
+                                    value={getCurrentValue('PG_PORT')}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('PG_PORT', e.target.value)}
+                                    placeholder="5432"
+                                    className={pendingChanges.PG_PORT !== undefined ? styles.pendingChange : ''}
                                 />
-                                <div className={styles.settingDescription}>SQL Server instance name</div>
+                                <div className={styles.settingDescription}>PostgreSQL server port (default 5432)</div>
                             </div>
 
                             <div className={styles.settingGroup}>
-                                <label htmlFor="db_database">Database Name</label>
+                                <label htmlFor="pg_database">Database Name</label>
                                 <input
                                     type="text"
-                                    id="db_database"
-                                    value={getCurrentValue('DB_DATABASE')}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('DB_DATABASE', e.target.value)}
-                                    placeholder="e.g., ShwanNew, ShwanOrtho"
-                                    className={pendingChanges.DB_DATABASE !== undefined ? styles.pendingChange : ''}
+                                    id="pg_database"
+                                    value={getCurrentValue('PG_DATABASE')}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('PG_DATABASE', e.target.value)}
+                                    placeholder="e.g., shwan_test"
+                                    className={pendingChanges.PG_DATABASE !== undefined ? styles.pendingChange : ''}
                                 />
                                 <div className={styles.settingDescription}>Database name to connect to</div>
                             </div>
@@ -329,28 +325,28 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                             <h4><i className="fas fa-key"></i> Authentication</h4>
 
                             <div className={styles.settingGroup}>
-                                <label htmlFor="db_user">Username</label>
+                                <label htmlFor="pg_user">Username</label>
                                 <input
                                     type="text"
-                                    id="db_user"
-                                    value={getCurrentValue('DB_USER')}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('DB_USER', e.target.value)}
-                                    placeholder="Database username"
-                                    className={pendingChanges.DB_USER !== undefined ? styles.pendingChange : ''}
+                                    id="pg_user"
+                                    value={getCurrentValue('PG_USER')}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('PG_USER', e.target.value)}
+                                    placeholder="Database role/username"
+                                    className={pendingChanges.PG_USER !== undefined ? styles.pendingChange : ''}
                                 />
-                                <div className={styles.settingDescription}>SQL Server login username</div>
+                                <div className={styles.settingDescription}>PostgreSQL role/username</div>
                             </div>
 
                             <div className={styles.settingGroup}>
-                                <label htmlFor="db_password">Password</label>
+                                <label htmlFor="pg_password">Password</label>
                                 <div className={styles.passwordInputGroup}>
                                     <input
                                         type={showPassword ? "text" : "password"}
-                                        id="db_password"
-                                        value={getCurrentValue('DB_PASSWORD')}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('DB_PASSWORD', e.target.value)}
+                                        id="pg_password"
+                                        value={getCurrentValue('PG_PASSWORD')}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('PG_PASSWORD', e.target.value)}
                                         placeholder="Database password"
-                                        className={pendingChanges.DB_PASSWORD !== undefined ? styles.pendingChange : ''}
+                                        className={pendingChanges.PG_PASSWORD !== undefined ? styles.pendingChange : ''}
                                     />
                                     <button
                                         type="button"
@@ -364,40 +360,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                                         <i className={showPassword ? "fas fa-eye-slash" : "fas fa-eye"}></i>
                                     </button>
                                 </div>
-                                <div className={styles.settingDescription}>SQL Server login password</div>
-                            </div>
-                        </div>
-
-                        {/* Security Settings */}
-                        <div className={styles.configGroup}>
-                            <h4><i className="fas fa-shield-alt"></i> Security Settings</h4>
-
-                            <div className={styles.settingGroup}>
-                                <label htmlFor="db_encrypt">Encrypt Connection</label>
-                                <select
-                                    id="db_encrypt"
-                                    value={getCurrentValue('DB_ENCRYPT')}
-                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('DB_ENCRYPT', e.target.value)}
-                                    className={pendingChanges.DB_ENCRYPT !== undefined ? styles.pendingChange : ''}
-                                >
-                                    <option value="true">Enabled</option>
-                                    <option value="false">Disabled</option>
-                                </select>
-                                <div className={styles.settingDescription}>Enable SSL/TLS encryption for database connection</div>
-                            </div>
-
-                            <div className={styles.settingGroup}>
-                                <label htmlFor="db_trust_cert">Trust Server Certificate</label>
-                                <select
-                                    id="db_trust_cert"
-                                    value={getCurrentValue('DB_TRUST_CERTIFICATE')}
-                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('DB_TRUST_CERTIFICATE', e.target.value)}
-                                    className={pendingChanges.DB_TRUST_CERTIFICATE !== undefined ? styles.pendingChange : ''}
-                                >
-                                    <option value="true">Trust</option>
-                                    <option value="false">Verify</option>
-                                </select>
-                                <div className={styles.settingDescription}>Trust the server certificate without validation</div>
+                                <div className={styles.settingDescription}>PostgreSQL role password (leave blank for trust/peer auth)</div>
                             </div>
                         </div>
 

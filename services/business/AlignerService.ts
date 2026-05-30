@@ -39,6 +39,7 @@ export type AlignerErrorCode =
   | 'SET_COST_NOT_DEFINED'
   | 'INVALID_AMOUNT'
   | 'PAYMENT_EXCEEDS_BALANCE'
+  | 'SET_COST_BELOW_PAID'
   | 'INVALID_SEARCH_TERM';
 
 /**
@@ -351,6 +352,24 @@ export async function validateAndUpdateSet(
       : undefined,
   };
 
+  // Re-enforce the dropped CK_MoreThanTotalW invariant in TS: a set's cost must never
+  // drop below what's already been paid for it, otherwise the set becomes overpaid.
+  if (sanitizedData.SetCost !== undefined) {
+    const balance = await alignerQueries.getAlignerSetBalance(parseInt(String(setId)));
+    const alreadyPaid = Number(balance?.TotalPaid ?? 0);
+    if (Number(sanitizedData.SetCost) < alreadyPaid) {
+      throw new AlignerValidationError(
+        `Set cost (${sanitizedData.SetCost}) cannot be less than the amount already paid for this set (${alreadyPaid}).`,
+        'SET_COST_BELOW_PAID',
+        {
+          setId: parseInt(String(setId)),
+          setCost: Number(sanitizedData.SetCost),
+          alreadyPaid,
+        }
+      );
+    }
+  }
+
   log.info(`Updating aligner set ${setId}:`, sanitizedData);
 
   try {
@@ -471,6 +490,33 @@ export async function validateAndCreateBatch(
 }
 
 /**
+ * Map a batch-update business-rule message to its AlignerErrorCode.
+ *
+ * `aligner-queries.ts#updateBatch` throws plain `Error`s for validation failures
+ * — the replacement for the deleted `usp_UpdateAlignerBatch` RAISERROR codes
+ * 50010-50020. Under pg there is no numeric `err.number`, so we key off the
+ * message text the query layer throws (kept in sync with `updateBatch`). Returns
+ * null for messages that aren't recognised batch-validation errors.
+ */
+function mapBatchUpdateError(message: string): AlignerErrorCode | null {
+  if (message === 'Aligner batch not found') return 'BATCH_NOT_FOUND';
+  if (message === 'Cannot change AlignerSetID') return 'INVALID_SET_CHANGE';
+  if (message.startsWith('Cannot update aligner batch: requested upper'))
+    return 'UPPER_ALIGNER_LIMIT_EXCEEDED';
+  if (message.startsWith('Cannot update aligner batch: requested lower'))
+    return 'LOWER_ALIGNER_LIMIT_EXCEEDED';
+  if (message === 'Cannot set IsActive: batch must be delivered first')
+    return 'BATCH_NOT_DELIVERED';
+  if (
+    message.startsWith('Template flag') ||
+    message.includes('requires UpperAlignerCount') ||
+    message.includes('requires LowerAlignerCount')
+  )
+    return 'VALIDATION_ERROR';
+  return null;
+}
+
+/**
  * Validate and update a batch
  *
  * Business Rules:
@@ -509,26 +555,19 @@ export async function validateAndUpdateBatch(
 
     return result;
   } catch (error) {
-    // Convert SQL validation errors (50010-50014) to AlignerValidationError
-    // These are custom THROW errors from usp_UpdateAlignerBatch stored procedure
-    const sqlError = error as { number?: number; message?: string };
-    if (sqlError.number && sqlError.number >= 50010 && sqlError.number <= 50020) {
-      // Map SQL error numbers to error codes
-      const errorCodeMap: Record<number, AlignerErrorCode> = {
-        50010: 'BATCH_NOT_FOUND',
-        50011: 'INVALID_SET_CHANGE',
-        50012: 'UPPER_ALIGNER_LIMIT_EXCEEDED',
-        50013: 'LOWER_ALIGNER_LIMIT_EXCEEDED',
-        50014: 'BATCH_NOT_DELIVERED',
-      };
-      const errorCode = errorCodeMap[sqlError.number] || 'VALIDATION_ERROR';
-      throw new AlignerValidationError(
-        sqlError.message || 'Batch update validation failed',
-        errorCode,
-        { batchId: parseInt(String(batchId)) }
-      );
+    // updateBatch (aligner-queries.ts) throws plain Error()s for business-rule
+    // violations — the old usp_UpdateAlignerBatch numeric RAISERROR codes are gone
+    // under pg. Translate the recognised messages into typed AlignerValidationErrors
+    // so the route returns a 400 with a code instead of a generic 500.
+    if (error instanceof AlignerValidationError) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    const errorCode = mapBatchUpdateError(message);
+    if (errorCode) {
+      throw new AlignerValidationError(message, errorCode, {
+        batchId: parseInt(String(batchId)),
+      });
     }
-    // Re-throw other errors as-is
+    // Re-throw unexpected (infrastructure) errors as-is
     throw error;
   }
 }

@@ -2,7 +2,10 @@
 
 /* Main container with improved spacing and centering */
 .addPatientContainer {
-    min-height: 100vh;
+    /* Renders INSIDE PatientShell (already header-offset by #app-container). Fill the
+       shell content box: 100vh − header − shell breadcrumb clearance + bottom paddings
+       (2.125 + 0.75 + 0.5rem). A bare 100vh overflowed by ~96px. */
+    min-height: calc(100vh - var(--header-height, 50px) - 3.375rem);
     background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-200) 100%);
     padding: var(--spacing-xl) var(--spacing-md);
     display: flex;

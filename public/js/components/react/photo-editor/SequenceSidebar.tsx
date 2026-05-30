@@ -22,9 +22,13 @@ interface FileEntryLite {
 interface Props {
   personId: number;
   defaultFolder: string;
+  /** relPaths already dropped into a slot — hidden from the list while in use. */
+  usedRelPaths: Set<string>;
+  /** Bumped by the parent to force a re-list (e.g. after a view's original is untagged). */
+  refreshSignal?: number;
 }
 
-const SequenceSidebar = ({ personId, defaultFolder }: Props) => {
+const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal = 0 }: Props) => {
   const toast = useToast();
   const [folders, setFolders] = useState<string[]>([]);
   const [folder, setFolder] = useState<string>(defaultFolder);
@@ -80,7 +84,7 @@ const SequenceSidebar = ({ personId, defaultFolder }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [personId, folder, toast, refreshFiles]);
+  }, [personId, folder, toast, refreshFiles, refreshSignal]);
 
   /** Create the folder on the share; a 409 (already there) is treated as success. */
   const ensureFolder = async (name: string): Promise<void> => {
@@ -145,6 +149,9 @@ const SequenceSidebar = ({ personId, defaultFolder }: Props) => {
     e.dataTransfer.effectAllowed = 'copy';
   };
 
+  // Hide photos already placed in a slot; they return here when the slot is cleared.
+  const visibleFiles = files.filter((f) => !usedRelPaths.has(f.relPath));
+
   return (
     <aside className={styles.sidebar}>
       <div className={styles.header}>
@@ -191,9 +198,11 @@ const SequenceSidebar = ({ personId, defaultFolder }: Props) => {
         <div className={styles.note}>Loading…</div>
       ) : files.length === 0 ? (
         <div className={styles.note}>No images in this folder.</div>
+      ) : visibleFiles.length === 0 ? (
+        <div className={styles.note}>All photos placed.</div>
       ) : (
         <div className={styles.list}>
-          {files.map((f) => (
+          {visibleFiles.map((f) => (
             <figure key={f.relPath} className={styles.thumb}>
               <img
                 src={`/api/patients/${personId}/files/content?path=${encodeURIComponent(f.relPath)}&thumb=240`}

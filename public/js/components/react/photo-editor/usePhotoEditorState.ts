@@ -3,8 +3,8 @@
  * returned action callbacks are not manually memoized.
  */
 import { useReducer } from 'react';
-import type { CropArea, PhotoViewCode, SlotMap } from './photoEditorTypes';
-import { makeInitialSlot, makeInitialSlots } from './photoEditorTypes';
+import type { CropArea, PhotoViewCode, SlotHydration, SlotMap } from './photoEditorTypes';
+import { makeInitialSlot, makeInitialSlots, VIEW_CODES } from './photoEditorTypes';
 
 type Action =
   | { type: 'PLACE'; view: PhotoViewCode; sourceRelPath: string; sourceName: string }
@@ -15,9 +15,27 @@ type Action =
   | { type: 'SET_ROTATION'; view: PhotoViewCode; rotation: number }
   | { type: 'TOGGLE_FLIP_H'; view: PhotoViewCode }
   | { type: 'TOGGLE_FLIP_V'; view: PhotoViewCode }
-  | { type: 'SET_CROPPED'; view: PhotoViewCode; area: CropArea };
+  | { type: 'SET_CROPPED'; view: PhotoViewCode; area: CropArea }
+  | { type: 'HYDRATE'; views: Partial<Record<PhotoViewCode, SlotHydration>> };
 
 function reducer(state: SlotMap, action: Action): SlotMap {
+  // Seed read-only "saved" display + re-edit info when a timepoint is opened. Has no
+  // single `view`, so it's handled before the per-view `slot` lookup below.
+  if (action.type === 'HYDRATE') {
+    const next = { ...state };
+    for (const v of VIEW_CODES) {
+      const h = action.views[v];
+      if (!h) continue;
+      next[v] = {
+        ...makeInitialSlot(v),
+        savedImageUrl: h.savedImageUrl,
+        canReEdit: h.canReEdit,
+        reEditRelPath: h.reEditRelPath,
+        reEditName: h.reEditName,
+      };
+    }
+    return next;
+  }
   const slot = state[action.view];
   switch (action.type) {
     case 'PLACE':
@@ -68,6 +86,7 @@ export interface PhotoEditorState {
   toggleFlipH: (view: PhotoViewCode) => void;
   toggleFlipV: (view: PhotoViewCode) => void;
   setCropped: (view: PhotoViewCode, area: CropArea) => void;
+  hydrate: (views: Partial<Record<PhotoViewCode, SlotHydration>>) => void;
 }
 
 export function usePhotoEditorState(): PhotoEditorState {
@@ -83,5 +102,6 @@ export function usePhotoEditorState(): PhotoEditorState {
     toggleFlipH: (view) => dispatch({ type: 'TOGGLE_FLIP_H', view }),
     toggleFlipV: (view) => dispatch({ type: 'TOGGLE_FLIP_V', view }),
     setCropped: (view, area) => dispatch({ type: 'SET_CROPPED', view, area }),
+    hydrate: (views) => dispatch({ type: 'HYDRATE', views }),
   };
 }

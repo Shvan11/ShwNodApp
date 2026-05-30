@@ -4,7 +4,10 @@
 .diagnosisPage {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    /* This page renders INSIDE PatientShell, which #app-container already offsets.
+       Fill the shell's content box: 100vh − header − the shell's breadcrumb clearance
+       + bottom paddings (2.125 + 0.75 + 0.5rem). A bare 100vh overflowed by ~96px. */
+    height: calc(100vh - var(--header-height, 50px) - 3.375rem);
     background: var(--background-secondary);
 }
 

@@ -9,6 +9,15 @@
   gap: var(--spacing-sm);
   width: 100%;
   min-height: 100%;
+  /* View-only "fit to screen" control from the topbar (default 1 = full width).
+     Narrowing the grid scales every cell down — each cell's height is its
+     width × aspect-ratio — so the 3×3 block gets shorter and .gridArea stops
+     needing to scroll. This is real layout (not CSS `zoom`/transform), which is
+     why it actually shrinks the slots: a `width`-driven box reflows, whereas
+     `zoom` cancels against the cells' own `width:100%`. react-easy-crop and
+     drag-drop coordinates are unaffected; Save output is identical. */
+  max-width: calc(100% * var(--pe-zoom, 1));
+  margin-inline: auto;
 }
 
 .cell {

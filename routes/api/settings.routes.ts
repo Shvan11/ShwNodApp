@@ -294,7 +294,7 @@ router.put(
       if (result.success) {
         // Mask password in response - create a copy to avoid mutating original
         const responseConfig = result.config
-          ? { ...result.config, DB_PASSWORD: '••••••••' }
+          ? { ...result.config, PG_PASSWORD: '••••••••' }
           : result.config;
 
         res.json({

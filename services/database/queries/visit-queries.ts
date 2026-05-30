@@ -208,10 +208,31 @@ async function applyPhotoDelete(
 }
 
 /**
+ * Resolve which work a patient-level visit summary should display. Prefer the active
+ * treatment (Status=1); when the patient has none (finished/discontinued), fall back to
+ * their most recent work so visit history stays visible. The original ProVisitSum took
+ * an explicit WorkID and was never active-only — scoping strictly to getActiveWID hid
+ * the entire history of every patient whose treatment was already complete.
+ */
+async function resolveSummaryWID(PID: number): Promise<number | null> {
+  const active = await getActiveWID(PID);
+  if (active != null) return active;
+  const row = await getKysely()
+    .selectFrom('tblwork')
+    .select('workid')
+    .where('PersonID', '=', PID)
+    // workid is identity (monotonic with creation) → highest = most recent work.
+    .orderBy('workid', 'desc')
+    .limit(1)
+    .executeTakeFirst();
+  return row?.workid ?? null;
+}
+
+/**
  * Retrieves visit summaries for a given patient ID. (was: ProVisitSum)
  */
 export async function getVisitsSummary(PID: number): Promise<VisitSummary[]> {
-  const WID = await getActiveWID(PID);
+  const WID = await resolveSummaryWID(PID);
   if (WID == null) return [];
   const rows = await getKysely()
     .selectFrom('tblvisits as v')

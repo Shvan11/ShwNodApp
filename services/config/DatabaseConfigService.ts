@@ -5,7 +5,7 @@
  */
 
 import EnvironmentManager, { DatabaseConfig, EnvironmentValidation, FileStatus } from './EnvironmentManager.js';
-import sql from 'mssql';
+import pg from 'pg';
 import { log } from '../../utils/logger.js';
 
 /**
@@ -101,8 +101,8 @@ class DatabaseConfigService {
       const config = await this.envManager.getDatabaseConfig();
 
       const displayConfig = { ...config };
-      if (!includeSensitive && displayConfig.DB_PASSWORD) {
-        displayConfig.DB_PASSWORD = '••••••••';
+      if (!includeSensitive && displayConfig.PG_PASSWORD) {
+        displayConfig.PG_PASSWORD = '••••••••';
       }
 
       return {
@@ -125,12 +125,12 @@ class DatabaseConfigService {
   async testConnection(testConfig: Partial<DatabaseConfig>): Promise<ConnectionTestResult> {
     const startTime = Date.now();
 
+    // PG_PASSWORD may be empty (trust/peer auth), so it is not required here.
     const required: Array<keyof DatabaseConfig> = [
-      'DB_SERVER',
-      'DB_INSTANCE',
-      'DB_DATABASE',
-      'DB_USER',
-      'DB_PASSWORD',
+      'PG_HOST',
+      'PG_PORT',
+      'PG_DATABASE',
+      'PG_USER',
     ];
     const missing = required.filter(
       (field) => !testConfig[field] || testConfig[field]!.trim() === ''
@@ -145,36 +145,34 @@ class DatabaseConfigService {
       };
     }
 
-    const mssqlConfig: sql.config = {
-      server: testConfig.DB_SERVER!,
-      database: testConfig.DB_DATABASE,
-      user: testConfig.DB_USER!,
-      password: testConfig.DB_PASSWORD!,
-      options: {
-        instanceName: testConfig.DB_INSTANCE,
-        encrypt: testConfig.DB_ENCRYPT === 'true',
-        trustServerCertificate: testConfig.DB_TRUST_CERTIFICATE === 'true',
-      },
-      connectionTimeout: parseInt(testConfig.DB_CONNECTION_TIMEOUT || '30000'),
-      requestTimeout: parseInt(testConfig.DB_REQUEST_TIMEOUT || '15000'),
-      pool: { max: 1, min: 0, idleTimeoutMillis: 1_000 },
-    };
+    const parsedPort = parseInt(testConfig.PG_PORT || '5432', 10);
+    const port = Number.isFinite(parsedPort) ? parsedPort : 5432;
+    const target = `${testConfig.PG_HOST}:${port}/${testConfig.PG_DATABASE}`;
 
-    log.info(`Testing database connection to ${testConfig.DB_SERVER}\\${testConfig.DB_INSTANCE}`);
+    // Short-lived pool, isolated from the app's runtime pool, so a bad test config
+    // can never poison the live connections.
+    const pool = new pg.Pool({
+      host: testConfig.PG_HOST,
+      port,
+      database: testConfig.PG_DATABASE,
+      user: testConfig.PG_USER,
+      password: testConfig.PG_PASSWORD || undefined,
+      max: 1,
+      connectionTimeoutMillis: 10_000,
+      idleTimeoutMillis: 1_000,
+    });
 
-    let pool: sql.ConnectionPool | null = null;
+    log.info(`Testing database connection to ${target}`);
+
     try {
-      pool = await new sql.ConnectionPool(mssqlConfig).connect();
-      const versionRow = await pool.request().query<{ version: string }>(
-        "SELECT CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(64)) AS version"
-      );
-      const serverVersion = versionRow.recordset[0]?.version ?? 'Unknown';
+      const result = await pool.query<{ version: string }>('SELECT version() AS version');
+      const serverVersion = result.rows[0]?.version ?? 'Unknown';
 
       log.info('Database connection test successful');
       return {
         success: true,
         message: 'Connection successful',
-        details: `Connected to ${testConfig.DB_SERVER}\\${testConfig.DB_INSTANCE}`,
+        details: `Connected to ${target}`,
         serverVersion,
         duration: Date.now() - startTime,
       };
@@ -189,9 +187,7 @@ class DatabaseConfigService {
         duration: Date.now() - startTime,
       };
     } finally {
-      if (pool) {
-        await pool.close().catch(() => {});
-      }
+      await pool.end().catch(() => {});
     }
   }
 
@@ -240,13 +236,12 @@ class DatabaseConfigService {
   validateConfiguration(config: Partial<DatabaseConfig>): ConfigValidation {
     const errors: string[] = [];
 
-    // Required fields
+    // Required fields (PG_PASSWORD may be empty for trust/peer auth)
     const required: Array<{ field: keyof DatabaseConfig; name: string }> = [
-      { field: 'DB_SERVER', name: 'Database Server' },
-      { field: 'DB_INSTANCE', name: 'Instance Name' },
-      { field: 'DB_DATABASE', name: 'Database Name' },
-      { field: 'DB_USER', name: 'Username' },
-      { field: 'DB_PASSWORD', name: 'Password' },
+      { field: 'PG_HOST', name: 'Host' },
+      { field: 'PG_PORT', name: 'Port' },
+      { field: 'PG_DATABASE', name: 'Database Name' },
+      { field: 'PG_USER', name: 'Username' },
     ];
 
     for (const { field, name } of required) {
@@ -255,30 +250,19 @@ class DatabaseConfigService {
       }
     }
 
-    // Validate boolean fields
-    const booleanFields: Array<keyof DatabaseConfig> = ['DB_ENCRYPT', 'DB_TRUST_CERTIFICATE'];
-    for (const field of booleanFields) {
-      if (config[field] && !['true', 'false'].includes(config[field]!)) {
-        errors.push(`${field} must be 'true' or 'false'`);
+    // Validate port
+    if (config.PG_PORT) {
+      const port = parseInt(config.PG_PORT, 10);
+      if (isNaN(port) || port < 1 || port > 65535) {
+        errors.push('PG_PORT must be a number between 1 and 65535');
       }
     }
 
-    // Validate numeric fields
-    const numericFields: Array<keyof DatabaseConfig> = ['DB_CONNECTION_TIMEOUT', 'DB_REQUEST_TIMEOUT'];
-    for (const field of numericFields) {
-      if (config[field]) {
-        const num = parseInt(config[field]!);
-        if (isNaN(num) || num < 1000 || num > 300000) {
-          errors.push(`${field} must be a number between 1000 and 300000`);
-        }
-      }
-    }
-
-    // Validate server name format
-    if (config.DB_SERVER) {
-      const serverName = config.DB_SERVER.trim();
-      if (serverName.includes(' ') || serverName.length > 255) {
-        errors.push('Server name contains invalid characters or is too long');
+    // Validate host format
+    if (config.PG_HOST) {
+      const host = config.PG_HOST.trim();
+      if (host.includes(' ') || host.length > 255) {
+        errors.push('Host contains invalid characters or is too long');
       }
     }
 
@@ -363,7 +347,7 @@ class DatabaseConfigService {
 
       // Sanitize sensitive data
       const sanitizedConfig: DatabaseConfig = { ...config };
-      sanitizedConfig.DB_PASSWORD = '••••••••';
+      sanitizedConfig.PG_PASSWORD = '••••••••';
 
       return {
         success: true,
@@ -387,45 +371,27 @@ class DatabaseConfigService {
   getConnectionPresets(): ConnectionPreset[] {
     return [
       {
-        id: 'local_sqlexpress',
-        name: 'Local SQL Server Express',
-        description: 'Local SQL Server Express instance',
+        id: 'local_sandbox',
+        name: 'Local Sandbox (shwan_test)',
+        description: 'Local PostgreSQL sandbox database on this machine',
         config: {
-          DB_SERVER: 'localhost',
-          DB_INSTANCE: 'SQLEXPRESS',
-          DB_DATABASE: 'ShwanNew',
-          DB_USER: '',
-          DB_PASSWORD: '',
-          DB_ENCRYPT: 'false',
-          DB_TRUST_CERTIFICATE: 'true',
+          PG_HOST: 'localhost',
+          PG_PORT: '5432',
+          PG_DATABASE: 'shwan_test',
+          PG_USER: 'shwan_app',
+          PG_PASSWORD: '',
         },
       },
       {
-        id: 'clinic_dolphin',
-        name: 'Clinic Dolphin Database',
-        description: 'Main clinic database server',
+        id: 'local_default',
+        name: 'Local PostgreSQL',
+        description: 'Default local PostgreSQL instance',
         config: {
-          DB_SERVER: 'CLINIC',
-          DB_INSTANCE: 'DOLPHIN',
-          DB_DATABASE: 'ShwanNew',
-          DB_USER: 'Staff',
-          DB_PASSWORD: '',
-          DB_ENCRYPT: 'false',
-          DB_TRUST_CERTIFICATE: 'true',
-        },
-      },
-      {
-        id: 'remote_secure',
-        name: 'Remote Secure Connection',
-        description: 'Remote database with encryption',
-        config: {
-          DB_SERVER: '',
-          DB_INSTANCE: '',
-          DB_DATABASE: 'ShwanNew',
-          DB_USER: '',
-          DB_PASSWORD: '',
-          DB_ENCRYPT: 'true',
-          DB_TRUST_CERTIFICATE: 'false',
+          PG_HOST: 'localhost',
+          PG_PORT: '5432',
+          PG_DATABASE: 'postgres',
+          PG_USER: 'postgres',
+          PG_PASSWORD: '',
         },
       },
     ];

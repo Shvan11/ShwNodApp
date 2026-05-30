@@ -17,6 +17,7 @@
 
 import { Router, type Request, type Response } from 'express';
 import { sql } from 'kysely';
+import { isUniqueViolation } from '../../utils/pg-errors.js';
 import { getKysely } from '../../services/database/kysely.js';
 import {
   getWorksByPatient,
@@ -559,6 +560,32 @@ router.put(
       }
       // ===== END FINANCIAL FIELDS PERMISSION CHECK =====
 
+      // ===== TOTAL-REQUIRED vs PAID GUARD (was DB CHECK CK_MoreThanTotalW) =====
+      // A work's TotalRequired must never drop below what's already been paid, or the
+      // work becomes overpaid. PostgreSQL can't host the old function-based CHECK, so
+      // enforce it here. (NULL/absent TotalRequired = no change / no limit → skip.)
+      if (
+        Object.prototype.hasOwnProperty.call(workData, 'TotalRequired') &&
+        workData.TotalRequired !== null &&
+        workData.TotalRequired !== undefined
+      ) {
+        const newTotal = Number(workData.TotalRequired);
+        const workForTotal = await getWorkDetailsFromQueries(
+          parseInt(String(workId))
+        );
+        const alreadyPaid = Number(
+          (workForTotal as { TotalPaid?: number } | null)?.TotalPaid ?? 0
+        );
+        if (Number.isFinite(newTotal) && newTotal < alreadyPaid) {
+          res.status(400).json({
+            error: 'Invalid total',
+            code: 'TOTAL_BELOW_PAID',
+            message: `Total required (${newTotal}) cannot be less than the amount already paid (${alreadyPaid}).`
+          });
+          return;
+        }
+      }
+
       // ===== DISCOUNT FIELDS PERMISSION + VALIDATION =====
       // Discount and DiscountDate are admin-only (financial concession).
       // DiscountReason is editable by any authenticated user.
@@ -749,9 +776,9 @@ router.post(
         rowsAffected: result.rowCount
       });
     } catch (error) {
-      // Handle unique constraint violation (patient already has active work)
-      const err = error as Error & { number?: number };
-      if (err.number === 2601 && err.message.includes('UNQ_tblWork_Active')) {
+      // Reactivating sets Status=1, which can collide with the patient's existing
+      // active work (partial unique index UNQ_tblWork_Active → pg SQLSTATE 23505).
+      if (isUniqueViolation(error, 'UNQ_tblWork_Active')) {
         ErrorResponses.conflict(
           res,
           'Cannot reactivate: Patient already has an active work'

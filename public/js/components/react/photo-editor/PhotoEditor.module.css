@@ -9,9 +9,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
   padding: var(--spacing-sm) var(--spacing-md);
   border-bottom: 1px solid var(--border-color, #e5e7eb);
   background: var(--background-primary);
+}
+
+/* Title + the relocated per-slot quick actions, grouped on the left. */
+.leftCluster {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  min-width: 0;
 }
 
 .titleBlock {
@@ -32,6 +42,65 @@
 .count {
   color: var(--text-muted, #6b7280);
   font-size: 0.85rem;
+}
+
+.rightTools {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+/* View-only zoom cluster. Drives the --pe-zoom custom property to shrink the slot
+   grid's width only, so the slots fit on screen without scrolling. The sidebar is
+   sized by the draggable divider (--pe-sidebar-w), not by zoom. Pure layout — no
+   effect on saved output. */
+.zoomControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+}
+
+.zoomBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--text-color, #374151);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.zoomBtn:hover:not(:disabled) {
+  background: var(--background-secondary);
+}
+
+.zoomBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.zoomLabel {
+  min-width: 46px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-color, #374151);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  cursor: pointer;
+}
+
+.zoomLabel:hover {
+  color: var(--primary-color);
 }
 
 .saveBtn {
@@ -67,8 +136,101 @@
   overflow: auto;
 }
 
+/* Draggable divider between the slot grid and the Sequence Files sidebar. Its 6px
+   width is a comfortable grab target; the centered line is the visible divider —
+   1px at rest, thickening to 3px and turning primary on hover/drag. PhotoEditor's
+   pointer handler updates --pe-sidebar-w on .body as this is dragged. */
+.resizer {
+  flex: 0 0 6px;
+  position: relative;
+  cursor: col-resize;
+  background: transparent;
+  touch-action: none;
+}
+
+.resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--border-color, #e5e7eb);
+  transition: background var(--transition-fast), width var(--transition-fast);
+}
+
+.resizer:hover::after,
+.resizer:active::after {
+  width: 3px;
+  background: var(--primary-color);
+}
+
 .notice {
   padding: var(--spacing-xl);
   text-align: center;
   color: var(--text-muted, #6b7280);
+}
+
+/* Per-view "Remove" confirmation dialog (rendered inside the shared <Modal>). */
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  max-width: 420px;
+  padding: var(--spacing-lg);
+}
+
+.confirmTitle {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-color, #374151);
+}
+
+.confirmText {
+  margin: 0;
+  color: var(--text-muted, #6b7280);
+  line-height: 1.5;
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.confirmCancel,
+.confirmDanger {
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.confirmCancel {
+  background: var(--background-secondary);
+  color: var(--text-color, #374151);
+}
+
+.confirmCancel:hover:not(:disabled) {
+  background: var(--border-color, #e5e7eb);
+}
+
+.confirmDanger {
+  background: var(--error-color, #dc2626);
+  color: #fff;
+}
+
+.confirmDanger:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.confirmCancel:disabled,
+.confirmDanger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

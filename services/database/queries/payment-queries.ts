@@ -130,8 +130,11 @@ export async function addInvoice(invoiceData: InvoiceData): Promise<{ invoiceID:
   const { workid, amountPaid, paymentDate, usdReceived, iqdReceived, change } = invoiceData;
 
   // Wrapped so the PatientType trigger (patient-type transition on the FIRST payment for a work)
-  // commits atomically with the invoice. (Note: the old function-based overpayment CHECK
-  // CK_MoreThanTotal is intentionally NOT re-enforced here — flagged for Phase 7.)
+  // commits atomically with the invoice. The old function-based overpayment CHECK
+  // (CK_MoreThanTotal: SUM(Amountpaid) <= TotalRequired) is re-enforced upstream in
+  // PaymentService.validateAndCreateInvoice — the sole caller — which rejects a payment
+  // that exceeds the remaining balance (TotalRequired - Discount - TotalPaid) before this
+  // runs. Aligner-set payments are likewise guarded in AlignerService.validateAndCreateAlignerPayment.
   const invoiceID = await withPgTransaction(async (trx) => {
     const row = await trx
       .insertInto('tblInvoice')

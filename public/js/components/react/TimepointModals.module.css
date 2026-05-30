@@ -1,0 +1,140 @@
+/**
+ * Shared content styles for the time-point Edit and Delete modals. The overlay,
+ * portal, focus-trap and dismiss behaviour come from the shared <Modal>; this
+ * module only styles the inner card (header / body / footer / form fields).
+ */
+.modalContent {
+    width: 100%;
+    max-width: 460px;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.modalSm {
+    max-width: 420px;
+}
+
+.modalHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.modalHeader h2 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-800);
+}
+
+.closeBtn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--gray-500);
+    cursor: pointer;
+    padding: 0 0.25rem;
+}
+
+.closeBtn:hover {
+    color: var(--gray-800);
+}
+
+.modalBody {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.input {
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    font-size: 0.9375rem;
+    color: var(--gray-800);
+    background: var(--gray-50);
+    border: 1px solid var(--gray-300);
+    border-radius: 8px;
+}
+
+.input:focus {
+    outline: none;
+    border-color: var(--indigo-500);
+    box-shadow: var(--shadow-focus);
+}
+
+.warningText {
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    color: var(--gray-700);
+}
+
+.consequenceList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.consequenceList li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9375rem;
+    line-height: 1.4;
+}
+
+.consequenceList li i {
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.consequenceRemoved {
+    color: var(--gray-800);
+}
+
+.consequenceRemoved i {
+    color: var(--danger-color);
+}
+
+.consequenceKept {
+    color: var(--gray-500);
+}
+
+.consequenceKept i {
+    color: var(--success-600);
+}
+
+.warningSubtle {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+}
+
+.modalFooter {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.625rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--gray-200);
+}

@@ -10,18 +10,17 @@ import path from 'path';
 import { log } from '../../utils/logger.js';
 
 /**
- * Database configuration interface
+ * Database configuration interface (PostgreSQL / node-postgres).
+ *
+ * Keys mirror the PG_* environment variables the app boots from (see config/config.ts
+ * and .env.example). The retired SQL Server DB_* keys are no longer modelled here.
  */
 export interface DatabaseConfig {
-  DB_SERVER: string;
-  DB_INSTANCE: string;
-  DB_DATABASE: string;
-  DB_USER: string;
-  DB_PASSWORD: string;
-  DB_ENCRYPT: string;
-  DB_TRUST_CERTIFICATE: string;
-  DB_CONNECTION_TIMEOUT: string;
-  DB_REQUEST_TIMEOUT: string;
+  PG_HOST: string;
+  PG_PORT: string;
+  PG_DATABASE: string;
+  PG_USER: string;
+  PG_PASSWORD: string;
 }
 
 /**
@@ -127,7 +126,7 @@ class EnvironmentManager {
 
     // Database configuration section
     const dbVars = Object.keys(envVars)
-      .filter((key) => key.startsWith('DB_'))
+      .filter((key) => key.startsWith('PG_'))
       .sort();
 
     if (dbVars.length > 0) {
@@ -143,7 +142,7 @@ class EnvironmentManager {
 
     // Other configuration sections
     const otherVars = Object.keys(envVars)
-      .filter((key) => !key.startsWith('DB_'))
+      .filter((key) => !key.startsWith('PG_'))
       .sort();
 
     if (otherVars.length > 0) {
@@ -263,15 +262,11 @@ class EnvironmentManager {
       const env = await this.readEnvFile();
 
       return {
-        DB_SERVER: env.DB_SERVER || '',
-        DB_INSTANCE: env.DB_INSTANCE || '',
-        DB_DATABASE: env.DB_DATABASE || 'ShwanNew',
-        DB_USER: env.DB_USER || '',
-        DB_PASSWORD: env.DB_PASSWORD || '',
-        DB_ENCRYPT: env.DB_ENCRYPT || 'false',
-        DB_TRUST_CERTIFICATE: env.DB_TRUST_CERTIFICATE || 'true',
-        DB_CONNECTION_TIMEOUT: env.DB_CONNECTION_TIMEOUT || '30000',
-        DB_REQUEST_TIMEOUT: env.DB_REQUEST_TIMEOUT || '15000',
+        PG_HOST: env.PG_HOST || 'localhost',
+        PG_PORT: env.PG_PORT || '5432',
+        PG_DATABASE: env.PG_DATABASE || 'shwan_test',
+        PG_USER: env.PG_USER || 'shwan_app',
+        PG_PASSWORD: env.PG_PASSWORD || '',
       };
     } catch (error) {
       log.error('Failed to get database configuration', { error: (error as Error).message });
@@ -284,13 +279,12 @@ class EnvironmentManager {
    */
   async updateDatabaseConfig(dbConfig: Partial<DatabaseConfig>): Promise<DatabaseConfig> {
     try {
-      // Validate required fields
+      // Validate required fields (PG_PASSWORD may be empty for trust/peer auth)
       const required: Array<keyof DatabaseConfig> = [
-        'DB_SERVER',
-        'DB_INSTANCE',
-        'DB_DATABASE',
-        'DB_USER',
-        'DB_PASSWORD',
+        'PG_HOST',
+        'PG_PORT',
+        'PG_DATABASE',
+        'PG_USER',
       ];
       for (const field of required) {
         if (!dbConfig[field] || dbConfig[field]!.trim() === '') {
@@ -301,15 +295,11 @@ class EnvironmentManager {
       // Prepare database-specific updates
       const dbUpdates: Record<string, string> = {};
       const validFields: Array<keyof DatabaseConfig> = [
-        'DB_SERVER',
-        'DB_INSTANCE',
-        'DB_DATABASE',
-        'DB_USER',
-        'DB_PASSWORD',
-        'DB_ENCRYPT',
-        'DB_TRUST_CERTIFICATE',
-        'DB_CONNECTION_TIMEOUT',
-        'DB_REQUEST_TIMEOUT',
+        'PG_HOST',
+        'PG_PORT',
+        'PG_DATABASE',
+        'PG_USER',
+        'PG_PASSWORD',
       ];
 
       for (const field of validFields) {
@@ -347,10 +337,10 @@ class EnvironmentManager {
 
       // Check for required database fields
       const required: Array<keyof DatabaseConfig> = [
-        'DB_SERVER',
-        'DB_INSTANCE',
-        'DB_USER',
-        'DB_PASSWORD',
+        'PG_HOST',
+        'PG_PORT',
+        'PG_DATABASE',
+        'PG_USER',
       ];
       const missing = required.filter((field) => !dbConfig[field]);
 

@@ -369,8 +369,11 @@
     --input-height-lg: 3.5rem;
 
     /* Layout dimensions */
+    /* Fixed universal-header footprint — single source of truth for: #app-container's
+       top padding (index.html), full-height page shells that subtract it from 100vh,
+       and toast / settings-nav top offsets. Responsive overrides are just below this
+       :root block (the header wraps to more rows as the viewport narrows). */
     --header-height: 50px;
-    /* Universal header height */
 
     /* ===================================================================
        Component-CSS back-compat tokens
@@ -423,6 +426,15 @@
     --border-radius: var(--radius-md);
     --spacing-2xl: var(--spacing-xxl);
 }
+
+/* Responsive --header-height: the universal header wraps to extra rows as the
+   viewport narrows, so the content offset must grow to match. These mirror the
+   breakpoints #app-container's padding-top used before it was tokenised. */
+@media (max-width: 1024px) { :root { --header-height: 80px; } }
+@media (max-width: 768px)  { :root { --header-height: 110px; } }
+@media (max-width: 640px)  { :root { --header-height: 100px; } }
+@media (max-width: 480px)  { :root { --header-height: 95px; } }
+@media (max-width: 375px)  { :root { --header-height: 90px; } }
 
 /* Calendar week/day-view redesign — uniform 112px slot system.
    Reuses --color-purple-medium (#6d67c6) and --color-teal (#20c997). */
