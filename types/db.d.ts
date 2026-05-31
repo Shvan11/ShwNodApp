@@ -9,6 +9,8 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S, I | undefined, U>
   : ColumnType<T, T | undefined, T>;
 
+export type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>;
+
 export type Json = JsonValue;
 
 export type JsonArray = JsonValue[];
@@ -30,6 +32,23 @@ export interface AlignerDoctors {
   DoctorName: string;
   DrID: Generated<number>;
   LogoPath: string | null;
+}
+
+export interface CdcSinkControl {
+  enabled: Generated<boolean>;
+  note: string | null;
+  sink: string;
+  stale: Generated<boolean>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface ChangeLog {
+  changed_at: Generated<Timestamp>;
+  id: Generated<Int8>;
+  op: string;
+  pk: string;
+  sink: string;
+  tbl: string;
 }
 
 export interface DocumentTemplates {
@@ -71,6 +90,13 @@ export interface DocumentTypes {
   type_code: string;
   type_id: Generated<number>;
   type_name: string;
+}
+
+export interface DolphinSyncMap {
+  created_at: Generated<Timestamp>;
+  dolphin_id: string;
+  local_pk: string;
+  local_table: string;
 }
 
 export interface Patients {
@@ -757,8 +783,11 @@ export interface TblWorkType {
 
 export interface DB {
   AlignerDoctors: AlignerDoctors;
+  cdc_sink_control: CdcSinkControl;
+  change_log: ChangeLog;
   DocumentTemplates: DocumentTemplates;
   DocumentTypes: DocumentTypes;
+  dolphin_sync_map: DolphinSyncMap;
   Patients: Patients;
   pgmigrations: Pgmigrations;
   portal_sessions: PortalSessions;

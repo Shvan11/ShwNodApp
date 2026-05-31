@@ -1,0 +1,277 @@
+/* Supabase Status — read-only sync health panel */
+
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding-bottom: 1rem;
+    border-bottom: 3px solid var(--gray-200);
+}
+
+.title {
+    color: var(--color-purple-light);
+    font-size: 1.8rem;
+    margin: 0 0 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 700;
+}
+
+.title i {
+    font-size: 1.5rem;
+}
+
+.description {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.headerActions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+}
+
+.checkedAt {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.refreshBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1rem;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    background: white;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.3s ease, color 0.3s ease;
+}
+
+.refreshBtn:hover:not(:disabled) {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.refreshBtn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Loading / error states */
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    height: 160px;
+    color: var(--text-secondary);
+}
+
+.loading i {
+    font-size: 1.5rem;
+    color: var(--primary-color);
+}
+
+.errorBanner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--error-50);
+    color: var(--error-600);
+    border-left: 4px solid var(--error-400);
+    padding: 0.85rem 1rem;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+/* Sink cards */
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+.card {
+    background: white;
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--gray-200);
+    border-left: 5px solid var(--gray-200);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    padding: 1.5rem;
+    transition: box-shadow 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+}
+
+.card.ok {
+    border-left-color: var(--success-300);
+}
+
+.card.warn {
+    border-left-color: var(--warning-300);
+}
+
+.card.down {
+    border-left-color: var(--error-400);
+}
+
+.card.off {
+    border-left-color: var(--gray-200);
+}
+
+.cardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.sinkName {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.sinkDescription {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin: 0 0 1rem;
+}
+
+/* Status badge + dot */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.badge.ok {
+    background: var(--success-50);
+    color: var(--success-800);
+}
+
+.badge.warn {
+    background: var(--warning-100);
+    color: var(--warning-900);
+}
+
+.badge.down {
+    background: var(--error-50);
+    color: var(--error-600);
+}
+
+.badge.off {
+    background: var(--gray-100);
+    color: var(--text-secondary);
+}
+
+.dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.badge.ok .dot {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.4;
+    }
+}
+
+/* Detail rows */
+.rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin: 0;
+}
+
+.row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    font-size: 0.9rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--gray-100, #f1f1f1);
+}
+
+.row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.row dt {
+    color: var(--text-secondary);
+    font-weight: 600;
+    flex: 0 0 auto;
+}
+
+.row dd {
+    margin: 0;
+    color: var(--text-primary);
+    text-align: right;
+    word-break: break-word;
+}
+
+.warnText {
+    color: var(--warning-900);
+    font-weight: 700;
+}
+
+.subtle {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+    }
+
+    .headerActions {
+        align-items: flex-start;
+    }
+}

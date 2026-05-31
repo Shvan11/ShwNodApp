@@ -1,13 +1,11 @@
 /**
  * On-demand record fetch for the forward sync (PostgreSQL → Supabase).
  *
- * The app-level enqueue (sync-queue.ts) writes SyncQueue rows with `JsonData = NULL`
- * (the "optimized flow"), so the processors fetch the current row from PG when they
- * dequeue it. These helpers return the exact snake_case column subsets the old
- * `trg_sync_*` triggers emitted via `FOR JSON PATH`, so the Supabase upsert payloads
- * are unchanged.
+ * The unified CDC PortalSink (services/sync/cdc/portal-sink.ts) calls fetchRecordFromPg(portalTable,
+ * id) to read the current row when draining a change. These helpers return the exact snake_case
+ * column subsets the portal Supabase schema expects, so the upsert payloads are unchanged.
  *
- * Phase 8 of the SQL Server → PostgreSQL migration. Reads via Kysely over the pg pool.
+ * Reads via Kysely over the pg pool.
  */
 import { getKysely } from '../database/kysely.js';
 

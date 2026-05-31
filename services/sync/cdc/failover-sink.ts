@@ -1,0 +1,126 @@
+/**
+ * Unified CDC — failover sink. Raw 1:1 replica: every captured local row is upserted byte-for-byte
+ * into the off-site Supabase failover project (project shwan-failover) over the session pooler.
+ *
+ * Table → PK is auto-discovered from the live schema (tables carrying trg_cdc_capture with a
+ * single-column PK), so the set tracks the trigger migrations with no list here.
+ */
+import pg from 'pg';
+import type { Pool } from 'pg';
+import { getPgPool } from '../../database/kysely.js';
+import { log } from '../../../utils/logger.js';
+import type { SyncSink } from './types.js';
+
+const { Pool: PgPool } = pg;
+
+function qIdent(id: string): string {
+  return '"' + id.replace(/"/g, '""') + '"';
+}
+
+/**
+ * Drop any `sslmode=` query param from a PG connection string, preserving everything else
+ * (credentials included). Newer pg-connection-string coerces `sslmode=require` → `verify-full`,
+ * which overrides our explicit `ssl: { rejectUnauthorized: false }` and fails the TLS handshake
+ * against the Supabase pooler's self-signed chain. Removing it lets the ssl object win — the
+ * connection stays encrypted, just without chain validation. Exported so the status-ping in
+ * routes/sync-webhook.ts builds the pool identically and reports the sink's true reachability.
+ */
+export function stripSslMode(connStr: string): string {
+  return connStr
+    .replace(/([?&])sslmode=[^&]*/gi, '$1') // drop the param, keep its leading separator
+    .replace(/\?&/g, '?')
+    .replace(/&&/g, '&') // collapse separators left behind
+    .replace(/[?&]$/g, ''); // trim a dangling separator
+}
+
+async function loadPks(local: Pool): Promise<Map<string, string>> {
+  const { rows } = await local.query<{ tbl: string; pk: string }>(
+    `SELECT c.relname AS tbl, a.attname AS pk
+       FROM pg_trigger tg
+       JOIN pg_class c     ON c.oid = tg.tgrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'public'
+       JOIN pg_index i     ON i.indrelid = c.oid AND i.indisprimary AND array_length(i.indkey::int[], 1) = 1
+       JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = i.indkey[0]
+      WHERE tg.tgname = 'trg_cdc_capture'`
+  );
+  const m = new Map<string, string>();
+  for (const r of rows) m.set(r.tbl, r.pk);
+  return m;
+}
+
+export class FailoverSink implements SyncSink {
+  readonly name = 'failover';
+  private pool: Pool | null = null;
+  private pkCache: Map<string, string> | null = null;
+
+  async init(): Promise<void> {
+    const url = process.env.SUPABASE_FAILOVER_DB_URL ?? '';
+    if (!url) throw new Error('SUPABASE_FAILOVER_DB_URL not set');
+    this.pool = new PgPool({
+      connectionString: stripSslMode(url),
+      ssl: { rejectUnauthorized: false }, // Supabase pooler terminates TLS; chain not validated here
+      max: 4,
+      connectionTimeoutMillis: 10_000,
+      idleTimeoutMillis: 30_000,
+    });
+    this.pool.on('error', (e: Error) => log.error('[cdc:failover] replica pool error', { error: e.message }));
+    this.pkCache = null;
+  }
+
+  async close(): Promise<void> {
+    if (this.pool) {
+      try {
+        await this.pool.end();
+      } catch {
+        /* already closing */
+      }
+      this.pool = null;
+    }
+  }
+
+  private async pkFor(table: string): Promise<string | undefined> {
+    const local = getPgPool();
+    if (!this.pkCache) this.pkCache = await loadPks(local);
+    if (!this.pkCache.has(table)) this.pkCache = await loadPks(local); // refresh once for a new trigger
+    return this.pkCache.get(table);
+  }
+
+  async upsert(table: string, pk: string): Promise<void> {
+    const pkCol = await this.pkFor(table);
+    if (!pkCol) {
+      log.warn(`[cdc:failover] no single-PK trigger for "${table}" — skipping`);
+      return;
+    }
+    const local = getPgPool();
+    // to_jsonb so wall-clock timestamps transfer as text without UTC drift.
+    const found = await local.query<{ r: Record<string, unknown> }>(
+      `SELECT to_jsonb(t.*) AS r FROM ${qIdent(table)} t WHERE ${qIdent(pkCol)} = $1`,
+      [pk]
+    );
+    if (found.rows.length === 0) {
+      await this.remove(table, pk);
+      return;
+    }
+    const row = found.rows[0].r;
+    const cols = Object.keys(row);
+    const colList = cols.map(qIdent).join(', ');
+    const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
+    const setList = cols
+      .filter((c) => c !== pkCol)
+      .map((c) => `${qIdent(c)} = EXCLUDED.${qIdent(c)}`)
+      .join(', ');
+    const conflict = setList
+      ? `ON CONFLICT (${qIdent(pkCol)}) DO UPDATE SET ${setList}`
+      : `ON CONFLICT (${qIdent(pkCol)}) DO NOTHING`;
+    await this.pool!.query(
+      `INSERT INTO ${qIdent(table)} (${colList}) VALUES (${placeholders}) ${conflict}`,
+      cols.map((c) => row[c])
+    );
+  }
+
+  async remove(table: string, pk: string): Promise<void> {
+    const pkCol = await this.pkFor(table);
+    if (!pkCol) return;
+    await this.pool!.query(`DELETE FROM ${qIdent(table)} WHERE ${qIdent(pkCol)} = $1`, [pk]);
+  }
+}

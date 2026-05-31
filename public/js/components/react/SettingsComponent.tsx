@@ -17,6 +17,7 @@ import ExchangeRatesSettings from './ExchangeRatesSettings';
 import LookupsSettings from './LookupsSettings';
 import ProtocolHandlersSettings from './ProtocolHandlersSettings';
 import CalendarTimesSettings from './CalendarTimesSettings';
+import SupabaseStatusSettings from './SupabaseStatusSettings';
 
 // Types
 interface SettingsTabComponentProps {
@@ -58,6 +59,7 @@ const SettingsComponent: React.FC = () => {
         exchangeRates: { hasChanges: false },
         lookups: { hasChanges: false },
         calendarTimes: { hasChanges: false },
+        supabaseStatus: { hasChanges: false },
         messaging: { hasChanges: false },
         system: { hasChanges: false },
         security: { hasChanges: false },
@@ -144,6 +146,14 @@ const SettingsComponent: React.FC = () => {
             icon: 'fas fa-clock',
             component: CalendarTimesSettings,
             description: 'Configure calendar time slot visibility'
+        },
+        {
+            id: 'supabaseStatus',
+            label: 'Supabase Status',
+            icon: 'fas fa-cloud',
+            component: SupabaseStatusSettings,
+            description: 'Live status of Supabase portal & failover sync',
+            adminOnly: true // exposes sync infrastructure detail
         },
         {
             id: 'messaging',

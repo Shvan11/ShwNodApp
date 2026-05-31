@@ -32,7 +32,6 @@ import { getKysely, withPgTransaction, type Database } from '../kysely.js';
 
 type PgTransaction = Transaction<Database>;
 import { toDateOnly } from '../../../utils/date.js';
-import { enqueueSync, enqueueSyncMany } from '../../sync/sync-queue.js';
 import config from '../../../config/config.js';
 import { log } from '../../../utils/logger.js';
 
@@ -413,7 +412,6 @@ export async function createDoctor(doctorData: DoctorData): Promise<number | nul
         .returning('DrID')
         .executeTakeFirstOrThrow();
 
-      await enqueueSync(trx, 'aligner_doctors', row.DrID, 'INSERT');
       return row.DrID;
     });
   } catch (err) {
@@ -442,7 +440,6 @@ export async function updateDoctor(drID: number, doctorData: DoctorData): Promis
         .where('DrID', '=', drID)
         .execute();
 
-      await enqueueSync(trx, 'aligner_doctors', drID, 'UPDATE');
     });
   } catch (err) {
     log.error('Failed to update doctor', {
@@ -459,7 +456,6 @@ export async function deleteDoctor(drID: number): Promise<void> {
   try {
     await withPgTransaction(async (trx) => {
       await trx.deleteFrom('AlignerDoctors').where('DrID', '=', drID).execute();
-      await enqueueSync(trx, 'aligner_doctors', drID, 'DELETE');
     });
   } catch (err) {
     log.error('Failed to delete doctor', {
@@ -829,20 +825,12 @@ export async function createAlignerSet(setData: AlignerSetData): Promise<number 
     return await withPgTransaction(async (trx) => {
       // Deactivate all other sets for this work if creating an active set
       if (isActive) {
-        const deactivated = await trx
+        await trx
           .updateTable('tblAlignerSets')
           .set({ IsActive: false })
           .where('WorkID', '=', WorkID)
           .where('IsActive', '=', true)
-          .returning('AlignerSetID')
           .execute();
-        // Sibling sets had IsActive flipped → sync them too (trg_sync_AlignerSets UPDATE).
-        await enqueueSyncMany(
-          trx,
-          'aligner_sets',
-          deactivated.map((r) => r.AlignerSetID),
-          'UPDATE'
-        );
       }
 
       const inserted = await trx
@@ -867,8 +855,6 @@ export async function createAlignerSet(setData: AlignerSetData): Promise<number 
         })
         .returning('AlignerSetID')
         .executeTakeFirstOrThrow();
-
-      await enqueueSync(trx, 'aligner_sets', inserted.AlignerSetID, 'INSERT');
 
       log.debug(`[DB QUERY TIMING] Total createAlignerSet() took: ${Date.now() - startTime}ms`);
       return inserted.AlignerSetID;
@@ -968,7 +954,6 @@ export async function updateAlignerSet(
         .where('AlignerSetID', '=', setId)
         .execute();
 
-      await enqueueSync(trx, 'aligner_sets', setId, 'UPDATE');
     });
   } catch (err) {
     log.error('Failed to update aligner set', {
@@ -999,7 +984,6 @@ export async function deleteAlignerSet(setId: number): Promise<void> {
   try {
     await withPgTransaction(async (trx) => {
       await trx.deleteFrom('tblAlignerSets').where('AlignerSetID', '=', setId).execute();
-      await enqueueSync(trx, 'aligner_sets', setId, 'DELETE');
     });
   } catch (err) {
     log.error('Failed to delete aligner set', {
@@ -1322,8 +1306,7 @@ export async function createBatch(batchData: BatchData): Promise<number | null> 
     if (loConsumed > remL) throw new Error(`Cannot add aligner batch: requested lower aligners (${loConsumed}) exceed remaining count (${remL})`);
 
     if (isActive) {
-      const deactivated = await trx.updateTable('tblAlignerBatches').set({ IsActive: false }).where('AlignerSetID', '=', AlignerSetID).where('IsActive', '=', true).returning('AlignerBatchID').execute();
-      await enqueueSyncMany(trx, 'aligner_batches', deactivated.map((r) => r.AlignerBatchID), 'UPDATE');
+      await trx.updateTable('tblAlignerBatches').set({ IsActive: false }).where('AlignerSetID', '=', AlignerSetID).where('IsActive', '=', true).execute();
     }
 
     const upperBase = hasU ? -1 : 0;
@@ -1363,10 +1346,6 @@ export async function createBatch(batchData: BatchData): Promise<number | null> 
       .where('AlignerSetID', '=', AlignerSetID)
       .execute();
 
-    // Forward sync: the new batch (INSERT) + the set whose Remaining* changed (UPDATE).
-    await enqueueSync(trx, 'aligner_batches', row.AlignerBatchID, 'INSERT');
-    await enqueueSync(trx, 'aligner_sets', AlignerSetID, 'UPDATE');
-
     return row.AlignerBatchID;
   });
 }
@@ -1404,28 +1383,6 @@ async function resequenceBatches(trx: PgTransaction, setId: number): Promise<voi
       "LowerAlignerStartSequence" = CASE WHEN c."LowerAlignerCount" > 0 THEN c.prevlower + CASE WHEN c.firsthaslower THEN 0 ELSE 1 END ELSE NULL END
     FROM cumulative c WHERE b."AlignerBatchID" = c."AlignerBatchID"
   `.execute(trx);
-}
-
-/**
- * Forward-sync cascade for a batch mutation that can touch sibling rows (resequencing,
- * activation) and/or the parent set's stored state. Enqueues every batch in the set as an
- * UPDATE — a harmless superset of the per-row trigger behaviour, since re-upserting an
- * unchanged row to Supabase is idempotent — and, when `includeSet`, the set itself. No-op
- * when sync is disabled (the sandbox default), so it adds no query overhead there.
- */
-async function enqueueBatchSetCascade(
-  trx: PgTransaction,
-  setId: number,
-  includeSet = true
-): Promise<void> {
-  if (!config.sync.enabled) return;
-  const batches = await trx
-    .selectFrom('tblAlignerBatches')
-    .select('AlignerBatchID')
-    .where('AlignerSetID', '=', setId)
-    .execute();
-  await enqueueSyncMany(trx, 'aligner_batches', batches.map((b) => b.AlignerBatchID), 'UPDATE');
-  if (includeSet) await enqueueSync(trx, 'aligner_sets', setId, 'UPDATE');
 }
 
 /**
@@ -1548,9 +1505,6 @@ export async function updateBatch(
         .execute();
     }
 
-    // Forward sync: this batch + any resequenced siblings (UPDATE) + the set whose
-    // Remaining* may have changed (UPDATE).
-    await enqueueBatchSetCascade(trx, AlignerSetID);
   });
 
   // usp_UpdateAlignerBatch returned no result set → no deactivated-batch info.
@@ -1611,9 +1565,7 @@ export async function updateBatchStatus(
       if (manufactured && target === null) {
         return { ...base, message: 'Batch already manufactured' };
       }
-      await trx.updateTable('tblAlignerBatches').set({ ManufactureDate: target ?? today }).where('AlignerBatchID', '=', batchId).execute();
-      await enqueueBatchSetCascade(trx, setId, false);
-      return { ...base, message: manufactured ? 'Manufacture date updated' : 'Batch marked as manufactured' };
+      await trx.updateTable('tblAlignerBatches').set({ ManufactureDate: target ?? today }).where('AlignerBatchID', '=', batchId).execute();      return { ...base, message: manufactured ? 'Manufacture date updated' : 'Batch marked as manufactured' };
     }
 
     if (action === 'DELIVER') {
@@ -1644,22 +1596,16 @@ export async function updateBatchStatus(
         await trx.updateTable('tblAlignerBatches').set({ IsActive: false }).where('AlignerSetID', '=', setId).where('AlignerBatchID', '<>', batchId).where('IsActive', '=', true).execute();
         await trx.updateTable('tblAlignerBatches').set({ IsActive: true }).where('AlignerBatchID', '=', batchId).execute();
         wasActivated = true;
-      }
-      await enqueueBatchSetCascade(trx, setId, false);
-      return { ...base, wasActivated, previouslyActiveBatchSequence, message: delivered ? 'Delivery date updated' : 'Batch marked as delivered' };
+      }      return { ...base, wasActivated, previouslyActiveBatchSequence, message: delivered ? 'Delivery date updated' : 'Batch marked as delivered' };
     }
 
     if (action === 'UNDO_MANUFACTURE') {
       if (delivered) throw new Error('Cannot undo manufacture: batch already delivered. Undo delivery first.');
-      await trx.updateTable('tblAlignerBatches').set({ ManufactureDate: null }).where('AlignerBatchID', '=', batchId).execute();
-      await enqueueBatchSetCascade(trx, setId, false);
-      return { ...base, message: 'Manufacture undone' };
+      await trx.updateTable('tblAlignerBatches').set({ ManufactureDate: null }).where('AlignerBatchID', '=', batchId).execute();      return { ...base, message: 'Manufacture undone' };
     }
 
     if (action === 'UNDO_DELIVERY') {
-      await trx.updateTable('tblAlignerBatches').set({ DeliveredToPatientDate: null, IsActive: false }).where('AlignerBatchID', '=', batchId).execute();
-      await enqueueBatchSetCascade(trx, setId, false);
-      return { ...base, message: 'Delivery undone (batch deactivated)' };
+      await trx.updateTable('tblAlignerBatches').set({ DeliveredToPatientDate: null, IsActive: false }).where('AlignerBatchID', '=', batchId).execute();      return { ...base, message: 'Delivery undone (batch deactivated)' };
     }
 
     throw new Error('Invalid action. Must be MANUFACTURE, DELIVER, UNDO_MANUFACTURE, or UNDO_DELIVERY');
@@ -1693,10 +1639,6 @@ export async function deleteBatch(batchId: number): Promise<void> {
 
     await resequenceBatches(trx, batch.AlignerSetID);
 
-    // Forward sync: the deleted batch (DELETE) + remaining resequenced siblings + the set
-    // whose Remaining* changed (UPDATE).
-    await enqueueSync(trx, 'aligner_batches', batchId, 'DELETE');
-    await enqueueBatchSetCascade(trx, batch.AlignerSetID);
   });
 }
 
@@ -1810,12 +1752,6 @@ export async function createNote(
           .execute();
       }
 
-      // Forward sync: only Lab notes are pushed to Supabase (Doctor notes originate in the
-      // portal — syncing them back would loop). Mirrors trg_sync_tblAlignerNotes.
-      if (noteType === 'Lab') {
-        await enqueueSync(trx, 'aligner_notes', row.NoteID, 'INSERT');
-      }
-
       return row.NoteID;
     });
   } catch (err) {
@@ -1858,16 +1794,11 @@ export async function getNoteById(noteId: number): Promise<NoteInfo | null> {
 export async function updateNote(noteId: number, noteText: string): Promise<void> {
   try {
     await withPgTransaction(async (trx) => {
-      const row = await trx
+      await trx
         .updateTable('tblAlignerNotes')
         .set({ NoteText: noteText.trim(), IsEdited: true, EditedAt: sql`localtimestamp` })
         .where('NoteID', '=', noteId)
-        .returning('NoteType')
-        .executeTakeFirst();
-      // Only Lab-note edits forward-sync (Doctor edits come from the portal).
-      if (row?.NoteType === 'Lab') {
-        await enqueueSync(trx, 'aligner_notes', noteId, 'UPDATE');
-      }
+        .execute();
     });
   } catch (err) {
     log.error('Failed to update note', {
@@ -1883,17 +1814,13 @@ export async function updateNote(noteId: number, noteText: string): Promise<void
 export async function toggleNoteReadStatus(noteId: number): Promise<void> {
   try {
     await withPgTransaction(async (trx) => {
-      const row = await trx
+      await trx
         .updateTable('tblAlignerNotes')
         .set((eb) => ({
           IsRead: sql<boolean>`case when ${eb.ref('IsRead')} = true then false else true end`,
         }))
         .where('NoteID', '=', noteId)
-        .returning('NoteType')
-        .executeTakeFirst();
-      if (row?.NoteType === 'Lab') {
-        await enqueueSync(trx, 'aligner_notes', noteId, 'UPDATE');
-      }
+        .execute();
     });
   } catch (err) {
     log.error('Failed to toggle note read status', {
@@ -1910,8 +1837,6 @@ export async function deleteNote(noteId: number): Promise<void> {
   try {
     await withPgTransaction(async (trx) => {
       await trx.deleteFrom('tblAlignerNotes').where('NoteID', '=', noteId).execute();
-      // DELETE forward-syncs for all note types (mirrors trg_sync_tblAlignerNotes_Delete).
-      await enqueueSync(trx, 'aligner_notes', noteId, 'DELETE');
     });
   } catch (err) {
     log.error('Failed to delete note', {

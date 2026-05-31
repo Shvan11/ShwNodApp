@@ -2,7 +2,7 @@
 
 **Shwan Orthodontics Management System** — Node.js + Express + React 19 + TypeScript practice management platform for an orthodontic clinic. Patients, treatments, dental chart, aligners, appointments, multi-channel messaging (WhatsApp/SMS/Telegram), financial/expenses, document templates (GrapesJS), Stand inventory/POS, Patient Portal.
 
-> ⚠️ **This is the PRODUCTION deployment.** It connects to the **live PostgreSQL database** (`shwan` on `localhost:5432`) and serves on **port 3000** — changes here touch real clinic data. (This folder was originally a sandbox clone and was later promoted to production.) The separate **sandbox/test** environment lives at `C:\ShwNodApp-dolphin` (port 3100, database `shwan_test`/`ShwanNew_Test`) — do experiments there, not here.
+> ⚠️ **This is the PRODUCTION deployment.** It connects to the **live PostgreSQL database** (`shwan` on `localhost:5432`) and serves on **port 3000** — changes here touch real clinic data. The separate **sandbox/test** environment lives at `C:\ShwNodApp-dolphin` (port 3100, database `shwan_test`) — do experiments there, not here.
 
 ---
 
@@ -16,6 +16,8 @@ npm start                # Serve from /dist-server (3000)
 npm run typecheck:all    # Both frontend + backend
 npm run lint:fix
 npm run css:types        # Regenerate .module.css.d.ts
+npm run db:migrate       # Apply migrations (also :down, :new-migration)
+npm run db:codegen       # Regenerate types/db.d.ts after schema change
 ```
 
 ---
@@ -24,18 +26,16 @@ npm run css:types        # Regenerate .module.css.d.ts
 
 **Backend** — Express 5, ESM, strict TS. Entry: `index.ts`.
 - `routes/` — root-level routes (admin/auth/portal/calendar/sync-webhook/template-api/user-management/web/email-api) + `routes/api/*.routes.ts` for feature endpoints
-- `services/` — 17 subdirs, business logic by domain (`business/`, `database/`, `messaging/`, `sync/`, `pdf/`, `templates/`, `webceph/`, `google-drive/`, `state/`, `monitoring/`, …)
-- `services/database/queries/` — one query module per domain
+- `services/` — ~17 subdirs, business logic by domain (`business/`, `database/`, `messaging/`, `sync/`, `pdf/`, `templates/`, `webceph/`, `google-drive/`, `state/`, `monitoring/`, …)
+- `services/database/queries/` — one query module per domain (~24 modules)
 - `middleware/`, `utils/`, `config/`, `types/`
 
 **Frontend** — React 19, React Router v7 Data Router, Vite 7. Entry: `public/js/App.tsx`.
-- `public/js/router/routes.config.tsx` — route table
-- `public/js/router/loaders.ts` — route loaders (5-min sessionStorage cache)
-- `public/js/routes/`, `public/js/pages/` — top-level screens (Stand*, Patient Portal, ChairDisplay live here)
-- `public/js/components/react/` — shared components, organized by feature subfolder
-- `public/js/contexts/`, `public/js/hooks/`, `public/js/services/`
+- `public/js/router/routes.config.tsx` — route table; `loaders.ts` — route loaders (5-min sessionStorage cache)
+- `public/js/routes/`, `public/js/pages/` — top-level screens (Stand*, Patient Portal, ChairDisplay)
+- `public/js/components/react/` — shared components by feature subfolder; plus `contexts/`, `hooks/`, `services/`
 
-**CSS** — CSS Modules (`*.module.css`) for components; globals under `public/css/` (variables, reset, layout, shared component styles).
+**CSS** — CSS Modules (`*.module.css`) for components; globals under `public/css/` (variables, reset, layout).
 
 ---
 
@@ -43,19 +43,15 @@ npm run css:types        # Regenerate .module.css.d.ts
 
 ### Navigation — React Router ONLY
 ```typescript
-// CORRECT
 const navigate = useNavigate();
-navigate('/patient/123/works');
-
-// WRONG — causes full page reload
-window.location.href = '/patient/123/works';
+navigate('/patient/123/works');   // CORRECT
+// window.location.href = ...      // WRONG — full page reload
 ```
 Exceptions: external URLs, system protocols (`explorer:`, `csimaging:`), security logout, route-loader 401 redirects.
 
 ### Toast, not alert()
 ```typescript
-const toast = useToast();
-toast.success('Saved!');
+const toast = useToast(); toast.success('Saved!');
 // Non-React: window.toast?.success('Done!')
 ```
 
@@ -67,85 +63,103 @@ log.error('Failed', { error: err.message });
 ```
 
 ### Shared `<Modal>` only
-All overlay modals render via `public/js/components/react/Modal.tsx` (portal into `#modal-root`, focus trap, scroll lock, Escape + backdrop dismiss, `aria-modal`). **Never write a raw `.modal-overlay` / `styles.modalOverlay` wrapper** — it won't escape stacking/clipping ancestors.
+All overlay modals render via `public/js/components/react/Modal.tsx` (portal into `#modal-root`, focus trap, scroll lock, Escape + backdrop dismiss). **Never write a raw `.modal-overlay` / `styles.modalOverlay` wrapper** — it won't escape stacking/clipping ancestors.
 
 ### Frontend API contract types
-Shared API request/response types live in `public/js/types/api.types.ts`. Use `ApiResponse<T>` (`{ success, data?, error? }`) for new endpoints. Don't redefine inline shapes.
-
-- Import as `import type { ApiResponse } from '@/types/api.types'` — the `@types/*` alias works in tsconfig but **not** in Vite, so it breaks value exports at build.
-- Aligner-domain types stay in `pages/aligner/aligner.types.ts`.
-- UI form state and hook return types stay inline; only API boundary shapes go in `api.types.ts`.
+Shared API request/response types live in `public/js/types/api.types.ts`. Use `ApiResponse<T>` (`{ success, data?, error? }`) for new endpoints; don't redefine inline shapes.
+- Import as `import type { ApiResponse } from '@/types/api.types'` — the `@types/*` alias works in tsconfig but **not** Vite, so it breaks value exports at build.
+- Aligner-domain types stay in `pages/aligner/aligner.types.ts`. UI form/hook state stays inline; only API boundary shapes go in `api.types.ts`.
 
 ### CSS Modules
 ```typescript
 import styles from './Component.module.css';
 <div className={styles.container}>
 ```
-No inline styles (except dynamic), no `!important` (except print/a11y). For colors, spacing, z-index, breakpoints — use the design tokens in `public/css/base/variables.css`; don't invent new values inline.
+No inline styles (except dynamic), no `!important` (except print/a11y). Use the design tokens in `public/css/base/variables.css` for colors/spacing/z-index/breakpoints — don't invent values inline.
 
 ---
 
 ## Database
 
-**PostgreSQL** (local native service) via **node-postgres (`pg`) + Kysely** typed query builder — `pg.Pool` (max 10, ~30s timeouts). The SQL Server / mssql / tarn stack was retired in the Phase-9 migration cutover (see `docs/postgres-migration-plan.md`). There are **no stored procedures, triggers, or scalar functions in the DB** — all that logic now lives in TypeScript services/query modules.
+**PostgreSQL** (local native service) via **node-postgres (`pg`) + Kysely** typed query builder — `pg.Pool` (max 10, ~30s timeouts). The SQL Server / mssql stack was retired in the migration cutover (`docs/postgres-migration-plan.md`). There are **no stored procedures, triggers, or scalar functions for app logic** — all that lives in TypeScript (the only DB triggers are the CDC capture ones, see Sync).
 
-**Where to talk to the DB**: `services/database/kysely.ts` exposes `getKysely()` (the `Kysely<Database>` instance) and `withPgTransaction(cb)` (wraps `db.transaction().execute()`). **All 21 query modules + the converted routes/services use these directly.** `services/database/index.ts` is now *only* connection diagnostics + lifecycle (`testConnection` / `testConnectionWithRetry` / `getDatabaseStats` / `healthCheck` / `shutdown`) — it no longer has `executeQuery`/`executeStoredProcedure`/`TYPES`/`sql`/`withRequest` (those were the mssql bridge; gone). For one-off raw SQL inside a module, use Kysely's `sql` template tag (`import { sql } from 'kysely'`), not a string facade.
+**Where to talk to the DB**: `services/database/kysely.ts` exposes `getKysely()` (the `Kysely<Database>` instance) and `withPgTransaction(cb)`. All query modules + converted routes/services use these directly. `services/database/index.ts` is now *only* connection diagnostics + lifecycle (`testConnection`/`testConnectionWithRetry`/`getDatabaseStats`/`healthCheck`/`shutdown`) — no more `executeQuery`/`executeStoredProcedure`/`TYPES`. For one-off raw SQL inside a module, use Kysely's `sql` template tag (`import { sql } from 'kysely'`).
 
 **Gotchas — do not regress:**
-- **`Database` type** is generated by `npm run db:codegen` → `types/db.d.ts` (kysely-codegen). Identifiers are **double-quoted** in PG so CamelCase column/table names (`"PersonID"`, `"tblpatients"`) are preserved — but unquoted identifiers fold to lowercase, so a raw `sql` string with `tblPatients`/`dbo.` will fail (`relation does not exist`). Match the generated casing; tables are mostly lowercase (`tblpatients`, `tblwork`), columns mixed-case.
-- **Collation**: text columns are `citext` (case-insensitive `=`/`LIKE`/unique, accent-sensitive) to reproduce SQL Server's `Arabic_CI_AS` with no app churn. The two image-type codes (`tblImageTypes.ImageTypeCode`, `tblTimePointImages.ImageType`) stay `char(2)`.
-- **Dates**: columns are `timestamp`/`date` **WITHOUT** time zone (single-clinic wall-clock; `timestamptz` would reintroduce the UTC-midnight-shift bug). The `pg` type parsers in `kysely.ts` return `date`→`'YYYY-MM-DD'` **string**, `timestamp`→local `Date`, `numeric`/`bigint`→`number`. kysely-codegen types `date` as a `Date` alias, so SELECTs that need the string use a type-only `$castTo<string>()`. `utils/date.ts#toDateOnly` is the safety net. Don't `(col as Date).toISOString()` a `date` column — it's already a string.
-- **Booleans**: `bit`→`boolean`, so flags compare/insert JS `true|false`, not `0|1`.
-- **NULL ordering**: PG sorts NULLs LAST on ASC (SQL Server sorted them FIRST); add `NULLS FIRST` where exact order matters.
-- **Identity**: PK columns are `GENERATED BY DEFAULT AS IDENTITY`; FK-violation detection uses PG SQLSTATE `23503` (was mssql error `547`).
+- **`Database` type** is generated by `npm run db:codegen` → `types/db.d.ts`. PG quotes identifiers, so CamelCase names (`"PersonID"`, `"tblpatients"`) are preserved — but unquoted identifiers fold to lowercase, so a raw `sql` string with `tblPatients`/`dbo.` fails (`relation does not exist`). Match generated casing; tables mostly lowercase (`tblpatients`, `tblwork`), columns mixed-case.
+- **Collation**: text columns are `citext` (case-insensitive `=`/`LIKE`/unique, accent-sensitive) to reproduce SQL Server's `Arabic_CI_AS`. The two image-type codes (`tblImageTypes.ImageTypeCode`, `tblTimePointImages.ImageType`) stay `char(2)`.
+- **Dates**: columns are `timestamp`/`date` **WITHOUT** time zone (single-clinic wall-clock; `timestamptz` would reintroduce the UTC-midnight-shift bug). The `pg` parsers in `kysely.ts` return `date`→`'YYYY-MM-DD'` **string**, `timestamp`→local `Date`, `numeric`/`bigint`→`number`. kysely-codegen types `date` as `Date`, so SELECTs needing the string use a type-only `$castTo<string>()`. `utils/date.ts#toDateOnly` is the safety net. Don't `(col as Date).toISOString()` a `date` column — it's already a string.
+- **Booleans**: `bit`→`boolean`; flags compare/insert JS `true|false`, not `0|1`.
+- **NULL ordering**: PG sorts NULLs LAST on ASC (SQL Server sorted FIRST); add `NULLS FIRST` where exact order matters.
+- **Identity**: PK columns are `GENERATED BY DEFAULT AS IDENTITY`; FK-violation detection uses PG SQLSTATE `23503` (was mssql `547`).
 
-**Migrations**: schema is owned by **node-pg-migrate** — `migrations/pg/*.sql` (plain SQL up/down). `npm run db:migrate` / `db:migrate:down` / `db:new-migration`; regenerate `types/db.d.ts` with `npm run db:codegen` after any schema change. Kysely is the runtime query builder, **not** the DDL owner.
+**Migrations**: schema is owned by **node-pg-migrate** — `migrations/pg/*.sql` (plain SQL up/down). Kysely is the runtime query builder, **not** the DDL owner. Regenerate `types/db.d.ts` after any schema change.
 
-**Connection** (see `.env`): `localhost:5432`, db `shwan` (the **live production** database), role `shwan_app` (Windows service `postgresql-x64-18`). The separate sandbox DB is `shwan_test` under `C:\ShwNodApp-dolphin` (port 3100) — run experiments there, never against this instance.
+**Connection** (see `.env`): `localhost:5432`, db `shwan`, role `shwan_app` (Windows service `postgresql-x64-18`).
 
-**Sessions live in PostgreSQL** (`express-session` via **`connect-pg-simple`**, wired in `index.ts`). The old `connect-sqlite3` store (`./data/sessions.db`, `./data/portal-sessions.db`) was retired — there is now a **single durable backing store**. Two tables, `staff_sessions` (cookie `shwan.sid`) and `portal_sessions` (cookie `shwan.portal`), both owned by `migrations/pg` (the store runs with `createTableIfMissing: false`, never issues DDL) and sharing the existing `pg` pool via `getPgPool()`. **The only remaining SQLite in the app is `services/archform/archform-db.ts`** — that reads the **external Archform aligner software's own SQLite file** via `better-sqlite3` (a third-party DB we integrate with, not our storage choice); it is intentionally kept and is unrelated to session/app data.
+**Sessions live in PostgreSQL** (`express-session` via **`connect-pg-simple`**, wired in `index.ts`; the old `connect-sqlite3` store is retired). Two tables — `staff_sessions` (cookie `shwan.sid`) and `portal_sessions` (cookie `shwan.portal`) — owned by `migrations/pg` (store runs `createTableIfMissing: false`, never issues DDL) and sharing the `pg` pool via `getPgPool()`. **The only remaining SQLite is `services/archform/archform-db.ts`** — reads the external Archform aligner software's own SQLite file via `better-sqlite3` (intentional, third-party integration).
 
-**mssql is not gone from disk yet**: the `mssql` package + `services/database/pool.ts` + `scripts/{etl-mssql-to-pg,parity-*,probe-sysstarttime}.ts` survive **only** as one-way migration tooling for the Phase-10 production cutover (ETL/parity read the live SQL Server `ShwanNew`). No app-runtime code imports them. They get removed at the end of Phase 10.
+**mssql on disk**: the `mssql` package + `services/database/pool.ts` survive as migration tooling (`scripts/etl-mssql-to-pg`, `parity-*`, etc., which read the live SQL Server `ShwanNew`). No app-runtime code imports `pool.ts` **except the temporary Dolphin sink** (see Sync) — which only connects when explicitly enabled.
 
-Schema reference: `migrations/init_script.sql` is a (now-historical) T-SQL dump of the old SQL Server schema, kept as the authoring reference for the PG DDL. The live schema is `migrations/pg/`. `migrations/postgresql/` is for the separate aligner-portal-external app, not the main DB.
+Schema reference: `migrations/init_script.sql` is a historical T-SQL dump of the old schema, kept as authoring reference. The live schema is `migrations/pg/`. `migrations/postgresql/` is for the separate aligner-portal-external app, not the main DB.
+
+---
+
+## Sync (unified CDC)
+
+**One change feed, multiple sinks.** DB triggers capture every row change *once* into the coalescing `change_log`, and an engine replicates each sink's slice to its destination:
+- **portal** — curated snake_case subset the external aligner portal reads (Supabase `SUPABASE_URL`). A *transform*, not a mirror.
+- **failover** — raw 1:1 copy of the full DB on a *separate* Supabase account (project `shwan-failover`), off-site DR.
+- **dolphin** — temporary, see below.
+
+This replaced an older split design (the app-level `SyncQueue` enqueue is retired — don't reintroduce it). It is *not* logical replication and *not* nightly reloads.
+
+**Code:** `services/sync/cdc/` — `engine.ts` (generic per-sink drain: batched, coalescing, version-guarded delete, anti-bloat breaker), `failover-sink.ts` (raw `pg` upsert), `portal-sink.ts` (transform via `sync-fetch.ts` + filters), `index.ts` (`startCdc`/`stopCdc`/`drainCdcNow`, wired into boot + `gracefulShutdown`). The **reverse** path (`sync-engine.ts`, `reverse-sync-poller.ts`, `/api/sync/webhook`) is separate and unchanged.
+
+**On/off (per sink):** `SYNC_ENABLED` (portal), `FAILOVER_SYNC_ENABLED` (failover) — both default off in sandbox. Immediate kill switch without restart: `UPDATE cdc_sink_control SET enabled=false WHERE sink='portal';` (`cdc_capture()` then skips that sink).
+
+**Don't regress:**
+- Migrations `*_add-failover-cdc.sql` + `*_failover-cdc-fanout.sql` install a generic `cdc_capture()` trigger (`TG_ARGV = (pk_col, sink, …)`). The **6 portal tables** (`tblpatients`, `tblwork`, `AlignerDoctors`, `tblAlignerSets`, `tblAlignerBatches`, `tblAlignerNotes`) feed **both** sinks; the other ~59 feed `failover` only.
+- **PortalSink re-applies the portal's business filters** (triggers alone would lose them): `work`/`patients` only when aligner-related, `aligner_notes` only `Lab` notes; FK parents bootstrapped via `ensureRelatedRecordsExist`.
+- **Loop guard:** reverse-sync writes do `SET LOCAL app.cdc_origin='reverse'`; `cdc_capture()` skips them so a doctor edit flowing Supabase→local doesn't bounce back. The Lab-only filter is a second backstop.
+- **Add a table** = add a `cdc_capture('<PKcol>', 'failover'[, 'portal'])` trigger in a migration — no app code (`failover` auto-discovers table→PK from `pg_trigger`). **Not captured:** sessions, sync/migration infra (`change_log`, `cdc_sink_control`, `SyncQueue`, `pgmigrations`), composite-PK `tblPrivatePhotos`.
+- **Circuit breaker:** backlog past `*_SYNC_MAX_BACKLOG` disables that sink's capture and sets `cdc_sink_control.stale` (→ full reload needed). An outage is a non-event — deltas coalesce and the engine retries.
+- The failover replica is **RLS-locked** (server-side only). The initial full load / any full reload are **run by the user** (`C:\pg18-migration\`), as are prod-schema migrations — Claude's harness blocks the bulk push.
+
+Live sink status surfaces in Settings via `public/js/components/react/SupabaseStatusSettings.tsx` (polls `GET /api/sync/supabase-status`).
+
+### Dolphin sync (temporary)
+A **third CDC sink** (`dolphin`) one-way-syncs the app's native timepoint/image rows into the legacy **Dolphin Imaging SQL Server DB** (`DolphinPlatform.dbo.Patients`/`TimePoints`/`TimePointImages`). The app already crops photos (`routes/api/photo-editor.routes.ts`) into the shared `working/` dir under Dolphin's `{personId}0{tpCode}.I{NN}` naming + local `tblTimePoints`/`tblTimePointImages` rows; this sink fills the Dolphin **DB tables** (no files copied) so Dolphin Imaging can see them. **Meant to be deleted** once the native pipeline is trusted — remove `services/sync/cdc/dolphin-sink.ts`, its `index.ts` entry, the `DOLPHIN_SYNC_*` env block, and migration `*_add-dolphin-cdc-sink.sql`.
+- **Off by default** (`DOLPHIN_SYNC_ENABLED`); kill switch `UPDATE cdc_sink_control SET enabled=false WHERE sink='dolphin';`.
+- **Reuses the surviving mssql pool** (`services/database/pool.ts`, `ShwanNew`; Dolphin via three-part `DolphinPlatform.dbo.*` names) — the one runtime mssql dependency, and only when enabled.
+- **Mapping table** `dolphin_sync_map(local_table, local_pk) → dolphin_id` (un-triggered ⇒ no feedback loop) recovers the Dolphin GUID on delete, since the change feed carries no payload. The reserved `DolphinTpID`/`DolphinPatID`/`DolphinTpiID` columns are deliberately **not** written (those tables are captured — writing them would re-trigger the sink).
+- Resolution/adoption mechanics (patient by `patOtherID=PersonID`, itypID lookup, natural-key adoption) live in `dolphin-sink.ts`. **Going-forward only — no backfill.** Timepoint delete = **cascade**.
 
 ---
 
 ## Realtime / SSE
 
-WebSockets have been retired. All server→client realtime now flows over **Server-Sent Events**. The legacy `utils/websocket.ts`, `wsService`, `connectionManager`, and `public/js/constants/websocket-events.ts` are gone — don't restore them.
+WebSockets are retired — all server→client realtime flows over **Server-Sent Events**. The legacy `utils/websocket.ts`, `wsService`, `connectionManager`, and `public/js/constants/websocket-events.ts` are gone — **don't restore them.**
 
-**Server entry**: `index.ts` creates a bare `new EventEmitter()` (kept under the name `wsEmitter` for symmetry with existing emit sites) and hands it to the SSE broadcasters at boot:
+**Server**: `index.ts` creates a bare `new EventEmitter()` (named `wsEmitter` for symmetry with existing emit sites) and hands it to the broadcasters at boot:
 - `services/messaging/sse-broadcaster.ts` — appointments + chair-display channels
-- `services/messaging/sse-whatsapp.ts` — WhatsApp channel (QR, client-ready, message-status, sending-progress/finished)
+- `services/messaging/sse-whatsapp.ts` — WhatsApp channel (QR, client-ready, message-status, progress)
 
-Routes/services still emit the same internal events (`wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, date)`, `CHAIR_PATIENT_LOAD`, `WHATSAPP_*`); the broadcasters translate them to SSE frames at the boundary. Add new internal events to `services/messaging/websocket-events.ts` (the filename is legacy — the constants are now in-process emitter names only, never on the wire) and wire them in the relevant broadcaster's `ensureInitialized()`.
+Routes/services still emit internal events (`wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, date)`, `CHAIR_PATIENT_LOAD`, `WHATSAPP_*`); broadcasters translate them to SSE frames. Add new internal events to `services/messaging/websocket-events.ts` (filename is legacy — these are now in-process emitter names, never on the wire) and wire them in the relevant broadcaster's `ensureInitialized()`.
 
 **Routes**:
-- `GET /sse/chair-display/:chairId` — **public** (kiosk has no session — internal-LAN assumption, matches the legacy WS posture).
-- `GET /api/sse/appointments` and `GET /api/sse/whatsapp` — mounted **after** the auth gate; a 401 closes the EventSource (browser sets `readyState=CLOSED` and stops auto-retrying).
+- `GET /sse/chair-display/:chairId` — **public** (kiosk has no session; internal-LAN assumption).
+- `GET /api/sse/appointments` and `GET /api/sse/whatsapp` — mounted **after** the auth gate; a 401 closes the EventSource.
 
-**Transport hygiene** (each SSE handler does this — copy the pattern, don't reinvent):
-- `req.setTimeout(0); res.setTimeout(0)` — bypasses the global 30 s `requestTimeout` middleware, otherwise every stream 408s at exactly 30 s.
+**Transport hygiene** (each SSE handler does this — copy the pattern):
+- `req.setTimeout(0); res.setTimeout(0)` — bypasses the global 30 s `requestTimeout` middleware (else every stream 408s at 30 s).
 - Headers: `Content-Type: text/event-stream`, `Cache-Control: no-cache, no-transform`, `Connection: keep-alive`, `X-Accel-Buffering: no`.
-- Initial frame: `retry: ${2500 + jitter}\n\n` so a server restart doesn't trigger a thundering-herd reconnect.
-- **One** module-scoped 25 s `setInterval` writes `:\n\n` comment frames to every open stream — undercuts Caddy's ~30 s idle drop and proves transport health without per-connection timers.
+- Initial frame `retry: ${2500 + jitter}\n\n` so a restart doesn't trigger a thundering-herd reconnect.
+- **One** module-scoped 25 s `setInterval` writes `:\n\n` comment frames to every open stream — undercuts Caddy's ~30 s idle drop.
 
-**Freshness signal**: `sseAppointments.getFreshness()` / `sseWhatsapp.getFreshness()` return `'fresh'` iff `readyState === EventSource.OPEN`. No heartbeat-arrival clock — the browser's `onopen`/`onerror` transitions are authoritative. `markStale()` sets a sticky flag for the recovery-fetch-failed case (cleared on next open).
+**Client singletons**: `public/js/services/sse-appointments.ts` and `sse-whatsapp.ts` — refcounted (`ensureConnected()` on mount, `release()` on unmount; `EventSource` opened on first acquire, closed at refcount zero). **Never `new EventSource(...)` directly in app code** except the chair-display kiosk (`public/js/routes/ChairDisplay.tsx`, intentional standalone). Liveness/freshness, the "Live | Stale | Offline…" indicator (`appointments/ConnectionStatus.tsx`), and forced-reconnect triggers (visibility/pageshow, see `constants/sse-liveness.ts`) are handled inside these singletons.
 
-**"Live" indicator** (`public/js/components/react/appointments/ConnectionStatus.tsx`, unchanged): **Live** | **Stale — Resyncing** | **Static** (non-today views) | **Offline** | **Reconnecting…** | **Connection Error**.
-
-**Client singletons**: `public/js/services/sse-appointments.ts` (`sseAppointments`) and `public/js/services/sse-whatsapp.ts` (`sseWhatsapp`). Refcount-based — hooks call `ensureConnected()` on mount and `release()` on unmount; the underlying `EventSource` is opened on first acquire and closed when refcount hits zero. **Never `new EventSource(...)` directly in app code** except the chair-display kiosk (`public/js/routes/ChairDisplay.tsx`, intentional standalone — no session, no shared listeners).
-
-**Forced reconnect triggers** (built into the singletons + the kiosk):
-- `visibilitychange` → hidden ≥ 2 min then visible (`VISIBILITY_RESUME_THRESHOLD_MS` in `public/js/constants/sse-liveness.ts`): close + reopen to dodge half-dead NAT/cellular transports.
-- `pageshow` with `persisted === true`: iOS bfcache restore — the handle survives but the socket is dead.
-
-**Chair-display state** (`sse-broadcaster.ts`): server keeps an in-memory `chairCurrentPatient` map with a 12 h TTL, so a kiosk reconnect replays the current patient on connect. Each chair has a monotonic `chairEpoch` counter — an async LOAD that resolves after a later CLEAR (or another LOAD) detects the bump and skips writing stale state. Lost on server restart by design.
-
-**WhatsApp QR-viewer accounting**: every open `/api/sse/whatsapp` stream registers as a QR viewer via `messageState.registerQRViewer(viewerId)` and unregisters on close. The `messageState.activeQRViewers > 0` check still gates QR data-URL generation and on-demand WhatsApp init — don't break this on the SSE side.
-
-**Graceful shutdown**: `teardownSseBroadcaster()` and `teardownWhatsappSseBroadcaster()` (both called from `gracefulShutdown` in `index.ts`) detach emitter listeners, clear the keep-alive interval, end all open streams, and reset the module-scoped maps.
+**Other invariants**: chair-display keeps an in-memory current-patient map (12 h TTL, monotonic `chairEpoch` guards stale async LOADs; lost on restart by design). Every open `/api/sse/whatsapp` stream registers a QR viewer via `messageState.registerQRViewer()` — the `activeQRViewers > 0` check gates QR generation + on-demand WhatsApp init; don't break it. Graceful shutdown calls `teardownSseBroadcaster()` + `teardownWhatsappSseBroadcaster()` from `gracefulShutdown`.
 
 ---
 
@@ -162,25 +176,23 @@ Use `import type { … }` for type-only imports.
 
 ## Environment
 
-`.env.example` documents all vars grouped by category. Required for boot: `PORT`, `MACHINE_PATH`, the PostgreSQL block (`PG_HOST`, `PG_PORT`, `PG_DATABASE`, `PG_USER`, `PG_PASSWORD` — or `DATABASE_URL`), and `SESSION_SECRET`. The legacy `DB_*` (SQL Server) vars are now used only by the `scripts/` migration tooling, not app boot. `DB_DRIVER` defaults to `pg` and the mssql path is gone, so it no longer changes runtime behavior. Optional service blocks (Telegram, Twilio, Google Drive, WebCeph, Gemini, Supabase sync) can be left blank to disable.
+`.env.example` documents all vars by category. Required for boot: `PORT`, `MACHINE_PATH`, the PostgreSQL block (`PG_HOST`/`PG_PORT`/`PG_DATABASE`/`PG_USER`/`PG_PASSWORD`, or `DATABASE_URL`), and `SESSION_SECRET`. Legacy `DB_*` (SQL Server) vars are used only by `scripts/` migration tooling and the Dolphin sink, not app boot. Optional service blocks (Telegram, Twilio, Google Drive, WebCeph, Gemini, Supabase sync) can be left blank to disable.
 
 ---
 
 ## Deployment & environments
 
-- **Dev = WSL (Linux); Prod = Windows Server.** Code must run on **both**, and a future move to a Linux-based server is planned — keep everything OS-agnostic. Use `utils/path-resolver.ts` + the platform `path` module for all filesystem paths; never hardcode `/` or `\` separators or assume posix.
-- **Patient data volume** is the SMB/UNC share `\\Clinic\clinic1` (`MACHINE_PATH`; `PatientsFolder` DB option), reachable from every LAN PC but **not from phones**. It is a *separate volume* from the OS temp dir on both platforms → `fs.rename` from temp to the share throws `EXDEV`; stage temp files on the same volume. Per-file `stat`/`lstat` over the share is a network round-trip — avoid bulk stat in hot paths.
-- **Remote access**: two front doors to the same on-host Node app. On-LAN, **Caddy** reverse-proxies `local.shwan-orthodontics.com` (`Caddyfile`; see `middleware/index.ts` trust-proxy note). Off-LAN, a **cloudflared named tunnel** (`config_cloudflared.yml`) routes `remote.shwan-orthodontics.com` → `localhost:3000` through Cloudflare. `config.urls.publicUrl` defaults to the remote domain (`config/config.ts`). Tunnel credentials live outside the repo under the OS user's `.cloudflared/` dir — never commit or paste them.
+- **Dev = WSL (Linux); Prod = Windows Server.** Code must run on both, and a future Linux server is planned — keep everything OS-agnostic. Use `utils/path-resolver.ts` + the platform `path` module for all filesystem paths; never hardcode `/` or `\`.
+- **Patient data volume** is the SMB/UNC share `\\Clinic\clinic1` (`MACHINE_PATH`; `PatientsFolder` DB option), reachable from LAN PCs but **not phones**. It is a *separate volume* from the OS temp dir → `fs.rename` from temp to the share throws `EXDEV`; stage temp files on the same volume. Per-file `stat`/`lstat` over the share is a network round-trip — avoid bulk stat in hot paths.
+- **Remote access**: two front doors to the same on-host Node app. On-LAN, **Caddy** reverse-proxies `local.shwan-orthodontics.com` (`Caddyfile`; see `middleware/index.ts` trust-proxy note). Off-LAN, a **cloudflared named tunnel** (`config_cloudflared.yml`) routes `remote.shwan-orthodontics.com` → `localhost:3000`. `config.urls.publicUrl` defaults to the remote domain. Tunnel credentials live outside the repo under the OS user's `.cloudflared/` dir — never commit or paste them.
 
 ---
 
 ## Testing credentials
 
 ```
-Username: Admin
-Password: Yarmok11
+Username: Admin   Password: Yarmok11
 ```
-
 ```bash
 curl -c /tmp/cookies.txt -X POST http://localhost:3001/api/auth/login \
   -H "Content-Type: application/json" \
@@ -196,4 +208,4 @@ curl -c /tmp/cookies.txt -X POST http://localhost:3001/api/auth/login \
 - Cross-platform path handling lives in `utils/path-resolver.ts` (auto Windows/WSL conversion).
 - RTL support for Kurdish/Arabic; check `rtl-support.css` before adding directional styles.
 - Graceful shutdown chains exist for all long-lived services (WhatsApp, sync, pool, SSE broadcasters); don't add `process.exit()` mid-flow.
-- After using Playwright, delete every screenshot it left behind — clean up all leftover screenshot files before finishing.
+- After using Playwright, delete every screenshot it left behind before finishing.

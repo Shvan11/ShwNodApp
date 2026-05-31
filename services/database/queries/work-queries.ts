@@ -17,7 +17,6 @@
  */
 import { sql, type Kysely } from 'kysely';
 import { getKysely, withPgTransaction, type Database } from '../kysely.js';
-import { enqueueWorkIfAligner } from '../../sync/sync-queue.js';
 import { toDateOnly } from '../../../utils/date.js';
 
 /**
@@ -605,7 +604,6 @@ export async function updateWork(
       .where('workid', '=', workId)
       .executeTakeFirst();
 
-    await enqueueWorkIfAligner(trx, workId, 'UPDATE');
     return { success: true, rowCount: Number(result.numUpdatedRows) };
   });
 }
@@ -618,7 +616,6 @@ export async function finishWork(workId: number): Promise<{ success: boolean; ro
       .where('workid', '=', workId)
       .executeTakeFirst();
 
-    await enqueueWorkIfAligner(trx, workId, 'UPDATE');
     return { success: true, rowCount: Number(result.numUpdatedRows) };
   });
 }
@@ -633,7 +630,6 @@ export async function discontinueWork(
       .where('workid', '=', workId)
       .executeTakeFirst();
 
-    await enqueueWorkIfAligner(trx, workId, 'UPDATE');
     return { success: true, rowCount: Number(result.numUpdatedRows) };
   });
 }
@@ -648,7 +644,6 @@ export async function reactivateWork(
       .where('workid', '=', workId)
       .executeTakeFirst();
 
-    await enqueueWorkIfAligner(trx, workId, 'UPDATE');
     return { success: true, rowCount: Number(result.numUpdatedRows) };
   });
 }
@@ -1100,9 +1095,6 @@ export async function transferWork(
       .where('workid', '=', workId)
       .execute();
 
-    // Work moved to a new owner → forward-sync the work (if aligner-tracked). The new
-    // patient is synced lazily by the queue processor's related-record bootstrap.
-    await enqueueWorkIfAligner(trx, workId, 'UPDATE');
   });
 
   return {

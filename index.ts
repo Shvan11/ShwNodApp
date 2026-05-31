@@ -47,8 +47,8 @@ import { EventEmitter } from 'events';
 import HealthCheck from './services/monitoring/HealthCheck.js';
 import { testConnection, testConnectionWithRetry, shutdown as shutdownDatabase } from './services/database/index.js';
 import { createPathResolver } from './utils/path-resolver.js';
-import queueProcessor from './services/sync/queue-processor.js';
 import { startPeriodicPolling, stopPeriodicPolling } from './services/sync/reverse-sync-poller.js';
+import { startCdc, stopCdc } from './services/sync/cdc/index.js';
 import ResourceManager from './services/core/ResourceManager.js';
 import { log } from './utils/logger.js';
 import { requestTimeout, TIMEOUTS } from './middleware/timeout.js';
@@ -538,31 +538,21 @@ function startServer(): Promise<HTTPServer> {
       // Supabase sync (master-gated by SYNC_ENABLED). In the sandbox this whole block is
       // skipped: no queue processor, no reverse poller — nothing reaches Supabase.
       if (config.sync.enabled) {
-        // Forward sync: drains the local SyncQueue → Supabase (webhook-triggered, zero polling)
-        try {
-          queueProcessor.start();
-          log.info('✅ Queue processor started - Webhook-based sync enabled (PostgreSQL → Supabase)');
-          log.info('   Real-time: app-level enqueue + queue-notify webhook drive processing');
-          log.info('   Reverse sync: Supabase webhooks handle doctor edits (see routes/sync-webhook.js)');
-        } catch (error) {
-          log.warn('⚠️  Queue processor failed to start:', { error: (error as Error).message });
-          log.info('   Sync will not be available. Check Supabase credentials.');
-        }
-
-        // Reverse sync poller (Supabase → PostgreSQL): catches changes missed while offline
-        // + periodic hourly checks.
+        // Reverse sync poller (Supabase → PostgreSQL): catches doctor edits missed while offline
+        // + periodic hourly checks. (Forward sync is the unified CDC below.)
         try {
           startPeriodicPolling(); // Uses env config or defaults to 60 min
           log.info('✅ Reverse sync poller started (Supabase → PostgreSQL)');
-          log.info('   Startup: Catches changes missed while server was offline');
-          log.info('   Periodic: Hourly checks as fallback for webhook failures');
         } catch (error) {
           log.warn('⚠️  Reverse sync poller failed to start:', { error: (error as Error).message });
-          log.info('   Missed changes will not be recovered. Check Supabase configuration.');
         }
       } else {
-        log.info('⏭️  Supabase sync disabled (SYNC_ENABLED=false) — queue processor + reverse poller not started');
+        log.info('⏭️  Reverse sync disabled (SYNC_ENABLED=false)');
       }
+
+      // Unified CDC forward sync (one change feed → sinks). Self-gates per sink:
+      // SYNC_ENABLED → portal Supabase, FAILOVER_SYNC_ENABLED → failover replica.
+      startCdc();
 
       resolve(serverInstance);
     });
@@ -616,8 +606,14 @@ async function gracefulShutdown(signal: string): Promise<void> {
     if (config.sync.enabled) {
       log.info('🔄 Stopping reverse sync poller...');
       stopPeriodicPolling();
-      log.info('🛑 Stopping queue processor...');
-      queueProcessor.stop();
+    }
+
+    // Stop the unified CDC forward sync (both sinks; turns capture OFF).
+    try {
+      log.info('🛑 Stopping CDC forward sync...');
+      await stopCdc();
+    } catch (error) {
+      log.warn('⚠️  CDC shutdown error:', { error: (error as Error).message });
     }
 
     // Clean up WhatsApp service

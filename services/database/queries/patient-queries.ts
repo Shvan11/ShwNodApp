@@ -13,7 +13,6 @@ import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import * as readline from 'node:readline';
 import { getKysely, withPgTransaction } from '../kysely.js';
-import { enqueuePatientIfAligner } from '../../sync/sync-queue.js';
 import config from '../../../config/config.js';
 import { createPathResolver } from '../../../utils/path-resolver.js';
 import { toDateOnly } from '../../../utils/date.js';
@@ -584,9 +583,6 @@ export async function updatePatient(
       .where('PersonID', '=', personId)
       .execute();
 
-    // Forward-sync the patient demographics (only if aligner-tracked). Mirrors
-    // trg_sync_tblPatients' EXISTS(work → aligner sets) filter.
-    await enqueuePatientIfAligner(trx, personId, 'UPDATE');
   });
   return { success: true };
 }
