@@ -125,7 +125,6 @@ export class DolphinSink implements SyncSink {
       .select((eb) => [
         'FirstName',
         'LastName',
-        'PatientName',
         'Gender',
         eb.ref('DateofBirth').$castTo<string | null>().as('DateofBirth'),
       ])
@@ -134,19 +133,32 @@ export class DolphinSink implements SyncSink {
     if (!p) throw new Error(`[cdc:dolphin] PersonID ${personId} not found in tblpatients`);
 
     const gender = p.Gender === 1 ? 'M' : p.Gender === 2 ? 'F' : 'U'; // tblGender: 1=Male, 2=Female
+    // Mirror the legacy AddDolph proc EXACTLY: Dolphin Imaging lists/searches patients by
+    // patIndexName ("Last, First") and filters its patient browser on the uniqueidentifier
+    // patStatusID — so patName/patIndexName/patStatusID/normID/patEntryDate/patNorm must all be set
+    // or the row stays invisible in Dolphin's UI. (@fn/@ln bound as '' so SQL string concatenation
+    // can't NULL-propagate the name away.)
     const ins = await pool
       .request()
       .input('oid', sql.VarChar, String(personId))
-      .input('fn', sql.VarChar, p.FirstName ?? null)
-      .input('ln', sql.VarChar, p.LastName ?? null)
-      .input('nm', sql.VarChar, p.PatientName ?? null)
+      .input('fn', sql.VarChar, p.FirstName ?? '')
+      .input('ln', sql.VarChar, p.LastName ?? '')
       .input('g', sql.Char, gender)
       .input('bd', sql.DateTime, parseLocalDate(p.DateofBirth))
       .query<{ patID: string }>(
         `INSERT INTO DolphinPlatform.dbo.Patients
-           (patOtherID, patFirstName, patLastName, patName, patGender, patBirthdate, patStatus)
+           (patOtherID, patFirstName, patLastName,
+            patName, patIndexName,
+            patGender, patBirthdate,
+            patStatusID, normID, patEntryDate, patNorm)
          OUTPUT inserted.patID
-         VALUES (@oid, @fn, @ln, @nm, @g, @bd, 1)`
+         VALUES (@oid, @fn, @ln,
+            COALESCE(@fn,'') + ' '  + COALESCE(@ln,''),
+            COALESCE(@ln,'') + ', ' + COALESCE(@fn,''),
+            @g, @bd,
+            CAST('6F583B65-1EC9-4F02-B2E4-37CD8318C695' AS uniqueidentifier),
+            CAST('6F999E7E-D010-4C44-961B-14C66A322ACF' AS uniqueidentifier),
+            GETDATE(), 0)`
       );
     const id = ins.recordset[0].patID;
     this.patIdByPerson.set(personId, id);
@@ -176,6 +188,7 @@ export class DolphinSink implements SyncSink {
       .selectFrom('tblTimePoints')
       .select((eb) => [
         'PersonID',
+        'tpCode',
         'tpDescription',
         eb.ref('tpDateTime').$castTo<string | null>().as('tpDateTime'),
       ])
@@ -187,7 +200,7 @@ export class DolphinSink implements SyncSink {
     }
 
     const patId = await this.resolvePatId(tp.PersonID);
-    const tpId = await this.resolveTpId(pk, patId, tp.tpDescription, tp.tpDateTime);
+    const tpId = await this.resolveTpId(pk, patId, tp.tpCode, tp.tpDescription, tp.tpDateTime);
 
     // Always normalise name/date (covers in-app edits of the timepoint's description/date).
     await this.pool!.request()
@@ -205,6 +218,7 @@ export class DolphinSink implements SyncSink {
   private async resolveTpId(
     localPk: string,
     patId: string,
+    localTpCode: string | number | null,
     tpDescription: string | null,
     tpDateTime: string | null
   ): Promise<string> {
@@ -231,16 +245,23 @@ export class DolphinSink implements SyncSink {
       return id;
     }
 
-    // Else INSERT. Dolphin tpCode is a per-patient varchar sequence (independent of our PG tpCode);
-    // TRY_CAST so a non-numeric legacy tpCode can't throw (treated as no max → starts the run at 1).
+    // Else INSERT. The Dolphin tpCode MUST equal the tpCode embedded in the rendered image
+    // filename ({PersonID}0{tpCode}.I{NN}, written by the photo editor with OUR PG tpCode) —
+    // Dolphin Imaging locates a timepoint's images by deriving that name from patOtherID + tpCode,
+    // so a mismatch means Dolphin finds no images (and crashes on the inconsistency). We therefore
+    // reuse our PG tpCode as the Dolphin tpCode. Fallback (non-numeric/missing PG tpCode): mirror
+    // the legacy AddTimePoint proc — ISNULL(MAX+1, 0), i.e. a patient's FIRST timepoint is 0, not 1.
+    const appCode =
+      localTpCode != null && /^\d+$/.test(String(localTpCode)) ? Number(localTpCode) : null;
     const ins = await pool
       .request()
       .input('pat', sql.UniqueIdentifier, patId)
+      .input('appcode', sql.Int, appCode)
       .input('desc', sql.VarChar, tpDescription ?? null)
       .input('dt', sql.DateTime, date)
       .query<{ tpID: string }>(
-        `DECLARE @code int =
-           COALESCE((SELECT MAX(TRY_CAST(tpCode AS int)) FROM DolphinPlatform.dbo.TimePoints WHERE patID = @pat), 0) + 1;
+        `DECLARE @code int = COALESCE(@appcode,
+           ISNULL((SELECT MAX(TRY_CAST(tpCode AS int)) + 1 FROM DolphinPlatform.dbo.TimePoints WHERE patID = @pat), 0));
          INSERT INTO DolphinPlatform.dbo.TimePoints (patID, tpCode, tpDescription, tpDateTime)
          OUTPUT inserted.tpID
          VALUES (@pat, CAST(@code AS varchar(12)), @desc, @dt);`

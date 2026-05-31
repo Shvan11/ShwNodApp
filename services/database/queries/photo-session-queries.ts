@@ -14,6 +14,7 @@ import { getActiveWID } from './patient-queries.js';
 interface PatientForPhotoSession {
   firstName: string | null;
   lastName: string | null;
+  patientName: string | null;
   dob: Date | null;
   gender: number | null;
 }
@@ -47,11 +48,29 @@ export async function getPatientForPhotoSession(
     .select((eb) => [
       'FirstName as firstName',
       'LastName as lastName',
+      'PatientName as patientName',
       eb.ref('DateofBirth').as('dob'),
       'Gender as gender',
     ])
     .executeTakeFirst();
   return (row as PatientForPhotoSession | undefined) ?? null;
+}
+
+/**
+ * Set a patient's English first/last name. Used by the photo-session guard to ensure Dolphin
+ * receives a Latin-script name — Dolphin's patient-name columns are varchar/Latin1 and corrupt
+ * Arabic to '?', so a patient with no English name must supply one before photos can sync.
+ */
+export async function updatePatientName(
+  personId: string,
+  firstName: string,
+  lastName: string
+): Promise<void> {
+  await getKysely()
+    .updateTable('tblpatients')
+    .set({ FirstName: firstName, LastName: lastName })
+    .where('PersonID', '=', parseInt(personId, 10))
+    .execute();
 }
 
 /**

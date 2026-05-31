@@ -112,20 +112,37 @@ export class CdcEngine {
       if (rows.length === 0) return;
 
       let applied = 0;
+      let deferred = 0;
+      let lastError: string | null = null;
       for (const r of rows) {
         if (this.stopped) break;
-        if (r.op === 'D') await this.sink.remove(r.tbl, r.pk);
-        else await this.sink.upsert(r.tbl, r.pk);
-        // Version-guarded delete: skipped (→ reprocessed) if the row was re-touched since we read it.
-        await local.query('DELETE FROM change_log WHERE id = $1 AND changed_at = $2::timestamp', [
-          r.id,
-          r.changed_at_text,
-        ]);
-        applied++;
+        // Apply each row independently. A single failure (e.g. an FK-parent that has not
+        // been replicated yet — coalescing can reorder a child ahead of its parent) must NOT
+        // abort the whole cycle: leave the offending row in change_log for the next pass and
+        // keep going, so the parent later in this batch still lands and the child succeeds next
+        // cycle. Persistent failures keep the backlog growing → the circuit breaker is the backstop.
+        try {
+          if (r.op === 'D') await this.sink.remove(r.tbl, r.pk);
+          else await this.sink.upsert(r.tbl, r.pk);
+          // Version-guarded delete: skipped (→ reprocessed) if the row was re-touched since we read it.
+          await local.query('DELETE FROM change_log WHERE id = $1 AND changed_at = $2::timestamp', [
+            r.id,
+            r.changed_at_text,
+          ]);
+          applied++;
+        } catch (rowErr) {
+          deferred++;
+          lastError = (rowErr as Error).message;
+        }
       }
       if (applied > 0) log.info(`[cdc:${this.sink.name}] replicated ${applied} change(s)`);
+      if (deferred > 0)
+        log.warn(`[cdc:${this.sink.name}] deferred ${deferred} change(s) (will retry)`, { error: lastError });
 
-      if (rows.length === this.opts.batchSize && !this.stopped) setTimeout(() => void this.drainOnce(), 50);
+      // Only fast-chain when we made progress; if the whole window failed (destination down, or
+      // parents sit beyond this window) waiting for the next interval tick avoids a hot retry loop.
+      if (applied > 0 && rows.length === this.opts.batchSize && !this.stopped)
+        setTimeout(() => void this.drainOnce(), 50);
     } catch (err) {
       log.warn(`[cdc:${this.sink.name}] drain cycle failed (will retry)`, { error: (err as Error).message });
     } finally {

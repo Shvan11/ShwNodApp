@@ -33,6 +33,21 @@ export const WORK_STATUS = {
 
 type WorkStatusType = (typeof WORK_STATUS)[keyof typeof WORK_STATUS];
 
+/**
+ * Coerce a value bound for a numeric PG column to `number | null`.
+ *
+ * The route layer forwards JSON form values verbatim, so empty optional numeric
+ * fields arrive as `''` (empty string). A plain `?? null` does NOT catch that —
+ * `??` only collapses `null`/`undefined` — so the empty string would reach PG and
+ * blow up with `invalid input syntax for type smallint: ""`. This treats `''`
+ * (and other blank/NaN inputs) as NULL.
+ */
+function numOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isNaN(n) ? null : n;
+}
+
 // Type definitions
 interface Work {
   workid: number;
@@ -531,23 +546,23 @@ export async function addWork(workData: WorkData): Promise<{ workid: number } | 
       PersonID: workData.PersonID,
       // TotalRequired / Typeofwork are NOT NULL in the PG schema; the WorkData type
       // allows them optional, so keep the legacy `?? null` runtime (PG enforces NOT NULL).
-      TotalRequired: (workData.TotalRequired ?? null) as number,
+      TotalRequired: numOrNull(workData.TotalRequired) as number,
       Currency: workData.Currency || null,
-      Typeofwork: (workData.Typeofwork ?? null) as number,
+      Typeofwork: numOrNull(workData.Typeofwork) as number,
       Notes: workData.Notes || null,
       Status: status,
       StartDate: (workData.StartDate as Date | string | null) || null,
       DebondDate: (workData.DebondDate as Date | string | null) || null,
       FPhotoDate: (workData.FPhotoDate as Date | string | null) || null,
       IPhotoDate: (workData.IPhotoDate as Date | string | null) || null,
-      EstimatedDuration: workData.EstimatedDuration ?? null,
+      EstimatedDuration: numOrNull(workData.EstimatedDuration),
       DrID: workData.DrID,
       NotesDate: (workData.NotesDate as Date | string | null) || null,
-      KeyWordID1: workData.KeyWordID1 || null,
-      KeyWordID2: workData.KeyWordID2 || null,
-      KeywordID3: workData.KeywordID3 || null,
-      KeywordID4: workData.KeywordID4 || null,
-      KeywordID5: workData.KeywordID5 || null,
+      KeyWordID1: numOrNull(workData.KeyWordID1),
+      KeyWordID2: numOrNull(workData.KeyWordID2),
+      KeywordID3: numOrNull(workData.KeywordID3),
+      KeywordID4: numOrNull(workData.KeywordID4),
+      KeywordID5: numOrNull(workData.KeywordID5),
     })
     .returning('workid')
     .executeTakeFirst();
@@ -563,24 +578,24 @@ export async function updateWork(
   const updateValues: Record<string, unknown> = {};
 
   const fieldValues: Record<string, unknown> = {
-    TotalRequired: workData.TotalRequired ?? null,
+    TotalRequired: numOrNull(workData.TotalRequired),
     Currency: workData.Currency || null,
-    Typeofwork: workData.Typeofwork ?? null,
+    Typeofwork: numOrNull(workData.Typeofwork),
     Notes: workData.Notes || null,
     Status: workData.Status ?? WORK_STATUS.ACTIVE,
     StartDate: (workData.StartDate as Date | string | null) || null,
     DebondDate: (workData.DebondDate as Date | string | null) || null,
     FPhotoDate: (workData.FPhotoDate as Date | string | null) || null,
     IPhotoDate: (workData.IPhotoDate as Date | string | null) || null,
-    EstimatedDuration: workData.EstimatedDuration || null,
+    EstimatedDuration: numOrNull(workData.EstimatedDuration),
     DrID: workData.DrID,
     NotesDate: (workData.NotesDate as Date | string | null) || null,
-    KeyWordID1: workData.KeyWordID1 || null,
-    KeyWordID2: workData.KeyWordID2 || null,
-    KeywordID3: workData.KeywordID3 || null,
-    KeywordID4: workData.KeywordID4 || null,
-    KeywordID5: workData.KeywordID5 || null,
-    Discount: workData.Discount ?? null,
+    KeyWordID1: numOrNull(workData.KeyWordID1),
+    KeyWordID2: numOrNull(workData.KeyWordID2),
+    KeywordID3: numOrNull(workData.KeywordID3),
+    KeywordID4: numOrNull(workData.KeywordID4),
+    KeywordID5: numOrNull(workData.KeywordID5),
+    Discount: numOrNull(workData.Discount),
     DiscountDate: (workData.DiscountDate as Date | string | null) || null,
     DiscountReason: workData.DiscountReason ?? null,
   };
@@ -652,9 +667,10 @@ export async function addWorkWithInvoice(
   workData: WorkData
 ): Promise<{ workId: number; invoiceId: number }> {
   const today = toDateOnly(new Date());
+  const totalRequired = numOrNull(workData.TotalRequired);
   const usdReceived =
-    workData.Currency === 'USD' || workData.Currency === 'EUR' ? workData.TotalRequired : 0;
-  const iqdReceived = workData.Currency === 'IQD' ? workData.TotalRequired : 0;
+    workData.Currency === 'USD' || workData.Currency === 'EUR' ? totalRequired : 0;
+  const iqdReceived = workData.Currency === 'IQD' ? totalRequired : 0;
 
   // Atomic work + invoice insert (the original ran one BEGIN/COMMIT TRANSACTION batch).
   // Status is hard-coded to 2 (Finished) here, matching the original VALUES list.
@@ -665,23 +681,23 @@ export async function addWorkWithInvoice(
         .insertInto('tblwork')
         .values({
           PersonID: workData.PersonID,
-          TotalRequired: (workData.TotalRequired ?? null) as number,
+          TotalRequired: numOrNull(workData.TotalRequired) as number,
           Currency: workData.Currency || null,
-          Typeofwork: (workData.Typeofwork ?? null) as number,
+          Typeofwork: numOrNull(workData.Typeofwork) as number,
           Notes: workData.Notes || null,
           Status: WORK_STATUS.FINISHED,
           StartDate: (workData.StartDate as Date | string | null) || null,
           DebondDate: (workData.DebondDate as Date | string | null) || null,
           FPhotoDate: (workData.FPhotoDate as Date | string | null) || null,
           IPhotoDate: (workData.IPhotoDate as Date | string | null) || null,
-          EstimatedDuration: workData.EstimatedDuration ?? null,
+          EstimatedDuration: numOrNull(workData.EstimatedDuration),
           DrID: workData.DrID,
           NotesDate: (workData.NotesDate as Date | string | null) || null,
-          KeyWordID1: workData.KeyWordID1 || null,
-          KeyWordID2: workData.KeyWordID2 || null,
-          KeywordID3: workData.KeywordID3 || null,
-          KeywordID4: workData.KeywordID4 || null,
-          KeywordID5: workData.KeywordID5 || null,
+          KeyWordID1: numOrNull(workData.KeyWordID1),
+          KeyWordID2: numOrNull(workData.KeyWordID2),
+          KeywordID3: numOrNull(workData.KeywordID3),
+          KeywordID4: numOrNull(workData.KeywordID4),
+          KeywordID5: numOrNull(workData.KeywordID5),
         })
         .returning('workid')
         .executeTakeFirstOrThrow();
@@ -690,7 +706,7 @@ export async function addWorkWithInvoice(
         .insertInto('tblInvoice')
         .values({
           workid: work.workid,
-          Amountpaid: workData.TotalRequired ?? 0,
+          Amountpaid: totalRequired ?? 0,
           Dateofpayment: today,
           USDReceived: usdReceived ?? 0,
           IQDReceived: iqdReceived ?? 0,

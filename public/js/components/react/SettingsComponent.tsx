@@ -152,8 +152,7 @@ const SettingsComponent: React.FC = () => {
             label: 'Supabase Status',
             icon: 'fas fa-cloud',
             component: SupabaseStatusSettings,
-            description: 'Live status of Supabase portal & failover sync',
-            adminOnly: true // exposes sync infrastructure detail
+            description: 'Live status of Supabase portal & failover sync'
         },
         {
             id: 'messaging',

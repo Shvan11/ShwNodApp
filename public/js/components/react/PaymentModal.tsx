@@ -562,6 +562,19 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         }
     };
 
+    // Toggle: fill the amount field with the exact remaining balance (zeroes the balance)
+    const handlePayFullBalanceToggle = (checked: boolean) => {
+        // Lock to amount mode so the value isn't recomputed from cash
+        setModeLocked(true);
+        if (entryMode !== 'amount') setEntryMode('amount');
+
+        if (checked && calculations.remainingBalance > 0) {
+            setFormData(prev => ({ ...prev, amountToRegister: calculations.remainingBalance }));
+        } else {
+            setFormData(prev => ({ ...prev, amountToRegister: '' }));
+        }
+    };
+
     const handleChangeOverride = (value: string) => {
         const numericValue = parseFormattedNumber(value) || 0;
         setFormData(prev => ({
@@ -828,6 +841,12 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
     if (!workData) return null;
 
+    // Whether the amount field currently equals the full remaining balance
+    // (drives the "Pay full balance" checkbox; auto-unticks when the user edits the amount)
+    const amountEqualsBalance =
+        calculations.remainingBalance > 0 &&
+        (parseFloat(String(formData.amountToRegister)) || 0) === Math.round(calculations.remainingBalance);
+
     // Detect same-currency selection (for entry mode locking)
     // Cash mode doesn't make sense for same-currency - can't derive "amount owed" from "cash received"
     const isSameCurrencySelection =
@@ -983,6 +1002,16 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                         placeholder={entryMode === 'cash' ? 'Auto' : 'Enter amount'}
                                         className={`${styles.inputLg} ${entryMode === 'cash' ? styles.inputReadonly : ''}`}
                                     />
+                                    {entryMode === 'amount' && calculations.remainingBalance > 0 && (
+                                        <label className={styles.payFullBalanceCheck}>
+                                            <input
+                                                type="checkbox"
+                                                checked={amountEqualsBalance}
+                                                onChange={(e) => handlePayFullBalanceToggle(e.target.checked)}
+                                            />
+                                            <span>Pay full balance ({formatCurrency(calculations.remainingBalance, calculations.accountCurrency)})</span>
+                                        </label>
+                                    )}
                                 </div>
 
                                 {/* Cash Received - Dynamic based on currency */}

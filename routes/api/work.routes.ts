@@ -363,10 +363,13 @@ router.post(
         message: 'Work added successfully'
       });
     } catch (error) {
-      log.error('Error adding work:', error);
-
-      // Handle validation errors from service layer
+      // Handle validation errors from service layer (expected business-rule
+      // rejections — log at warn, not error, and without a stack trace).
       if (error instanceof WorkValidationError) {
+        log.warn('Work creation rejected by validation', {
+          code: error.code,
+          personId: req.body?.PersonID
+        });
         if (error.code === 'DUPLICATE_ACTIVE_WORK') {
           ErrorResponses.conflict(
             res,
@@ -382,6 +385,7 @@ router.post(
         return;
       }
 
+      log.error('Error adding work:', error);
       sendError(res, 500, 'Failed to add work', error as Error);
     }
   }
@@ -407,10 +411,13 @@ router.post(
         message: 'Work and invoice created successfully'
       });
     } catch (error) {
-      log.error('Error adding work with invoice:', error);
-
-      // Handle validation errors from service layer
+      // Handle validation errors from service layer (expected business-rule
+      // rejections — log at warn, not error, and without a stack trace).
       if (error instanceof WorkValidationError) {
+        log.warn('Work-with-invoice creation rejected by validation', {
+          code: error.code,
+          personId: req.body?.PersonID
+        });
         if (error.code === 'DUPLICATE_ACTIVE_WORK') {
           ErrorResponses.conflict(
             res,
@@ -426,6 +433,7 @@ router.post(
         return;
       }
 
+      log.error('Error adding work with invoice:', error);
       sendError(res, 500, 'Failed to add work with invoice', error as Error);
     }
   }
@@ -847,14 +855,18 @@ router.delete(
         rowsAffected: result.rowsAffected
       });
     } catch (error) {
-      log.error('Error deleting work:', error);
-
-      // Handle validation errors from service layer
+      // Handle validation errors from service layer (expected business-rule
+      // rejections — log at warn, not error, and without a stack trace).
       if (error instanceof WorkValidationError) {
+        log.warn('Work deletion rejected by validation', {
+          code: error.code,
+          workId: req.body?.workId
+        });
         ErrorResponses.conflict(res, error.message, error.details);
         return;
       }
 
+      log.error('Error deleting work:', error);
       sendError(res, 500, 'Failed to delete work', error as Error);
     }
   }
@@ -1704,9 +1716,10 @@ router.get(
         relatedRecords: relatedCounts
       });
     } catch (error) {
-      log.error('Error getting transfer preview:', error);
-
       if (error instanceof WorkValidationError) {
+        log.warn('Transfer preview rejected by validation', {
+          code: error.code
+        });
         if (error.code === 'WORK_NOT_FOUND') {
           ErrorResponses.notFound(res, 'Work');
           return;
@@ -1715,6 +1728,7 @@ router.get(
         return;
       }
 
+      log.error('Error getting transfer preview:', error);
       sendError(res, 500, 'Failed to get transfer preview', error as Error);
     }
   }
@@ -1768,9 +1782,11 @@ router.post(
         message: 'Work transferred successfully'
       });
     } catch (error) {
-      log.error('Error transferring work:', error);
-
       if (error instanceof WorkValidationError) {
+        log.warn('Work transfer rejected by validation', {
+          code: error.code,
+          workId: req.params?.workId
+        });
         switch (error.code) {
           case 'WORK_NOT_FOUND':
           case 'TARGET_PATIENT_NOT_FOUND':
@@ -1788,6 +1804,7 @@ router.post(
         }
       }
 
+      log.error('Error transferring work:', error);
       sendError(res, 500, 'Failed to transfer work', error as Error);
     }
   }

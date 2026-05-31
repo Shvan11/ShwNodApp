@@ -737,21 +737,20 @@ class WhatsAppService extends EventEmitter {
       throw new Error('Initialization aborted due to timeout');
     }
 
-    // Dev-only: stop puppeteer's signal handlers from racing our
-    // gracefulShutdown. On Linux dev (tsx watch + concurrently) this race
-    // corrupts the WA Web IndexedDB MANIFEST. Production (Windows Service)
-    // keeps puppeteer defaults — its tested shutdown path is unchanged.
-    const isDev = process.env.NODE_ENV !== 'production';
+    // Let Puppeteer keep its DEFAULT signal handlers (handleSIGINT/SIGTERM/
+    // SIGHUP all true) so it tears Chrome down when the process is signalled.
+    // This was previously disabled in dev to dodge a tsx-watch + concurrently
+    // signal race that corrupted the WA Web IndexedDB MANIFEST — but that race
+    // was specific to the OLD WSL/Linux dev box. Dev and prod now BOTH run on
+    // Windows, where SIGINT (Ctrl+C) is delivered to the process and the
+    // uncatchable kills (node --watch restarts, hard service stops) wouldn't run
+    // our handlers regardless. So restoring Puppeteer's defaults can only help
+    // close Chrome and matches the production (Windows service) shutdown path.
     const client = new Client({
       authStrategy: new LocalAuth({ clientId: 'client' }),
       puppeteer: {
         headless: true,
         timeout: 30000,
-        ...(isDev && {
-          handleSIGINT: false,
-          handleSIGTERM: false,
-          handleSIGHUP: false,
-        }),
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',

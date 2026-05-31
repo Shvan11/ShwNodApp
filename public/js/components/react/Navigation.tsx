@@ -215,6 +215,20 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         }
     };
 
+    const handleOpenDolphin = () => {
+        try {
+            // Dolphin protocol handler keys off PersonID; the desktop side looks the patient
+            // up by patOtherID. No name needed in the URL (Dolphin already holds the patient).
+            const url = `dolphin:${personId}?action=open`;
+            window.location.href = url;
+
+            console.log('Opening Dolphin Imaging for patient:', personId);
+        } catch (err) {
+            console.error('Error opening Dolphin Imaging:', err);
+            toast.error('Failed to open Dolphin Imaging: ' + (err instanceof Error ? err.message : 'Unknown error'));
+        }
+    };
+
     const formatDate = (dateTime: string): string => {
         return dateTime.substring(0, 10).split("-").reverse().join("-");
     };
@@ -524,6 +538,23 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                                 <img src="/images/3Shape_transparent_256x256.png" alt="3Shape" />
                             </div>
                             <span className="action-item-label">3Shape</span>
+                        </Link>
+
+                        <Link
+                            to="#"
+                            className={`flyout-action-item ${isNewPatient ? 'disabled' : ''}`}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                if (isNewPatient) return;
+                                handleOpenDolphin();
+                                setMoreActionsExpanded(false);
+                            }}
+                            title={isNewPatient ? "Save patient first to access Dolphin Imaging" : "Launch Dolphin Imaging with patient data"}
+                        >
+                            <div className="action-item-icon">
+                                <img src="/images/dolphin-logo@2x.png" alt="Dolphin" />
+                            </div>
+                            <span className="action-item-label">Dolphin Imaging</span>
                         </Link>
 
                         <Link

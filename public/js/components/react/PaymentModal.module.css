@@ -323,6 +323,22 @@
     color: var(--success-color);
 }
 
+/* "Pay full balance" quick-fill checkbox under the Amount to Register field */
+.payFullBalanceCheck {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs, 6px);
+    margin-top: var(--spacing-xs, 6px);
+    font-size: var(--font-size-xs, 11px);
+    color: var(--gray-600);
+    cursor: pointer;
+    user-select: none;
+}
+
+.payFullBalanceCheck input {
+    cursor: pointer;
+}
+
 /* ========================================
    PAYMENT MODAL INPUT SIZING
    All inputs within payment modal share base styles

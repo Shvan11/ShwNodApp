@@ -21,6 +21,7 @@ export const StateEventTypes = {
   CLIENT_ERROR: 'client_error',
   CLIENT_RECONNECTING: 'client_reconnecting',
   WHATSAPP_STATE_CHANGED: 'whatsapp_state_changed',
+  WHATSAPP_INITIALIZATION_REQUESTED: 'whatsapp_initialization_requested',
 
   // Message Status Events
   MESSAGE_STATUS_UPDATED: 'message_status_updated',

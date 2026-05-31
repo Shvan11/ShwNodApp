@@ -51,6 +51,11 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
     const [timepointType, setTimepointType] = useState('Initial');
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
     const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
+    // Set when the server reports the patient has no English name — Dolphin's patient columns are
+    // Latin1 and corrupt Arabic, so we capture an English first/last before proceeding.
+    const [needsName, setNeedsName] = useState(false);
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
 
     useEffect(() => {
         loadPhotoDates();
@@ -88,10 +93,27 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
         setSelectedDate(`${year}-${month}-${day}`);
     };
 
+    // Latin-1 (CP1252) only — mirrors the server's isLatin1 guard. Arabic chars would corrupt in Dolphin.
+    const isLatin1 = (s: string) => /^[ -ÿ]+$/.test(s);
+
     const handleSubmit = async (overrideDate = false) => {
         if (!patientInfo?.FirstName && !patientInfo?.PatientName) {
             toast.error('Patient name is required');
             return;
+        }
+
+        // When the server has asked for an English name, validate before resubmitting.
+        if (needsName) {
+            const f = firstName.trim();
+            const l = lastName.trim();
+            if (!f || !l) {
+                toast.error('Enter both an English first and last name');
+                return;
+            }
+            if (!isLatin1(f) || !isLatin1(l)) {
+                toast.error('Use English (Latin) letters only — Dolphin Imaging cannot store Arabic names');
+                return;
+            }
         }
 
         try {
@@ -101,7 +123,12 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
             const response = await fetch(`/api/photo-editor/${personId}/prepare`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tpDescription: timepointType, tpDate: selectedDate, overrideDate })
+                body: JSON.stringify({
+                    tpDescription: timepointType,
+                    tpDate: selectedDate,
+                    overrideDate,
+                    ...(needsName ? { firstName: firstName.trim(), lastName: lastName.trim() } : {})
+                })
             });
 
             if (!response.ok) {
@@ -110,6 +137,14 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
             }
 
             const data = await response.json();
+
+            // Patient has no English name — Dolphin can't store Arabic, so capture one and resubmit.
+            if (data.needsName) {
+                setNeedsName(true);
+                toast.error(data.message || 'An English first and last name is required');
+                setSubmitting(false);
+                return;
+            }
 
             // tblwork date conflict — offer to override the existing Initial/Final date.
             if (data.conflict) {
@@ -192,6 +227,44 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                                 </div>
                             </div>
                         </div>
+                    )}
+
+                    {/* English-name capture — shown when the patient has no Latin name (Dolphin can't store Arabic) */}
+                    {needsName && (
+                        <>
+                            <div className={`${styles.conflictWarning} ${styles.conflictError}`}>
+                                <div className={styles.conflictIcon}>
+                                    <i className="fas fa-language" />
+                                </div>
+                                <div className={styles.conflictContent}>
+                                    <strong>English name required</strong>
+                                    <p>
+                                        This patient has no English name. Enter an English (Latin) first and last
+                                        name — Dolphin Imaging cannot store Arabic names.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className={styles.formGroup}>
+                                <label>First Name (English)</label>
+                                <input
+                                    type="text"
+                                    value={firstName}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setFirstName(e.target.value)}
+                                    className={styles.formInput}
+                                    placeholder="e.g. Malika"
+                                />
+                            </div>
+                            <div className={styles.formGroup}>
+                                <label>Last Name (English)</label>
+                                <input
+                                    type="text"
+                                    value={lastName}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setLastName(e.target.value)}
+                                    className={styles.formInput}
+                                    placeholder="e.g. Mohammed"
+                                />
+                            </div>
+                        </>
                     )}
 
                     {/* Timepoint Type */}
@@ -285,7 +358,7 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                                 onClick={() => handleSubmit(false)}
                                 disabled={submitting || loading}
                             >
-                                {submitting ? 'Opening…' : 'Open Editor'}
+                                {submitting ? 'Opening…' : needsName ? 'Save & Open Editor' : 'Open Editor'}
                             </button>
                         </>
                     )}
