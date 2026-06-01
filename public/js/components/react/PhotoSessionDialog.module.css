@@ -166,6 +166,78 @@
     font-size: 0.9rem;
 }
 
+/* Import folder (memory-card source) */
+.importFolder {
+    margin-bottom: 1.25rem;
+}
+
+.importFolder > label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-color, #333);
+    font-size: 0.9rem;
+}
+
+.importRow {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex-wrap: wrap;
+}
+
+.folderName {
+    font-size: 0.9rem;
+    color: var(--text-color, #333);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.statusBadge {
+    flex-shrink: 0;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.badgeGranted { background: #d1e7dd; color: #0f5132; }
+.badgePrompt  { background: #fff3cd; color: #856404; }
+.badgeDenied  { background: #f8d7da; color: #721c24; }
+.badgeUnset   { background: var(--gray-100, #e9ecef); color: var(--text-light, #666); }
+
+.iniHint {
+    margin: 0.5rem 0 0 0;
+    font-size: 0.78rem;
+    color: var(--text-light, #666);
+    line-height: 1.4;
+}
+
+.importActions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.625rem;
+    flex-wrap: wrap;
+}
+
+.linkBtn {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--primary-color, #007bff);
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.linkBtn:hover {
+    color: var(--primary-dark, #0056b3);
+}
+
 /* Loading */
 .loadingPlaceholder {
     padding: 1rem;

@@ -296,16 +296,24 @@ export async function showFilePicker(
   }
 
   try {
-    const pickerOptions: Parameters<typeof window.showOpenFilePicker>[0] = {
+    // `startIn` is part of the spec but missing from the lib.dom type, so widen locally.
+    const pickerOptions: NonNullable<Parameters<typeof window.showOpenFilePicker>[0]> & {
+      startIn?: FilePickerOptions['startIn'];
+    } = {
       multiple: options?.multiple ?? false,
       excludeAcceptAllOption: options?.excludeAcceptAllOption ?? false
     };
 
     if (options?.accept) {
-      pickerOptions!.types = [{
+      pickerOptions.types = [{
         description: options.description ?? 'Files',
         accept: options.accept
       }];
+    }
+
+    // Default the picker's starting location (e.g. a remembered directory handle).
+    if (options?.startIn) {
+      pickerOptions.startIn = options.startIn;
     }
 
     const handles = await window.showOpenFilePicker(pickerOptions);

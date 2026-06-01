@@ -533,6 +533,20 @@
     color: var(--gray-700);
 }
 
+.deleteModalContent p.deleteModalWarning {
+    background-color: var(--error-50);
+    border: var(--border-width-thin) solid var(--error-500);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    color: var(--error-700);
+    font-size: var(--font-size-sm);
+}
+
+.deleteModalWarning i {
+    color: var(--error-500);
+    margin-right: var(--spacing-xs);
+}
+
 .deleteModalActions {
     display: flex;
     gap: var(--spacing-md);

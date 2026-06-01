@@ -139,6 +139,21 @@ export async function getNativeTimePoint(
   return (row as NativeTimePointRow | undefined) ?? null;
 }
 
+/**
+ * List every tpCode a patient has, so the on-disk `working/` gallery files
+ * (`{personId}0{tpCode}.i{view}`) can be removed when the patient is deleted.
+ * Must be called BEFORE deletePatient — the `ON DELETE CASCADE` on
+ * `FK_tblTimePoints_tblpatients` wipes these rows with the patient.
+ */
+export async function getTimePointCodesForPatient(personId: number): Promise<number[]> {
+  const rows = await getKysely()
+    .selectFrom('tblTimePoints')
+    .where('PersonID', '=', personId)
+    .select('tpCode')
+    .execute();
+  return rows.map((r) => r.tpCode);
+}
+
 export interface UpdateTimePointResult {
   ok: boolean;
   /** true when another tpCode for this patient already holds the target (name, date). */

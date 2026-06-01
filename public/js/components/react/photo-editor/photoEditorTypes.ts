@@ -73,6 +73,16 @@ export function aspectForView(view: PhotoViewCode): number {
   return d.width / d.height;
 }
 
+/**
+ * Zoom bounds + per-notch sensitivity. Shared by the cropper (min/max/speed props)
+ * and the grid-level wheel handler that owns scroll-zoom for the selected slot, so
+ * both clamp and step identically. ZOOM_SPEED mirrors react-easy-crop's wheel math
+ * (`zoom - pixelY * speed / 200`).
+ */
+export const ZOOM_MIN = 0.2;
+export const ZOOM_MAX = 3;
+export const ZOOM_SPEED = 0.1;
+
 /** Occlusal views (Upper/Lower) are shot through a mirror → default to a flip. */
 export function defaultFlipV(view: PhotoViewCode): boolean {
   return view === 'i23' || view === 'i24';

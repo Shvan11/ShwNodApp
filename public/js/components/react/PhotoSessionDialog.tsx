@@ -1,5 +1,6 @@
 import { useState, useEffect, ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import { useImportFolder } from '@/hooks/useImportFolder';
 import Modal from './Modal';
 import styles from './PhotoSessionDialog.module.css';
 
@@ -44,6 +45,9 @@ interface ConflictInfo {
 
 const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Props) => {
     const toast = useToast();
+    // The memory-card import folder reused by the editor's "Move from card" flow; surfaced
+    // here so the user sees/grants access before opening the editor.
+    const importFolder = useImportFolder('readwrite');
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -177,6 +181,22 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
         setConflictInfo(null);
     };
 
+    const handleChooseImportFolder = async (): Promise<void> => {
+        const dir = await importFolder.choosePick();
+        if (dir) toast.success(`Import folder set to “${dir.name}”`);
+    };
+
+    const handleGrantImportFolder = async (): Promise<void> => {
+        const ok = await importFolder.grant();
+        if (ok) toast.success('Import folder access granted');
+        else toast.warning('Access was not granted');
+    };
+
+    const handleForgetImportFolder = async (): Promise<void> => {
+        await importFolder.clear();
+        toast.info('Import folder forgotten');
+    };
+
     const formatDate = (dateStr: string): string => {
         if (!dateStr) return '';
         const date = new Date(dateStr);
@@ -292,6 +312,77 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                             className={styles.formInput}
                             disabled={!!conflictInfo}
                         />
+                    </div>
+
+                    {/* Import folder — the memory-card source reused by "Move from card" in the editor */}
+                    <div className={styles.importFolder}>
+                        <label>Import folder</label>
+                        {importFolder.status === 'unsupported' ? (
+                            <p className={styles.iniHint}>Folder import needs Chrome or Edge.</p>
+                        ) : (
+                            <>
+                                <div className={styles.importRow}>
+                                    <span className={styles.folderName} title={importFolder.folderName ?? undefined}>
+                                        <i className="fas fa-folder" aria-hidden="true" />{' '}
+                                        {importFolder.folderName ?? 'No folder selected'}
+                                    </span>
+                                    {importFolder.status === 'granted' && (
+                                        <span className={`${styles.statusBadge} ${styles.badgeGranted}`}>Ready</span>
+                                    )}
+                                    {importFolder.status === 'prompt' && (
+                                        <span className={`${styles.statusBadge} ${styles.badgePrompt}`}>Needs access</span>
+                                    )}
+                                    {importFolder.status === 'denied' && (
+                                        <span className={`${styles.statusBadge} ${styles.badgeDenied}`}>Blocked</span>
+                                    )}
+                                    {importFolder.status === 'unset' && (
+                                        <span className={`${styles.statusBadge} ${styles.badgeUnset}`}>Not set</span>
+                                    )}
+                                </div>
+
+                                <div className={styles.importActions}>
+                                    {importFolder.status === 'unset' && (
+                                        <button type="button" className="btn btn-secondary" onClick={handleChooseImportFolder}>
+                                            <i className="fas fa-folder-open" aria-hidden="true" /> Choose import folder
+                                        </button>
+                                    )}
+                                    {importFolder.status === 'prompt' && (
+                                        <>
+                                            <button type="button" className="btn btn-secondary" onClick={handleGrantImportFolder}>
+                                                <i className="fas fa-key" aria-hidden="true" /> Grant access
+                                            </button>
+                                            <button type="button" className={styles.linkBtn} onClick={handleChooseImportFolder}>
+                                                Change folder
+                                            </button>
+                                        </>
+                                    )}
+                                    {importFolder.status === 'granted' && (
+                                        <>
+                                            <button type="button" className={styles.linkBtn} onClick={handleChooseImportFolder}>
+                                                Change folder
+                                            </button>
+                                            <button type="button" className={styles.linkBtn} onClick={handleForgetImportFolder}>
+                                                Forget
+                                            </button>
+                                        </>
+                                    )}
+                                    {importFolder.status === 'denied' && (
+                                        <>
+                                            <button type="button" className="btn btn-secondary" onClick={handleGrantImportFolder}>
+                                                <i className="fas fa-key" aria-hidden="true" /> Try again
+                                            </button>
+                                            <button type="button" className={styles.linkBtn} onClick={handleChooseImportFolder}>
+                                                Change folder
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+
+                                {(importFolder.status === 'prompt' || importFolder.status === 'denied') && (
+                                    <p className={styles.iniHint}>Tip: choose “Allow on every visit” so access sticks.</p>
+                                )}
+                            </>
+                        )}
                     </div>
 
                     {/* Appointments List */}

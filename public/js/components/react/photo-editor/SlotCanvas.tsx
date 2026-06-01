@@ -11,7 +11,7 @@ import Cropper from 'react-easy-crop';
 import type { Area, Point } from 'react-easy-crop';
 import styles from './SlotCanvas.module.css';
 import type { CropArea, SlotState } from './photoEditorTypes';
-import { aspectForView, labelForView } from './photoEditorTypes';
+import { aspectForView, labelForView, ZOOM_MIN, ZOOM_MAX, ZOOM_SPEED } from './photoEditorTypes';
 
 /** Inert crop handler for inactive slots (react-easy-crop requires onCropChange). */
 const noop = (): void => {};
@@ -144,9 +144,14 @@ const SlotCanvas = ({ personId, slot, active, onCropChange, onZoomChange, onCrop
           // server fills any uncovered slot region with white, so the render
           // matches this preview (margins and all). minZoom < 1 enables zoom-out.
           restrictPosition={false}
-          minZoom={0.2}
-          maxZoom={3}
-          zoomSpeed={0.1}
+          minZoom={ZOOM_MIN}
+          maxZoom={ZOOM_MAX}
+          zoomSpeed={ZOOM_SPEED}
+          // Scroll-zoom is owned by SlotGrid's grid-level wheel handler so the
+          // SELECTED slot zooms reliably anywhere over its cell (the cropper's own
+          // listener only fires over the crop area, leaving dead zones that let the
+          // page scroll instead). Disable the built-in one to avoid double-zoom.
+          zoomWithScroll={false}
           showGrid={false}
           objectFit="cover"
           onCropChange={active ? onCropChange : noop}

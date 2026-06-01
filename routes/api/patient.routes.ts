@@ -39,20 +39,25 @@ import { getOption } from '../../services/database/queries/options-queries.js';
 import { ErrorResponses } from '../../utils/error-response.js';
 import * as PatientService from '../../services/business/PatientService.js';
 import { PatientValidationError } from '../../services/business/PatientService.js';
+import { transliterateNameToEnglish } from '../../services/business/name-transliteration.js';
 import * as PatientPortalService from '../../services/business/PatientPortalService.js';
 import {
   getNativeTimePoint,
   updateNativeTimePoint,
   deleteNativeTimePoint,
+  getTimePointCodesForPatient,
 } from '../../services/database/queries/native-timepoint-queries.js';
-import { updatePhotoDate } from '../../services/database/queries/photo-session-queries.js';
+import { updatePhotoDate, updatePatientName } from '../../services/database/queries/photo-session-queries.js';
 import {
   deleteWorkingFilesForTimepoint,
+  deleteWorkingFilesForPatient,
   timepointFolderName,
 } from '../../services/imaging/photo-cleanup.service.js';
+import { purgeDolphinPatient } from '../../services/sync/cdc/dolphin-sink.js';
 import {
   renameEntry,
   hardDelete,
+  deletePatientFolder,
   entryExists,
   sanitizeName,
   FileExplorerError,
@@ -1033,6 +1038,29 @@ router.post(
         personId: result.personId,
         message: 'Patient created successfully'
       });
+
+      // English first/last not supplied → auto-fill by romanizing the Arabic patientName
+      // with Gemini, AFTER responding so the create request never blocks on the API call.
+      // Best-effort, fire-and-forget: only fills the missing field(s), and silently keeps
+      // them empty if Gemini is unconfigured / errors / can't produce a clean Latin name.
+      if (!processedData.firstName || !processedData.lastName) {
+        void (async () => {
+          try {
+            const ai = await transliterateNameToEnglish(processedData.patientName);
+            if (!ai) return;
+            await updatePatientName(
+              String(result.personId),
+              processedData.firstName || ai.firstName,
+              processedData.lastName || ai.lastName
+            );
+          } catch (err) {
+            log.warn('Background name transliteration failed', {
+              personId: result.personId,
+              error: err instanceof Error ? err.message : String(err)
+            });
+          }
+        })();
+      }
     } catch (error) {
       // Handle duplicate patient name error
       const err = error as Error & {
@@ -1134,8 +1162,57 @@ router.delete(
   async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
     try {
       const personId = parseInt(req.params.personId);
+
+      // Capture the patient's tpCodes BEFORE the delete — deletePatient's cascade
+      // (FK_tblTimePoints_tblpatients ON DELETE CASCADE) drops the timepoint rows, so
+      // afterwards we'd have no way to name the rendered working/ files to remove.
+      const tpCodes = await getTimePointCodesForPatient(personId);
+
       await deletePatient(personId);
-      res.json({ success: true, message: 'Patient deleted successfully' });
+      // DB cascade is authoritative; the on-share photo folder is removed after it
+      // succeeds. Best-effort + logged: a locked file on the SMB share (EBUSY) must
+      // not leave the request hanging in a "record gone but call failed" state.
+      let folderRemoved = true;
+      try {
+        await deletePatientFolder(personId);
+      } catch (folderErr) {
+        folderRemoved = false;
+        log.error('Patient record deleted but folder removal failed', {
+          personId,
+          error: (folderErr as Error).message,
+        });
+      }
+
+      // Wipe the rendered working/ gallery files (the originals folder above does NOT
+      // cover them — they live in the flat shared working/ dir). Best-effort: each file
+      // delete already swallows its own error.
+      try {
+        await deleteWorkingFilesForPatient(personId, tpCodes);
+      } catch (workingErr) {
+        log.error('Patient deleted but working/ files cleanup failed', {
+          personId,
+          error: (workingErr as Error).message,
+        });
+      }
+
+      // Finish the Dolphin wipe: the CDC sink removes the Dolphin timepoints/images
+      // (via the cascade deletes), but never the Dolphin patient row — purge it here so
+      // the patient fully disappears from Dolphin Imaging. No-op if Dolphin sync is off.
+      try {
+        await purgeDolphinPatient(personId);
+      } catch (dolphinErr) {
+        log.error('Patient deleted but Dolphin purge failed', {
+          personId,
+          error: (dolphinErr as Error).message,
+        });
+      }
+      res.json({
+        success: true,
+        message: folderRemoved
+          ? 'Patient and folder deleted successfully'
+          : 'Patient deleted, but its photo folder could not be removed (a file may be open). Please delete it manually.',
+        folderRemoved,
+      });
     } catch (error) {
       log.error('Error deleting patient:', error);
       ErrorResponses.internalError(

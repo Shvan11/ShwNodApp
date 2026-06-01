@@ -58,3 +58,18 @@ export async function deleteWorkingFilesForTimepoint(
     })
   );
 }
+
+/**
+ * Remove the rendered `working/` gallery files for ALL of a patient's timepoints
+ * (used by the patient delete — patient-queries.ts#deletePatient only removes DB
+ * rows + the originals folder, not these flat shared files). Takes the patient's
+ * tpCodes (read before the DB cascade dropped them) and clears each via the
+ * exact-filename helper — exact names, never a `{personId}0*` glob, because
+ * personIds can prefix each other (e.g. 71 vs 710) and collide in that scheme.
+ */
+export async function deleteWorkingFilesForPatient(
+  personId: number,
+  tpCodes: number[]
+): Promise<void> {
+  await Promise.all(tpCodes.map((tpCode) => deleteWorkingFilesForTimepoint(personId, tpCode)));
+}

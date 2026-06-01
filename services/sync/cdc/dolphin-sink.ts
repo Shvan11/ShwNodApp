@@ -44,6 +44,70 @@ function parseLocalDate(s: string | null): Date | null {
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
 }
 
+/**
+ * Hard-delete a patient's ENTIRE Dolphin footprint — the `Patients` row plus every
+ * `TimePoints`/`TimePointImages` row under it — and clear their `dolphin_sync_map` entries.
+ *
+ * The CDC sink alone can't do this: a patient delete cascades `tblTimePoints`/
+ * `tblTimePointImages` (→ the sink's removeTimePoint drops the Dolphin timepoints/images), but
+ * `tblpatients` is NOT a dolphin-captured table, and removeTimePoint deliberately leaves the
+ * Dolphin patient — so the patient row would linger orphaned in Dolphin Imaging. This is called
+ * directly from the patient delete route to finish the wipe. Resolves Dolphin's GUID PKs by
+ * patOtherID (= our PersonID), so it's correct regardless of whether the CDC timepoint-remove
+ * events have drained yet (idempotent — re-running on an absent patient is a no-op).
+ *
+ * No-op when DOLPHIN_SYNC_ENABLED is off (the temporary feature is disabled / SQL Server may be
+ * unreachable). Best-effort: the caller wraps it so a Dolphin outage never fails the delete.
+ */
+export async function purgeDolphinPatient(personId: number): Promise<void> {
+  if (process.env.DOLPHIN_SYNC_ENABLED !== 'true') return;
+
+  const pool = await getPool(); // ShwanNew; Dolphin via DolphinPlatform.dbo.* three-part names
+  const found = await pool
+    .request()
+    .input('oid', sql.VarChar, String(personId))
+    .query<{ patID: string }>('SELECT patID FROM DolphinPlatform.dbo.Patients WHERE patOtherID = @oid');
+  if (found.recordset.length === 0) return; // nothing in Dolphin for this patient
+  const patID = found.recordset[0].patID;
+
+  // Capture the GUIDs first (SELECT, not a DELETE…OUTPUT) — DolphinPlatform.dbo.TimePoints has
+  // enabled triggers, and SQL Server forbids an OUTPUT clause without INTO on a triggered table.
+  const tpiRows = await pool
+    .request()
+    .input('pat', sql.UniqueIdentifier, patID)
+    .query<{ tpiID: string }>('SELECT tpiID FROM DolphinPlatform.dbo.TimePointImages WHERE patID = @pat');
+  const tpRows = await pool
+    .request()
+    .input('pat', sql.UniqueIdentifier, patID)
+    .query<{ tpID: string }>('SELECT tpID FROM DolphinPlatform.dbo.TimePoints WHERE patID = @pat');
+
+  // Delete children → parent.
+  await pool.request().input('pat', sql.UniqueIdentifier, patID).query('DELETE FROM DolphinPlatform.dbo.TimePointImages WHERE patID = @pat');
+  await pool.request().input('pat', sql.UniqueIdentifier, patID).query('DELETE FROM DolphinPlatform.dbo.TimePoints WHERE patID = @pat');
+  await pool.request().input('pat', sql.UniqueIdentifier, patID).query('DELETE FROM DolphinPlatform.dbo.Patients WHERE patID = @pat');
+
+  const tpiGuids = tpiRows.recordset.map((r) => r.tpiID);
+  const tpGuids = tpRows.recordset.map((r) => r.tpID);
+  if (tpiGuids.length > 0) {
+    await getPgPool().query('DELETE FROM dolphin_sync_map WHERE local_table = $1 AND dolphin_id = ANY($2::uuid[])', [
+      TPI,
+      tpiGuids,
+    ]);
+  }
+  if (tpGuids.length > 0) {
+    await getPgPool().query('DELETE FROM dolphin_sync_map WHERE local_table = $1 AND dolphin_id = ANY($2::uuid[])', [
+      TP,
+      tpGuids,
+    ]);
+  }
+  log.info('[cdc:dolphin] purged Dolphin patient', {
+    personId,
+    patID,
+    timepoints: tpGuids.length,
+    images: tpiGuids.length,
+  });
+}
+
 export class DolphinSink implements SyncSink {
   readonly name = 'dolphin';
   private pool: ConnectionPool | null = null;

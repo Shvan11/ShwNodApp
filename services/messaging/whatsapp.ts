@@ -800,15 +800,27 @@ class WhatsAppService extends EventEmitter {
             clientState: this.clientState.state,
           });
 
+          // An init timeout is NOT proof of corruption — WhatsApp is often just
+          // slow to verify a perfectly good session (repeated QR "verifying
+          // session validity"). Don't move a healthy session aside on a mere
+          // timeout; re-validate first and only clean if the files are
+          // genuinely corrupted. The next attempt restores the slow session.
           if (hasSession) {
-            log.info('Cleaning up corrupted session files');
-            try {
-              await this.cleanupInvalidSession();
-              log.info('Session cleanup complete - will retry on next attempt');
-            } catch (cleanupError) {
-              log.error('Failed to cleanup session', {
-                error: (cleanupError as Error).message,
-              });
+            const recheck = await this.validateSessionQuality();
+            if (recheck === 'corrupted') {
+              log.info('Init timed out and session is corrupted - cleaning up');
+              try {
+                await this.cleanupInvalidSession();
+                log.info('Session cleanup complete - will retry on next attempt');
+              } catch (cleanupError) {
+                log.error('Failed to cleanup session', {
+                  error: (cleanupError as Error).message,
+                });
+              }
+            } else {
+              log.info(
+                `Init timed out but session quality is '${recheck}' - preserving it, will retry`
+              );
             }
           }
 
@@ -2118,7 +2130,23 @@ class WhatsAppService extends EventEmitter {
       return { success: true, reason: 'no_session' };
     }
 
-    log.info('Deleting session directory without backup');
+    // A live/hung Chromium child still holds an OS handle on the session's
+    // SQLite files (e.g. "Account Web Data"), so on Windows rmSync fails with
+    // EBUSY no matter how many times we retry. Tear the client+browser down
+    // first to release the handle. No-op when no in-process client exists
+    // (e.g. the startup corrupted-session path).
+    if (this.clientState.client) {
+      log.info('Tearing down live client before session deletion to release file locks');
+      await this.cleanupFailedClient();
+    }
+
+    // Hard delete — no recoverable copy. We only reach here on a genuine
+    // 'corrupted' verdict (validateSessionQuality in performInitialization, and
+    // the init-timeout re-validation), so there is no good session worth
+    // keeping. The accuracy of that verdict is the only safety net: if it
+    // misfires the cost is a re-scan, which is exactly the forcing function to
+    // keep the detection correct instead of papering over it with backups.
+    log.info('Deleting corrupted session directory');
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {

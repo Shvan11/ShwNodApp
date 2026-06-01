@@ -388,9 +388,14 @@ const PatientManagement = () => {
         try {
             const res = await fetch(`/api/patients/${selectedPatient.PersonID}`, { method: 'DELETE' });
             if(!res.ok) throw new Error('Delete failed');
+            const data = await res.json().catch(() => ({}));
             executeSearch();
             setShowDeleteConfirm(false);
-            toast.success('Patient deleted');
+            if (data.folderRemoved === false) {
+                toast.warning(data.message || 'Patient deleted, but its photo folder could not be removed.');
+            } else {
+                toast.success('Patient and photo folder deleted');
+            }
         } catch(err) {
             toast.error(err instanceof Error ? err.message : 'Delete failed');
         }
@@ -637,6 +642,11 @@ const PatientManagement = () => {
                         </div>
                         <div className={styles.deleteModalContent}>
                             <p>Are you sure you want to delete <strong>{selectedPatient.PatientName}</strong>?</p>
+                            <p className={styles.deleteModalWarning}>
+                                <i className="fas fa-exclamation-triangle"></i> This permanently deletes the patient record
+                                <strong> and the patient's entire photo folder on the share</strong> (all photos and files).
+                                This cannot be undone.
+                            </p>
                             <div className={styles.deleteModalActions}>
                                 <button onClick={() => setShowDeleteConfirm(false)} className="btn btn-secondary">Cancel</button>
                                 <button onClick={handleDeleteConfirm} className="btn btn-danger">Delete</button>

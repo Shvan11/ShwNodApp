@@ -352,6 +352,13 @@ export async function createFolder(
 ): Promise<FileEntry> {
   const safeName = sanitizeName(name);
   const { root, abs } = resolveSafe(personId, joinRel(relPath, safeName));
+  // Bootstrap the patient root if this is the patient's first folder — a brand-new
+  // patient has no `clinic1/{personId}` dir yet, which would otherwise make the
+  // parent guard below throw 404. Only the (safe, validated) root is auto-created;
+  // nested parents still must exist (non-recursive create semantics preserved).
+  if (normalizeRel(relPath) === '') {
+    await fs.mkdir(root, { recursive: true });
+  }
   await realpathGuardParent(abs, root);
   try {
     await fs.mkdir(abs); // non-recursive: fails if parent missing
@@ -544,6 +551,21 @@ export async function hardDelete(personId: string | number, relPath: string): Pr
     throw err;
   }
   await fs.rm(abs, { recursive: true, force: true });
+}
+
+/**
+ * Permanently remove a patient's ENTIRE folder (`clinic1/{personId}`) — used when
+ * the patient record itself is deleted. Unlike `hardDelete` (which refuses the
+ * patient root), this targets the root on purpose. Unrecoverable. Idempotent: a
+ * missing folder is a no-op (`force: true`), so it's safe for patients that never
+ * had any files on the share.
+ */
+export async function deletePatientFolder(personId: string | number): Promise<void> {
+  if (!/^\d+$/.test(String(personId))) {
+    throw new FileExplorerError('Invalid patient id', 400);
+  }
+  const root = patientRoot(personId);
+  await fs.rm(root, { recursive: true, force: true });
 }
 
 // ===========================================
