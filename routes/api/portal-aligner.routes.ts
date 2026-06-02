@@ -63,7 +63,18 @@ function getCfJwks(teamUrl: string): ReturnType<typeof createRemoteJWKSet> {
 // are not required; we just allow the configured Pages origin.
 // ---------------------------------------------------------------------------
 function cors(req: Request, res: Response, next: NextFunction): void {
-  const origin = process.env.PORTAL_ALLOWED_ORIGIN || '*';
+  // PORTAL_ALLOWED_ORIGIN may be a comma-separated allowlist (custom domain +
+  // *.pages.dev preview). Reflect whichever request Origin matches.
+  const allowed = (process.env.PORTAL_ALLOWED_ORIGIN || '*')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const reqOrigin = req.headers.origin || '';
+  const origin = allowed.includes('*')
+    ? '*'
+    : reqOrigin && allowed.includes(reqOrigin)
+      ? reqOrigin
+      : allowed[0] || '*';
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
