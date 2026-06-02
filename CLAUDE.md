@@ -107,24 +107,22 @@ Schema reference: `migrations/init_script.sql` is a historical T-SQL dump of the
 
 ## Sync (unified CDC)
 
-**One change feed, multiple sinks.** DB triggers capture every row change *once* into the coalescing `change_log`, and an engine replicates each sink's slice to its destination:
-- **portal** — curated snake_case subset the external aligner portal reads (Supabase `SUPABASE_URL`). A *transform*, not a mirror.
-- **failover** — raw 1:1 copy of the full DB on a *separate* Supabase account (project `shwan-failover`), off-site DR.
+**One change feed, one Supabase database.** DB triggers capture every row change *once* into the coalescing `change_log`, and an engine replicates each sink's slice to its destination:
+- **failover** — raw 1:1 mirror of the full DB into the **single** Supabase database. This is the *only* Supabase sink and the aligner portal's **future serving source** (the portal will read the raw tables directly). The sink keeps the name `failover` for its live `cdc_sink_control`/`change_log` rows, but it's the **primary mirror, not a fallback**. Runs permanently; must stay complete/live.
 - **dolphin** — temporary, see below.
 
-This replaced an older split design (the app-level `SyncQueue` enqueue is retired — don't reintroduce it). It is *not* logical replication and *not* nightly reloads.
+> **Retired:** the curated snake_case **portal** projection (`portal-sink.ts` + `sync-fetch.ts`) and the entire **reverse-sync** path (`sync-engine.ts`, `reverse-sync-poller.ts`, `POST /api/sync/webhook`) were removed when consolidating to one database. `aligner-portal-external` is deprecated until rewritten against the raw schema. The older app-level `SyncQueue` enqueue is also retired — don't reintroduce any of these. This is *not* logical replication and *not* nightly reloads.
 
-**Code:** `services/sync/cdc/` — `engine.ts` (generic per-sink drain: batched, coalescing, version-guarded delete, anti-bloat breaker), `failover-sink.ts` (raw `pg` upsert), `portal-sink.ts` (transform via `sync-fetch.ts` + filters), `index.ts` (`startCdc`/`stopCdc`/`drainCdcNow`, wired into boot + `gracefulShutdown`). The **reverse** path (`sync-engine.ts`, `reverse-sync-poller.ts`, `/api/sync/webhook`) is separate and unchanged.
+**Code:** `services/sync/cdc/` — `engine.ts` (generic per-sink drain: batched, coalescing, version-guarded delete, anti-bloat breaker), `failover-sink.ts` (raw `pg` upsert), `index.ts` (`startCdc`/`stopCdc`/`drainCdcNow`, wired into boot + `gracefulShutdown`).
 
-**On/off (per sink):** `SYNC_ENABLED` (portal), `FAILOVER_SYNC_ENABLED` (failover) — both default off in sandbox. Immediate kill switch without restart: `UPDATE cdc_sink_control SET enabled=false WHERE sink='portal';` (`cdc_capture()` then skips that sink).
+**On/off (per sink):** `FAILOVER_SYNC_ENABLED` (mirror), `DOLPHIN_SYNC_ENABLED` (dolphin) — default off in sandbox. Immediate kill switch without restart: `UPDATE cdc_sink_control SET enabled=false WHERE sink='failover';` (`cdc_capture()` then skips that sink).
 
 **Don't regress:**
-- Migrations `*_add-failover-cdc.sql` + `*_failover-cdc-fanout.sql` install a generic `cdc_capture()` trigger (`TG_ARGV = (pk_col, sink, …)`). The **6 portal tables** (`tblpatients`, `tblwork`, `AlignerDoctors`, `tblAlignerSets`, `tblAlignerBatches`, `tblAlignerNotes`) feed **both** sinks; the other ~59 feed `failover` only.
-- **PortalSink re-applies the portal's business filters** (triggers alone would lose them): `work`/`patients` only when aligner-related, `aligner_notes` only `Lab` notes; FK parents bootstrapped via `ensureRelatedRecordsExist`.
-- **Loop guard:** reverse-sync writes do `SET LOCAL app.cdc_origin='reverse'`; `cdc_capture()` skips them so a doctor edit flowing Supabase→local doesn't bounce back. The Lab-only filter is a second backstop.
-- **Add a table** = add a `cdc_capture('<PKcol>', 'failover'[, 'portal'])` trigger in a migration — no app code (`failover` auto-discovers table→PK from `pg_trigger`). **Not captured:** sessions, sync/migration infra (`change_log`, `cdc_sink_control`, `SyncQueue`, `pgmigrations`), composite-PK `tblPrivatePhotos`.
-- **Circuit breaker:** backlog past `*_SYNC_MAX_BACKLOG` disables that sink's capture and sets `cdc_sink_control.stale` (→ full reload needed). An outage is a non-event — deltas coalesce and the engine retries.
-- The failover replica is **RLS-locked** (server-side only). The initial full load / any full reload are **run by the user** (`C:\pg18-migration\`), as are prod-schema migrations — Claude's harness blocks the bulk push.
+- Migrations `*_add-failover-cdc.sql` + `*_failover-cdc-fanout.sql` install a generic `cdc_capture()` trigger (`TG_ARGV = (pk_col, sink, …)`); `*_drop-portal-cdc-sink.sql` then removed the dead `portal` fanout. Now **all ~65 captured tables feed `failover` only**.
+- **Loop guard (preserved for future reverse sync):** `cdc_capture()` still skips writes made under `SET LOCAL app.cdc_origin='reverse'`. Nothing sets that flag today, but the branch stays so reverse sync (Doctor notes + aligner `days`) can be reintroduced loop-free — **do not delete it** from the `cdc_capture()` function. Reverse v2 also needs a Supabase-side guard (react only to genuine portal edits on portal-owned fields, idempotent apply).
+- **Add a table** = add a `cdc_capture('<PKcol>', 'failover')` trigger in a migration — no app code (`failover` auto-discovers table→PK from `pg_trigger`). **Not captured:** sessions, sync/migration infra (`change_log`, `cdc_sink_control`, `pgmigrations`), composite-PK `tblPrivatePhotos`.
+- **Circuit breaker:** backlog past `FAILOVER_SYNC_MAX_BACKLOG` disables capture and sets `cdc_sink_control.stale` (→ full reload needed). An outage is a non-event — deltas coalesce and the engine retries.
+- The mirror is **RLS-locked** (server-side only) until the portal is rewritten to read it via RLS/views. The initial full load / any full reload are **run by the user** (`C:\pg18-migration\`), as are prod-schema migrations — Claude's harness blocks the bulk push.
 
 Live sink status surfaces in Settings via `public/js/components/react/SupabaseStatusSettings.tsx` (polls `GET /api/sync/supabase-status`).
 

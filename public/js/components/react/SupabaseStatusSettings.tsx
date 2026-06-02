@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './SupabaseStatusSettings.module.css';
 
 /**
- * Read-only Settings tab: live status of the two Supabase CDC sinks (portal + failover).
+ * Read-only Settings tab: live status of the single Supabase CDC mirror (sink 'failover').
  * Polls GET /api/sync/supabase-status every POLL_MS. Never reports unsaved changes, so the
  * tab never shows a Save badge.
  */
@@ -10,7 +10,7 @@ import styles from './SupabaseStatusSettings.module.css';
 const POLL_MS = 10_000;
 
 interface SinkStatus {
-    sink: 'portal' | 'failover';
+    sink: 'failover';
     configured: boolean;
     envEnabled: boolean;
     enabled: boolean;
@@ -35,13 +35,9 @@ interface SupabaseStatusSettingsProps {
 }
 
 const SINK_META: Record<SinkStatus['sink'], { label: string; description: string }> = {
-    portal: {
-        label: 'Portal',
-        description: 'Curated aligner-portal subset → portal Supabase project.',
-    },
     failover: {
-        label: 'Failover',
-        description: 'Raw 1:1 off-site replica → failover Supabase project (disaster recovery).',
+        label: 'Database mirror',
+        description: 'Raw 1:1 mirror → the single Supabase database (the portal\'s serving source).',
     },
 };
 

@@ -1,6 +1,9 @@
 /**
- * Unified CDC — failover sink. Raw 1:1 replica: every captured local row is upserted byte-for-byte
- * into the off-site Supabase failover project (project shwan-failover) over the session pooler.
+ * Unified CDC — the mirror sink (sink name 'failover', kept for the live cdc_sink_control/change_log
+ * rows). Raw 1:1 mirror: every captured local row is upserted byte-for-byte into the single Supabase
+ * database over the session pooler. This mirror is the only Supabase sink and the aligner portal's
+ * future serving source (the curated portal projection was retired) — it is the primary mirror, not
+ * a fallback.
  *
  * Table → PK is auto-discovered from the live schema (tables carrying trg_cdc_capture with a
  * single-column PK), so the set tracks the trigger migrations with no list here.

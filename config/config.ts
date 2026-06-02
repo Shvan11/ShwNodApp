@@ -104,11 +104,6 @@ const config: AppConfig = {
     userApiPassword: process.env.WEBCEPH_USER_API_PASSWORD,
     baseUrl: process.env.WEBCEPH_API_BASE_URL || 'https://api.webceph.com'
   },
-  sync: {
-    // Master switch for the Supabase sync subsystem. OFF unless explicitly enabled
-    // (sandbox stays off; production sets SYNC_ENABLED=true). See SyncConfig.
-    enabled: process.env.SYNC_ENABLED === 'true',
-  },
   cs_export: process.env.CS_EXPORT,
   gram_session: process.env.GRAM_SESSION,
 };

@@ -47,7 +47,6 @@ import { EventEmitter } from 'events';
 import HealthCheck from './services/monitoring/HealthCheck.js';
 import { testConnection, testConnectionWithRetry, shutdown as shutdownDatabase } from './services/database/index.js';
 import { createPathResolver } from './utils/path-resolver.js';
-import { startPeriodicPolling, stopPeriodicPolling } from './services/sync/reverse-sync-poller.js';
 import { startCdc, stopCdc } from './services/sync/cdc/index.js';
 import ResourceManager from './services/core/ResourceManager.js';
 import { log } from './utils/logger.js';
@@ -234,9 +233,9 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     // Public UI assets — no auth required
     app.use('/photoswipe', express.static('./public/photoswipe/'));
-    // NOTE: do NOT mount ./data as static — it holds reverse-sync-state.json (and
-    // formerly the SQLite session DBs, now migrated to PostgreSQL). Templates under
-    // ./data/templates are read via fs.readFile in the receipt service, never served over HTTP.
+    // NOTE: do NOT mount ./data as static — it holds runtime state/config (and formerly the
+    // SQLite session DBs, now migrated to PostgreSQL). Templates under ./data/templates are read
+    // via fs.readFile in the receipt service, never served over HTTP.
     app.use('/images', express.static('./public/images')); // Serve images directory for production mode
 
     // Set up the in-process event bus that fans real-time updates into the
@@ -535,23 +534,8 @@ function startServer(): Promise<HTTPServer> {
       log.debug('server.listen callback fired');
       log.info(`Server listening on port: ${port}`);
 
-      // Supabase sync (master-gated by SYNC_ENABLED). In the sandbox this whole block is
-      // skipped: no queue processor, no reverse poller — nothing reaches Supabase.
-      if (config.sync.enabled) {
-        // Reverse sync poller (Supabase → PostgreSQL): catches doctor edits missed while offline
-        // + periodic hourly checks. (Forward sync is the unified CDC below.)
-        try {
-          startPeriodicPolling(); // Uses env config or defaults to 60 min
-          log.info('✅ Reverse sync poller started (Supabase → PostgreSQL)');
-        } catch (error) {
-          log.warn('⚠️  Reverse sync poller failed to start:', { error: (error as Error).message });
-        }
-      } else {
-        log.info('⏭️  Reverse sync disabled (SYNC_ENABLED=false)');
-      }
-
-      // Unified CDC forward sync (one change feed → sinks). Self-gates per sink:
-      // SYNC_ENABLED → portal Supabase, FAILOVER_SYNC_ENABLED → failover replica.
+      // Unified CDC forward sync (one change feed → the single Supabase mirror). Self-gates per
+      // sink: FAILOVER_SYNC_ENABLED → raw mirror, DOLPHIN_SYNC_ENABLED → Dolphin SQL Server.
       startCdc();
 
       resolve(serverInstance);
@@ -601,14 +585,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
     log.info('🏥 Stopping health monitoring...');
     HealthCheck.stop();
 
-    // Stop the sync subsystem (only started when SYNC_ENABLED — both stops are
-    // idempotent, but skip the noise when sync was never running).
-    if (config.sync.enabled) {
-      log.info('🔄 Stopping reverse sync poller...');
-      stopPeriodicPolling();
-    }
-
-    // Stop the unified CDC forward sync (both sinks; turns capture OFF).
+    // Stop the unified CDC forward sync (all sinks; turns capture OFF).
     try {
       log.info('🛑 Stopping CDC forward sync...');
       await stopCdc();

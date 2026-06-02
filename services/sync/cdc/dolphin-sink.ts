@@ -17,7 +17,7 @@
  * source PG row is already gone (no payload to read), and PG integer PKs don't match Dolphin's
  * uniqueidentifier PKs anyway. So the sink owns an UN-triggered table, dolphin_sync_map(local_table,
  * local_pk) → dolphin_id, that survives the source deletion. Un-triggered ⇒ no capture feedback
- * loop, so (unlike PortalSink) this sink needs no cdc_origin guard.
+ * loop, so this sink needs no cdc_origin guard.
  *
  * Scope: going-forward only (no backfill). Timepoint delete = CASCADE (drops the whole Dolphin
  * timepoint incl. any Dolphin-owned x-rays/ceph/scans sharing it).
@@ -390,7 +390,7 @@ export class DolphinSink implements SyncSink {
     const patId = await this.resolvePatId(img.PersonID);
 
     // Ensure the parent timepoint exists in Dolphin (the image's 'I' event may drain before its
-    // parent's). Bootstrap it via upsertTimePoint, mirroring PortalSink.ensureRelatedRecordsExist.
+    // parent's). Bootstrap it via upsertTimePoint (FK-parent bootstrap pattern).
     let tpId = await this.mapGet(TP, img.TimePointID);
     if (!tpId) {
       await this.upsertTimePoint(String(img.TimePointID));
