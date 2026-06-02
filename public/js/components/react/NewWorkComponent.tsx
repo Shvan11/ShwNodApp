@@ -60,7 +60,7 @@ interface WorkFormData {
 }
 
 interface WorkResponse {
-    workid: number;
+    work_id: number;
     person_id: number;
     type_of_work?: number;
     total_required?: number;
@@ -203,7 +203,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
             const response = await fetch(`/api/getworks?code=${personId}`);
             if (!response.ok) throw new Error('Failed to fetch work data');
             const works: WorkResponse[] = await response.json();
-            const work = works.find(w => w.workid === workId);
+            const work = works.find(w => w.work_id === workId);
 
             if (work) {
                 const discountDateISO = work.discount_date ? new Date(work.discount_date).toISOString().split('T')[0] : '';
@@ -326,7 +326,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     const errorMessage = `Cannot activate this work: Patient already has an active work:\n\n` +
                         `Work Type: ${existingWork.type || 'N/A'}\n` +
                         `Doctor: ${existingWork.doctor || 'N/A'}\n` +
-                        `Work ID: ${existingWork.workid}\n\n` +
+                        `Work ID: ${existingWork.work_id}\n\n` +
                         `Please finish or discontinue the existing work first.`;
                     throw new Error(errorMessage);
                 }

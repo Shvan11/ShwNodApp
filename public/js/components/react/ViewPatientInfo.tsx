@@ -16,7 +16,7 @@ interface Alert {
     alert_details: string;
     alert_type_id?: number;
     alert_severity?: number;
-    CreationDate?: string;
+    creation_date?: string;
 }
 
 interface PatientInfo {
@@ -27,7 +27,7 @@ interface PatientInfo {
     phone?: string;
     phone2?: string;
     email?: string;
-    date_of_birth?: string;
+    DateOfBirth?: string;
     gender?: string;
     GenderDisplay?: string;
     Address?: string;
@@ -416,9 +416,9 @@ const ViewPatientInfo = ({ personId }: Props) => {
                             <div key={alert.alert_id} className={styles.patientAlertItem}>
                                 <div className={styles.patientAlertContent}>
                                     <span className={styles.patientAlertText}>{alert.alert_details}</span>
-                                    {alert.CreationDate && (
+                                    {alert.creation_date && (
                                         <span className={styles.patientAlertDate}>
-                                            {new Date(alert.CreationDate).toLocaleDateString('en-US', {
+                                            {new Date(alert.creation_date).toLocaleDateString('en-US', {
                                                 year: 'numeric',
                                                 month: 'short',
                                                 day: 'numeric'
@@ -502,13 +502,13 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Date of Birth:</span>
                             <span className={styles.patientInfoValue}>
-                                {formatDateDisplay(patientInfo.date_of_birth)}
+                                {formatDateDisplay(patientInfo.DateOfBirth)}
                             </span>
                         </div>
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Age:</span>
                             <span className={styles.patientInfoValue}>
-                                {calculateAge(patientInfo.date_of_birth)}
+                                {calculateAge(patientInfo.DateOfBirth)}
                             </span>
                         </div>
                         <div className={styles.patientInfoRow}>

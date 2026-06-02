@@ -65,6 +65,7 @@
     "grapesjs-preset-newsletter": "^1.0.2",
     "image-size": "^2.0.2",
     "imask": "^7.6.1",
+    "jose": "^6.2.3",
     "kysely": "^0.29.2",
     "mssql": "^12.5.2",
     "multer": "^2.0.2",

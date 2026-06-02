@@ -20,6 +20,17 @@ import { getKysely, withPgTransaction, type Database } from '../kysely.js';
 import { toDateOnly } from '../../../utils/date.js';
 
 /**
+ * Normalize a form-supplied numeric value for a nullable numeric column.
+ * Empty string (unfilled form field), null and undefined all become null;
+ * a real 0 is preserved. PG rejects "" for numeric columns (22P02), so this
+ * must run on numeric fields that can arrive as "" from the client.
+ */
+function numericOrNull(value: number | string | null | undefined): number | null {
+  if (value === '' || value === null || value === undefined) return null;
+  return Number(value);
+}
+
+/**
  * Work status Constants
  * 1 = Active (ongoing treatment)
  * 2 = Finished (completed successfully)
@@ -450,8 +461,8 @@ export async function addWorkDetail(workDetailData: WorkItemData): Promise<{ id:
         filling_depth: workDetailData.filling_depth || null,
         canals_no: workDetailData.canals_no || null,
         working_length: workDetailData.working_length || null,
-        implant_length: workDetailData.implant_length ?? null,
-        implant_diameter: workDetailData.implant_diameter ?? null,
+        implant_length: numericOrNull(workDetailData.implant_length),
+        implant_diameter: numericOrNull(workDetailData.implant_diameter),
         implant_manufacturer_id: workDetailData.implant_manufacturer_id || null,
         material: workDetailData.material || null,
         lab_name: workDetailData.lab_name || null,
@@ -491,8 +502,8 @@ export async function updateWorkDetail(
         filling_depth: workDetailData.filling_depth || null,
         canals_no: workDetailData.canals_no || null,
         working_length: workDetailData.working_length || null,
-        implant_length: workDetailData.implant_length ?? null,
-        implant_diameter: workDetailData.implant_diameter ?? null,
+        implant_length: numericOrNull(workDetailData.implant_length),
+        implant_diameter: numericOrNull(workDetailData.implant_diameter),
         implant_manufacturer_id: workDetailData.implant_manufacturer_id || null,
         material: workDetailData.material || null,
         lab_name: workDetailData.lab_name || null,

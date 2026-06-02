@@ -13,12 +13,12 @@ import styles from './TeethSelector.module.css';
  */
 
 interface ToothOption {
-    ID: number;
-    ToothCode: string;
-    ToothName: string;
-    ToothNumber?: string;
-    Quadrant: 'UR' | 'UL' | 'LR' | 'LL';
-    IsPermanent: boolean;
+    id: number;
+    tooth_code: string;
+    tooth_name: string;
+    tooth_number?: string;
+    quadrant: 'UR' | 'UL' | 'LR' | 'LL';
+    is_permanent: boolean;
 }
 
 interface TeethSelectorProps {
@@ -49,11 +49,11 @@ const TeethSelector = React.memo(({
     const teethByQuadrant = useMemo((): TeethByQuadrant => {
         const sortTeeth = (teeth: ToothOption[], quadrant: QuadrantKey): ToothOption[] => {
             return [...teeth].sort((a, b) => {
-                // Sort by ToothNumber for consistent Palmer notation display
+                // Sort by tooth_number for consistent Palmer notation display
                 // Right quadrants: 8→1 (outer to midline, descending)
                 // Left quadrants: 1→8 (midline to outer, ascending)
-                const numA = a.ToothNumber || a.ToothCode.replace(a.Quadrant, '');
-                const numB = b.ToothNumber || b.ToothCode.replace(b.Quadrant, '');
+                const numA = a.tooth_number || a.tooth_code.replace(a.quadrant, '');
+                const numB = b.tooth_number || b.tooth_code.replace(b.quadrant, '');
 
                 if (quadrant === 'UR' || quadrant === 'LR') {
                     // Right side: descending (8, 7, 6... 1)
@@ -71,8 +71,8 @@ const TeethSelector = React.memo(({
         const quadrants: QuadrantKey[] = ['UR', 'UL', 'LR', 'LL'];
 
         quadrants.forEach(q => {
-            const permanentTeeth = teethOptions.filter(t => t.Quadrant === q && t.IsPermanent);
-            const deciduousTeeth = teethOptions.filter(t => t.Quadrant === q && !t.IsPermanent);
+            const permanentTeeth = teethOptions.filter(t => t.quadrant === q && t.is_permanent);
+            const deciduousTeeth = teethOptions.filter(t => t.quadrant === q && !t.is_permanent);
             grouped.permanent[q] = sortTeeth(permanentTeeth, q);
             grouped.deciduous[q] = sortTeeth(deciduousTeeth, q);
         });
@@ -102,32 +102,32 @@ const TeethSelector = React.memo(({
     }, [onSelectionChange]);
 
     // Memoize computed values
-    const hasPermanentTeeth = useMemo(() => teethOptions.some(t => t.IsPermanent), [teethOptions]);
-    const hasDeciduousTeeth = useMemo(() => teethOptions.some(t => !t.IsPermanent), [teethOptions]);
+    const hasPermanentTeeth = useMemo(() => teethOptions.some(t => t.is_permanent), [teethOptions]);
+    const hasDeciduousTeeth = useMemo(() => teethOptions.some(t => !t.is_permanent), [teethOptions]);
 
     // Get selected teeth display text
     const selectedDisplay = useMemo(() => {
         if (selectedTeethIds.length === 0) return '';
-        const teethMap = new Map(teethOptions.map(t => [t.ID, t.ToothCode]));
+        const teethMap = new Map(teethOptions.map(t => [t.id, t.tooth_code]));
         return selectedTeethIds.map(id => teethMap.get(id)).filter(Boolean).join(', ');
     }, [selectedTeethIds, teethOptions]);
 
     // Render a single graphical tooth for permanent teeth
     const renderPermanentTooth = (tooth: ToothOption, isLower: boolean) => {
-        const isSelected = selectedSet.has(tooth.ID);
-        const toothNumber = tooth.ToothCode.replace(tooth.Quadrant, '');
+        const isSelected = selectedSet.has(tooth.id);
+        const toothNumber = tooth.tooth_code.replace(tooth.quadrant, '');
 
         return (
             <div
-                key={tooth.ID}
+                key={tooth.id}
                 className={cn(styles.tooth, isSelected && styles.toothSelected)}
-                onClick={() => handleToothClick(tooth.ID)}
-                title={tooth.ToothName}
+                onClick={() => handleToothClick(tooth.id)}
+                title={tooth.tooth_name}
             >
                 {isLower && <span className={styles.toothNumber}>{toothNumber}</span>}
                 <img
-                    src={`/images/teeth/chart/${tooth.ToothCode}.svg`}
-                    alt={tooth.ToothCode}
+                    src={`/images/teeth/chart/${tooth.tooth_code}.svg`}
+                    alt={tooth.tooth_code}
                     loading="lazy"
                 />
                 {!isLower && <span className={styles.toothNumber}>{toothNumber}</span>}
@@ -137,16 +137,16 @@ const TeethSelector = React.memo(({
 
     // Render deciduous tooth button (letter-based)
     const renderDeciduousTooth = (tooth: ToothOption) => {
-        const isSelected = selectedSet.has(tooth.ID);
-        const toothLetter = tooth.ToothCode.replace(tooth.Quadrant, '');
+        const isSelected = selectedSet.has(tooth.id);
+        const toothLetter = tooth.tooth_code.replace(tooth.quadrant, '');
 
         return (
             <button
-                key={tooth.ID}
+                key={tooth.id}
                 type="button"
                 className={cn(styles.deciduousBtn, isSelected && styles.deciduousBtnSelected)}
-                onClick={() => handleToothClick(tooth.ID)}
-                title={tooth.ToothName}
+                onClick={() => handleToothClick(tooth.id)}
+                title={tooth.tooth_name}
             >
                 {toothLetter}
             </button>

@@ -249,9 +249,9 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
             content: `
                 <div class="patient-info" style="padding: 15px; background: #f9f9f9; margin: 10px 0;">
                     <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #333;">Patient Information</h3>
-                    <p style="margin: 5px 0;"><strong>Name:</strong> {{patient.PatientName}}</p>
-                    <p style="margin: 5px 0;"><strong>Phone:</strong> {{patient.Phone}}</p>
-                    <p style="margin: 5px 0;"><strong>Patient ID:</strong> {{patient.PersonID}}</p>
+                    <p style="margin: 5px 0;"><strong>Name:</strong> {{patient.patient_name}}</p>
+                    <p style="margin: 5px 0;"><strong>Phone:</strong> {{patient.phone}}</p>
+                    <p style="margin: 5px 0;"><strong>Patient ID:</strong> {{patient.person_id}}</p>
                 </div>
             `,
             attributes: { class: 'fa fa-user' }
@@ -267,23 +267,23 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr style="border-bottom: 1px solid #ddd;">
                             <td style="padding: 8px;">Total Treatment Cost:</td>
-                            <td style="padding: 8px; text-align: right;"><strong>{{work.TotalRequired|currency}} {{work.Currency}}</strong></td>
+                            <td style="padding: 8px; text-align: right;"><strong>{{work.total_required|currency}} {{work.currency}}</strong></td>
                         </tr>
                         <tr style="border-bottom: 1px solid #ddd;">
                             <td style="padding: 8px;">Previously Paid:</td>
-                            <td style="padding: 8px; text-align: right;">{{payment.PreviouslyPaid|currency}} {{payment.Currency}}</td>
+                            <td style="padding: 8px; text-align: right;">{{payment.PreviouslyPaid|currency}} {{payment.currency}}</td>
                         </tr>
                         <tr style="border-bottom: 2px solid #333; background: #f0f0f0;">
                             <td style="padding: 8px;"><strong>Paid Today:</strong></td>
-                            <td style="padding: 8px; text-align: right;"><strong>{{payment.AmountPaidToday|currency}} {{payment.Currency}}</strong></td>
+                            <td style="padding: 8px; text-align: right;"><strong>{{payment.AmountPaidToday|currency}} {{payment.currency}}</strong></td>
                         </tr>
                         <tr style="font-size: 18px;">
                             <td style="padding: 12px 8px;"><strong>Total Paid:</strong></td>
-                            <td style="padding: 12px 8px; text-align: right;"><strong>{{payment.TotalPaid|currency}} {{payment.Currency}}</strong></td>
+                            <td style="padding: 12px 8px; text-align: right;"><strong>{{payment.TotalPaid|currency}} {{payment.currency}}</strong></td>
                         </tr>
                         <tr style="font-size: 18px; color: #d32f2f;">
                             <td style="padding: 8px;"><strong>Remaining Balance:</strong></td>
-                            <td style="padding: 8px; text-align: right;"><strong>{{payment.RemainingBalance|currency}} {{payment.Currency}}</strong></td>
+                            <td style="padding: 8px; text-align: right;"><strong>{{payment.RemainingBalance|currency}} {{payment.currency}}</strong></td>
                         </tr>
                     </table>
                 </div>
@@ -299,7 +299,7 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
                 <div class="receipt-footer" style="text-align: center; padding: 20px; border-top: 2px solid #333; margin-top: 20px;">
                     <p style="margin: 5px 0; font-size: 14px; font-weight: bold;">Thank you for your payment!</p>
                     <p style="margin: 5px 0; font-size: 12px; color: #666;">Keep this receipt for your records</p>
-                    <p style="margin: 10px 0; font-size: 11px; color: #999;">Receipt #{{work.WorkID}} | {{payment.PaymentDateTime|date:MMM DD, YYYY}}</p>
+                    <p style="margin: 10px 0; font-size: 11px; color: #999;">Receipt #{{work.work_id}} | {{payment.PaymentDateTime|date:MMM DD, YYYY}}</p>
                 </div>
             `,
             attributes: { class: 'fa fa-receipt' }

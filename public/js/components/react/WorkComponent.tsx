@@ -74,11 +74,12 @@ interface DetailFormData {
 }
 
 interface ToothOption {
-    ID: number;
-    ToothCode: string;
-    ToothName: string;
-    Quadrant: 'UR' | 'UL' | 'LR' | 'LL';
-    IsPermanent: boolean;
+    id: number;
+    tooth_code: string;
+    tooth_name: string;
+    tooth_number?: string;
+    quadrant: 'UR' | 'UL' | 'LR' | 'LL';
+    is_permanent: boolean;
 }
 
 interface ImplantManufacturer {
@@ -430,14 +431,14 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
             if (!response.ok) {
                 // Handle dependency error with detailed message
-                if (response.status === 409 && result.dependencies) {
-                    const deps = result.dependencies;
+                if (response.status === 409 && result.details?.dependencies) {
+                    const deps = result.details.dependencies;
                     let detailMessage = '⚠️ CANNOT DELETE WORK - EXISTING RECORDS FOUND ⚠️\n\n';
                     detailMessage += 'This work has the following records that must be deleted first:\n\n';
 
                     if (deps.InvoiceCount > 0) detailMessage += `• ${deps.InvoiceCount} payment(s)\n`;
                     if (deps.VisitCount > 0) detailMessage += `• ${deps.VisitCount} visit(s)\n`;
-                    if (deps.DetailCount > 0) detailMessage += `• ${deps.DetailCount} treatment detail(s)\n`;
+                    if (deps.ItemCount > 0) detailMessage += `• ${deps.ItemCount} treatment detail(s)\n`;
                     if (deps.DiagnosisCount > 0) detailMessage += `• ${deps.DiagnosisCount} diagnosis(es)\n`;
                     if (deps.ImplantCount > 0) detailMessage += `• ${deps.ImplantCount} implant(s)\n`;
                     if (deps.ScrewCount > 0) detailMessage += `• ${deps.ScrewCount} screw(s)\n`;
