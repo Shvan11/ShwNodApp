@@ -7,31 +7,33 @@ import { resolveDoctorColor, DEFAULT_PICKER_HEX, NEUTRAL_PICKER_HEX } from './do
 import styles from './EmployeeSettings.module.css';
 
 interface Position {
-    ID: number;
-    PositionName: string;
+    id: number;
+    position_name: string;
 }
 
 interface Employee {
-    ID: number;
-    employeeName: string;
-    Position: number | string;
-    Email: string | null;
-    Percentage: boolean;
-    receiveEmail: boolean;
-    getAppointments: boolean;
-    SortOrder: number | string | null;
-    AppointmentColor: string | null;
+    id: number;
+    employee_name: string;
+    position: number | string;
+    position_name: string | null;
+    email: string | null;
+    phone: string | null;
+    percentage: boolean;
+    receive_email: boolean;
+    get_appointments: boolean;
+    sort_order: number | string | null;
+    appointment_color: string | null;
 }
 
 interface FormData {
-    employeeName: string;
-    Position: string;
-    Email: string;
-    Percentage: boolean;
+    employee_name: string;
+    position: string;
+    email: string;
+    percentage: boolean;
     receiveEmail: boolean;
     getAppointments: boolean;
-    SortOrder: string;
-    AppointmentColor: string;
+    sort_order: string;
+    appointment_color: string;
 }
 
 interface EmployeeSettingsProps {
@@ -48,14 +50,14 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
     const [editingId, setEditingId] = useState<number | null>(null);
     const [showAddForm, setShowAddForm] = useState(false);
     const [formData, setFormData] = useState<FormData>({
-        employeeName: '',
-        Position: '',
-        Email: '',
-        Percentage: false,
+        employee_name: '',
+        position: '',
+        email: '',
+        percentage: false,
         receiveEmail: false,
         getAppointments: false,
-        SortOrder: '',
-        AppointmentColor: ''
+        sort_order: '',
+        appointment_color: ''
     });
     const [activeTab, setActiveTab] = useState<'basic' | 'other'>('basic');
 
@@ -99,14 +101,14 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
 
     const handleAdd = () => {
         setFormData({
-            employeeName: '',
-            Position: '',
-            Email: '',
-            Percentage: false,
+            employee_name: '',
+            position: '',
+            email: '',
+            percentage: false,
             receiveEmail: false,
             getAppointments: false,
-            SortOrder: '',
-            AppointmentColor: ''
+            sort_order: '',
+            appointment_color: ''
         });
         setEditingId(null);
         setActiveTab('basic');
@@ -115,30 +117,30 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
 
     const handleEdit = (employee: Employee) => {
         setFormData({
-            employeeName: employee.employeeName || '',
-            Position: String(employee.Position || ''),
-            Email: employee.Email || '',
-            Percentage: employee.Percentage || false,
-            receiveEmail: employee.receiveEmail || false,
-            getAppointments: employee.getAppointments || false,
-            SortOrder: String(employee.SortOrder || ''),
-            AppointmentColor: employee.AppointmentColor || ''
+            employee_name: employee.employee_name || '',
+            position: String(employee.position || ''),
+            email: employee.email || '',
+            percentage: employee.percentage || false,
+            receiveEmail: employee.receive_email || false,
+            getAppointments: employee.get_appointments || false,
+            sort_order: String(employee.sort_order || ''),
+            appointment_color: employee.appointment_color || ''
         });
-        setEditingId(employee.ID);
+        setEditingId(employee.id);
         setActiveTab('basic');
         setShowAddForm(true);
     };
 
     const handleCancel = () => {
         setFormData({
-            employeeName: '',
-            Position: '',
-            Email: '',
-            Percentage: false,
+            employee_name: '',
+            position: '',
+            email: '',
+            percentage: false,
             receiveEmail: false,
             getAppointments: false,
-            SortOrder: '',
-            AppointmentColor: ''
+            sort_order: '',
+            appointment_color: ''
         });
         setEditingId(null);
         setShowAddForm(false);
@@ -177,8 +179,8 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         }
     };
 
-    const handleDelete = async (employeeId: number, employeeName: string) => {
-        if (!await confirm(`Are you sure you want to delete ${employeeName}?`, { title: 'Delete Employee', danger: true, confirmText: 'Delete' })) {
+    const handleDelete = async (employeeId: number, employee_name: string) => {
+        if (!await confirm(`Are you sure you want to delete ${employee_name}?`, { title: 'Delete Employee', danger: true, confirmText: 'Delete' })) {
             return;
         }
 
@@ -213,22 +215,22 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
     // Clearing the picker stores no colour, so the doctor falls back to their
     // built-in default (or neutral) on the calendar.
     const handleClearColor = () => {
-        setFormData(prev => ({ ...prev, AppointmentColor: '' }));
+        setFormData(prev => ({ ...prev, appointment_color: '' }));
     };
 
     const getPositionName = (positionId: number | string): string => {
-        const position = positions.find(p => p.ID === Number(positionId));
-        return position ? position.PositionName : 'Unknown';
+        const pos = positions.find(p => p.id === Number(positionId));
+        return pos ? pos.position_name : 'Unknown';
     };
 
     // Effective calendar swatch for the table (only meaningful for doctors who
     // can be assigned appointments).
     const renderColorSwatch = (employee: Employee) => {
-        const color = employee.getAppointments
+        const color = employee.get_appointments
             ? resolveDoctorColor({
-                  ID: employee.ID,
-                  employeeName: employee.employeeName,
-                  AppointmentColor: employee.AppointmentColor
+                  id: employee.id,
+                  employee_name: employee.employee_name,
+                  appointment_color: employee.appointment_color
               })
             : null;
         if (!color) return <span className={styles.noEmail}>—</span>;
@@ -236,7 +238,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             <span
                 className={styles.colorDot}
                 style={{ background: color.fill, borderColor: color.edge }}
-                title={employee.AppointmentColor || 'Default'}
+                title={employee.appointment_color || 'Default'}
             />
         );
     };
@@ -327,14 +329,14 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                         <div>
                                             <div className={styles.formRow}>
                                                 <div className={styles.formGroup}>
-                                                    <label htmlFor="employeeName">
+                                                    <label htmlFor="employee_name">
                                                         Employee Name <span className={styles.required}>*</span>
                                                     </label>
                                                     <input
                                                         type="text"
-                                                        id="employeeName"
-                                                        name="employeeName"
-                                                        value={formData.employeeName}
+                                                        id="employee_name"
+                                                        name="employee_name"
+                                                        value={formData.employee_name}
                                                         onChange={handleInputChange}
                                                         required
                                                         placeholder="e.g., John Smith"
@@ -342,20 +344,20 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                 </div>
 
                                                 <div className={styles.formGroup}>
-                                                    <label htmlFor="Position">
+                                                    <label htmlFor="position">
                                                         Position <span className={styles.required}>*</span>
                                                     </label>
                                                     <select
-                                                        id="Position"
-                                                        name="Position"
-                                                        value={formData.Position}
+                                                        id="position"
+                                                        name="position"
+                                                        value={formData.position}
                                                         onChange={handleInputChange}
                                                         required
                                                     >
                                                         <option value="">Select a position</option>
                                                         {positions.map(pos => (
-                                                            <option key={pos.ID} value={pos.ID}>
-                                                                {pos.PositionName}
+                                                            <option key={pos.id} value={pos.id}>
+                                                                {pos.position_name}
                                                             </option>
                                                         ))}
                                                     </select>
@@ -364,7 +366,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
 
                                             <div className={styles.formRow}>
                                                 <div className={styles.formGroup}>
-                                                    <label htmlFor="SortOrder">
+                                                    <label htmlFor="sort_order">
                                                         Sort Order
                                                         <span className={styles.fieldHelp}>
                                                             (Lower numbers appear first)
@@ -372,9 +374,9 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                     </label>
                                                     <input
                                                         type="number"
-                                                        id="SortOrder"
-                                                        name="SortOrder"
-                                                        value={formData.SortOrder}
+                                                        id="sort_order"
+                                                        name="sort_order"
+                                                        value={formData.sort_order}
                                                         onChange={handleInputChange}
                                                         placeholder="e.g., 1"
                                                         min="1"
@@ -392,7 +394,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                         <div>
                                             <div className={styles.formRow}>
                                                 <div className={styles.formGroup}>
-                                                    <label htmlFor="Email">
+                                                    <label htmlFor="email">
                                                         Email Address
                                                         <span className={styles.fieldHelp}>
                                                             (Required for notifications)
@@ -400,9 +402,9 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                     </label>
                                                     <input
                                                         type="email"
-                                                        id="Email"
-                                                        name="Email"
-                                                        value={formData.Email}
+                                                        id="email"
+                                                        name="email"
+                                                        value={formData.email}
                                                         onChange={handleInputChange}
                                                         placeholder="employee@example.com"
                                                     />
@@ -414,7 +416,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
 
                                             <div className={styles.formRow}>
                                                 <div className={styles.formGroup}>
-                                                    <label htmlFor="AppointmentColor">
+                                                    <label htmlFor="appointment_color">
                                                         Calendar Color
                                                         <span className={styles.fieldHelp}>
                                                             (Shown on the appointment calendar)
@@ -423,16 +425,16 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                     <div className={styles.colorField}>
                                                         <input
                                                             type="color"
-                                                            id="AppointmentColor"
-                                                            name="AppointmentColor"
+                                                            id="appointment_color"
+                                                            name="appointment_color"
                                                             className={styles.colorInput}
-                                                            value={formData.AppointmentColor || (editingId != null ? DEFAULT_PICKER_HEX[editingId] : undefined) || NEUTRAL_PICKER_HEX}
+                                                            value={formData.appointment_color || (editingId != null ? DEFAULT_PICKER_HEX[editingId] : undefined) || NEUTRAL_PICKER_HEX}
                                                             onChange={handleInputChange}
                                                         />
                                                         <span className={styles.colorValue}>
-                                                            {formData.AppointmentColor ? formData.AppointmentColor.toUpperCase() : 'Default'}
+                                                            {formData.appointment_color ? formData.appointment_color.toUpperCase() : 'Default'}
                                                         </span>
-                                                        {formData.AppointmentColor && (
+                                                        {formData.appointment_color && (
                                                             <button
                                                                 type="button"
                                                                 className={styles.colorClear}
@@ -481,8 +483,8 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                     <label>
                                                         <input
                                                             type="checkbox"
-                                                            name="Percentage"
-                                                            checked={formData.Percentage}
+                                                            name="percentage"
+                                                            checked={formData.percentage}
                                                             onChange={handleInputChange}
                                                         />
                                                         <span className={styles.checkboxLabel}>
@@ -534,34 +536,34 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                             </thead>
                             <tbody>
                                 {employees.map(employee => (
-                                    <tr key={employee.ID}>
-                                        <td data-label="ID">{employee.ID}</td>
+                                    <tr key={employee.id}>
+                                        <td data-label="ID">{employee.id}</td>
                                         <td data-label="Name" className={styles.employeeName}>
                                             <i className="fas fa-user"></i>
-                                            {employee.employeeName}
+                                            {employee.employee_name}
                                         </td>
                                         <td data-label="Position">
                                             <span className={styles.positionBadge}>
-                                                {getPositionName(employee.Position)}
+                                                {getPositionName(employee.position)}
                                             </span>
                                         </td>
                                         <td data-label="Sort Order">
                                             <span className={styles.sortOrderValue}>
-                                                {employee.SortOrder || '—'}
+                                                {employee.sort_order || '—'}
                                             </span>
                                         </td>
                                         <td data-label="Email">
-                                            {employee.Email ? (
+                                            {employee.email ? (
                                                 <span className={styles.emailValue}>
                                                     <i className="fas fa-envelope"></i>
-                                                    {employee.Email}
+                                                    {employee.email}
                                                 </span>
                                             ) : (
                                                 <span className={styles.noEmail}>No email</span>
                                             )}
                                         </td>
                                         <td data-label="Commission">
-                                            {employee.Percentage ? (
+                                            {employee.percentage ? (
                                                 <span className={`${styles.badge} ${styles.badgeSuccess}`}>
                                                     <i className="fas fa-percent"></i>
                                                     Yes
@@ -574,7 +576,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                             )}
                                         </td>
                                         <td data-label="Email Notifications">
-                                            {employee.receiveEmail ? (
+                                            {employee.receive_email ? (
                                                 <span className={`${styles.badge} ${styles.badgeSuccess}`}>
                                                     <i className="fas fa-check-circle"></i>
                                                     Enabled
@@ -587,7 +589,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                             )}
                                         </td>
                                         <td data-label="Appointments">
-                                            {employee.getAppointments ? (
+                                            {employee.get_appointments ? (
                                                 <span className={`${styles.badge} ${styles.badgeInfo}`}>
                                                     <i className="fas fa-check"></i>
                                                     Yes
@@ -612,7 +614,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                             </button>
                                             <button
                                                 className={`${styles.btnIcon} ${styles.btnDelete}`}
-                                                onClick={() => handleDelete(employee.ID, employee.employeeName)}
+                                                onClick={() => handleDelete(employee.id, employee.employee_name)}
                                                 title="Delete employee"
                                             >
                                                 <i className="fas fa-trash"></i>

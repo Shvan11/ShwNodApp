@@ -20,6 +20,7 @@
  */
 import { sql, type RawBuilder } from 'kysely';
 import { getKysely } from '../kysely.js';
+import { isForeignKeyViolation } from '../../../utils/pg-errors.js';
 
 // type definitions
 interface ReferenceConfig {
@@ -435,8 +436,7 @@ export async function deleteLookupItem(tableKey: string, id: string | number): P
     await query.execute(db);
   } catch (err) {
     // PG foreign_key_violation (was mssql error 547).
-    const sqlState = (err as { code?: string }).code;
-    if (sqlState === '23503') {
+    if (isForeignKeyViolation(err)) {
       throw new ReferentialError(
         'Cannot delete: this item is still referenced elsewhere.'
       );

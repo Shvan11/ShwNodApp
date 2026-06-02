@@ -210,6 +210,20 @@ interface BatchUpdateData extends Omit<BatchData, 'aligner_set_id'> {
   aligner_set_id?: number;
 }
 
+/**
+ * Coerce a possibly-empty / string numeric input to an integer.
+ *
+ * Blank form fields arrive over JSON as `''`, which `??` does NOT catch —
+ * passing `''` to an integer column throws PG `22P02`
+ * (`invalid input syntax for type integer: ""`). Returns `fallback` for
+ * null/undefined/empty/non-numeric values; otherwise the truncated integer.
+ */
+function toIntOr<T extends number | null>(value: unknown, fallback: T): number | T {
+  if (value === null || value === undefined || value === '') return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.trunc(n) : fallback;
+}
+
 interface AlignerNote {
   note_id: number;
   aligner_set_id: number;
@@ -817,8 +831,8 @@ export async function createAlignerSet(setData: AlignerSetData): Promise<number 
   } = setData;
 
   const isActive = is_active !== undefined ? is_active : true;
-  const upper = upper_aligners_count ?? 0;
-  const lower = lower_aligners_count ?? 0;
+  const upper = toIntOr(upper_aligners_count, 0);
+  const lower = toIntOr(lower_aligners_count, 0);
 
   try {
     return await withPgTransaction(async (trx) => {
@@ -842,7 +856,7 @@ export async function createAlignerSet(setData: AlignerSetData): Promise<number 
           lower_aligners_count: lower,
           remaining_upper_aligners: upper,
           remaining_lower_aligners: lower,
-          days: days ?? null,
+          days: toIntOr(days, null),
           aligner_dr_id,
           set_url: set_url || null,
           set_pdf_url: set_pdf_url || null,
@@ -938,7 +952,7 @@ export async function updateAlignerSet(
           remaining_lower_aligners: sql<number>`${eb.ref('remaining_lower_aligners')} + (${newLowerCount} - ${eb.ref('lower_aligners_count')})`,
           upper_aligners_count: newUpperCount,
           lower_aligners_count: newLowerCount,
-          days: days ?? null,
+          days: toIntOr(days, null),
           ...(drId !== undefined && Number.isFinite(drId)
             ? { aligner_dr_id: drId }
             : {}),
@@ -1271,8 +1285,8 @@ export async function createBatch(batchData: BatchData): Promise<number | null> 
     is_last,
   } = batchData;
 
-  const upper = upper_aligner_count ?? 0;
-  const lower = lower_aligner_count ?? 0;
+  const upper = toIntOr(upper_aligner_count, 0);
+  const lower = toIntOr(lower_aligner_count, 0);
   const hasU = has_upper_template ?? false;
   const hasL = has_lower_template ?? false;
   const isActive = is_active ?? false;
@@ -1326,7 +1340,7 @@ export async function createBatch(batchData: BatchData): Promise<number | null> 
         lower_aligner_count: lower,
         manufacture_date: null,
         delivered_to_patient_date: null,
-        days: days ?? null,
+        days: toIntOr(days, null),
         notes: notes || null,
         is_active: isActive,
         is_last: isLast,
@@ -1406,8 +1420,8 @@ export async function updateBatch(
     has_lower_template,
   } = batchData;
 
-  const upper = upper_aligner_count ?? 0;
-  const lower = lower_aligner_count ?? 0;
+  const upper = toIntOr(upper_aligner_count, 0);
+  const lower = toIntOr(lower_aligner_count, 0);
 
   await withPgTransaction(async (trx) => {
     const old = await trx
@@ -1461,14 +1475,14 @@ export async function updateBatch(
 
     const countsChanged = upper !== (old.upper_aligner_count ?? 0) || lower !== (old.lower_aligner_count ?? 0);
     const templateChanged = newHasU !== oldHasU || newHasL !== oldHasL;
-    const daysChanged = (days ?? null) !== (old.days ?? null);
+    const daysChanged = toIntOr(days, null) !== (old.days ?? null);
 
     await trx
       .updateTable('aligner_batches')
       .set({
         upper_aligner_count: upper,
         lower_aligner_count: lower,
-        days: days ?? null,
+        days: toIntOr(days, null),
         notes: notes || null,
         is_active: is_active ?? undefined,
         is_last: is_last ?? undefined,

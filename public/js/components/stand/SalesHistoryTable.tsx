@@ -34,7 +34,7 @@ const SalesHistoryTable: React.FC<SalesHistoryTableProps> = ({
   onView,
   onVoid,
 }) => {
-  const isVoided = (sale: StandSale): boolean => sale.VoidedDate != null;
+  const isVoided = (sale: StandSale): boolean => sale.voided_date != null;
 
   return (
     <div className={styles.container}>
@@ -75,24 +75,24 @@ const SalesHistoryTable: React.FC<SalesHistoryTableProps> = ({
                 const voided = isVoided(sale);
                 return (
                   <tr
-                    key={sale.SaleID}
+                    key={sale.sale_id}
                     className={voided ? styles.voidedRow : undefined}
                   >
-                    <td>{formatDateTime(sale.SaleDate)}</td>
-                    <td>#{sale.SaleID}</td>
+                    <td>{formatDateTime(sale.sale_date)}</td>
+                    <td>#{sale.sale_id}</td>
                     <td className={styles.amountCell}>
-                      {formatNumber(sale.TotalAmount)} IQD
+                      {formatNumber(sale.total_amount)} IQD
                     </td>
                     <td
                       className={`${styles.amountCell} ${
-                        sale.TotalProfit >= 0
+                        sale.total_profit >= 0
                           ? styles.profitPositive
                           : styles.profitNegative
                       }`}
                     >
-                      {formatNumber(sale.TotalProfit)} IQD
+                      {formatNumber(sale.total_profit)} IQD
                     </td>
-                    <td>{sale.PaymentMethod}</td>
+                    <td>{sale.payment_method}</td>
                     <td>{sale.patient_name ?? '-'}</td>
                     <td>{sale.CashierName ?? '-'}</td>
                     <td>
@@ -108,7 +108,7 @@ const SalesHistoryTable: React.FC<SalesHistoryTableProps> = ({
                       <div className={styles.actions}>
                         <button
                           className={styles.btnView}
-                          onClick={() => onView(sale.SaleID)}
+                          onClick={() => onView(sale.sale_id)}
                           type="button"
                           title="View details"
                         >
@@ -118,7 +118,7 @@ const SalesHistoryTable: React.FC<SalesHistoryTableProps> = ({
                         {!voided && (
                           <button
                             className={styles.btnVoid}
-                            onClick={() => onVoid(sale.SaleID)}
+                            onClick={() => onVoid(sale.sale_id)}
                             type="button"
                             title="Void sale"
                           >

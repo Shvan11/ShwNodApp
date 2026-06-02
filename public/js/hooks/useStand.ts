@@ -9,29 +9,29 @@ import { useState, useEffect, useCallback } from 'react';
 // ============================================================================
 
 export interface StandCategory {
-  CategoryID: number;
-  CategoryName: string;
-  IsActive: boolean;
+  category_id: number;
+  category_name: string;
+  is_active: boolean;
 }
 
 export interface StandItem {
-  ItemID: number;
-  ItemName: string;
-  SKU: string | null;
-  Barcode: string | null;
-  CategoryID: number | null;
-  CostPrice: number;
-  SellPrice: number;
-  CurrentStock: number;
-  ReorderLevel: number;
-  ExpiryDate: string | null;
-  Unit: string | null;
-  Notes: string | null;
-  IsActive: boolean;
-  DateAdded: string;
-  ModifiedDate: string | null;
-  CreatedBy: number | null;
-  CategoryName: string | null;
+  item_id: number;
+  item_name: string;
+  sku: string | null;
+  barcode: string | null;
+  category_id: number | null;
+  cost_price: number;
+  sell_price: number;
+  current_stock: number;
+  reorder_level: number;
+  expiry_date: string | null;
+  unit: string | null;
+  notes: string | null;
+  is_active: boolean;
+  date_added: string;
+  modified_date: string | null;
+  created_by: number | null;
+  category_name: string | null;
 }
 
 export interface StandItemFilters {
@@ -42,33 +42,33 @@ export interface StandItemFilters {
 }
 
 export interface StandSale {
-  SaleID: number;
-  SaleDate: string;
-  TotalAmount: number;
-  TotalCost: number;
-  TotalProfit: number;
-  AmountPaid: number;
-  Change: number;
-  PaymentMethod: string;
-  CustomerNote: string | null;
+  sale_id: number;
+  sale_date: string;
+  total_amount: number;
+  total_cost: number;
+  total_profit: number;
+  amount_paid: number;
+  change: number;
+  payment_method: string;
+  customer_note: string | null;
   person_id: number | null;
-  CashierID: number | null;
-  VoidedDate: string | null;
-  VoidedBy: number | null;
-  VoidReason: string | null;
+  cashier_id: number | null;
+  voided_date: string | null;
+  voided_by: number | null;
+  void_reason: string | null;
   patient_name: string | null;
   CashierName: string | null;
 }
 
 export interface StandSaleItem {
-  SaleItemID: number;
-  SaleID: number;
-  ItemID: number;
-  Quantity: number;
-  UnitPrice: number;
-  UnitCost: number;
-  LineTotal: number;
-  ItemName: string;
+  sale_item_id: number;
+  sale_id: number;
+  item_id: number;
+  quantity: number;
+  unit_price: number;
+  unit_cost: number;
+  line_total: number;
+  item_name: string;
 }
 
 export interface StandSaleWithItems extends StandSale {
@@ -83,16 +83,16 @@ export interface StandSaleFilters {
 }
 
 export interface StandStockMovement {
-  MovementID: number;
-  ItemID: number;
-  MovementType: string;
-  Quantity: number;
-  UnitCost: number | null;
-  TotalCost: number | null;
-  RelatedSaleID: number | null;
-  Reason: string | null;
-  MovementDate: string;
-  PerformedBy: number | null;
+  movement_id: number;
+  item_id: number;
+  movement_type: string;
+  quantity: number;
+  unit_cost: number | null;
+  total_cost: number | null;
+  related_sale_id: number | null;
+  reason: string | null;
+  movement_date: string;
+  performed_by: number | null;
   PerformedByName: string | null;
 }
 
@@ -106,7 +106,7 @@ export interface StandDashboardKPIs {
 }
 
 export interface SalesSummaryRow {
-  SaleDate: string;
+  sale_date: string;
   SalesCount: number;
   Revenue: number;
   Cost: number;
@@ -114,11 +114,11 @@ export interface SalesSummaryRow {
 }
 
 export interface TopItemRow {
-  ItemID: number;
-  ItemName: string;
+  item_id: number;
+  item_name: string;
   TotalQuantity: number;
   TotalRevenue: number;
-  TotalProfit: number;
+  total_profit: number;
 }
 
 export interface StandReportData {
@@ -452,7 +452,7 @@ export function useStockMovements(itemId: number | null): {
 // ============================================================================
 
 export function useStandItemMutations(onSuccess?: () => void): {
-  createItem: (data: StandItemCreateData) => Promise<{ ItemID: number }>;
+  createItem: (data: StandItemCreateData) => Promise<{ item_id: number }>;
   updateItem: (id: number, data: Partial<StandItemCreateData>) => Promise<void>;
   deleteItem: (id: number) => Promise<void>;
   restockItem: (id: number, quantity: number, unitCost: number) => Promise<void>;
@@ -463,7 +463,7 @@ export function useStandItemMutations(onSuccess?: () => void): {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const createItem = useCallback(async (data: StandItemCreateData): Promise<{ ItemID: number }> => {
+  const createItem = useCallback(async (data: StandItemCreateData): Promise<{ item_id: number }> => {
     try {
       setLoading(true); setError(null);
       const response = await fetch('/api/stand/items', {

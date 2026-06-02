@@ -135,33 +135,33 @@ const POSItemSearch: React.FC<POSItemSearchProps> = ({ onSelect }) => {
         <ul className={styles.dropdown} role="listbox">
           {results.map((item) => (
             <li
-              key={item.ItemID}
+              key={item.item_id}
               className={styles.dropdownItem}
               role="option"
               aria-selected={false}
               onClick={() => handleSelect(item)}
             >
               <div className={styles.itemInfo}>
-                <span className={styles.itemName}>{item.ItemName}</span>
-                {item.CategoryName && (
+                <span className={styles.itemName}>{item.item_name}</span>
+                {item.category_name && (
                   <span className={styles.itemCategory}>
-                    {item.CategoryName}
+                    {item.category_name}
                   </span>
                 )}
               </div>
               <div className={styles.itemMeta}>
                 <span className={styles.itemPrice}>
-                  {formatNumber(item.SellPrice)} IQD
+                  {formatNumber(item.sell_price)} IQD
                 </span>
                 <span
                   className={
-                    item.CurrentStock > 0
+                    item.current_stock > 0
                       ? styles.itemStockAvailable
                       : styles.itemStockOut
                   }
                 >
-                  {item.CurrentStock > 0
-                    ? `${item.CurrentStock} in stock`
+                  {item.current_stock > 0
+                    ? `${item.current_stock} in stock`
                     : 'Out of stock'}
                 </span>
               </div>

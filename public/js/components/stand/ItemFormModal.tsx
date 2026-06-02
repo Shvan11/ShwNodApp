@@ -40,12 +40,12 @@ interface FormErrors {
 }
 
 interface VisionScanResult {
-  ItemName: string;
-  Barcode: string | null;
-  ExpiryDate: string | null;
+  item_name: string;
+  barcode: string | null;
+  expiry_date: string | null;
   CategorySuggestion: string;
-  Unit: string;
-  Notes: string;
+  unit: string;
+  notes: string;
 }
 
 function compressImage(file: File, maxWidth = 1024): Promise<string> {
@@ -148,7 +148,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
       const saved = sessionStorage.getItem(FORM_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as PersistedFormState;
-        const currentId = item?.ItemID ?? null;
+        const currentId = item?.item_id ?? null;
         if (parsed.itemId === currentId) restored = parsed;
       }
     } catch {
@@ -174,20 +174,20 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
       }
     } else if (item) {
       setFormData({
-        itemName: item.ItemName,
-        sku: item.SKU || '',
-        barcode: item.Barcode || '',
-        categoryId: item.CategoryID != null ? String(item.CategoryID) : '',
-        costPrice: item.CostPrice,
-        sellPrice: item.SellPrice,
-        currentStock: item.CurrentStock,
-        reorderLevel: item.ReorderLevel,
-        expiryDate: item.ExpiryDate ? item.ExpiryDate.split('T')[0] : '',
-        unit: item.Unit || '',
-        notes: item.Notes || '',
+        itemName: item.item_name,
+        sku: item.sku || '',
+        barcode: item.barcode || '',
+        categoryId: item.category_id != null ? String(item.category_id) : '',
+        costPrice: item.cost_price,
+        sellPrice: item.sell_price,
+        currentStock: item.current_stock,
+        reorderLevel: item.reorder_level,
+        expiryDate: item.expiry_date ? item.expiry_date.split('T')[0] : '',
+        unit: item.unit || '',
+        notes: item.notes || '',
       });
-      setDisplayCost(item.CostPrice ? formatNumber(item.CostPrice) : '');
-      setDisplaySell(item.SellPrice ? formatNumber(item.SellPrice) : '');
+      setDisplayCost(item.cost_price ? formatNumber(item.cost_price) : '');
+      setDisplaySell(item.sell_price ? formatNumber(item.sell_price) : '');
     } else {
       setFormData({ ...DEFAULT_FORM });
       setDisplayCost('');
@@ -207,7 +207,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
         );
         if (cancelled) return;
         const payload: PersistedFormState = {
-          itemId: item?.ItemID ?? null,
+          itemId: item?.item_id ?? null,
           formData,
           imageDataUrls,
         };
@@ -247,25 +247,25 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
     if (!suggestion || categories.length === 0) return '';
     const lower = suggestion.toLowerCase().trim();
 
-    const exact = categories.find((c) => c.CategoryName.toLowerCase() === lower);
-    if (exact) return String(exact.CategoryID);
+    const exact = categories.find((c) => c.category_name.toLowerCase() === lower);
+    if (exact) return String(exact.category_id);
 
     const partial = categories.find(
       (c) =>
-        c.CategoryName.toLowerCase().includes(lower) ||
-        lower.includes(c.CategoryName.toLowerCase())
+        c.category_name.toLowerCase().includes(lower) ||
+        lower.includes(c.category_name.toLowerCase())
     );
-    if (partial) return String(partial.CategoryID);
+    if (partial) return String(partial.category_id);
 
     const suggestionWords = lower.split(/\s+/);
     let bestMatch: { id: number; score: number } | null = null;
     for (const cat of categories) {
-      const catWords = cat.CategoryName.toLowerCase().split(/\s+/);
+      const catWords = cat.category_name.toLowerCase().split(/\s+/);
       const score = suggestionWords.filter((w) =>
         catWords.some((cw) => cw.includes(w) || w.includes(cw))
       ).length;
       if (score > 0 && (!bestMatch || score > bestMatch.score)) {
-        bestMatch = { id: cat.CategoryID, score };
+        bestMatch = { id: cat.category_id, score };
       }
     }
     if (bestMatch) return String(bestMatch.id);
@@ -332,15 +332,15 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
       const scan = result.data;
 
       // Prefer local BarcodeDetector result over Gemini's AI-read barcode
-      const barcode = localBarcode || scan.Barcode;
+      const barcode = localBarcode || scan.barcode;
 
       setFormData((prev) => ({
         ...prev,
-        itemName: scan.ItemName || prev.itemName,
+        itemName: scan.item_name || prev.itemName,
         barcode: barcode || prev.barcode,
-        expiryDate: scan.ExpiryDate || prev.expiryDate,
-        unit: UNIT_OPTIONS.includes(scan.Unit?.toLowerCase()) ? scan.Unit.toLowerCase() : prev.unit,
-        notes: scan.Notes || prev.notes,
+        expiryDate: scan.expiry_date || prev.expiryDate,
+        unit: UNIT_OPTIONS.includes(scan.unit?.toLowerCase()) ? scan.unit.toLowerCase() : prev.unit,
+        notes: scan.notes || prev.notes,
         categoryId: matchCategory(scan.CategorySuggestion) || prev.categoryId,
       }));
 
@@ -550,8 +550,8 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
               >
                 <option value="">Select Category</option>
                 {categories.map((cat) => (
-                  <option key={cat.CategoryID} value={cat.CategoryID}>
-                    {cat.CategoryName}
+                  <option key={cat.category_id} value={cat.category_id}>
+                    {cat.category_name}
                   </option>
                 ))}
               </select>

@@ -22,24 +22,24 @@ export default function StandPOS() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [lastSale, setLastSale] = useState<{ change: number; saleId: number } | null>(null);
 
-  const total = cart.reduce((sum, ci) => sum + ci.item.SellPrice * ci.quantity, 0);
+  const total = cart.reduce((sum, ci) => sum + ci.item.sell_price * ci.quantity, 0);
 
   const addToCart = useCallback((item: StandItem) => {
     setCart(prev => {
-      const existing = prev.find(ci => ci.item.ItemID === item.ItemID);
+      const existing = prev.find(ci => ci.item.item_id === item.item_id);
       if (existing) {
-        if (existing.quantity >= item.CurrentStock) {
-          toast.warning(`Max stock available: ${item.CurrentStock}`);
+        if (existing.quantity >= item.current_stock) {
+          toast.warning(`Max stock available: ${item.current_stock}`);
           return prev;
         }
         return prev.map(ci =>
-          ci.item.ItemID === item.ItemID
+          ci.item.item_id === item.item_id
             ? { ...ci, quantity: ci.quantity + 1 }
             : ci
         );
       }
-      if (item.CurrentStock <= 0) {
-        toast.error(`"${item.ItemName}" is out of stock`);
+      if (item.current_stock <= 0) {
+        toast.error(`"${item.item_name}" is out of stock`);
         return prev;
       }
       return [...prev, { item, quantity: 1 }];
@@ -57,15 +57,15 @@ export default function StandPOS() {
 
   const handleUpdateQuantity = (itemId: number, quantity: number) => {
     if (quantity <= 0) {
-      setCart(prev => prev.filter(ci => ci.item.ItemID !== itemId));
+      setCart(prev => prev.filter(ci => ci.item.item_id !== itemId));
       return;
     }
     setCart(prev =>
       prev.map(ci => {
-        if (ci.item.ItemID !== itemId) return ci;
-        if (quantity > ci.item.CurrentStock) {
-          toast.warning(`Max stock: ${ci.item.CurrentStock}`);
-          return { ...ci, quantity: ci.item.CurrentStock };
+        if (ci.item.item_id !== itemId) return ci;
+        if (quantity > ci.item.current_stock) {
+          toast.warning(`Max stock: ${ci.item.current_stock}`);
+          return { ...ci, quantity: ci.item.current_stock };
         }
         return { ...ci, quantity };
       })
@@ -73,7 +73,7 @@ export default function StandPOS() {
   };
 
   const handleRemove = (itemId: number) => {
-    setCart(prev => prev.filter(ci => ci.item.ItemID !== itemId));
+    setCart(prev => prev.filter(ci => ci.item.item_id !== itemId));
   };
 
   const handleConfirmSale = async (
@@ -84,7 +84,7 @@ export default function StandPOS() {
   ) => {
     try {
       const result = await createSale({
-        items: cart.map(ci => ({ itemId: ci.item.ItemID, quantity: ci.quantity })),
+        items: cart.map(ci => ({ itemId: ci.item.item_id, quantity: ci.quantity })),
         amountPaid,
         paymentMethod,
         customerNote,

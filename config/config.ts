@@ -3,6 +3,7 @@
  * Loads environment variables and provides configuration for the application
  */
 import dotenv from 'dotenv';
+import { z } from 'zod';
 import type { AppConfig } from '../types/config.types.js';
 import { log } from '../utils/logger.js';
 
@@ -14,18 +15,46 @@ if (process.env.NODE_ENV === 'development') {
   dotenv.config({ path: '.env.development', override: true, debug: false });
 }
 
-// Check for required environment variables
-const requiredEnvVars: string[] = [
-  'DB_SERVER',
-  'DB_INSTANCE',
-  'DB_USER',
-  'DB_PASSWORD'
-];
+// ---------------------------------------------------------------------------
+// Boot environment validation (fail fast)
+//
+// Validates only the vars genuinely required to boot (per CLAUDE.md): the PG
+// connection (DATABASE_URL *or* the discrete PG_* block), SESSION_SECRET, and
+// MACHINE_PATH (the patient-data share). A missing/invalid one throws here at
+// import time with a clear message, instead of a silent warning followed by a
+// confusing downstream crash.
+//
+// Legacy DB_* (SQL Server — migration tooling + Dolphin sink only) and every
+// optional service block (Telegram/Twilio/Google/WebCeph/Gemini/Supabase) stay
+// out of this schema so they remain blank-able.
+// ---------------------------------------------------------------------------
+const envSchema = z
+  .object({
+    MACHINE_PATH: z.string().min(1, 'MACHINE_PATH is required (patient-data share path)'),
+    SESSION_SECRET: z.string().min(1, 'SESSION_SECRET is required'),
+    PORT: z.coerce.number().int().positive().optional(),
+    DATABASE_URL: z.string().optional(),
+    PG_HOST: z.string().optional(),
+    PG_PORT: z.coerce.number().int().positive().optional(),
+    PG_DATABASE: z.string().optional(),
+    PG_USER: z.string().optional(),
+    PG_PASSWORD: z.string().optional(),
+  })
+  .refine(
+    (env) => !!env.DATABASE_URL || !!(env.PG_HOST && env.PG_DATABASE && env.PG_USER),
+    {
+      message:
+        'PostgreSQL connection is required: set DATABASE_URL or the full PG_HOST/PG_DATABASE/PG_USER/PG_PASSWORD block.',
+    }
+  );
 
-for (const envVar of requiredEnvVars) {
-  if (!process.env[envVar]) {
-    log.warn(`Missing environment variable ${envVar}`);
-  }
+const envResult = envSchema.safeParse(process.env);
+if (!envResult.success) {
+  const detail = envResult.error.issues
+    .map((issue) => `  - ${issue.path.join('.') || 'env'}: ${issue.message}`)
+    .join('\n');
+  log.error(`Invalid environment configuration:\n${detail}`);
+  throw new Error('Invalid environment configuration — see logs above. Fix .env before starting.');
 }
 
 // Port configuration - always use 3000

@@ -28,7 +28,7 @@ export default function Stand() {
   const handleRestock = async (quantity: number, unitCost: number) => {
     if (!restockItem) return;
     try {
-      await doRestock(restockItem.ItemID, quantity, unitCost);
+      await doRestock(restockItem.item_id, quantity, unitCost);
       toast.success('Item restocked successfully');
       setRestockItem(null);
     } catch {

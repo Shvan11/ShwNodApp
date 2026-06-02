@@ -505,7 +505,16 @@ class WhatsAppService extends EventEmitter {
 
   private setupEventListeners(): void {
     stateEvents.on('whatsapp_initialization_requested', () => {
-      this.initializeOnDemand();
+      // Fire-and-forget: when an init is already in flight, initializeOnDemand()
+      // returns the *shared* initializationPromise, which can reject (e.g. init
+      // timeout). Without this .catch() that rejection escapes as an unhandled
+      // rejection. The primary awaiter in initialize() already handles recovery
+      // (reconnect/circuit breaker), so here we only need to swallow it.
+      this.initializeOnDemand().catch((error: unknown) => {
+        log.debug('On-demand WhatsApp initialization rejected (handled by init/reconnect logic)', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
     });
   }
 

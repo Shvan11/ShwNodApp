@@ -27,7 +27,7 @@ const TopItemsChart: React.FC<TopItemsChartProps> = ({ data }) => {
       chartInstance.current.destroy();
     }
 
-    const labels = data.map((row) => row.ItemName);
+    const labels = data.map((row) => row.item_name);
     const quantities = data.map((row) => row.TotalQuantity);
 
     // Generate a gradient-like colour palette for the bars
@@ -77,7 +77,7 @@ const TopItemsChart: React.FC<TopItemsChartProps> = ({ data }) => {
                 return [
                   `Qty: ${formatNumber(row.TotalQuantity)}`,
                   `Revenue: ${formatNumber(row.TotalRevenue)} IQD`,
-                  `Profit: ${formatNumber(row.TotalProfit)} IQD`,
+                  `Profit: ${formatNumber(row.total_profit)} IQD`,
                 ];
               },
             },

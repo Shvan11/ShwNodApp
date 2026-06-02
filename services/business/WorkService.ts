@@ -351,9 +351,9 @@ export async function validateAndCreateWork(
     );
     return result;
   } catch (error) {
-    // Duplicate active-work unique violation (partial index UNQ_tblWork_Active).
+    // Duplicate active-work unique violation (partial index unq_tblwork_active).
     // pg reports this as SQLSTATE 23505 + constraint name — NOT the old mssql 2601.
-    if (isUniqueViolation(error, 'UNQ_tblWork_Active')) {
+    if (isUniqueViolation(error, 'unq_tblwork_active')) {
       const errorDetails = await formatDuplicateActiveWorkError(
         workData.person_id
       );
@@ -407,9 +407,9 @@ export async function validateAndCreateWorkWithInvoice(
     );
     return result;
   } catch (error) {
-    // Duplicate active-work unique violation (partial index UNQ_tblWork_Active).
+    // Duplicate active-work unique violation (partial index unq_tblwork_active).
     // pg reports this as SQLSTATE 23505 + constraint name — NOT the old mssql 2601.
-    if (isUniqueViolation(error, 'UNQ_tblWork_Active')) {
+    if (isUniqueViolation(error, 'unq_tblwork_active')) {
       const errorDetails = await formatDuplicateActiveWorkError(
         workData.person_id
       );

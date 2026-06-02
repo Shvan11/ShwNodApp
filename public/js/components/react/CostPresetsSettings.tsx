@@ -6,10 +6,10 @@ import styles from './CostPresetsSettings.module.css';
 type Currency = 'IQD' | 'USD' | 'EUR';
 
 interface CostPreset {
-    PresetID: number;
-    Amount: number;
-    Currency: Currency;
-    DisplayOrder: number;
+    preset_id: number;
+    amount: number;
+    currency: Currency;
+    display_order: number;
 }
 
 interface FormData {
@@ -57,7 +57,7 @@ const CostPresetsSettings = () => {
     }, []);
 
     // Filter presets by currency
-    const filteredPresets = presets.filter(p => p.Currency === activeCurrency);
+    const filteredPresets = presets.filter(p => p.currency === activeCurrency);
 
     // Handle form input changes
     const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -104,11 +104,11 @@ const CostPresetsSettings = () => {
     const handleEditPreset = (preset: CostPreset) => {
         setEditingPreset(preset);
         setFormData({
-            amount: String(preset.Amount),
-            currency: preset.Currency,
-            displayOrder: preset.DisplayOrder
+            amount: String(preset.amount),
+            currency: preset.currency,
+            displayOrder: preset.display_order
         });
-        setDisplayAmount(preset.Amount ? formatNumber(preset.Amount) : '');
+        setDisplayAmount(preset.amount ? formatNumber(preset.amount) : '');
     };
 
     // Update preset
@@ -123,7 +123,7 @@ const CostPresetsSettings = () => {
         if (!editingPreset) return;
 
         try {
-            const response = await fetch(`/api/settings/cost-presets/${editingPreset.PresetID}`, {
+            const response = await fetch(`/api/settings/cost-presets/${editingPreset.preset_id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -150,13 +150,13 @@ const CostPresetsSettings = () => {
     };
 
     // Delete preset
-    const handleDeletePreset = async (presetId: number) => {
+    const handleDeletePreset = async (preset_id: number) => {
         if (!await confirm('Are you sure you want to delete this preset?', { title: 'Delete Preset', danger: true, confirmText: 'Delete' })) {
             return;
         }
 
         try {
-            const response = await fetch(`/api/settings/cost-presets/${presetId}`, {
+            const response = await fetch(`/api/settings/cost-presets/${preset_id}`, {
                 method: 'DELETE'
             });
 
@@ -302,10 +302,10 @@ const CostPresetsSettings = () => {
                             </thead>
                             <tbody>
                                 {filteredPresets.map(preset => (
-                                    <tr key={preset.PresetID}>
-                                        <td>{formatNumber(preset.Amount)}</td>
-                                        <td>{preset.Currency}</td>
-                                        <td>{preset.DisplayOrder}</td>
+                                    <tr key={preset.preset_id}>
+                                        <td>{formatNumber(preset.amount)}</td>
+                                        <td>{preset.currency}</td>
+                                        <td>{preset.display_order}</td>
                                         <td className={styles.actions}>
                                             <button
                                                 className={`${styles.btnIcon} ${styles.btnEdit}`}
@@ -316,7 +316,7 @@ const CostPresetsSettings = () => {
                                             </button>
                                             <button
                                                 className={`${styles.btnIcon} ${styles.btnDelete}`}
-                                                onClick={() => handleDeletePreset(preset.PresetID)}
+                                                onClick={() => handleDeletePreset(preset.preset_id)}
                                                 title="Delete"
                                             >
                                                 <i className="fas fa-trash"></i>

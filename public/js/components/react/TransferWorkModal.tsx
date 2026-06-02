@@ -8,13 +8,13 @@ import PatientQuickSearch, { type SelectedPatient } from './PatientQuickSearch';
  * Work data for transfer
  */
 interface Work {
-  workid: number;
+  work_id: number;
   person_id: number;
-  TypeName?: string;
-  StatusName?: string;
+  type_name?: string;
+  status_name?: string;
   doctor_name?: string;
   total_required?: number;
-  Currency?: string;
+  currency?: string;
   patient_name?: string;
 }
 
@@ -77,7 +77,7 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
   const loadPreview = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/work/${work.workid}/transfer-preview`);
+      const response = await fetch(`/api/work/${work.work_id}/transfer-preview`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to load preview');
@@ -90,7 +90,7 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [work.workid, toast]);
+  }, [work.work_id, toast]);
 
   // Handle patient selection from QuickSearch
   const handleSelectPatient = useCallback((patient: SelectedPatient): void => {
@@ -104,7 +104,7 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
 
     setTransferring(true);
     try {
-      const response = await fetch(`/api/work/${work.workid}/transfer`, {
+      const response = await fetch(`/api/work/${work.work_id}/transfer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetPatientId: selectedPatient.person_id })
@@ -169,11 +169,11 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
               <div className={styles.currentInfo}>
                 <div className={styles.infoRow}>
                   <span className={styles.infoLabel}>Work Type:</span>
-                  <span className={styles.infoValue}>{work.TypeName || 'Unknown'}</span>
+                  <span className={styles.infoValue}>{work.type_name || 'Unknown'}</span>
                 </div>
                 <div className={styles.infoRow}>
                   <span className={styles.infoLabel}>Status:</span>
-                  <span className={styles.infoValue}>{work.StatusName || 'Unknown'}</span>
+                  <span className={styles.infoValue}>{work.status_name || 'Unknown'}</span>
                 </div>
                 {work.doctor_name && (
                   <div className={styles.infoRow}>

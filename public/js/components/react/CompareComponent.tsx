@@ -20,9 +20,9 @@ interface Props {
 }
 
 interface Timepoint {
-    tpCode: number;
-    tpDescription: string;
-    tpDateTime: string;
+    tp_code: number;
+    tp_description: string;
+    tp_date_time: string;
 }
 
 interface PhotoType {
@@ -441,15 +441,15 @@ const CompareComponent = ({ personId, phone }: Props) => {
             console.log('Loaded timepoints data:', data);
             setTimepoints(data);
 
-            // Auto-select first and last timepoints (skip tpCode 0)
+            // Auto-select first and last timepoints (skip tp_code 0)
             let autoSelected: number[] = [];
             if (data.length >= 2) {
-                const validTimepoints = data.filter(tp => tp.tpCode > 0);
+                const validTimepoints = data.filter(tp => tp.tp_code > 0);
 
                 if (validTimepoints.length >= 2) {
-                    autoSelected = [validTimepoints[0].tpCode, validTimepoints[validTimepoints.length - 1].tpCode];
+                    autoSelected = [validTimepoints[0].tp_code, validTimepoints[validTimepoints.length - 1].tp_code];
                 } else if (validTimepoints.length === 1 && data.length >= 2) {
-                    autoSelected = [data[0].tpCode, data[1].tpCode];
+                    autoSelected = [data[0].tp_code, data[1].tp_code];
                 }
             }
 
@@ -1744,17 +1744,17 @@ const CompareComponent = ({ personId, phone }: Props) => {
                         <div className={styles.timepointList}>
                             {timepoints.map(tp => (
                                 <label
-                                    key={tp.tpCode}
-                                    className={cn(styles.checkboxRow, selectedTimepoints.includes(tp.tpCode) && styles.checkboxRowSelected)}
+                                    key={tp.tp_code}
+                                    className={cn(styles.checkboxRow, selectedTimepoints.includes(tp.tp_code) && styles.checkboxRowSelected)}
                                 >
                                     <input
                                         type="checkbox"
-                                        checked={selectedTimepoints.includes(tp.tpCode)}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleTimepointSelection(tp.tpCode, e.target.checked)}
+                                        checked={selectedTimepoints.includes(tp.tp_code)}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleTimepointSelection(tp.tp_code, e.target.checked)}
                                         className={styles.checkboxInput}
                                     />
                                     <span>
-                                        {tp.tpDescription} ({new Date(tp.tpDateTime).toLocaleDateString()})
+                                        {tp.tp_description} ({new Date(tp.tp_date_time).toLocaleDateString()})
                                     </span>
                                 </label>
                             ))}

@@ -9,8 +9,8 @@ import { useState, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
 
 interface Doctor {
-    ID: number;
-    employeeName: string;
+    id: number;
+    employee_name: string;
 }
 
 interface DoctorFilterProps {
@@ -93,8 +93,8 @@ const DoctorFilter = ({ selectedDoctorId, onDoctorChange, className = '' }: Doct
             >
                 <option value="">Filter by Doctor...</option>
                 {doctors.map((doctor) => (
-                    <option key={doctor.ID} value={doctor.ID}>
-                        {doctor.employeeName}
+                    <option key={doctor.id} value={doctor.id}>
+                        {doctor.employee_name}
                     </option>
                 ))}
             </select>

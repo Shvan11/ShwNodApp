@@ -14,7 +14,7 @@ interface Patient {
     patient_name?: string;
     first_name?: string;
     last_name?: string;
-    Phone?: string;
+    phone?: string;
     TotalSets?: number;
     ActiveSets?: number;
     UnreadDoctorNotes?: number;
@@ -90,7 +90,7 @@ const PatientsList: React.FC = () => {
         const query = patientFilter.toLowerCase();
         return patients.filter(p => {
             const name = formatPatientName(p).toLowerCase();
-            const phone = (p.Phone || '').toLowerCase();
+            const phone = (p.phone || '').toLowerCase();
             const id = String(p.person_id);
 
             return name.includes(query) || phone.includes(query) || id.includes(query);
@@ -206,7 +206,7 @@ const PatientsList: React.FC = () => {
                             </div>
                             <div className={styles.patientCardMeta}>
                                 <span><i className="fas fa-id-card"></i> {patient.person_id}</span>
-                                <span><i className="fas fa-phone"></i> {patient.Phone || 'N/A'}</span>
+                                <span><i className="fas fa-phone"></i> {patient.phone || 'N/A'}</span>
                             </div>
                             <div className={styles.patientCardStats}>
                                 <div className={styles.stat}>

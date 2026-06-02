@@ -30,8 +30,8 @@ export default function RestockModal({ isOpen, item, onClose, onSave }: RestockM
   useEffect(() => {
     if (isOpen && item) {
       setQuantity(1);
-      setUnitCost(item.CostPrice);
-      setDisplayUnitCost(item.CostPrice ? formatNumber(item.CostPrice) : '');
+      setUnitCost(item.cost_price);
+      setDisplayUnitCost(item.cost_price ? formatNumber(item.cost_price) : '');
       setErrors({});
     }
   }, [isOpen, item]);
@@ -102,9 +102,9 @@ export default function RestockModal({ isOpen, item, onClose, onSave }: RestockM
           <div className={styles.modalBody}>
             <div className={styles.itemInfo}>
               <p>
-                <strong>{item.ItemName}</strong>
+                <strong>{item.item_name}</strong>
               </p>
-              <p>Current Stock: {formatNumber(item.CurrentStock)}</p>
+              <p>Current Stock: {formatNumber(item.current_stock)}</p>
             </div>
 
             <div className={styles.formRow}>

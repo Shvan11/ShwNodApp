@@ -16,6 +16,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import { sql } from 'kysely';
 import { isUniqueViolation } from '../../utils/pg-errors.js';
 import { getKysely } from '../../services/database/kysely.js';
@@ -45,6 +46,7 @@ import {
   getWorkItemTeeth
 } from '../../services/database/queries/work-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import { validate } from '../../middleware/validate.js';
 import {
   requireRecordAge,
   getWorkCreationDate,
@@ -156,6 +158,16 @@ interface UpdateWorkBody {
   discount_date?: string | null;
   discount_reason?: string | null;
 }
+
+// Boundary guard for PUT /updatework. Deliberately a *loose* schema: this is a
+// lenient, mutation-heavy financial handler that rest-spreads `...workData` to the
+// updater and converts date fields in place, so we validate only the two required
+// scalars (workId, dr_id) and pass every other field through UNTOUCHED — a strict
+// schema would silently strip work fields on write-back. See CLAUDE.md (Zod = boundaries).
+const updateWorkBodySchema = z.looseObject({
+  workId: z.coerce.number().int().positive(),
+  dr_id: z.coerce.number().int().positive(),
+});
 
 interface WorkStatusBody {
   workId: number;
@@ -446,29 +458,12 @@ router.put(
   '/updatework',
   authenticate,
   authorize(['admin', 'secretary']),
+  validate({ body: updateWorkBodySchema }),
   async (req: Request, res: Response): Promise<void> => {
     try {
+      // workId + dr_id validated and coerced to positive ints by the schema;
+      // all other work fields pass through untouched (loose schema).
       const { workId, ...workData } = req.body as UpdateWorkBody;
-
-      if (!workId) {
-        log.warn('Update work request missing workId');
-        ErrorResponses.missingParameter(res, 'workId');
-        return;
-      }
-
-      // Validate dr_id is provided
-      if (!workData.dr_id) {
-        log.warn('Update work request missing dr_id', { workId });
-        ErrorResponses.badRequest(res, 'dr_id is required');
-        return;
-      }
-
-      // Validate data types
-      if (isNaN(parseInt(String(workId))) || isNaN(parseInt(String(workData.dr_id)))) {
-        log.warn('Update work invalid parameters', { workId, dr_id: workData.dr_id });
-        ErrorResponses.badRequest(res, 'workId and dr_id must be valid numbers');
-        return;
-      }
 
       // Convert date strings to proper Date objects if provided
       const dateFields = [
@@ -785,8 +780,8 @@ router.post(
       });
     } catch (error) {
       // Reactivating sets status=1, which can collide with the patient's existing
-      // active work (partial unique index UNQ_tblWork_Active → pg SQLSTATE 23505).
-      if (isUniqueViolation(error, 'UNQ_tblWork_Active')) {
+      // active work (partial unique index unq_tblwork_active → pg SQLSTATE 23505).
+      if (isUniqueViolation(error, 'unq_tblwork_active')) {
         ErrorResponses.conflict(
           res,
           'Cannot reactivate: Patient already has an active work'

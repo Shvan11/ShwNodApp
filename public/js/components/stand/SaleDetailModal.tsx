@@ -37,7 +37,7 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
   onClose,
   onVoid,
 }) => {
-  const isVoided = sale?.VoidedDate != null;
+  const isVoided = sale?.voided_date != null;
 
   return (
     <Modal
@@ -51,10 +51,10 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
           <div className={styles.headerInfo}>
             <h2 id="sale-detail-modal-title" className={styles.headerTitle}>
               <i className="fas fa-receipt" />
-              Sale #{sale?.SaleID ?? '...'}
+              Sale #{sale?.sale_id ?? '...'}
             </h2>
             <div className={styles.headerMeta}>
-              {sale && <span>{formatDateTime(sale.SaleDate)}</span>}
+              {sale && <span>{formatDateTime(sale.sale_date)}</span>}
               {sale && (
                 <span
                   className={`${styles.statusBadge} ${
@@ -97,14 +97,14 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
                 </thead>
                 <tbody>
                   {sale.Items.map((lineItem) => (
-                    <tr key={lineItem.SaleItemID}>
-                      <td>{lineItem.ItemName}</td>
-                      <td className={styles.numericCell}>{lineItem.Quantity}</td>
+                    <tr key={lineItem.sale_item_id}>
+                      <td>{lineItem.item_name}</td>
+                      <td className={styles.numericCell}>{lineItem.quantity}</td>
                       <td className={styles.numericCell}>
-                        {formatNumber(lineItem.UnitPrice)} IQD
+                        {formatNumber(lineItem.unit_price)} IQD
                       </td>
                       <td className={styles.numericCell}>
-                        {formatNumber(lineItem.LineTotal)} IQD
+                        {formatNumber(lineItem.line_total)} IQD
                       </td>
                     </tr>
                   ))}
@@ -119,19 +119,19 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
                   <div className={styles.totalsRow}>
                     <span className={styles.totalsLabel}>Total</span>
                     <span className={styles.totalsValue}>
-                      {formatNumber(sale.TotalAmount)} IQD
+                      {formatNumber(sale.total_amount)} IQD
                     </span>
                   </div>
                   <div className={styles.totalsRow}>
                     <span className={styles.totalsLabel}>Cost</span>
                     <span className={styles.totalsValue}>
-                      {formatNumber(sale.TotalCost)} IQD
+                      {formatNumber(sale.total_cost)} IQD
                     </span>
                   </div>
                   <div className={`${styles.totalsRow} ${styles.totalHighlight}`}>
                     <span className={styles.totalsLabel}>Profit</span>
                     <span className={`${styles.totalsValue} ${styles.profitValue}`}>
-                      {formatNumber(sale.TotalProfit)} IQD
+                      {formatNumber(sale.total_profit)} IQD
                     </span>
                   </div>
                 </div>
@@ -141,18 +141,18 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
                   <h4 className={styles.totalsCardTitle}>Payment</h4>
                   <div className={styles.totalsRow}>
                     <span className={styles.totalsLabel}>Method</span>
-                    <span className={styles.totalsValue}>{sale.PaymentMethod}</span>
+                    <span className={styles.totalsValue}>{sale.payment_method}</span>
                   </div>
                   <div className={styles.totalsRow}>
                     <span className={styles.totalsLabel}>Amount Paid</span>
                     <span className={styles.totalsValue}>
-                      {formatNumber(sale.AmountPaid)} IQD
+                      {formatNumber(sale.amount_paid)} IQD
                     </span>
                   </div>
                   <div className={`${styles.totalsRow} ${styles.totalHighlight}`}>
                     <span className={styles.totalsLabel}>Change</span>
                     <span className={styles.totalsValue}>
-                      {formatNumber(sale.Change)} IQD
+                      {formatNumber(sale.change)} IQD
                     </span>
                   </div>
                 </div>
@@ -175,18 +175,18 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
               </div>
 
               {/* Customer note */}
-              {sale.CustomerNote && (
+              {sale.customer_note && (
                 <div className={styles.customerNote}>
                   <h4 className={styles.customerNoteTitle}>Customer Note</h4>
-                  <p className={styles.customerNoteText}>{sale.CustomerNote}</p>
+                  <p className={styles.customerNoteText}>{sale.customer_note}</p>
                 </div>
               )}
 
               {/* Void reason */}
-              {isVoided && sale.VoidReason && (
+              {isVoided && sale.void_reason && (
                 <div className={styles.voidReason}>
                   <h4 className={styles.voidReasonTitle}>Void Reason</h4>
-                  <p className={styles.voidReasonText}>{sale.VoidReason}</p>
+                  <p className={styles.voidReasonText}>{sale.void_reason}</p>
                 </div>
               )}
             </div>
@@ -196,7 +196,7 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
               {!isVoided && (
                 <button
                   className={styles.btnVoid}
-                  onClick={() => onVoid(sale.SaleID)}
+                  onClick={() => onVoid(sale.sale_id)}
                   type="button"
                 >
                   <i className="fas fa-ban" />

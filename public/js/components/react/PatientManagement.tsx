@@ -13,8 +13,8 @@ interface Patient {
     patient_name: string;
     first_name?: string;
     last_name?: string;
-    Phone?: string;
-    DateAdded?: string;
+    phone?: string;
+    date_added?: string;
     TagName?: string;
 }
 
@@ -587,8 +587,8 @@ const PatientManagement = () => {
                                         </strong>
                                         {p.first_name && <div>{p.first_name} {p.last_name}</div>}
                                     </td>
-                                    <td data-label="Phone"><PhoneDisplay phone={p.Phone} /> {!p.Phone && '-'}</td>
-                                    <td data-label="Date">{p.DateAdded ? new Date(p.DateAdded).toLocaleDateString() : '-'}</td>
+                                    <td data-label="Phone"><PhoneDisplay phone={p.phone} /> {!p.phone && '-'}</td>
+                                    <td data-label="Date">{p.date_added ? new Date(p.date_added).toLocaleDateString() : '-'}</td>
                                     <td data-label="Tag">{p.TagName ? <span className={styles.tagBadge}>{p.TagName}</span> : '-'}</td>
                                     <td data-label="Actions">
                                         <div className={styles.actionButtons}>

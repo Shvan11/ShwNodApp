@@ -3,15 +3,15 @@ import { formatNumber } from '../../utils/formatters';
 import styles from './POSCart.module.css';
 
 interface StandItem {
-  ItemID: number;
-  ItemName: string;
-  SKU: string | null;
-  Barcode: string | null;
-  CostPrice: number;
-  SellPrice: number;
-  CurrentStock: number;
-  CategoryName: string | null;
-  IsActive: boolean;
+  item_id: number;
+  item_name: string;
+  sku: string | null;
+  barcode: string | null;
+  cost_price: number;
+  sell_price: number;
+  current_stock: number;
+  category_name: string | null;
+  is_active: boolean;
 }
 
 export interface CartItem {
@@ -95,15 +95,15 @@ const POSCart: React.FC<POSCartProps> = ({
 
       <div className={styles.itemsList}>
         {items.map((cartItem) => {
-          const lineTotal = cartItem.item.SellPrice * cartItem.quantity;
+          const lineTotal = cartItem.item.sell_price * cartItem.quantity;
           return (
-            <div key={cartItem.item.ItemID} className={styles.cartRow}>
+            <div key={cartItem.item.item_id} className={styles.cartRow}>
               <div className={styles.rowInfo}>
                 <span className={styles.rowName}>
-                  {cartItem.item.ItemName}
+                  {cartItem.item.item_name}
                 </span>
                 <span className={styles.rowPrice}>
-                  {formatNumber(cartItem.item.SellPrice)} IQD
+                  {formatNumber(cartItem.item.sell_price)} IQD
                 </span>
               </div>
 
@@ -113,7 +113,7 @@ const POSCart: React.FC<POSCartProps> = ({
                     type="button"
                     className={styles.stepperButton}
                     onClick={() =>
-                      handleDecrement(cartItem.item.ItemID, cartItem.quantity)
+                      handleDecrement(cartItem.item.item_id, cartItem.quantity)
                     }
                     disabled={cartItem.quantity <= 1}
                     aria-label="Decrease quantity"
@@ -125,16 +125,16 @@ const POSCart: React.FC<POSCartProps> = ({
                     className={styles.quantityInput}
                     value={cartItem.quantity}
                     onChange={(e) =>
-                      handleQuantityChange(cartItem.item.ItemID, e.target.value)
+                      handleQuantityChange(cartItem.item.item_id, e.target.value)
                     }
                     min={1}
-                    aria-label={`Quantity for ${cartItem.item.ItemName}`}
+                    aria-label={`Quantity for ${cartItem.item.item_name}`}
                   />
                   <button
                     type="button"
                     className={styles.stepperButton}
                     onClick={() =>
-                      handleIncrement(cartItem.item.ItemID, cartItem.quantity)
+                      handleIncrement(cartItem.item.item_id, cartItem.quantity)
                     }
                     aria-label="Increase quantity"
                   >
@@ -149,8 +149,8 @@ const POSCart: React.FC<POSCartProps> = ({
                 <button
                   type="button"
                   className={styles.removeButton}
-                  onClick={() => onRemove(cartItem.item.ItemID)}
-                  aria-label={`Remove ${cartItem.item.ItemName}`}
+                  onClick={() => onRemove(cartItem.item.item_id)}
+                  aria-label={`Remove ${cartItem.item.item_name}`}
                 >
                   <i className="fas fa-trash-alt" />
                 </button>

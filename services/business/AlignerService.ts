@@ -440,6 +440,43 @@ export async function validateAndDeleteSet(
  * @returns Object with newBatchId and deactivatedBatch info
  * @throws AlignerValidationError If validation fails
  */
+/**
+ * Parse an optional aligner count from request input.
+ *
+ * Blank (`''` / null / undefined) → 0: the count is optional, e.g. a
+ * single-arch batch leaves one side empty. A *present* but non-numeric,
+ * negative, or fractional value is a client mistake → 400 (caller surfaces
+ * it via the route's AlignerValidationError → badRequest mapping). This is the
+ * friendly counterpart to the query layer's `toIntOr` safety-net coercion.
+ */
+function parseOptionalCount(value: unknown, label: string): number {
+  if (value === null || value === undefined || value === '') return 0;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0) {
+    throw new AlignerValidationError(
+      `${label} must be a whole number of 0 or more`,
+      'VALIDATION_ERROR'
+    );
+  }
+  return n;
+}
+
+/**
+ * Parse the optional "days per aligner" value. Blank → null (unset);
+ * a present value must be a whole number of 1 or more.
+ */
+function parseOptionalDays(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new AlignerValidationError(
+      'Days per aligner must be a whole number of 1 or more',
+      'VALIDATION_ERROR'
+    );
+  }
+  return n;
+}
+
 export async function validateAndCreateBatch(
   batchData: BatchCreateData
 ): Promise<CreateBatchResult> {
@@ -449,6 +486,26 @@ export async function validateAndCreateBatch(
     throw new AlignerValidationError(
       'aligner_set_id is required',
       'MISSING_REQUIRED_FIELDS'
+    );
+  }
+
+  // Validate numeric inputs up front so a blank/garbage field returns a
+  // friendly 400 instead of a raw PG 22P02 (or a silently-defaulted batch).
+  const upperCount = parseOptionalCount(
+    batchData.upper_aligner_count,
+    'Upper aligner count'
+  );
+  const lowerCount = parseOptionalCount(
+    batchData.lower_aligner_count,
+    'Lower aligner count'
+  );
+  parseOptionalDays(batchData.days); // format check; value applied in createBatch
+
+  // A batch with no aligners on either arch is meaningless.
+  if (upperCount <= 0 && lowerCount <= 0) {
+    throw new AlignerValidationError(
+      'Enter an upper or lower aligner count',
+      'VALIDATION_ERROR'
     );
   }
 
@@ -535,6 +592,27 @@ export async function validateAndUpdateBatch(
     throw new AlignerValidationError(
       'Valid batchId is required',
       'INVALID_BATCH_ID'
+    );
+  }
+
+  // Validate the numeric fields that were supplied (a PUT may be partial — e.g.
+  // toggling is_active only — so unsupplied fields keep their stored values). A
+  // blank/garbage value returns a friendly 400 instead of a raw PG 22P02.
+  const hasUpper = batchData.upper_aligner_count !== undefined;
+  const hasLower = batchData.lower_aligner_count !== undefined;
+  const upperCount = hasUpper
+    ? parseOptionalCount(batchData.upper_aligner_count, 'Upper aligner count')
+    : null;
+  const lowerCount = hasLower
+    ? parseOptionalCount(batchData.lower_aligner_count, 'Lower aligner count')
+    : null;
+  if (batchData.days !== undefined) parseOptionalDays(batchData.days);
+
+  // When both counts are being set, a 0/0 batch is meaningless (mirror create).
+  if (hasUpper && hasLower && (upperCount ?? 0) <= 0 && (lowerCount ?? 0) <= 0) {
+    throw new AlignerValidationError(
+      'Enter an upper or lower aligner count',
+      'VALIDATION_ERROR'
     );
   }
 

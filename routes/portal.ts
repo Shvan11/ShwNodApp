@@ -5,12 +5,14 @@
  * person_id from req.session.patientId — NEVER from params or body.
  */
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import { sql } from 'kysely';
 import { getKysely } from '../services/database/kysely.js';
 import { getTimePoints } from '../services/database/queries/timepoint-queries.js';
 import { getVisitsSummary } from '../services/database/queries/visit-queries.js';
 import { getPayments } from '../services/database/queries/payment-queries.js';
 import { authenticatePatient, portalLoginLimiter } from '../middleware/patientAuth.js';
+import { validate } from '../middleware/validate.js';
 import {
   verifyPin,
   getVisiblePhotos,
@@ -21,10 +23,16 @@ import { log } from '../utils/logger.js';
 
 const router = Router();
 
-interface LoginBody {
-  personId: number | string;
-  pin: string;
-}
+// Boundary schemas — the source of truth for these handlers' input types.
+const loginSchema = z.object({
+  personId: z.coerce.number().int().positive(),
+  pin: z.string().min(1),
+});
+type LoginBody = z.infer<typeof loginSchema>;
+
+const photosParamsSchema = z.object({
+  tp: z.string().regex(/^[A-Za-z0-9_-]{1,10}$/, 'Invalid timepoint code'),
+});
 
 // --------------------------------------------------------------------------
 // POST /api/portal/login
@@ -32,14 +40,11 @@ interface LoginBody {
 router.post(
   '/login',
   portalLoginLimiter,
+  validate({ body: loginSchema }),
   async (req: Request<unknown, unknown, LoginBody>, res: Response): Promise<void> => {
     try {
-      const { personId, pin } = req.body;
-      const pid = typeof personId === 'string' ? parseInt(personId, 10) : personId;
-      if (!pid || !Number.isFinite(pid) || !pin || typeof pin !== 'string') {
-        res.status(400).json({ success: false, error: 'person_id and PIN are required.' });
-        return;
-      }
+      // Validated + coerced by middleware: personId is a positive int, pin a non-empty string.
+      const { personId: pid, pin } = req.body;
 
       const result = await verifyPin(pid, pin);
       if (!result.ok) {
@@ -155,14 +160,11 @@ router.get(
 router.get(
   '/photos/:tp',
   authenticatePatient,
+  validate({ params: photosParamsSchema }),
   async (req: Request<{ tp: string }>, res: Response): Promise<void> => {
     try {
       const pid = req.session.patientId!;
-      const tp = req.params.tp;
-      if (!tp || !/^[A-Za-z0-9_-]{1,10}$/.test(tp)) {
-        res.status(400).json({ success: false, error: 'Invalid timepoint code' });
-        return;
-      }
+      const tp = req.params.tp; // validated against /^[A-Za-z0-9_-]{1,10}$/ by middleware
       const photos = await getVisiblePhotos(pid, tp);
       res.json({ success: true, photos });
     } catch (error) {

@@ -163,7 +163,7 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
             }
 
             // Hand off to the in-app editor.
-            onPrepared?.({ tpCode: data.tpCode, tpName: timepointType, tpDate: selectedDate });
+            onPrepared?.({ tpCode: data.tp_code, tpName: timepointType, tpDate: selectedDate });
             onClose();
         } catch (error) {
             console.error('Error preparing photo session:', error);

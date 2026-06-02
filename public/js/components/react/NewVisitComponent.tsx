@@ -16,52 +16,52 @@ interface Wire {
 }
 
 interface Operator {
-    ID: number;
-    employeeName: string;
+    id: number;
+    employee_name: string;
 }
 
 interface LatestWires {
-    UpperWireID: number | null;
+    upper_wire_id: number | null;
     UpperWireName: string | null;
-    LowerWireID: number | null;
+    lower_wire_id: number | null;
     LowerWireName: string | null;
 }
 
 interface VisitFormData {
     work_id: number;
     visit_date: string;
-    UpperWireID: number | string;
-    LowerWireID: number | string;
-    BracketChange: string;
-    WireBending: string;
-    Elastics: string;
-    OPG: boolean;
-    PPhoto: boolean;
-    IPhoto: boolean;
-    FPhoto: boolean;
-    Others: string;
-    NextVisit: string;
-    ApplianceRemoved: boolean;
-    OperatorID: number | string;
+    upper_wire_id: number | string;
+    lower_wire_id: number | string;
+    bracket_change: string;
+    wire_bending: string;
+    elastics: string;
+    opg: boolean;
+    p_photo: boolean;
+    i_photo: boolean;
+    f_photo: boolean;
+    others: string;
+    next_visit: string;
+    appliance_removed: boolean;
+    operator_id: number | string;
 }
 
 interface VisitResponse {
-    ID: number;
+    id: number;
     work_id: number;
     visit_date: string;
-    UpperWireID?: number;
-    LowerWireID?: number;
-    BracketChange?: string;
-    WireBending?: string;
-    Elastics?: string;
-    OPG?: boolean;
-    PPhoto?: boolean;
-    IPhoto?: boolean;
-    FPhoto?: boolean;
-    Others?: string;
-    NextVisit?: string;
-    ApplianceRemoved?: boolean;
-    OperatorID?: number;
+    upper_wire_id?: number;
+    lower_wire_id?: number;
+    bracket_change?: string;
+    wire_bending?: string;
+    elastics?: string;
+    opg?: boolean;
+    p_photo?: boolean;
+    i_photo?: boolean;
+    f_photo?: boolean;
+    others?: string;
+    next_visit?: string;
+    appliance_removed?: boolean;
+    operator_id?: number;
 }
 
 interface NewVisitComponentProps {
@@ -71,7 +71,7 @@ interface NewVisitComponentProps {
     onCancel?: () => void;
 }
 
-type TextFieldKey = 'Others' | 'NextVisit';
+type TextFieldKey = 'others' | 'next_visit';
 
 const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisitComponentProps) => {
     const toast = useToast();
@@ -80,33 +80,33 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
     const [wires, setWires] = useState<Wire[]>([]);
     const [operators, setOperators] = useState<Operator[]>([]);
     const [latestWires, setLatestWires] = useState<LatestWires>({
-        UpperWireID: null,
+        upper_wire_id: null,
         UpperWireName: null,
-        LowerWireID: null,
+        lower_wire_id: null,
         LowerWireName: null
     });
     const othersTextareaRef = useRef<HTMLTextAreaElement>(null);
     const nextVisitTextareaRef = useRef<HTMLTextAreaElement>(null);
-    const [lastFocusedField, setLastFocusedField] = useState<TextFieldKey>('Others');
+    const [lastFocusedField, setLastFocusedField] = useState<TextFieldKey>('others');
     const [activeTab, setActiveTab] = useState<'basic' | 'treatment'>('basic');
 
     // Form state
     const [formData, setFormData] = useState<VisitFormData>({
         work_id: workId ?? 0,
         visit_date: new Date().toISOString().split('T')[0],
-        UpperWireID: '',
-        LowerWireID: '',
-        BracketChange: '',
-        WireBending: '',
-        Elastics: '',
-        OPG: false,
-        PPhoto: false,
-        IPhoto: false,
-        FPhoto: false,
-        Others: '',
-        NextVisit: '',
-        ApplianceRemoved: false,
-        OperatorID: ''
+        upper_wire_id: '',
+        lower_wire_id: '',
+        bracket_change: '',
+        wire_bending: '',
+        elastics: '',
+        opg: false,
+        p_photo: false,
+        i_photo: false,
+        f_photo: false,
+        others: '',
+        next_visit: '',
+        appliance_removed: false,
+        operator_id: ''
     });
 
 
@@ -147,19 +147,19 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
             setFormData({
                 work_id: visit.work_id,
                 visit_date: visit.visit_date ? new Date(visit.visit_date).toISOString().split('T')[0] : '',
-                UpperWireID: visit.UpperWireID || '',
-                LowerWireID: visit.LowerWireID || '',
-                BracketChange: visit.BracketChange || '',
-                WireBending: visit.WireBending || '',
-                Elastics: visit.Elastics || '',
-                OPG: visit.OPG || false,
-                PPhoto: visit.PPhoto || false,
-                IPhoto: visit.IPhoto || false,
-                FPhoto: visit.FPhoto || false,
-                Others: visit.Others || '',
-                NextVisit: visit.NextVisit || '',
-                ApplianceRemoved: visit.ApplianceRemoved || false,
-                OperatorID: visit.OperatorID || ''
+                upper_wire_id: visit.upper_wire_id || '',
+                lower_wire_id: visit.lower_wire_id || '',
+                bracket_change: visit.bracket_change || '',
+                wire_bending: visit.wire_bending || '',
+                elastics: visit.elastics || '',
+                opg: visit.opg || false,
+                p_photo: visit.p_photo || false,
+                i_photo: visit.i_photo || false,
+                f_photo: visit.f_photo || false,
+                others: visit.others || '',
+                next_visit: visit.next_visit || '',
+                appliance_removed: visit.appliance_removed || false,
+                operator_id: visit.operator_id || ''
             });
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An error occurred');
@@ -239,7 +239,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
             return { ...prevData, [targetField]: newValue };
         });
 
-        const targetRef = lastFocusedField === 'Others' ? othersTextareaRef : nextVisitTextareaRef;
+        const targetRef = lastFocusedField === 'others' ? othersTextareaRef : nextVisitTextareaRef;
         if (targetRef.current) {
             targetRef.current.focus();
         }
@@ -338,13 +338,13 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                     <div className={styles.formGroup}>
                         <label>Operator</label>
                         <select
-                            value={formData.OperatorID}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFieldChange('OperatorID', e.target.value)}
+                            value={formData.operator_id}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFieldChange('operator_id', e.target.value)}
                         >
                             <option value="">Select Operator</option>
                             {operators.map(op => (
-                                <option key={op.ID} value={op.ID}>
-                                    {op.employeeName}
+                                <option key={op.id} value={op.id}>
+                                    {op.employee_name}
                                 </option>
                             ))}
                         </select>
@@ -361,8 +361,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                             {latestWires.UpperWireName && (
                                 <button
                                     type="button"
-                                    onClick={() => handleFieldChange('UpperWireID', latestWires.UpperWireID!)}
-                                    className={cn(styles.wireBtn, styles.upper, { [styles.active]: formData.UpperWireID === latestWires.UpperWireID })}
+                                    onClick={() => handleFieldChange('upper_wire_id', latestWires.upper_wire_id!)}
+                                    className={cn(styles.wireBtn, styles.upper, { [styles.active]: formData.upper_wire_id === latestWires.upper_wire_id })}
                                 >
                                     <div className={styles.wireLabel}>Upper:</div>
                                     <div className={styles.wireName}>{latestWires.UpperWireName}</div>
@@ -371,8 +371,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                             {latestWires.LowerWireName && (
                                 <button
                                     type="button"
-                                    onClick={() => handleFieldChange('LowerWireID', latestWires.LowerWireID!)}
-                                    className={cn(styles.wireBtn, styles.lower, { [styles.active]: formData.LowerWireID === latestWires.LowerWireID })}
+                                    onClick={() => handleFieldChange('lower_wire_id', latestWires.lower_wire_id!)}
+                                    className={cn(styles.wireBtn, styles.lower, { [styles.active]: formData.lower_wire_id === latestWires.lower_wire_id })}
                                 >
                                     <div className={styles.wireLabel}>Lower:</div>
                                     <div className={styles.wireName}>{latestWires.LowerWireName}</div>
@@ -387,8 +387,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         <div className={styles.formGroup}>
                             <label>Upper Wire</label>
                             <select
-                                value={formData.UpperWireID}
-                                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFieldChange('UpperWireID', e.target.value)}
+                                value={formData.upper_wire_id}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFieldChange('upper_wire_id', e.target.value)}
                             >
                                 <option value="">Select Wire</option>
                                 {wires.map(wire => (
@@ -401,8 +401,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         <div className={styles.formGroup}>
                             <label>Lower Wire</label>
                             <select
-                                value={formData.LowerWireID}
-                                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFieldChange('LowerWireID', e.target.value)}
+                                value={formData.lower_wire_id}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFieldChange('lower_wire_id', e.target.value)}
                             >
                                 <option value="">Select Wire</option>
                                 {wires.map(wire => (
@@ -422,8 +422,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         <label>Bracket Change</label>
                         <input
                             type="text"
-                            value={formData.BracketChange}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('BracketChange', e.target.value)}
+                            value={formData.bracket_change}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('bracket_change', e.target.value)}
                             placeholder="e.g., Replaced upper left bracket"
                         />
                     </div>
@@ -432,8 +432,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         <label>Wire Bending</label>
                         <input
                             type="text"
-                            value={formData.WireBending}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('WireBending', e.target.value)}
+                            value={formData.wire_bending}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('wire_bending', e.target.value)}
                             placeholder="e.g., Omega loop on upper wire"
                         />
                     </div>
@@ -442,8 +442,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         <label>Elastics</label>
                         <input
                             type="text"
-                            value={formData.Elastics}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('Elastics', e.target.value)}
+                            value={formData.elastics}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('elastics', e.target.value)}
                             placeholder="e.g., Class II elastics"
                         />
                     </div>
@@ -456,7 +456,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                             <i className="fas fa-tooth"></i> Select Teeth
                         </span>
                         <span className={styles.chartHint}>
-                            <i className="fas fa-arrow-down"></i> Appends to: <strong>{lastFocusedField === 'Others' ? 'Other Notes' : 'Next Visit'}</strong>
+                            <i className="fas fa-arrow-down"></i> Appends to: <strong>{lastFocusedField === 'others' ? 'Other Notes' : 'Next Visit'}</strong>
                         </span>
                     </label>
                     <DentalChart onToothClick={handleToothClick} />
@@ -466,7 +466,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 <div className={cn(styles.formGroup, styles.fullWidth)}>
                     <label>
                         Other Notes
-                        {lastFocusedField === 'Others' && (
+                        {lastFocusedField === 'others' && (
                             <span className={styles.activeIndicator}>
                                 <i className="fas fa-tooth"></i> Active
                             </span>
@@ -474,12 +474,12 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                     </label>
                     <textarea
                         ref={othersTextareaRef}
-                        value={formData.Others}
-                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleFieldChange('Others', e.target.value)}
-                        onFocus={() => handleFieldFocus('Others')}
+                        value={formData.others}
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleFieldChange('others', e.target.value)}
+                        onFocus={() => handleFieldFocus('others')}
                         rows={4}
                         placeholder="Any additional notes about this visit..."
-                        className={lastFocusedField === 'Others' ? styles.active : ''}
+                        className={lastFocusedField === 'others' ? styles.active : ''}
                     />
                 </div>
 
@@ -487,7 +487,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 <div className={cn(styles.formGroup, styles.fullWidth)}>
                     <label>
                         Next Visit Instructions
-                        {lastFocusedField === 'NextVisit' && (
+                        {lastFocusedField === 'next_visit' && (
                             <span className={styles.activeIndicator}>
                                 <i className="fas fa-tooth"></i> Active
                             </span>
@@ -495,12 +495,12 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                     </label>
                     <textarea
                         ref={nextVisitTextareaRef}
-                        value={formData.NextVisit}
-                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleFieldChange('NextVisit', e.target.value)}
-                        onFocus={() => handleFieldFocus('NextVisit')}
+                        value={formData.next_visit}
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleFieldChange('next_visit', e.target.value)}
+                        onFocus={() => handleFieldFocus('next_visit')}
                         rows={4}
                         placeholder="Instructions or notes for the next visit..."
-                        className={lastFocusedField === 'NextVisit' ? styles.active : ''}
+                        className={lastFocusedField === 'next_visit' ? styles.active : ''}
                     />
                 </div>
 
@@ -509,40 +509,40 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                     <label className={styles.checkboxLabel}>
                         <input
                             type="checkbox"
-                            checked={formData.OPG}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('OPG', e.target.checked)}
+                            checked={formData.opg}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('opg', e.target.checked)}
                         />
                         <span>OPG Taken</span>
                     </label>
                     <label className={styles.checkboxLabel}>
                         <input
                             type="checkbox"
-                            checked={formData.IPhoto}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('IPhoto', e.target.checked)}
+                            checked={formData.i_photo}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('i_photo', e.target.checked)}
                         />
                         <span>Initial Photo</span>
                     </label>
                     <label className={styles.checkboxLabel}>
                         <input
                             type="checkbox"
-                            checked={formData.PPhoto}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('PPhoto', e.target.checked)}
+                            checked={formData.p_photo}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('p_photo', e.target.checked)}
                         />
                         <span>Progress Photo</span>
                     </label>
                     <label className={styles.checkboxLabel}>
                         <input
                             type="checkbox"
-                            checked={formData.FPhoto}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('FPhoto', e.target.checked)}
+                            checked={formData.f_photo}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('f_photo', e.target.checked)}
                         />
                         <span>Final Photo</span>
                     </label>
                     <label className={styles.checkboxLabel}>
                         <input
                             type="checkbox"
-                            checked={formData.ApplianceRemoved}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('ApplianceRemoved', e.target.checked)}
+                            checked={formData.appliance_removed}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('appliance_removed', e.target.checked)}
                         />
                         <span>Appliance Removed</span>
                     </label>

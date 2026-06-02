@@ -49,20 +49,20 @@ interface PatientData {
     patient_name?: string;
     first_name?: string;
     last_name?: string;
-    Phone?: string;
+    phone?: string;
     phone2?: string;
-    Email?: string;
+    email?: string;
     date_of_birth?: string;
-    Gender?: string;
-    AddressID?: string;
-    ReferralSourceID?: string;
-    PatientTypeID?: string;
-    Notes?: string;
-    Language?: number | string;
-    CountryCode?: string;
-    EstimatedCost?: string;
-    Currency?: string;
-    TagID?: string;
+    gender?: string;
+    address_id?: string;
+    referral_source_id?: string;
+    patient_type_id?: string;
+    notes?: string;
+    language?: number | string;
+    country_code?: string;
+    estimated_cost?: string;
+    currency?: string;
+    tag_id?: string;
 }
 
 interface FormData {
@@ -70,20 +70,20 @@ interface FormData {
     patient_name: string;
     first_name: string;
     last_name: string;
-    Phone: string;
-    Phone2: string;
-    Email: string;
+    phone: string;
+    phone2: string;
+    email: string;
     date_of_birth: string;
-    Gender: string;
-    AddressID: string;
-    ReferralSourceID: string;
-    PatientTypeID: string;
-    Notes: string;
-    Language: string;
-    CountryCode: string;
-    EstimatedCost: string;
-    Currency: string;
-    TagID: string;
+    gender: string;
+    address_id: string;
+    referral_source_id: string;
+    patient_type_id: string;
+    notes: string;
+    language: string;
+    country_code: string;
+    estimated_cost: string;
+    currency: string;
+    tag_id: string;
 }
 
 interface UploadData {
@@ -129,20 +129,20 @@ const EditPatientComponent = ({ personId }: Props) => {
         patient_name: '',
         first_name: '',
         last_name: '',
-        Phone: '',
-        Phone2: '',
-        Email: '',
+        phone: '',
+        phone2: '',
+        email: '',
         date_of_birth: '',
-        Gender: '',
-        AddressID: '',
-        ReferralSourceID: '',
-        PatientTypeID: '',
-        Notes: '',
-        Language: '0',
-        CountryCode: '',
-        EstimatedCost: '',
-        Currency: 'IQD',
-        TagID: ''
+        gender: '',
+        address_id: '',
+        referral_source_id: '',
+        patient_type_id: '',
+        notes: '',
+        language: '0',
+        country_code: '',
+        estimated_cost: '',
+        currency: 'IQD',
+        tag_id: ''
     });
 
     const loadDropdownData = useCallback(async () => {
@@ -187,20 +187,20 @@ const EditPatientComponent = ({ personId }: Props) => {
                 patient_name: data.patient_name || '',
                 first_name: data.first_name || '',
                 last_name: data.last_name || '',
-                Phone: data.Phone || '',
-                Phone2: data.phone2 || '',
-                Email: data.Email || '',
+                phone: data.phone || '',
+                phone2: data.phone2 || '',
+                email: data.email || '',
                 date_of_birth: data.date_of_birth ? new Date(data.date_of_birth).toISOString().split('T')[0] : '',
-                Gender: data.Gender || '',
-                AddressID: data.AddressID || '',
-                ReferralSourceID: data.ReferralSourceID || '',
-                PatientTypeID: data.PatientTypeID || '',
-                Notes: data.Notes || '',
-                Language: (data.Language !== null && data.Language !== undefined) ? data.Language.toString() : '0',
-                CountryCode: data.CountryCode || '',
-                EstimatedCost: data.EstimatedCost || '',
-                Currency: data.Currency || 'IQD',
-                TagID: data.TagID || ''
+                gender: data.gender || '',
+                address_id: data.address_id || '',
+                referral_source_id: data.referral_source_id || '',
+                patient_type_id: data.patient_type_id || '',
+                notes: data.notes || '',
+                language: (data.language !== null && data.language !== undefined) ? data.language.toString() : '0',
+                country_code: data.country_code || '',
+                estimated_cost: data.estimated_cost || '',
+                currency: data.currency || 'IQD',
+                tag_id: data.tag_id || ''
             });
         } catch (err) {
             console.error('Error loading patient data:', err);
@@ -258,8 +258,8 @@ const EditPatientComponent = ({ personId }: Props) => {
 
             // Map gender ID to gender name
             let genderName = '';
-            if (formData.Gender) {
-                const gender = genders.find(g => g.id === parseInt(formData.Gender));
+            if (formData.gender) {
+                const gender = genders.find(g => g.id === parseInt(formData.gender));
                 genderName = gender ? gender.name : '';
             }
 
@@ -535,23 +535,23 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <label>Country Code</label>
                         <input
                             type="text"
-                            value={formData.CountryCode}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, CountryCode: e.target.value})}
+                            value={formData.country_code}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, country_code: e.target.value})}
                             placeholder="+964"
                         />
                     </div>
                     <div className={styles.formGroup}>
                         <label>Phone</label>
                         <PhoneInput
-                            value={formData.Phone}
-                            onChange={(value) => setFormData({...formData, Phone: value})}
+                            value={formData.phone}
+                            onChange={(value) => setFormData({...formData, phone: value})}
                         />
                     </div>
                     <div className={styles.formGroup}>
                         <label>Phone 2</label>
                         <PhoneInput
-                            value={formData.Phone2}
-                            onChange={(value) => setFormData({...formData, Phone2: value})}
+                            value={formData.phone2}
+                            onChange={(value) => setFormData({...formData, phone2: value})}
                         />
                     </div>
                 </div>
@@ -561,8 +561,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <label>Email</label>
                         <input
                             type="email"
-                            value={formData.Email}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, Email: e.target.value})}
+                            value={formData.email}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, email: e.target.value})}
                         />
                     </div>
                     <div className={styles.formGroup}>
@@ -579,8 +579,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                     <div className={styles.formGroup}>
                         <label>Gender</label>
                         <select
-                            value={formData.Gender}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, Gender: e.target.value})}
+                            value={formData.gender}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, gender: e.target.value})}
                         >
                             <option value="">Select Gender</option>
                             {genders.map(gender => (
@@ -593,8 +593,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                     <div className={styles.formGroup}>
                         <label>Language</label>
                         <select
-                            value={formData.Language}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, Language: e.target.value})}
+                            value={formData.language}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, language: e.target.value})}
                         >
                             <option value="0">Kurdish</option>
                             <option value="1">Arabic</option>
@@ -607,8 +607,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                     <div className={styles.formGroup}>
                         <label>Address/Zone</label>
                         <select
-                            value={formData.AddressID}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, AddressID: e.target.value})}
+                            value={formData.address_id}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, address_id: e.target.value})}
                         >
                             <option value="">Select Address</option>
                             {addresses.map(address => (
@@ -621,8 +621,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                     <div className={styles.formGroup}>
                         <label>Referral Source</label>
                         <select
-                            value={formData.ReferralSourceID}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, ReferralSourceID: e.target.value})}
+                            value={formData.referral_source_id}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, referral_source_id: e.target.value})}
                         >
                             <option value="">Select Referral Source</option>
                             {referralSources.map(source => (
@@ -638,8 +638,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                     <div className={styles.formGroup}>
                         <label>Patient Type</label>
                         <select
-                            value={formData.PatientTypeID}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, PatientTypeID: e.target.value})}
+                            value={formData.patient_type_id}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, patient_type_id: e.target.value})}
                         >
                             <option value="">Select Patient Type</option>
                             {patientTypes.map(type => (
@@ -652,8 +652,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                     <div className={styles.formGroup}>
                         <label>Tag</label>
                         <select
-                            value={formData.TagID}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, TagID: e.target.value})}
+                            value={formData.tag_id}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, tag_id: e.target.value})}
                         >
                             <option value="">Select Tag</option>
                             {tags.map(tag => (
@@ -670,11 +670,11 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <label>Estimated Cost (Consultation)</label>
                         <input
                             type="text"
-                            value={formData.EstimatedCost ? formData.EstimatedCost.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''}
+                            value={formData.estimated_cost ? formData.estimated_cost.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                 const rawValue = e.target.value.replace(/,/g, '');
                                 if (rawValue === '' || /^\d+$/.test(rawValue)) {
-                                    setFormData({...formData, EstimatedCost: rawValue});
+                                    setFormData({...formData, estimated_cost: rawValue});
                                 }
                             }}
                             placeholder="Cost quoted at consultation"
@@ -683,8 +683,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                     <div className={styles.formGroup}>
                         <label>Currency</label>
                         <select
-                            value={formData.Currency}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, Currency: e.target.value})}
+                            value={formData.currency}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, currency: e.target.value})}
                         >
                             <option value="IQD">Iraqi Dinar (IQD)</option>
                             <option value="USD">US Dollar (USD)</option>
@@ -696,8 +696,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                 <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
                     <label>Notes</label>
                     <textarea
-                        value={formData.Notes}
-                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData({...formData, Notes: e.target.value})}
+                        value={formData.notes}
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData({...formData, notes: e.target.value})}
                         rows={3}
                     />
                 </div>

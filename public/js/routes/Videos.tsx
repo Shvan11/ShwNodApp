@@ -7,12 +7,12 @@ import styles from './Videos.module.css';
  * Video interface from API
  */
 interface Video {
-  ID: number;
-  Description: string;
+  id: number;
+  description: string;
   Video: string;
   Image: string;
-  Category: number | null;
-  Details: string | null;
+  category: number | null;
+  details: string | null;
 }
 
 /**
@@ -120,11 +120,11 @@ export default function Videos() {
   const filteredVideos = videos.filter((video) => {
     const matchesSearch =
       searchQuery === '' ||
-      video.Description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (video.Details && video.Details.toLowerCase().includes(searchQuery.toLowerCase()));
+      video.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (video.details && video.details.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const matchesCategory =
-      selectedCategory === '' || video.Category?.toString() === selectedCategory;
+      selectedCategory === '' || video.category?.toString() === selectedCategory;
 
     return matchesSearch && matchesCategory;
   });
@@ -162,9 +162,9 @@ export default function Videos() {
   const handleEditVideo = (video: Video) => {
     setEditingVideo(video);
     setFormData({
-      description: video.Description,
-      category: video.Category?.toString() || '',
-      details: video.Details || '',
+      description: video.description,
+      category: video.category?.toString() || '',
+      details: video.details || '',
     });
     setVideoFile(null);
     setThumbnailFile(null);
@@ -187,7 +187,7 @@ export default function Videos() {
     setIsQRModalOpen(true);
 
     try {
-      const response = await fetch(`/api/videos/${video.ID}/qr`);
+      const response = await fetch(`/api/videos/${video.id}/qr`);
       if (!response.ok) throw new Error('Failed to generate QR code');
 
       const result = await response.json();
@@ -323,7 +323,7 @@ export default function Videos() {
     try {
       if (editingVideo) {
         // Update existing video (metadata only)
-        const response = await fetch(`/api/videos/${editingVideo.ID}`, {
+        const response = await fetch(`/api/videos/${editingVideo.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -371,7 +371,7 @@ export default function Videos() {
     if (!videoToDelete) return;
 
     try {
-      const response = await fetch(`/api/videos/${videoToDelete.ID}`, {
+      const response = await fetch(`/api/videos/${videoToDelete.id}`, {
         method: 'DELETE',
       });
 
@@ -456,14 +456,14 @@ export default function Videos() {
       {!loading && filteredVideos.length > 0 && (
         <div className={styles.videoGrid}>
           {filteredVideos.map((video) => (
-            <div key={video.ID} className={styles.videoCard}>
+            <div key={video.id} className={styles.videoCard}>
               <div
                 className={styles.thumbnailWrapper}
                 onClick={() => handlePlayVideo(video)}
               >
                 <img
-                  src={`/api/videos/${video.ID}/thumbnail`}
-                  alt={video.Description}
+                  src={`/api/videos/${video.id}/thumbnail`}
+                  alt={video.description}
                   className={styles.thumbnail}
                   onError={(e) => {
                     (e.target as HTMLImageElement).src =
@@ -475,13 +475,13 @@ export default function Videos() {
                 </div>
               </div>
               <div className={styles.cardContent}>
-                <h3 className={styles.videoTitle}>{video.Description}</h3>
-                {video.Category && (
+                <h3 className={styles.videoTitle}>{video.description}</h3>
+                {video.category && (
                   <span className={styles.categoryBadge}>
-                    {categories.find((c) => c.id === video.Category)?.name || `Category ${video.Category}`}
+                    {categories.find((c) => c.id === video.category)?.name || `Category ${video.category}`}
                   </span>
                 )}
-                {video.Details && <p className={styles.videoDetails}>{video.Details}</p>}
+                {video.details && <p className={styles.videoDetails}>{video.details}</p>}
               </div>
               <div className={styles.cardActions}>
                 <button
@@ -520,7 +520,7 @@ export default function Videos() {
           ariaLabelledBy="video-player-title"
         >
           <div className={styles.playerHeader}>
-            <h2 id="video-player-title">{currentVideo.Description}</h2>
+            <h2 id="video-player-title">{currentVideo.description}</h2>
             <button className={styles.closeBtn} onClick={handleClosePlayer}>
               <i className="fas fa-times"></i>
             </button>
@@ -530,7 +530,7 @@ export default function Videos() {
               controls
               autoPlay
               className={styles.videoPlayer}
-              src={`/api/videos/${currentVideo.ID}/stream`}
+              src={`/api/videos/${currentVideo.id}/stream`}
             >
               Your browser does not support the video tag.
             </video>
@@ -675,7 +675,7 @@ export default function Videos() {
                 delete this video?
               </p>
               <p>
-                <strong>{videoToDelete.Description}</strong>
+                <strong>{videoToDelete.description}</strong>
               </p>
               <p className={styles.deleteWarning}>
                 This action cannot be undone. The video file and thumbnail will be

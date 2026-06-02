@@ -485,16 +485,26 @@ async function initializeApplication(): Promise<AppInitResult> {
         }
     });
 
-    // ===== ADDED: Enhanced error handling for startup =====
-    // Handle uncaught exceptions gracefully during startup
+    // ===== Enhanced error handling =====
+    // An uncaught *exception* can leave the process in an unknown/corrupted
+    // state, so we still tear down cleanly. (Node's own default would crash
+    // anyway — gracefulShutdown just lets long-lived services close first.)
     process.on('uncaughtException', (error: Error) => {
-      log.error('💥 Uncaught Exception during startup:', { error: error.message });
+      log.error('💥 Uncaught Exception:', { error: error.message, stack: error.stack });
       gracefulShutdown('uncaughtException');
     });
 
+    // An unhandled *rejection* must NOT bring down the production server. These
+    // almost always originate in a peripheral, self-healing subsystem (e.g. the
+    // WhatsApp client's init timeout / reconnect loop) that has its own retry
+    // and circuit-breaker logic — killing the whole clinic app over one is a
+    // far worse outcome than the stray rejection itself. Log it loudly and keep
+    // serving; the owning subsystem recovers on its own.
     process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
-      log.error('💥 Unhandled Rejection during startup:', { promise: String(promise), reason: String(reason) });
-      gracefulShutdown('unhandledRejection');
+      log.error('💥 Unhandled Rejection (ignored — server stays up):', {
+        promise: String(promise),
+        reason: reason instanceof Error ? reason.stack ?? reason.message : String(reason),
+      });
     });
 
     // Start server
@@ -508,7 +518,7 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     log.info('🎉 Application started successfully!');
     log.info(`🌐 Server running at http://localhost:${port}`);
-    log.info(`🔒 HTTPS available via Caddy at https://clinic.local`);
+    log.info(`🔒 HTTPS available via Caddy at https://local.shwan-orthodontics.com`);
     log.info(`📊 Health check available at http://localhost:${port}/api/health`);
 
     return { wsEmitter };
@@ -780,7 +790,7 @@ const { wsEmitter } = await initializeApplication();
 // Log application readiness
 log.info('🎯 Application initialization complete - ready to serve requests');
 log.info(`📋 Available endpoints:
-  • Main Application: http://localhost:${port} (via Caddy: https://clinic.local)
+  • Main Application: http://localhost:${port} (via Caddy: https://local.shwan-orthodontics.com)
   • API Health Check: http://localhost:${port}/api/health
   • Basic Health: http://localhost:${port}/health/basic
   • WhatsApp Status: http://localhost:${port}/api/wa/status

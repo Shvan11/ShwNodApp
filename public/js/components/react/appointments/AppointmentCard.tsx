@@ -167,7 +167,7 @@ const AppointmentCard = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (canUndoPresent && onUndoState) {
-                                onUndoState(appointmentId, 'Present');
+                                onUndoState(appointmentId, 'present');
                             }
                         }}
                         title={canUndoPresent ? `Checked In: ${presentTime} - Click to undo` : (isSeated ? "Cannot undo: Patient is already seated" : "Cannot undo: Visit is completed")}
@@ -185,7 +185,7 @@ const AppointmentCard = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (isSeated && canUndoSeated && onUndoState) {
-                                onUndoState(appointmentId, 'Seated');
+                                onUndoState(appointmentId, 'seated');
                             } else if (!isSeated && onMarkSeated) {
                                 onMarkSeated(appointmentId);
                             }
@@ -209,7 +209,7 @@ const AppointmentCard = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (isDismissed && onUndoState) {
-                                onUndoState(appointmentId, 'Dismissed');
+                                onUndoState(appointmentId, 'dismissed');
                             } else if (isSeated && onMarkDismissed) {
                                 onMarkDismissed(appointmentId);
                             }

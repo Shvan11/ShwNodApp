@@ -70,6 +70,10 @@ Shared API request/response types live in `public/js/types/api.types.ts`. Use `A
 - Import as `import type { ApiResponse } from '@/types/api.types'` — the `@types/*` alias works in tsconfig but **not** Vite, so it breaks value exports at build.
 - Aligner-domain types stay in `pages/aligner/aligner.types.ts`. UI form/hook state stays inline; only API boundary shapes go in `api.types.ts`.
 
+### Runtime validation (Zod) — boundaries only
+Zod validates **untrusted input crossing into the app**, nowhere else: request bodies/params/query, env at boot, and `res.json()` parsing on external-facing (Patient Portal) calls. Use the shared `validate({ body?, params?, query? })` middleware (`middleware/validate.ts`) on routes — it parses, coerces, writes back, and 400s via `ErrorResponses`. The schema is the **single source of truth**: derive types with `z.infer<typeof schema>`, never hand-write a parallel `interface` beside it. The boot env schema lives in `config/config.ts` (throws on missing PG / SESSION_SECRET / MACHINE_PATH).
+- **Never** validate Kysely/DB results (already typed from `types/db.d.ts` — the DB is a source we own), nor internal function calls (that's what TypeScript is for). Re-validating trusted data is wasted CPU and a second source of truth.
+
 ### CSS Modules
 ```typescript
 import styles from './Component.module.css';

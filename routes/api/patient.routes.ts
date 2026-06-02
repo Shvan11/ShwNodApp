@@ -1121,8 +1121,8 @@ router.put(
       await updatePatient(personId, updateData);
       res.json({ success: true, message: 'Patient updated successfully' });
     } catch (error) {
-      // Duplicate patient name → pg unique violation on index IX_Name_ID (was mssql 2601).
-      if (isUniqueViolation(error, 'IX_Name_ID')) {
+      // Duplicate patient name → pg unique violation on index ix_name_id (was mssql 2601).
+      if (isUniqueViolation(error, 'ix_name_id')) {
         log.warn(
           `Duplicate patient name attempted during update: ${patientData.patient_name}`
         );
@@ -1164,7 +1164,7 @@ router.delete(
       const personId = parseInt(req.params.personId);
 
       // Capture the patient's tpCodes BEFORE the delete — deletePatient's cascade
-      // (FK_tblTimePoints_tblpatients ON DELETE CASCADE) drops the timepoint rows, so
+      // (fk_time_points_tblpatients ON DELETE CASCADE) drops the timepoint rows, so
       // afterwards we'd have no way to name the rendered working/ files to remove.
       const tpCodes = await getTimePointCodesForPatient(personId);
 

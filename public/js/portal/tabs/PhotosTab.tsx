@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import styles from '../portal.module.css';
 
 interface TimePoint {
-  tpCode: string;
-  tpDateTime: string;
-  tpDescription: string;
+  tp_code: string;
+  tp_date_time: string;
+  tp_description: string;
 }
 
 interface Photo {
@@ -52,10 +52,10 @@ const PhotosTab = () => {
           return;
         }
         const sorted = [...data.timepoints].sort(
-          (a, b) => new Date(b.tpDateTime).getTime() - new Date(a.tpDateTime).getTime()
+          (a, b) => new Date(b.tp_date_time).getTime() - new Date(a.tp_date_time).getTime()
         );
         setTps(sorted);
-        if (sorted.length > 0) setSelectedTp(sorted[0].tpCode);
+        if (sorted.length > 0) setSelectedTp(sorted[0].tp_code);
       } catch {
         if (!cancelled) setTpsError('Unable to reach the server.');
       }
@@ -131,18 +131,18 @@ const PhotosTab = () => {
       <div className={styles.tpScroller}>
         {tabList.map((t) => (
           <button
-            key={t.tpCode}
+            key={t.tp_code}
             type="button"
             className={
-              t.tpCode === selectedTp
+              t.tp_code === selectedTp
                 ? `${styles.tpChip} ${styles.tpChipActive}`
                 : styles.tpChip
             }
-            onClick={() => setSelectedTp(t.tpCode)}
+            onClick={() => setSelectedTp(t.tp_code)}
           >
-            <div className={styles.tpChipDate}>{formatTpDate(t.tpDateTime)}</div>
-            {t.tpDescription && (
-              <div className={styles.tpChipDesc}>{t.tpDescription}</div>
+            <div className={styles.tpChipDate}>{formatTpDate(t.tp_date_time)}</div>
+            {t.tp_description && (
+              <div className={styles.tpChipDesc}>{t.tp_description}</div>
             )}
           </button>
         ))}

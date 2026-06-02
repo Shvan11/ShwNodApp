@@ -5,9 +5,9 @@ import { useToast } from '../../contexts/ToastContext';
 import PhotoSessionDialog from './PhotoSessionDialog';
 
 interface Timepoint {
-    tpCode: string;
-    tpDescription: string;
-    tpDateTime: string;
+    tp_code: string;
+    tp_description: string;
+    tp_date_time: string;
 }
 
 interface PatientInfo {
@@ -279,12 +279,12 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
     const renderTimepointItem = (timepoint: Timepoint) => {
         // Check if this timepoint is currently active
         const currentTp = tpCode ? tpCode.replace('tp', '') : '0';
-        const isActive = currentTp === timepoint.tpCode;
+        const isActive = currentTp === timepoint.tp_code;
 
         return (
             <Link
-                key={timepoint.tpCode}
-                to={`/patient/${personId}/photos/tp${timepoint.tpCode}`}
+                key={timepoint.tp_code}
+                to={`/patient/${personId}/photos/tp${timepoint.tp_code}`}
                 className={`sidebar-nav-item timepoint-subitem ${isActive ? 'active' : ''}`}
                 onClick={() => setPhotosExpanded(false)}
             >
@@ -292,8 +292,8 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                     <i className="fas fa-circle icon-xs" />
                 </div>
                 <div className="timepoint-content">
-                    <span className="timepoint-description">{timepoint.tpDescription}</span>
-                    <span className="timepoint-date">{formatDate(timepoint.tpDateTime)}</span>
+                    <span className="timepoint-description">{timepoint.tp_description}</span>
+                    <span className="timepoint-date">{formatDate(timepoint.tp_date_time)}</span>
                 </div>
             </Link>
         );

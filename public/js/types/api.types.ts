@@ -91,9 +91,9 @@ export interface HistoryResult {
 export interface PaymentSaveData {
     amount_paid: number;
     date_of_payment: string;
-    ActualAmount: null;
-    ActualCur: string;
-    Change: null;
+    actual_amount: null;
+    actual_cur: string;
+    change: null;
 }
 
 // =============================================================================
@@ -142,7 +142,7 @@ export interface PhotoPrepareRequest {
 
 /** POST /api/photo-editor/:personId/prepare response data (success or shwan-date conflict). */
 export interface PhotoPrepareResult {
-    tpCode?: number;
+    tp_code?: number;
     conflict?: boolean;
     conflictSource?: 'shwan';
     existingDate?: string;
@@ -165,7 +165,7 @@ export interface PhotoRenderRequest {
 export interface PhotoRenderResult {
     success: true;
     queued: true;
-    tpCode: number;
+    tp_code: number;
 }
 
 /** POST /api/portal/login (patient portal). */

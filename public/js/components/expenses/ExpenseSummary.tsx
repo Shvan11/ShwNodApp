@@ -9,8 +9,8 @@ import styles from '../../routes/Expenses.module.css';
 
 // Types
 interface SummaryTotal {
-    Currency: string;
-    TotalAmount: number;
+    currency: string;
+    total_amount: number;
     ExpenseCount?: number;
 }
 
@@ -41,8 +41,8 @@ export default function ExpenseSummary({ startDate, endDate, expenses }: Expense
     const getSummaryData = (): SummaryResult => {
         if (startDate && endDate && summary) {
             // Use server-side summary when date range is available
-            const iqd = summary.totals?.find(t => t.Currency === 'IQD')?.TotalAmount || 0;
-            const usd = summary.totals?.find(t => t.Currency === 'USD')?.TotalAmount || 0;
+            const iqd = summary.totals?.find(t => t.currency === 'IQD')?.total_amount || 0;
+            const usd = summary.totals?.find(t => t.currency === 'USD')?.total_amount || 0;
             const count = summary.totals?.reduce((sum, t) => sum + (t.ExpenseCount || 0), 0) || 0;
 
             return { iqd, usd, count };
@@ -54,12 +54,12 @@ export default function ExpenseSummary({ startDate, endDate, expenses }: Expense
         }
 
         const iqd = expenses
-            .filter(e => (e.Currency || '').trim() === 'IQD')
-            .reduce((sum, e) => sum + (e.Amount ?? 0), 0);
+            .filter(e => (e.currency || '').trim() === 'IQD')
+            .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
         const usd = expenses
-            .filter(e => (e.Currency || '').trim() === 'USD')
-            .reduce((sum, e) => sum + (e.Amount ?? 0), 0);
+            .filter(e => (e.currency || '').trim() === 'USD')
+            .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
         return { iqd, usd, count: expenses.length };
     };

@@ -17,6 +17,7 @@ import config from '../../../config/config.js';
 import { createPathResolver } from '../../../utils/path-resolver.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
+import { isUniqueViolation } from '../../../utils/pg-errors.js';
 
 // type definitions
 interface PatientInfo {
@@ -420,49 +421,59 @@ export async function getActiveWID(PID: number): Promise<number | null> {
 export async function createPatient(patientData: PatientData): Promise<CreatePatientResult> {
   const db = getKysely();
 
-  // patient_name is citext → this duplicate check is case-insensitive (matches Arabic_CI_AS).
-  const duplicateCheck = await db
-    .selectFrom('patients')
-    .select(['person_id', 'patient_name'])
-    .where('patient_name', '=', patientData.patientName)
-    .execute();
-
-  if (duplicateCheck.length > 0) {
-    const error = new Error(
-      `A patient with the name "${patientData.patientName}" already exists.`
-    ) as DuplicatePatientError;
-    error.code = 'DUPLICATE_PATIENT_NAME';
-    error.existingPatientId = duplicateCheck[0].person_id;
-    throw error;
-  }
-
   const toInt = (v: string | number | undefined): number | null =>
     v ? parseInt(String(v), 10) : null;
 
-  const inserted = await db
-    .insertInto('patients')
-    .values({
-      patient_name: patientData.patientName,
-      phone: patientData.phone || null,
-      first_name: patientData.firstName || null,
-      last_name: patientData.lastName || null,
-      date_of_birth: patientData.dateOfBirth ? toDateOnly(patientData.dateOfBirth) : null,
-      gender: toInt(patientData.gender),
-      phone2: patientData.phone2 || null,
-      email: patientData.email || null,
-      address_id: toInt(patientData.addressID),
-      referral_source_id: toInt(patientData.referralSourceID),
-      patient_type_id: toInt(patientData.patientTypeID),
-      notes: patientData.notes || null,
-      language: patientData.language ? parseInt(String(patientData.language), 10) : 0,
-      country_code: patientData.countryCode || null,
-      estimated_cost: toInt(patientData.estimatedCost),
-      currency: patientData.currency || null,
-    })
-    .returning('person_id')
-    .executeTakeFirstOrThrow();
+  // Duplicate names are rejected by the unique index ix_name_id (on the citext
+  // patient_name column → case-insensitive, matching Arabic_CI_AS). We let the
+  // INSERT hit it rather than pre-checking with a SELECT, which was racy: two
+  // concurrent creates could both pass the SELECT and then one would throw an
+  // unhandled pg error. This mirrors how updatePatient's caller handles the
+  // same constraint.
+  try {
+    const inserted = await db
+      .insertInto('patients')
+      .values({
+        patient_name: patientData.patientName,
+        phone: patientData.phone || null,
+        first_name: patientData.firstName || null,
+        last_name: patientData.lastName || null,
+        date_of_birth: patientData.dateOfBirth ? toDateOnly(patientData.dateOfBirth) : null,
+        gender: toInt(patientData.gender),
+        phone2: patientData.phone2 || null,
+        email: patientData.email || null,
+        address_id: toInt(patientData.addressID),
+        referral_source_id: toInt(patientData.referralSourceID),
+        patient_type_id: toInt(patientData.patientTypeID),
+        notes: patientData.notes || null,
+        language: patientData.language ? parseInt(String(patientData.language), 10) : 0,
+        country_code: patientData.countryCode || null,
+        estimated_cost: toInt(patientData.estimatedCost),
+        currency: patientData.currency || null,
+      })
+      .returning('person_id')
+      .executeTakeFirstOrThrow();
 
-  return { personId: inserted.person_id };
+    return { personId: inserted.person_id };
+  } catch (error) {
+    if (isUniqueViolation(error, 'ix_name_id')) {
+      // Recover the existing patient's id for the API contract — only on the
+      // (rare) conflict path, and no longer racy: we're reporting an
+      // already-committed duplicate, not gating the insert.
+      const existing = await db
+        .selectFrom('patients')
+        .select('person_id')
+        .where('patient_name', '=', patientData.patientName)
+        .executeTakeFirst();
+      const dup = new Error(
+        `A patient with the name "${patientData.patientName}" already exists.`
+      ) as DuplicatePatientError;
+      dup.code = 'DUPLICATE_PATIENT_NAME';
+      dup.existingPatientId = existing?.person_id ?? 0;
+      throw dup;
+    }
+    throw error;
+  }
 }
 
 /**

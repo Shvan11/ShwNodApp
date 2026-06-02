@@ -39,21 +39,21 @@ export default function DeleteItemModal({ isOpen, item, onConfirm, onCancel }: D
 
         <div className={styles.itemDetails}>
           <p>
-            <strong>Item:</strong> {item.ItemName}
+            <strong>Item:</strong> {item.item_name}
           </p>
           <p>
-            <strong>Current Stock:</strong> {formatNumber(item.CurrentStock)}
+            <strong>Current Stock:</strong> {formatNumber(item.current_stock)}
           </p>
-          {item.CategoryName && (
+          {item.category_name && (
             <p>
-              <strong>Category:</strong> {item.CategoryName}
+              <strong>Category:</strong> {item.category_name}
             </p>
           )}
           <p>
-            <strong>Cost Price:</strong> {formatNumber(item.CostPrice)} IQD
+            <strong>Cost Price:</strong> {formatNumber(item.cost_price)} IQD
           </p>
           <p>
-            <strong>Sell Price:</strong> {formatNumber(item.SellPrice)} IQD
+            <strong>Sell Price:</strong> {formatNumber(item.sell_price)} IQD
           </p>
         </div>
       </div>

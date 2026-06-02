@@ -19,15 +19,15 @@ export interface ExpenseFilters {
  * Expense data
  */
 export interface Expense {
-  ID: number;
-  Amount: number;
-  Currency: string;
-  CategoryID?: number;
-  CategoryName?: string;
-  SubcategoryID?: number;
-  SubcategoryName?: string;
-  Note?: string;
-  expenseDate?: string;
+  id: number;
+  amount: number;
+  currency: string;
+  category_id?: number;
+  category_name?: string;
+  subcategory_id?: number;
+  subcategory_name?: string;
+  note?: string;
+  expense_date?: string;
   [key: string]: unknown;
 }
 
@@ -35,8 +35,8 @@ export interface Expense {
  * Category data
  */
 export interface Category {
-  CategoryID: number;
-  CategoryName: string;
+  category_id: number;
+  category_name: string;
   [key: string]: unknown;
 }
 
@@ -44,9 +44,9 @@ export interface Category {
  * Subcategory data
  */
 export interface Subcategory {
-  SubcategoryID: number;
-  SubcategoryName: string;
-  CategoryID: number;
+  subcategory_id: number;
+  subcategory_name: string;
+  category_id: number;
   [key: string]: unknown;
 }
 
@@ -56,12 +56,12 @@ export interface Subcategory {
 export interface ExpenseSummary {
   totalExpenses: number;
   byCategory: Array<{
-    CategoryName: string;
-    Total: number;
+    category_name: string;
+    total: number;
   }>;
   byCurrency: Array<{
-    Currency: string;
-    Total: number;
+    currency: string;
+    total: number;
   }>;
   [key: string]: unknown;
 }
@@ -70,7 +70,7 @@ export interface ExpenseSummary {
  * Expense data for create/update (matches backend API)
  */
 export interface ExpenseData {
-  expenseDate: string;
+  expense_date: string;
   amount: number;
   currency: string;
   note?: string;

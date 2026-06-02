@@ -42,35 +42,36 @@ interface DiagnosisData {
     o_canine_relation: string;
     o_functional_occlusion: string;
     // Cephalometric Analysis
-    C_SNA: string;
-    C_SNB: string;
-    C_ANB: string;
-    C_SNMx: string;
-    C_Wits: string;
-    C_FMA: string;
-    C_MMA: string;
-    C_UIMX: string;
-    C_LIMd: string;
-    C_UI_LI: string;
-    C_LI_APo: string;
-    C_Ulip_E: string;
-    C_Llip_E: string;
-    C_Naso_lip: string;
-    C_TAFH: string;
-    C_UAFH: string;
-    C_LAFH: string;
-    C_PercentLAFH: string;
+    c_sna: string;
+    c_snb: string;
+    c_anb: string;
+    c_sn_mx: string;
+    c_wits: string;
+    c_fma: string;
+    c_mma: string;
+    c_uimx: string;
+    c_li_md: string;
+    c_ui_li: string;
+    c_li_a_po: string;
+    c_ulip_e: string;
+    c_llip_e: string;
+    c_naso_lip: string;
+    c_tafh: string;
+    c_uafh: string;
+    c_lafh: string;
+    c_percent_lafh: string;
 }
 
 interface PatientInfo {
-    Name: string;
+    patient_name?: string;
+    name?: string;
     person_id?: number;
     [key: string]: unknown;
 }
 
 interface WorkInfo {
-    workid: number;
-    TypeName?: string;
+    work_id: number;
+    type_name?: string;
     [key: string]: unknown;
 }
 
@@ -128,24 +129,24 @@ const Diagnosis = () => {
         o_canine_relation: '',
         o_functional_occlusion: '',
         // Cephalometric Analysis
-        C_SNA: '',
-        C_SNB: '',
-        C_ANB: '',
-        C_SNMx: '',
-        C_Wits: '',
-        C_FMA: '',
-        C_MMA: '',
-        C_UIMX: '',
-        C_LIMd: '',
-        C_UI_LI: '',
-        C_LI_APo: '',
-        C_Ulip_E: '',
-        C_Llip_E: '',
-        C_Naso_lip: '',
-        C_TAFH: '',
-        C_UAFH: '',
-        C_LAFH: '',
-        C_PercentLAFH: ''
+        c_sna: '',
+        c_snb: '',
+        c_anb: '',
+        c_sn_mx: '',
+        c_wits: '',
+        c_fma: '',
+        c_mma: '',
+        c_uimx: '',
+        c_li_md: '',
+        c_ui_li: '',
+        c_li_a_po: '',
+        c_ulip_e: '',
+        c_llip_e: '',
+        c_naso_lip: '',
+        c_tafh: '',
+        c_uafh: '',
+        c_lafh: '',
+        c_percent_lafh: ''
     });
 
     useEffect(() => {
@@ -171,7 +172,7 @@ const Diagnosis = () => {
 
             if (worksResponse.ok) {
                 const works: WorkInfo[] = await worksResponse.json();
-                const work = works.find(w => w.workid === parseInt(workId || '0'));
+                const work = works.find(w => w.work_id === parseInt(workId || '0'));
                 setWorkInfo(work || null);
             }
 
@@ -242,7 +243,7 @@ const Diagnosis = () => {
 
     const handleReset = async () => {
         // Show confirmation
-        const confirmMessage = `Are you sure you want to reset/delete this diagnosis?\n\nWork: ${workInfo?.TypeName || 'N/A'}\nDate: ${diagnosisData.dx_date}\n\n⚠️ This action cannot be undone!`;
+        const confirmMessage = `Are you sure you want to reset/delete this diagnosis?\n\nWork: ${workInfo?.type_name || 'N/A'}\nDate: ${diagnosisData.dx_date}\n\n⚠️ This action cannot be undone!`;
 
         if (!await confirm(confirmMessage, { title: 'Delete Diagnosis', danger: true, confirmText: 'Delete' })) return;
 
@@ -309,13 +310,13 @@ const Diagnosis = () => {
                             {patientInfo && (
                                 <span className={styles.patientName}>
                                     <i className="fas fa-user"></i>
-                                    {patientInfo.Name}
+                                    {patientInfo.patient_name || patientInfo.name}
                                 </span>
                             )}
                             {workInfo && (
                                 <span className={styles.workType}>
                                     <i className="fas fa-tooth"></i>
-                                    {workInfo.TypeName || 'Treatment'}
+                                    {workInfo.type_name || 'Treatment'}
                                 </span>
                             )}
                             <span className={styles.workId}>
@@ -730,8 +731,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_SNA || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_SNA', e.target.value)}
+                                        value={diagnosisData.c_sna || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_sna', e.target.value)}
                                         placeholder="Normal: 82° ±2"
                                     />
                                 </div>
@@ -741,8 +742,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_SNB || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_SNB', e.target.value)}
+                                        value={diagnosisData.c_snb || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_snb', e.target.value)}
                                         placeholder="Normal: 80° ±2"
                                     />
                                 </div>
@@ -752,8 +753,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_ANB || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_ANB', e.target.value)}
+                                        value={diagnosisData.c_anb || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_anb', e.target.value)}
                                         placeholder="Normal: 2° ±2"
                                     />
                                 </div>
@@ -763,8 +764,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_SNMx || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_SNMx', e.target.value)}
+                                        value={diagnosisData.c_sn_mx || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_sn_mx', e.target.value)}
                                         placeholder="Normal: 8° ±3"
                                     />
                                 </div>
@@ -774,8 +775,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_Wits || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_Wits', e.target.value)}
+                                        value={diagnosisData.c_wits || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_wits', e.target.value)}
                                         placeholder="Normal: -1mm ±2"
                                     />
                                 </div>
@@ -790,8 +791,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_FMA || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_FMA', e.target.value)}
+                                        value={diagnosisData.c_fma || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_fma', e.target.value)}
                                         placeholder="Normal: 25° ±5"
                                     />
                                 </div>
@@ -801,8 +802,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_MMA || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_MMA', e.target.value)}
+                                        value={diagnosisData.c_mma || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_mma', e.target.value)}
                                         placeholder="Normal: 27° ±5"
                                     />
                                 </div>
@@ -812,8 +813,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_TAFH || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_TAFH', e.target.value)}
+                                        value={diagnosisData.c_tafh || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_tafh', e.target.value)}
                                         placeholder="Total anterior face height"
                                     />
                                 </div>
@@ -823,8 +824,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_UAFH || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_UAFH', e.target.value)}
+                                        value={diagnosisData.c_uafh || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_uafh', e.target.value)}
                                         placeholder="Upper anterior face height"
                                     />
                                 </div>
@@ -834,8 +835,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_LAFH || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_LAFH', e.target.value)}
+                                        value={diagnosisData.c_lafh || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_lafh', e.target.value)}
                                         placeholder="Lower anterior face height"
                                     />
                                 </div>
@@ -845,8 +846,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_PercentLAFH || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_PercentLAFH', e.target.value)}
+                                        value={diagnosisData.c_percent_lafh || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_percent_lafh', e.target.value)}
                                         placeholder="Normal: 55% ±2"
                                     />
                                 </div>
@@ -861,8 +862,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_UIMX || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_UIMX', e.target.value)}
+                                        value={diagnosisData.c_uimx || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_uimx', e.target.value)}
                                         placeholder="Normal: 110° ±6"
                                     />
                                 </div>
@@ -872,8 +873,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_LIMd || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_LIMd', e.target.value)}
+                                        value={diagnosisData.c_li_md || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_li_md', e.target.value)}
                                         placeholder="Normal: 90° ±3"
                                     />
                                 </div>
@@ -883,8 +884,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_UI_LI || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_UI_LI', e.target.value)}
+                                        value={diagnosisData.c_ui_li || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_ui_li', e.target.value)}
                                         placeholder="Normal: 130° ±10"
                                     />
                                 </div>
@@ -894,8 +895,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_LI_APo || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_LI_APo', e.target.value)}
+                                        value={diagnosisData.c_li_a_po || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_li_a_po', e.target.value)}
                                         placeholder="Normal: 1mm ±2"
                                     />
                                 </div>
@@ -910,8 +911,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_Ulip_E || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_Ulip_E', e.target.value)}
+                                        value={diagnosisData.c_ulip_e || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_ulip_e', e.target.value)}
                                         placeholder="Normal: -4mm ±2"
                                     />
                                 </div>
@@ -921,8 +922,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_Llip_E || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_Llip_E', e.target.value)}
+                                        value={diagnosisData.c_llip_e || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_llip_e', e.target.value)}
                                         placeholder="Normal: -2mm ±2"
                                     />
                                 </div>
@@ -932,8 +933,8 @@ const Diagnosis = () => {
                                     <input
                                         type="text"
                                         className={styles.formInput}
-                                        value={diagnosisData.C_Naso_lip || ''}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('C_Naso_lip', e.target.value)}
+                                        value={diagnosisData.c_naso_lip || ''}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('c_naso_lip', e.target.value)}
                                         placeholder="Normal: 102° ±8"
                                     />
                                 </div>

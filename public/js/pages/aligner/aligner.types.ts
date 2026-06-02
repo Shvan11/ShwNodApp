@@ -13,8 +13,8 @@
 export interface AlignerDoctor {
     dr_id: number;
     doctor_name: string;
-    DoctorEmail?: string | null;
-    LogoPath?: string | null;
+    doctor_email?: string | null;
+    logo_path?: string | null;
 }
 
 /**
@@ -24,7 +24,7 @@ export interface AlignerDoctor {
 export interface AlignerDoctorWithAliases extends AlignerDoctor {
     id: number;      // Alias for dr_id
     name: string;    // Alias for doctor_name
-    logoPath?: string | null;  // camelCase alias for LogoPath
+    logoPath?: string | null;  // camelCase alias for logo_path
 }
 
 /**

@@ -22,10 +22,23 @@ interface GalleryImage {
 }
 
 interface Timepoint {
+    tp_code: string;
+    tp_description: string;
+    tp_date_time: string;
+}
+
+// Legacy shape expected by EditTimepointModal / DeleteTimepointModal (not in this file's edit scope)
+interface LegacyTimepoint {
     tpCode: string;
     tpDescription: string;
     tpDateTime: string;
 }
+
+const toLegacyTp = (tp: Timepoint): LegacyTimepoint => ({
+    tpCode: tp.tp_code,
+    tpDescription: tp.tp_description,
+    tpDateTime: tp.tp_date_time,
+});
 
 interface ImageElement {
     id: string;
@@ -95,8 +108,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     // Originals-folder existence for the open menu (null = still checking).
     const [menuFolder, setMenuFolder] = useState<{ folder: string | null; exists: boolean } | null>(null);
     const menuTpRef = useRef<string | null>(null);
-    const [editTp, setEditTp] = useState<Timepoint | null>(null);
-    const [deleteTp, setDeleteTp] = useState<Timepoint | null>(null);
+    const [editTp, setEditTp] = useState<LegacyTimepoint | null>(null);
+    const [deleteTp, setDeleteTp] = useState<LegacyTimepoint | null>(null);
     const [deleteScope, setDeleteScope] = useState<DeleteScope>('all');
     const [savingTp, setSavingTp] = useState(false);
     const [deletingTp, setDeletingTp] = useState(false);
@@ -705,18 +718,18 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         const rect = e.currentTarget.getBoundingClientRect();
         setMenuFor({ tp, x: rect.right - 270, y: rect.bottom + 4 });
         setMenuFolder(null);
-        menuTpRef.current = tp.tpCode;
+        menuTpRef.current = tp.tp_code;
         if (personId) {
-            fetch(`/api/patients/${personId}/timepoints/${tp.tpCode}/folder`)
+            fetch(`/api/patients/${personId}/timepoints/${tp.tp_code}/folder`)
                 .then((r) => (r.ok ? r.json() : null))
                 .then((data: { folder: string | null; exists: boolean } | null) => {
                     // Ignore a stale resolve if another tab's menu was opened meanwhile.
-                    if (menuTpRef.current === tp.tpCode) {
+                    if (menuTpRef.current === tp.tp_code) {
                         setMenuFolder(data ?? { folder: null, exists: false });
                     }
                 })
                 .catch(() => {
-                    if (menuTpRef.current === tp.tpCode) setMenuFolder({ folder: null, exists: false });
+                    if (menuTpRef.current === tp.tp_code) setMenuFolder({ folder: null, exists: false });
                 });
         }
     };
@@ -739,10 +752,10 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     // Open the native photo editor for THIS time point (its own name+date, so a
     // re-render resolves to the same timepoint and reuses its originals folder).
     const handleReimport = (tp: Timepoint) => {
-        const date = (tp.tpDateTime ?? '').substring(0, 10);
+        const date = (tp.tp_date_time ?? '').substring(0, 10);
         navigate(
-            `/patient/${personId}/photo-editor/tp${tp.tpCode}` +
-                `?tpName=${encodeURIComponent(tp.tpDescription ?? '')}&date=${date}`
+            `/patient/${personId}/photo-editor/tp${tp.tp_code}` +
+                `?tpName=${encodeURIComponent(tp.tp_description ?? '')}&date=${date}`
         );
     };
 
@@ -784,7 +797,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 // If the active tab was the one removed, move to a remaining timepoint.
                 if (removed.tpCode === tpCode) {
                     if (next.length > 0) {
-                        navigate(`/patient/${personId}/photos/tp${next[0].tpCode}`);
+                        navigate(`/patient/${personId}/photos/tp${next[0].tp_code}`);
                     } else {
                         navigate(`/patient/${personId}/photos`);
                     }
@@ -813,7 +826,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     );
     // Whether the current tpCode is actually one of this patient's sessions. The
     // sidebar Photos button always points at tp0, which often doesn't exist.
-    const selectedTpExists = timepoints.some((tp) => tp.tpCode === tpCode);
+    const selectedTpExists = timepoints.some((tp) => tp.tp_code === tpCode);
     const noSessions = !loadingTimepoints && timepoints.length === 0;
 
     return (
@@ -826,20 +839,20 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 <div className={tpStyles.selector}>
                     {timepoints.map((timepoint, index) => (
                         <div
-                            key={`tp-${timepoint.tpCode}-${index}`}
-                            className={`${tpStyles.tab} ${tpCode === timepoint.tpCode ? tpStyles.tabActive : ''}`}
+                            key={`tp-${timepoint.tp_code}-${index}`}
+                            className={`${tpStyles.tab} ${tpCode === timepoint.tp_code ? tpStyles.tabActive : ''}`}
                         >
                             <button
                                 type="button"
                                 className={tpStyles.tabNav}
-                                onClick={() => handleTimepointClick(timepoint.tpCode)}
+                                onClick={() => handleTimepointClick(timepoint.tp_code)}
                             >
                                 <div className={tpStyles.tabIcon}>
                                     <i className="fas fa-camera"></i>
                                 </div>
                                 <div className={tpStyles.tabContent}>
-                                    <div className={tpStyles.tabDesc}>{timepoint.tpDescription}</div>
-                                    <div className={tpStyles.tabDate}>{formatDate(timepoint.tpDateTime)}</div>
+                                    <div className={tpStyles.tabDesc}>{timepoint.tp_description}</div>
+                                    <div className={tpStyles.tabDate}>{formatDate(timepoint.tp_date_time)}</div>
                                 </div>
                             </button>
                             <button
@@ -847,7 +860,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                 className={tpStyles.kebab}
                                 aria-label="Time point actions"
                                 aria-haspopup="menu"
-                                aria-expanded={menuFor?.tp.tpCode === timepoint.tpCode}
+                                aria-expanded={menuFor?.tp.tp_code === timepoint.tp_code}
                                 onClick={(e) => openTimepointMenu(e, timepoint)}
                             >
                                 <i className="fas fa-ellipsis-v" aria-hidden="true"></i>
@@ -936,11 +949,11 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                               ? 'present'
                               : 'absent') satisfies FolderState
                     }
-                    onEdit={() => { setEditTp(menuFor.tp); setMenuFor(null); }}
+                    onEdit={() => { setEditTp(toLegacyTp(menuFor.tp)); setMenuFor(null); }}
                     onReimport={() => { handleReimport(menuFor.tp); setMenuFor(null); }}
                     onOpenFolder={handleOpenFolder}
                     onOpenWorking={handleOpenWorking}
-                    onDelete={(scope) => { setDeleteScope(scope); setDeleteTp(menuFor.tp); setMenuFor(null); }}
+                    onDelete={(scope) => { setDeleteScope(scope); setDeleteTp(toLegacyTp(menuFor.tp)); setMenuFor(null); }}
                     onClose={() => setMenuFor(null)}
                 />
             )}

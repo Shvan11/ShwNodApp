@@ -5,29 +5,30 @@ import { isOrthoWork, needsDetails } from '../../config/workTypeConfig';
 import styles from './WorkCard.module.css';
 
 export interface Work {
-    workid: number;
+    work_id: number;
     person_id: number;
     type_of_work: number;
-    TypeName?: string;
-    Status: number;
+    type_name?: string;
+    status: number;
+    status_name?: string;
     total_required?: number;
     TotalPaid?: number;
-    Currency?: 'USD' | 'IQD';
-    AdditionDate?: string;
-    StartDate?: string;
-    DebondDate?: string;
-    EstimatedDuration?: number;
+    currency?: 'USD' | 'IQD';
+    addition_date?: string;
+    start_date?: string;
+    debond_date?: string;
+    estimated_duration?: number;
     dr_id?: number;
     doctor_name?: string;
-    Notes?: string;
-    KeyWordID1?: number;
-    KeyWordID2?: number;
-    KeywordID3?: number;
-    KeywordID4?: number;
-    KeywordID5?: number;
-    Discount?: number | null;
-    DiscountDate?: string | null;
-    DiscountReason?: string | null;
+    notes?: string;
+    keyword_id_1?: number;
+    keyword_id_2?: number;
+    keyword_id_3?: number;
+    keyword_id_4?: number;
+    keyword_id_5?: number;
+    discount?: number | null;
+    discount_date?: string | null;
+    discount_reason?: string | null;
 }
 
 export interface WorkStatus {
@@ -91,20 +92,20 @@ const WorkCard = ({
     const [showActions, setShowActions] = useState(false);
 
     const getStatusBadge = () => {
-        if (work.Status === WORK_STATUS.FINISHED) {
+        if (work.status === WORK_STATUS.FINISHED) {
             return <span className={cn(styles.statusBadge, styles.statusBadgeCompleted)}>Completed</span>;
         }
-        if (work.Status === WORK_STATUS.DISCONTINUED) {
+        if (work.status === WORK_STATUS.DISCONTINUED) {
             return <span className={cn(styles.statusBadge, styles.statusBadgeDiscontinued)}>Discontinued</span>;
         }
         return <span className={cn(styles.statusBadge, styles.statusBadgeActive)}>Active</span>;
     };
 
-    const isActive = work.Status === WORK_STATUS.ACTIVE;
-    const isFinished = work.Status === WORK_STATUS.FINISHED;
-    const isDiscontinued = work.Status === WORK_STATUS.DISCONTINUED;
+    const isActive = work.status === WORK_STATUS.ACTIVE;
+    const isFinished = work.status === WORK_STATUS.FINISHED;
+    const isDiscontinued = work.status === WORK_STATUS.DISCONTINUED;
 
-    const getDiscount = (): number => Number(work.Discount ?? 0);
+    const getDiscount = (): number => Number(work.discount ?? 0);
 
     const getRemainingBalance = (): number => {
         return (work.total_required || 0) - getDiscount() - (work.TotalPaid || 0);
@@ -128,15 +129,15 @@ const WorkCard = ({
                     <div className={styles.title}>
                         <i className={cn('fas', isExpanded ? 'fa-chevron-down' : 'fa-chevron-right', styles.chevronIcon)}></i>
                         <i className="fas fa-tooth"></i>
-                        <h3>{work.TypeName || 'Other Treatment'}</h3>
+                        <h3>{work.type_name || 'Other Treatment'}</h3>
                         {getStatusBadge()}
                     </div>
                     <div className={styles.metaMinimal}>
                         <span><i className="fas fa-user-md"></i> {work.doctor_name ? (work.doctor_name === 'Admin' ? work.doctor_name : `Dr. ${work.doctor_name}`) : 'Not assigned'}</span>
-                        <span><i className="fas fa-calendar-plus"></i> {formatDate(work.AdditionDate)}</span>
+                        <span><i className="fas fa-calendar-plus"></i> {formatDate(work.addition_date)}</span>
                         {!isExpanded && getRemainingBalance() > 0 && (
                             <span className={styles.balanceIndicator}>
-                                <i className="fas fa-exclamation-circle"></i> Balance: {formatCurrency(getRemainingBalance(), work.Currency)}
+                                <i className="fas fa-exclamation-circle"></i> Balance: {formatCurrency(getRemainingBalance(), work.currency)}
                             </span>
                         )}
                     </div>
@@ -215,32 +216,32 @@ const WorkCard = ({
                     <div className={styles.financial}>
                         <div className={styles.financialItem}>
                             <span className={styles.financialLabel}>Total Cost</span>
-                            <span className={styles.financialValue}>{formatCurrency(work.total_required, work.Currency)}</span>
+                            <span className={styles.financialValue}>{formatCurrency(work.total_required, work.currency)}</span>
                         </div>
                         {getDiscount() > 0 && (
                             <>
                                 <div className={styles.financialItem}>
                                     <span className={styles.financialLabel}>Discount</span>
                                     <span className={cn(styles.financialValue, styles.financialValueDiscount)}>
-                                        -{formatCurrency(getDiscount(), work.Currency)}
+                                        -{formatCurrency(getDiscount(), work.currency)}
                                     </span>
                                 </div>
                                 <div className={styles.financialItem}>
                                     <span className={styles.financialLabel}>Net</span>
                                     <span className={cn(styles.financialValue, styles.financialValueNet)}>
-                                        {formatCurrency((work.total_required || 0) - getDiscount(), work.Currency)}
+                                        {formatCurrency((work.total_required || 0) - getDiscount(), work.currency)}
                                     </span>
                                 </div>
                             </>
                         )}
                         <div className={styles.financialItem}>
                             <span className={styles.financialLabel}>Paid</span>
-                            <span className={cn(styles.financialValue, styles.financialValuePaid)}>{formatCurrency(work.TotalPaid, work.Currency)}</span>
+                            <span className={cn(styles.financialValue, styles.financialValuePaid)}>{formatCurrency(work.TotalPaid, work.currency)}</span>
                         </div>
                         <div className={styles.financialItem}>
                             <span className={styles.financialLabel}>Remaining</span>
                             <span className={cn(styles.financialValue, isFullyPaid() ? styles.financialValuePaidFull : styles.financialValueRemaining)}>
-                                {formatCurrency(getRemainingBalance(), work.Currency)}
+                                {formatCurrency(getRemainingBalance(), work.currency)}
                             </span>
                         </div>
                     </div>
@@ -250,37 +251,37 @@ const WorkCard = ({
                         <div className={cn(styles.infoItem, styles.discountBadge)}>
                             <i className="fas fa-tag"></i>
                             <span>
-                                Discount applied{work.DiscountDate ? ` on ${formatDate(work.DiscountDate)}` : ''}
-                                {work.DiscountReason ? ` — ${work.DiscountReason}` : ''}
+                                Discount applied{work.discount_date ? ` on ${formatDate(work.discount_date)}` : ''}
+                                {work.discount_reason ? ` — ${work.discount_reason}` : ''}
                             </span>
                         </div>
                     )}
 
                     {/* Additional Details */}
-                    {(work.Notes || work.EstimatedDuration || work.DebondDate || work.StartDate) && (
+                    {(work.notes || work.estimated_duration || work.debond_date || work.start_date) && (
                         <div className={styles.additionalInfo}>
-                            {work.StartDate && (
+                            {work.start_date && (
                                 <div className={styles.infoItem}>
                                     <i className="fas fa-play-circle"></i>
-                                    <span>Started: {formatDate(work.StartDate)}</span>
+                                    <span>Started: {formatDate(work.start_date)}</span>
                                 </div>
                             )}
-                            {work.EstimatedDuration && (
+                            {work.estimated_duration && (
                                 <div className={styles.infoItem}>
                                     <i className="fas fa-clock"></i>
-                                    <span>Duration: {work.EstimatedDuration} months</span>
+                                    <span>Duration: {work.estimated_duration} months</span>
                                 </div>
                             )}
-                            {work.DebondDate && (
+                            {work.debond_date && (
                                 <div className={styles.infoItem}>
                                     <i className="fas fa-calendar-check"></i>
-                                    <span>Debond: {formatDate(work.DebondDate)}</span>
+                                    <span>Debond: {formatDate(work.debond_date)}</span>
                                 </div>
                             )}
-                            {work.Notes && (
+                            {work.notes && (
                                 <div className={cn(styles.infoItem, styles.infoItemFullWidth)}>
                                     <i className="fas fa-sticky-note"></i>
-                                    <span>{work.Notes}</span>
+                                    <span>{work.notes}</span>
                                 </div>
                             )}
                         </div>
@@ -312,7 +313,7 @@ const WorkCard = ({
                                 <button
                                     type="button"
                                     className="btn btn-card-action btn-diagnosis"
-                                    onClick={() => navigate(`/patient/${personId}/work/${work.workid}/diagnosis`)}
+                                    onClick={() => navigate(`/patient/${personId}/work/${work.work_id}/diagnosis`)}
                                     title="View diagnosis and treatment plan"
                                 >
                                     <i className="fas fa-stethoscope"></i>

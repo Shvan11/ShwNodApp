@@ -44,8 +44,8 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
   };
 
   const startEdit = (cat: StandCategory) => {
-    setEditingId(cat.CategoryID);
-    setEditingName(cat.CategoryName);
+    setEditingId(cat.category_id);
+    setEditingName(cat.category_name);
   };
 
   const cancelEdit = () => {
@@ -66,12 +66,12 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
   };
 
   const handleDelete = async (cat: StandCategory) => {
-    if (!await confirm(`Deactivate category "${cat.CategoryName}"? Existing items will keep it, but it won't appear in pickers.`, { title: 'Deactivate Category' })) {
+    if (!await confirm(`Deactivate category "${cat.category_name}"? Existing items will keep it, but it won't appear in pickers.`, { title: 'Deactivate Category' })) {
       return;
     }
     try {
-      await deleteCategory(cat.CategoryID);
-      toast.success(`Deactivated "${cat.CategoryName}"`);
+      await deleteCategory(cat.category_id);
+      toast.success(`Deactivated "${cat.category_name}"`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to deactivate category');
     }
@@ -116,8 +116,8 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
           ) : (
             <ul className={styles.categoryList}>
               {categories.map((cat) => (
-                <li key={cat.CategoryID} className={styles.categoryRow}>
-                  {editingId === cat.CategoryID ? (
+                <li key={cat.category_id} className={styles.categoryRow}>
+                  {editingId === cat.category_id ? (
                     <>
                       <input
                         type="text"
@@ -129,7 +129,7 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
-                            void saveEdit(cat.CategoryID);
+                            void saveEdit(cat.category_id);
                           } else if (e.key === 'Escape') {
                             cancelEdit();
                           }
@@ -138,7 +138,7 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
                       <button
                         type="button"
                         className="btn btn-primary btn-sm"
-                        onClick={() => void saveEdit(cat.CategoryID)}
+                        onClick={() => void saveEdit(cat.category_id)}
                         disabled={loading || !editingName.trim()}
                       >
                         Save
@@ -154,7 +154,7 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
                     </>
                   ) : (
                     <>
-                      <span className={styles.categoryName}>{cat.CategoryName}</span>
+                      <span className={styles.categoryName}>{cat.category_name}</span>
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"

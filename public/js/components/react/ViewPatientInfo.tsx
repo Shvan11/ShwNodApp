@@ -24,23 +24,23 @@ interface PatientInfo {
     patient_name?: string;
     first_name?: string;
     last_name?: string;
-    Phone?: string;
-    Phone2?: string;
-    Email?: string;
+    phone?: string;
+    phone2?: string;
+    email?: string;
     date_of_birth?: string;
-    Gender?: string;
+    gender?: string;
     GenderDisplay?: string;
     Address?: string;
     ReferralSource?: string;
-    PatientType?: string;
-    Tag?: string;
-    Notes?: string;
-    DateAdded?: string;
-    CountryCode?: string;
+    patient_type?: string;
+    tag?: string;
+    notes?: string;
+    date_added?: string;
+    country_code?: string;
     DolphinId?: number | null;
-    EstimatedCost?: string | number;
-    Currency?: string;
-    Language?: number;
+    estimated_cost?: string | number;
+    currency?: string;
+    language?: number;
     AlertCount?: number;
 }
 
@@ -52,10 +52,10 @@ interface EditingCostState {
 type Currency = 'IQD' | 'USD' | 'EUR';
 
 interface CostPreset {
-    PresetID: number;
-    Amount: number;
-    Currency: Currency;
-    DisplayOrder: number;
+    preset_id: number;
+    amount: number;
+    currency: Currency;
+    display_order: number;
 }
 
 interface AlertType {
@@ -263,8 +263,8 @@ const ViewPatientInfo = ({ personId }: Props) => {
     // Cost editing handlers
     const handleStartEditingCost = () => {
         setEditingCost({
-            value: patientInfo?.EstimatedCost?.toString() || '',
-            currency: patientInfo?.Currency || 'IQD'
+            value: patientInfo?.estimated_cost?.toString() || '',
+            currency: patientInfo?.currency || 'IQD'
         });
     };
 
@@ -305,8 +305,8 @@ const ViewPatientInfo = ({ personId }: Props) => {
     // Handle preset selection
     const handleSelectPreset = (preset: CostPreset) => {
         setEditingCost({
-            value: preset.Amount.toString(),
-            currency: preset.Currency
+            value: preset.amount.toString(),
+            currency: preset.currency
         });
     };
 
@@ -314,8 +314,8 @@ const ViewPatientInfo = ({ personId }: Props) => {
     const getFilteredPresets = (): CostPreset[] => {
         if (!editingCost) return [];
         return costPresets
-            .filter(p => p.Currency === editingCost.currency)
-            .sort((a, b) => a.DisplayOrder - b.DisplayOrder);
+            .filter(p => p.currency === editingCost.currency)
+            .sort((a, b) => a.display_order - b.display_order);
     };
 
     // Format preset amount for display
@@ -472,18 +472,18 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Phone:</span>
                             <span className={styles.patientInfoValue}>
-                                {formatPhoneDisplay(patientInfo.CountryCode, patientInfo.Phone)}
+                                {formatPhoneDisplay(patientInfo.country_code, patientInfo.phone)}
                             </span>
                         </div>
-                        {patientInfo.Phone2 && (
+                        {patientInfo.phone2 && (
                             <div className={styles.patientInfoRow}>
                                 <span className={styles.patientInfoLabel}>Phone 2:</span>
-                                <span className={styles.patientInfoValue}>{formatPhoneForDisplay(patientInfo.Phone2)}</span>
+                                <span className={styles.patientInfoValue}>{formatPhoneForDisplay(patientInfo.phone2)}</span>
                             </div>
                         )}
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Email:</span>
-                            <span className={styles.patientInfoValue}>{patientInfo.Email || '-'}</span>
+                            <span className={styles.patientInfoValue}>{patientInfo.email || '-'}</span>
                         </div>
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Address:</span>
@@ -514,13 +514,13 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Gender:</span>
                             <span className={styles.patientInfoValue}>
-                                {patientInfo.GenderDisplay || patientInfo.Gender || '-'}
+                                {patientInfo.GenderDisplay || patientInfo.gender || '-'}
                             </span>
                         </div>
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Language:</span>
                             <span className={styles.patientInfoValue}>
-                                {getLanguageDisplay(patientInfo.Language)}
+                                {getLanguageDisplay(patientInfo.language)}
                             </span>
                         </div>
                     </div>
@@ -535,16 +535,16 @@ const ViewPatientInfo = ({ personId }: Props) => {
                     <div className={styles.patientInfoRows}>
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Patient Type:</span>
-                            <span className={styles.patientInfoValue}>{patientInfo.PatientType || '-'}</span>
+                            <span className={styles.patientInfoValue}>{patientInfo.patient_type || '-'}</span>
                         </div>
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Referral Source:</span>
                             <span className={styles.patientInfoValue}>{patientInfo.ReferralSource || '-'}</span>
                         </div>
-                        {patientInfo.Tag && (
+                        {patientInfo.tag && (
                             <div className={styles.patientInfoRow}>
                                 <span className={styles.patientInfoLabel}>Tag:</span>
-                                <span className={`${styles.patientInfoValue} ${styles.patientTag}`}>{patientInfo.Tag}</span>
+                                <span className={`${styles.patientInfoValue} ${styles.patientTag}`}>{patientInfo.tag}</span>
                             </div>
                         )}
                         <div className={styles.patientInfoRow}>
@@ -556,7 +556,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Date Added:</span>
                             <span className={styles.patientInfoValue}>
-                                {formatDateDisplay(patientInfo.DateAdded)}
+                                {formatDateDisplay(patientInfo.date_added)}
                             </span>
                         </div>
                     </div>
@@ -604,12 +604,12 @@ const ViewPatientInfo = ({ personId }: Props) => {
                                     <div className={styles.patientCostPresets}>
                                         {getFilteredPresets().map(preset => (
                                             <button
-                                                key={preset.PresetID}
+                                                key={preset.preset_id}
                                                 type="button"
                                                 onClick={() => handleSelectPreset(preset)}
                                                 className={styles.patientCostPresetBtn}
                                             >
-                                                {formatPresetAmount(preset.Amount)}
+                                                {formatPresetAmount(preset.amount)}
                                             </button>
                                         ))}
                                     </div>
@@ -639,7 +639,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                             <div className={styles.patientInfoRow}>
                                 <span className={styles.patientInfoLabel}>Estimated Cost:</span>
                                 <span className={`${styles.patientInfoValue} ${styles.patientCostDisplay}`}>
-                                    {formatCostDisplay(patientInfo.EstimatedCost, patientInfo.Currency)}
+                                    {formatCostDisplay(patientInfo.estimated_cost, patientInfo.currency)}
                                     <button
                                         onClick={handleStartEditingCost}
                                         className={styles.patientCostEditBtn}
@@ -660,7 +660,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         Notes
                     </h3>
                     <div className={styles.patientNotesContent}>
-                        {patientInfo.Notes || <span className={styles.patientNotesEmpty}>No notes for this patient</span>}
+                        {patientInfo.notes || <span className={styles.patientNotesEmpty}>No notes for this patient</span>}
                     </div>
                 </div>
 

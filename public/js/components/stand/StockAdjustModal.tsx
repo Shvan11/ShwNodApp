@@ -42,7 +42,7 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
     if (!reason.trim()) {
       newErrors.reason = 'Reason is required';
     }
-    if (item && item.CurrentStock + delta < 0) {
+    if (item && item.current_stock + delta < 0) {
       newErrors.delta = 'Resulting stock cannot be negative';
     }
     setErrors(newErrors);
@@ -64,7 +64,7 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
 
   if (!item) return null;
 
-  const resultingStock = item.CurrentStock + delta;
+  const resultingStock = item.current_stock + delta;
   const previewClass =
     resultingStock > 0
       ? styles.stockPreviewPositive
@@ -90,9 +90,9 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
           <div className={styles.modalBody}>
             <div className={styles.itemInfo}>
               <p>
-                <strong>{item.ItemName}</strong>
+                <strong>{item.item_name}</strong>
               </p>
-              <p>Current Stock: {formatNumber(item.CurrentStock)}</p>
+              <p>Current Stock: {formatNumber(item.current_stock)}</p>
             </div>
 
             <div className={styles.formGroup}>

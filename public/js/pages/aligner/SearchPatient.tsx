@@ -10,8 +10,8 @@ interface AlignerPatient {
     patient_name?: string;
     first_name?: string;
     last_name?: string;
-    Phone?: string;
-    WorkType?: string;
+    phone?: string;
+    work_type?: string;
 }
 
 const SearchPatient: React.FC = () => {
@@ -113,8 +113,8 @@ const SearchPatient: React.FC = () => {
                                     </div>
                                     <div className={styles.resultMeta}>
                                         <span><i className="fas fa-id-card"></i> {patient.person_id}</span>
-                                        <span><i className="fas fa-phone"></i> <PhoneDisplay phone={patient.Phone} />{!patient.Phone && 'N/A'}</span>
-                                        <span><i className="fas fa-tooth"></i> {patient.WorkType}</span>
+                                        <span><i className="fas fa-phone"></i> <PhoneDisplay phone={patient.phone} />{!patient.phone && 'N/A'}</span>
+                                        <span><i className="fas fa-tooth"></i> {patient.work_type}</span>
                                     </div>
                                 </div>
                             ))

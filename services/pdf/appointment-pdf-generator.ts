@@ -16,7 +16,6 @@
 import PDFDocument from 'pdfkit';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { getAppointmentsWithPhones } from '../database/queries/appointment-queries.js';
 import { log } from '../../utils/logger.js';
 
@@ -99,9 +98,11 @@ interface DateFormatOptions {
 // CONSTANTS
 // =============================================================================
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const PROJECT_ROOT = path.resolve(__dirname, '../..');
+// Resolve from the launch directory (repo root), not the compiled file location.
+// Assets like fonts/ live in the repo root and are NOT copied into dist-server by
+// the tsc build, so anchoring to __dirname would miss them in production. Matches
+// aligner-label-generator.ts, which already resolves fonts via process.cwd().
+const PROJECT_ROOT = process.cwd();
 
 /** PDF Document Configuration */
 const PDF_CONFIG = {

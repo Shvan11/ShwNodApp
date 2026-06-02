@@ -33,23 +33,24 @@ interface PatientInfo {
 }
 
 interface WorkDetail {
-    ID: number;
+    id: number;
     work_id: number;
     TeethIds?: number[];
     Teeth?: string;
-    FillingType?: string;
-    FillingDepth?: string;
-    CanalsNo?: number;
-    WorkingLength?: string;
-    ImplantLength?: number;
-    ImplantDiameter?: number;
-    ImplantManufacturerID?: number;
-    Material?: string;
-    LabName?: string;
-    ItemCost?: number;
-    StartDate?: string;
-    CompletedDate?: string;
-    Note?: string;
+    ImplantManufacturerName?: string;
+    filling_type?: string;
+    filling_depth?: string;
+    canals_no?: number;
+    working_length?: string;
+    implant_length?: number;
+    implant_diameter?: number;
+    implant_manufacturer_id?: number;
+    material?: string;
+    lab_name?: string;
+    item_cost?: number;
+    start_date?: string;
+    completed_date?: string;
+    note?: string;
     // Allow dynamic access for work type display fields
     [key: string]: string | number | number[] | undefined;
 }
@@ -57,19 +58,19 @@ interface WorkDetail {
 interface DetailFormData {
     work_id: number | null;
     TeethIds: number[];
-    FillingType: string;
-    FillingDepth: string;
-    CanalsNo: string;
-    WorkingLength: string;
-    ImplantLength: string;
-    ImplantDiameter: string;
-    ImplantManufacturerID: string;
-    Material: string;
-    LabName: string;
-    ItemCost: string;
-    StartDate: string;
-    CompletedDate: string;
-    Note: string;
+    filling_type: string;
+    filling_depth: string;
+    canals_no: string;
+    working_length: string;
+    implant_length: string;
+    implant_diameter: string;
+    implant_manufacturer_id: string;
+    material: string;
+    lab_name: string;
+    item_cost: string;
+    start_date: string;
+    completed_date: string;
+    note: string;
 }
 
 interface ToothOption {
@@ -89,9 +90,9 @@ interface Payment {
     InvoiceID: number;
     date_of_payment: string;
     amount_paid: number;
-    ActualAmount?: number;
-    ActualCur?: string;
-    Change?: number;
+    actual_amount?: number;
+    actual_cur?: string;
+    change?: number;
 }
 
 interface WorkComponentProps {
@@ -168,19 +169,19 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const [detailFormData, setDetailFormData] = useState<DetailFormData>({
         work_id: null,
         TeethIds: [],
-        FillingType: '',
-        FillingDepth: '',
-        CanalsNo: '',
-        WorkingLength: '',
-        ImplantLength: '',
-        ImplantDiameter: '',
-        ImplantManufacturerID: '',
-        Material: '',
-        LabName: '',
-        ItemCost: '',
-        StartDate: '',
-        CompletedDate: '',
-        Note: ''
+        filling_type: '',
+        filling_depth: '',
+        canals_no: '',
+        working_length: '',
+        implant_length: '',
+        implant_diameter: '',
+        implant_manufacturer_id: '',
+        material: '',
+        lab_name: '',
+        item_cost: '',
+        start_date: '',
+        completed_date: '',
+        note: ''
     });
     const [displayItemCost, setDisplayItemCost] = useState('');
 
@@ -228,9 +229,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     // Auto-expand the first active work when works are loaded
     useEffect(() => {
         if (works.length > 0) {
-            const firstActiveWork = works.find(work => work.Status === WORK_STATUS.ACTIVE);
+            const firstActiveWork = works.find(work => work.status === WORK_STATUS.ACTIVE);
             if (firstActiveWork) {
-                setExpandedWorks(new Set([firstActiveWork.workid]));
+                setExpandedWorks(new Set([firstActiveWork.work_id]));
             }
         }
     }, [works]);
@@ -302,7 +303,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     };
 
     const handleEditWork = (work: Work) => {
-        navigate(`/patient/${personId}/new-work?workId=${work.workid}`);
+        navigate(`/patient/${personId}/new-work?workId=${work.work_id}`);
     };
 
     // Show confirmation modal for work status changes
@@ -336,17 +337,17 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             switch (type) {
                 case 'complete':
                     endpoint = '/api/finishwork';
-                    body = { workId: work.workid };
+                    body = { workId: work.work_id };
                     successMessage = 'Work marked as completed';
                     break;
                 case 'discontinue':
                     endpoint = '/api/discontinuework';
-                    body = { workId: work.workid };
+                    body = { workId: work.work_id };
                     successMessage = 'Work marked as discontinued';
                     break;
                 case 'reactivate':
                     endpoint = '/api/reactivatework';
-                    body = { workId: work.workid, personId: work.person_id };
+                    body = { workId: work.work_id, personId: work.person_id };
                     successMessage = 'Work reactivated successfully';
                     break;
             }
@@ -422,7 +423,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             const response = await fetch('/api/deletework', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ workId: work.workid })
+                body: JSON.stringify({ workId: work.work_id })
             });
 
             const result = await response.json();
@@ -483,7 +484,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const handleViewDetails = async (work: Work) => {
         setSelectedWork(work);
         setShowDetailsModal(true);
-        await loadWorkDetails(work.workid);
+        await loadWorkDetails(work.work_id);
     };
 
     const loadWorkDetails = async (workId: number) => {
@@ -501,21 +502,21 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         if (!selectedWork) return;
         setEditingDetail(null);
         setDetailFormData({
-            work_id: selectedWork.workid,
+            work_id: selectedWork.work_id,
             TeethIds: [],
-            FillingType: '',
-            FillingDepth: '',
-            CanalsNo: '',
-            WorkingLength: '',
-            ImplantLength: '',
-            ImplantDiameter: '',
-            ImplantManufacturerID: '',
-            Material: '',
-            LabName: '',
-            ItemCost: '',
-            StartDate: '',
-            CompletedDate: '',
-            Note: ''
+            filling_type: '',
+            filling_depth: '',
+            canals_no: '',
+            working_length: '',
+            implant_length: '',
+            implant_diameter: '',
+            implant_manufacturer_id: '',
+            material: '',
+            lab_name: '',
+            item_cost: '',
+            start_date: '',
+            completed_date: '',
+            note: ''
         });
         setDisplayItemCost('');
         setShowDetailForm(true);
@@ -526,21 +527,21 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         setDetailFormData({
             work_id: detail.work_id,
             TeethIds: detail.TeethIds || [],
-            FillingType: detail.FillingType || '',
-            FillingDepth: detail.FillingDepth || '',
-            CanalsNo: String(detail.CanalsNo || ''),
-            WorkingLength: detail.WorkingLength || '',
-            ImplantLength: String(detail.ImplantLength || ''),
-            ImplantDiameter: String(detail.ImplantDiameter || ''),
-            ImplantManufacturerID: String(detail.ImplantManufacturerID || ''),
-            Material: detail.Material || '',
-            LabName: detail.LabName || '',
-            ItemCost: String(detail.ItemCost || ''),
-            StartDate: detail.StartDate ? detail.StartDate.split('T')[0] : '',
-            CompletedDate: detail.CompletedDate ? detail.CompletedDate.split('T')[0] : '',
-            Note: detail.Note || ''
+            filling_type: detail.filling_type || '',
+            filling_depth: detail.filling_depth || '',
+            canals_no: String(detail.canals_no || ''),
+            working_length: detail.working_length || '',
+            implant_length: String(detail.implant_length || ''),
+            implant_diameter: String(detail.implant_diameter || ''),
+            implant_manufacturer_id: String(detail.implant_manufacturer_id || ''),
+            material: detail.material || '',
+            lab_name: detail.lab_name || '',
+            item_cost: String(detail.item_cost || ''),
+            start_date: detail.start_date ? detail.start_date.split('T')[0] : '',
+            completed_date: detail.completed_date ? detail.completed_date.split('T')[0] : '',
+            note: detail.note || ''
         });
-        setDisplayItemCost(detail.ItemCost ? formatNumber(detail.ItemCost) : '');
+        setDisplayItemCost(detail.item_cost ? formatNumber(detail.item_cost) : '');
         setShowDetailForm(true);
     };
 
@@ -554,7 +555,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 response = await fetch('/api/updateworkdetail', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ detailId: editingDetail.ID, ...detailFormData })
+                    body: JSON.stringify({ detailId: editingDetail.id, ...detailFormData })
                 });
             } else {
                 response = await fetch('/api/addworkdetail', {
@@ -570,7 +571,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             }
 
             if (selectedWork) {
-                await loadWorkDetails(selectedWork.workid);
+                await loadWorkDetails(selectedWork.work_id);
             }
             setShowDetailForm(false);
         } catch (err) {
@@ -594,7 +595,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             }
 
             if (selectedWork) {
-                await loadWorkDetails(selectedWork.workid);
+                await loadWorkDetails(selectedWork.work_id);
             }
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
@@ -602,9 +603,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     };
 
     const getProgressPercentage = (work: Work): number => {
-        if (work.Status === WORK_STATUS.FINISHED) return 100;
-        if (work.Status === WORK_STATUS.DISCONTINUED) return 0;
-        if (!work.StartDate) return 0;
+        if (work.status === WORK_STATUS.FINISHED) return 100;
+        if (work.status === WORK_STATUS.DISCONTINUED) return 0;
+        if (!work.start_date) return 0;
 
         let progress = 25;
         // Note: IPhotoDate, DebondDate, FPhotoDate may need to be added to Work interface
@@ -613,24 +614,24 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     const filteredWorks = works
         .filter(work => {
-            const matchesSearch = work.Notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            const matchesSearch = work.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 work.doctor_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
             const matchesFilter = filterStatus === 'all' ||
-                (filterStatus === 'active' && work.Status === WORK_STATUS.ACTIVE) ||
-                (filterStatus === 'completed' && work.Status === WORK_STATUS.FINISHED) ||
-                (filterStatus === 'discontinued' && work.Status === WORK_STATUS.DISCONTINUED);
+                (filterStatus === 'active' && work.status === WORK_STATUS.ACTIVE) ||
+                (filterStatus === 'completed' && work.status === WORK_STATUS.FINISHED) ||
+                (filterStatus === 'discontinued' && work.status === WORK_STATUS.DISCONTINUED);
 
             return matchesSearch && matchesFilter;
         })
         .sort((a, b) => {
-            if (a.Status === WORK_STATUS.ACTIVE && b.Status !== WORK_STATUS.ACTIVE) return -1;
-            if (a.Status !== WORK_STATUS.ACTIVE && b.Status === WORK_STATUS.ACTIVE) return 1;
-            if (a.Status === WORK_STATUS.DISCONTINUED && b.Status === WORK_STATUS.FINISHED) return -1;
-            if (a.Status === WORK_STATUS.FINISHED && b.Status === WORK_STATUS.DISCONTINUED) return 1;
+            if (a.status === WORK_STATUS.ACTIVE && b.status !== WORK_STATUS.ACTIVE) return -1;
+            if (a.status !== WORK_STATUS.ACTIVE && b.status === WORK_STATUS.ACTIVE) return 1;
+            if (a.status === WORK_STATUS.DISCONTINUED && b.status === WORK_STATUS.FINISHED) return -1;
+            if (a.status === WORK_STATUS.FINISHED && b.status === WORK_STATUS.DISCONTINUED) return 1;
 
-            const dateA = new Date(a.AdditionDate || 0);
-            const dateB = new Date(b.AdditionDate || 0);
+            const dateA = new Date(a.addition_date || 0);
+            const dateB = new Date(b.addition_date || 0);
             return dateA.getTime() - dateB.getTime();
         });
 
@@ -649,7 +650,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     };
 
     const handleAddAlignerSet = (work: Work) => {
-        navigate(`/aligner/patient/${work.workid}`);
+        navigate(`/aligner/patient/${work.work_id}`);
     };
 
     const handleAddPayment = (work: Work) => {
@@ -660,7 +661,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const handleViewPaymentHistory = async (work: Work) => {
         setSelectedWorkForPayment(work);
         setShowPaymentHistoryModal(true);
-        await loadPaymentHistory(work.workid);
+        await loadPaymentHistory(work.work_id);
     };
 
     const loadPaymentHistory = async (workId: number) => {
@@ -679,7 +680,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     };
 
     const handlePrintReceipt = (work: Work) => {
-        window.open(`/api/templates/receipt/work/${work.workid}`, '_blank');
+        window.open(`/api/templates/receipt/work/${work.work_id}`, '_blank');
     };
 
     const toggleWorkExpanded = (workId: number) => {
@@ -782,15 +783,15 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <span className={styles.summaryLabelInline}>Total</span>
                                 </div>
                                 <div className={styles.summaryCardInline}>
-                                    <span className={styles.summaryValueInline}>{works.filter(w => w.Status === WORK_STATUS.ACTIVE).length}</span>
+                                    <span className={styles.summaryValueInline}>{works.filter(w => w.status === WORK_STATUS.ACTIVE).length}</span>
                                     <span className={styles.summaryLabelInline}>Active</span>
                                 </div>
                                 <div className={styles.summaryCardInline}>
-                                    <span className={styles.summaryValueInline}>{works.filter(w => w.Status === WORK_STATUS.FINISHED).length}</span>
+                                    <span className={styles.summaryValueInline}>{works.filter(w => w.status === WORK_STATUS.FINISHED).length}</span>
                                     <span className={styles.summaryLabelInline}>Completed</span>
                                 </div>
                                 <div className={styles.summaryCardInline}>
-                                    <span className={styles.summaryValueInline}>{works.filter(w => w.Status === WORK_STATUS.DISCONTINUED).length}</span>
+                                    <span className={styles.summaryValueInline}>{works.filter(w => w.status === WORK_STATUS.DISCONTINUED).length}</span>
                                     <span className={styles.summaryLabelInline}>Discontinued</span>
                                 </div>
                             </div>
@@ -850,7 +851,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     </div>
                     <div className={styles.successActions}>
                         <button
-                            onClick={() => handleAddAlignerSet({ workid: newAlignerWorkId } as Work)}
+                            onClick={() => handleAddAlignerSet({ work_id: newAlignerWorkId } as Work)}
                             className={styles.btnSuccessAction}
                         >
                             <i className="fas fa-tooth"></i> Add Aligner Set
@@ -872,13 +873,13 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             <div className={styles.worksCardContainer}>
                 {filteredWorks.map((work) => (
                     <WorkCard
-                        key={work.workid}
+                        key={work.work_id}
                         work={work}
                         personId={personId}
                         isAlignerWork={isAlignerWork}
-                        isExpanded={expandedWorks.has(work.workid)}
+                        isExpanded={expandedWorks.has(work.work_id)}
                         isAdmin={isAdmin}
-                        onToggleExpanded={() => toggleWorkExpanded(work.workid)}
+                        onToggleExpanded={() => toggleWorkExpanded(work.work_id)}
                         onViewDetails={handleViewDetails}
                         onEdit={handleEditWork}
                         onDelete={handleDeleteWork}
@@ -889,8 +890,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         onComplete={handleCompleteWork}
                         onDiscontinue={handleDiscontinueWork}
                         onReactivate={handleReactivateWork}
-                        onViewVisits={(work) => navigate(`/patient/${personId}/visits?workId=${work.workid}`)}
-                        onNewVisit={(work) => navigate(`/patient/${personId}/new-visit?workId=${work.workid}`)}
+                        onViewVisits={(work) => navigate(`/patient/${personId}/visits?workId=${work.work_id}`)}
+                        onNewVisit={(work) => navigate(`/patient/${personId}/new-visit?workId=${work.work_id}`)}
                         onPrintReceipt={handlePrintReceipt}
                         formatDate={formatDate}
                         formatCurrency={formatCurrency}
@@ -919,7 +920,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     ariaLabelledBy="work-details-modal-title"
                 >
                         <div className={styles.modalHeader}>
-                            <h3 id="work-details-modal-title">Work Details - {selectedWork.TypeName || 'Work #' + selectedWork.workid}</h3>
+                            <h3 id="work-details-modal-title">Work Details - {selectedWork.type_name || 'Work #' + selectedWork.work_id}</h3>
                             <button
                                 onClick={() => setShowDetailsModal(false)}
                                 className={styles.modalClose}
@@ -936,7 +937,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 <div className={styles.infoGrid}>
                                     <div className={styles.infoItem}>
                                         <label>Work ID:</label>
-                                        <span className={styles.workId}>{selectedWork.workid}</span>
+                                        <span className={styles.workId}>{selectedWork.work_id}</span>
                                     </div>
                                 </div>
                             </div>
@@ -968,14 +969,14 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                         </thead>
                                         <tbody>
                                             {workDetails.map((detail) => (
-                                                <tr key={detail.ID}>
+                                                <tr key={detail.id}>
                                                     {getWorkTypeConfig(selectedWork.type_of_work).displayFields.map((field: { key: string; label: string }) => (
                                                         <td key={field.key}>
                                                             {field.key === 'Teeth' ? (
                                                                 <span className={styles.teethBadge}>{detail.Teeth || '-'}</span>
-                                                            ) : field.key === 'CanalsNo' ? (
-                                                                detail.CanalsNo ? `${detail.CanalsNo} canal${detail.CanalsNo > 1 ? 's' : ''}` : '-'
-                                                            ) : field.key === 'ImplantLength' || field.key === 'ImplantDiameter' ? (
+                                                            ) : field.key === 'canals_no' ? (
+                                                                detail.canals_no ? `${detail.canals_no} canal${detail.canals_no > 1 ? 's' : ''}` : '-'
+                                                            ) : field.key === 'implant_length' || field.key === 'implant_diameter' ? (
                                                                 detail[field.key] ? `${detail[field.key]} mm` : '-'
                                                             ) : (
                                                                 detail[field.key] || '-'
@@ -983,9 +984,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                         </td>
                                                     ))}
                                                     <td>
-                                                        {detail.CompletedDate ? (
+                                                        {detail.completed_date ? (
                                                             <span className={`${styles.statusBadge} ${styles.statusCompleted}`}>Completed</span>
-                                                        ) : detail.StartDate ? (
+                                                        ) : detail.start_date ? (
                                                             <span className={`${styles.statusBadge} ${styles.statusStarted}`}>Started</span>
                                                         ) : (
                                                             <span className={`${styles.statusBadge} ${styles.statusPending}`}>Pending</span>
@@ -1001,7 +1002,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                                 <i className="fas fa-edit"></i>
                                                             </button>
                                                             <button
-                                                                onClick={() => handleDeleteDetail(detail.ID)}
+                                                                onClick={() => handleDeleteDetail(detail.id)}
                                                                 className="btn btn-xs btn-danger"
                                                                 title="Delete"
                                                             >
@@ -1070,8 +1071,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <div className={styles.formGroup}>
                                         <label>Filling Type</label>
                                         <select
-                                            value={detailFormData.FillingType}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, FillingType: e.target.value })}
+                                            value={detailFormData.filling_type}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, filling_type: e.target.value })}
                                         >
                                             <option value="">Select Type</option>
                                             {FILLING_TYPE_OPTIONS.map((opt: string) => (
@@ -1085,8 +1086,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <div className={styles.formGroup}>
                                         <label>Filling Depth</label>
                                         <select
-                                            value={detailFormData.FillingDepth}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, FillingDepth: e.target.value })}
+                                            value={detailFormData.filling_depth}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, filling_depth: e.target.value })}
                                         >
                                             <option value="">Select Depth</option>
                                             {FILLING_DEPTH_OPTIONS.map((opt: string) => (
@@ -1101,8 +1102,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                         <label>Number of Canals</label>
                                         <input
                                             type="number"
-                                            value={detailFormData.CanalsNo}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, CanalsNo: e.target.value })}
+                                            value={detailFormData.canals_no}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, canals_no: e.target.value })}
                                             min="1"
                                             max="5"
                                             placeholder="1-5"
@@ -1115,8 +1116,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                         <label>Working Length</label>
                                         <input
                                             type="text"
-                                            value={detailFormData.WorkingLength}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, WorkingLength: e.target.value })}
+                                            value={detailFormData.working_length}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, working_length: e.target.value })}
                                             placeholder="e.g., 20mm, 18mm, 19mm"
                                         />
                                     </div>
@@ -1126,8 +1127,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <div className={styles.formGroup}>
                                         <label>Manufacturer</label>
                                         <select
-                                            value={detailFormData.ImplantManufacturerID}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, ImplantManufacturerID: e.target.value })}
+                                            value={detailFormData.implant_manufacturer_id}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, implant_manufacturer_id: e.target.value })}
                                         >
                                             <option value="">Select Manufacturer...</option>
                                             {implantManufacturers.map(m => (
@@ -1143,8 +1144,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                         <input
                                             type="number"
                                             step="0.5"
-                                            value={detailFormData.ImplantLength}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, ImplantLength: e.target.value })}
+                                            value={detailFormData.implant_length}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, implant_length: e.target.value })}
                                             placeholder="e.g., 10, 11.5, 13"
                                         />
                                     </div>
@@ -1156,8 +1157,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                         <input
                                             type="number"
                                             step="0.1"
-                                            value={detailFormData.ImplantDiameter}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, ImplantDiameter: e.target.value })}
+                                            value={detailFormData.implant_diameter}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, implant_diameter: e.target.value })}
                                             placeholder="e.g., 3.5, 4.0, 5.0"
                                         />
                                     </div>
@@ -1167,8 +1168,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <div className={styles.formGroup}>
                                         <label>Material</label>
                                         <select
-                                            value={detailFormData.Material}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, Material: e.target.value })}
+                                            value={detailFormData.material}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, material: e.target.value })}
                                         >
                                             <option value="">Select Material</option>
                                             {MATERIAL_OPTIONS.map((opt: string) => (
@@ -1183,8 +1184,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                         <label>Lab Name</label>
                                         <input
                                             type="text"
-                                            value={detailFormData.LabName}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, LabName: e.target.value })}
+                                            value={detailFormData.lab_name}
+                                            onChange={(e) => setDetailFormData({ ...detailFormData, lab_name: e.target.value })}
                                             placeholder="Enter lab name"
                                         />
                                     </div>
@@ -1196,8 +1197,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <label>Start Date</label>
                                     <input
                                         type="date"
-                                        value={detailFormData.StartDate}
-                                        onChange={(e) => setDetailFormData({ ...detailFormData, StartDate: e.target.value })}
+                                        value={detailFormData.start_date}
+                                        onChange={(e) => setDetailFormData({ ...detailFormData, start_date: e.target.value })}
                                     />
                                 </div>
 
@@ -1205,8 +1206,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <label>Completed Date</label>
                                     <input
                                         type="date"
-                                        value={detailFormData.CompletedDate}
-                                        onChange={(e) => setDetailFormData({ ...detailFormData, CompletedDate: e.target.value })}
+                                        value={detailFormData.completed_date}
+                                        onChange={(e) => setDetailFormData({ ...detailFormData, completed_date: e.target.value })}
                                     />
                                 </div>
 
@@ -1219,9 +1220,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                             const digits = e.target.value.replace(/[^\d]/g, '');
                                             const num = parseInt(digits, 10) || 0;
                                             setDisplayItemCost(num ? num.toLocaleString('en-US') : '');
-                                            setDetailFormData({ ...detailFormData, ItemCost: String(num) });
+                                            setDetailFormData({ ...detailFormData, item_cost: String(num) });
                                         }}
-                                        onBlur={() => setDisplayItemCost(detailFormData.ItemCost ? formatNumber(detailFormData.ItemCost) : '')}
+                                        onBlur={() => setDisplayItemCost(detailFormData.item_cost ? formatNumber(detailFormData.item_cost) : '')}
                                         placeholder="Optional"
                                     />
                                 </div>
@@ -1230,8 +1231,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
                                 <label>Notes</label>
                                 <textarea
-                                    value={detailFormData.Note}
-                                    onChange={(e) => setDetailFormData({ ...detailFormData, Note: e.target.value })}
+                                    value={detailFormData.note}
+                                    onChange={(e) => setDetailFormData({ ...detailFormData, note: e.target.value })}
                                     rows={3}
                                     placeholder="Additional notes..."
                                 />
@@ -1277,7 +1278,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     ariaLabelledBy="payment-history-title"
                 >
                         <div className={styles.modalHeader}>
-                            <h3 id="payment-history-title">Payment History - {selectedWorkForPayment.TypeName || 'Work #' + selectedWorkForPayment.workid}</h3>
+                            <h3 id="payment-history-title">Payment History - {selectedWorkForPayment.type_name || 'Work #' + selectedWorkForPayment.work_id}</h3>
                             <button
                                 onClick={() => setShowPaymentHistoryModal(false)}
                                 className={styles.modalClose}
@@ -1292,19 +1293,19 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <div className={styles.paymentSummaryItem}>
                                         <span className={styles.paymentSummaryLabel}>Total Required:</span>
                                         <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValueTotal}`}>
-                                            {formatCurrency(selectedWorkForPayment.total_required, selectedWorkForPayment.Currency)}
+                                            {formatCurrency(selectedWorkForPayment.total_required, selectedWorkForPayment.currency)}
                                         </span>
                                     </div>
                                     <div className={styles.paymentSummaryItem}>
                                         <span className={styles.paymentSummaryLabel}>Total Paid:</span>
                                         <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValuePaid}`}>
-                                            {formatCurrency(selectedWorkForPayment.TotalPaid, selectedWorkForPayment.Currency)}
+                                            {formatCurrency(selectedWorkForPayment.TotalPaid, selectedWorkForPayment.currency)}
                                         </span>
                                     </div>
                                     <div className={styles.paymentSummaryItem}>
                                         <span className={styles.paymentSummaryLabel}>Balance Remaining:</span>
                                         <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValueBalance}`}>
-                                            {formatCurrency((selectedWorkForPayment.total_required || 0) - (selectedWorkForPayment.TotalPaid || 0), selectedWorkForPayment.Currency)}
+                                            {formatCurrency((selectedWorkForPayment.total_required || 0) - (selectedWorkForPayment.TotalPaid || 0), selectedWorkForPayment.currency)}
                                         </span>
                                     </div>
                                 </div>
@@ -1320,7 +1321,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                         <thead>
                                             <tr>
                                                 <th>Date</th>
-                                                <th>Amount Paid ({selectedWorkForPayment.Currency})</th>
+                                                <th>Amount Paid ({selectedWorkForPayment.currency})</th>
                                                 <th>Actual Amount</th>
                                                 <th>Actual Currency</th>
                                                 <th>Change</th>
@@ -1332,16 +1333,16 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                 <tr key={payment.InvoiceID || index}>
                                                     <td>{formatDate(payment.date_of_payment)}</td>
                                                     <td className={styles.paymentAmount}>
-                                                        {formatCurrency(payment.amount_paid, selectedWorkForPayment.Currency)}
+                                                        {formatCurrency(payment.amount_paid, selectedWorkForPayment.currency)}
                                                     </td>
-                                                    <td>{payment.ActualAmount ? formatCurrency(payment.ActualAmount, payment.ActualCur) : '-'}</td>
-                                                    <td>{payment.ActualCur || '-'}</td>
-                                                    <td>{payment.Change ? formatCurrency(payment.Change, payment.ActualCur) : '-'}</td>
+                                                    <td>{payment.actual_amount ? formatCurrency(payment.actual_amount, payment.actual_cur) : '-'}</td>
+                                                    <td>{payment.actual_cur || '-'}</td>
+                                                    <td>{payment.change ? formatCurrency(payment.change, payment.actual_cur) : '-'}</td>
                                                     <td>
                                                         <div className={styles.paymentActions}>
                                                             <button
                                                                 onClick={() => {
-                                                                    toast.info(`Edit payment functionality coming soon!\n\nPayment ID: ${payment.InvoiceID}\nAmount: ${formatCurrency(payment.amount_paid, selectedWorkForPayment.Currency)}`);
+                                                                    toast.info(`Edit payment functionality coming soon!\n\nPayment ID: ${payment.InvoiceID}\nAmount: ${formatCurrency(payment.amount_paid, selectedWorkForPayment.currency)}`);
                                                                 }}
                                                                 className={styles.btnActionEdit}
                                                                 title="Edit Payment"
@@ -1350,7 +1351,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                             </button>
                                                             <button
                                                                 onClick={async () => {
-                                                                    if (await confirm(`Are you sure you want to delete this payment?\n\nAmount: ${formatCurrency(payment.amount_paid, selectedWorkForPayment.Currency)}\nDate: ${formatDate(payment.date_of_payment)}\n\nThis action cannot be undone.`, { title: 'Delete Payment', danger: true, confirmText: 'Delete' })) {
+                                                                    if (await confirm(`Are you sure you want to delete this payment?\n\nAmount: ${formatCurrency(payment.amount_paid, selectedWorkForPayment.currency)}\nDate: ${formatDate(payment.date_of_payment)}\n\nThis action cannot be undone.`, { title: 'Delete Payment', danger: true, confirmText: 'Delete' })) {
                                                                         try {
                                                                             const response = await fetch(`/api/deleteInvoice/${payment.InvoiceID}`, {
                                                                                 method: 'DELETE'
@@ -1358,7 +1359,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                                             const result = await response.json();
                                                                             if (result.status === 'success') {
                                                                                 toast.success('Payment deleted successfully!');
-                                                                                loadPaymentHistory(selectedWorkForPayment.workid);
+                                                                                loadPaymentHistory(selectedWorkForPayment.work_id);
                                                                                 loadWorks();
                                                                             } else {
                                                                                 throw new Error(result.message || 'Failed to delete payment');
@@ -1433,13 +1434,13 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                             </p>
                             <div className={styles.confirmDetailsBox}>
                                 <p className={styles.confirmDetailLine}>
-                                    <strong>Work Type:</strong> {workToDelete.TypeName || 'N/A'}
+                                    <strong>Work Type:</strong> {workToDelete.type_name || 'N/A'}
                                 </p>
                                 <p className={styles.confirmDetailLine}>
                                     <strong>Doctor:</strong> {workToDelete.doctor_name || 'N/A'}
                                 </p>
                                 <p className={styles.confirmDetailLine}>
-                                    <strong>Total Required:</strong> {formatCurrency(workToDelete.total_required, workToDelete.Currency)}
+                                    <strong>Total Required:</strong> {formatCurrency(workToDelete.total_required, workToDelete.currency)}
                                 </p>
                             </div>
                             <p className={`${styles.confirmWarning} ${styles.confirmWarningStrong}`}>
@@ -1486,13 +1487,13 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     </p>
                                     <div className={styles.confirmDetailsBox}>
                                         <p className={styles.confirmDetailLine}>
-                                            <strong>Work Type:</strong> {config.work.TypeName || 'N/A'}
+                                            <strong>Work Type:</strong> {config.work.type_name || 'N/A'}
                                         </p>
                                         <p className={styles.confirmDetailLine}>
                                             <strong>Doctor:</strong> {config.work.doctor_name || 'N/A'}
                                         </p>
                                         <p className={styles.confirmDetailLine}>
-                                            <strong>Total Required:</strong> {formatCurrency(config.work.total_required, config.work.Currency)}
+                                            <strong>Total Required:</strong> {formatCurrency(config.work.total_required, config.work.currency)}
                                         </p>
                                     </div>
                                     <p className={styles.confirmWarning}>

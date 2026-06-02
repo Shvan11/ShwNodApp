@@ -123,7 +123,7 @@ export default function Expenses() {
 
   // Open delete confirmation modal
   const handleDeleteExpense = (id: number) => {
-    const expense = expenses.find(e => e.ID === id);
+    const expense = expenses.find(e => e.id === id);
     if (expense) {
       setExpenseToDelete(expense);
       setIsDeleteModalOpen(true);
@@ -134,7 +134,7 @@ export default function Expenses() {
   const handleSaveExpense = async (expenseData: ExpenseData) => {
     try {
       if (currentExpense) {
-        await updateExpense(currentExpense.ID, expenseData);
+        await updateExpense(currentExpense.id, expenseData);
         toast.success('Expense updated successfully');
       } else {
         await createExpense(expenseData);
@@ -154,7 +154,7 @@ export default function Expenses() {
     if (!expenseToDelete) return;
 
     try {
-      await deleteExpense(expenseToDelete.ID);
+      await deleteExpense(expenseToDelete.id);
       toast.success('Expense deleted successfully');
       setIsDeleteModalOpen(false);
       setExpenseToDelete(null);

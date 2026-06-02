@@ -95,8 +95,8 @@ const PatientSets: React.FC = () => {
         patient_name: loaderData.patient.patient_name as string | undefined,
         first_name: loaderData.patient.first_name as string | undefined,
         last_name: loaderData.patient.last_name as string | undefined,
-        Phone: loaderData.patient.Phone as string | undefined,
-        WorkType: loaderData.work.TypeName as string | undefined,
+        Phone: loaderData.patient.phone as string | undefined,
+        WorkType: loaderData.work.type_name as string | undefined,
         workid: parseInt(workId || '0'),
     } : null;
 
@@ -432,10 +432,10 @@ const PatientSets: React.FC = () => {
                 aligner_set_id: currentSetForPayment.aligner_set_id,
                 amount_paid: paymentData.amount_paid,
                 date_of_payment: paymentData.date_of_payment,
-                PaymentMethod: 'Cash', // Default method
-                ActualAmount: paymentData.ActualAmount,
-                ActualCur: paymentData.ActualCur,
-                Change: paymentData.Change
+                payment_method: 'Cash', // Default method
+                actual_amount: paymentData.actual_amount,
+                actual_cur: paymentData.actual_cur,
+                change: paymentData.change
             })
         });
 
@@ -748,7 +748,7 @@ const PatientSets: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...currentSet,
-                    SetUrl: quickUrlValue.trim() || null
+                    set_url: quickUrlValue.trim() || null
                 })
             });
 
@@ -1051,7 +1051,7 @@ const PatientSets: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...currentSet,
-                    SetPdfUrl: quickPdfUrlValue.trim() || null
+                    set_pdf_url: quickPdfUrlValue.trim() || null
                 })
             });
 
@@ -1117,7 +1117,7 @@ const PatientSets: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...currentSet,
-                    SetVideo: quickVideoValue.trim() || null
+                    set_video: quickVideoValue.trim() || null
                 })
             });
 
@@ -1154,8 +1154,7 @@ const PatientSets: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     aligner_set_id: setId,
-                    NoteType: 'Lab',
-                    NoteText: labNoteText.trim()
+                    note_text: labNoteText.trim()
                 })
             });
 
@@ -1196,7 +1195,7 @@ const PatientSets: React.FC = () => {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    NoteText: editNoteText.trim()
+                    note_text: editNoteText.trim()
                 })
             });
 

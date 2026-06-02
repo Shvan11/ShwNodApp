@@ -3,14 +3,14 @@ import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters';
 import styles from './StatisticsComponent.module.css';
 
 interface Invoice {
-    invoiceID: number;
+    invoice_id: number;
     patient_name: string;
-    SysStartTime: string;
+    sys_start_time: string;
     currency: 'IQD' | 'USD';
     amount_paid: number;
-    IQDReceived?: number;
-    USDReceived?: number;
-    Change?: number;
+    iqd_received?: number;
+    usd_received?: number;
+    change?: number;
 }
 
 interface SelectedDateData {
@@ -104,9 +104,9 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
 
         invoices.forEach(invoice => {
             // Sum ALL IQD and USD received regardless of treatment currency
-            totalIQD += invoice.IQDReceived || 0;
-            totalUSD += invoice.USDReceived || 0;
-            totalChangeIQD += invoice.Change || 0;
+            totalIQD += invoice.iqd_received || 0;
+            totalUSD += invoice.usd_received || 0;
+            totalChangeIQD += invoice.change || 0;
         });
 
         return {
@@ -217,12 +217,12 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                                     </thead>
                                     <tbody>
                                         {invoices.map((invoice) => (
-                                            <tr key={invoice.invoiceID}>
-                                                <td data-label="Invoice #" className={styles.invoiceId}>{invoice.invoiceID}</td>
+                                            <tr key={invoice.invoice_id}>
+                                                <td data-label="Invoice #" className={styles.invoiceId}>{invoice.invoice_id}</td>
                                                 <td data-label="Patient Name" className={`${styles.patientName} text-rtl`}>
                                                     {invoice.patient_name}
                                                 </td>
-                                                <td data-label="Time">{formatTime(invoice.SysStartTime)}</td>
+                                                <td data-label="Time">{formatTime(invoice.sys_start_time)}</td>
                                                 <td data-label="Treatment Currency" className={styles.currencyBadge}>
                                                     <span className={`badge ${invoice.currency}`}>
                                                         {invoice.currency}
@@ -232,13 +232,13 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                                                     {invoice.amount_paid} {invoice.currency}
                                                 </td>
                                                 <td data-label="IQD Received" className={`${styles.amount} ${styles.iqd}`}>
-                                                    {invoice.IQDReceived ? formatCurrency(invoice.IQDReceived, 'IQD') : '-'}
+                                                    {invoice.iqd_received ? formatCurrency(invoice.iqd_received, 'IQD') : '-'}
                                                 </td>
                                                 <td data-label="USD Received" className={`${styles.amount} ${styles.usd}`}>
-                                                    {invoice.USDReceived ? formatCurrency(invoice.USDReceived, 'USD') : '-'}
+                                                    {invoice.usd_received ? formatCurrency(invoice.usd_received, 'USD') : '-'}
                                                 </td>
                                                 <td data-label="Change Given" className={`${styles.amount} ${styles.change}`}>
-                                                    {invoice.Change ? formatCurrency(invoice.Change, 'IQD') : '-'}
+                                                    {invoice.change ? formatCurrency(invoice.change, 'IQD') : '-'}
                                                 </td>
                                             </tr>
                                         ))}

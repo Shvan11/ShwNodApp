@@ -85,9 +85,9 @@ export const WORK_TYPE_FIELDS: Record<number, WorkTypeFieldConfig> = {
     fields: ['teeth', 'canalsNo', 'workingLength', 'note'],
     displayFields: [
       { key: 'Teeth', label: 'Tooth' },
-      { key: 'CanalsNo', label: 'Canals' },
-      { key: 'WorkingLength', label: 'Working Length' },
-      { key: 'Note', label: 'Notes' },
+      { key: 'canals_no', label: 'Canals' },
+      { key: 'working_length', label: 'Working Length' },
+      { key: 'note', label: 'Notes' },
     ],
   },
 
@@ -98,9 +98,9 @@ export const WORK_TYPE_FIELDS: Record<number, WorkTypeFieldConfig> = {
     fields: ['teeth', 'fillingType', 'fillingDepth', 'note'],
     displayFields: [
       { key: 'Teeth', label: 'Tooth' },
-      { key: 'FillingType', label: 'Type' },
-      { key: 'FillingDepth', label: 'Depth' },
-      { key: 'Note', label: 'Notes' },
+      { key: 'filling_type', label: 'Type' },
+      { key: 'filling_depth', label: 'Depth' },
+      { key: 'note', label: 'Notes' },
     ],
   },
 
@@ -112,9 +112,9 @@ export const WORK_TYPE_FIELDS: Record<number, WorkTypeFieldConfig> = {
     displayFields: [
       { key: 'Teeth', label: 'Tooth Position' },
       { key: 'ImplantManufacturerName', label: 'Manufacturer' },
-      { key: 'ImplantLength', label: 'Length (mm)' },
-      { key: 'ImplantDiameter', label: 'Diameter (mm)' },
-      { key: 'Note', label: 'Notes' },
+      { key: 'implant_length', label: 'Length (mm)' },
+      { key: 'implant_diameter', label: 'Diameter (mm)' },
+      { key: 'note', label: 'Notes' },
     ],
   },
 
@@ -125,9 +125,9 @@ export const WORK_TYPE_FIELDS: Record<number, WorkTypeFieldConfig> = {
     fields: ['teeth', 'material', 'labName', 'note'],
     displayFields: [
       { key: 'Teeth', label: 'Teeth' },
-      { key: 'Material', label: 'Material' },
-      { key: 'LabName', label: 'Lab' },
-      { key: 'Note', label: 'Notes' },
+      { key: 'material', label: 'Material' },
+      { key: 'lab_name', label: 'Lab' },
+      { key: 'note', label: 'Notes' },
     ],
   },
 
@@ -138,9 +138,9 @@ export const WORK_TYPE_FIELDS: Record<number, WorkTypeFieldConfig> = {
     fields: ['teeth', 'material', 'labName', 'note'],
     displayFields: [
       { key: 'Teeth', label: 'Teeth' },
-      { key: 'Material', label: 'Material' },
-      { key: 'LabName', label: 'Lab' },
-      { key: 'Note', label: 'Notes' },
+      { key: 'material', label: 'Material' },
+      { key: 'lab_name', label: 'Lab' },
+      { key: 'note', label: 'Notes' },
     ],
   },
 
@@ -151,7 +151,7 @@ export const WORK_TYPE_FIELDS: Record<number, WorkTypeFieldConfig> = {
     fields: ['teeth', 'note'],
     displayFields: [
       { key: 'Teeth', label: 'Tooth/Area' },
-      { key: 'Note', label: 'Procedure Notes' },
+      { key: 'note', label: 'Procedure Notes' },
     ],
   },
 
@@ -162,7 +162,7 @@ export const WORK_TYPE_FIELDS: Record<number, WorkTypeFieldConfig> = {
     fields: ['teeth', 'note'],
     displayFields: [
       { key: 'Teeth', label: 'Tooth Extracted' },
-      { key: 'Note', label: 'Notes' },
+      { key: 'note', label: 'Notes' },
     ],
   },
 };
@@ -174,7 +174,7 @@ const DEFAULT_WORK_TYPE_CONFIG: WorkTypeFieldConfig = {
   fields: ['teeth', 'note'],
   displayFields: [
     { key: 'Teeth', label: 'Teeth' },
-    { key: 'Note', label: 'Notes' },
+    { key: 'note', label: 'Notes' },
   ],
 };
 

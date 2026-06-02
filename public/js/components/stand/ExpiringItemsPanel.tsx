@@ -60,9 +60,9 @@ const ExpiringItemsPanel: React.FC<ExpiringItemsPanelProps> = ({ items, loading 
   const itemsWithDays = useMemo(
     () =>
       items
-        .filter((item) => item.ExpiryDate != null)
+        .filter((item) => item.expiry_date != null)
         .map((item) => {
-          const days = daysBetween(today, new Date(item.ExpiryDate as string));
+          const days = daysBetween(today, new Date(item.expiry_date as string));
           return { item, days };
         })
         .sort((a, b) => a.days - b.days),
@@ -93,12 +93,12 @@ const ExpiringItemsPanel: React.FC<ExpiringItemsPanelProps> = ({ items, loading 
       ) : (
         <ul className={styles.list}>
           {itemsWithDays.map(({ item, days }) => (
-            <li key={item.ItemID} className={styles.item}>
+            <li key={item.item_id} className={styles.item}>
               <div className={styles.itemInfo}>
-                <span className={styles.itemName}>{item.ItemName}</span>
+                <span className={styles.itemName}>{item.item_name}</span>
                 <div className={styles.expiryInfo}>
                   <span className={styles.expiryDate}>
-                    {formatDate(item.ExpiryDate as string)}
+                    {formatDate(item.expiry_date as string)}
                   </span>
                   <span className={`${styles.daysRemaining} ${getDaysClass(days)}`}>
                     {getDaysLabel(days)}
@@ -107,7 +107,7 @@ const ExpiringItemsPanel: React.FC<ExpiringItemsPanelProps> = ({ items, loading 
               </div>
               <span className={styles.stockBadge}>
                 <i className="fas fa-cubes" />
-                {item.CurrentStock}
+                {item.current_stock}
               </span>
             </li>
           ))}

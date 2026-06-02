@@ -9,7 +9,7 @@
  * returns as a 'YYYY-MM-DD' string. The declared types are preserved via
  * `$castTo<Date>()` (type-only); the runtime value is now a string — see FLAGS.
  * The IF EXISTS…UPDATE…ELSE INSERT exchange-rate upserts became ON CONFLICT against
- * the new UQ_tblsms_date unique constraint. tblsms.date is PG `date`, so date params
+ * the new uq_sms_date unique index. tblsms.date is PG `date`, so date params
  * are wrapped as `sql<Date>` to satisfy the static type without changing emitted SQL.
  */
 import { sql } from 'kysely';
@@ -189,7 +189,7 @@ export async function updateExchangeRate(exchangeRate: number): Promise<unknown[
   const today = toDateOnly(new Date());
   const db = getKysely();
 
-  // IF EXISTS…UPDATE…ELSE INSERT → ON CONFLICT against UQ_tblsms_date.
+  // IF EXISTS…UPDATE…ELSE INSERT → ON CONFLICT against the unique index uq_sms_date.
   await db
     .insertInto('sms')
     .values({
@@ -225,7 +225,7 @@ export async function getExchangeRateForDate(date: string): Promise<number | nul
 export async function updateExchangeRateForDate(date: string, exchangeRate: number): Promise<unknown[]> {
   const db = getKysely();
 
-  // IF EXISTS…UPDATE…ELSE INSERT → ON CONFLICT against UQ_tblsms_date.
+  // IF EXISTS…UPDATE…ELSE INSERT → ON CONFLICT against the unique index uq_sms_date.
   await db
     .insertInto('sms')
     .values({

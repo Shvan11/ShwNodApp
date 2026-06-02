@@ -9,14 +9,14 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 
 // Types
 interface WorkData {
-    workid: number;
-    TypeName?: string;
+    work_id: number;
+    type_name?: string;
     total_required?: number;
     TotalPaid?: number;
-    Currency?: 'USD' | 'IQD';
-    Discount?: number | null;
-    DiscountDate?: string | null;
-    DiscountReason?: string | null;
+    currency?: 'USD' | 'IQD';
+    discount?: number | null;
+    discount_date?: string | null;
+    discount_reason?: string | null;
 }
 
 interface ReceiptData extends WorkData {
@@ -128,9 +128,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     useEffect(() => {
         // Fetch complete work data from V_Report view
         const fetchCompleteWorkData = async () => {
-            if (workData && workData.workid) {
+            if (workData && workData.work_id) {
                 try {
-                    const response = await fetch(`/api/getworkforreceipt/${workData.workid}`);
+                    const response = await fetch(`/api/getworkforreceipt/${workData.work_id}`);
                     if (response.ok) {
                         const data = await response.json();
                         setCompleteWorkData(data);
@@ -250,8 +250,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
     const initializeFormData = () => {
         if (!workData) return;
-        const remainingBalance = (workData.total_required || 0) - Number(workData.Discount ?? 0) - (workData.TotalPaid || 0);
-        const accountCurrency = workData.Currency || 'IQD';
+        const remainingBalance = (workData.total_required || 0) - Number(workData.discount ?? 0) - (workData.TotalPaid || 0);
+        const accountCurrency = workData.currency || 'IQD';
 
         setCalculations(prev => ({
             ...prev,
@@ -720,7 +720,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             setLoading(true);
 
             const invoiceData = {
-                workid: workData!.workid,
+                workid: workData!.work_id,
                 amountPaid: amountPaid,
                 paymentDate: formData.paymentDate,
                 usdReceived: actualUSD,
@@ -751,13 +751,13 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                     usdReceived: actualUSD,
                     iqdReceived: actualIQD,
                     change: parseInt(String(formData.change)) || 0,
-                    newBalance: ((workData!.total_required || 0) - Number(workData!.Discount ?? 0) - (workData!.TotalPaid || 0) - amountPaid)
+                    newBalance: ((workData!.total_required || 0) - Number(workData!.discount ?? 0) - (workData!.TotalPaid || 0) - amountPaid)
                 });
 
                 fetch('/api/wa/send-receipt', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ workId: workData!.workid })
+                    body: JSON.stringify({ workId: workData!.work_id })
                 })
                     .then(res => res.json())
                     .then((waResult: { success: boolean; message?: string }) => {
@@ -788,7 +788,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const handlePrint = async () => {
         try {
             // Fetch receipt HTML from template-based system using work ID
-            const response = await fetch(`/api/templates/receipt/work/${workData!.workid}`);
+            const response = await fetch(`/api/templates/receipt/work/${workData!.work_id}`);
             if (!response.ok) throw new Error('Failed to generate receipt');
 
             const html = await response.text();
@@ -884,15 +884,15 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                     <i className="fas fa-credit-card"></i>
                                     Add Payment
                                 </h2>
-                                <span className={styles.paymentWorkType}>{workData.TypeName || `Work #${workData.workid}`}</span>
+                                <span className={styles.paymentWorkType}>{workData.type_name || `Work #${workData.work_id}`}</span>
                             </div>
                             <div className={styles.paymentHeaderRight}>
                                 <div className={styles.paymentBalanceBadge}>
                                     <span className={styles.balanceLabel}>Balance</span>
                                     <span className={styles.balanceAmount}>{formatCurrency(calculations.remainingBalance, calculations.accountCurrency)}</span>
-                                    {Number(workData.Discount ?? 0) > 0 && (
+                                    {Number(workData.discount ?? 0) > 0 && (
                                         <span className={styles.balanceLabel} style={{ marginTop: 4 }}>
-                                            <i className="fas fa-tag"></i> {formatCurrency(Number(workData.Discount), calculations.accountCurrency)} discount applied
+                                            <i className="fas fa-tag"></i> {formatCurrency(Number(workData.discount), calculations.accountCurrency)} discount applied
                                         </span>
                                     )}
                                 </div>
@@ -1215,7 +1215,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                         </div>
                         <h2>Payment Recorded!</h2>
                         <p className={styles.successAmount}>
-                            {formatCurrency(receiptData?.amountPaidToday || 0, receiptData?.Currency || 'IQD')}
+                            {formatCurrency(receiptData?.amountPaidToday || 0, receiptData?.currency || 'IQD')}
                         </p>
                         <div className={styles.successActions}>
                             <button onClick={handlePrint} className="btn btn-primary">

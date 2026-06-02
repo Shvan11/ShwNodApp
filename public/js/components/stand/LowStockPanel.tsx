@@ -38,13 +38,13 @@ const LowStockPanel: React.FC<LowStockPanelProps> = ({ items, loading, onRestock
       ) : (
         <ul className={styles.list}>
           {items.map((item) => (
-            <li key={item.ItemID} className={styles.item}>
+            <li key={item.item_id} className={styles.item}>
               <div className={styles.itemInfo}>
-                <span className={styles.itemName}>{item.ItemName}</span>
+                <span className={styles.itemName}>{item.item_name}</span>
                 <div className={styles.stockLevel}>
-                  <span className={styles.currentStock}>{item.CurrentStock}</span>
+                  <span className={styles.currentStock}>{item.current_stock}</span>
                   <span className={styles.separator}>/</span>
-                  <span className={styles.reorderLevel}>{item.ReorderLevel}</span>
+                  <span className={styles.reorderLevel}>{item.reorder_level}</span>
                 </div>
               </div>
               <button

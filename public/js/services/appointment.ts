@@ -4,18 +4,23 @@
  */
 import { fetchJSON } from '../core/http';
 
-// Appointment data types
+// Appointment data types — matches /api/getWebApps response (AppointmentRow)
 export interface Appointment {
-  AppID: number;
-  PatientID: number;
-  PatientName: string;
-  Phone: string;
-  AppDate: string;
-  AppTime: string;
-  Status: number;
-  StatusName?: string;
-  Notes?: string;
-  WorkType?: string;
+  appointment_id: number;
+  person_id?: number;
+  Num?: number;
+  apptime?: string | null;
+  patient_type?: string;
+  patient_name?: string;
+  app_detail?: string;
+  present?: string | null;
+  seated?: string | null;
+  dismissed?: string | null;
+  HasVisit?: boolean;
+  phone?: string | null;
+  notes?: string | null;
+  dr_id?: number | null;
+  work_id?: number | null;
   [key: string]: unknown;
 }
 

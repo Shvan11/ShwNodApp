@@ -6,8 +6,8 @@ import type { AlignerDoctor } from '../../pages/aligner/aligner.types';
 
 interface FormData {
     doctor_name: string;
-    DoctorEmail: string;
-    LogoPath: string;
+    doctor_email: string;
+    logo_path: string;
 }
 
 interface AlignerDoctorsSettingsProps {
@@ -24,8 +24,8 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
     const [showAddForm, setShowAddForm] = useState(false);
     const [formData, setFormData] = useState<FormData>({
         doctor_name: '',
-        DoctorEmail: '',
-        LogoPath: ''
+        doctor_email: '',
+        logo_path: ''
     });
 
     // Load doctors on component mount
@@ -54,7 +54,7 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
     };
 
     const handleAdd = () => {
-        setFormData({ doctor_name: '', DoctorEmail: '', LogoPath: '' });
+        setFormData({ doctor_name: '', doctor_email: '', logo_path: '' });
         setEditingId(null);
         setShowAddForm(true);
     };
@@ -62,15 +62,15 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
     const handleEdit = (doctor: AlignerDoctor) => {
         setFormData({
             doctor_name: doctor.doctor_name || '',
-            DoctorEmail: doctor.DoctorEmail || '',
-            LogoPath: doctor.LogoPath || ''
+            doctor_email: doctor.doctor_email || '',
+            logo_path: doctor.logo_path || ''
         });
         setEditingId(doctor.dr_id);
         setShowAddForm(true);
     };
 
     const handleCancel = () => {
-        setFormData({ doctor_name: '', DoctorEmail: '', LogoPath: '' });
+        setFormData({ doctor_name: '', doctor_email: '', logo_path: '' });
         setEditingId(null);
         setShowAddForm(false);
     };
@@ -203,7 +203,7 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
                             <input
                                 type="text"
                                 id="DoctorName"
-                                name="DoctorName"
+                                name="doctor_name"
                                 value={formData.doctor_name}
                                 onChange={handleInputChange}
                                 required
@@ -221,8 +221,8 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
                             <input
                                 type="email"
                                 id="DoctorEmail"
-                                name="DoctorEmail"
-                                value={formData.DoctorEmail}
+                                name="doctor_email"
+                                value={formData.doctor_email}
                                 onChange={handleInputChange}
                                 placeholder="doctor@example.com"
                             />
@@ -238,8 +238,8 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
                             <input
                                 type="text"
                                 id="LogoPath"
-                                name="LogoPath"
-                                value={formData.LogoPath}
+                                name="logo_path"
+                                value={formData.logo_path}
                                 onChange={handleInputChange}
                                 placeholder="C:\Aligner_Sets\Labels\logo.png"
                             />
@@ -288,17 +288,17 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
                                             {doctor.doctor_name === 'Admin' ? doctor.doctor_name : `Dr. ${doctor.doctor_name}`}
                                         </td>
                                         <td>
-                                            {doctor.DoctorEmail ? (
+                                            {doctor.doctor_email ? (
                                                 <span className={styles.emailValue}>
                                                     <i className="fas fa-envelope"></i>
-                                                    {doctor.DoctorEmail}
+                                                    {doctor.doctor_email}
                                                 </span>
                                             ) : (
                                                 <span className={styles.noEmail}>No email</span>
                                             )}
                                         </td>
                                         <td>
-                                            {doctor.DoctorEmail ? (
+                                            {doctor.doctor_email ? (
                                                 <span className={`${styles.badge} ${styles.badgeSuccess}`}>
                                                     <i className="fas fa-check-circle"></i>
                                                     Enabled
@@ -311,7 +311,7 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
                                             )}
                                         </td>
                                         <td className={styles.logoPath}>
-                                            {doctor.LogoPath || <span className={styles.textMuted}>—</span>}
+                                            {doctor.logo_path || <span className={styles.textMuted}>—</span>}
                                         </td>
                                         <td className={styles.actions}>
                                             <button

@@ -66,16 +66,16 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                 </thead>
                 <tbody>
                     {expenses.map((expense, index) => {
-                        const date = formatDate(expense.expenseDate);
-                        const amount = formatNumber(expense.Amount);
-                        const currency = (expense.Currency || '').trim();
+                        const date = formatDate(expense.expense_date);
+                        const amount = formatNumber(expense.amount);
+                        const currency = (expense.currency || '').trim();
                         const currencyLower = currency.toLowerCase();
-                        const category = expense.CategoryName || '-';
-                        const subcategory = expense.SubcategoryName || '-';
-                        const note = expense.Note || '-';
+                        const category = expense.category_name || '-';
+                        const subcategory = expense.subcategory_name || '-';
+                        const note = expense.note || '-';
 
                         return (
-                            <tr key={expense.ID ?? `expense-${index}`} data-expense-id={expense.ID}>
+                            <tr key={expense.id ?? `expense-${index}`} data-expense-id={expense.id}>
                                 <td>{date}</td>
                                 <td className={`${styles.amountCell} ${getCurrencyClass(currencyLower)}`}>
                                     {amount}
@@ -94,14 +94,14 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                                     <div className={styles.actionButtons}>
                                         <button
                                             className="btn-edit"
-                                            onClick={() => onEdit(expense.ID)}
+                                            onClick={() => onEdit(expense.id)}
                                             aria-label="Edit expense"
                                         >
                                             Edit
                                         </button>
                                         <button
                                             className="btn-delete"
-                                            onClick={() => onDelete(expense.ID)}
+                                            onClick={() => onDelete(expense.id)}
                                             aria-label="Delete expense"
                                         >
                                             Delete

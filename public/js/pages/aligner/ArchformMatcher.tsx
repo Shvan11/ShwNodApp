@@ -199,7 +199,7 @@ const ArchformMatcher: React.FC = () => {
             setAlignerSets((prev) =>
                 prev.map((s) =>
                     s.aligner_set_id === selectedSetId
-                        ? { ...s, ArchformID: archformId }
+                        ? { ...s, archform_id: archformId }
                         : s
                 )
             );
@@ -240,7 +240,7 @@ const ArchformMatcher: React.FC = () => {
             toast.success('Match removed');
             setAlignerSets((prev) =>
                 prev.map((s) =>
-                    s.aligner_set_id === setId ? { ...s, ArchformID: null } : s
+                    s.aligner_set_id === setId ? { ...s, archform_id: null } : s
                 )
             );
         } catch (err) {
@@ -448,7 +448,7 @@ const ArchformMatcher: React.FC = () => {
             // Clear any ArchformID matches referencing this patient
             setAlignerSets((prev) =>
                 prev.map((s) =>
-                    s.archform_id === deleteTarget.Id ? { ...s, ArchformID: null } : s
+                    s.archform_id === deleteTarget.Id ? { ...s, archform_id: null } : s
                 )
             );
 

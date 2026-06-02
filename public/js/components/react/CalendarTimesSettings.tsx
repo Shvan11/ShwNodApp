@@ -7,8 +7,8 @@ interface CalendarTimesSettingsProps {
 }
 
 interface TimeSlot {
-    TimeID: number;
-    MyTime: string;
+    time_id: number;
+    my_time: string;
 }
 
 type SlotCategory = 'early' | 'main' | 'late';
@@ -72,7 +72,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
 
     // Get all time strings from database
     const allTimes = useMemo(() => {
-        return allTimeSlots.map(slot => parseTimeToHHMM(slot.MyTime));
+        return allTimeSlots.map(slot => parseTimeToHHMM(slot.my_time));
     }, [allTimeSlots]);
 
     // Categorized slots
@@ -201,7 +201,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             const response = await fetch('/api/admin/lookups/tbltimes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ MyTime: `1970-01-01T${timeStr}:00` })
+                body: JSON.stringify({ my_time: `1970-01-01T${timeStr}:00` })
             });
 
             if (!response.ok) {
@@ -234,7 +234,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
 
     // Delete time slot
     const handleDeleteTimeSlot = async (timeStr: string) => {
-        const slot = allTimeSlots.find(s => parseTimeToHHMM(s.MyTime) === timeStr);
+        const slot = allTimeSlots.find(s => parseTimeToHHMM(s.my_time) === timeStr);
         if (!slot) {
             setError('Time slot not found');
             return;
@@ -244,7 +244,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
         setError(null);
 
         try {
-            const response = await fetch(`/api/admin/lookups/tbltimes/${slot.TimeID}`, {
+            const response = await fetch(`/api/admin/lookups/tbltimes/${slot.time_id}`, {
                 method: 'DELETE'
             });
 

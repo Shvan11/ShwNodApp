@@ -34,8 +34,8 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
 
             if (data.status === 'success') {
                 const optionsMap: OptionsMap = {};
-                data.options.forEach((option: { OptionName: string; OptionValue: string }) => {
-                    optionsMap[option.OptionName] = option.OptionValue;
+                data.options.forEach((option: { option_name: string; option_value: string }) => {
+                    optionsMap[option.option_name] = option.option_value;
                 });
                 setOptions(optionsMap);
             } else {

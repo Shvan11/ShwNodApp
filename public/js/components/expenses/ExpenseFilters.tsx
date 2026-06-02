@@ -19,13 +19,13 @@ interface ExpenseFiltersProps {
 }
 
 interface Category {
-    CategoryID: number;
-    CategoryName: string;
+    category_id: number;
+    category_name: string;
 }
 
 interface Subcategory {
-    SubcategoryID: number;
-    SubcategoryName: string;
+    subcategory_id: number;
+    subcategory_name: string;
 }
 
 export default function ExpenseFilters({ filters, onFilterChange, onApply, onReset }: ExpenseFiltersProps) {
@@ -105,8 +105,8 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                         >
                             <option value="">All Categories</option>
                             {categories.map(cat => (
-                                <option key={cat.CategoryID} value={cat.CategoryID}>
-                                    {cat.CategoryName}
+                                <option key={cat.category_id} value={cat.category_id}>
+                                    {cat.category_name}
                                 </option>
                             ))}
                         </select>
@@ -129,8 +129,8 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                         >
                             <option value="">All Subcategories</option>
                             {subcategories.map(sub => (
-                                <option key={sub.SubcategoryID} value={sub.SubcategoryID}>
-                                    {sub.SubcategoryName}
+                                <option key={sub.subcategory_id} value={sub.subcategory_id}>
+                                    {sub.subcategory_name}
                                 </option>
                             ))}
                         </select>

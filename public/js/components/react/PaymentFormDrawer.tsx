@@ -5,11 +5,11 @@ import { formatNumber } from '../../utils/formatters';
 
 // Types
 interface SetInfo {
-    SetSequence?: number;
+    set_sequence?: number;
     Balance?: number;
-    SetCost?: number;
+    set_cost?: number;
     TotalPaid?: number;
-    Currency?: string;
+    currency?: string;
 }
 
 interface WorkInfo {
@@ -49,7 +49,7 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
     useEffect(() => {
         if (isOpen && set) {
             // Reset form when drawer opens
-            const initialAmount = set.Balance || set.SetCost || 0;
+            const initialAmount = set.Balance || set.set_cost || 0;
             setFormData({
                 amount_paid: initialAmount,
                 date_of_payment: new Date().toISOString().split('T')[0]
@@ -95,7 +95,7 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
             newErrors.date_of_payment = 'Payment date is required';
         }
 
-        if (set && set.Balance && amount > set.Balance) {
+        if (set && set.Balance != null && amount > set.Balance) {
             newErrors.amount_paid = `Amount cannot exceed balance of ${formatNumber(set.Balance)}`;
         }
 
@@ -116,9 +116,9 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
             await onSave({
                 ...formData,
                 amount_paid: Number(formData.amount_paid),
-                ActualAmount: null,
-                ActualCur: set?.Currency || 'USD',
-                Change: null
+                actual_amount: null,
+                actual_cur: set?.currency || 'USD',
+                change: null
             });
             onClose();
         } catch (error) {
@@ -131,10 +131,10 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
 
     if (!isOpen) return null;
 
-    const remainingBalance = set?.Balance || set?.SetCost || 0;
+    const remainingBalance = set?.Balance || set?.set_cost || 0;
     const totalPaid = set?.TotalPaid || 0;
     const newBalance = remainingBalance - (Number(formData.amount_paid) || 0);
-    const currency = set?.Currency || 'USD';
+    const currency = set?.currency || 'USD';
 
     return (
         <div className="drawer-overlay" onClick={onClose}>
@@ -150,13 +150,13 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
                     {/* Payment Summary */}
                     <div className="aligner-payment-summary">
                         <div className="summary-header">
-                            <h3>Set #{set?.SetSequence}</h3>
+                            <h3>Set #{set?.set_sequence}</h3>
                             <span className="set-currency">{currency}</span>
                         </div>
                         <div className="summary-grid">
                             <div className="summary-item">
                                 <span className="label">Set Cost</span>
-                                <span className="value">{formatNumber(set?.SetCost || 0)}</span>
+                                <span className="value">{formatNumber(set?.set_cost || 0)}</span>
                             </div>
                             <div className="summary-item">
                                 <span className="label">Total Paid</span>

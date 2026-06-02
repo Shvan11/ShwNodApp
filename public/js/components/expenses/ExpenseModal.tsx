@@ -12,13 +12,13 @@ import styles from '../../routes/Expenses.module.css';
 
 // Types
 interface Category {
-    CategoryID: number;
-    CategoryName: string;
+    category_id: number;
+    category_name: string;
 }
 
 interface Subcategory {
-    SubcategoryID: number;
-    SubcategoryName: string;
+    subcategory_id: number;
+    subcategory_name: string;
 }
 
 interface FormData {
@@ -66,15 +66,15 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
             if (expense) {
                 // Edit mode - populate with expense data
                 setFormData({
-                    expenseDate: expense.expenseDate?.split('T')[0] || '',
-                    amount: expense.Amount || 0,
-                    currency: (expense.Currency || '').trim() || 'IQD',
-                    categoryId: expense.CategoryID || '',
-                    subcategoryId: expense.SubcategoryID || '',
-                    note: expense.Note || ''
+                    expenseDate: expense.expense_date?.split('T')[0] || '',
+                    amount: expense.amount || 0,
+                    currency: (expense.currency || '').trim() || 'IQD',
+                    categoryId: expense.category_id || '',
+                    subcategoryId: expense.subcategory_id || '',
+                    note: expense.note || ''
                 });
-                setDisplayAmount(expense.Amount ? formatNumber(expense.Amount) : '');
-                setCategoryId(expense.CategoryID || '');
+                setDisplayAmount(expense.amount ? formatNumber(expense.amount) : '');
+                setCategoryId(expense.category_id || '');
             } else {
                 // Add mode - set default date to today
                 const today = new Date().toISOString().split('T')[0];
@@ -148,7 +148,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
         }
 
         const expenseData: ExpenseData = {
-            expenseDate: formData.expenseDate,
+            expense_date: formData.expenseDate,
             amount: parseInt(String(formData.amount)),
             currency: formData.currency,
             note: formData.note,
@@ -257,8 +257,8 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                             >
                                 <option value="">Select Category</option>
                                 {categories.map(cat => (
-                                    <option key={cat.CategoryID} value={cat.CategoryID}>
-                                        {cat.CategoryName}
+                                    <option key={cat.category_id} value={cat.category_id}>
+                                        {cat.category_name}
                                     </option>
                                 ))}
                             </select>
@@ -275,8 +275,8 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                             >
                                 <option value="">Select Subcategory</option>
                                 {subcategories.map(sub => (
-                                    <option key={sub.SubcategoryID} value={sub.SubcategoryID}>
-                                        {sub.SubcategoryName}
+                                    <option key={sub.subcategory_id} value={sub.subcategory_id}>
+                                        {sub.subcategory_name}
                                     </option>
                                 ))}
                             </select>

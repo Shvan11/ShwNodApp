@@ -12,8 +12,10 @@
  *                                tables IN THE BACKGROUND (202 + SSE on completion).
  */
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import type { EventEmitter } from 'events';
 import { authorize } from '../../middleware/auth.js';
+import { validate } from '../../middleware/validate.js';
 import { InternalEmitterEvents } from '../../services/messaging/websocket-events.js';
 import { sendSuccess, ErrorResponses } from '../../utils/error-response.js';
 import {
@@ -45,14 +47,6 @@ export function setWebSocketEmitter(emitter: EventEmitter): void {
   wsEmitter = emitter;
 }
 
-interface PrepareBody {
-  tpDescription?: string;
-  tpDate?: string; // YYYY-MM-DD
-  overrideDate?: boolean;
-  firstName?: string; // supplied when the patient has no English name (Dolphin needs Latin)
-  lastName?: string;
-}
-
 /**
  * Latin-1 (CP1252) representable. Dolphin's patient-name columns are varchar with a Latin1
  * collation, so any non-Latin-1 character (e.g. Arabic script) is stored as '?'. We gate names
@@ -73,11 +67,39 @@ interface SlotSpecBody {
   output?: { width: number; height: number };
 }
 
-interface RenderBody {
-  tpName?: string;
-  tpDate?: string; // YYYY-MM-DD
-  slots?: SlotSpecBody[];
-}
+// --- Boundary schemas (see CLAUDE.md: Zod at trust boundaries only) ---
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+const personIdParams = z.object({ personId: z.string().regex(/^\d+$/, 'Invalid patient id') });
+
+const prepareBodySchema = z.object({
+  tpDescription: z.string().min(1, 'tpDescription is required'),
+  tpDate: z.string().regex(YMD, 'Invalid tpDate (expected YYYY-MM-DD)'),
+  overrideDate: z.boolean().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+});
+
+const renderBodySchema = z.object({
+  tpName: z.string().min(1, 'tpName is required'),
+  tpDate: z.string().regex(YMD, 'Invalid tpDate (expected YYYY-MM-DD)'),
+  // Keep slot contents opaque: per-slot shape is validated tolerantly in
+  // processRenderJob (malformed slots are skipped, not rejected). z.unknown()
+  // preserves each slot object untouched through the validate() write-back.
+  slots: z.array(z.unknown()).min(1, 'No slots to render'),
+});
+
+const deleteViewBodySchema = z.object({
+  tpCode: z.coerce.number().int().nonnegative(),
+  tpName: z.string().optional(),
+  tpDate: z.string().optional(),
+  view: z.string().regex(/^i(10|12|13|20|21|22|23|24)$/, 'Invalid view code'),
+});
+
+// Schema-derived types — the validated, post-coercion shapes (slots stay opaque
+// and are narrowed to SlotSpecBody[] at the processRenderJob boundary).
+type PrepareBody = z.infer<typeof prepareBodySchema>;
+type RenderBody = z.infer<typeof renderBodySchema>;
+type DeleteViewBody = z.infer<typeof deleteViewBodySchema>;
 
 /** Parse 'YYYY-MM-DD' to a LOCAL-midnight Date (pool runs useUTC:false). */
 function parseLocalDate(s: string): Date | null {
@@ -108,19 +130,12 @@ function toDateOnly(d: Date | string): string {
 router.post(
   '/:personId/prepare',
   authorize(['admin', 'secretary']),
+  validate({ params: personIdParams, body: prepareBodySchema }),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
       const { tpDescription, tpDate, overrideDate } = req.body as PrepareBody;
 
-      if (!/^\d+$/.test(personId)) {
-        ErrorResponses.badRequest(res, 'Invalid patient id');
-        return;
-      }
-      if (!tpDescription || !tpDate) {
-        ErrorResponses.badRequest(res, 'Missing required fields: tpDescription, tpDate');
-        return;
-      }
       const parsedDate = parseLocalDate(tpDate);
       if (!parsedDate) {
         ErrorResponses.badRequest(res, 'Invalid tpDate (expected YYYY-MM-DD)');
@@ -234,26 +249,15 @@ router.post(
 router.post(
   '/:personId/render',
   authorize(['admin', 'secretary']),
+  validate({ params: personIdParams, body: renderBodySchema }),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
       const { tpName, tpDate, slots } = req.body as RenderBody;
 
-      if (!/^\d+$/.test(personId)) {
-        ErrorResponses.badRequest(res, 'Invalid patient id');
-        return;
-      }
-      if (!tpName || !tpDate) {
-        ErrorResponses.badRequest(res, 'Missing required fields: tpName, tpDate');
-        return;
-      }
       const parsedDate = parseLocalDate(tpDate);
       if (!parsedDate) {
         ErrorResponses.badRequest(res, 'Invalid tpDate (expected YYYY-MM-DD)');
-        return;
-      }
-      if (!Array.isArray(slots) || slots.length === 0) {
-        ErrorResponses.badRequest(res, 'No slots to render');
         return;
       }
 
@@ -279,7 +283,8 @@ router.post(
         parsedDate,
         tp_code,
         timePointId,
-        slots,
+        // Slot internals are validated tolerantly inside processRenderJob.
+        slots: slots as SlotSpecBody[],
         userId: req.session?.userId,
       });
     } catch (err) {
@@ -409,29 +414,12 @@ async function processRenderJob(job: RenderJob): Promise<void> {
 router.delete(
   '/:personId/view',
   authorize(['admin', 'secretary']),
+  validate({ params: personIdParams, body: deleteViewBodySchema }),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
-      const { tpCode, tpName, tpDate, view } = req.body as {
-        tpCode?: number | string;
-        tpName?: string;
-        tpDate?: string;
-        view?: string;
-      };
-
-      if (!/^\d+$/.test(personId)) {
-        ErrorResponses.badRequest(res, 'Invalid patient id');
-        return;
-      }
-      if (tpCode === undefined || !/^\d+$/.test(String(tpCode))) {
-        ErrorResponses.badRequest(res, 'Invalid tpCode');
-        return;
-      }
-      if (typeof view !== 'string' || !/^i(10|12|13|20|21|22|23|24)$/.test(view)) {
-        ErrorResponses.badRequest(res, 'Invalid view code');
-        return;
-      }
-      const tpCodeNum = Number(tpCode);
+      const { tpCode, tpName, tpDate, view } = req.body as DeleteViewBody;
+      const tpCodeNum = tpCode; // already coerced to a non-negative int by the schema
 
       // 1. Delete the cropped working file (idempotent).
       await deleteWorkingView(Number(personId), tpCodeNum, view);
@@ -466,13 +454,9 @@ router.delete(
  * GET /:personId/photo-dates
  * Appointments + visits used to suggest dates in the photo-session dialog.
  */
-router.get('/:personId/photo-dates', async (req: Request, res: Response): Promise<void> => {
+router.get('/:personId/photo-dates', validate({ params: personIdParams }), async (req: Request, res: Response): Promise<void> => {
   try {
     const { personId } = req.params;
-    if (!/^\d+$/.test(personId)) {
-      ErrorResponses.badRequest(res, 'Invalid patient id');
-      return;
-    }
     const [appointments, visits] = await Promise.all([
       getPhotoSessionAppointments(personId),
       getPhotoSessionVisits(personId),

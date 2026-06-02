@@ -13,10 +13,10 @@ interface Column {
 }
 
 interface HolidayItem {
-    ID?: number;
-    HolidayName?: string;
-    Holidaydate?: string;
-    Description?: string;
+    id?: number;
+    holiday_name?: string;
+    holiday_date?: string;
+    description?: string;
     [key: string]: unknown;
 }
 
@@ -268,7 +268,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
         }
 
         // For new holidays, check if there are existing appointments
-        const holidayDate = data.Holidaydate as string | undefined;
+        const holidayDate = data.holiday_date as string | undefined;
         if (holidayDate) {
             const warning = await checkAppointmentsOnDate(holidayDate);
             if (warning) {
@@ -371,7 +371,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
 
     // Get the primary display column
     const getDisplayValue = (item: HolidayItem): string => {
-        return item.HolidayName || 'Unnamed Holiday';
+        return item.holiday_name || 'Unnamed Holiday';
     };
 
     return (

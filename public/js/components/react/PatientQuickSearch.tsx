@@ -28,7 +28,7 @@ interface SelectOption {
 export interface SelectedPatient {
     person_id: number;
     patient_name: string;
-    Phone?: string;
+    phone?: string;
 }
 
 /**
@@ -117,7 +117,7 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
             onSelect({
                 person_id: patient.id,
                 patient_name: patient.name || '',
-                Phone: patient.phone
+                phone: patient.phone
             });
         }
     }, [filteredPatients, onSelect]);

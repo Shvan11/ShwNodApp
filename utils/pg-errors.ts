@@ -66,3 +66,58 @@ export function isCheckViolation(error: unknown, constraint?: string): boolean {
   if (err.code !== PG_SQLSTATE.CHECK_VIOLATION) return false;
   return !constraint || err.constraint === constraint;
 }
+
+/** The HTTP shape a classified pg error maps to. */
+export interface ClassifiedPgError {
+  status: number;
+  /** Domain code echoed to the client (not the raw SQLSTATE). */
+  code: string;
+  /** Generic, leak-free message — precise messages stay route-local. */
+  message: string;
+}
+
+/**
+ * Map a caught value to the HTTP response a pg constraint violation deserves,
+ * or `null` when it isn't one of the classified pg errors (caller falls back).
+ *
+ * This is the bridge between the SQLSTATE predicates above and an HTTP layer.
+ * It is the *safety net* for errors that escaped a route's own try/catch — so
+ * the messages are deliberately generic and never echo SQL text, table, or
+ * constraint names. Routes that want a precise, user-facing message keep
+ * handling the error locally (e.g. via the predicates + ErrorResponses).
+ *
+ * Note: SQLSTATE 23503 is ambiguous (inserting a bad reference vs. deleting a
+ * still-referenced row); the neutral 409 message covers both, and precise
+ * cases (see ReferentialError) stay route-local.
+ */
+export function classifyPgError(error: unknown): ClassifiedPgError | null {
+  if (isUniqueViolation(error)) {
+    return {
+      status: 409,
+      code: 'UNIQUE_VIOLATION',
+      message: 'A record with these values already exists.',
+    };
+  }
+  if (isForeignKeyViolation(error)) {
+    return {
+      status: 409,
+      code: 'FOREIGN_KEY_VIOLATION',
+      message: 'This operation conflicts with related records.',
+    };
+  }
+  if (isNotNullViolation(error)) {
+    return {
+      status: 400,
+      code: 'NOT_NULL_VIOLATION',
+      message: 'A required field is missing.',
+    };
+  }
+  if (isCheckViolation(error)) {
+    return {
+      status: 400,
+      code: 'CHECK_VIOLATION',
+      message: 'A value failed a database validation rule.',
+    };
+  }
+  return null;
+}

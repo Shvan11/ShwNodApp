@@ -467,7 +467,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                 <input
                                     type="number"
                                     id="BatchSequence"
-                                    name="BatchSequence"
+                                    name="batch_sequence"
                                     value={formData.batch_sequence}
                                     onChange={handleChange}
                                     className={errors.batch_sequence ? 'error' : ''}
@@ -523,7 +523,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         <input
                                             type="number"
                                             id="UpperAlignerCount"
-                                            name="UpperAlignerCount"
+                                            name="upper_aligner_count"
                                             value={formData.upper_aligner_count}
                                             onChange={handleChange}
                                             className={errors.upper_aligner_count ? 'error' : ''}
@@ -590,7 +590,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         <input
                                             type="number"
                                             id="LowerAlignerCount"
-                                            name="LowerAlignerCount"
+                                            name="lower_aligner_count"
                                             value={formData.lower_aligner_count}
                                             onChange={handleChange}
                                             className={errors.lower_aligner_count ? 'error' : ''}
@@ -802,7 +802,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                     <input
                                         type="number"
                                         id="Days"
-                                        name="Days"
+                                        name="days"
                                         value={formData.days}
                                         onChange={handleChange}
                                         min="1"
@@ -818,7 +818,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                 <label htmlFor="Notes">Notes</label>
                                 <textarea
                                     id="Notes"
-                                    name="Notes"
+                                    name="notes"
                                     value={formData.notes}
                                     onChange={handleChange}
                                     rows={3}
@@ -830,7 +830,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                 <input
                                     type="checkbox"
                                     id="IsActive"
-                                    name="IsActive"
+                                    name="is_active"
                                     checked={formData.is_active}
                                     onChange={handleChange}
                                 />
@@ -844,7 +844,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                 <input
                                     type="checkbox"
                                     id="IsLast"
-                                    name="IsLast"
+                                    name="is_last"
                                     checked={formData.is_last}
                                     onChange={handleChange}
                                 />

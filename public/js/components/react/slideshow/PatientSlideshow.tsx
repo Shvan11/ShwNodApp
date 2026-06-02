@@ -26,6 +26,13 @@ interface GalleryEntry {
   height?: number;
 }
 
+/** Raw shape from GET /api/patients/:id/timepoints (snake_case API). */
+interface TimepointApiRow {
+  tp_code: string;
+  tp_date_time: string;
+  tp_description: string;
+}
+
 // dd-mm-yyyy, matching the convention used elsewhere (Navigation.formatDate).
 function formatDate(dateTime: string): string {
   if (!dateTime) return '';
@@ -99,7 +106,17 @@ const PatientSlideshow = ({ personId }: Props) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
-      .then((data: Timepoint[]) => setTimepoints(Array.isArray(data) ? data : []))
+      .then((data: TimepointApiRow[]) =>
+        setTimepoints(
+          Array.isArray(data)
+            ? data.map((r) => ({
+                tpCode: r.tp_code,
+                tpDateTime: r.tp_date_time,
+                tpDescription: r.tp_description,
+              }))
+            : []
+        )
+      )
       .catch((err) => {
         if (err.name !== 'AbortError') {
           toast.error('Failed to load photo sessions');

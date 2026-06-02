@@ -492,9 +492,9 @@ const AppointmentCalendar = ({
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    Holidaydate: date,
-                    HolidayName: holidayName,
-                    Description: description
+                    holiday_date: date,
+                    holiday_name: holidayName,
+                    description: description
                 })
             });
 

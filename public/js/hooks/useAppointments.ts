@@ -15,12 +15,13 @@ export interface AppointmentStats {
  */
 export interface Appointment {
   appointment_id: number;
-  PatientID: number;
+  person_id?: number;
   patient_name?: string;
-  AppsDate?: string;
-  AppsTime?: string;
-  State?: string;
-  Phone?: string;
+  patient_type?: string | null;
+  app_date?: string | null;
+  app_detail?: string | null;
+  apptime?: string | null;
+  phone?: string | null;
   [key: string]: unknown;
 }
 
@@ -180,7 +181,7 @@ export function useAppointments(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             appointment_id: appointmentId,
-            state: 'Present',
+            state: 'present',
             time: currentTime,
           }),
         });
@@ -228,7 +229,7 @@ export function useAppointments(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             appointment_id: appointmentId,
-            state: 'Seated',
+            state: 'seated',
             time: currentTime,
           }),
         });
@@ -276,7 +277,7 @@ export function useAppointments(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             appointment_id: appointmentId,
-            state: 'Dismissed',
+            state: 'dismissed',
             time: currentTime,
           }),
         });

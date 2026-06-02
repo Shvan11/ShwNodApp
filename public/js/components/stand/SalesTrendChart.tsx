@@ -35,7 +35,7 @@ const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ data }) => {
       chartInstance.current.destroy();
     }
 
-    const labels = data.map((row) => formatShortDate(row.SaleDate));
+    const labels = data.map((row) => formatShortDate(row.sale_date));
     const revenueData = data.map((row) => row.Revenue);
     const profitData = data.map((row) => row.Profit);
 

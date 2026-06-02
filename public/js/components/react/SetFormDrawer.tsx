@@ -22,8 +22,8 @@ interface SetFormData {
 }
 
 interface FormErrors {
-    SetSequence?: string;
-    AlignerDrID?: string;
+    set_sequence?: string;
+    aligner_dr_id?: string;
     [key: string]: string | undefined;
 }
 
@@ -206,7 +206,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
         try {
             const dataToSend = {
                 ...formData,
-                WorkID: workId
+                work_id: workId
             };
 
             const url = set
@@ -431,7 +431,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             <input
                                                 type="number"
                                                 id="SetSequence"
-                                                name="SetSequence"
+                                                name="set_sequence"
                                                 value={formData.set_sequence}
                                                 onChange={handleChange}
                                                 className={errors.set_sequence ? 'error' : ''}
@@ -447,7 +447,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             <input
                                                 type="number"
                                                 id="UpperAlignersCount"
-                                                name="UpperAlignersCount"
+                                                name="upper_aligners_count"
                                                 value={formData.upper_aligners_count}
                                                 onChange={handleChange}
                                                 min="0"
@@ -459,7 +459,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             <input
                                                 type="number"
                                                 id="Days"
-                                                name="Days"
+                                                name="days"
                                                 value={formData.days}
                                                 onChange={handleChange}
                                                 min="0"
@@ -488,7 +488,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             <input
                                                 type="number"
                                                 id="LowerAlignersCount"
-                                                name="LowerAlignersCount"
+                                                name="lower_aligners_count"
                                                 value={formData.lower_aligners_count}
                                                 onChange={handleChange}
                                                 min="0"
@@ -501,7 +501,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             </label>
                                             <select
                                                 id="AlignerDrID"
-                                                name="AlignerDrID"
+                                                name="aligner_dr_id"
                                                 value={formData.aligner_dr_id}
                                                 onChange={handleChange}
                                                 className={errors.aligner_dr_id ? 'error' : ''}
@@ -530,7 +530,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             <input
                                                 type="url"
                                                 id="SetUrl"
-                                                name="SetUrl"
+                                                name="set_url"
                                                 value={formData.set_url}
                                                 onChange={handleChange}
                                                 placeholder="https://..."
@@ -542,7 +542,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             <input
                                                 type="url"
                                                 id="SetPdfUrl"
-                                                name="SetPdfUrl"
+                                                name="set_pdf_url"
                                                 value={formData.set_pdf_url}
                                                 onChange={handleChange}
                                                 placeholder="https://drive.google.com/..."
@@ -554,7 +554,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             <input
                                                 type="url"
                                                 id="SetVideo"
-                                                name="SetVideo"
+                                                name="set_video"
                                                 value={formData.set_video}
                                                 onChange={handleChange}
                                                 placeholder="https://www.youtube.com/watch?v=..."
@@ -636,7 +636,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             <input
                                                 type="text"
                                                 id="SetCost"
-                                                name="SetCost"
+                                                name="set_cost"
                                                 value={displaySetCost}
                                                 onChange={(e) => {
                                                     const digits = e.target.value.replace(/[^\d]/g, '');
@@ -653,7 +653,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             <label htmlFor="Currency">Currency</label>
                                             <select
                                                 id="Currency"
-                                                name="Currency"
+                                                name="currency"
                                                 value={formData.currency}
                                                 onChange={handleChange}
                                             >
@@ -672,7 +672,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                     <label htmlFor="Notes">Notes</label>
                                     <textarea
                                         id="Notes"
-                                        name="Notes"
+                                        name="notes"
                                         value={formData.notes}
                                         onChange={handleChange}
                                         rows={4}
@@ -691,7 +691,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             <input
                                                 type="checkbox"
                                                 id="IsActive"
-                                                name="IsActive"
+                                                name="is_active"
                                                 checked={formData.is_active}
                                                 onChange={handleChange}
                                             />

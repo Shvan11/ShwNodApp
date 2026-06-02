@@ -65,13 +65,12 @@ interface ApiLoaderOptions {
  */
 export interface PatientData {
   person_id?: number;
-  code?: number;
-  id?: number;
-  name?: string;
   patient_name?: string;
   first_name?: string;
   last_name?: string;
-  Phone?: string;
+  phone?: string;
+  phone2?: string;
+  email?: string;
   [key: string]: unknown;
 }
 
@@ -81,8 +80,9 @@ export interface PatientData {
 export interface WorkData {
   work_id?: number;
   person_id?: number;
-  WorkType?: string;
-  TypeName?: string;
+  type_name?: string;
+  doctor_name?: string;
+  status_name?: string;
   [key: string]: unknown;
 }
 
@@ -306,8 +306,9 @@ export async function workDetailsLoader({
  * Timepoint data
  */
 export interface TimepointData {
-  ID?: number;
-  TimePoint?: string;
+  tp_code?: string | number;
+  tp_date_time?: string;
+  tp_description?: string;
   [key: string]: unknown;
 }
 
@@ -398,8 +399,10 @@ export async function patientShellLoader({
  * Doctor data
  */
 export interface DoctorData {
-  DoctorID?: number;
-  DoctorName?: string;
+  dr_id?: number;
+  doctor_name?: string;
+  doctor_email?: string | null;
+  logo_path?: string | null;
   [key: string]: unknown;
 }
 
@@ -610,10 +613,10 @@ export async function patientManagementLoader({
 
     // Parse responses
     const allPatients: PatientData[] = allPatientsRes.ok ? await allPatientsRes.json() : [];
-    const workTypesData: Array<{ ID: number; WorkType: string }> = workTypesRes.ok
+    const workTypesData: Array<{ id: number; work_type: string }> = workTypesRes.ok
       ? await workTypesRes.json()
       : [];
-    const keywordsData: Array<{ ID: number; KeyWord: string }> = keywordsRes.ok
+    const keywordsData: Array<{ id: number; key_word: string }> = keywordsRes.ok
       ? await keywordsRes.json()
       : [];
     const tagsData: Array<{ id: number; tag: string }> = tagsRes.ok ? await tagsRes.json() : [];
@@ -623,13 +626,13 @@ export async function patientManagementLoader({
 
     // Transform to react-select format
     const workTypes: SelectOption[] = workTypesData.map((wt) => ({
-      value: wt.ID,
-      label: wt.WorkType,
+      value: wt.id,
+      label: wt.work_type,
     }));
 
     const keywords: SelectOption[] = keywordsData.map((kw) => ({
-      value: kw.ID,
-      label: kw.KeyWord,
+      value: kw.id,
+      label: kw.key_word,
     }));
 
     const tags: SelectOption[] = tagsData.map((tag) => ({
@@ -714,12 +717,12 @@ export async function patientManagementLoader({
  * Appointment data
  */
 export interface AppointmentData {
-  AppointmentID?: number;
-  PatientID?: number;
-  PatientName?: string;
-  AppsDate?: string;
-  AppsTime?: string;
-  State?: string;
+  appointment_id?: number;
+  person_id?: number;
+  patient_name?: string;
+  app_date?: string | Date;
+  app_detail?: string;
+  apptime?: string | null;
   [key: string]: unknown;
 }
 

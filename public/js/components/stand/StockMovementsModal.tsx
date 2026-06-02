@@ -54,22 +54,22 @@ function MovementsTable({ movements }: { movements: StandStockMovement[] }) {
         </thead>
         <tbody>
           {movements.map((mov) => {
-            const qtyClass = mov.Quantity >= 0 ? styles.quantityPositive : styles.quantityNegative;
-            const qtyDisplay = mov.Quantity > 0 ? `+${formatNumber(mov.Quantity)}` : formatNumber(mov.Quantity);
+            const qtyClass = mov.quantity >= 0 ? styles.quantityPositive : styles.quantityNegative;
+            const qtyDisplay = mov.quantity > 0 ? `+${formatNumber(mov.quantity)}` : formatNumber(mov.quantity);
 
             return (
-              <tr key={mov.MovementID}>
-                <td>{formatDate(mov.MovementDate)}</td>
+              <tr key={mov.movement_id}>
+                <td>{formatDate(mov.movement_date)}</td>
                 <td>
-                  <span className={`${styles.typeBadge} ${getTypeBadgeClass(mov.MovementType)}`}>
-                    {mov.MovementType}
+                  <span className={`${styles.typeBadge} ${getTypeBadgeClass(mov.movement_type)}`}>
+                    {mov.movement_type}
                   </span>
                 </td>
                 <td className={qtyClass}>{qtyDisplay}</td>
-                <td>{mov.TotalCost != null ? formatNumber(mov.TotalCost) : '-'}</td>
-                <td>{mov.RelatedSaleID != null ? `#${mov.RelatedSaleID}` : '-'}</td>
-                <td className={styles.reasonCell} title={mov.Reason || undefined}>
-                  {mov.Reason || '-'}
+                <td>{mov.total_cost != null ? formatNumber(mov.total_cost) : '-'}</td>
+                <td>{mov.related_sale_id != null ? `#${mov.related_sale_id}` : '-'}</td>
+                <td className={styles.reasonCell} title={mov.reason || undefined}>
+                  {mov.reason || '-'}
                 </td>
                 <td>{mov.PerformedByName || '-'}</td>
               </tr>
@@ -82,7 +82,7 @@ function MovementsTable({ movements }: { movements: StandStockMovement[] }) {
 }
 
 export default function StockMovementsModal({ isOpen, item, onClose }: StockMovementsModalProps) {
-  const { movements, loading } = useStockMovements(isOpen && item ? item.ItemID : null);
+  const { movements, loading } = useStockMovements(isOpen && item ? item.item_id : null);
 
   if (!item) return null;
 
@@ -103,9 +103,9 @@ export default function StockMovementsModal({ isOpen, item, onClose }: StockMove
         <div className={styles.modalBody}>
           <div className={styles.itemInfo}>
             <p>
-              <strong>{item.ItemName}</strong>
+              <strong>{item.item_name}</strong>
             </p>
-            <p>Current Stock: {formatNumber(item.CurrentStock)}</p>
+            <p>Current Stock: {formatNumber(item.current_stock)}</p>
           </div>
 
           {loading ? (

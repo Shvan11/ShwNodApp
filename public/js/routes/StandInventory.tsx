@@ -100,7 +100,7 @@ export default function StandInventory() {
   const handleSaveItem = async (data: Record<string, unknown>) => {
     try {
       if (formItem) {
-        await updateItem(formItem.ItemID, data);
+        await updateItem(formItem.item_id, data);
         toast.success('Item updated successfully');
       } else {
         await createItem(data as unknown as Parameters<typeof createItem>[0]);
@@ -116,7 +116,7 @@ export default function StandInventory() {
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await deleteItem(deleteTarget.ItemID);
+      await deleteItem(deleteTarget.item_id);
       toast.success('Item deactivated successfully');
       setDeleteTarget(null);
     } catch {
@@ -127,7 +127,7 @@ export default function StandInventory() {
   const handleConfirmRestock = async (quantity: number, unitCost: number) => {
     if (!restockTarget) return;
     try {
-      await restockItem(restockTarget.ItemID, quantity, unitCost);
+      await restockItem(restockTarget.item_id, quantity, unitCost);
       toast.success('Item restocked successfully');
       setRestockTarget(null);
     } catch {
@@ -138,7 +138,7 @@ export default function StandInventory() {
   const handleConfirmAdjust = async (delta: number, reason: string) => {
     if (!adjustTarget) return;
     try {
-      await adjustStock(adjustTarget.ItemID, delta, reason);
+      await adjustStock(adjustTarget.item_id, delta, reason);
       toast.success('Stock adjusted successfully');
       setAdjustTarget(null);
     } catch {

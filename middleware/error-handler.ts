@@ -14,6 +14,7 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import { log } from '../utils/logger.js';
+import { classifyPgError } from '../utils/pg-errors.js';
 
 export function errorHandler(
   err: Error,
@@ -34,6 +35,30 @@ export function errorHandler(
       path: req.path,
       error: err.message,
       stack: err.stack,
+    });
+    return;
+  }
+
+  // Safety net for a pg constraint violation that escaped a route's own
+  // try/catch: classify it to the right status (409/400) instead of a blanket
+  // 500. Routes that handle the error locally never reach here.
+  const classified = classifyPgError(err);
+  if (classified) {
+    log.warn('DB error classified at central handler', {
+      timestamp,
+      method: req.method,
+      path: req.path,
+      code: classified.code,
+      error: err.message,
+    });
+    res.status(classified.status).json({
+      success: false,
+      error: classified.message,
+      code: classified.code,
+      timestamp,
+      ...(!isProduction && {
+        details: { message: err.message, stack: err.stack },
+      }),
     });
     return;
   }

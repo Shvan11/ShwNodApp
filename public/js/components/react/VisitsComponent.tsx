@@ -11,25 +11,25 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import styles from './VisitsComponent.module.css';
 
 interface Visit {
-    ID: number;
+    id: number;
     work_id: number;
     visit_date: string;
-    OperatorID?: number;
+    operator_id?: number;
     OperatorName?: string;
-    UpperWireID?: number;
+    upper_wire_id?: number;
     UpperWireName?: string;
-    LowerWireID?: number;
+    lower_wire_id?: number;
     LowerWireName?: string;
-    BracketChange?: string;
-    WireBending?: string;
-    Elastics?: string;
-    OPG?: boolean;
-    IPhoto?: boolean;
-    PPhoto?: boolean;
-    FPhoto?: boolean;
-    Others?: string;
-    NextVisit?: string;
-    ApplianceRemoved?: boolean;
+    bracket_change?: string;
+    wire_bending?: string;
+    elastics?: string;
+    opg?: boolean;
+    i_photo?: boolean;
+    p_photo?: boolean;
+    f_photo?: boolean;
+    others?: string;
+    next_visit?: string;
+    appliance_removed?: boolean;
 }
 
 interface VisitsComponentProps {
@@ -38,7 +38,7 @@ interface VisitsComponentProps {
 }
 
 const SEARCHABLE_FIELDS: (keyof Visit)[] = [
-    'Others', 'BracketChange', 'WireBending', 'Elastics', 'NextVisit',
+    'others', 'bracket_change', 'wire_bending', 'elastics', 'next_visit',
 ];
 
 const visitMatches = (visit: Visit, term: string): boolean => {
@@ -189,18 +189,18 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                 </div>
                 <div className={styles.summaryCard}>
                     <h3>OPG Taken</h3>
-                    <span className={styles.summaryValue}>{visits.filter(v => v.OPG).length}</span>
+                    <span className={styles.summaryValue}>{visits.filter(v => v.opg).length}</span>
                 </div>
                 <div className={styles.summaryCard}>
                     <h3>Photos Taken</h3>
-                    <span className={styles.summaryValue}>{visits.filter(v => v.IPhoto || v.PPhoto || v.FPhoto).length}</span>
+                    <span className={styles.summaryValue}>{visits.filter(v => v.i_photo || v.p_photo || v.f_photo).length}</span>
                 </div>
             </div>
 
             {/* Visit Cards View */}
             <div className={styles.cardsContainer}>
                 {filteredVisits.map((visit) => (
-                    <div key={visit.ID} className={styles.card}>
+                    <div key={visit.id} className={styles.card}>
                         {/* Header Row */}
                         <div className={styles.cardHeader}>
                             <div>
@@ -211,24 +211,24 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                                     {visit.OperatorName && (
                                         <span><i className="fas fa-user-md"></i> {visit.OperatorName}</span>
                                     )}
-                                    {visit.OPG && (
+                                    {visit.opg && (
                                         <span className={styles.metaSuccess}><i className="fas fa-x-ray"></i> OPG</span>
                                     )}
-                                    {visit.ApplianceRemoved && (
+                                    {visit.appliance_removed && (
                                         <span className={styles.metaDanger}><i className="fas fa-times-circle"></i> Removed</span>
                                     )}
                                 </div>
                             </div>
                             <div className={styles.actionButtons}>
                                 <button
-                                    onClick={() => handleEditVisit(visit.ID)}
+                                    onClick={() => handleEditVisit(visit.id)}
                                     className="btn-edit"
                                     title="Edit visit"
                                 >
                                     Edit
                                 </button>
                                 <button
-                                    onClick={() => handleDeleteVisit(visit.ID)}
+                                    onClick={() => handleDeleteVisit(visit.id)}
                                     className="btn-delete"
                                     title="Delete visit"
                                 >
@@ -256,51 +256,51 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                         )}
 
                         {/* Treatment Info */}
-                        {(visit.BracketChange || visit.WireBending || visit.Elastics) && (
+                        {(visit.bracket_change || visit.wire_bending || visit.elastics) && (
                             <div className={styles.treatmentInfo}>
-                                {visit.BracketChange && (
+                                {visit.bracket_change && (
                                     <div className={styles.treatmentInfoItem}>
                                         <span className={styles.treatmentInfoLabel}>Bracket: </span>
-                                        <span className={styles.treatmentInfoValue}>{highlight(visit.BracketChange, searchTerm, styles.highlight)}</span>
+                                        <span className={styles.treatmentInfoValue}>{highlight(visit.bracket_change, searchTerm, styles.highlight)}</span>
                                     </div>
                                 )}
-                                {visit.WireBending && (
+                                {visit.wire_bending && (
                                     <div className={styles.treatmentInfoItem}>
                                         <span className={styles.treatmentInfoLabel}>Bending: </span>
-                                        <span className={styles.treatmentInfoValue}>{highlight(visit.WireBending, searchTerm, styles.highlight)}</span>
+                                        <span className={styles.treatmentInfoValue}>{highlight(visit.wire_bending, searchTerm, styles.highlight)}</span>
                                     </div>
                                 )}
-                                {visit.Elastics && (
+                                {visit.elastics && (
                                     <div className={styles.treatmentInfoItem}>
                                         <span className={styles.treatmentInfoLabel}>Elastics: </span>
-                                        <span className={styles.treatmentInfoValue}>{highlight(visit.Elastics, searchTerm, styles.highlight)}</span>
+                                        <span className={styles.treatmentInfoValue}>{highlight(visit.elastics, searchTerm, styles.highlight)}</span>
                                     </div>
                                 )}
                             </div>
                         )}
 
                         {/* Photos */}
-                        {(visit.IPhoto || visit.PPhoto || visit.FPhoto) && (
+                        {(visit.i_photo || visit.p_photo || visit.f_photo) && (
                             <div className={styles.photoBadges}>
-                                {visit.IPhoto && <span className={styles.photoBadge}><i className="fas fa-camera"></i> Initial</span>}
-                                {visit.PPhoto && <span className={styles.photoBadge}><i className="fas fa-camera"></i> Progress</span>}
-                                {visit.FPhoto && <span className={styles.photoBadge}><i className="fas fa-camera"></i> Final</span>}
+                                {visit.i_photo && <span className={styles.photoBadge}><i className="fas fa-camera"></i> Initial</span>}
+                                {visit.p_photo && <span className={styles.photoBadge}><i className="fas fa-camera"></i> Progress</span>}
+                                {visit.f_photo && <span className={styles.photoBadge}><i className="fas fa-camera"></i> Final</span>}
                             </div>
                         )}
 
                         {/* Notes Section */}
-                        {visit.Others && (
+                        {visit.others && (
                             <div className={styles.notesSection}>
                                 <strong><i className="fas fa-sticky-note"></i> Notes</strong>
-                                <p>{highlight(visit.Others, searchTerm, styles.highlight)}</p>
+                                <p>{highlight(visit.others, searchTerm, styles.highlight)}</p>
                             </div>
                         )}
 
                         {/* Next Visit Instructions */}
-                        {visit.NextVisit && (
+                        {visit.next_visit && (
                             <div className={styles.nextVisitSection}>
                                 <strong><i className="fas fa-arrow-circle-right"></i> Next Visit</strong>
-                                <p>{highlight(visit.NextVisit, searchTerm, styles.highlight)}</p>
+                                <p>{highlight(visit.next_visit, searchTerm, styles.highlight)}</p>
                             </div>
                         )}
                     </div>

@@ -90,32 +90,32 @@ export default function ItemTable({
           </thead>
           <tbody>
             {items.map((item) => {
-              const stockBadge = getStockBadge(item.CurrentStock, item.ReorderLevel);
-              const profit = item.SellPrice - item.CostPrice;
-              const expiryStatus = isExpiringSoon(item.ExpiryDate);
+              const stockBadge = getStockBadge(item.current_stock, item.reorder_level);
+              const profit = item.sell_price - item.cost_price;
+              const expiryStatus = isExpiringSoon(item.expiry_date);
 
               return (
                 <tr
-                  key={item.ItemID}
-                  className={!item.IsActive ? styles.inactiveRow : undefined}
+                  key={item.item_id}
+                  className={!item.is_active ? styles.inactiveRow : undefined}
                 >
-                  <td>{item.ItemName}</td>
-                  <td>{item.SKU || '-'}</td>
-                  <td>{item.CategoryName || '-'}</td>
+                  <td>{item.item_name}</td>
+                  <td>{item.sku || '-'}</td>
+                  <td>{item.category_name || '-'}</td>
                   <td>
                     <span className={`${styles.stockBadge} ${stockBadge.className}`}>
-                      {item.CurrentStock} &middot; {stockBadge.label}
+                      {item.current_stock} &middot; {stockBadge.label}
                     </span>
                   </td>
-                  <td className={styles.amountCell}>{formatNumber(item.CostPrice)}</td>
-                  <td className={styles.amountCell}>{formatNumber(item.SellPrice)}</td>
+                  <td className={styles.amountCell}>{formatNumber(item.cost_price)}</td>
+                  <td className={styles.amountCell}>{formatNumber(item.sell_price)}</td>
                   <td
                     className={`${styles.profitCell} ${profit < 0 ? styles.profitNegative : ''}`}
                   >
                     {formatNumber(profit)}
                   </td>
                   <td>
-                    {item.ExpiryDate ? (
+                    {item.expiry_date ? (
                       <span
                         className={
                           expiryStatus === 'expired'
@@ -125,7 +125,7 @@ export default function ItemTable({
                               : undefined
                         }
                       >
-                        {formatDate(item.ExpiryDate)}
+                        {formatDate(item.expiry_date)}
                       </span>
                     ) : (
                       '-'
@@ -136,35 +136,35 @@ export default function ItemTable({
                       <button
                         className={`${styles.actionBtn} ${styles.btnEdit}`}
                         onClick={() => onEdit(item)}
-                        aria-label={`Edit ${item.ItemName}`}
+                        aria-label={`Edit ${item.item_name}`}
                       >
                         Edit
                       </button>
                       <button
                         className={`${styles.actionBtn} ${styles.btnRestock}`}
                         onClick={() => onRestock(item)}
-                        aria-label={`Restock ${item.ItemName}`}
+                        aria-label={`Restock ${item.item_name}`}
                       >
                         Restock
                       </button>
                       <button
                         className={`${styles.actionBtn} ${styles.btnAdjust}`}
                         onClick={() => onAdjust(item)}
-                        aria-label={`Adjust stock for ${item.ItemName}`}
+                        aria-label={`Adjust stock for ${item.item_name}`}
                       >
                         Adjust
                       </button>
                       <button
                         className={`${styles.actionBtn} ${styles.btnMovements}`}
                         onClick={() => onMovements(item)}
-                        aria-label={`View movements for ${item.ItemName}`}
+                        aria-label={`View movements for ${item.item_name}`}
                       >
                         Movements
                       </button>
                       <button
                         className={`${styles.actionBtn} ${styles.btnDelete}`}
                         onClick={() => onDelete(item)}
-                        aria-label={`Delete ${item.ItemName}`}
+                        aria-label={`Delete ${item.item_name}`}
                       >
                         Delete
                       </button>

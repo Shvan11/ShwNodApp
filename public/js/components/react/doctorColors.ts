@@ -13,23 +13,23 @@ import type { DoctorColor, LegendDoctor } from './calendar.types';
 
 /** Minimal employee shape needed to resolve a calendar colour. */
 export interface DoctorColorSource {
-    ID: number;
-    employeeName: string;
-    AppointmentColor?: string | null;
+    id: number;
+    employee_name: string;
+    appointment_color?: string | null;
 }
 
 /**
  * Built-in defaults for the historically hand-tuned doctors, applied when the
- * employee has no AppointmentColor set so their calendar look is preserved
+ * employee has no appointment_color set so their calendar look is preserved
  * exactly. Editing the colour in Employee Settings overrides these.
- * Keyed by drID (tblEmployees.ID). fill = soft card background, edge = border.
+ * Keyed by drID (employees.id). fill = soft card background, edge = border.
  */
 const FIXED_DEFAULT_COLORS: Record<number, DoctorColor> = {
     7: { fill: 'oklch(94% 0.04 250)', edge: 'oklch(70% 0.12 250)' }, // Rojena — blue
     1: { fill: 'oklch(94% 0.05 85)',  edge: 'oklch(72% 0.13 85)'  }  // Shwan Elias — amber
 };
 
-/** Seed shown in the Settings colour picker when no custom colour is set. */
+/** Seed shown in the Settings colour picker when no custom appointment_color is set. */
 export const DEFAULT_PICKER_HEX: Record<number, string> = {
     7: '#4f8de0', // ≈ Rojena blue
     1: '#d8a64b'  // ≈ Shwan amber
@@ -59,11 +59,11 @@ export function hexToDoctorColor(hex: string): DoctorColor | null {
  * neutral (no tint).
  */
 export function resolveDoctorColor(emp: DoctorColorSource): DoctorColor | null {
-    if (emp.AppointmentColor) {
-        const custom = hexToDoctorColor(emp.AppointmentColor);
+    if (emp.appointment_color) {
+        const custom = hexToDoctorColor(emp.appointment_color);
         if (custom) return custom;
     }
-    return FIXED_DEFAULT_COLORS[emp.ID] ?? null;
+    return FIXED_DEFAULT_COLORS[emp.id] ?? null;
 }
 
 export interface DoctorColorResult {
@@ -82,8 +82,8 @@ export function buildDoctorColors(eligible: DoctorColorSource[]): DoctorColorRes
     const legend: LegendDoctor[] = [];
     for (const emp of eligible) {
         const color = resolveDoctorColor(emp);
-        if (color) byId.set(emp.ID, color);
-        legend.push({ id: emp.ID, name: emp.employeeName, color });
+        if (color) byId.set(emp.id, color);
+        legend.push({ id: emp.id, name: emp.employee_name, color });
     }
     return { byId, legend };
 }

@@ -111,7 +111,7 @@ const PatientShell = () => {
         : (patient?.name || patient?.patient_name || `Patient ${personId}`) as string;
 
     // Work display name from loader data
-    const workTypeName = work?.TypeName || '';
+    const workTypeName = work?.type_name || '';
 
     // Fetch work data when workId (from route or query param) changes
     const workIdFromQuery = searchParams.get('workId');
@@ -123,7 +123,7 @@ const PatientShell = () => {
         view: searchParams.get('view') ?? undefined,
         filter: searchParams.get('filter') ?? undefined,
         workId: effectiveWorkId ?? undefined,
-        phone: patient?.Phone ?? undefined,
+        phone: patient?.phone ?? undefined,
     };
 
     return (

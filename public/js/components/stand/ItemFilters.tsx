@@ -82,8 +82,8 @@ export default function ItemFilters({ filters, onFilterChange, onApply, onReset 
             >
               <option value="">All Categories</option>
               {categories.map((cat) => (
-                <option key={cat.CategoryID} value={cat.CategoryID}>
-                  {cat.CategoryName}
+                <option key={cat.category_id} value={cat.category_id}>
+                  {cat.category_name}
                 </option>
               ))}
             </select>

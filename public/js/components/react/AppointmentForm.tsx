@@ -17,13 +17,13 @@ interface ValidationErrors {
 }
 
 interface Doctor {
-    ID: number;
-    employeeName: string;
+    id: number;
+    employee_name: string;
 }
 
 interface AppointmentDetail {
-    ID: number;
-    Detail: string;
+    id: number;
+    detail: string;
 }
 
 interface AppointmentFormProps {
@@ -90,8 +90,8 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
             // "Clinic" is the most common assignment, so float it to the top of the
             // dropdown; everyone else keeps the server's SortOrder (Array.sort is stable).
             employees.sort((a, b) => {
-                if (a.employeeName === 'Clinic') return -1;
-                if (b.employeeName === 'Clinic') return 1;
+                if (a.employee_name === 'Clinic') return -1;
+                if (b.employee_name === 'Clinic') return 1;
                 return 0;
             });
             setDoctors(employees);
@@ -350,9 +350,9 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                                 className={validation.DrID ? styles.error : ''}
                             >
                                 <option value="">Select doctor...</option>
-                                {doctors.filter(d => d.ID).map((doctor) => (
-                                    <option key={doctor.ID} value={doctor.ID}>
-                                        {doctor.employeeName}
+                                {doctors.filter(d => d.id).map((doctor) => (
+                                    <option key={doctor.id} value={doctor.id}>
+                                        {doctor.employee_name}
                                     </option>
                                 ))}
                             </select>
@@ -370,9 +370,9 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                                 className={validation.AppDetail ? styles.error : ''}
                             >
                                 <option value="">Select type...</option>
-                                {details.filter(d => d.ID).map((detail) => (
-                                    <option key={detail.ID} value={detail.Detail}>
-                                        {detail.Detail}
+                                {details.filter(d => d.id).map((detail) => (
+                                    <option key={detail.id} value={detail.detail}>
+                                        {detail.detail}
                                     </option>
                                 ))}
                             </select>
