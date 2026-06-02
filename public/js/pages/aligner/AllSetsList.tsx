@@ -4,25 +4,25 @@ import { useNavigate } from 'react-router-dom';
 import styles from './AllSetsList.module.css';
 
 interface AlignerSetView {
-    PersonID: number;
-    WorkID: number;
-    AlignerSetID: number;
-    PatientName: string;
-    DoctorName: string;
-    AlignerDrID: number;
-    SetSequence: number | null;
-    BatchSequence: number | null;
-    DeliveredToPatientDate: string | null;
+    person_id: number;
+    work_id: number;
+    aligner_set_id: number;
+    patient_name: string;
+    doctor_name: string;
+    aligner_dr_id: number;
+    set_sequence: number | null;
+    batch_sequence: number | null;
+    delivered_to_patient_date: string | null;
     NextDueDate: string | null;
     NextBatchPresent: 'True' | 'False';
     LabStatus: 'no_batches' | 'needs_mfg' | 'in_lab' | 'all_delivered';
     IsLast: boolean | number;
     SetIsActive: boolean | number;
     WorkStatus: number;
-    Notes: string | null;
+    notes: string | null;
 }
 
-type SortColumn = 'PatientName' | 'DoctorName' | 'SetSequence' | 'BatchSequence' | 'LabStatus' | 'NextDueDate' | 'Notes';
+type SortColumn = 'patient_name' | 'doctor_name' | 'set_sequence' | 'batch_sequence' | 'LabStatus' | 'NextDueDate' | 'notes';
 type SortDirection = 'asc' | 'desc';
 
 const AllSetsList: React.FC = () => {
@@ -61,7 +61,7 @@ const AllSetsList: React.FC = () => {
 
     const handlePatientClick = (set: AlignerSetView): void => {
         // Navigate to patient's aligner management page
-        navigate(`/aligner/patient/${set.WorkID}`);
+        navigate(`/aligner/patient/${set.work_id}`);
     };
 
     const formatDate = (dateString: string | null): string => {
@@ -77,8 +77,8 @@ const AllSetsList: React.FC = () => {
     const getUniqueDoctors = (): { id: number; name: string }[] => {
         const doctorMap = new Map<number, string>();
         sets.forEach(set => {
-            if (!doctorMap.has(set.AlignerDrID)) {
-                doctorMap.set(set.AlignerDrID, set.DoctorName);
+            if (!doctorMap.has(set.aligner_dr_id)) {
+                doctorMap.set(set.aligner_dr_id, set.doctor_name);
             }
         });
         return Array.from(doctorMap.entries()).map(([id, name]) => ({ id, name }));
@@ -86,7 +86,7 @@ const AllSetsList: React.FC = () => {
 
     // Check if patient is waiting for next batch (previously delivered, but no next batch)
     const isWaitingForNextBatch = (set: AlignerSetView): boolean => {
-        return set.NextBatchPresent === 'False' && !!set.DeliveredToPatientDate;
+        return set.NextBatchPresent === 'False' && !!set.delivered_to_patient_date;
     };
 
     // Render next batch status badge (combined status + readiness)
@@ -99,7 +99,7 @@ const AllSetsList: React.FC = () => {
         }
 
         // Final batch delivered = treatment complete (flag shown in Active Batch column)
-        if (isFinal && set.DeliveredToPatientDate) {
+        if (isFinal && set.delivered_to_patient_date) {
             return <span className={`${styles.badge} ${styles.badgeNa}`}>—</span>;
         }
 
@@ -144,7 +144,7 @@ const AllSetsList: React.FC = () => {
 
         // Filter by doctor
         if (selectedDoctor !== 'all') {
-            filtered = filtered.filter(s => s.AlignerDrID === parseInt(selectedDoctor));
+            filtered = filtered.filter(s => s.aligner_dr_id === parseInt(selectedDoctor));
         }
 
         // Filter by no next batch if toggle is on
@@ -167,8 +167,8 @@ const AllSetsList: React.FC = () => {
         if (filter.trim()) {
             const query = filter.toLowerCase();
             filtered = filtered.filter(s => {
-                const name = (s.PatientName || '').toLowerCase();
-                const doctor = (s.DoctorName || '').toLowerCase();
+                const name = (s.patient_name || '').toLowerCase();
+                const doctor = (s.doctor_name || '').toLowerCase();
                 return name.includes(query) || doctor.includes(query);
             });
         }
@@ -263,10 +263,10 @@ const AllSetsList: React.FC = () => {
     const lastBatchCount = activeSets.filter(s => s.IsLast === true || s.IsLast === 1).length;
     const finishedCount = baseSets.filter(s => s.WorkStatus === 2 || s.WorkStatus === 3).length;
     const inactiveSetsCount = sets.filter(s => s.SetIsActive !== true && s.SetIsActive !== 1).length;
-    const noNextBatchCount = activeSets.filter(s => s.NextBatchPresent === 'False' && s.DeliveredToPatientDate).length;
+    const noNextBatchCount = activeSets.filter(s => s.NextBatchPresent === 'False' && s.delivered_to_patient_date).length;
     // Count sets that are "Not Created" - all batches delivered but not marked as final
     const notCreatedCount = activeSets.filter(s =>
-        s.BatchSequence &&
+        s.batch_sequence &&
         !(s.IsLast === true || s.IsLast === 1) &&
         s.NextBatchPresent === 'False' &&
         s.LabStatus === 'all_delivered'
@@ -427,13 +427,13 @@ const AllSetsList: React.FC = () => {
                     <table className={styles.table}>
                         <thead>
                             <tr>
-                                {renderSortableHeader('Patient', 'PatientName')}
-                                {renderSortableHeader('Doctor', 'DoctorName')}
-                                {renderSortableHeader('Active Set', 'SetSequence')}
-                                {renderSortableHeader('Active Batch', 'BatchSequence')}
+                                {renderSortableHeader('Patient', 'patient_name')}
+                                {renderSortableHeader('Doctor', 'doctor_name')}
+                                {renderSortableHeader('Active Set', 'set_sequence')}
+                                {renderSortableHeader('Active Batch', 'batch_sequence')}
                                 {renderSortableHeader('Next Batch Status', 'LabStatus')}
                                 {renderSortableHeader('Next Due', 'NextDueDate')}
-                                {renderSortableHeader('Notes', 'Notes')}
+                                {renderSortableHeader('notes', 'notes')}
                             </tr>
                         </thead>
                         <tbody>
@@ -454,7 +454,7 @@ const AllSetsList: React.FC = () => {
                                 // Format active batch with delivery date
                                 const renderActiveBatch = (): ReactNode => {
                                     // No batch delivered yet = no active batch
-                                    if (!set.DeliveredToPatientDate) {
+                                    if (!set.delivered_to_patient_date) {
                                         return <span className={`${styles.badge} ${styles.badgeNoBatch}`}>No active batch</span>;
                                     }
                                     // Has delivered batch - show batch number and delivery date
@@ -462,7 +462,7 @@ const AllSetsList: React.FC = () => {
                                     return (
                                         <>
                                             <span className={`${styles.badge} ${styles.badgeBatch}`}>
-                                                Batch {set.BatchSequence} · {formatDate(set.DeliveredToPatientDate)}
+                                                Batch {set.batch_sequence} · {formatDate(set.delivered_to_patient_date)}
                                             </span>
                                             {isFinal && (
                                                 <span className={`${styles.badge} ${styles.badgeFinal}`} style={{ marginLeft: '4px' }}>
@@ -475,20 +475,20 @@ const AllSetsList: React.FC = () => {
 
                                 return (
                                 <tr
-                                    key={`${set.PersonID}-${set.AlignerSetID}`}
+                                    key={`${set.person_id}-${set.aligner_set_id}`}
                                     onClick={() => handlePatientClick(set)}
                                     className={rowClass}
                                 >
                                     <td data-label="Patient">
                                         <div className={styles.patientName}>
-                                            {set.PatientName}
+                                            {set.patient_name}
                                         </div>
                                     </td>
-                                    <td data-label="Doctor">{set.DoctorName === 'Admin' ? set.DoctorName : `Dr. ${set.DoctorName}`}</td>
+                                    <td data-label="Doctor">{set.doctor_name === 'Admin' ? set.doctor_name : `Dr. ${set.doctor_name}`}</td>
                                     <td data-label="Set">
-                                        {set.SetSequence != null ? (
+                                        {set.set_sequence != null ? (
                                             <span className={`${styles.badge} ${styles.badgeSet}`}>
-                                                Set {set.SetSequence}
+                                                Set {set.set_sequence}
                                             </span>
                                         ) : (
                                             <span className={`${styles.badge} ${styles.badgeNoSet}`}>
@@ -502,9 +502,9 @@ const AllSetsList: React.FC = () => {
                                         {set.NextDueDate ? formatDate(set.NextDueDate) : '—'}
                                     </td>
                                     <td data-label="Notes">
-                                        {set.Notes ? (
+                                        {set.notes ? (
                                             <span className={styles.notes}>
-                                                {set.Notes}
+                                                {set.notes}
                                             </span>
                                         ) : (
                                             <span className={styles.notesEmpty}>—</span>

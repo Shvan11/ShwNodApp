@@ -88,7 +88,7 @@ const AppointmentsList = ({
             <div className={styles.grid}>
                 {sortedAppointments.map(appointment => (
                     <AppointmentCard
-                        key={appointment.appointmentID || appointment.AppointmentID}
+                        key={appointment.appointment_id}
                         appointment={appointment}
                         showStatus={showStatus}
                         onCheckIn={onCheckIn}

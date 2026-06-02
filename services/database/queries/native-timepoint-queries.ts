@@ -11,8 +11,8 @@
  * `new sql.Request(tx)` + T-SQL `WITH (UPDLOCK, HOLDLOCK)` / `IF @@ROWCOUNT=0` became
  * a `withPgTransaction` with `SELECT … FOR UPDATE` on the existing-row lookup, and the
  * Phase-2 unique constraints as the race backstops:
- *   - `UX_tblTimePoints_Person_tpCode` (PersonID, tpCode)  — find-or-create allocator
- *   - `UQ_tblTimePointImages_TP_Type`  (TimePointID, ImageType) — image upsert key
+ *   - `UX_tblTimePoints_Person_tpCode` (person_id, tpCode)  — find-or-create allocator
+ *   - `UQ_tblTimePointImages_TP_Type`  (time_point_id, image_type) — image upsert key
  */
 import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
@@ -20,15 +20,15 @@ import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 
 export interface NativeTimePoint {
-  tpCode: number;
+  tp_code: number;
   timePointId: number;
 }
 
 /**
- * Find an existing native timepoint by (PersonID, tpDescription, tpDateTime), or
+ * Find an existing native timepoint by (person_id, tpDescription, tpDateTime), or
  * create one with the next per-patient `tpCode` (MAX+1). The existing-row lookup takes
  * `FOR UPDATE` inside the transaction so a concurrent identical prepare waits; the
- * unique `(PersonID, tpCode)` index backstops the new-allocation race (a losing
+ * unique `(person_id, tpCode)` index backstops the new-allocation race (a losing
  * concurrent allocator surfaces a unique-violation, which the caller can retry).
  *
  * @param tpDate local-midnight Date; bound as a 'YYYY-MM-DD' string via toDateOnly so
@@ -42,38 +42,38 @@ export async function findOrCreateNativeTimePoint(
   const dateStr = toDateOnly(tpDate);
   return withPgTransaction(async (trx) => {
     const existing = await trx
-      .selectFrom('tblTimePoints')
-      .where('PersonID', '=', personId)
-      .where('tpDescription', '=', tpName)
-      .where('tpDateTime', '=', sql<Date>`${dateStr}`)
-      .orderBy('tpCode')
-      .select(['TimePointID', 'tpCode'])
+      .selectFrom('time_points')
+      .where('person_id', '=', personId)
+      .where('tp_description', '=', tpName)
+      .where('tp_date_time', '=', sql<Date>`${dateStr}`)
+      .orderBy('tp_code')
+      .select(['time_point_id', 'tp_code'])
       .limit(1)
       .forUpdate()
       .executeTakeFirst();
     if (existing) {
-      return { tpCode: existing.tpCode, timePointId: existing.TimePointID };
+      return { tp_code: existing.tp_code, timePointId: existing.time_point_id };
     }
 
     const maxRow = await trx
-      .selectFrom('tblTimePoints')
-      .where('PersonID', '=', personId)
-      .select((eb) => eb.fn.max('tpCode').as('maxCode'))
+      .selectFrom('time_points')
+      .where('person_id', '=', personId)
+      .select((eb) => eb.fn.max('tp_code').as('maxCode'))
       .executeTakeFirst();
     const next = (maxRow?.maxCode ?? -1) + 1;
 
     const inserted = await trx
-      .insertInto('tblTimePoints')
-      .values({ PersonID: personId, tpCode: next, tpDescription: tpName, tpDateTime: sql<Date>`${dateStr}` })
-      .returning(['TimePointID', 'tpCode'])
+      .insertInto('time_points')
+      .values({ person_id: personId, tp_code: next, tp_description: tpName, tp_date_time: sql<Date>`${dateStr}` })
+      .returning(['time_point_id', 'tp_code'])
       .executeTakeFirstOrThrow();
-    log.info('Created native timepoint', { personId, tpCode: inserted.tpCode, tpName });
-    return { tpCode: inserted.tpCode, timePointId: inserted.TimePointID };
+    log.info('Created native timepoint', { personId, tp_code: inserted.tp_code, tpName });
+    return { tp_code: inserted.tp_code, timePointId: inserted.time_point_id };
   });
 }
 
 /**
- * Upsert one view-image row keyed on (TimePointID, ImageType) via the Phase-2
+ * Upsert one view-image row keyed on (time_point_id, image_type) via the Phase-2
  * unique constraint — re-saving a slot updates in place instead of duplicating.
  *
  * @param imageType 2-digit view code, e.g. '10'  (the view minus the leading 'i')
@@ -89,21 +89,21 @@ export async function upsertNativeTimePointImage(
 ): Promise<void> {
   const dateStr = toDateOnly(imageDate);
   await getKysely()
-    .insertInto('tblTimePointImages')
+    .insertInto('time_point_images')
     .values({
-      TimePointID: timePointId,
-      PersonID: personId,
-      ImageType: imageType,
-      ImageFile: imageFile,
-      ImageDate: sql<Date>`${dateStr}`,
-      Title: title,
+      time_point_id: timePointId,
+      person_id: personId,
+      image_type: imageType,
+      image_file: imageFile,
+      image_date: sql<Date>`${dateStr}`,
+      title: title,
     })
     .onConflict((oc) =>
-      oc.columns(['TimePointID', 'ImageType']).doUpdateSet({
-        ImageFile: imageFile,
-        ImageDate: sql<Date>`${dateStr}`,
-        Title: title,
-        PersonID: personId,
+      oc.columns(['time_point_id', 'image_type']).doUpdateSet({
+        image_file: imageFile,
+        image_date: sql<Date>`${dateStr}`,
+        title: title,
+        person_id: personId,
       })
     )
     .execute();
@@ -111,29 +111,29 @@ export async function upsertNativeTimePointImage(
 
 export interface NativeTimePointRow {
   timePointId: number;
-  tpDescription: string | null;
+  tp_description: string | null;
   /** PG `date` → 'YYYY-MM-DD' string at runtime (see kysely.ts pg parser). */
-  tpDateTime: string;
+  tp_date_time: string;
 }
 
 /**
- * Fetch a single timepoint by (PersonID, tpCode) — its id, name and date.
+ * Fetch a single timepoint by (person_id, tpCode) — its id, name and date.
  * Returns null if the patient has no timepoint with that code. Used by the
  * edit/delete routes to read the *old* name/date (to locate the originals
  * folder) and to 404 cleanly.
  */
 export async function getNativeTimePoint(
   personId: number,
-  tpCode: number
+  tp_code: number
 ): Promise<NativeTimePointRow | null> {
   const row = await getKysely()
-    .selectFrom('tblTimePoints')
-    .where('PersonID', '=', personId)
-    .where('tpCode', '=', tpCode)
+    .selectFrom('time_points')
+    .where('person_id', '=', personId)
+    .where('tp_code', '=', tp_code)
     .select((eb) => [
-      'TimePointID as timePointId',
-      'tpDescription',
-      eb.ref('tpDateTime').$castTo<string>().as('tpDateTime'),
+      'time_point_id as timePointId',
+      'tp_description',
+      eb.ref('tp_date_time').$castTo<string>().as('tp_date_time'),
     ])
     .executeTakeFirst();
   return (row as NativeTimePointRow | undefined) ?? null;
@@ -147,11 +147,11 @@ export async function getNativeTimePoint(
  */
 export async function getTimePointCodesForPatient(personId: number): Promise<number[]> {
   const rows = await getKysely()
-    .selectFrom('tblTimePoints')
-    .where('PersonID', '=', personId)
-    .select('tpCode')
+    .selectFrom('time_points')
+    .where('person_id', '=', personId)
+    .select('tp_code')
     .execute();
-  return rows.map((r) => r.tpCode);
+  return rows.map((r) => r.tp_code);
 }
 
 export interface UpdateTimePointResult {
@@ -169,57 +169,57 @@ export interface UpdateTimePointResult {
  */
 export async function updateNativeTimePoint(
   personId: number,
-  tpCode: number,
-  tpDescription: string,
-  tpDateTime: string
+  tp_code: number,
+  tp_description: string,
+  tp_date_time: string
 ): Promise<UpdateTimePointResult> {
   return withPgTransaction(async (trx) => {
     const clash = await trx
-      .selectFrom('tblTimePoints')
-      .where('PersonID', '=', personId)
-      .where('tpCode', '!=', tpCode)
-      .where('tpDescription', '=', tpDescription)
-      .where('tpDateTime', '=', sql<Date>`${tpDateTime}`)
-      .select('TimePointID')
+      .selectFrom('time_points')
+      .where('person_id', '=', personId)
+      .where('tp_code', '!=', tp_code)
+      .where('tp_description', '=', tp_description)
+      .where('tp_date_time', '=', sql<Date>`${tp_date_time}`)
+      .select('time_point_id')
       .limit(1)
       .executeTakeFirst();
     if (clash) return { ok: false, conflict: true };
 
     await trx
-      .updateTable('tblTimePoints')
-      .set({ tpDescription, tpDateTime: sql<Date>`${tpDateTime}` })
-      .where('PersonID', '=', personId)
-      .where('tpCode', '=', tpCode)
+      .updateTable('time_points')
+      .set({ tp_description, tp_date_time: sql<Date>`${tp_date_time}` })
+      .where('person_id', '=', personId)
+      .where('tp_code', '=', tp_code)
       .execute();
-    log.info('Updated native timepoint', { personId, tpCode, tpDescription, tpDateTime });
+    log.info('Updated native timepoint', { personId, tp_code, tp_description, tp_date_time });
     return { ok: true };
   });
 }
 
 /**
- * Delete a timepoint by (PersonID, tpCode). The `tblTimePointImages` FK is
+ * Delete a timepoint by (person_id, tpCode). The `tblTimePointImages` FK is
  * `ON DELETE CASCADE`, so its image rows go with it in one statement.
  */
-export async function deleteNativeTimePoint(personId: number, tpCode: number): Promise<void> {
+export async function deleteNativeTimePoint(personId: number, tp_code: number): Promise<void> {
   await getKysely()
-    .deleteFrom('tblTimePoints')
-    .where('PersonID', '=', personId)
-    .where('tpCode', '=', tpCode)
+    .deleteFrom('time_points')
+    .where('person_id', '=', personId)
+    .where('tp_code', '=', tp_code)
     .execute();
-  log.info('Deleted native timepoint', { personId, tpCode });
+  log.info('Deleted native timepoint', { personId, tp_code });
 }
 
 /**
- * Delete one view-image row by (TimePointID, ImageType) — the per-view "Remove" in
+ * Delete one view-image row by (time_point_id, image_type) — the per-view "Remove" in
  * the photo editor. Idempotent: deleting a non-existent row affects 0 rows.
  *
  * @param imageType 2-digit view code, e.g. '10' (the view code minus the leading 'i')
  */
 export async function deleteNativeTimePointImage(timePointId: number, imageType: string): Promise<void> {
   await getKysely()
-    .deleteFrom('tblTimePointImages')
-    .where('TimePointID', '=', timePointId)
-    .where('ImageType', '=', imageType)
+    .deleteFrom('time_point_images')
+    .where('time_point_id', '=', timePointId)
+    .where('image_type', '=', imageType)
     .execute();
   log.info('Deleted native timepoint image', { timePointId, imageType });
 }

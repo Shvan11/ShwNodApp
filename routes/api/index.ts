@@ -29,7 +29,7 @@ import { Router } from 'express';
 import type { EventEmitter } from 'events';
 
 // Import all route modules
-// Note: Routes that haven't been migrated yet use .js, migrated ones use .js (ESM resolution)
+// note: Routes that haven't been migrated yet use .js, migrated ones use .js (ESM resolution)
 import patientRoutes from './patient.routes.js';
 import appointmentRoutes, { setWebSocketEmitter as setAppointmentWS } from './appointment.routes.js';
 import chairDisplayRoutes, { setWebSocketEmitter as setChairDisplayWS } from './chair-display.routes.js';
@@ -75,7 +75,7 @@ export function setWebSocketEmitter(emitter: EventEmitter): void {
 router.use('/templates', templateRouter);
 
 // Mount all route modules
-// Note: Order matters for routes with similar patterns - most specific routes first
+// note: Order matters for routes with similar patterns - most specific routes first
 
 // Core entity routes
 router.use('/', patientRoutes);       // Patient management

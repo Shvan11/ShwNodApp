@@ -4,10 +4,10 @@ import styles from './StatisticsComponent.module.css';
 
 interface Invoice {
     invoiceID: number;
-    PatientName: string;
+    patient_name: string;
     SysStartTime: string;
     currency: 'IQD' | 'USD';
-    Amountpaid: number;
+    amount_paid: number;
     IQDReceived?: number;
     USDReceived?: number;
     Change?: number;
@@ -220,7 +220,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                                             <tr key={invoice.invoiceID}>
                                                 <td data-label="Invoice #" className={styles.invoiceId}>{invoice.invoiceID}</td>
                                                 <td data-label="Patient Name" className={`${styles.patientName} text-rtl`}>
-                                                    {invoice.PatientName}
+                                                    {invoice.patient_name}
                                                 </td>
                                                 <td data-label="Time">{formatTime(invoice.SysStartTime)}</td>
                                                 <td data-label="Treatment Currency" className={styles.currencyBadge}>
@@ -229,7 +229,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                                                     </span>
                                                 </td>
                                                 <td data-label="Amount Paid" className={styles.amount}>
-                                                    {invoice.Amountpaid} {invoice.currency}
+                                                    {invoice.amount_paid} {invoice.currency}
                                                 </td>
                                                 <td data-label="IQD Received" className={`${styles.amount} ${styles.iqd}`}>
                                                     {invoice.IQDReceived ? formatCurrency(invoice.IQDReceived, 'IQD') : '-'}

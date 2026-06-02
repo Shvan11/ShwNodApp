@@ -84,8 +84,8 @@ const PatientShell = () => {
     const work = loaderData?.work;
     const isNewPatient = loaderData?.isNew ?? (personId === 'new');
 
-    // Validated PersonID from loader data (null if invalid or new patient)
-    const validatedPersonId = patient?.PersonID ?? null;
+    // Validated person_id from loader data (null if invalid or new patient)
+    const validatedPersonId = (patient?.person_id as number | undefined) ?? null;
 
     // Notify the chair-side public display (if this PC is configured as a chair)
     // when a patient is opened/closed. Fire-and-forget via sendBeacon — never
@@ -108,7 +108,7 @@ const PatientShell = () => {
     // Patient display name from loader data
     const patientName = isNewPatient
         ? 'New Patient'
-        : (patient?.name || patient?.PatientName || `Patient ${personId}`);
+        : (patient?.name || patient?.patient_name || `Patient ${personId}`) as string;
 
     // Work display name from loader data
     const workTypeName = work?.TypeName || '';

@@ -17,7 +17,7 @@ import { sql } from 'kysely';
 import { getKysely } from '../database/kysely.js';
 
 /**
- * Currency amounts
+ * currency amounts
  */
 export interface CurrencyAmounts {
   IQD: number;
@@ -56,23 +56,23 @@ export interface DailyData {
  * Base invoice from stored procedure
  */
 export interface BaseInvoice {
-  invoiceID: number;
+  invoice_id: number;
   workid?: number;
-  Amountpaid?: number;
-  Dateofpayment?: Date | string;
-  PatientName?: string;
-  Phone?: string;
-  SysStartTime?: Date | string;
+  amount_paid?: number;
+  date_of_payment?: Date | string;
+  patient_name?: string;
+  phone?: string;
+  sys_start_time?: Date | string;
   currency?: string;
-  Change?: number;
+  change?: number;
 }
 
 /**
  * Enriched invoice with payment details
  */
 export interface EnrichedInvoice extends BaseInvoice {
-  IQDReceived: number;
-  USDReceived: number;
+  iqd_received: number;
+  usd_received: number;
 }
 
 /**
@@ -155,29 +155,29 @@ export function calculateMonthlyStatistics(
  * Invoice details from database
  */
 interface InvoiceDetails {
-  IQDReceived: number | null;
-  USDReceived: number | null;
+  iqd_received: number | null;
+  usd_received: number | null;
   [key: string]: number | null;
 }
 
 /**
  * Enrich an invoice with additional details
  *
- * Fetches IQDReceived and USDReceived for a specific invoice
+ * Fetches iqd_received and usd_received for a specific invoice
  *
  * @param invoice - Base invoice object
- * @returns Enriched invoice with IQDReceived and USDReceived
+ * @returns Enriched invoice with iqd_received and usd_received
  */
 async function enrichInvoice(invoice: BaseInvoice): Promise<EnrichedInvoice> {
   const db = getKysely();
   const { rows: invoiceDetails } = await sql<InvoiceDetails>`
-    SELECT "IQDReceived", "USDReceived" FROM "tblInvoice" WHERE "invoiceID" = ${invoice.invoiceID}
+    SELECT "iqd_received", "usd_received" FROM "invoices" WHERE "invoice_id" = ${invoice.invoice_id}
   `.execute(db);
 
   return {
     ...invoice,
-    IQDReceived: invoiceDetails[0]?.IQDReceived || 0,
-    USDReceived: invoiceDetails[0]?.USDReceived || 0,
+    iqd_received: invoiceDetails[0]?.iqd_received || 0,
+    usd_received: invoiceDetails[0]?.usd_received || 0,
   };
 }
 
@@ -185,7 +185,7 @@ async function enrichInvoice(invoice: BaseInvoice): Promise<EnrichedInvoice> {
  * Enrich invoices with additional details in parallel
  *
  * For each invoice from the stored procedure, fetches additional
- * payment details (IQDReceived, USDReceived) using Promise.all
+ * payment details (iqd_received, usd_received) using Promise.all
  *
  * @param invoices - Base invoices from stored procedure
  * @returns Enriched invoices

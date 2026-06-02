@@ -78,21 +78,21 @@ export class AppointmentValidationError extends Error {
  * Appointment creation data
  */
 export interface AppointmentCreateData {
-  PersonID: number | string;
-  AppDate: string;
-  AppDetail: string;
-  DrID: number | string;
+  person_id: number | string;
+  app_date: string;
+  app_detail: string;
+  dr_id: number | string;
 }
 
 /**
  * Created appointment result
  */
 export interface CreatedAppointment {
-  appointmentID: number | undefined;
-  PersonID: number;
-  AppDate: string;
-  AppDetail: string;
-  DrID: number;
+  appointment_id: number | undefined;
+  person_id: number;
+  app_date: string;
+  app_detail: string;
+  dr_id: number;
   doctorName: string;
 }
 
@@ -100,18 +100,18 @@ export interface CreatedAppointment {
  * Doctor info from verification
  */
 export interface DoctorInfo {
-  ID: number;
-  employeeName: string;
-  PositionName: string;
+  id: number;
+  employee_name: string;
+  position_name: string;
 }
 
 /**
  * Quick check-in data
  */
 export interface QuickCheckInData {
-  PersonID: number | string;
-  AppDetail?: string;
-  DrID?: number | string;
+  person_id: number | string;
+  app_detail?: string;
+  dr_id?: number | string;
 }
 
 /**
@@ -122,15 +122,15 @@ export interface QuickCheckInResult {
   alreadyCheckedIn?: boolean;
   checkedIn?: boolean;
   created?: boolean;
-  appointmentID: number | undefined;
+  appointment_id: number | undefined;
   message: string;
   appointment: {
-    appointmentID: number | undefined;
-    PersonID: number;
-    AppDate: string;
-    AppDetail?: string;
-    DrID?: number | null;
-    Present?: string | Date;
+    appointment_id: number | undefined;
+    person_id: number;
+    app_date: string;
+    app_detail?: string;
+    dr_id?: number | null;
+    present?: string | Date;
   };
 }
 
@@ -150,29 +150,29 @@ interface FormattedDateTime {
 function validateAppointmentRequiredFields(
   appointmentData: AppointmentCreateData
 ): void {
-  const { PersonID, AppDate, AppDetail, DrID } = appointmentData;
+  const { person_id, app_date, app_detail, dr_id } = appointmentData;
 
   // Validate required fields
-  if (!PersonID || !AppDate || !AppDetail || !DrID) {
+  if (!person_id || !app_date || !app_detail || !dr_id) {
     throw new AppointmentValidationError(
-      'Missing required fields: PersonID, AppDate, AppDetail, DrID',
+      'Missing required fields: person_id, app_date, app_detail, dr_id',
       'MISSING_REQUIRED_FIELDS'
     );
   }
 
   // Validate data types
-  if (isNaN(parseInt(String(PersonID))) || isNaN(parseInt(String(DrID)))) {
+  if (isNaN(parseInt(String(person_id))) || isNaN(parseInt(String(dr_id)))) {
     throw new AppointmentValidationError(
-      'PersonID and DrID must be valid numbers',
+      'person_id and dr_id must be valid numbers',
       'INVALID_DATA_TYPE'
     );
   }
 
   // Validate date format
-  const appointmentDate = new Date(AppDate);
+  const appointmentDate = new Date(app_date);
   if (isNaN(appointmentDate.getTime())) {
     throw new AppointmentValidationError(
-      'Invalid date format for AppDate',
+      'Invalid date format for app_date',
       'INVALID_DATE_FORMAT'
     );
   }
@@ -180,22 +180,22 @@ function validateAppointmentRequiredFields(
 
 /**
  * Verify that an employee is a doctor
- * @param drID - Doctor/Employee ID
+ * @param drID - Doctor/Employee id
  * @returns Doctor information
  * @throws AppointmentValidationError If employee is not a doctor
  */
 export async function verifyDoctor(drID: number | string): Promise<DoctorInfo> {
   const db = getKysely();
   const { rows: doctorCheck } = await sql<DoctorInfo>`
-        SELECT e."ID", e."employeeName", p."PositionName"
-        FROM "tblEmployees" e
-        INNER JOIN "tblPositions" p ON e."Position" = p."ID"
-        WHERE e."ID" = ${parseInt(String(drID))} AND p."PositionName" = 'Doctor'
+        SELECT e."id", e."employee_name", p."position_name"
+        FROM "employees" e
+        INNER JOIN "positions" p ON e."position" = p."id"
+        WHERE e."id" = ${parseInt(String(drID))} AND p."position_name" = 'Doctor'
     `.execute(db);
 
   if (!doctorCheck || doctorCheck.length === 0) {
     throw new AppointmentValidationError(
-      'Invalid doctor ID or employee is not a doctor',
+      'Invalid doctor id or employee is not a doctor',
       'INVALID_DOCTOR'
     );
   }
@@ -205,7 +205,7 @@ export async function verifyDoctor(drID: number | string): Promise<DoctorInfo> {
 
 /**
  * Check for appointment conflicts (same patient, same day)
- * @param personID - Patient ID
+ * @param personID - Patient id
  * @param appDate - Appointment date
  * @returns null if no conflict
  * @throws AppointmentValidationError If conflict exists
@@ -215,21 +215,21 @@ export async function checkAppointmentConflict(
   appDate: string
 ): Promise<null> {
   interface ConflictResult {
-    appointmentID: number;
+    appointment_id: number;
   }
 
   const db = getKysely();
   const { rows: conflictCheck } = await sql<ConflictResult>`
-        SELECT "appointmentID"
-        FROM "tblappointments"
-        WHERE "PersonID" = ${parseInt(String(personID))} AND "AppDate"::date = ${appDate}::date
+        SELECT "appointment_id"
+        FROM "appointments"
+        WHERE "person_id" = ${parseInt(String(personID))} AND "app_date"::date = ${appDate}::date
     `.execute(db);
 
   if (conflictCheck && conflictCheck.length > 0) {
     throw new AppointmentValidationError(
       'Patient already has an appointment on this date',
       'APPOINTMENT_CONFLICT',
-      { existingAppointmentID: conflictCheck[0].appointmentID }
+      { existingAppointmentID: conflictCheck[0].appointment_id }
     );
   }
 
@@ -248,12 +248,12 @@ export async function checkHolidayConflict(appDate: string): Promise<void> {
   const holiday = await isDateHoliday(dateOnly);
   if (holiday) {
     throw new AppointmentValidationError(
-      `Cannot create appointment on ${holiday.HolidayName} (${dateOnly})`,
+      `Cannot create appointment on ${holiday.holiday_name} (${dateOnly})`,
       'HOLIDAY_CONFLICT',
       {
-        holidayId: holiday.ID,
-        holidayName: holiday.HolidayName,
-        holidayDate: toDateOnly(holiday.Holidaydate),
+        holidayId: holiday.id,
+        holidayName: holiday.holiday_name,
+        holidayDate: toDateOnly(holiday.holiday_date),
       }
     );
   }
@@ -281,45 +281,45 @@ function formatCurrentDateTime(): FormattedDateTime {
 /**
  * Validate and create a new appointment
  * @param appointmentData - Appointment data to create
- * @returns Created appointment with ID and doctor info
+ * @returns Created appointment with id and doctor info
  * @throws AppointmentValidationError If validation fails
  */
 export async function validateAndCreateAppointment(
   appointmentData: AppointmentCreateData
 ): Promise<CreatedAppointment> {
-  const { PersonID, AppDate, AppDetail, DrID } = appointmentData;
+  const { person_id, app_date, app_detail, dr_id } = appointmentData;
 
   // Validate required fields
   validateAppointmentRequiredFields(appointmentData);
 
   // Check if date is a holiday (block appointments on holidays)
-  await checkHolidayConflict(AppDate);
+  await checkHolidayConflict(app_date);
 
   // Verify doctor exists and is actually a doctor
-  const doctor = await verifyDoctor(DrID);
+  const doctor = await verifyDoctor(dr_id);
 
   // Check for appointment conflicts
-  await checkAppointmentConflict(PersonID, AppDate);
+  await checkAppointmentConflict(person_id, app_date);
 
   // Insert new appointment (+ AppoPatientType trigger, in createAppointment)
   const newAppointmentId = await createAppointment({
-    PersonID: parseInt(String(PersonID)),
-    AppDate,
-    AppDetail,
-    DrID: parseInt(String(DrID)),
+    person_id: parseInt(String(person_id)),
+    app_date,
+    app_detail,
+    dr_id: parseInt(String(dr_id)),
   });
 
   log.info(
-    `Appointment created: ID ${newAppointmentId}, Patient ${PersonID}, Doctor ${doctor.employeeName}, Date ${AppDate}`
+    `Appointment created: id ${newAppointmentId}, Patient ${person_id}, Doctor ${doctor.employee_name}, Date ${app_date}`
   );
 
   return {
-    appointmentID: newAppointmentId,
-    PersonID: parseInt(String(PersonID)),
-    AppDate,
-    AppDetail,
-    DrID: parseInt(String(DrID)),
-    doctorName: doctor.employeeName,
+    appointment_id: newAppointmentId,
+    person_id: parseInt(String(person_id)),
+    app_date,
+    app_detail,
+    dr_id: parseInt(String(dr_id)),
+    doctorName: doctor.employee_name,
   };
 }
 
@@ -338,19 +338,19 @@ export async function validateAndCreateAppointment(
 export async function quickCheckIn(
   checkInData: QuickCheckInData
 ): Promise<QuickCheckInResult> {
-  const { PersonID, AppDetail, DrID } = checkInData;
+  const { person_id, app_detail, dr_id } = checkInData;
 
-  // Validate PersonID
-  if (!PersonID || isNaN(parseInt(String(PersonID)))) {
+  // Validate person_id
+  if (!person_id || isNaN(parseInt(String(person_id)))) {
     throw new AppointmentValidationError(
-      'PersonID is required and must be a valid number',
+      'person_id is required and must be a valid number',
       'INVALID_PERSON_ID'
     );
   }
 
   // Set defaults for optional fields
-  const detail = AppDetail || 'Walk-in';
-  const doctorId = DrID ? parseInt(String(DrID)) : null;
+  const detail = app_detail || 'Walk-in';
+  const doctorId = dr_id ? parseInt(String(dr_id)) : null;
 
   // Get formatted current date/time
   const { dateTime, dateOnly, timeObject } = formatCurrentDateTime();
@@ -361,113 +361,113 @@ export async function quickCheckIn(
 
   // Check if patient already has an appointment today
   interface ExistingAppointment {
-    appointmentID: number;
-    Present: string | null;
-    Seated: string | null;
-    Dismissed: string | null;
+    appointment_id: number;
+    present: string | null;
+    seated: string | null;
+    dismissed: string | null;
   }
 
   const db = getKysely();
   const { rows: existingAppointment } = await sql<ExistingAppointment>`
-        SELECT "appointmentID", "Present", "Seated", "Dismissed"
-        FROM "tblappointments"
-        WHERE "PersonID" = ${parseInt(String(PersonID))}
-          AND "AppDate"::date = ${dateOnly}::date
+        SELECT "appointment_id", "present", "seated", "dismissed"
+        FROM "appointments"
+        WHERE "person_id" = ${parseInt(String(person_id))}
+          AND "app_date"::date = ${dateOnly}::date
     `.execute(db);
 
   // Scenario 1: Appointment exists and patient already checked in
   if (existingAppointment && existingAppointment.length > 0) {
     const apt = existingAppointment[0];
 
-    if (apt.Present) {
+    if (apt.present) {
       log.info(
-        `Patient ${PersonID} already checked in today (Appointment ${apt.appointmentID})`
+        `Patient ${person_id} already checked in today (Appointment ${apt.appointment_id})`
       );
       return {
         success: true,
         alreadyCheckedIn: true,
-        appointmentID: apt.appointmentID,
+        appointment_id: apt.appointment_id,
         message: 'Patient already checked in today',
         appointment: {
-          appointmentID: apt.appointmentID,
-          PersonID: parseInt(String(PersonID)),
-          AppDate: dateTime,
-          Present: apt.Present,
+          appointment_id: apt.appointment_id,
+          person_id: parseInt(String(person_id)),
+          app_date: dateTime,
+          present: apt.present,
         },
       };
     }
 
     // Scenario 2: Appointment exists but not checked in - route through the
     // state-machine proc so a stale view can't re-check-in a patient who has
-    // already moved to Seated or Dismissed since the existence check above.
+    // already moved to seated or dismissed since the existence check above.
     try {
-      await updatePresent(apt.appointmentID, 'Present', presentTimeString);
+      await updatePresent(apt.appointment_id, 'present', presentTimeString);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('[INVALID_STATE_TRANSITION]')) {
         throw new AppointmentValidationError(
           message,
           'INVALID_STATE_TRANSITION',
-          { existingAppointmentID: apt.appointmentID }
+          { existingAppointmentID: apt.appointment_id }
         );
       }
       throw err;
     }
 
     log.info(
-      `Patient ${PersonID} checked in to existing appointment ${apt.appointmentID}`
+      `Patient ${person_id} checked in to existing appointment ${apt.appointment_id}`
     );
 
     return {
       success: true,
       checkedIn: true,
-      appointmentID: apt.appointmentID,
+      appointment_id: apt.appointment_id,
       message: 'Patient checked in successfully',
       appointment: {
-        appointmentID: apt.appointmentID,
-        PersonID: parseInt(String(PersonID)),
-        AppDate: dateTime,
-        Present: timeObject,
+        appointment_id: apt.appointment_id,
+        person_id: parseInt(String(person_id)),
+        app_date: dateTime,
+        present: timeObject,
       },
     };
   }
 
-  // Scenario 3: No appointment exists - create new with Present time
+  // Scenario 3: No appointment exists - create new with present time
 
   // Check if today is a holiday (block walk-in appointments on holidays)
   await checkHolidayConflict(dateTime);
 
-  // If doctor ID provided, verify it's valid
+  // If doctor id provided, verify it's valid
   if (doctorId) {
     await verifyDoctor(doctorId);
   }
 
-  // Create new appointment with Present time already set (+ AppoPatientType in createAppointment)
+  // Create new appointment with present time already set (+ AppoPatientType in createAppointment)
   const newAppointmentId = await createAppointment({
-    PersonID: parseInt(String(PersonID)),
-    AppDate: dateTime,
-    AppDetail: detail,
-    DrID: doctorId,
-    Present: presentTimeString,
+    person_id: parseInt(String(person_id)),
+    app_date: dateTime,
+    app_detail: detail,
+    dr_id: doctorId,
+    present: presentTimeString,
   });
 
   log.info(
-    `Quick check-in: Created appointment ${newAppointmentId} for patient ${PersonID} with Present time`
+    `Quick check-in: Created appointment ${newAppointmentId} for patient ${person_id} with present time`
   );
 
   return {
     success: true,
     created: true,
     checkedIn: true,
-    appointmentID: newAppointmentId,
+    appointment_id: newAppointmentId,
     message: 'Appointment created and patient checked in successfully',
     appointment: {
-      appointmentID: newAppointmentId,
-      PersonID: parseInt(String(PersonID)),
-      AppDate: dateTime,
-      AppDetail: detail,
-      DrID: doctorId,
-      Present: timeObject,
+      appointment_id: newAppointmentId,
+      person_id: parseInt(String(person_id)),
+      app_date: dateTime,
+      app_detail: detail,
+      dr_id: doctorId,
+      present: timeObject,
     },
   };
 }

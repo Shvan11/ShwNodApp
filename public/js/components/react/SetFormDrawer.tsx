@@ -6,19 +6,19 @@ import { formatNumber } from '../../utils/formatters';
 import type { AlignerDoctorMinimal, AlignerSet } from '../../pages/aligner/aligner.types';
 
 interface SetFormData {
-    SetSequence: number | string;
-    Type: string;
-    UpperAlignersCount: number | string;
-    LowerAlignersCount: number | string;
-    Days: number | string;
-    AlignerDrID: number | string;
-    SetUrl: string;
-    SetPdfUrl: string;
-    SetVideo: string;
-    SetCost: number | string;
-    Currency: string;
-    Notes: string;
-    IsActive: boolean;
+    set_sequence: number | string;
+    type: string;
+    upper_aligners_count: number | string;
+    lower_aligners_count: number | string;
+    days: number | string;
+    aligner_dr_id: number | string;
+    set_url: string;
+    set_pdf_url: string;
+    set_video: string;
+    set_cost: number | string;
+    currency: string;
+    notes: string;
+    is_active: boolean;
 }
 
 interface FormErrors {
@@ -53,19 +53,19 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
     const toast = useToast();
     const confirm = useConfirm();
     const [formData, setFormData] = useState<SetFormData>({
-        SetSequence: '',
-        Type: '',
-        UpperAlignersCount: '',
-        LowerAlignersCount: '',
-        Days: '',
-        AlignerDrID: '',
-        SetUrl: '',
-        SetPdfUrl: '',
-        SetVideo: '',
-        SetCost: '',
-        Currency: 'USD',
-        Notes: '',
-        IsActive: true
+        set_sequence: '',
+        type: '',
+        upper_aligners_count: '',
+        lower_aligners_count: '',
+        days: '',
+        aligner_dr_id: '',
+        set_url: '',
+        set_pdf_url: '',
+        set_video: '',
+        set_cost: '',
+        currency: 'USD',
+        notes: '',
+        is_active: true
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
@@ -78,21 +78,21 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
 
     // Check if an inactive set can be reactivated
     const cannotReactivate = (): boolean => {
-        if (!set || set.IsActive) {
+        if (!set || set.is_active) {
             return false; // New sets or already active sets can be changed
         }
 
         // Get the creation date of current set
-        const currentSetDate = new Date(set.CreationDate || '');
+        const currentSetDate = new Date(set.creation_date || '');
 
         // Check if there's a newer set (created after this one) with at least one batch
         const hasNewerSetWithBatches = allSets.some(otherSet => {
             // Must be a different set
-            if (otherSet.AlignerSetID === set.AlignerSetID) {
+            if (otherSet.aligner_set_id === set.aligner_set_id) {
                 return false;
             }
 
-            const otherSetDate = new Date(otherSet.CreationDate || '');
+            const otherSetDate = new Date(otherSet.creation_date || '');
 
             // Must be created after the current set and have at least one batch
             return otherSetDate > currentSetDate && (otherSet.TotalBatches || 0) > 0;
@@ -105,27 +105,27 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
         if (isOpen && set) {
             // Edit mode - populate form
             setFormData({
-                SetSequence: set.SetSequence || '',
-                Type: set.Type || '',
-                UpperAlignersCount: set.UpperAlignersCount || '',
-                LowerAlignersCount: set.LowerAlignersCount || '',
-                Days: set.Days || '',
-                AlignerDrID: set.AlignerDrID || '',
-                SetUrl: set.SetUrl || '',
-                SetPdfUrl: set.SetPdfUrl || '',
-                SetVideo: set.SetVideo || '',
-                SetCost: set.SetCost || '',
-                Currency: set.Currency || 'USD',
-                Notes: set.Notes || '',
-                IsActive: set.IsActive !== undefined ? set.IsActive : true
+                set_sequence: set.set_sequence || '',
+                type: set.type || '',
+                upper_aligners_count: set.upper_aligners_count || '',
+                lower_aligners_count: set.lower_aligners_count || '',
+                days: set.days || '',
+                aligner_dr_id: set.aligner_dr_id || '',
+                set_url: set.set_url || '',
+                set_pdf_url: set.set_pdf_url || '',
+                set_video: set.set_video || '',
+                set_cost: set.set_cost || '',
+                currency: set.currency || 'USD',
+                notes: set.notes || '',
+                is_active: set.is_active !== undefined ? set.is_active : true
             });
-            setDisplaySetCost(set.SetCost ? formatNumber(set.SetCost) : '');
+            setDisplaySetCost(set.set_cost ? formatNumber(set.set_cost) : '');
         } else if (isOpen) {
             // Add mode - reset form with auto-populated values
 
             // Calculate next SetSequence as max existing sequence + 1
             const maxSequence = allSets.length > 0
-                ? Math.max(...allSets.map(s => s.SetSequence || 0))
+                ? Math.max(...allSets.map(s => s.set_sequence || 0))
                 : 0;
             const nextSequence = maxSequence + 1;
 
@@ -135,30 +135,30 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
             let defaultDoctor: number | string = '';
             if (allSets.length > 0) {
                 const firstSet = allSets.reduce((min, s) =>
-                    (s.SetSequence || Infinity) < (min.SetSequence || Infinity) ? s : min
+                    (s.set_sequence || Infinity) < (min.set_sequence || Infinity) ? s : min
                 , allSets[0]);
-                if (firstSet.AlignerDrID) {
-                    const doctorExists = doctors?.find(d => d.DrID === firstSet.AlignerDrID);
+                if (firstSet.aligner_dr_id) {
+                    const doctorExists = doctors?.find(d => d.dr_id === firstSet.aligner_dr_id);
                     if (doctorExists) {
-                        defaultDoctor = firstSet.AlignerDrID;
+                        defaultDoctor = firstSet.aligner_dr_id;
                     }
                 }
             }
 
             setFormData({
-                SetSequence: nextSequence,
-                Type: '',
-                UpperAlignersCount: '',
-                LowerAlignersCount: '',
-                Days: '',
-                AlignerDrID: defaultDoctor,
-                SetUrl: '',
-                SetPdfUrl: '',
-                SetVideo: '',
-                SetCost: '',
-                Currency: 'USD',
-                Notes: '',
-                IsActive: true
+                set_sequence: nextSequence,
+                type: '',
+                upper_aligners_count: '',
+                lower_aligners_count: '',
+                days: '',
+                aligner_dr_id: defaultDoctor,
+                set_url: '',
+                set_pdf_url: '',
+                set_video: '',
+                set_cost: '',
+                currency: 'USD',
+                notes: '',
+                is_active: true
             });
             setDisplaySetCost('');
         }
@@ -182,12 +182,12 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
     const validate = (): boolean => {
         const newErrors: FormErrors = {};
 
-        if (!formData.SetSequence || formData.SetSequence === '') {
-            newErrors.SetSequence = 'Set sequence is required';
+        if (!formData.set_sequence || formData.set_sequence === '') {
+            newErrors.set_sequence = 'Set sequence is required';
         }
 
-        if (!formData.AlignerDrID || formData.AlignerDrID === '' || isNaN(parseInt(String(formData.AlignerDrID)))) {
-            newErrors.AlignerDrID = 'Doctor is required';
+        if (!formData.aligner_dr_id || formData.aligner_dr_id === '' || isNaN(parseInt(String(formData.aligner_dr_id)))) {
+            newErrors.aligner_dr_id = 'Doctor is required';
         }
 
         setErrors(newErrors);
@@ -210,7 +210,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
             };
 
             const url = set
-                ? `/api/aligner/sets/${set.AlignerSetID}`
+                ? `/api/aligner/sets/${set.aligner_set_id}`
                 : '/api/aligner/sets';
 
             const method = set ? 'PUT' : 'POST';
@@ -225,8 +225,8 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
 
             if (result.success) {
                 // If there's a PDF file to upload, do it after saving
-                if (pdfFile && (result.setId || set?.AlignerSetID)) {
-                    const setIdToUse = result.setId || set?.AlignerSetID;
+                if (pdfFile && (result.setId || set?.aligner_set_id)) {
+                    const setIdToUse = result.setId || set?.aligner_set_id;
                     await handlePdfUpload(setIdToUse);
                 }
 
@@ -282,7 +282,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
     };
 
     const handlePdfDelete = async (): Promise<void> => {
-        if (!set?.AlignerSetID) return;
+        if (!set?.aligner_set_id) return;
 
         if (!await confirm('Are you sure you want to delete this PDF?', { title: 'Delete PDF', danger: true, confirmText: 'Delete' })) {
             return;
@@ -291,7 +291,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
         try {
             setDeletingPdf(true);
 
-            const response = await fetch(`/api/aligner/sets/${set.AlignerSetID}/pdf`, {
+            const response = await fetch(`/api/aligner/sets/${set.aligner_set_id}/pdf`, {
                 method: 'DELETE'
             });
 
@@ -302,7 +302,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
             }
 
             // Update form data to reflect deletion
-            setFormData(prev => ({ ...prev, SetPdfUrl: '' }));
+            setFormData(prev => ({ ...prev, set_pdf_url: '' }));
             toast.success('PDF deleted successfully');
 
         } catch (error) {
@@ -432,13 +432,13 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                 type="number"
                                                 id="SetSequence"
                                                 name="SetSequence"
-                                                value={formData.SetSequence}
+                                                value={formData.set_sequence}
                                                 onChange={handleChange}
-                                                className={errors.SetSequence ? 'error' : ''}
+                                                className={errors.set_sequence ? 'error' : ''}
                                                 min="1"
                                             />
-                                            {errors.SetSequence && (
-                                                <span className="error-message">{errors.SetSequence}</span>
+                                            {errors.set_sequence && (
+                                                <span className="error-message">{errors.set_sequence}</span>
                                             )}
                                         </div>
 
@@ -448,7 +448,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                 type="number"
                                                 id="UpperAlignersCount"
                                                 name="UpperAlignersCount"
-                                                value={formData.UpperAlignersCount}
+                                                value={formData.upper_aligners_count}
                                                 onChange={handleChange}
                                                 min="0"
                                             />
@@ -460,7 +460,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                 type="number"
                                                 id="Days"
                                                 name="Days"
-                                                value={formData.Days}
+                                                value={formData.days}
                                                 onChange={handleChange}
                                                 min="0"
                                             />
@@ -469,11 +469,11 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
 
                                     <div className="form-column">
                                         <div className="form-field">
-                                            <label htmlFor="Type">Type</label>
+                                            <label htmlFor="type">Type</label>
                                             <select
-                                                id="Type"
-                                                name="Type"
-                                                value={formData.Type}
+                                                id="type"
+                                                name="type"
+                                                value={formData.type}
                                                 onChange={handleChange}
                                             >
                                                 <option value="">Select Type</option>
@@ -489,7 +489,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                 type="number"
                                                 id="LowerAlignersCount"
                                                 name="LowerAlignersCount"
-                                                value={formData.LowerAlignersCount}
+                                                value={formData.lower_aligners_count}
                                                 onChange={handleChange}
                                                 min="0"
                                             />
@@ -502,19 +502,19 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             <select
                                                 id="AlignerDrID"
                                                 name="AlignerDrID"
-                                                value={formData.AlignerDrID}
+                                                value={formData.aligner_dr_id}
                                                 onChange={handleChange}
-                                                className={errors.AlignerDrID ? 'error' : ''}
+                                                className={errors.aligner_dr_id ? 'error' : ''}
                                             >
                                                 <option value="">Select Doctor</option>
                                                 {doctors && doctors.map(doctor => (
-                                                    <option key={doctor.DrID} value={doctor.DrID}>
-                                                        {doctor.DoctorName === 'Admin' ? doctor.DoctorName : `Dr. ${doctor.DoctorName}`}
+                                                    <option key={doctor.dr_id} value={doctor.dr_id}>
+                                                        {doctor.doctor_name === 'Admin' ? doctor.doctor_name : `Dr. ${doctor.doctor_name}`}
                                                     </option>
                                                 ))}
                                             </select>
-                                            {errors.AlignerDrID && (
-                                                <span className="error-message">{errors.AlignerDrID}</span>
+                                            {errors.aligner_dr_id && (
+                                                <span className="error-message">{errors.aligner_dr_id}</span>
                                             )}
                                         </div>
                                     </div>
@@ -531,7 +531,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                 type="url"
                                                 id="SetUrl"
                                                 name="SetUrl"
-                                                value={formData.SetUrl}
+                                                value={formData.set_url}
                                                 onChange={handleChange}
                                                 placeholder="https://..."
                                             />
@@ -543,7 +543,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                 type="url"
                                                 id="SetPdfUrl"
                                                 name="SetPdfUrl"
-                                                value={formData.SetPdfUrl}
+                                                value={formData.set_pdf_url}
                                                 onChange={handleChange}
                                                 placeholder="https://drive.google.com/..."
                                             />
@@ -555,7 +555,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                 type="url"
                                                 id="SetVideo"
                                                 name="SetVideo"
-                                                value={formData.SetVideo}
+                                                value={formData.set_video}
                                                 onChange={handleChange}
                                                 placeholder="https://www.youtube.com/watch?v=..."
                                             />
@@ -567,7 +567,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                         {/* PDF Upload Section */}
                                         <div className="form-field">
                                             <label>PDF File</label>
-                                            {formData.SetPdfUrl ? (
+                                            {formData.set_pdf_url ? (
                                                 <div className="pdf-uploaded-status">
                                                     <div className="pdf-status-header">
                                                         <i className="fas fa-file-pdf"></i>
@@ -577,7 +577,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                         <button
                                                             type="button"
                                                             className="btn btn-secondary btn-sm"
-                                                            onClick={() => window.open(formData.SetPdfUrl, '_blank')}
+                                                            onClick={() => window.open(formData.set_pdf_url, '_blank')}
                                                         >
                                                             <i className="fas fa-external-link-alt"></i> View PDF
                                                         </button>
@@ -642,9 +642,9 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                     const digits = e.target.value.replace(/[^\d]/g, '');
                                                     const num = parseInt(digits, 10) || 0;
                                                     setDisplaySetCost(num ? num.toLocaleString('en-US') : '');
-                                                    setFormData(prev => ({ ...prev, SetCost: num }));
+                                                    setFormData(prev => ({ ...prev, set_cost: num }));
                                                 }}
-                                                onBlur={() => setDisplaySetCost(formData.SetCost ? formatNumber(formData.SetCost) : '')}
+                                                onBlur={() => setDisplaySetCost(formData.set_cost ? formatNumber(formData.set_cost) : '')}
                                                 placeholder="Enter cost"
                                             />
                                         </div>
@@ -654,7 +654,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             <select
                                                 id="Currency"
                                                 name="Currency"
-                                                value={formData.Currency}
+                                                value={formData.currency}
                                                 onChange={handleChange}
                                             >
                                                 <option value="USD">USD</option>
@@ -673,7 +673,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                     <textarea
                                         id="Notes"
                                         name="Notes"
-                                        value={formData.Notes}
+                                        value={formData.notes}
                                         onChange={handleChange}
                                         rows={4}
                                         placeholder="Additional notes..."
@@ -692,7 +692,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                 type="checkbox"
                                                 id="IsActive"
                                                 name="IsActive"
-                                                checked={formData.IsActive}
+                                                checked={formData.is_active}
                                                 onChange={handleChange}
                                             />
                                             <label htmlFor="IsActive">Active Set</label>

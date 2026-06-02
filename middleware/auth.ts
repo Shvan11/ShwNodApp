@@ -100,10 +100,10 @@ export async function verifyCredentials(
 ): Promise<AuthResult> {
   try {
     const { rows: users } = await sql<DbUser>`
-      SELECT "UserID" AS "userId", "Username" AS "username", "PasswordHash" AS "passwordHash",
-             "FullName" AS "fullName", "Role" AS "role", "IsActive" AS "isActive"
-      FROM "tblUsers"
-      WHERE "Username" = ${username}
+      SELECT "user_id" AS "userId", "username" AS "username", "password_hash" AS "passwordHash",
+             "full_name" AS "fullName", "role" AS "role", "is_active" AS "isActive"
+      FROM "users"
+      WHERE "username" = ${username}
     `.execute(getKysely());
 
     if (!users || users.length === 0) {
@@ -132,7 +132,7 @@ export async function verifyCredentials(
     }
 
     // Update last login timestamp
-    await sql`UPDATE "tblUsers" SET "LastLogin" = LOCALTIMESTAMP WHERE "UserID" = ${user.userId}`.execute(getKysely());
+    await sql`UPDATE "users" SET "last_login" = LOCALTIMESTAMP WHERE "user_id" = ${user.userId}`.execute(getKysely());
 
     const safeUser: SafeUser = {
       userId: user.userId,

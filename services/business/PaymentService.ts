@@ -3,8 +3,8 @@
  *
  * This service handles all payment and invoice business logic including:
  * - Invoice validation and creation
- * - Currency validation and conversion
- * - Change calculation and validation
+ * - currency validation and conversion
+ * - change calculation and validation
  * - Payment amount validation
  * - Exchange rate handling
  *
@@ -33,7 +33,7 @@ export type PaymentErrorCode =
   | 'PAYMENT_EXCEEDS_REMAINING';
 
 /**
- * Currency type
+ * currency type
  */
 export type CurrencyType = 'USD' | 'IQD';
 
@@ -86,7 +86,7 @@ export interface InvoiceCreateData {
 }
 
 /**
- * Change calculation parameters
+ * change calculation parameters
  */
 interface ChangeCalculationParams {
   accountCurrency: CurrencyType | string;
@@ -114,7 +114,7 @@ function validateCurrencyAmounts(usd: number, iqd: number): void {
   // Validation 2: Non-negative amounts
   if (usd < 0 || iqd < 0) {
     throw new PaymentValidationError(
-      'Currency amounts cannot be negative',
+      'currency amounts cannot be negative',
       'NEGATIVE_AMOUNT'
     );
   }
@@ -142,7 +142,7 @@ function isSameCurrencyPayment(
 
 /**
  * Validate change amount for cross-currency payments
- * @param changeAmount - Change to give back
+ * @param changeAmount - change to give back
  * @param usd - USD received
  * @param iqd - IQD received
  * @param exchangeRate - Current exchange rate
@@ -156,7 +156,7 @@ function validateChangeAmount(
 ): void {
   if (changeAmount < 0) {
     throw new PaymentValidationError(
-      'Change amount cannot be negative',
+      'change amount cannot be negative',
       'NEGATIVE_CHANGE'
     );
   }
@@ -165,10 +165,10 @@ function validateChangeAmount(
     return; // No change, no validation needed
   }
 
-  // Validation 3: Change cannot exceed IQD received (simple case)
+  // Validation 3: change cannot exceed IQD received (simple case)
   if (usd === 0 && changeAmount > iqd) {
     throw new PaymentValidationError(
-      `Change (${changeAmount} IQD) cannot exceed IQD received (${iqd} IQD)`,
+      `change (${changeAmount} IQD) cannot exceed IQD received (${iqd} IQD)`,
       'CHANGE_EXCEEDS_IQD_RECEIVED'
     );
   }
@@ -179,7 +179,7 @@ function validateChangeAmount(
 
     if (changeAmount > totalIQDValue) {
       throw new PaymentValidationError(
-        `Change (${changeAmount} IQD) cannot exceed total IQD value in transaction (${totalIQDValue} IQD at rate ${exchangeRate})`,
+        `change (${changeAmount} IQD) cannot exceed total IQD value in transaction (${totalIQDValue} IQD at rate ${exchangeRate})`,
         'CHANGE_EXCEEDS_TOTAL_VALUE',
         {
           usdReceived: usd,
@@ -195,7 +195,7 @@ function validateChangeAmount(
 
 /**
  * Calculate and validate change for a payment
- * @param params - Change calculation parameters
+ * @param params - change calculation parameters
  * @returns Validated change amount (null for same-currency)
  */
 async function calculateValidatedChange(
@@ -225,10 +225,10 @@ async function calculateValidatedChange(
  *
  * Validation Rules:
  * 1. At least one currency amount (USD or IQD) must be > 0
- * 2. Currency amounts cannot be negative
+ * 2. currency amounts cannot be negative
  * 3. For same-currency payments: change is set to NULL (not tracked)
  * 4. For cross-currency payments: change is validated and saved
- * 5. Change cannot exceed IQD received (simple case)
+ * 5. change cannot exceed IQD received (simple case)
  * 6. For USD payments: change validated against total IQD value at exchange rate
  *
  * @param invoiceData - Invoice data to validate and create
@@ -254,12 +254,12 @@ export async function validateAndCreateInvoice(
     throw new PaymentValidationError('Work record not found', 'WORK_NOT_FOUND');
   }
 
-  const accountCurrency = workDetails.Currency || 'USD';
+  const accountCurrency = workDetails.currency || 'USD';
 
   // Block overpayment: amountPaid must not exceed remaining balance
-  // Remaining = TotalRequired - Discount - TotalPaid
-  const totalRequired = Number(workDetails.TotalRequired ?? 0);
-  const discount = Number(workDetails.Discount ?? 0);
+  // Remaining = total_required - discount - TotalPaid
+  const totalRequired = Number(workDetails.total_required ?? 0);
+  const discount = Number(workDetails.discount ?? 0);
   const totalPaid = Number(workDetails.TotalPaid ?? 0);
   const remaining = totalRequired - discount - totalPaid;
   const requestedAmount = Number(amountPaid) || 0;
@@ -292,18 +292,18 @@ export async function validateAndCreateInvoice(
   });
 
   log.info(
-    `Invoice created successfully: Work ${workid}, Amount ${amountPaid}, Change: ${changeToSave}`
+    `Invoice created successfully: Work ${workid}, amount ${amountPaid}, change: ${changeToSave}`
   );
 
-  // Construct the Invoice object from input data plus returned ID
+  // Construct the Invoice object from input data plus returned id
   const invoice: Invoice = {
-    InvoiceID: result[0]?.invoiceID,
+    InvoiceID: result[0]?.invoice_id,
     workid,
-    Amountpaid: amountPaid,
-    Dateofpayment: new Date(paymentDate),
-    USDReceived: usd || null,
-    IQDReceived: iqd || null,
-    Change: changeToSave,
+    amount_paid: amountPaid,
+    date_of_payment: new Date(paymentDate),
+    usd_received: usd || null,
+    iqd_received: iqd || null,
+    change: changeToSave,
   };
 
   return invoice;

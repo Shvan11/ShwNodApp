@@ -54,14 +54,14 @@ export class AlignerPdfError extends Error {
  * Set information for PDF operations
  */
 export interface SetInfo {
-  AlignerSetID: number;
-  WorkID: number;
-  SetSequence: number;
-  DriveFileId: string | null;
-  PersonID: number;
-  PatientName: string;
-  FirstName: string | null;
-  LastName: string | null;
+  aligner_set_id: number;
+  work_id: number;
+  set_sequence: number;
+  drive_file_id: string | null;
+  person_id: number;
+  patient_name: string;
+  first_name: string | null;
+  last_name: string | null;
 }
 
 /**
@@ -93,7 +93,7 @@ export interface PdfUploadResult {
 
 /**
  * Get aligner set information for PDF operations
- * @param setId - Aligner set ID
+ * @param setId - Aligner set id
  * @returns Set information
  * @throws AlignerPdfError If set not found
  */
@@ -101,18 +101,18 @@ async function getSetInfo(setId: number): Promise<SetInfo> {
   const db = getKysely();
   const { rows: result } = await sql<SetInfo>`
         SELECT
-            s."AlignerSetID",
-            s."WorkID",
-            s."SetSequence",
-            s."DriveFileId",
-            w."PersonID",
-            p."PatientName",
-            p."FirstName",
-            p."LastName"
-        FROM "tblAlignerSets" s
-        INNER JOIN "tblwork" w ON s."WorkID" = w."workid"
-        INNER JOIN "tblpatients" p ON w."PersonID" = p."PersonID"
-        WHERE s."AlignerSetID" = ${setId}
+            s."aligner_set_id",
+            s."work_id",
+            s."set_sequence",
+            s."drive_file_id",
+            w."person_id",
+            p."patient_name",
+            p."first_name",
+            p."last_name"
+        FROM "aligner_sets" s
+        INNER JOIN "works" w ON s."work_id" = w."work_id"
+        INNER JOIN "patients" p ON w."person_id" = p."person_id"
+        WHERE s."aligner_set_id" = ${setId}
     `.execute(db);
 
   if (!result || result.length === 0) {
@@ -126,7 +126,7 @@ async function getSetInfo(setId: number): Promise<SetInfo> {
 
 /**
  * Delete old PDF from Google Drive (with error tolerance)
- * @param driveFileId - Drive file ID
+ * @param driveFileId - Drive file id
  */
 async function deleteOldPdfFromDrive(
   driveFileId: string | null
@@ -146,9 +146,9 @@ async function deleteOldPdfFromDrive(
 
 /**
  * Update database with new PDF information
- * @param setId - Aligner set ID
+ * @param setId - Aligner set id
  * @param uploadResult - Upload result from Drive service
- * @param uploaderEmail - Email of uploader
+ * @param uploaderEmail - email of uploader
  */
 async function updateDatabaseWithPdf(
   setId: number,
@@ -157,13 +157,13 @@ async function updateDatabaseWithPdf(
 ): Promise<void> {
   const db = getKysely();
   await sql`
-        UPDATE "tblAlignerSets"
+        UPDATE "aligner_sets"
         SET
-            "SetPdfUrl" = ${uploadResult.url},
-            "DriveFileId" = ${uploadResult.fileId},
-            "PdfUploadedAt" = LOCALTIMESTAMP,
-            "PdfUploadedBy" = ${uploaderEmail}
-        WHERE "AlignerSetID" = ${setId}
+            "set_pdf_url" = ${uploadResult.url},
+            "drive_file_id" = ${uploadResult.fileId},
+            "pdf_uploaded_at" = LOCALTIMESTAMP,
+            "pdf_uploaded_by" = ${uploaderEmail}
+        WHERE "aligner_set_id" = ${setId}
     `.execute(db);
 
   log.info(`Database updated with PDF info for set ${setId}`);
@@ -178,9 +178,9 @@ async function updateDatabaseWithPdf(
  * 3. Upload new PDF to Google Drive
  * 4. Update database with new PDF metadata
  *
- * @param setId - Aligner set ID
+ * @param setId - Aligner set id
  * @param file - Uploaded file object
- * @param uploaderEmail - Email of uploader
+ * @param uploaderEmail - email of uploader
  * @returns Upload result
  * @throws AlignerPdfError If workflow fails
  */
@@ -195,10 +195,10 @@ export async function uploadPdfForSet(
     // Step 1: Get set information
     const setInfo = await getSetInfo(setId);
     const patientName =
-      setInfo.PatientName || `${setInfo.FirstName} ${setInfo.LastName}`;
+      setInfo.patient_name || `${setInfo.first_name} ${setInfo.last_name}`;
 
     // Step 2: Delete old file from Drive if exists (best-effort)
-    await deleteOldPdfFromDrive(setInfo.DriveFileId);
+    await deleteOldPdfFromDrive(setInfo.drive_file_id);
 
     // Step 3: Upload to Google Drive
     const uploadResult = await driveUploadService.uploadPdfForSet(
@@ -207,10 +207,10 @@ export async function uploadPdfForSet(
         originalName: file.originalname,
       },
       {
-        patientId: String(setInfo.PersonID),
+        patientId: String(setInfo.person_id),
         patientName: patientName,
-        workId: String(setInfo.WorkID),
-        setSequence: setInfo.SetSequence,
+        workId: String(setInfo.work_id),
+        setSequence: setInfo.set_sequence,
       },
       uploaderEmail
     );
@@ -250,18 +250,18 @@ export async function uploadPdfForSet(
 
 /**
  * Clear PDF information from database
- * @param setId - Aligner set ID
+ * @param setId - Aligner set id
  */
 async function clearPdfFromDatabase(setId: number): Promise<void> {
   const db = getKysely();
   await sql`
-        UPDATE "tblAlignerSets"
+        UPDATE "aligner_sets"
         SET
-            "SetPdfUrl" = NULL,
-            "DriveFileId" = NULL,
-            "PdfUploadedAt" = NULL,
-            "PdfUploadedBy" = NULL
-        WHERE "AlignerSetID" = ${setId}
+            "set_pdf_url" = NULL,
+            "drive_file_id" = NULL,
+            "pdf_uploaded_at" = NULL,
+            "pdf_uploaded_by" = NULL
+        WHERE "aligner_set_id" = ${setId}
     `.execute(db);
 
   log.info(`PDF metadata cleared from database for set ${setId}`);
@@ -271,11 +271,11 @@ async function clearPdfFromDatabase(setId: number): Promise<void> {
  * Delete PDF from an aligner set
  *
  * Multi-step workflow:
- * 1. Fetch set information to get Drive file ID
+ * 1. Fetch set information to get Drive file id
  * 2. Delete from Google Drive if exists (best-effort)
  * 3. Clear PDF metadata from database
  *
- * @param setId - Aligner set ID
+ * @param setId - Aligner set id
  * @throws AlignerPdfError If workflow fails
  */
 export async function deletePdfFromSet(setId: number): Promise<void> {
@@ -284,14 +284,14 @@ export async function deletePdfFromSet(setId: number): Promise<void> {
 
     // Step 1: Get set information
     interface DriveFileResult {
-      DriveFileId: string | null;
+      drive_file_id: string | null;
     }
 
     const db = getKysely();
     const { rows: result } = await sql<DriveFileResult>`
-            SELECT "DriveFileId"
-            FROM "tblAlignerSets"
-            WHERE "AlignerSetID" = ${setId}
+            SELECT "drive_file_id"
+            FROM "aligner_sets"
+            WHERE "aligner_set_id" = ${setId}
         `.execute(db);
 
     if (!result || result.length === 0) {
@@ -300,7 +300,7 @@ export async function deletePdfFromSet(setId: number): Promise<void> {
       });
     }
 
-    const driveFileId = result[0].DriveFileId;
+    const driveFileId = result[0].drive_file_id;
 
     // Step 2: Delete from Google Drive if exists (best-effort)
     await deleteOldPdfFromDrive(driveFileId);

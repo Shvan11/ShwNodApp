@@ -14,23 +14,23 @@ const router = Router();
  * Staff member response type
  */
 interface StaffMember {
-  ID: number;
-  employeeName: string;
+  id: number;
+  employee_name: string;
 }
 
 /**
  * GET /doctors
- * Get all doctors (employees with Position = Doctor)
+ * Get all doctors (employees with position = Doctor)
  */
 router.get('/doctors', async (_req: Request, res: Response): Promise<void> => {
   try {
     const db = getKysely();
     const { rows: doctors } = await sql<StaffMember>`
-      SELECT e."ID", e."employeeName"
-      FROM "tblEmployees" e
-      INNER JOIN "tblPositions" p ON e."Position" = p."ID"
-      WHERE p."PositionName" = 'Doctor'
-      ORDER BY e."employeeName"
+      SELECT e."id", e."employee_name"
+      FROM "employees" e
+      INNER JOIN "positions" p ON e."position" = p."id"
+      WHERE p."position_name" = 'Doctor'
+      ORDER BY e."employee_name"
     `.execute(db);
     res.json(doctors);
   } catch (error) {
@@ -47,9 +47,9 @@ router.get('/operators', async (_req: Request, res: Response): Promise<void> => 
   try {
     const db = getKysely();
     const { rows: operators } = await sql<StaffMember>`
-      SELECT e."ID", e."employeeName"
-      FROM "tblEmployees" e
-      ORDER BY e."employeeName"
+      SELECT e."id", e."employee_name"
+      FROM "employees" e
+      ORDER BY e."employee_name"
     `.execute(db);
     res.json(operators);
   } catch (error) {

@@ -61,11 +61,11 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
   try {
     const db = getKysely();
     const { rows } = await sql<UserResult>`
-      SELECT "UserID" AS "userId", "Username" AS "username", "FullName" AS "fullName",
-             "Role" AS "role", "IsActive" AS "isActive", "LastLogin" AS "lastLogin",
-             "CreatedAt" AS "createdAt"
-      FROM "tblUsers"
-      ORDER BY "CreatedAt" DESC`.execute(db);
+      SELECT "user_id" AS "userId", "username" AS "username", "full_name" AS "fullName",
+             "role" AS "role", "is_active" AS "isActive", "last_login" AS "lastLogin",
+             "created_at" AS "createdAt"
+      FROM "users"
+      ORDER BY "created_at" DESC`.execute(db);
 
     res.json({
       success: true,
@@ -123,7 +123,7 @@ router.post(
 
       // Check if username exists
       const { rows: existing } = await sql<{ userId: number }>`
-        SELECT "UserID" AS "userId" FROM "tblUsers" WHERE "Username" = ${username}`.execute(db);
+        SELECT "user_id" AS "userId" FROM "users" WHERE "username" = ${username}`.execute(db);
 
       if (existing.length > 0) {
         res.status(400).json({
@@ -138,7 +138,7 @@ router.post(
 
       // Create user
       await sql`
-        INSERT INTO "tblUsers" ("Username", "PasswordHash", "FullName", "Role", "CreatedBy")
+        INSERT INTO "users" ("username", "password_hash", "full_name", "role", "created_by")
         VALUES (${username}, ${passwordHash}, ${fullName || ''}, ${role}, ${req.session.username})`.execute(db);
 
       log.info(`User created: ${username} (${role}) by ${req.session.username}`);
@@ -184,7 +184,7 @@ router.put(
 
       // Update password
       const db = getKysely();
-      await sql`UPDATE "tblUsers" SET "PasswordHash" = ${passwordHash} WHERE "UserID" = ${parseInt(userId)}`.execute(db);
+      await sql`UPDATE "users" SET "password_hash" = ${passwordHash} WHERE "user_id" = ${parseInt(userId)}`.execute(db);
 
       log.info(`Password reset for user ID ${userId} by ${req.session.username}`);
 
@@ -223,7 +223,7 @@ router.put(
 
       // Toggle active status
       const db = getKysely();
-      await sql`UPDATE "tblUsers" SET "IsActive" = NOT "IsActive" WHERE "UserID" = ${parseInt(userId)}`.execute(db);
+      await sql`UPDATE "users" SET "is_active" = NOT "is_active" WHERE "user_id" = ${parseInt(userId)}`.execute(db);
 
       log.info(`User status toggled for ID ${userId} by ${req.session.username}`);
 
@@ -261,7 +261,7 @@ router.delete(
       }
 
       const db = getKysely();
-      await sql`DELETE FROM "tblUsers" WHERE "UserID" = ${parseInt(userId)}`.execute(db);
+      await sql`DELETE FROM "users" WHERE "user_id" = ${parseInt(userId)}`.execute(db);
 
       log.info(`User deleted: ID ${userId} by ${req.session.username}`);
 

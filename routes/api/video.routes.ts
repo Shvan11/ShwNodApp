@@ -72,7 +72,7 @@ const upload = multer({
   },
 });
 
-// Type definitions
+// type definitions
 interface VideoIdParams {
   id: string;
 }
@@ -226,7 +226,7 @@ router.get('/:id/stream', async (req: Request<VideoIdParams>, res: Response): Pr
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
         'Accept-Ranges': 'bytes',
         'Content-Length': chunkSize,
-        'Content-Type': mimeType,
+        'Content-type': mimeType,
       });
 
       fileStream.pipe(res);
@@ -234,7 +234,7 @@ router.get('/:id/stream', async (req: Request<VideoIdParams>, res: Response): Pr
       // No range - send entire file
       res.writeHead(200, {
         'Content-Length': fileSize,
-        'Content-Type': mimeType,
+        'Content-type': mimeType,
         'Accept-Ranges': 'bytes',
       });
 
@@ -282,7 +282,7 @@ router.get('/:id/thumbnail', async (req: Request<VideoIdParams>, res: Response):
 
     res.writeHead(200, {
       'Content-Length': stat.size,
-      'Content-Type': mimeType,
+      'Content-type': mimeType,
       'Cache-Control': 'public, max-age=86400', // Cache for 24 hours
     });
 
@@ -318,7 +318,7 @@ router.get('/:id/qr', async (req: Request<VideoIdParams>, res: Response): Promis
     sendSuccess(res, {
       qr: qrResult.qr,
       url: qrResult.url,
-      title: video.Description,
+      title: video.description,
     });
   } catch (error) {
     log.error('[Videos] Error generating QR code:', error);

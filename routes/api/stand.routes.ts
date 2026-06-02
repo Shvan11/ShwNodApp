@@ -104,7 +104,7 @@ router.post(
     try {
       const { name } = req.body;
       if (!name || !name.trim()) {
-        ErrorResponses.badRequest(res, 'Category name is required');
+        ErrorResponses.badRequest(res, 'category name is required');
         return;
       }
       const result = await addStandCategory(name.trim());
@@ -122,7 +122,7 @@ router.put(
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid category ID'); return; }
+      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid category id'); return; }
       await updateStandCategory(id, req.body);
       res.json({ success: true });
     } catch (error) {
@@ -138,7 +138,7 @@ router.delete(
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid category ID'); return; }
+      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid category id'); return; }
       await deactivateStandCategory(id);
       res.json({ success: true });
     } catch (error) {
@@ -215,7 +215,7 @@ router.post(
 Extract the product details and return them matching the exact JSON schema.
 Look across all images to find missing data like expiry dates or barcodes.
 For the barcode, read the numbers printed under any barcode or near a QR code.
-For ItemName, combine the brand name and product name as shown on packaging.`;
+For item_name, combine the brand name and product name as shown on packaging.`;
 
       const generateRequest = {
         model: process.env.GEMINI_MODEL ?? 'gemini-3-flash-preview',
@@ -230,14 +230,14 @@ For ItemName, combine the brand name and product name as shown on packaging.`;
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              ItemName: { type: Type.STRING, description: 'Product name as shown on packaging' },
-              Barcode: { type: Type.STRING, description: 'Barcode number if visible, otherwise null', nullable: true },
-              ExpiryDate: { type: Type.STRING, description: 'Expiry date in YYYY-MM-DD format if visible, otherwise null', nullable: true },
+              item_name: { type: Type.STRING, description: 'Product name as shown on packaging' },
+              barcode: { type: Type.STRING, description: 'barcode number if visible, otherwise null', nullable: true },
+              expiry_date: { type: Type.STRING, description: 'Expiry date in YYYY-MM-DD format if visible, otherwise null', nullable: true },
               CategorySuggestion: { type: Type.STRING, description: 'Product category (e.g. Mouthwash, Toothbrush, Floss, Dental Care, Skin Care, Medicine)' },
-              Unit: { type: Type.STRING, description: 'Unit type: one of piece, box, tube, bottle, pack' },
-              Notes: { type: Type.STRING, description: 'Brief 1-sentence summary of active ingredients or features' },
+              unit: { type: Type.STRING, description: 'unit type: one of piece, box, tube, bottle, pack' },
+              notes: { type: Type.STRING, description: 'Brief 1-sentence summary of active ingredients or features' },
             },
-            required: ['ItemName', 'CategorySuggestion', 'Unit', 'Notes'],
+            required: ['item_name', 'CategorySuggestion', 'unit', 'notes'],
           },
         },
       };
@@ -264,7 +264,7 @@ For ItemName, combine the brand name and product name as shown on packaging.`;
 
       const parsed = JSON.parse(result.text ?? '{}');
 
-      log.info('Vision scan completed', { itemName: parsed.ItemName });
+      log.info('Vision scan completed', { itemName: parsed.item_name });
       res.json({ success: true, data: parsed });
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
@@ -322,7 +322,7 @@ router.get(
 router.get('/stand/items/:id', async (req: Request<{ id: string }>, res: Response): Promise<void> => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item ID'); return; }
+    if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
     const item = await getStandItemById(id);
     if (!item) { ErrorResponses.notFound(res, 'Item'); return; }
     res.json(item);
@@ -358,7 +358,7 @@ router.put(
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item ID'); return; }
+      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
       await updateStandItem(id, req.body);
       res.json({ success: true });
     } catch (error) {
@@ -374,7 +374,7 @@ router.delete(
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item ID'); return; }
+      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
       await softDeleteStandItem(id);
       res.json({ success: true });
     } catch (error) {
@@ -390,7 +390,7 @@ router.post(
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item ID'); return; }
+      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
       const { quantity, unitCost } = req.body;
       if (!quantity || unitCost === undefined) {
         ErrorResponses.badRequest(res, 'Missing required fields: quantity, unitCost');
@@ -412,7 +412,7 @@ router.post(
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item ID'); return; }
+      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
       const { delta, reason } = req.body;
       if (delta === undefined || !reason) {
         ErrorResponses.badRequest(res, 'Missing required fields: delta, reason');
@@ -430,7 +430,7 @@ router.post(
 router.get('/stand/items/:id/movements', async (req: Request<{ id: string }>, res: Response): Promise<void> => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item ID'); return; }
+    if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
     const movements = await getStockMovements(id, {
       startDate: req.query.startDate as string | undefined,
       endDate: req.query.endDate as string | undefined,
@@ -486,7 +486,7 @@ router.get(
 router.get('/stand/sales/:id', async (req: Request<{ id: string }>, res: Response): Promise<void> => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid sale ID'); return; }
+    if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid sale id'); return; }
     const sale = await getStandSaleById(id);
     if (!sale) { ErrorResponses.notFound(res, 'Sale'); return; }
     res.json(sale);
@@ -502,7 +502,7 @@ router.post(
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid sale ID'); return; }
+      if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid sale id'); return; }
       const { reason } = req.body;
       if (!reason) {
         ErrorResponses.badRequest(res, 'Void reason is required');

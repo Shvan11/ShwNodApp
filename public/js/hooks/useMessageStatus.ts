@@ -18,7 +18,7 @@ const apiClient = new APIClient();
  */
 export interface Message {
   PatientID?: number;
-  PatientName?: string;
+  patient_name?: string;
   Phone?: string;
   MessageText?: string;
   status: MessageStatusValue;

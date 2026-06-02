@@ -18,13 +18,13 @@ interface WorkInfo {
 }
 
 interface PaymentFormData {
-    Amountpaid: string | number;
-    Dateofpayment: string;
+    amount_paid: string | number;
+    date_of_payment: string;
 }
 
 interface FormErrors {
-    Amountpaid?: string | null;
-    Dateofpayment?: string | null;
+    amount_paid?: string | null;
+    date_of_payment?: string | null;
     submit?: string;
 }
 
@@ -38,8 +38,8 @@ interface PaymentFormDrawerProps {
 
 const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }: PaymentFormDrawerProps) => {
     const [formData, setFormData] = useState<PaymentFormData>({
-        Amountpaid: 0,
-        Dateofpayment: new Date().toISOString().split('T')[0]
+        amount_paid: 0,
+        date_of_payment: new Date().toISOString().split('T')[0]
     });
 
     const [displayAmount, setDisplayAmount] = useState('');
@@ -51,8 +51,8 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
             // Reset form when drawer opens
             const initialAmount = set.Balance || set.SetCost || 0;
             setFormData({
-                Amountpaid: initialAmount,
-                Dateofpayment: new Date().toISOString().split('T')[0]
+                amount_paid: initialAmount,
+                date_of_payment: new Date().toISOString().split('T')[0]
             });
             setDisplayAmount(initialAmount ? formatNumber(initialAmount) : '');
             setErrors({});
@@ -77,26 +77,26 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
         const digits = value.replace(/[^\d]/g, '');
         const num = parseInt(digits, 10) || 0;
         setDisplayAmount(num ? num.toLocaleString('en-US') : '');
-        setFormData(prev => ({ ...prev, Amountpaid: num }));
-        if (errors.Amountpaid) {
-            setErrors(prev => ({ ...prev, Amountpaid: null }));
+        setFormData(prev => ({ ...prev, amount_paid: num }));
+        if (errors.amount_paid) {
+            setErrors(prev => ({ ...prev, amount_paid: null }));
         }
     };
 
     const validate = (): boolean => {
         const newErrors: FormErrors = {};
-        const amount = Number(formData.Amountpaid) || 0;
+        const amount = Number(formData.amount_paid) || 0;
 
         if (amount <= 0) {
-            newErrors.Amountpaid = 'Amount paid is required and must be greater than 0';
+            newErrors.amount_paid = 'Amount paid is required and must be greater than 0';
         }
 
-        if (!formData.Dateofpayment) {
-            newErrors.Dateofpayment = 'Payment date is required';
+        if (!formData.date_of_payment) {
+            newErrors.date_of_payment = 'Payment date is required';
         }
 
         if (set && set.Balance && amount > set.Balance) {
-            newErrors.Amountpaid = `Amount cannot exceed balance of ${formatNumber(set.Balance)}`;
+            newErrors.amount_paid = `Amount cannot exceed balance of ${formatNumber(set.Balance)}`;
         }
 
         setErrors(newErrors);
@@ -115,7 +115,7 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
         try {
             await onSave({
                 ...formData,
-                Amountpaid: Number(formData.Amountpaid),
+                amount_paid: Number(formData.amount_paid),
                 ActualAmount: null,
                 ActualCur: set?.Currency || 'USD',
                 Change: null
@@ -133,7 +133,7 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
 
     const remainingBalance = set?.Balance || set?.SetCost || 0;
     const totalPaid = set?.TotalPaid || 0;
-    const newBalance = remainingBalance - (Number(formData.Amountpaid) || 0);
+    const newBalance = remainingBalance - (Number(formData.amount_paid) || 0);
     const currency = set?.Currency || 'USD';
 
     return (
@@ -172,44 +172,44 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
                     <form onSubmit={handleSubmit} className="aligner-payment-form">
                         {/* Amount Paid */}
                         <div className="form-field">
-                            <label htmlFor="Amountpaid">
+                            <label htmlFor="amount_paid">
                                 Amount to Pay <span className="required">*</span>
                             </label>
                             <div className="input-group">
                                 <input
                                     type="text"
-                                    id="Amountpaid"
-                                    name="Amountpaid"
+                                    id="amount_paid"
+                                    name="amount_paid"
                                     value={displayAmount}
                                     onChange={(e) => handleAmountChange(e.target.value)}
-                                    onBlur={() => setDisplayAmount(formData.Amountpaid ? formatNumber(formData.Amountpaid) : '')}
-                                    className={errors.Amountpaid ? 'error' : ''}
+                                    onBlur={() => setDisplayAmount(formData.amount_paid ? formatNumber(formData.amount_paid) : '')}
+                                    className={errors.amount_paid ? 'error' : ''}
                                     autoFocus
                                     placeholder="Enter amount"
                                 />
                                 <span className="currency-badge">{currency}</span>
                             </div>
-                            {errors.Amountpaid && <span className="error-message">{errors.Amountpaid}</span>}
+                            {errors.amount_paid && <span className="error-message">{errors.amount_paid}</span>}
                         </div>
 
                         {/* Payment Date */}
                         <div className="form-field">
-                            <label htmlFor="Dateofpayment">
+                            <label htmlFor="date_of_payment">
                                 Payment Date <span className="required">*</span>
                             </label>
                             <input
                                 type="date"
-                                id="Dateofpayment"
-                                name="Dateofpayment"
-                                value={formData.Dateofpayment}
+                                id="date_of_payment"
+                                name="date_of_payment"
+                                value={formData.date_of_payment}
                                 onChange={handleChange}
-                                className={errors.Dateofpayment ? 'error' : ''}
+                                className={errors.date_of_payment ? 'error' : ''}
                             />
-                            {errors.Dateofpayment && <span className="error-message">{errors.Dateofpayment}</span>}
+                            {errors.date_of_payment && <span className="error-message">{errors.date_of_payment}</span>}
                         </div>
 
                         {/* New Balance Preview */}
-                        {Number(formData.Amountpaid) > 0 && (
+                        {Number(formData.amount_paid) > 0 && (
                             <div className="balance-preview">
                                 <span className="preview-label">New Balance:</span>
                                 <span className={`preview-value ${newBalance <= 0 ? 'paid-full' : ''}`}>

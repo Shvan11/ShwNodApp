@@ -2,7 +2,7 @@
  * TimePoint and image-related database queries.
  *
  * Reads from the LOCAL clone tables (`tblTimePoints` / `tblTimePointImages`),
- * keyed by `PersonID`. (These formerly proxied the Dolphin `ListDolphTimePoints` /
+ * keyed by `person_id`. (These formerly proxied the Dolphin `ListDolphTimePoints` /
  * `ListTimePointImgs` stored procs into `DolphinPlatform`; that dependency is gone.)
  *
  * Migration Phase 4: translated to typed Kysely (PostgreSQL). Runs against the pg
@@ -11,15 +11,15 @@
 import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
 
-// Type definitions
+// type definitions
 interface TimePoint {
-  tpCode: string;
-  tpDateTime: string;
-  tpDescription: string;
+  tp_code: string;
+  tp_date_time: string;
+  tp_description: string;
 }
 
 /**
- * Retrieves time points for a given patient ID, ordered chronologically by date.
+ * Retrieves time points for a given patient id, ordered chronologically by date.
  *
  * Ordered by `tpDateTime` (then `tpCode` as a tiebreaker) so the photo timepoint tabs
  * render left-to-right in date order. (Historically this ordered by `tpCode`, which only
@@ -34,15 +34,15 @@ interface TimePoint {
 export function getTimePoints(PID: string): Promise<TimePoint[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblTimePoints')
-    .where('PersonID', '=', Number.parseInt(PID, 10))
+    .selectFrom('time_points')
+    .where('person_id', '=', Number.parseInt(PID, 10))
     .select((eb) => [
-      sql<string>`cast(${eb.ref('tpCode')} as varchar)`.as('tpCode'),
-      eb.ref('tpDateTime').$castTo<string>().as('tpDateTime'),
-      'tpDescription',
+      sql<string>`cast(${eb.ref('tp_code')} as varchar)`.as('tp_code'),
+      eb.ref('tp_date_time').$castTo<string>().as('tp_date_time'),
+      'tp_description',
     ])
-    .orderBy('tpDateTime')
-    .orderBy('tpCode')
+    .orderBy('tp_date_time')
+    .orderBy('tp_code')
     .execute() as Promise<TimePoint[]>;
 }
 
@@ -53,12 +53,12 @@ export function getTimePoints(PID: string): Promise<TimePoint[]> {
 export function getTimePointImgs(pid: string, tp: string): Promise<string[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblTimePointImages as ti')
-    .innerJoin('tblTimePoints as t', 't.TimePointID', 'ti.TimePointID')
-    .where('t.PersonID', '=', Number.parseInt(pid, 10))
-    .where('t.tpCode', '=', Number.parseInt(tp, 10))
-    .orderBy('ti.ImageType')
-    .select((eb) => sql<string>`rtrim(${eb.ref('ti.ImageType')})`.as('ImageType'))
+    .selectFrom('time_point_images as ti')
+    .innerJoin('time_points as t', 't.time_point_id', 'ti.time_point_id')
+    .where('t.person_id', '=', Number.parseInt(pid, 10))
+    .where('t.tp_code', '=', Number.parseInt(tp, 10))
+    .orderBy('ti.image_type')
+    .select((eb) => sql<string>`rtrim(${eb.ref('ti.image_type')})`.as('image_type'))
     .execute()
-    .then((rows) => rows.map((r) => r.ImageType));
+    .then((rows) => rows.map((r) => r.image_type));
 }

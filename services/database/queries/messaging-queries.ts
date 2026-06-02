@@ -17,7 +17,7 @@ import { arabicDay } from '../../../utils/arabic-day.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 
-// Type definitions
+// type definitions
 interface CircuitBreakerStatus {
   state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
   failureCount: number;
@@ -247,7 +247,7 @@ function formatDMY(value: Date | string): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
-/** Normalise a local phone to `CountryCode + number` (no '+'), matching the procs' CASE ladder. */
+/** Normalise a local phone to `country_code + number` (no '+'), matching the procs' CASE ladder. */
 function formatPhone(phone: string, countryCode: string): string {
   const p = phone.trim();
   if (p.startsWith(`+${countryCode}`)) return p.slice(1);
@@ -300,24 +300,24 @@ function statusTextToCode(status: string): number {
 }
 
 /**
- * Replaces trg_MessageStatusHistory: append a history row for each appointment whose DeliveredWa
+ * Replaces trg_MessageStatusHistory: append a history row for each appointment whose delivered_wa
  * actually changed (new value <> old, treating old NULL as ''). Runs inside the caller's trx.
  */
 async function insertStatusHistory(
   trx: import('kysely').Transaction<import('../kysely.js').Database>,
-  changes: Array<{ appointmentID: number; waMessageID: string | null; delivered: string }>,
+  changes: Array<{ appointment_id: number; waMessageID: string | null; delivered: string }>,
   when: Date
 ): Promise<void> {
   if (changes.length === 0) return;
   await trx
-    .insertInto('tblMessageStatusHistory')
+    .insertInto('message_status_history')
     .values(
       changes.map((c) => ({
-        AppointmentID: c.appointmentID,
-        WaMessageID: c.waMessageID ?? '',
-        StatusCode: statusTextToCode(c.delivered),
-        StatusText: c.delivered,
-        Timestamp: when,
+        appointment_id: c.appointment_id,
+        wa_message_id: c.waMessageID ?? '',
+        status_code: statusTextToCode(c.delivered),
+        status_text: c.delivered,
+        timestamp: when,
       }))
     )
     .execute();
@@ -344,42 +344,42 @@ export async function updateWhatsAppDeliveryStatus(
       const now = new Date();
 
       const c = await withPgTransaction(async (trx) => {
-        // Old DeliveredWa per appointment (to drive the trg_MessageStatusHistory equivalent).
+        // Old delivered_wa per appointment (to drive the trg_MessageStatusHistory equivalent).
         const oldRows = await trx
-          .selectFrom('tblappointments')
-          .select(['appointmentID', 'DeliveredWa'])
-          .where('appointmentID', 'in', ids)
+          .selectFrom('appointments')
+          .select(['appointment_id', 'delivered_wa'])
+          .where('appointment_id', 'in', ids)
           .execute();
-        const oldById = new Map(oldRows.map((r) => [r.appointmentID, (r.DeliveredWa as string | null) ?? '']));
+        const oldById = new Map(oldRows.map((r) => [r.appointment_id, (r.delivered_wa as string | null) ?? '']));
 
         await sql`
-          UPDATE "tblappointments" AS a SET
-            "DeliveredWa" = w.delivered,
-            "WaMessageID" = w.wamid,
-            "WantNotify" = CASE WHEN w.delivered IN ('READ','DEVICE','SERVER') THEN false ELSE a."WantNotify" END,
-            "LastUpdated" = ${now}::timestamp,
-            "DeliveredTimestamp" = CASE
-              WHEN w.delivered IN ('DEVICE','SERVER') AND a."DeliveredTimestamp" IS NULL THEN ${now}::timestamp
-              ELSE a."DeliveredTimestamp" END,
-            "ReadTimestamp" = CASE
-              WHEN w.delivered = 'READ' AND a."ReadTimestamp" IS NULL THEN ${now}::timestamp
-              ELSE a."ReadTimestamp" END
+          UPDATE "appointments" AS a SET
+            "delivered_wa" = w.delivered,
+            "wa_message_id" = w.wamid,
+            "want_notify" = CASE WHEN w.delivered IN ('READ','DEVICE','SERVER') THEN false ELSE a."want_notify" END,
+            "last_updated" = ${now}::timestamp,
+            "delivered_timestamp" = CASE
+              WHEN w.delivered IN ('DEVICE','SERVER') AND a."delivered_timestamp" IS NULL THEN ${now}::timestamp
+              ELSE a."delivered_timestamp" END,
+            "read_timestamp" = CASE
+              WHEN w.delivered = 'READ' AND a."read_timestamp" IS NULL THEN ${now}::timestamp
+              ELSE a."read_timestamp" END
           FROM unnest(${ids}::int[], ${statuses}::text[], ${wamids}::text[]) AS w(appointmentid, delivered, wamid)
-          WHERE a."appointmentID" = w.appointmentid
+          WHERE a."appointment_id" = w.appointmentid
         `.execute(trx);
 
         const changed = messages
-          .map((m) => ({ appointmentID: m.id, waMessageID: m.whatsappMessageId || '', delivered: convertAckStatus(m.ack) }))
-          .filter((m) => m.delivered !== oldById.get(m.appointmentID));
+          .map((m) => ({ appointment_id: m.id, waMessageID: m.whatsappMessageId || '', delivered: convertAckStatus(m.ack) }))
+          .filter((m) => m.delivered !== oldById.get(m.appointment_id));
         await insertStatusHistory(trx, changed, now);
 
         const { rows } = await sql<{ total: number; read: number; delivered: number; server: number }>`
           SELECT
             COUNT(*)::int AS total,
-            COALESCE(SUM(CASE WHEN "DeliveredWa" = 'READ'   THEN 1 ELSE 0 END), 0)::int AS read,
-            COALESCE(SUM(CASE WHEN "DeliveredWa" = 'DEVICE' THEN 1 ELSE 0 END), 0)::int AS delivered,
-            COALESCE(SUM(CASE WHEN "DeliveredWa" = 'SERVER' THEN 1 ELSE 0 END), 0)::int AS server
-          FROM "tblappointments" WHERE "appointmentID" = ANY(${ids}::int[])
+            COALESCE(SUM(CASE WHEN "delivered_wa" = 'READ'   THEN 1 ELSE 0 END), 0)::int AS read,
+            COALESCE(SUM(CASE WHEN "delivered_wa" = 'DEVICE' THEN 1 ELSE 0 END), 0)::int AS delivered,
+            COALESCE(SUM(CASE WHEN "delivered_wa" = 'SERVER' THEN 1 ELSE 0 END), 0)::int AS server
+          FROM "appointments" WHERE "appointment_id" = ANY(${ids}::int[])
         `.execute(trx);
         return rows[0] ?? { total: messages.length, read: 0, delivered: 0, server: 0 };
       });
@@ -426,22 +426,22 @@ export async function getWhatsAppMessages(
           : `The day after tomorrow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at`;
 
       const candidates = await getKysely()
-        .selectFrom('tblappointments as a')
-        .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
-        .where('a.AppDay', '=', sql<Date>`${dateStr}::date`)
-        .where('a.WantWa', '=', true)
-        .where((eb) => eb.or([eb('a.Notified', 'is', null), eb('a.Notified', '=', false)]))
-        .where((eb) => eb.or([eb('a.SentWa', 'is', null), eb('a.SentWa', '=', false)]))
-        .where('p.Phone', 'is not', null)
-        .orderBy('a.AppTime')
+        .selectFrom('appointments as a')
+        .innerJoin('patients as p', 'p.person_id', 'a.person_id')
+        .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
+        .where('a.want_wa', '=', true)
+        .where((eb) => eb.or([eb('a.notified', 'is', null), eb('a.notified', '=', false)]))
+        .where((eb) => eb.or([eb('a.sent_wa', 'is', null), eb('a.sent_wa', '=', false)]))
+        .where('p.phone', 'is not', null)
+        .orderBy('a.app_time')
         .select([
-          'a.appointmentID as id',
-          'p.Phone as phone',
-          'p.CountryCode as countryCode',
-          'p.PatientName as patientName',
-          'p.FirstName as firstName',
-          'p.Language as language',
-          'a.AppDate as appDate',
+          'a.appointment_id as id',
+          'p.phone as phone',
+          'p.country_code as countryCode',
+          'p.patient_name as patientName',
+          'p.first_name as firstName',
+          'p.language as language',
+          'a.app_date as appDate',
         ])
         .execute();
 
@@ -465,7 +465,7 @@ export async function getWhatsAppMessages(
         names.push(r.patientName || '');
       }
 
-      await sql`UPDATE "tblsms" SET "smssent" = true WHERE "date" = ${dateStr}::date`.execute(getKysely());
+      await sql`UPDATE "sms" SET "sms_sent" = true WHERE "date" = ${dateStr}::date`.execute(getKysely());
 
       log.debug('WhatsApp messages retrieved successfully', { messageCount: ids.length, date });
       return [numbers, messages, ids, names] as [string[], string[], number[], string[]];
@@ -493,13 +493,13 @@ export async function updateWhatsAppStatus(
     .execute(async () => {
       const now = new Date();
       const result = await sql`
-        UPDATE "tblappointments" AS a SET
-          "SentWa" = true,
-          "WaMessageID" = w.wamid,
-          "WantWa" = false,
-          "SentTimestamp" = ${now}::timestamp
+        UPDATE "appointments" AS a SET
+          "sent_wa" = true,
+          "wa_message_id" = w.wamid,
+          "want_wa" = false,
+          "sent_timestamp" = ${now}::timestamp
         FROM unnest(${appointmentIds}::int[], ${messageIds}::text[]) AS w(appointmentid, wamid)
-        WHERE a."appointmentID" = w.appointmentid
+        WHERE a."appointment_id" = w.appointmentid
       `.execute(getKysely());
 
       const updatedCount = Number(result.numAffectedRows ?? appointmentIds.length);
@@ -528,54 +528,54 @@ export async function updateSingleMessageStatus(
 
       return withPgTransaction(async (trx) => {
         const existing = await trx
-          .selectFrom('tblappointments')
-          .select(['appointmentID', 'DeliveredWa'])
-          .where('WaMessageID', '=', messageId)
+          .selectFrom('appointments')
+          .select(['appointment_id', 'delivered_wa'])
+          .where('wa_message_id', '=', messageId)
           .executeTakeFirst();
 
         if (!existing) {
-          log.warn('Message ID not found in database', { messageId });
+          log.warn('Message id not found in database', { messageId });
           return { success: true, found: false };
         }
 
-        const oldDelivered = (existing.DeliveredWa as string | null) ?? '';
+        const oldDelivered = (existing.delivered_wa as string | null) ?? '';
 
         await sql`
-          UPDATE "tblappointments" SET
-            "DeliveredWa" = ${statusText},
-            "WantNotify" = CASE WHEN ${statusText} IN ('READ','DEVICE','SERVER') THEN false ELSE "WantNotify" END,
-            "LastUpdated" = ${now}::timestamp,
-            "DeliveredTimestamp" = CASE
-              WHEN ${statusText} IN ('DEVICE','SERVER') AND "DeliveredTimestamp" IS NULL THEN ${now}::timestamp
-              ELSE "DeliveredTimestamp" END,
-            "ReadTimestamp" = CASE
-              WHEN ${statusText} = 'READ' AND "ReadTimestamp" IS NULL THEN ${now}::timestamp
-              ELSE "ReadTimestamp" END
-          WHERE "appointmentID" = ${existing.appointmentID}
+          UPDATE "appointments" SET
+            "delivered_wa" = ${statusText},
+            "want_notify" = CASE WHEN ${statusText} IN ('READ','DEVICE','SERVER') THEN false ELSE "want_notify" END,
+            "last_updated" = ${now}::timestamp,
+            "delivered_timestamp" = CASE
+              WHEN ${statusText} IN ('DEVICE','SERVER') AND "delivered_timestamp" IS NULL THEN ${now}::timestamp
+              ELSE "delivered_timestamp" END,
+            "read_timestamp" = CASE
+              WHEN ${statusText} = 'READ' AND "read_timestamp" IS NULL THEN ${now}::timestamp
+              ELSE "read_timestamp" END
+          WHERE "appointment_id" = ${existing.appointment_id}
         `.execute(trx);
 
         if (statusText !== oldDelivered) {
-          await insertStatusHistory(trx, [{ appointmentID: existing.appointmentID, waMessageID: messageId, delivered: statusText }], now);
+          await insertStatusHistory(trx, [{ appointment_id: existing.appointment_id, waMessageID: messageId, delivered: statusText }], now);
         }
 
         const info = await trx
-          .selectFrom('tblappointments as a')
-          .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
-          .where('a.appointmentID', '=', existing.appointmentID)
-          .select(['a.appointmentID', 'p.PatientName', 'p.Phone', 'a.DeliveredWa', 'a.LastUpdated'])
+          .selectFrom('appointments as a')
+          .innerJoin('patients as p', 'p.person_id', 'a.person_id')
+          .where('a.appointment_id', '=', existing.appointment_id)
+          .select(['a.appointment_id', 'p.patient_name', 'p.phone', 'a.delivered_wa', 'a.last_updated'])
           .executeTakeFirst();
 
-        log.info('Single message status updated successfully', { messageId, appointmentId: existing.appointmentID });
+        log.info('Single message status updated successfully', { messageId, appointmentId: existing.appointment_id });
         return {
           success: true,
           found: true,
           appointment: info
             ? {
-                appointmentId: info.appointmentID,
-                patientName: info.PatientName,
-                phone: info.Phone ?? '',
-                status: info.DeliveredWa ?? '',
-                lastUpdated: info.LastUpdated as Date,
+                appointmentId: info.appointment_id,
+                patientName: info.patient_name,
+                phone: info.phone ?? '',
+                status: info.delivered_wa ?? '',
+                lastUpdated: info.last_updated as Date,
               }
             : undefined,
         };
@@ -600,14 +600,14 @@ export async function getWhatsAppDeliveryStatus(
     .execute(async () => {
       const dateStr = typeof date === 'string' ? date.slice(0, 10) : toDateOnly(date);
       const rows = await getKysely()
-        .selectFrom('tblappointments as a')
-        .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
-        .where('a.AppDay', '=', sql<Date>`${dateStr}::date`)
-        .where('a.SentWa', '=', true)
+        .selectFrom('appointments as a')
+        .innerJoin('patients as p', 'p.person_id', 'a.person_id')
+        .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
+        .where('a.sent_wa', '=', true)
         .select([
-          'a.appointmentID as id',
-          sql<string>`COALESCE(p."CountryCode", '964') || p."Phone" || '@c.us'`.as('number'),
-          'a.WaMessageID as wamid',
+          'a.appointment_id as id',
+          sql<string>`COALESCE(p."country_code", '964') || p."phone" || '@c.us'`.as('number'),
+          'a.wa_message_id as wamid',
         ])
         .execute();
 
@@ -664,18 +664,18 @@ export async function getSmsMessages(date: Date | string): Promise<SmsMessage[]>
         : `Tommorow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at `;
 
       const rows = await getKysely()
-        .selectFrom('tblappointments as a')
-        .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
-        .where('a.AppDay', '=', sql<Date>`${dateStr}::date`)
-        .where('a.WantNotify', '=', true)
-        .where((eb) => eb.or([eb('a.Notified', 'is', null), eb('a.Notified', '=', false)]))
+        .selectFrom('appointments as a')
+        .innerJoin('patients as p', 'p.person_id', 'a.person_id')
+        .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
+        .where('a.want_notify', '=', true)
+        .where((eb) => eb.or([eb('a.notified', 'is', null), eb('a.notified', '=', false)]))
         .select([
-          'a.appointmentID as id',
-          'p.Phone as phone',
-          'p.PatientName as patientName',
-          'p.FirstName as firstName',
-          'p.Language as language',
-          'a.AppDate as appDate',
+          'a.appointment_id as id',
+          'p.phone as phone',
+          'p.patient_name as patientName',
+          'p.first_name as firstName',
+          'p.language as language',
+          'a.app_date as appDate',
         ])
         .execute();
 
@@ -713,15 +713,15 @@ export async function updateSmsIds(
       const ids = messages.map((m) => m.id);
       const sids = messages.map((m) => m.sid);
       await sql`
-        UPDATE "tblappointments" AS a SET "sms_sid" = w.sid, "Notified" = true, "WantWa" = false
+        UPDATE "appointments" AS a SET "sms_sid" = w.sid, "notified" = true, "want_wa" = false
         FROM unnest(${ids}::int[], ${sids}::text[]) AS w(appointmentid, sid)
-        WHERE a."appointmentID" = w.appointmentid
+        WHERE a."appointment_id" = w.appointmentid
       `.execute(getKysely());
       log.info('SMS IDs updated successfully', { updatedCount: messages.length });
       return { success: true, updatedCount: messages.length };
     }, operationName)
     .catch((error: Error) => {
-      log.error('SMS ID update failed', { operationName, error: error.message });
+      log.error('SMS id update failed', { operationName, error: error.message });
       return { success: false, error: error.message, updatedCount: 0 };
     });
 }
@@ -736,10 +736,10 @@ export async function getSmsIds(date: Date | string): Promise<SmsIdMessage[]> {
     .execute(async () => {
       const dateStr = typeof date === 'string' ? date.slice(0, 10) : toDateOnly(date);
       const rows = await getKysely()
-        .selectFrom('tblappointments')
-        .where('AppDay', '=', sql<Date>`${dateStr}::date`)
+        .selectFrom('appointments')
+        .where('app_day', '=', sql<Date>`${dateStr}::date`)
         .where('sms_sid', 'is not', null)
-        .select(['appointmentID as id', 'sms_sid as sid'])
+        .select(['appointment_id as id', 'sms_sid as sid'])
         .execute();
       log.info('SMS IDs retrieved for status checking', { idCount: rows.length });
       return rows.map((r) => ({ id: r.id, sid: (r.sid as string) ?? '' }));
@@ -762,9 +762,9 @@ export async function updateSmsStatus(messages: SmsStatusMessage[]): Promise<Upd
       const ids = messages.map((m) => m.id);
       const statuses = messages.map((m) => m.status);
       await sql`
-        UPDATE "tblappointments" AS a SET "SMSStatus" = w.status
+        UPDATE "appointments" AS a SET "sms_status" = w.status
         FROM unnest(${ids}::int[], ${statuses}::text[]) AS w(appointmentid, status)
-        WHERE a."appointmentID" = w.appointmentid
+        WHERE a."appointment_id" = w.appointmentid
       `.execute(getKysely());
       log.info('SMS status update completed successfully', { updatedCount: messages.length });
       return { success: true, updatedCount: messages.length };
@@ -785,19 +785,19 @@ export async function getMessageStatusByDate(date: Date | string): Promise<Messa
     .execute(async () => {
       const dateStr = typeof date === 'string' ? date.slice(0, 10) : toDateOnly(date);
       const rows = await getKysely()
-        .selectFrom('tblappointments as a')
-        .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
-        .where('a.AppDay', '=', sql<Date>`${dateStr}::date`)
-        .orderBy('a.AppTime')
+        .selectFrom('appointments as a')
+        .innerJoin('patients as p', 'p.person_id', 'a.person_id')
+        .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
+        .orderBy('a.app_time')
         .select([
-          'a.appointmentID as appointmentId',
-          'p.PatientName as patientName',
-          'p.Phone as phone',
-          'a.SentWa as sentStatus',
-          'a.DeliveredWa as deliveryStatus',
-          'a.WaMessageID as messageId',
-          'a.SentTimestamp as sentTimestamp',
-          'a.LastUpdated as lastUpdated',
+          'a.appointment_id as appointmentId',
+          'p.patient_name as patientName',
+          'p.phone as phone',
+          'a.sent_wa as sentStatus',
+          'a.delivered_wa as deliveryStatus',
+          'a.wa_message_id as messageId',
+          'a.sent_timestamp as sentTimestamp',
+          'a.last_updated as lastUpdated',
         ])
         .execute();
 
@@ -844,18 +844,18 @@ export async function getNewAppointmentMessage(
   appointmentId: number
 ): Promise<NewAppointmentMessage | null> {
   const row = await getKysely()
-    .selectFrom('tblpatients as p')
-    .innerJoin('tblappointments as a', 'a.PersonID', 'p.PersonID')
-    .where('p.PersonID', '=', personId)
-    .where('a.appointmentID', '=', appointmentId)
+    .selectFrom('patients as p')
+    .innerJoin('appointments as a', 'a.person_id', 'p.person_id')
+    .where('p.person_id', '=', personId)
+    .where('a.appointment_id', '=', appointmentId)
     .select([
-      'p.PatientName as patientName',
-      'p.FirstName as firstName',
-      'p.Phone as phone',
-      'p.CountryCode as countryCode',
-      'p.Language as language',
-      'a.AppDay as appDay',
-      'a.AppDate as appDate',
+      'p.patient_name as patientName',
+      'p.first_name as firstName',
+      'p.phone as phone',
+      'p.country_code as countryCode',
+      'p.language as language',
+      'a.app_day as appDay',
+      'a.app_date as appDate',
     ])
     .executeTakeFirst();
 
@@ -906,31 +906,31 @@ export async function getNewAppointmentMessage(
 export async function resetMessagingForDate(date: string): Promise<ResetResult> {
   return withPgTransaction(async (trx) => {
     await sql`
-      DELETE FROM "tblMessageStatusHistory"
-      WHERE "AppointmentID" IN (SELECT "appointmentID" FROM "tblappointments" WHERE "AppDay" = ${date}::date)
+      DELETE FROM "message_status_history"
+      WHERE "appointment_id" IN (SELECT "appointment_id" FROM "appointments" WHERE "app_day" = ${date}::date)
     `.execute(trx);
 
     const upd = await sql`
-      UPDATE "tblappointments" SET
-        "Notified" = false, "SentWa" = false, "DeliveredWa" = NULL, "WantWa" = true,
-        "WaMessageID" = NULL, "SentTimestamp" = NULL, "LastUpdated" = NULL,
-        "DeliveredTimestamp" = NULL, "ReadTimestamp" = NULL, "WantNotify" = true
-      WHERE "AppDay" = ${date}::date
+      UPDATE "appointments" SET
+        "notified" = false, "sent_wa" = false, "delivered_wa" = NULL, "want_wa" = true,
+        "wa_message_id" = NULL, "sent_timestamp" = NULL, "last_updated" = NULL,
+        "delivered_timestamp" = NULL, "read_timestamp" = NULL, "want_notify" = true
+      WHERE "app_day" = ${date}::date
     `.execute(trx);
     const appointmentsReset = Number(upd.numAffectedRows ?? 0);
 
-    const smsUpd = await sql`UPDATE "tblsms" SET "smssent" = false WHERE "date" = ${date}::date`.execute(trx);
+    const smsUpd = await sql`UPDATE "sms" SET "sms_sent" = false WHERE "date" = ${date}::date`.execute(trx);
     const smsRecordsReset = Number(smsUpd.numAffectedRows ?? 0);
 
     const stats = await trx
-      .selectFrom('tblappointments')
-      .where('AppDay', '=', sql<Date>`${date}::date`)
+      .selectFrom('appointments')
+      .where('app_day', '=', sql<Date>`${date}::date`)
       .select((eb) => [
         eb.fn.countAll<number>().as('total'),
-        eb.fn.sum<number>(sql`CASE WHEN "WantWa" = true THEN 1 ELSE 0 END`).as('readyWa'),
-        eb.fn.sum<number>(sql`CASE WHEN "WantNotify" = true THEN 1 ELSE 0 END`).as('readySms'),
-        eb.fn.sum<number>(sql`CASE WHEN "SentWa" = true THEN 1 ELSE 0 END`).as('sentWa'),
-        eb.fn.sum<number>(sql`CASE WHEN "Notified" = true THEN 1 ELSE 0 END`).as('notified'),
+        eb.fn.sum<number>(sql`CASE WHEN "want_wa" = true THEN 1 ELSE 0 END`).as('readyWa'),
+        eb.fn.sum<number>(sql`CASE WHEN "want_notify" = true THEN 1 ELSE 0 END`).as('readySms'),
+        eb.fn.sum<number>(sql`CASE WHEN "sent_wa" = true THEN 1 ELSE 0 END`).as('sentWa'),
+        eb.fn.sum<number>(sql`CASE WHEN "notified" = true THEN 1 ELSE 0 END`).as('notified'),
       ])
       .executeTakeFirst();
 

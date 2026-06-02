@@ -163,7 +163,7 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
                 <div className={styles.infoItem}>
                   <span className={styles.infoLabel}>Patient</span>
                   <span className={styles.infoValue}>
-                    {sale.PatientName ?? 'Walk-in'}
+                    {sale.patient_name ?? 'Walk-in'}
                   </span>
                 </div>
                 <div className={styles.infoItem}>

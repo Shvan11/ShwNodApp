@@ -51,12 +51,12 @@ export interface StandSale {
   Change: number;
   PaymentMethod: string;
   CustomerNote: string | null;
-  PersonID: number | null;
+  person_id: number | null;
   CashierID: number | null;
   VoidedDate: string | null;
   VoidedBy: number | null;
   VoidReason: string | null;
-  PatientName: string | null;
+  patient_name: string | null;
   CashierName: string | null;
 }
 

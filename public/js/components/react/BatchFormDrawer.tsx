@@ -4,28 +4,28 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import type { AlignerBatch, AlignerSetForBatch } from '../../pages/aligner/aligner.types';
 
 interface BatchFormData {
-    BatchSequence: number | string;
-    UpperAlignerCount: number | string;
-    LowerAlignerCount: number | string;
-    Days: number | string;
-    Notes: string;
-    IsActive: boolean;
-    IsLast: boolean;
+    batch_sequence: number | string;
+    upper_aligner_count: number | string;
+    lower_aligner_count: number | string;
+    days: number | string;
+    notes: string;
+    is_active: boolean;
+    is_last: boolean;
 }
 
 interface ComputedFields {
-    UpperAlignerStartSequence: number;
-    LowerAlignerStartSequence: number;
-    UpperAlignerEndSequence: number | null;
-    LowerAlignerEndSequence: number | null;
+    upper_aligner_start_sequence: number;
+    lower_aligner_start_sequence: number;
+    upper_aligner_end_sequence: number | null;
+    lower_aligner_end_sequence: number | null;
 }
 
 interface FormErrors {
-    BatchSequence?: string;
-    UpperAlignerCount?: string;
-    LowerAlignerCount?: string;
-    IsActive?: string;
-    IsLast?: string;
+    batch_sequence?: string;
+    upper_aligner_count?: string;
+    lower_aligner_count?: string;
+    is_active?: string;
+    is_last?: string;
     [key: string]: string | undefined;
 }
 
@@ -53,13 +53,13 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
     const toast = useToast();
     const confirm = useConfirm();
     const [formData, setFormData] = useState<BatchFormData>({
-        BatchSequence: '',
-        UpperAlignerCount: '',
-        LowerAlignerCount: '',
-        Days: '',
-        Notes: '',
-        IsActive: false,
-        IsLast: false
+        batch_sequence: '',
+        upper_aligner_count: '',
+        lower_aligner_count: '',
+        days: '',
+        notes: '',
+        is_active: false,
+        is_last: false
     });
 
     // State for date editing
@@ -70,10 +70,10 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
     const [savingDate, setSavingDate] = useState<boolean>(false);
 
     const [computedFields, setComputedFields] = useState<ComputedFields>({
-        UpperAlignerStartSequence: 1,
-        LowerAlignerStartSequence: 1,
-        UpperAlignerEndSequence: null,
-        LowerAlignerEndSequence: null
+        upper_aligner_start_sequence: 1,
+        lower_aligner_start_sequence: 1,
+        upper_aligner_end_sequence: null,
+        lower_aligner_end_sequence: null
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
@@ -87,7 +87,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
     const isFirstBatch = existingBatches.length === 0;
     // When editing, check if this batch is the first one (no other batch has a lower sequence)
     const isEditingFirstBatch = batch && !existingBatches.some(b =>
-        b.AlignerBatchID !== batch.AlignerBatchID && b.BatchSequence < batch.BatchSequence
+        b.aligner_batch_id !== batch.aligner_batch_id && b.batch_sequence < batch.batch_sequence
     );
     const canChangeTemplateOption = isFirstBatch || isEditingFirstBatch;
 
@@ -97,13 +97,13 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             if (batch) {
                 // Edit mode - populate form (dates are handled separately via status endpoints)
                 setFormData({
-                    BatchSequence: batch.BatchSequence ?? '',
-                    UpperAlignerCount: batch.UpperAlignerCount ?? '',
-                    LowerAlignerCount: batch.LowerAlignerCount ?? '',
-                    Days: batch.Days ?? '',
-                    Notes: batch.Notes || '',
-                    IsActive: batch.IsActive !== undefined ? batch.IsActive : false,
-                    IsLast: batch.IsLast !== undefined ? batch.IsLast : false
+                    batch_sequence: batch.batch_sequence ?? '',
+                    upper_aligner_count: batch.upper_aligner_count ?? '',
+                    lower_aligner_count: batch.lower_aligner_count ?? '',
+                    days: batch.days ?? '',
+                    notes: batch.notes || '',
+                    is_active: batch.is_active !== undefined ? batch.is_active : false,
+                    is_last: batch.is_last !== undefined ? batch.is_last : false
                 });
                 // Reset date editing state
                 setEditingManufactureDate(false);
@@ -111,23 +111,23 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                 setTempManufactureDate('');
                 setTempDeliveryDate('');
                 setComputedFields({
-                    UpperAlignerStartSequence: batch.UpperAlignerStartSequence ?? 1,
-                    LowerAlignerStartSequence: batch.LowerAlignerStartSequence ?? 1,
-                    UpperAlignerEndSequence: batch.UpperAlignerEndSequence ?? null,
-                    LowerAlignerEndSequence: batch.LowerAlignerEndSequence ?? null
+                    upper_aligner_start_sequence: batch.upper_aligner_start_sequence ?? 1,
+                    lower_aligner_start_sequence: batch.lower_aligner_start_sequence ?? 1,
+                    upper_aligner_end_sequence: batch.upper_aligner_end_sequence ?? null,
+                    lower_aligner_end_sequence: batch.lower_aligner_end_sequence ?? null
                 });
                 // When editing first batch, read template flags directly from the batch
                 const isFirstBatchEdit = !existingBatches.some(b =>
-                    b.AlignerBatchID !== batch.AlignerBatchID && b.BatchSequence < batch.BatchSequence
+                    b.aligner_batch_id !== batch.aligner_batch_id && b.batch_sequence < batch.batch_sequence
                 );
                 if (isFirstBatchEdit) {
-                    setHasUpperTemplate(batch.HasUpperTemplate ?? false);
-                    setHasLowerTemplate(batch.HasLowerTemplate ?? false);
+                    setHasUpperTemplate(batch.has_upper_template ?? false);
+                    setHasLowerTemplate(batch.has_lower_template ?? false);
                 }
             } else {
                 // Add mode - calculate next batch sequence and start sequences
                 const nextBatchSequence = existingBatches.length > 0
-                    ? Math.max(...existingBatches.map(b => b.BatchSequence || 0)) + 1
+                    ? Math.max(...existingBatches.map(b => b.batch_sequence || 0)) + 1
                     : 1;
 
                 // Calculate start sequences based on last batch's end sequences
@@ -136,23 +136,23 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
 
                 if (existingBatches.length > 0) {
                     const lastBatch = existingBatches.reduce((latest, b) =>
-                        (b.BatchSequence > latest.BatchSequence) ? b : latest
+                        (b.batch_sequence > latest.batch_sequence) ? b : latest
                     );
 
-                    upperStart = (lastBatch.UpperAlignerEndSequence || 0) + 1;
-                    lowerStart = (lastBatch.LowerAlignerEndSequence || 0) + 1;
+                    upperStart = (lastBatch.upper_aligner_end_sequence || 0) + 1;
+                    lowerStart = (lastBatch.lower_aligner_end_sequence || 0) + 1;
                 }
                 // First batch defaults to start=1 (no template); the template effect below
                 // shifts it to 0 if the user enables HasUpperTemplate/HasLowerTemplate.
 
                 setFormData({
-                    BatchSequence: nextBatchSequence,
-                    UpperAlignerCount: '',
-                    LowerAlignerCount: '',
-                    Days: set?.Days || '',
-                    Notes: '',
-                    IsActive: false,
-                    IsLast: false
+                    batch_sequence: nextBatchSequence,
+                    upper_aligner_count: '',
+                    lower_aligner_count: '',
+                    days: set?.days || '',
+                    notes: '',
+                    is_active: false,
+                    is_last: false
                 });
                 // Reset date editing state for add mode
                 setEditingManufactureDate(false);
@@ -161,10 +161,10 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                 setTempDeliveryDate('');
 
                 setComputedFields({
-                    UpperAlignerStartSequence: upperStart,
-                    LowerAlignerStartSequence: lowerStart,
-                    UpperAlignerEndSequence: null,
-                    LowerAlignerEndSequence: null
+                    upper_aligner_start_sequence: upperStart,
+                    lower_aligner_start_sequence: lowerStart,
+                    upper_aligner_end_sequence: null,
+                    lower_aligner_end_sequence: null
                 });
 
                 // Default template flags to false for new batches (user can opt in on first batch)
@@ -175,34 +175,34 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         }
 
         previousIsOpenRef.current = isOpen;
-    }, [isOpen, batch, existingBatches, set?.Days]);
+    }, [isOpen, batch, existingBatches, set?.days]);
 
     // Update start sequences when template flag checkboxes change (for first batch - add or edit)
     useEffect(() => {
         if (canChangeTemplateOption) {
             setComputedFields(prev => ({
                 ...prev,
-                UpperAlignerStartSequence: hasUpperTemplate ? 0 : 1,
-                LowerAlignerStartSequence: hasLowerTemplate ? 0 : 1
+                upper_aligner_start_sequence: hasUpperTemplate ? 0 : 1,
+                lower_aligner_start_sequence: hasLowerTemplate ? 0 : 1
             }));
         }
     }, [hasUpperTemplate, hasLowerTemplate, canChangeTemplateOption]);
 
     // Auto-calculate end sequences when counts change
     useEffect(() => {
-        const upperCount = parseInt(String(formData.UpperAlignerCount));
-        const lowerCount = parseInt(String(formData.LowerAlignerCount));
+        const upperCount = parseInt(String(formData.upper_aligner_count));
+        const lowerCount = parseInt(String(formData.lower_aligner_count));
 
         setComputedFields(prev => ({
             ...prev,
-            UpperAlignerEndSequence: !isNaN(upperCount) && upperCount > 0
-                ? prev.UpperAlignerStartSequence + upperCount - 1
+            upper_aligner_end_sequence: !isNaN(upperCount) && upperCount > 0
+                ? prev.upper_aligner_start_sequence + upperCount - 1
                 : null,
-            LowerAlignerEndSequence: !isNaN(lowerCount) && lowerCount > 0
-                ? prev.LowerAlignerStartSequence + lowerCount - 1
+            lower_aligner_end_sequence: !isNaN(lowerCount) && lowerCount > 0
+                ? prev.lower_aligner_start_sequence + lowerCount - 1
                 : null
         }));
-    }, [formData.UpperAlignerCount, formData.LowerAlignerCount]);
+    }, [formData.upper_aligner_count, formData.lower_aligner_count]);
 
     const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
         const { name, value, type } = e.target;
@@ -220,13 +220,13 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
     const validate = (): { valid: boolean; errors: FormErrors } => {
         const newErrors: FormErrors = {};
 
-        if (!formData.BatchSequence || formData.BatchSequence === '') {
-            newErrors.BatchSequence = 'Batch sequence is required';
+        if (!formData.batch_sequence || formData.batch_sequence === '') {
+            newErrors.batch_sequence = 'Batch sequence is required';
         }
 
         // Validate active batch must have delivery date (check batch prop, not formData)
-        if (formData.IsActive && !batch?.DeliveredToPatientDate) {
-            newErrors.IsActive = 'Cannot mark as active: batch must be delivered first';
+        if (formData.is_active && !batch?.delivered_to_patient_date) {
+            newErrors.is_active = 'Cannot mark as active: batch must be delivered first';
         }
 
         // Real aligners consumed = total slots in batch minus the template slot (if any).
@@ -235,29 +235,29 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         const newHasLowerTpl = canChangeTemplateOption && hasLowerTemplate;
 
         // Validate upper aligner consumption doesn't exceed remaining
-        if (set && formData.UpperAlignerCount) {
-            const upperCount = parseInt(String(formData.UpperAlignerCount));
+        if (set && formData.upper_aligner_count) {
+            const upperCount = parseInt(String(formData.upper_aligner_count));
             const upperConsumed = upperCount - (newHasUpperTpl ? 1 : 0);
             // When editing, add back this batch's prior real consumption to get available total
-            const oldUpperCount = batch ? (parseInt(String(batch.UpperAlignerCount)) || 0) : 0;
-            const oldUpperConsumed = batch ? oldUpperCount - (batch.HasUpperTemplate ? 1 : 0) : 0;
-            const availableUpper = (set.RemainingUpperAligners || 0) + oldUpperConsumed;
+            const oldUpperCount = batch ? (parseInt(String(batch.upper_aligner_count)) || 0) : 0;
+            const oldUpperConsumed = batch ? oldUpperCount - (batch.has_upper_template ? 1 : 0) : 0;
+            const availableUpper = (set.remaining_upper_aligners || 0) + oldUpperConsumed;
 
             if (!isNaN(upperCount) && upperConsumed > availableUpper) {
-                newErrors.UpperAlignerCount = `Cannot exceed ${availableUpper} available upper aligners (${set.RemainingUpperAligners} remaining + ${oldUpperConsumed} from this batch)`;
+                newErrors.upper_aligner_count = `Cannot exceed ${availableUpper} available upper aligners (${set.remaining_upper_aligners} remaining + ${oldUpperConsumed} from this batch)`;
             }
         }
 
         // Validate lower aligner consumption doesn't exceed remaining
-        if (set && formData.LowerAlignerCount) {
-            const lowerCount = parseInt(String(formData.LowerAlignerCount));
+        if (set && formData.lower_aligner_count) {
+            const lowerCount = parseInt(String(formData.lower_aligner_count));
             const lowerConsumed = lowerCount - (newHasLowerTpl ? 1 : 0);
-            const oldLowerCount = batch ? (parseInt(String(batch.LowerAlignerCount)) || 0) : 0;
-            const oldLowerConsumed = batch ? oldLowerCount - (batch.HasLowerTemplate ? 1 : 0) : 0;
-            const availableLower = (set.RemainingLowerAligners || 0) + oldLowerConsumed;
+            const oldLowerCount = batch ? (parseInt(String(batch.lower_aligner_count)) || 0) : 0;
+            const oldLowerConsumed = batch ? oldLowerCount - (batch.has_lower_template ? 1 : 0) : 0;
+            const availableLower = (set.remaining_lower_aligners || 0) + oldLowerConsumed;
 
             if (!isNaN(lowerCount) && lowerConsumed > availableLower) {
-                newErrors.LowerAlignerCount = `Cannot exceed ${availableLower} available lower aligners (${set.RemainingLowerAligners} remaining + ${oldLowerConsumed} from this batch)`;
+                newErrors.lower_aligner_count = `Cannot exceed ${availableLower} available lower aligners (${set.remaining_lower_aligners} remaining + ${oldLowerConsumed} from this batch)`;
             }
         }
 
@@ -285,21 +285,21 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         const newHasUpperTpl = canChangeTemplateOption && hasUpperTemplate;
         const newHasLowerTpl = canChangeTemplateOption && hasLowerTemplate;
 
-        const upperCount = parseInt(String(formData.UpperAlignerCount)) || 0;
-        const lowerCount = parseInt(String(formData.LowerAlignerCount)) || 0;
+        const upperCount = parseInt(String(formData.upper_aligner_count)) || 0;
+        const lowerCount = parseInt(String(formData.lower_aligner_count)) || 0;
         const newUpperConsumed = upperCount - (newHasUpperTpl ? 1 : 0);
         const newLowerConsumed = lowerCount - (newHasLowerTpl ? 1 : 0);
 
-        const oldUpperCount = batch ? (parseInt(String(batch.UpperAlignerCount)) || 0) : 0;
-        const oldLowerCount = batch ? (parseInt(String(batch.LowerAlignerCount)) || 0) : 0;
-        const oldUpperConsumed = batch ? oldUpperCount - (batch.HasUpperTemplate ? 1 : 0) : 0;
-        const oldLowerConsumed = batch ? oldLowerCount - (batch.HasLowerTemplate ? 1 : 0) : 0;
+        const oldUpperCount = batch ? (parseInt(String(batch.upper_aligner_count)) || 0) : 0;
+        const oldLowerCount = batch ? (parseInt(String(batch.lower_aligner_count)) || 0) : 0;
+        const oldUpperConsumed = batch ? oldUpperCount - (batch.has_upper_template ? 1 : 0) : 0;
+        const oldLowerConsumed = batch ? oldLowerCount - (batch.has_lower_template ? 1 : 0) : 0;
 
-        const newRemainingUpper = (set?.RemainingUpperAligners ?? 0) + oldUpperConsumed - newUpperConsumed;
-        const newRemainingLower = (set?.RemainingLowerAligners ?? 0) + oldLowerConsumed - newLowerConsumed;
+        const newRemainingUpper = (set?.remaining_upper_aligners ?? 0) + oldUpperConsumed - newUpperConsumed;
+        const newRemainingLower = (set?.remaining_lower_aligners ?? 0) + oldLowerConsumed - newLowerConsumed;
 
         let markAsLast = false;
-        if (newRemainingUpper === 0 && newRemainingLower === 0 && !formData.IsLast) {
+        if (newRemainingUpper === 0 && newRemainingLower === 0 && !formData.is_last) {
             markAsLast = await confirm(
                 'Both remaining upper and lower aligners will be 0. Do you want to mark this as the last batch?',
                 { title: 'Mark as Last Batch', confirmText: 'Mark as Last', cancelText: 'No' }
@@ -311,16 +311,16 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         try {
             const dataToSend = {
                 ...formData,
-                ...(markAsLast && { IsLast: true }),
-                AlignerSetID: set?.AlignerSetID,
-                UpperAlignerStartSequence: computedFields.UpperAlignerStartSequence,
-                LowerAlignerStartSequence: computedFields.LowerAlignerStartSequence,
-                HasUpperTemplate: canChangeTemplateOption ? hasUpperTemplate : undefined,
-                HasLowerTemplate: canChangeTemplateOption ? hasLowerTemplate : undefined
+                ...(markAsLast && { is_last: true }),
+                aligner_set_id: set?.aligner_set_id,
+                upper_aligner_start_sequence: computedFields.upper_aligner_start_sequence,
+                lower_aligner_start_sequence: computedFields.lower_aligner_start_sequence,
+                has_upper_template: canChangeTemplateOption ? hasUpperTemplate : undefined,
+                has_lower_template: canChangeTemplateOption ? hasLowerTemplate : undefined
             };
 
             const url = batch
-                ? `/api/aligner/batches/${batch.AlignerBatchID}`
+                ? `/api/aligner/batches/${batch.aligner_batch_id}`
                 : '/api/aligner/batches';
 
             const method = batch ? 'PUT' : 'POST';
@@ -346,7 +346,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                 toast.success(batch ? 'Batch updated successfully!' : 'Batch created successfully!');
 
                 // If a batch was automatically deactivated, inform the user
-                if (result.deactivatedBatch && formData.IsActive) {
+                if (result.deactivatedBatch && formData.is_active) {
                     toast.info(`Batch #${result.deactivatedBatch.batchSequence} was automatically deactivated (only one batch can be active at a time)`);
                 }
 
@@ -379,7 +379,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         if (!batch) return;
         setSavingDate(true);
         try {
-            const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/manufacture`, {
+            const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}/manufacture`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ targetDate: dateStr })
@@ -404,7 +404,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         if (!batch) return;
         setSavingDate(true);
         try {
-            const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/deliver`, {
+            const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}/deliver`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ targetDate: dateStr })
@@ -468,13 +468,13 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                     type="number"
                                     id="BatchSequence"
                                     name="BatchSequence"
-                                    value={formData.BatchSequence}
+                                    value={formData.batch_sequence}
                                     onChange={handleChange}
-                                    className={errors.BatchSequence ? 'error' : ''}
+                                    className={errors.batch_sequence ? 'error' : ''}
                                     min="1"
                                 />
-                                {errors.BatchSequence && (
-                                    <span className="error-message">{errors.BatchSequence}</span>
+                                {errors.batch_sequence && (
+                                    <span className="error-message">{errors.batch_sequence}</span>
                                 )}
                             </div>
 
@@ -488,7 +488,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                     <h3 className="section-heading-no-top">Upper Aligners
                                         {set && (
                                             <span className="remaining-count">
-                                                (Remaining: <strong className={(set.RemainingUpperAligners || 0) > 0 ? 'positive' : 'negative'}>{set.RemainingUpperAligners}</strong>)
+                                                (Remaining: <strong className={(set.remaining_upper_aligners || 0) > 0 ? 'positive' : 'negative'}>{set.remaining_upper_aligners}</strong>)
                                             </span>
                                         )}
                                     </h3>
@@ -512,7 +512,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         <input
                                             type="number"
                                             id="UpperAlignerStartSequence"
-                                            value={computedFields.UpperAlignerStartSequence}
+                                            value={computedFields.upper_aligner_start_sequence}
                                             readOnly
                                             className="readonly"
                                         />
@@ -524,14 +524,14 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                             type="number"
                                             id="UpperAlignerCount"
                                             name="UpperAlignerCount"
-                                            value={formData.UpperAlignerCount}
+                                            value={formData.upper_aligner_count}
                                             onChange={handleChange}
-                                            className={errors.UpperAlignerCount ? 'error' : ''}
+                                            className={errors.upper_aligner_count ? 'error' : ''}
                                             min="0"
                                             placeholder="Number of aligners"
                                         />
-                                        {errors.UpperAlignerCount && (
-                                            <span className="error-message">{errors.UpperAlignerCount}</span>
+                                        {errors.upper_aligner_count && (
+                                            <span className="error-message">{errors.upper_aligner_count}</span>
                                         )}
                                     </div>
 
@@ -540,7 +540,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         <input
                                             type="number"
                                             id="UpperAlignerEndSequence"
-                                            value={computedFields.UpperAlignerEndSequence || ''}
+                                            value={computedFields.upper_aligner_end_sequence || ''}
                                             readOnly
                                             className="readonly"
                                             placeholder="Auto-calculated"
@@ -555,7 +555,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                     <h3 className="section-heading-no-top">Lower Aligners
                                         {set && (
                                             <span className="remaining-count">
-                                                (Remaining: <strong className={(set.RemainingLowerAligners || 0) > 0 ? 'positive' : 'negative'}>{set.RemainingLowerAligners}</strong>)
+                                                (Remaining: <strong className={(set.remaining_lower_aligners || 0) > 0 ? 'positive' : 'negative'}>{set.remaining_lower_aligners}</strong>)
                                             </span>
                                         )}
                                     </h3>
@@ -579,7 +579,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         <input
                                             type="number"
                                             id="LowerAlignerStartSequence"
-                                            value={computedFields.LowerAlignerStartSequence}
+                                            value={computedFields.lower_aligner_start_sequence}
                                             readOnly
                                             className="readonly"
                                         />
@@ -591,14 +591,14 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                             type="number"
                                             id="LowerAlignerCount"
                                             name="LowerAlignerCount"
-                                            value={formData.LowerAlignerCount}
+                                            value={formData.lower_aligner_count}
                                             onChange={handleChange}
-                                            className={errors.LowerAlignerCount ? 'error' : ''}
+                                            className={errors.lower_aligner_count ? 'error' : ''}
                                             min="0"
                                             placeholder="Number of aligners"
                                         />
-                                        {errors.LowerAlignerCount && (
-                                            <span className="error-message">{errors.LowerAlignerCount}</span>
+                                        {errors.lower_aligner_count && (
+                                            <span className="error-message">{errors.lower_aligner_count}</span>
                                         )}
                                     </div>
 
@@ -607,7 +607,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         <input
                                             type="number"
                                             id="LowerAlignerEndSequence"
-                                            value={computedFields.LowerAlignerEndSequence || ''}
+                                            value={computedFields.lower_aligner_end_sequence || ''}
                                             readOnly
                                             className="readonly"
                                             placeholder="Auto-calculated"
@@ -623,13 +623,13 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
 
 
                             {/* Show CreationDate when editing (read-only) */}
-                            {batch && batch.CreationDate && (
+                            {batch && batch.creation_date && (
                                 <div className="form-row">
                                     <div className="form-field">
                                         <label>Created On</label>
                                         <input
                                             type="text"
-                                            value={new Date(batch.CreationDate).toLocaleDateString('en-GB', {
+                                            value={new Date(batch.creation_date).toLocaleDateString('en-GB', {
                                                 year: 'numeric', month: 'short', day: 'numeric',
                                                 hour: '2-digit', minute: '2-digit'
                                             })}
@@ -677,7 +677,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                             <div className="date-display-with-actions">
                                                 <input
                                                     type="text"
-                                                    value={formatDisplayDate(batch.ManufactureDate)}
+                                                    value={formatDisplayDate(batch.manufacture_date)}
                                                     readOnly
                                                     className="readonly"
                                                 />
@@ -685,14 +685,14 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                                     type="button"
                                                     className="btn btn-sm btn-outline"
                                                     onClick={() => {
-                                                        setTempManufactureDate(batch.ManufactureDate?.split('T')[0] || getTodayDateString());
+                                                        setTempManufactureDate(batch.manufacture_date?.split('T')[0] || getTodayDateString());
                                                         setEditingManufactureDate(true);
                                                     }}
-                                                    title={batch.ManufactureDate ? 'Change date' : 'Set manufacture date'}
+                                                    title={batch.manufacture_date ? 'Change date' : 'Set manufacture date'}
                                                 >
-                                                    <i className="fas fa-calendar-alt"></i> {batch.ManufactureDate ? 'Edit' : 'Set'}
+                                                    <i className="fas fa-calendar-alt"></i> {batch.manufacture_date ? 'Edit' : 'Set'}
                                                 </button>
-                                                {batch.ManufactureDate && !batch.DeliveredToPatientDate && onUndoManufacture && (
+                                                {batch.manufacture_date && !batch.delivered_to_patient_date && onUndoManufacture && (
                                                     <button
                                                         type="button"
                                                         className="btn btn-sm btn-outline btn-danger"
@@ -753,26 +753,26 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                             <div className="date-display-with-actions">
                                                 <input
                                                     type="text"
-                                                    value={formatDisplayDate(batch.DeliveredToPatientDate)}
+                                                    value={formatDisplayDate(batch.delivered_to_patient_date)}
                                                     readOnly
                                                     className="readonly"
                                                 />
-                                                {batch.ManufactureDate ? (
+                                                {batch.manufacture_date ? (
                                                     <button
                                                         type="button"
                                                         className="btn btn-sm btn-outline"
                                                         onClick={() => {
-                                                            setTempDeliveryDate(batch.DeliveredToPatientDate?.split('T')[0] || getTodayDateString());
+                                                            setTempDeliveryDate(batch.delivered_to_patient_date?.split('T')[0] || getTodayDateString());
                                                             setEditingDeliveryDate(true);
                                                         }}
-                                                        title={batch.DeliveredToPatientDate ? 'Change date' : 'Set delivery date'}
+                                                        title={batch.delivered_to_patient_date ? 'Change date' : 'Set delivery date'}
                                                     >
-                                                        <i className="fas fa-calendar-alt"></i> {batch.DeliveredToPatientDate ? 'Edit' : 'Set'}
+                                                        <i className="fas fa-calendar-alt"></i> {batch.delivered_to_patient_date ? 'Edit' : 'Set'}
                                                     </button>
                                                 ) : (
                                                     <span className="field-hint">Requires manufacture date</span>
                                                 )}
-                                                {batch.DeliveredToPatientDate && onUndoDelivery && (
+                                                {batch.delivered_to_patient_date && onUndoDelivery && (
                                                     <button
                                                         type="button"
                                                         className="btn btn-sm btn-outline btn-danger"
@@ -803,7 +803,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         type="number"
                                         id="Days"
                                         name="Days"
-                                        value={formData.Days}
+                                        value={formData.days}
                                         onChange={handleChange}
                                         min="1"
                                         placeholder="Days to wear each aligner"
@@ -819,7 +819,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                 <textarea
                                     id="Notes"
                                     name="Notes"
-                                    value={formData.Notes}
+                                    value={formData.notes}
                                     onChange={handleChange}
                                     rows={3}
                                     placeholder="Additional notes..."
@@ -831,12 +831,12 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                     type="checkbox"
                                     id="IsActive"
                                     name="IsActive"
-                                    checked={formData.IsActive}
+                                    checked={formData.is_active}
                                     onChange={handleChange}
                                 />
                                 <label htmlFor="IsActive">Active (Being used by patient)</label>
-                                {errors.IsActive && (
-                                    <span className="error-message">{errors.IsActive}</span>
+                                {errors.is_active && (
+                                    <span className="error-message">{errors.is_active}</span>
                                 )}
                             </div>
 
@@ -845,14 +845,14 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                     type="checkbox"
                                     id="IsLast"
                                     name="IsLast"
-                                    checked={formData.IsLast}
+                                    checked={formData.is_last}
                                     onChange={handleChange}
                                 />
                                 <label htmlFor="IsLast">
                                     Last Batch (Final batch before new scan or treatment completion)
                                 </label>
-                                {errors.IsLast && (
-                                    <span className="error-message">{errors.IsLast}</span>
+                                {errors.is_last && (
+                                    <span className="error-message">{errors.is_last}</span>
                                 )}
                             </div>
                         </div>

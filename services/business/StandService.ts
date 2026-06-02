@@ -100,29 +100,29 @@ export async function validateAndCreateSale(saleData: SaleInput) {
       );
     }
 
-    if (!item.IsActive) {
+    if (!item.is_active) {
       throw new StandValidationError(
-        `Item is inactive: ${item.ItemName}`,
+        `Item is inactive: ${item.item_name}`,
         'ITEM_INACTIVE',
-        { itemId: item.ItemID, itemName: item.ItemName }
+        { itemId: item.item_id, itemName: item.item_name }
       );
     }
 
-    if (item.CurrentStock < lineItem.quantity) {
+    if (item.current_stock < lineItem.quantity) {
       throw new StandValidationError(
-        `Insufficient stock for "${item.ItemName}": available ${item.CurrentStock}, requested ${lineItem.quantity}`,
+        `Insufficient stock for "${item.item_name}": available ${item.current_stock}, requested ${lineItem.quantity}`,
         'INSUFFICIENT_STOCK',
-        { itemId: item.ItemID, itemName: item.ItemName, available: item.CurrentStock, requested: lineItem.quantity }
+        { itemId: item.item_id, itemName: item.item_name, available: item.current_stock, requested: lineItem.quantity }
       );
     }
 
     resolvedItems.push({
-      itemId: item.ItemID,
+      itemId: item.item_id,
       quantity: lineItem.quantity,
-      unitPrice: item.SellPrice,
-      unitCost: item.CostPrice,
-      lineTotal: lineItem.quantity * item.SellPrice,
-      itemName: item.ItemName,
+      unitPrice: item.sell_price,
+      unitCost: item.cost_price,
+      lineTotal: lineItem.quantity * item.sell_price,
+      itemName: item.item_name,
     });
   }
 
@@ -171,10 +171,10 @@ export async function validateAndCreateSale(saleData: SaleInput) {
     throw err;
   }
 
-  log.info(`Stand sale created: SaleID=${result.SaleID}, Total=${totalAmount}, Profit=${totalProfit}`);
+  log.info(`Stand sale created: sale_id=${result.sale_id}, Total=${totalAmount}, Profit=${totalProfit}`);
 
   return {
-    saleId: result.SaleID,
+    saleId: result.sale_id,
     totalAmount,
     totalCost,
     totalProfit,
@@ -199,7 +199,7 @@ export async function validateAndRestockItem(
   }
 
   if (unitCost < 0) {
-    throw new StandValidationError('Unit cost cannot be negative', 'INVALID_QUANTITY', { unitCost });
+    throw new StandValidationError('unit cost cannot be negative', 'INVALID_QUANTITY', { unitCost });
   }
 
   const item = await getStandItemById(itemId);
@@ -209,7 +209,7 @@ export async function validateAndRestockItem(
 
   await restockItem(itemId, quantity, unitCost, userId);
 
-  log.info(`Stand item restocked: ItemID=${itemId}, Qty=${quantity}, UnitCost=${unitCost}`);
+  log.info(`Stand item restocked: item_id=${itemId}, Qty=${quantity}, unit_cost=${unitCost}`);
 }
 
 // ============================================================================
@@ -227,7 +227,7 @@ export async function validateAndAdjustStock(
   }
 
   if (!reason || reason.trim().length === 0) {
-    throw new StandValidationError('Reason is required for stock adjustments', 'INVALID_QUANTITY');
+    throw new StandValidationError('reason is required for stock adjustments', 'INVALID_QUANTITY');
   }
 
   const item = await getStandItemById(itemId);
@@ -235,11 +235,11 @@ export async function validateAndAdjustStock(
     throw new StandValidationError('Item not found', 'ITEM_NOT_FOUND', { itemId });
   }
 
-  if (item.CurrentStock + delta < 0) {
+  if (item.current_stock + delta < 0) {
     throw new StandValidationError(
-      `Adjustment would result in negative stock (current: ${item.CurrentStock}, delta: ${delta})`,
+      `Adjustment would result in negative stock (current: ${item.current_stock}, delta: ${delta})`,
       'INSUFFICIENT_STOCK',
-      { itemId, currentStock: item.CurrentStock, delta }
+      { itemId, currentStock: item.current_stock, delta }
     );
   }
 
@@ -249,15 +249,15 @@ export async function validateAndAdjustStock(
     const msg = err instanceof Error ? err.message : String(err);
     if (msg === 'INSUFFICIENT_STOCK_FOR_ADJUSTMENT') {
       throw new StandValidationError(
-        `Adjustment would result in negative stock for "${item.ItemName}" — stock changed concurrently.`,
+        `Adjustment would result in negative stock for "${item.item_name}" — stock changed concurrently.`,
         'INSUFFICIENT_STOCK',
-        { itemId, currentStock: item.CurrentStock, delta }
+        { itemId, currentStock: item.current_stock, delta }
       );
     }
     throw err;
   }
 
-  log.info(`Stand stock adjusted: ItemID=${itemId}, Delta=${delta}, Reason="${reason}"`);
+  log.info(`Stand stock adjusted: item_id=${itemId}, Delta=${delta}, reason="${reason}"`);
 }
 
 // ============================================================================
@@ -275,8 +275,8 @@ export async function validateAndVoidSale(
     throw new StandValidationError('Sale not found', 'SALE_NOT_FOUND', { saleId });
   }
 
-  if (sale.VoidedDate) {
-    throw new StandValidationError('Sale has already been voided', 'ALREADY_VOIDED', { saleId, voidedDate: sale.VoidedDate });
+  if (sale.voided_date) {
+    throw new StandValidationError('Sale has already been voided', 'ALREADY_VOIDED', { saleId, voidedDate: sale.voided_date });
   }
 
   try {
@@ -291,5 +291,5 @@ export async function validateAndVoidSale(
     throw err;
   }
 
-  log.info(`Stand sale voided: SaleID=${saleId}, Reason="${reason}"`);
+  log.info(`Stand sale voided: sale_id=${saleId}, reason="${reason}"`);
 }

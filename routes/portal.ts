@@ -2,7 +2,7 @@
  * Patient Portal Routes — mounted at /api/portal
  *
  * Patient-facing endpoints. Every handler (except /login) reads the
- * PersonID from req.session.patientId — NEVER from params or body.
+ * person_id from req.session.patientId — NEVER from params or body.
  */
 import { Router, type Request, type Response } from 'express';
 import { sql } from 'kysely';
@@ -37,7 +37,7 @@ router.post(
       const { personId, pin } = req.body;
       const pid = typeof personId === 'string' ? parseInt(personId, 10) : personId;
       if (!pid || !Number.isFinite(pid) || !pin || typeof pin !== 'string') {
-        res.status(400).json({ success: false, error: 'PersonID and PIN are required.' });
+        res.status(400).json({ success: false, error: 'person_id and PIN are required.' });
         return;
       }
 
@@ -103,11 +103,11 @@ router.get(
       res.json({
         success: true,
         patient: {
-          personId: profile.PersonID,
-          patientName: profile.PatientName,
-          firstName: profile.FirstName,
-          lastName: profile.LastName,
-          language: profile.Language,
+          personId: profile.person_id,
+          patientName: profile.patient_name,
+          firstName: profile.first_name,
+          lastName: profile.last_name,
+          language: profile.language,
         },
       });
     } catch (error) {
@@ -134,7 +134,7 @@ router.get(
       // Count private photos per timepoint
       const privateByTp = new Map<string, number>();
       for (const entry of privateList) {
-        privateByTp.set(entry.TimepointCode, (privateByTp.get(entry.TimepointCode) || 0) + 1);
+        privateByTp.set(entry.timepoint_code, (privateByTp.get(entry.timepoint_code) || 0) + 1);
       }
 
       // Filter timepoints: need at least one visible (non-private) photo
@@ -194,9 +194,9 @@ router.get(
 // GET /api/portal/appointments/next
 // --------------------------------------------------------------------------
 interface NextAppointmentRow {
-  appointmentID: number;
-  AppDate: string;
-  AppDetail: string | null;
+  appointment_id: number;
+  app_date: string;
+  app_detail: string | null;
   DrName: string | null;
 }
 
@@ -209,15 +209,15 @@ router.get(
       const db = getKysely();
       const { rows } = await sql<NextAppointmentRow>`
         SELECT
-           a."appointmentID",
-           to_char(a."AppDate", 'YYYY-MM-DD"T"HH24:MI:SS') AS "AppDate",
-           a."AppDetail",
-           e."employeeName" AS "DrName"
-         FROM "tblappointments" a
-         LEFT JOIN "tblEmployees" e ON a."DrID" = e."ID"
-         WHERE a."PersonID" = ${pid}
-           AND a."AppDate" >= CURRENT_DATE
-         ORDER BY a."AppDate" ASC
+           a."appointment_id",
+           to_char(a."app_date", 'YYYY-MM-DD"T"HH24:MI:SS') AS "app_date",
+           a."app_detail",
+           e."employee_name" AS "DrName"
+         FROM "appointments" a
+         LEFT JOIN "employees" e ON a."dr_id" = e."id"
+         WHERE a."person_id" = ${pid}
+           AND a."app_date" >= CURRENT_DATE
+         ORDER BY a."app_date" ASC
          LIMIT 1`.execute(db);
       res.json({ success: true, appointment: rows[0] ?? null });
     } catch (error) {

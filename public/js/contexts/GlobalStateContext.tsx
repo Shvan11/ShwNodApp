@@ -7,9 +7,9 @@ import sseWhatsapp from '../services/sse-whatsapp';
 export interface PatientData {
   code?: number;
   id?: number;
-  PatientName?: string;
-  FirstName?: string;
-  LastName?: string;
+  patient_name?: string;
+  first_name?: string;
+  last_name?: string;
   Phone?: string;
   [key: string]: unknown;
 }
@@ -28,9 +28,9 @@ export interface UserData {
  * Appointment data structure
  */
 export interface AppointmentData {
-  AppointmentID?: number;
+  appointment_id?: number;
   PatientID?: number;
-  PatientName?: string;
+  patient_name?: string;
   AppsDate?: string;
   AppsTime?: string;
   State?: string;

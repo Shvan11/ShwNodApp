@@ -24,7 +24,7 @@ const VisitsTab = () => {
           return;
         }
         const sorted = [...data.visits].sort(
-          (a, b) => new Date(b.VisitDate).getTime() - new Date(a.VisitDate).getTime()
+          (a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()
         );
         setVisits(sorted);
       } catch {
@@ -70,13 +70,13 @@ const VisitsTab = () => {
     <div className={styles.tabPanel}>
       <ul className={styles.visitList}>
         {visits.map((v) => (
-          <li key={v.ID} className={styles.visitItem}>
-            <div className={styles.visitDate}>{formatVisitDate(v.VisitDate)}</div>
+          <li key={v.id} className={styles.visitItem}>
+            <div className={styles.visitDate}>{formatVisitDate(v.visit_date)}</div>
             {v.Summary && <div className={styles.visitSummary}>{v.Summary}</div>}
             <div className={styles.visitBadges}>
-              {v.OPG && <span className={styles.visitBadge}>OPG</span>}
-              {v.IPhoto && <span className={styles.visitBadge}>Photos</span>}
-              {v.ApplianceRemoved && (
+              {v.opg && <span className={styles.visitBadge}>OPG</span>}
+              {v.i_photo && <span className={styles.visitBadge}>Photos</span>}
+              {v.appliance_removed && (
                 <span className={`${styles.visitBadge} ${styles.visitBadgeAccent}`}>
                   Appliance removed
                 </span>

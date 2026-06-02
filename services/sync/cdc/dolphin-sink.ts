@@ -29,8 +29,8 @@ import { getKysely, getPgPool } from '../../database/kysely.js';
 import { log } from '../../../utils/logger.js';
 import type { SyncSink } from './types.js';
 
-const TP = 'tblTimePoints';
-const TPI = 'tblTimePointImages';
+const TP = 'time_points';
+const TPI = 'time_point_images';
 
 /**
  * Parse a PG `date`/`timestamp` value (arrives as a 'YYYY-MM-DD…' string per kysely.ts parsers) to
@@ -53,7 +53,7 @@ function parseLocalDate(s: string | null): Date | null {
  * `tblpatients` is NOT a dolphin-captured table, and removeTimePoint deliberately leaves the
  * Dolphin patient — so the patient row would linger orphaned in Dolphin Imaging. This is called
  * directly from the patient delete route to finish the wipe. Resolves Dolphin's GUID PKs by
- * patOtherID (= our PersonID), so it's correct regardless of whether the CDC timepoint-remove
+ * patOtherID (= our person_id), so it's correct regardless of whether the CDC timepoint-remove
  * events have drained yet (idempotent — re-running on an absent patient is a no-op).
  *
  * No-op when DOLPHIN_SYNC_ENABLED is off (the temporary feature is disabled / SQL Server may be
@@ -66,9 +66,9 @@ export async function purgeDolphinPatient(personId: number): Promise<void> {
   const found = await pool
     .request()
     .input('oid', sql.VarChar, String(personId))
-    .query<{ patID: string }>('SELECT patID FROM DolphinPlatform.dbo.Patients WHERE patOtherID = @oid');
+    .query<{ pat_id: string }>('SELECT patID FROM DolphinPlatform.dbo.Patients WHERE patOtherID = @oid');
   if (found.recordset.length === 0) return; // nothing in Dolphin for this patient
-  const patID = found.recordset[0].patID;
+  const patID = found.recordset[0].pat_id;
 
   // Capture the GUIDs first (SELECT, not a DELETE…OUTPUT) — DolphinPlatform.dbo.TimePoints has
   // enabled triggers, and SQL Server forbids an OUTPUT clause without INTO on a triggered table.
@@ -111,9 +111,9 @@ export async function purgeDolphinPatient(personId: number): Promise<void> {
 export class DolphinSink implements SyncSink {
   readonly name = 'dolphin';
   private pool: ConnectionPool | null = null;
-  /** PersonID → Dolphin patID GUID. Reset on init. Bounded by distinct patients with photo edits. */
+  /** person_id → Dolphin patID GUID. Reset on init. Bounded by distinct patients with photo edits. */
   private patIdByPerson = new Map<number, string>();
-  /** ImageTypeCode → Dolphin itypID GUID. Reset on init. Bounded by the 34 image types. */
+  /** image_type_code → Dolphin itypID GUID. Reset on init. Bounded by the 34 image types. */
   private itypByCode = new Map<string, string>();
 
   async init(): Promise<void> {
@@ -167,36 +167,36 @@ export class DolphinSink implements SyncSink {
 
   // ───────────────────────────── resolvers (Dolphin patient / image-type GUIDs) ───────────────────
 
-  /** Resolve the Dolphin patID for our PersonID; create the Dolphin patient from tblpatients if absent. */
+  /** Resolve the Dolphin patID for our person_id; create the Dolphin patient from tblpatients if absent. */
   private async resolvePatId(personId: number): Promise<string> {
     const cached = this.patIdByPerson.get(personId);
     if (cached) return cached;
     const pool = this.pool!;
 
-    // patOtherID holds our PersonID (verified: stored as the plain integer as text).
+    // patOtherID holds our person_id (verified: stored as the plain integer as text).
     const found = await pool
       .request()
       .input('oid', sql.VarChar, String(personId))
-      .query<{ patID: string }>('SELECT patID FROM DolphinPlatform.dbo.Patients WHERE patOtherID = @oid');
+      .query<{ pat_id: string }>('SELECT patID FROM DolphinPlatform.dbo.Patients WHERE patOtherID = @oid');
     if (found.recordset.length > 0) {
-      const id = found.recordset[0].patID;
+      const id = found.recordset[0].pat_id;
       this.patIdByPerson.set(personId, id);
       return id;
     }
 
     const p = await getKysely()
-      .selectFrom('tblpatients')
+      .selectFrom('patients')
       .select((eb) => [
-        'FirstName',
-        'LastName',
-        'Gender',
-        eb.ref('DateofBirth').$castTo<string | null>().as('DateofBirth'),
+        'first_name',
+        'last_name',
+        'gender',
+        eb.ref('date_of_birth').$castTo<string | null>().as('date_of_birth'),
       ])
-      .where('PersonID', '=', personId)
+      .where('person_id', '=', personId)
       .executeTakeFirst();
-    if (!p) throw new Error(`[cdc:dolphin] PersonID ${personId} not found in tblpatients`);
+    if (!p) throw new Error(`[cdc:dolphin] person_id ${personId} not found in tblpatients`);
 
-    const gender = p.Gender === 1 ? 'M' : p.Gender === 2 ? 'F' : 'U'; // tblGender: 1=Male, 2=Female
+    const gender = p.gender === 1 ? 'M' : p.gender === 2 ? 'F' : 'U'; // tblGender: 1=Male, 2=Female
     // Mirror the legacy AddDolph proc EXACTLY: Dolphin Imaging lists/searches patients by
     // patIndexName ("Last, First") and filters its patient browser on the uniqueidentifier
     // patStatusID — so patName/patIndexName/patStatusID/normID/patEntryDate/patNorm must all be set
@@ -205,17 +205,17 @@ export class DolphinSink implements SyncSink {
     const ins = await pool
       .request()
       .input('oid', sql.VarChar, String(personId))
-      .input('fn', sql.VarChar, p.FirstName ?? '')
-      .input('ln', sql.VarChar, p.LastName ?? '')
+      .input('fn', sql.VarChar, p.first_name ?? '')
+      .input('ln', sql.VarChar, p.last_name ?? '')
       .input('g', sql.Char, gender)
-      .input('bd', sql.DateTime, parseLocalDate(p.DateofBirth))
-      .query<{ patID: string }>(
+      .input('bd', sql.DateTime, parseLocalDate(p.date_of_birth))
+      .query<{ pat_id: string }>(
         `INSERT INTO DolphinPlatform.dbo.Patients
            (patOtherID, patFirstName, patLastName,
             patName, patIndexName,
             patGender, patBirthdate,
             patStatusID, normID, patEntryDate, patNorm)
-         OUTPUT inserted.patID
+         OUTPUT inserted.pat_id
          VALUES (@oid, @fn, @ln,
             COALESCE(@fn,'') + ' '  + COALESCE(@ln,''),
             COALESCE(@ln,'') + ', ' + COALESCE(@fn,''),
@@ -224,23 +224,23 @@ export class DolphinSink implements SyncSink {
             CAST('6F999E7E-D010-4C44-961B-14C66A322ACF' AS uniqueidentifier),
             GETDATE(), 0)`
       );
-    const id = ins.recordset[0].patID;
+    const id = ins.recordset[0].pat_id;
     this.patIdByPerson.set(personId, id);
-    log.info('[cdc:dolphin] created Dolphin patient', { personId, patID: id });
+    log.info('[cdc:dolphin] created Dolphin patient', { personId, pat_id: id });
     return id;
   }
 
-  /** Resolve the Dolphin itypID for a 2-digit ImageType code via the local tblImageTypes.DolphinItypID. */
+  /** Resolve the Dolphin itypID for a 2-digit image_type code via the local tblImageTypes.dolphin_ityp_id. */
   private async resolveItyp(imageType: string | null): Promise<string | null> {
     if (!imageType) return null;
     const cached = this.itypByCode.get(imageType);
     if (cached) return cached;
     const row = await getKysely()
-      .selectFrom('tblImageTypes')
-      .select('DolphinItypID')
-      .where('ImageTypeCode', '=', imageType)
+      .selectFrom('image_types')
+      .select('dolphin_ityp_id')
+      .where('image_type_code', '=', imageType)
       .executeTakeFirst();
-    const id = row?.DolphinItypID ?? null;
+    const id = row?.dolphin_ityp_id ?? null;
     if (id) this.itypByCode.set(imageType, id);
     return id;
   }
@@ -249,28 +249,28 @@ export class DolphinSink implements SyncSink {
 
   private async upsertTimePoint(pk: string): Promise<void> {
     const tp = await getKysely()
-      .selectFrom('tblTimePoints')
+      .selectFrom('time_points')
       .select((eb) => [
-        'PersonID',
-        'tpCode',
-        'tpDescription',
-        eb.ref('tpDateTime').$castTo<string | null>().as('tpDateTime'),
+        'person_id',
+        'tp_code',
+        'tp_description',
+        eb.ref('tp_date_time').$castTo<string | null>().as('tp_date_time'),
       ])
-      .where('TimePointID', '=', Number(pk))
+      .where('time_point_id', '=', Number(pk))
       .executeTakeFirst();
     if (!tp) {
       await this.removeTimePoint(pk);
       return;
     }
 
-    const patId = await this.resolvePatId(tp.PersonID);
-    const tpId = await this.resolveTpId(pk, patId, tp.tpCode, tp.tpDescription, tp.tpDateTime);
+    const patId = await this.resolvePatId(tp.person_id);
+    const tpId = await this.resolveTpId(pk, patId, tp.tp_code, tp.tp_description, tp.tp_date_time);
 
     // Always normalise name/date (covers in-app edits of the timepoint's description/date).
     await this.pool!.request()
       .input('tpid', sql.UniqueIdentifier, tpId)
-      .input('desc', sql.VarChar, tp.tpDescription ?? null)
-      .input('dt', sql.DateTime, parseLocalDate(tp.tpDateTime))
+      .input('desc', sql.VarChar, tp.tp_description ?? null)
+      .input('dt', sql.DateTime, parseLocalDate(tp.tp_date_time))
       .query('UPDATE DolphinPlatform.dbo.TimePoints SET tpDescription = @desc, tpDateTime = @dt WHERE tpID = @tpid');
   }
 
@@ -283,20 +283,20 @@ export class DolphinSink implements SyncSink {
     localPk: string,
     patId: string,
     localTpCode: string | number | null,
-    tpDescription: string | null,
-    tpDateTime: string | null
+    tp_description: string | null,
+    tp_date_time: string | null
   ): Promise<string> {
     const mapped = await this.mapGet(TP, localPk);
     if (mapped) return mapped;
 
     const pool = this.pool!;
-    const date = parseLocalDate(tpDateTime);
+    const date = parseLocalDate(tp_date_time);
 
     // Adopt an existing Dolphin timepoint by natural key (don't duplicate the ~3.4k already there).
     const found = await pool
       .request()
       .input('pat', sql.UniqueIdentifier, patId)
-      .input('desc', sql.VarChar, tpDescription ?? null)
+      .input('desc', sql.VarChar, tp_description ?? null)
       .input('dt', sql.DateTime, date)
       .query<{ tpID: string }>(
         `SELECT TOP 1 tpID FROM DolphinPlatform.dbo.TimePoints
@@ -310,7 +310,7 @@ export class DolphinSink implements SyncSink {
     }
 
     // Else INSERT. The Dolphin tpCode MUST equal the tpCode embedded in the rendered image
-    // filename ({PersonID}0{tpCode}.I{NN}, written by the photo editor with OUR PG tpCode) —
+    // filename ({person_id}0{tpCode}.I{NN}, written by the photo editor with OUR PG tpCode) —
     // Dolphin Imaging locates a timepoint's images by deriving that name from patOtherID + tpCode,
     // so a mismatch means Dolphin finds no images (and crashes on the inconsistency). We therefore
     // reuse our PG tpCode as the Dolphin tpCode. Fallback (non-numeric/missing PG tpCode): mirror
@@ -321,7 +321,7 @@ export class DolphinSink implements SyncSink {
       .request()
       .input('pat', sql.UniqueIdentifier, patId)
       .input('appcode', sql.Int, appCode)
-      .input('desc', sql.VarChar, tpDescription ?? null)
+      .input('desc', sql.VarChar, tp_description ?? null)
       .input('dt', sql.DateTime, date)
       .query<{ tpID: string }>(
         `DECLARE @code int = COALESCE(@appcode,
@@ -371,43 +371,43 @@ export class DolphinSink implements SyncSink {
 
   private async upsertImage(pk: string): Promise<void> {
     const img = await getKysely()
-      .selectFrom('tblTimePointImages')
+      .selectFrom('time_point_images')
       .select((eb) => [
-        'TimePointID',
-        'PersonID',
-        'ImageType',
-        'ImageFile',
-        'Title',
-        eb.ref('ImageDate').$castTo<string | null>().as('ImageDate'),
+        'time_point_id',
+        'person_id',
+        'image_type',
+        'image_file',
+        'title',
+        eb.ref('image_date').$castTo<string | null>().as('image_date'),
       ])
-      .where('TimePointImageID', '=', Number(pk))
+      .where('time_point_image_id', '=', Number(pk))
       .executeTakeFirst();
     if (!img) {
       await this.removeImage(pk);
       return;
     }
 
-    const patId = await this.resolvePatId(img.PersonID);
+    const patId = await this.resolvePatId(img.person_id);
 
     // Ensure the parent timepoint exists in Dolphin (the image's 'I' event may drain before its
     // parent's). Bootstrap it via upsertTimePoint (FK-parent bootstrap pattern).
-    let tpId = await this.mapGet(TP, img.TimePointID);
+    let tpId = await this.mapGet(TP, img.time_point_id);
     if (!tpId) {
-      await this.upsertTimePoint(String(img.TimePointID));
-      tpId = await this.mapGet(TP, img.TimePointID);
+      await this.upsertTimePoint(String(img.time_point_id));
+      tpId = await this.mapGet(TP, img.time_point_id);
     }
-    if (!tpId) throw new Error(`[cdc:dolphin] could not resolve parent timepoint ${img.TimePointID} for image ${pk}`);
+    if (!tpId) throw new Error(`[cdc:dolphin] could not resolve parent timepoint ${img.time_point_id} for image ${pk}`);
 
-    const itypId = await this.resolveItyp(img.ImageType); // may be null — Dolphin allows NULL itypID
-    const imageDate = parseLocalDate(img.ImageDate);
-    const tpiId = await this.resolveTpiId(pk, patId, tpId, img.ImageType, img.ImageFile, imageDate, itypId);
+    const itypId = await this.resolveItyp(img.image_type); // may be null — Dolphin allows NULL itypID
+    const imageDate = parseLocalDate(img.image_date);
+    const tpiId = await this.resolveTpiId(pk, patId, tpId, img.image_type, img.image_file, imageDate, itypId);
 
     // Always normalise to current values (covers re-crop of the same slot, and adopted Dolphin rows).
     await this.pool!.request()
       .input('tpiid', sql.UniqueIdentifier, tpiId)
-      .input('file', sql.VarChar, img.ImageFile ?? null)
+      .input('file', sql.VarChar, img.image_file ?? null)
       .input('dt', sql.DateTime, imageDate)
-      .input('title', sql.VarChar, img.Title ?? null)
+      .input('title', sql.VarChar, img.title ?? null)
       .input('ityp', sql.UniqueIdentifier, itypId)
       .query(
         `UPDATE DolphinPlatform.dbo.TimePointImages

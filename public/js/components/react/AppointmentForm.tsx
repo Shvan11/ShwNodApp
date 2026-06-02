@@ -212,10 +212,10 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    PersonID: parseInt(String(formData.PersonID)),
-                    AppDate: appointmentDateTime,
-                    AppDetail: formData.AppDetail,
-                    DrID: parseInt(formData.DrID)
+                    person_id: parseInt(String(formData.PersonID)),
+                    app_date: appointmentDateTime,
+                    app_detail: formData.AppDetail,
+                    dr_id: parseInt(formData.DrID)
                 })
             });
 
@@ -243,7 +243,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                 fetch('/api/wa/send-appointment', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ appointmentId: result.appointmentID })
+                    body: JSON.stringify({ appointmentId: result.appointment_id })
                 })
                     .then(res => res.json())
                     .then((waResult: { success: boolean; message?: string }) => {

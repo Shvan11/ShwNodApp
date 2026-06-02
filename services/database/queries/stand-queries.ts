@@ -7,14 +7,14 @@
  * sale/void/restock/adjust transactions run on `withPgTransaction`. Positional
  * `ColumnValue` mappers are gone — queries return plain objects.
  *
- * Type notes:
+ * type notes:
  * - All price/cost/total/stock columns are PG `integer` → JS number (no cast).
- * - `ExpiryDate` is PG `date` → the centralized parser (kysely.ts) returns a
- *   `'YYYY-MM-DD'` string at runtime (codegen mistypes it as Timestamp). We cast
- *   it to `string` on SELECT. NOTE: `StandItemRow.ExpiryDate` is declared `Date`,
+ * - `expiry_date` is PG `date` → the centralized parser (kysely.ts) returns a
+ *   `'YYYY-MM-DD'` string at runtime (codegen mistypes it as timestamp). We cast
+ *   it to `string` on SELECT. NOTE: `StandItemRow.expiry_date` is declared `Date`,
  *   but the value is now a string — the documented Phase-4 date-string behavior.
- * - `SaleDate` / `MovementDate` / `DateAdded` / `ModifiedDate` are `timestamp` → Date.
- * - citext columns (`ItemName`/`SKU`/`Barcode`/`MovementType`/…) make `=`/`LIKE`
+ * - `sale_date` / `movement_date` / `date_added` / `modified_date` are `timestamp` → Date.
+ * - citext columns (`item_name`/`sku`/`barcode`/`movement_type`/…) make `=`/`LIKE`
  *   case-insensitive with no app churn (matches the old Arabic_CI_AS columns).
  */
 import { sql } from 'kysely';
@@ -48,72 +48,72 @@ interface StandStockMovementFilters {
 }
 
 interface StandCategoryRow {
-  CategoryID: number;
-  CategoryName: string;
-  IsActive: boolean;
+  category_id: number;
+  category_name: string;
+  is_active: boolean;
 }
 
 interface StandItemRow {
-  ItemID: number;
-  ItemName: string;
-  SKU: string | null;
-  Barcode: string | null;
-  CategoryID: number | null;
-  CostPrice: number;
-  SellPrice: number;
-  CurrentStock: number;
-  ReorderLevel: number;
-  ExpiryDate: Date | null;
-  Unit: string | null;
-  Notes: string | null;
-  IsActive: boolean;
-  DateAdded: Date;
-  ModifiedDate: Date | null;
-  CreatedBy: number | null;
-  CategoryName: string | null;
+  item_id: number;
+  item_name: string;
+  sku: string | null;
+  barcode: string | null;
+  category_id: number | null;
+  cost_price: number;
+  sell_price: number;
+  current_stock: number;
+  reorder_level: number;
+  expiry_date: Date | null;
+  unit: string | null;
+  notes: string | null;
+  is_active: boolean;
+  date_added: Date;
+  modified_date: Date | null;
+  created_by: number | null;
+  category_name: string | null;
 }
 
 interface StandSaleRow {
-  SaleID: number;
-  SaleDate: Date;
-  TotalAmount: number;
-  TotalCost: number;
-  TotalProfit: number;
-  AmountPaid: number;
-  Change: number;
-  PaymentMethod: string;
-  CustomerNote: string | null;
-  PersonID: number | null;
-  CashierID: number | null;
-  VoidedDate: Date | null;
-  VoidedBy: number | null;
-  VoidReason: string | null;
-  PatientName: string | null;
+  sale_id: number;
+  sale_date: Date;
+  total_amount: number;
+  total_cost: number;
+  total_profit: number;
+  amount_paid: number;
+  change: number;
+  payment_method: string;
+  customer_note: string | null;
+  person_id: number | null;
+  cashier_id: number | null;
+  voided_date: Date | null;
+  voided_by: number | null;
+  void_reason: string | null;
+  patient_name: string | null;
   CashierName: string | null;
 }
 
 interface StandSaleItemRow {
-  SaleItemID: number;
-  SaleID: number;
-  ItemID: number;
-  Quantity: number;
-  UnitPrice: number;
-  UnitCost: number;
-  LineTotal: number;
-  ItemName: string;
+  sale_item_id: number;
+  sale_id: number;
+  item_id: number;
+  quantity: number;
+  unit_price: number;
+  unit_cost: number;
+  line_total: number;
+  item_name: string;
 }
 
 interface StandMovementRow {
-  MovementID: number;
-  ItemID: number;
-  MovementType: string;
-  Quantity: number;
-  UnitCost: number | null;
-  TotalCost: number | null;
-  RelatedSaleID: number | null;
-  Reason: string | null;
-  MovementDate: Date;
-  PerformedBy: number | null;
+  movement_id: number;
+  item_id: number;
+  movement_type: string;
+  quantity: number;
+  unit_cost: number | null;
+  total_cost: number | null;
+  related_sale_id: number | null;
+  reason: string | null;
+  movement_date: Date;
+  performed_by: number | null;
   PerformedByName: string | null;
 }
 
@@ -174,7 +174,7 @@ interface DashboardKPIs {
 }
 
 interface SalesSummaryRow {
-  SaleDate: string;
+  sale_date: string;
   SalesCount: number;
   Revenue: number;
   Cost: number;
@@ -182,33 +182,33 @@ interface SalesSummaryRow {
 }
 
 interface TopItemRow {
-  ItemID: number;
-  ItemName: string;
+  item_id: number;
+  item_name: string;
   TotalQuantity: number;
   TotalRevenue: number;
-  TotalProfit: number;
+  total_profit: number;
 }
 
-// Shared SELECT shape for tblStandItems (+ joined CategoryName). Reused by every
+// Shared SELECT shape for tblStandItems (+ joined category_name). Reused by every
 // item read so the column projection stays identical across functions.
 function selectStandItemColumns() {
   return [
-    'i.ItemID',
-    'i.ItemName',
-    'i.SKU',
-    'i.Barcode',
-    'i.CategoryID',
-    'i.CostPrice',
-    'i.SellPrice',
-    'i.CurrentStock',
-    'i.ReorderLevel',
-    'i.Unit',
-    'i.Notes',
-    'i.IsActive',
-    'i.DateAdded',
-    'i.ModifiedDate',
-    'i.CreatedBy',
-    'c.CategoryName',
+    'i.item_id',
+    'i.item_name',
+    'i.sku',
+    'i.barcode',
+    'i.category_id',
+    'i.cost_price',
+    'i.sell_price',
+    'i.current_stock',
+    'i.reorder_level',
+    'i.unit',
+    'i.notes',
+    'i.is_active',
+    'i.date_added',
+    'i.modified_date',
+    'i.created_by',
+    'c.category_name',
   ] as const;
 }
 
@@ -218,38 +218,38 @@ function selectStandItemColumns() {
 
 export async function getStandCategories(): Promise<StandCategoryRow[]> {
   return getKysely()
-    .selectFrom('tblStandCategories')
-    .select(['CategoryID', 'CategoryName', 'IsActive'])
-    .where('IsActive', '=', true)
-    .orderBy('CategoryName')
+    .selectFrom('stand_categories')
+    .select(['category_id', 'category_name', 'is_active'])
+    .where('is_active', '=', true)
+    .orderBy('category_name')
     .execute();
 }
 
-export async function addStandCategory(name: string): Promise<{ CategoryID: number }> {
+export async function addStandCategory(name: string): Promise<{ category_id: number }> {
   const row = await getKysely()
-    .insertInto('tblStandCategories')
-    .values({ CategoryName: name })
-    .returning('CategoryID')
+    .insertInto('stand_categories')
+    .values({ category_name: name })
+    .returning('category_id')
     .executeTakeFirstOrThrow();
 
-  return { CategoryID: row.CategoryID };
+  return { category_id: row.category_id };
 }
 
 export async function updateStandCategory(
   id: number,
   data: { categoryName?: string; isActive?: boolean }
 ): Promise<void> {
-  const set: { CategoryName?: string; IsActive?: boolean } = {};
+  const set: { category_name?: string; is_active?: boolean } = {};
 
-  if (data.categoryName !== undefined) set.CategoryName = data.categoryName;
-  if (data.isActive !== undefined) set.IsActive = data.isActive;
+  if (data.categoryName !== undefined) set.category_name = data.categoryName;
+  if (data.isActive !== undefined) set.is_active = data.isActive;
 
   if (Object.keys(set).length === 0) return;
 
   await getKysely()
-    .updateTable('tblStandCategories')
+    .updateTable('stand_categories')
     .set(set)
-    .where('CategoryID', '=', id)
+    .where('category_id', '=', id)
     .execute();
 }
 
@@ -263,54 +263,54 @@ export async function deactivateStandCategory(id: number): Promise<void> {
 
 export async function getStandItems(filters: StandItemFilters = {}): Promise<StandItemRow[]> {
   let q = getKysely()
-    .selectFrom('tblStandItems as i')
-    .leftJoin('tblStandCategories as c', 'i.CategoryID', 'c.CategoryID')
+    .selectFrom('stand_items as i')
+    .leftJoin('stand_categories as c', 'i.category_id', 'c.category_id')
     .select((eb) => [
       ...selectStandItemColumns(),
-      eb.ref('i.ExpiryDate').$castTo<string>().as('ExpiryDate'),
+      eb.ref('i.expiry_date').$castTo<string>().as('expiry_date'),
     ]);
 
   if (!filters.includeInactive) {
-    q = q.where('i.IsActive', '=', true);
+    q = q.where('i.is_active', '=', true);
   }
 
   if (filters.search) {
     const pattern = `%${filters.search}%`;
     q = q.where((eb) =>
       eb.or([
-        eb('i.ItemName', 'like', pattern),
-        eb('i.SKU', 'like', pattern),
-        eb('i.Barcode', 'like', pattern),
+        eb('i.item_name', 'like', pattern),
+        eb('i.sku', 'like', pattern),
+        eb('i.barcode', 'like', pattern),
       ])
     );
   }
 
   if (filters.categoryId) {
-    q = q.where('i.CategoryID', '=', filters.categoryId);
+    q = q.where('i.category_id', '=', filters.categoryId);
   }
 
   if (filters.stockStatus === 'out-of-stock') {
-    q = q.where('i.CurrentStock', '=', 0);
+    q = q.where('i.current_stock', '=', 0);
   } else if (filters.stockStatus === 'low-stock') {
     q = q
-      .where('i.CurrentStock', '>', 0)
-      .where((eb) => eb('i.CurrentStock', '<=', eb.ref('i.ReorderLevel')));
+      .where('i.current_stock', '>', 0)
+      .where((eb) => eb('i.current_stock', '<=', eb.ref('i.reorder_level')));
   } else if (filters.stockStatus === 'in-stock') {
-    q = q.where((eb) => eb('i.CurrentStock', '>', eb.ref('i.ReorderLevel')));
+    q = q.where((eb) => eb('i.current_stock', '>', eb.ref('i.reorder_level')));
   }
 
-  return q.orderBy('i.ItemName').execute() as unknown as Promise<StandItemRow[]>;
+  return q.orderBy('i.item_name').execute() as unknown as Promise<StandItemRow[]>;
 }
 
 export async function getStandItemById(id: number): Promise<StandItemRow | null> {
   const row = await getKysely()
-    .selectFrom('tblStandItems as i')
-    .leftJoin('tblStandCategories as c', 'i.CategoryID', 'c.CategoryID')
+    .selectFrom('stand_items as i')
+    .leftJoin('stand_categories as c', 'i.category_id', 'c.category_id')
     .select((eb) => [
       ...selectStandItemColumns(),
-      eb.ref('i.ExpiryDate').$castTo<string>().as('ExpiryDate'),
+      eb.ref('i.expiry_date').$castTo<string>().as('expiry_date'),
     ])
-    .where('i.ItemID', '=', id)
+    .where('i.item_id', '=', id)
     .executeTakeFirst();
 
   return (row as unknown as StandItemRow | undefined) ?? null;
@@ -318,42 +318,42 @@ export async function getStandItemById(id: number): Promise<StandItemRow | null>
 
 export async function getStandItemByBarcode(barcode: string): Promise<StandItemRow | null> {
   const row = await getKysely()
-    .selectFrom('tblStandItems as i')
-    .leftJoin('tblStandCategories as c', 'i.CategoryID', 'c.CategoryID')
+    .selectFrom('stand_items as i')
+    .leftJoin('stand_categories as c', 'i.category_id', 'c.category_id')
     .select((eb) => [
       ...selectStandItemColumns(),
-      eb.ref('i.ExpiryDate').$castTo<string>().as('ExpiryDate'),
+      eb.ref('i.expiry_date').$castTo<string>().as('expiry_date'),
     ])
-    .where('i.Barcode', '=', barcode)
-    .where('i.IsActive', '=', true)
+    .where('i.barcode', '=', barcode)
+    .where('i.is_active', '=', true)
     .executeTakeFirst();
 
   return (row as unknown as StandItemRow | undefined) ?? null;
 }
 
-export async function addStandItem(data: StandItemCreateData): Promise<{ ItemID: number }> {
+export async function addStandItem(data: StandItemCreateData): Promise<{ item_id: number }> {
   const initialStock = data.currentStock ?? 0;
 
   const row = await getKysely()
-    .insertInto('tblStandItems')
+    .insertInto('stand_items')
     .values({
-      ItemName: data.itemName,
-      SKU: data.sku || null,
-      Barcode: data.barcode || null,
-      CategoryID: data.categoryId || null,
-      CostPrice: data.costPrice,
-      SellPrice: data.sellPrice,
-      CurrentStock: initialStock,
-      ReorderLevel: data.reorderLevel ?? 1,
-      ExpiryDate: data.expiryDate || null,
-      Unit: data.unit || null,
-      Notes: data.notes || null,
-      CreatedBy: data.createdBy || null,
+      item_name: data.itemName,
+      sku: data.sku || null,
+      barcode: data.barcode || null,
+      category_id: data.categoryId || null,
+      cost_price: data.costPrice,
+      sell_price: data.sellPrice,
+      current_stock: initialStock,
+      reorder_level: data.reorderLevel ?? 1,
+      expiry_date: data.expiryDate || null,
+      unit: data.unit || null,
+      notes: data.notes || null,
+      created_by: data.createdBy || null,
     })
-    .returning('ItemID')
+    .returning('item_id')
     .executeTakeFirstOrThrow();
 
-  const itemId = row.ItemID;
+  const itemId = row.item_id;
 
   // Insert initial stock movement if stock > 0
   if (initialStock > 0) {
@@ -368,65 +368,65 @@ export async function addStandItem(data: StandItemCreateData): Promise<{ ItemID:
     });
   }
 
-  return { ItemID: itemId };
+  return { item_id: itemId };
 }
 
 export async function updateStandItem(id: number, data: StandItemUpdateData): Promise<void> {
-  const set: Record<string, unknown> = { ModifiedDate: sql`localtimestamp` };
+  const set: Record<string, unknown> = { modified_date: sql`localtimestamp` };
 
-  if (data.itemName !== undefined) set.ItemName = data.itemName;
-  if (data.sku !== undefined) set.SKU = data.sku;
-  if (data.barcode !== undefined) set.Barcode = data.barcode;
-  if (data.categoryId !== undefined) set.CategoryID = data.categoryId;
-  if (data.costPrice !== undefined) set.CostPrice = data.costPrice;
-  if (data.sellPrice !== undefined) set.SellPrice = data.sellPrice;
-  if (data.reorderLevel !== undefined) set.ReorderLevel = data.reorderLevel;
-  if (data.expiryDate !== undefined) set.ExpiryDate = data.expiryDate;
-  if (data.unit !== undefined) set.Unit = data.unit;
-  if (data.notes !== undefined) set.Notes = data.notes;
+  if (data.itemName !== undefined) set.item_name = data.itemName;
+  if (data.sku !== undefined) set.sku = data.sku;
+  if (data.barcode !== undefined) set.barcode = data.barcode;
+  if (data.categoryId !== undefined) set.category_id = data.categoryId;
+  if (data.costPrice !== undefined) set.cost_price = data.costPrice;
+  if (data.sellPrice !== undefined) set.sell_price = data.sellPrice;
+  if (data.reorderLevel !== undefined) set.reorder_level = data.reorderLevel;
+  if (data.expiryDate !== undefined) set.expiry_date = data.expiryDate;
+  if (data.unit !== undefined) set.unit = data.unit;
+  if (data.notes !== undefined) set.notes = data.notes;
 
   await getKysely()
-    .updateTable('tblStandItems')
+    .updateTable('stand_items')
     .set(set)
-    .where('ItemID', '=', id)
+    .where('item_id', '=', id)
     .execute();
 }
 
 export async function softDeleteStandItem(id: number): Promise<void> {
   await getKysely()
-    .updateTable('tblStandItems')
-    .set({ IsActive: false, ModifiedDate: sql`localtimestamp` })
-    .where('ItemID', '=', id)
+    .updateTable('stand_items')
+    .set({ is_active: false, modified_date: sql`localtimestamp` })
+    .where('item_id', '=', id)
     .execute();
 }
 
 export async function getLowStockItems(): Promise<StandItemRow[]> {
   return getKysely()
-    .selectFrom('tblStandItems as i')
-    .leftJoin('tblStandCategories as c', 'i.CategoryID', 'c.CategoryID')
+    .selectFrom('stand_items as i')
+    .leftJoin('stand_categories as c', 'i.category_id', 'c.category_id')
     .select((eb) => [
       ...selectStandItemColumns(),
-      eb.ref('i.ExpiryDate').$castTo<string>().as('ExpiryDate'),
+      eb.ref('i.expiry_date').$castTo<string>().as('expiry_date'),
     ])
-    .where('i.IsActive', '=', true)
-    .where((eb) => eb('i.CurrentStock', '<=', eb.ref('i.ReorderLevel')))
-    .orderBy('i.CurrentStock', 'asc')
+    .where('i.is_active', '=', true)
+    .where((eb) => eb('i.current_stock', '<=', eb.ref('i.reorder_level')))
+    .orderBy('i.current_stock', 'asc')
     .execute() as unknown as Promise<StandItemRow[]>;
 }
 
 export async function getExpiringItems(daysAhead: number = 30): Promise<StandItemRow[]> {
   return getKysely()
-    .selectFrom('tblStandItems as i')
-    .leftJoin('tblStandCategories as c', 'i.CategoryID', 'c.CategoryID')
+    .selectFrom('stand_items as i')
+    .leftJoin('stand_categories as c', 'i.category_id', 'c.category_id')
     .select((eb) => [
       ...selectStandItemColumns(),
-      eb.ref('i.ExpiryDate').$castTo<string>().as('ExpiryDate'),
+      eb.ref('i.expiry_date').$castTo<string>().as('expiry_date'),
     ])
-    .where('i.IsActive', '=', true)
-    .where('i.ExpiryDate', 'is not', null)
-    .where('i.ExpiryDate', '>=', sql<Date>`current_date`)
-    .where('i.ExpiryDate', '<=', sql<Date>`current_date + (${daysAhead} * interval '1 day')`)
-    .orderBy('i.ExpiryDate', 'asc')
+    .where('i.is_active', '=', true)
+    .where('i.expiry_date', 'is not', null)
+    .where('i.expiry_date', '>=', sql<Date>`current_date`)
+    .where('i.expiry_date', '<=', sql<Date>`current_date + (${daysAhead} * interval '1 day')`)
+    .orderBy('i.expiry_date', 'asc')
     .execute() as unknown as Promise<StandItemRow[]>;
 }
 
@@ -434,51 +434,51 @@ export async function getExpiringItems(daysAhead: number = 30): Promise<StandIte
 // SALES — TRANSACTIONAL
 // ============================================================================
 
-export async function createStandSaleTransaction(data: SaleCreateInput): Promise<{ SaleID: number }> {
+export async function createStandSaleTransaction(data: SaleCreateInput): Promise<{ sale_id: number }> {
   return withPgTransaction(async (trx) => {
     // 1. Insert sale header
     const saleRow = await trx
-      .insertInto('tblStandSales')
+      .insertInto('stand_sales')
       .values({
-        TotalAmount: data.totalAmount,
-        TotalCost: data.totalCost,
-        TotalProfit: data.totalProfit,
-        AmountPaid: data.amountPaid,
-        Change: data.change,
-        PaymentMethod: data.paymentMethod,
-        CustomerNote: data.customerNote || null,
-        PersonID: data.personId || null,
-        CashierID: data.cashierId || null,
+        total_amount: data.totalAmount,
+        total_cost: data.totalCost,
+        total_profit: data.totalProfit,
+        amount_paid: data.amountPaid,
+        change: data.change,
+        payment_method: data.paymentMethod,
+        customer_note: data.customerNote || null,
+        person_id: data.personId || null,
+        cashier_id: data.cashierId || null,
       })
-      .returning('SaleID')
+      .returning('sale_id')
       .executeTakeFirstOrThrow();
 
-    const saleId = saleRow.SaleID;
+    const saleId = saleRow.sale_id;
 
     // 2-4. For each line item: insert sale item, decrement stock, insert movement
     for (const item of data.items) {
       await trx
-        .insertInto('tblStandSaleItems')
+        .insertInto('stand_sale_items')
         .values({
-          SaleID: saleId,
-          ItemID: item.itemId,
-          Quantity: item.quantity,
-          UnitPrice: item.unitPrice,
-          UnitCost: item.unitCost,
-          LineTotal: item.lineTotal,
+          sale_id: saleId,
+          item_id: item.itemId,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          unit_cost: item.unitCost,
+          line_total: item.lineTotal,
         })
         .execute();
 
       // Atomic stock-decrement guard: only updates when stock is sufficient.
       // 0 rows ⇒ insufficient stock — abort the whole transaction.
       const stockResult = await trx
-        .updateTable('tblStandItems')
+        .updateTable('stand_items')
         .set((eb) => ({
-          CurrentStock: eb('CurrentStock', '-', item.quantity),
-          ModifiedDate: sql`localtimestamp`,
+          current_stock: eb('current_stock', '-', item.quantity),
+          modified_date: sql`localtimestamp`,
         }))
-        .where('ItemID', '=', item.itemId)
-        .where('CurrentStock', '>=', item.quantity)
+        .where('item_id', '=', item.itemId)
+        .where('current_stock', '>=', item.quantity)
         .executeTakeFirst();
 
       if (Number(stockResult.numUpdatedRows) !== 1) {
@@ -486,60 +486,60 @@ export async function createStandSaleTransaction(data: SaleCreateInput): Promise
       }
 
       await trx
-        .insertInto('tblStandStockMovements')
+        .insertInto('stand_stock_movements')
         .values({
-          ItemID: item.itemId,
-          MovementType: 'sale',
-          Quantity: -item.quantity,
-          UnitCost: item.unitCost,
-          RelatedSaleID: saleId,
-          PerformedBy: data.cashierId || null,
+          item_id: item.itemId,
+          movement_type: 'sale',
+          quantity: -item.quantity,
+          unit_cost: item.unitCost,
+          related_sale_id: saleId,
+          performed_by: data.cashierId || null,
         })
         .execute();
     }
 
-    return { SaleID: saleId };
+    return { sale_id: saleId };
   });
 }
 
 export async function getStandSales(filters: StandSaleFilters = {}): Promise<StandSaleRow[]> {
   let q = getKysely()
-    .selectFrom('tblStandSales as s')
-    .leftJoin('tblpatients as p', 's.PersonID', 'p.PersonID')
-    .leftJoin('tblUsers as u', 's.CashierID', 'u.UserID')
+    .selectFrom('stand_sales as s')
+    .leftJoin('patients as p', 's.person_id', 'p.person_id')
+    .leftJoin('users as u', 's.cashier_id', 'u.user_id')
     .select([
-      's.SaleID',
-      's.SaleDate',
-      's.TotalAmount',
-      's.TotalCost',
-      's.TotalProfit',
-      's.AmountPaid',
-      's.Change',
-      's.PaymentMethod',
-      's.CustomerNote',
-      's.PersonID',
-      's.CashierID',
-      's.VoidedDate',
-      's.VoidedBy',
-      's.VoidReason',
-      'p.PatientName',
-      'u.FullName as CashierName',
+      's.sale_id',
+      's.sale_date',
+      's.total_amount',
+      's.total_cost',
+      's.total_profit',
+      's.amount_paid',
+      's.change',
+      's.payment_method',
+      's.customer_note',
+      's.person_id',
+      's.cashier_id',
+      's.voided_date',
+      's.voided_by',
+      's.void_reason',
+      'p.patient_name',
+      'u.full_name as CashierName',
     ]);
 
   if (filters.startDate) {
-    q = q.where(sql`cast(${sql.ref('s.SaleDate')} as date)`, '>=', sql<Date>`${filters.startDate}`);
+    q = q.where(sql`cast(${sql.ref('s.sale_date')} as date)`, '>=', sql<Date>`${filters.startDate}`);
   }
   if (filters.endDate) {
-    q = q.where(sql`cast(${sql.ref('s.SaleDate')} as date)`, '<=', sql<Date>`${filters.endDate}`);
+    q = q.where(sql`cast(${sql.ref('s.sale_date')} as date)`, '<=', sql<Date>`${filters.endDate}`);
   }
   if (filters.cashierId) {
-    q = q.where('s.CashierID', '=', filters.cashierId);
+    q = q.where('s.cashier_id', '=', filters.cashierId);
   }
   if (filters.personId) {
-    q = q.where('s.PersonID', '=', filters.personId);
+    q = q.where('s.person_id', '=', filters.personId);
   }
 
-  q = q.orderBy('s.SaleDate', 'desc').orderBy('s.SaleID', 'desc');
+  q = q.orderBy('s.sale_date', 'desc').orderBy('s.sale_id', 'desc');
 
   // Opt-in pagination. 1000 caps a single page so a caller can't trigger an
   // unbounded scan.
@@ -555,48 +555,48 @@ export async function getStandSales(filters: StandSaleFilters = {}): Promise<Sta
 export async function getStandSaleById(id: number): Promise<(StandSaleRow & { Items: StandSaleItemRow[] }) | null> {
   // Get the sale header
   const sale = await getKysely()
-    .selectFrom('tblStandSales as s')
-    .leftJoin('tblpatients as p', 's.PersonID', 'p.PersonID')
-    .leftJoin('tblUsers as u', 's.CashierID', 'u.UserID')
+    .selectFrom('stand_sales as s')
+    .leftJoin('patients as p', 's.person_id', 'p.person_id')
+    .leftJoin('users as u', 's.cashier_id', 'u.user_id')
     .select([
-      's.SaleID',
-      's.SaleDate',
-      's.TotalAmount',
-      's.TotalCost',
-      's.TotalProfit',
-      's.AmountPaid',
-      's.Change',
-      's.PaymentMethod',
-      's.CustomerNote',
-      's.PersonID',
-      's.CashierID',
-      's.VoidedDate',
-      's.VoidedBy',
-      's.VoidReason',
-      'p.PatientName',
-      'u.FullName as CashierName',
+      's.sale_id',
+      's.sale_date',
+      's.total_amount',
+      's.total_cost',
+      's.total_profit',
+      's.amount_paid',
+      's.change',
+      's.payment_method',
+      's.customer_note',
+      's.person_id',
+      's.cashier_id',
+      's.voided_date',
+      's.voided_by',
+      's.void_reason',
+      'p.patient_name',
+      'u.full_name as CashierName',
     ])
-    .where('s.SaleID', '=', id)
+    .where('s.sale_id', '=', id)
     .executeTakeFirst();
 
   if (!sale) return null;
 
   // Get line items
   const items = await getKysely()
-    .selectFrom('tblStandSaleItems as si')
-    .innerJoin('tblStandItems as i', 'si.ItemID', 'i.ItemID')
+    .selectFrom('stand_sale_items as si')
+    .innerJoin('stand_items as i', 'si.item_id', 'i.item_id')
     .select([
-      'si.SaleItemID',
-      'si.SaleID',
-      'si.ItemID',
-      'si.Quantity',
-      'si.UnitPrice',
-      'si.UnitCost',
-      'si.LineTotal',
-      'i.ItemName',
+      'si.sale_item_id',
+      'si.sale_id',
+      'si.item_id',
+      'si.quantity',
+      'si.unit_price',
+      'si.unit_cost',
+      'si.line_total',
+      'i.item_name',
     ])
-    .where('si.SaleID', '=', id)
-    .orderBy('si.SaleItemID')
+    .where('si.sale_id', '=', id)
+    .orderBy('si.sale_item_id')
     .execute();
 
   return { ...(sale as StandSaleRow), Items: items as StandSaleItemRow[] };
@@ -609,45 +609,45 @@ export async function voidStandSale(
 ): Promise<void> {
   return withPgTransaction(async (trx) => {
     const voidResult = await trx
-      .updateTable('tblStandSales')
-      .set({ VoidedDate: sql`localtimestamp`, VoidedBy: userId, VoidReason: reason })
-      .where('SaleID', '=', saleId)
-      .where('VoidedDate', 'is', null)
+      .updateTable('stand_sales')
+      .set({ voided_date: sql`localtimestamp`, voided_by: userId, void_reason: reason })
+      .where('sale_id', '=', saleId)
+      .where('voided_date', 'is', null)
       .executeTakeFirst();
 
     // Row-level guard is the only atomic defense against a concurrent/duplicate void
     // (the caller's pre-check is TOCTOU). 0 rows ⇒ already voided — abort before
-    // restocking, else CurrentStock is credited twice and duplicate movements written.
+    // restocking, else current_stock is credited twice and duplicate movements written.
     if (Number(voidResult.numUpdatedRows) !== 1) {
       throw new Error(`ALREADY_VOIDED:${saleId}`);
     }
 
     const lineItems = await trx
-      .selectFrom('tblStandSaleItems')
-      .select(['ItemID', 'Quantity', 'UnitCost'])
-      .where('SaleID', '=', saleId)
+      .selectFrom('stand_sale_items')
+      .select(['item_id', 'quantity', 'unit_cost'])
+      .where('sale_id', '=', saleId)
       .execute();
 
     for (const row of lineItems) {
       await trx
-        .updateTable('tblStandItems')
+        .updateTable('stand_items')
         .set((eb) => ({
-          CurrentStock: eb('CurrentStock', '+', row.Quantity),
-          ModifiedDate: sql`localtimestamp`,
+          current_stock: eb('current_stock', '+', row.quantity),
+          modified_date: sql`localtimestamp`,
         }))
-        .where('ItemID', '=', row.ItemID)
+        .where('item_id', '=', row.item_id)
         .execute();
 
       await trx
-        .insertInto('tblStandStockMovements')
+        .insertInto('stand_stock_movements')
         .values({
-          ItemID: row.ItemID,
-          MovementType: 'void',
-          Quantity: row.Quantity,
-          UnitCost: row.UnitCost,
-          RelatedSaleID: saleId,
-          Reason: `Void: ${reason}`,
-          PerformedBy: userId,
+          item_id: row.item_id,
+          movement_type: 'void',
+          quantity: row.quantity,
+          unit_cost: row.unit_cost,
+          related_sale_id: saleId,
+          reason: `Void: ${reason}`,
+          performed_by: userId,
         })
         .execute();
     }
@@ -669,16 +669,16 @@ export async function addStockMovement(data: {
   performedBy?: number | null;
 }): Promise<void> {
   await getKysely()
-    .insertInto('tblStandStockMovements')
+    .insertInto('stand_stock_movements')
     .values({
-      ItemID: data.itemId,
-      MovementType: data.movementType,
-      Quantity: data.quantity,
-      UnitCost: data.unitCost ?? null,
-      TotalCost: data.totalCost ?? null,
-      RelatedSaleID: data.relatedSaleId ?? null,
-      Reason: data.reason ?? null,
-      PerformedBy: data.performedBy ?? null,
+      item_id: data.itemId,
+      movement_type: data.movementType,
+      quantity: data.quantity,
+      unit_cost: data.unitCost ?? null,
+      total_cost: data.totalCost ?? null,
+      related_sale_id: data.relatedSaleId ?? null,
+      reason: data.reason ?? null,
+      performed_by: data.performedBy ?? null,
     })
     .execute();
 }
@@ -691,23 +691,23 @@ export async function restockItem(
 ): Promise<void> {
   return withPgTransaction(async (trx) => {
     await trx
-      .updateTable('tblStandItems')
+      .updateTable('stand_items')
       .set((eb) => ({
-        CurrentStock: eb('CurrentStock', '+', quantity),
-        ModifiedDate: sql`localtimestamp`,
+        current_stock: eb('current_stock', '+', quantity),
+        modified_date: sql`localtimestamp`,
       }))
-      .where('ItemID', '=', itemId)
+      .where('item_id', '=', itemId)
       .execute();
 
     await trx
-      .insertInto('tblStandStockMovements')
+      .insertInto('stand_stock_movements')
       .values({
-        ItemID: itemId,
-        MovementType: 'restock',
-        Quantity: quantity,
-        UnitCost: unitCost,
-        TotalCost: quantity * unitCost,
-        PerformedBy: userId,
+        item_id: itemId,
+        movement_type: 'restock',
+        quantity: quantity,
+        unit_cost: unitCost,
+        total_cost: quantity * unitCost,
+        performed_by: userId,
       })
       .execute();
   });
@@ -723,13 +723,13 @@ export async function adjustStock(
     // Guard: only adjust when the result stays non-negative.
     // 0 rows ⇒ would go negative — abort the transaction.
     const result = await trx
-      .updateTable('tblStandItems')
+      .updateTable('stand_items')
       .set((eb) => ({
-        CurrentStock: eb('CurrentStock', '+', delta),
-        ModifiedDate: sql`localtimestamp`,
+        current_stock: eb('current_stock', '+', delta),
+        modified_date: sql`localtimestamp`,
       }))
-      .where('ItemID', '=', itemId)
-      .where(sql`("CurrentStock" + ${delta})`, '>=', 0)
+      .where('item_id', '=', itemId)
+      .where(sql`("current_stock" + ${delta})`, '>=', 0)
       .executeTakeFirst();
 
     if (Number(result.numUpdatedRows) !== 1) {
@@ -739,13 +739,13 @@ export async function adjustStock(
     const movementType = delta < 0 ? 'waste' : 'adjustment';
 
     await trx
-      .insertInto('tblStandStockMovements')
+      .insertInto('stand_stock_movements')
       .values({
-        ItemID: itemId,
-        MovementType: movementType,
-        Quantity: delta,
-        Reason: reason,
-        PerformedBy: userId,
+        item_id: itemId,
+        movement_type: movementType,
+        quantity: delta,
+        reason: reason,
+        performed_by: userId,
       })
       .execute();
   });
@@ -756,34 +756,34 @@ export async function getStockMovements(
   filters: StandStockMovementFilters = {}
 ): Promise<StandMovementRow[]> {
   let q = getKysely()
-    .selectFrom('tblStandStockMovements as m')
-    .leftJoin('tblUsers as u', 'm.PerformedBy', 'u.UserID')
+    .selectFrom('stand_stock_movements as m')
+    .leftJoin('users as u', 'm.performed_by', 'u.user_id')
     .select([
-      'm.MovementID',
-      'm.ItemID',
-      'm.MovementType',
-      'm.Quantity',
-      'm.UnitCost',
-      'm.TotalCost',
-      'm.RelatedSaleID',
-      'm.Reason',
-      'm.MovementDate',
-      'm.PerformedBy',
-      'u.FullName as PerformedByName',
+      'm.movement_id',
+      'm.item_id',
+      'm.movement_type',
+      'm.quantity',
+      'm.unit_cost',
+      'm.total_cost',
+      'm.related_sale_id',
+      'm.reason',
+      'm.movement_date',
+      'm.performed_by',
+      'u.full_name as PerformedByName',
     ])
-    .where('m.ItemID', '=', itemId);
+    .where('m.item_id', '=', itemId);
 
   if (filters.startDate) {
-    q = q.where(sql`cast(${sql.ref('m.MovementDate')} as date)`, '>=', sql<Date>`${filters.startDate}`);
+    q = q.where(sql`cast(${sql.ref('m.movement_date')} as date)`, '>=', sql<Date>`${filters.startDate}`);
   }
   if (filters.endDate) {
-    q = q.where(sql`cast(${sql.ref('m.MovementDate')} as date)`, '<=', sql<Date>`${filters.endDate}`);
+    q = q.where(sql`cast(${sql.ref('m.movement_date')} as date)`, '<=', sql<Date>`${filters.endDate}`);
   }
   if (filters.movementType) {
-    q = q.where('m.MovementType', '=', filters.movementType);
+    q = q.where('m.movement_type', '=', filters.movementType);
   }
 
-  q = q.orderBy('m.MovementDate', 'desc').orderBy('m.MovementID', 'desc');
+  q = q.orderBy('m.movement_date', 'desc').orderBy('m.movement_id', 'desc');
 
   return q.execute() as Promise<StandMovementRow[]>;
 }
@@ -795,43 +795,43 @@ export async function getStockMovements(
 export async function getStandDashboardKPIs(): Promise<DashboardKPIs> {
   const db = getKysely();
 
-  const todayPredicate = sql<boolean>`cast("SaleDate" as date) = current_date`;
+  const todayPredicate = sql<boolean>`cast("sale_date" as date) = current_date`;
 
   const todayStats = await db
-    .selectFrom('tblStandSales')
+    .selectFrom('stand_sales')
     .select((eb) => [
       eb.fn.countAll().as('TodaySalesCount'),
-      eb.fn.coalesce(eb.fn.sum('TotalAmount'), sql<number>`0`).as('TodayRevenue'),
-      eb.fn.coalesce(eb.fn.sum('TotalProfit'), sql<number>`0`).as('TodayProfit'),
+      eb.fn.coalesce(eb.fn.sum('total_amount'), sql<number>`0`).as('TodayRevenue'),
+      eb.fn.coalesce(eb.fn.sum('total_profit'), sql<number>`0`).as('TodayProfit'),
     ])
     .where(todayPredicate)
-    .where('VoidedDate', 'is', null)
+    .where('voided_date', 'is', null)
     .executeTakeFirstOrThrow();
 
   const lowStock = await db
-    .selectFrom('tblStandItems')
+    .selectFrom('stand_items')
     .select((eb) => eb.fn.countAll().as('cnt'))
-    .where('IsActive', '=', true)
-    .where((eb) => eb('CurrentStock', '<=', eb.ref('ReorderLevel')))
+    .where('is_active', '=', true)
+    .where((eb) => eb('current_stock', '<=', eb.ref('reorder_level')))
     .executeTakeFirstOrThrow();
 
   const expiring = await db
-    .selectFrom('tblStandItems')
+    .selectFrom('stand_items')
     .select((eb) => eb.fn.countAll().as('cnt'))
-    .where('IsActive', '=', true)
-    .where('ExpiryDate', 'is not', null)
-    .where('ExpiryDate', '>=', sql<Date>`current_date`)
-    .where('ExpiryDate', '<=', sql<Date>`current_date + interval '30 day'`)
+    .where('is_active', '=', true)
+    .where('expiry_date', 'is not', null)
+    .where('expiry_date', '>=', sql<Date>`current_date`)
+    .where('expiry_date', '<=', sql<Date>`current_date + interval '30 day'`)
     .executeTakeFirstOrThrow();
 
   const inventoryValue = await db
-    .selectFrom('tblStandItems')
+    .selectFrom('stand_items')
     .select((eb) =>
       eb.fn
-        .coalesce(eb.fn.sum(sql<number>`"CurrentStock" * "CostPrice"`), sql<number>`0`)
+        .coalesce(eb.fn.sum(sql<number>`"current_stock" * "cost_price"`), sql<number>`0`)
         .as('TotalInventoryValue')
     )
-    .where('IsActive', '=', true)
+    .where('is_active', '=', true)
     .executeTakeFirstOrThrow();
 
   return {
@@ -849,23 +849,23 @@ export async function getStandSalesSummary(
   endDate: string
 ): Promise<SalesSummaryRow[]> {
   const rows = await getKysely()
-    .selectFrom('tblStandSales')
+    .selectFrom('stand_sales')
     .select((eb) => [
-      sql<string>`to_char("SaleDate", 'YYYY-MM-DD')`.as('SaleDate'),
+      sql<string>`to_char("sale_date", 'YYYY-MM-DD')`.as('sale_date'),
       eb.fn.countAll().as('SalesCount'),
-      eb.fn.sum('TotalAmount').as('Revenue'),
-      eb.fn.sum('TotalCost').as('Cost'),
-      eb.fn.sum('TotalProfit').as('Profit'),
+      eb.fn.sum('total_amount').as('Revenue'),
+      eb.fn.sum('total_cost').as('Cost'),
+      eb.fn.sum('total_profit').as('Profit'),
     ])
-    .where(sql`cast("SaleDate" as date)`, '>=', sql<Date>`${startDate}`)
-    .where(sql`cast("SaleDate" as date)`, '<=', sql<Date>`${endDate}`)
-    .where('VoidedDate', 'is', null)
-    .groupBy(sql`to_char("SaleDate", 'YYYY-MM-DD')`)
-    .orderBy('SaleDate')
+    .where(sql`cast("sale_date" as date)`, '>=', sql<Date>`${startDate}`)
+    .where(sql`cast("sale_date" as date)`, '<=', sql<Date>`${endDate}`)
+    .where('voided_date', 'is', null)
+    .groupBy(sql`to_char("sale_date", 'YYYY-MM-DD')`)
+    .orderBy('sale_date')
     .execute();
 
   return rows.map((r) => ({
-    SaleDate: r.SaleDate,
+    sale_date: r.sale_date,
     SalesCount: Number(r.SalesCount),
     Revenue: Number(r.Revenue),
     Cost: Number(r.Cost),
@@ -879,30 +879,30 @@ export async function getTopSellingItems(
   limit: number = 10
 ): Promise<TopItemRow[]> {
   const rows = await getKysely()
-    .selectFrom('tblStandSaleItems as si')
-    .innerJoin('tblStandItems as i', 'si.ItemID', 'i.ItemID')
-    .innerJoin('tblStandSales as s', 'si.SaleID', 's.SaleID')
+    .selectFrom('stand_sale_items as si')
+    .innerJoin('stand_items as i', 'si.item_id', 'i.item_id')
+    .innerJoin('stand_sales as s', 'si.sale_id', 's.sale_id')
     .select((eb) => [
-      'si.ItemID',
-      'i.ItemName',
-      eb.fn.sum('si.Quantity').as('TotalQuantity'),
-      eb.fn.sum('si.LineTotal').as('TotalRevenue'),
-      eb.fn.sum(sql<number>`si."LineTotal" - (si."Quantity" * si."UnitCost")`).as('TotalProfit'),
+      'si.item_id',
+      'i.item_name',
+      eb.fn.sum('si.quantity').as('TotalQuantity'),
+      eb.fn.sum('si.line_total').as('TotalRevenue'),
+      eb.fn.sum(sql<number>`si."line_total" - (si."quantity" * si."unit_cost")`).as('total_profit'),
     ])
-    .where(sql`cast(${sql.ref('s.SaleDate')} as date)`, '>=', sql<Date>`${startDate}`)
-    .where(sql`cast(${sql.ref('s.SaleDate')} as date)`, '<=', sql<Date>`${endDate}`)
-    .where('s.VoidedDate', 'is', null)
-    .groupBy(['si.ItemID', 'i.ItemName'])
+    .where(sql`cast(${sql.ref('s.sale_date')} as date)`, '>=', sql<Date>`${startDate}`)
+    .where(sql`cast(${sql.ref('s.sale_date')} as date)`, '<=', sql<Date>`${endDate}`)
+    .where('s.voided_date', 'is', null)
+    .groupBy(['si.item_id', 'i.item_name'])
     .orderBy('TotalQuantity', 'desc')
     .limit(limit)
     .execute();
 
   return rows.map((r) => ({
-    ItemID: r.ItemID,
-    ItemName: r.ItemName,
+    item_id: r.item_id,
+    item_name: r.item_name,
     TotalQuantity: Number(r.TotalQuantity),
     TotalRevenue: Number(r.TotalRevenue),
-    TotalProfit: Number(r.TotalProfit),
+    total_profit: Number(r.total_profit),
   }));
 }
 
@@ -911,14 +911,14 @@ export async function getStandPurchasesSummary(
   endDate: string
 ): Promise<{ totalPurchases: number; restockCount: number }> {
   const row = await getKysely()
-    .selectFrom('tblStandStockMovements')
+    .selectFrom('stand_stock_movements')
     .select((eb) => [
-      eb.fn.coalesce(eb.fn.sum('TotalCost'), sql<number>`0`).as('TotalPurchases'),
+      eb.fn.coalesce(eb.fn.sum('total_cost'), sql<number>`0`).as('TotalPurchases'),
       eb.fn.countAll().as('RestockCount'),
     ])
-    .where('MovementType', '=', 'restock')
-    .where(sql`cast("MovementDate" as date)`, '>=', sql<Date>`${startDate}`)
-    .where(sql`cast("MovementDate" as date)`, '<=', sql<Date>`${endDate}`)
+    .where('movement_type', '=', 'restock')
+    .where(sql`cast("movement_date" as date)`, '>=', sql<Date>`${startDate}`)
+    .where(sql`cast("movement_date" as date)`, '<=', sql<Date>`${endDate}`)
     .executeTakeFirstOrThrow();
 
   return {

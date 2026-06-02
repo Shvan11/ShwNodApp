@@ -6,19 +6,19 @@ import styles from './WorkCard.module.css';
 
 export interface Work {
     workid: number;
-    PersonID: number;
-    Typeofwork: number;
+    person_id: number;
+    type_of_work: number;
     TypeName?: string;
     Status: number;
-    TotalRequired?: number;
+    total_required?: number;
     TotalPaid?: number;
     Currency?: 'USD' | 'IQD';
     AdditionDate?: string;
     StartDate?: string;
     DebondDate?: string;
     EstimatedDuration?: number;
-    DrID?: number;
-    DoctorName?: string;
+    dr_id?: number;
+    doctor_name?: string;
     Notes?: string;
     KeyWordID1?: number;
     KeyWordID2?: number;
@@ -107,7 +107,7 @@ const WorkCard = ({
     const getDiscount = (): number => Number(work.Discount ?? 0);
 
     const getRemainingBalance = (): number => {
-        return (work.TotalRequired || 0) - getDiscount() - (work.TotalPaid || 0);
+        return (work.total_required || 0) - getDiscount() - (work.TotalPaid || 0);
     };
 
     const isFullyPaid = (): boolean => {
@@ -132,7 +132,7 @@ const WorkCard = ({
                         {getStatusBadge()}
                     </div>
                     <div className={styles.metaMinimal}>
-                        <span><i className="fas fa-user-md"></i> {work.DoctorName ? (work.DoctorName === 'Admin' ? work.DoctorName : `Dr. ${work.DoctorName}`) : 'Not assigned'}</span>
+                        <span><i className="fas fa-user-md"></i> {work.doctor_name ? (work.doctor_name === 'Admin' ? work.doctor_name : `Dr. ${work.doctor_name}`) : 'Not assigned'}</span>
                         <span><i className="fas fa-calendar-plus"></i> {formatDate(work.AdditionDate)}</span>
                         {!isExpanded && getRemainingBalance() > 0 && (
                             <span className={styles.balanceIndicator}>
@@ -215,7 +215,7 @@ const WorkCard = ({
                     <div className={styles.financial}>
                         <div className={styles.financialItem}>
                             <span className={styles.financialLabel}>Total Cost</span>
-                            <span className={styles.financialValue}>{formatCurrency(work.TotalRequired, work.Currency)}</span>
+                            <span className={styles.financialValue}>{formatCurrency(work.total_required, work.Currency)}</span>
                         </div>
                         {getDiscount() > 0 && (
                             <>
@@ -228,7 +228,7 @@ const WorkCard = ({
                                 <div className={styles.financialItem}>
                                     <span className={styles.financialLabel}>Net</span>
                                     <span className={cn(styles.financialValue, styles.financialValueNet)}>
-                                        {formatCurrency((work.TotalRequired || 0) - getDiscount(), work.Currency)}
+                                        {formatCurrency((work.total_required || 0) - getDiscount(), work.Currency)}
                                     </span>
                                 </div>
                             </>
@@ -289,7 +289,7 @@ const WorkCard = ({
                     {/* Primary Actions - Conditionally show based on work type */}
                     <div className={styles.primaryActions}>
                         {/* Visits & Diagnosis only for ortho-related works */}
-                        {isOrthoWork(work.Typeofwork) && (
+                        {isOrthoWork(work.type_of_work) && (
                             <>
                                 <button
                                     type="button"
@@ -333,7 +333,7 @@ const WorkCard = ({
                         </button>
 
                         {/* Details only for non-ortho works that need treatment items */}
-                        {needsDetails(work.Typeofwork) && (
+                        {needsDetails(work.type_of_work) && (
                             <button
                                 type="button"
                                 className="btn btn-card-action btn-details"

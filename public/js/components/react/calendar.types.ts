@@ -20,13 +20,14 @@ export interface LegendDoctor {
 
 // Appointment displayed in calendar slots
 export interface CalendarAppointment {
-    appointmentID?: number | string;
+    appointment_id?: number | string;
     patientName?: string;
     appDetail?: string;
-    PersonID?: number;
     personID?: number | null;
     drID?: number | null;
     time?: string;
+    app_date?: string;
+    person_id?: number | null;
 }
 
 // Time slot info containing appointments
@@ -71,7 +72,7 @@ export interface SlotData {
     dayName?: string;
     appointments?: CalendarAppointment[];
     slotStatus: 'available' | 'booked' | 'full' | 'past' | string;
-    appointmentID?: number | string;
+    appointment_id?: number | string;
     appDetail?: string;
     patientName?: string;
 }
@@ -97,9 +98,9 @@ export interface AppointmentWarning {
     count: number;
     date?: string;
     appointments?: Array<{
-        PatientName: string;
-        AppDetail?: string;
-        AppDate?: string;
+        patient_name: string;
+        app_detail?: string;
+        app_date?: string;
     }>;
 }
 

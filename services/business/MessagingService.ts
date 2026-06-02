@@ -15,8 +15,8 @@ import { log } from '../../utils/logger.js';
 
 /**
  * Message status codes
- * - 0: Not Sent Yet (SentWa IS NULL — never attempted)
- * - 5: Ready to Resend (SentWa = 0 — explicitly reset)
+ * - 0: Not Sent Yet (sent_wa IS NULL — never attempted)
+ * - 5: Ready to Resend (sent_wa = 0 — explicitly reset)
  * - -1: Error/Failed
  * - 1: Server (received by WhatsApp server)
  * - 2: Device (delivered to user's device)
@@ -123,9 +123,9 @@ export interface MessageDetails {
  * Database format: sentStatus (boolean | null) + deliveryStatus (string)
  * Frontend format: numeric status code
  *
- * Status mapping:
- * - 0: Not Sent Yet (SentWa IS NULL — fresh appointment)
- * - 5: Ready to Resend (SentWa = 0 — explicitly reset)
+ * status mapping:
+ * - 0: Not Sent Yet (sent_wa IS NULL — fresh appointment)
+ * - 5: Ready to Resend (sent_wa = 0 — explicitly reset)
  * - -1: Error/Failed
  * - 1: Server (received by WhatsApp server)
  * - 2: Device (delivered to user's device)
@@ -221,7 +221,7 @@ export function calculateMessageCount(
     pending: 0,
   };
 
-  // Count existing message statuses. Status 5 (reset/ready) is treated as pending,
+  // Count existing message statuses. status 5 (reset/ready) is treated as pending,
   // not as sent — it needs to be re-sent.
   if (Array.isArray(existingMessages) && existingMessages.length > 0) {
     messageCount.alreadySent = existingMessages.filter(

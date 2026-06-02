@@ -33,20 +33,20 @@ function pad2(n: number): string {
 // bigint in PG (→ number via the kysely.ts type parser); `date` days arrive as 'YYYY-MM-DD'.
 const VW_CTES = sql`
   viqd AS (
-    SELECT "Dateofpayment" AS day, SUM("IQDReceived") AS sumiqd
-    FROM "tblInvoice" WHERE "IQDReceived" > 0 GROUP BY "Dateofpayment"
+    SELECT "date_of_payment" AS day, SUM("iqd_received") AS sumiqd
+    FROM "invoices" WHERE "iqd_received" > 0 GROUP BY "date_of_payment"
   ),
   vusd AS (
-    SELECT "Dateofpayment" AS day, SUM("USDReceived") AS sumusd
-    FROM "tblInvoice" WHERE "USDReceived" > 0 GROUP BY "Dateofpayment"
+    SELECT "date_of_payment" AS day, SUM("usd_received") AS sumusd
+    FROM "invoices" WHERE "usd_received" > 0 GROUP BY "date_of_payment"
   ),
   veiq AS (
-    SELECT "expenseDate" AS day, -SUM("Amount") AS sumexq
-    FROM "tblExpenses" WHERE "Currency" = 'IQD' GROUP BY "expenseDate"
+    SELECT "expense_date" AS day, -SUM("amount") AS sumexq
+    FROM "expenses" WHERE "currency" = 'IQD' GROUP BY "expense_date"
   ),
   veiusd AS (
-    SELECT "expenseDate" AS day, -SUM("Amount") AS sumexusd
-    FROM "tblExpenses" WHERE "Currency" = 'USD' GROUP BY "expenseDate"
+    SELECT "expense_date" AS day, -SUM("amount") AS sumexusd
+    FROM "expenses" WHERE "currency" = 'USD' GROUP BY "expense_date"
   ),
   vwiqd AS (
     SELECT COALESCE(v.day, e.day) AS day, v.sumiqd, e.sumexq,
@@ -75,14 +75,14 @@ export async function getMonthlyGrandTotals(
   const { rows } = await sql<DailyData>`
     WITH ${VW_CTES},
     dailyiqd AS (
-      SELECT "Dateofpayment" AS day,
-             SUM(COALESCE("IQDReceived", 0)) AS totaliqd,
-             SUM(COALESCE("Change", 0))      AS totalchange
-      FROM "tblInvoice" GROUP BY "Dateofpayment"
+      SELECT "date_of_payment" AS day,
+             SUM(COALESCE("iqd_received", 0)) AS totaliqd,
+             SUM(COALESCE("change", 0))      AS totalchange
+      FROM "invoices" GROUP BY "date_of_payment"
     ),
     dailyusd AS (
-      SELECT "Dateofpayment" AS day, SUM(COALESCE("USDReceived", 0)) AS totalusd
-      FROM "tblInvoice" GROUP BY "Dateofpayment"
+      SELECT "date_of_payment" AS day, SUM(COALESCE("usd_received", 0)) AS totalusd
+      FROM "invoices" GROUP BY "date_of_payment"
     )
     SELECT
       COALESCE(wq.day, wu.day)                                       AS "Day",
@@ -93,16 +93,16 @@ export async function getMonthlyGrandTotals(
       wu.sumexusd                                                    AS "ExpensesUSD",
       wu.finalusdsum                                                 AS "FinalUSDSum",
       CAST(
-        (COALESCE(wq.finaliqdsum, 0) / CAST(COALESCE(s."ExchangeRate", ${ex}::int) AS float))
+        (COALESCE(wq.finaliqdsum, 0) / CAST(COALESCE(s."exchange_rate", ${ex}::int) AS float))
         + COALESCE(wu.finalusdsum, 0) AS decimal(9, 2)
       )                                                              AS "GrandTotal",
       (COALESCE(wq.finaliqdsum, 0)
-        + COALESCE(wu.finalusdsum * COALESCE(s."ExchangeRate", ${ex}::int), 0)) AS "GrandTotalIQD",
+        + COALESCE(wu.finalusdsum * COALESCE(s."exchange_rate", ${ex}::int), 0)) AS "GrandTotalIQD",
       (COALESCE(dq.totaliqd, 0) + COALESCE(wq.sumexq, 0) - COALESCE(dq.totalchange, 0)) AS "QasaIQD",
       (COALESCE(du.totalusd, 0) + COALESCE(wu.sumexusd, 0))          AS "QasaUSD"
     FROM vwiqd wq
     FULL OUTER JOIN vwusd wu ON wq.day = wu.day
-    LEFT JOIN "tblsms" s ON COALESCE(wq.day, wu.day) = s."date"
+    LEFT JOIN "sms" s ON COALESCE(wq.day, wu.day) = s."date"
     LEFT JOIN dailyiqd dq ON COALESCE(wq.day, wu.day) = dq.day
     LEFT JOIN dailyusd du ON COALESCE(wq.day, wu.day) = du.day
     WHERE COALESCE(wq.day, wu.day) >= ${start}::date
@@ -153,25 +153,25 @@ export async function getYearlyMonthlyTotals(
 
 /**
  * All invoices paid on a given date, with patient + work context (was: ProDailyInvoices).
- * - Amountpaid is a thousands-grouped string (the proc used FORMAT(..,'#,##0')).
- * - SysStartTime is emitted as a UTC '…Z' ISO string (column stores UTC wall-clock); the
+ * - amount_paid is a thousands-grouped string (the proc used FORMAT(..,'#,##0')).
+ * - sys_start_time is emitted as a UTC '…Z' ISO string (column stores UTC wall-clock); the
  *   frontend converts to local. SysEndTime was dropped from the PG schema (unused).
  */
 export async function getDailyInvoices(date: string): Promise<BaseInvoice[]> {
   const { rows } = await sql<BaseInvoice>`
     SELECT
-      p."PatientName"                                              AS "PatientName",
-      i."invoiceID"                                                AS "invoiceID",
-      to_char(i."Amountpaid", 'FM999,999,999,990')                 AS "Amountpaid",
-      i."Dateofpayment"                                            AS "Dateofpayment",
-      i."workid"                                                   AS "workid",
-      to_char(i."SysStartTime", 'YYYY-MM-DD"T"HH24:MI:SS"Z"')      AS "SysStartTime",
-      i."Change"                                                   AS "Change",
-      w."Currency"                                                 AS "currency"
-    FROM "tblInvoice" i
-    INNER JOIN "tblwork" w ON w."workid" = i."workid"
-    INNER JOIN "tblpatients" p ON w."PersonID" = p."PersonID"
-    WHERE i."Dateofpayment" = ${date}::date
+      p."patient_name"                                              AS "patient_name",
+      i."invoice_id"                                                AS "invoice_id",
+      to_char(i."amount_paid", 'FM999,999,999,990')                 AS "amount_paid",
+      i."date_of_payment"                                            AS "date_of_payment",
+      i."work_id"                                                   AS "work_id",
+      to_char(i."sys_start_time", 'YYYY-MM-DD"T"HH24:MI:SS"Z"')      AS "sys_start_time",
+      i."change"                                                   AS "change",
+      w."currency"                                                 AS "currency"
+    FROM "invoices" i
+    INNER JOIN "works" w ON w."work_id" = i."work_id"
+    INNER JOIN "patients" p ON w."person_id" = p."person_id"
+    WHERE i."date_of_payment" = ${date}::date
   `.execute(getKysely());
 
   return rows;

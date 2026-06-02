@@ -31,17 +31,17 @@ interface EmailConfig {
  * Database option row
  */
 interface OptionRow {
-  OptionName: string;
-  OptionValue: string;
+  option_name: string;
+  option_value: string;
 }
 
 /**
  * Employee recipient
  */
 interface EmployeeRecipient {
-  ID: number;
-  employeeName: string;
-  Email: string;
+  id: number;
+  employee_name: string;
+  email: string;
 }
 
 /**
@@ -104,16 +104,16 @@ class EmailService {
     try {
       const db = getKysely();
       const { rows: results } = await sql<OptionRow>`
-                SELECT "OptionName", "OptionValue"
-                FROM "tbloptions"
-                WHERE "OptionName" LIKE 'EMAIL_%'
+                SELECT "option_name", "option_value"
+                FROM "options"
+                WHERE "option_name" LIKE 'EMAIL_%'
             `.execute(db);
 
       // Convert array to config object
       const config: EmailConfig = {};
       results.forEach((row) => {
-        const key = row.OptionName.replace('EMAIL_', '').toLowerCase();
-        config[key] = row.OptionValue;
+        const key = row.option_name.replace('EMAIL_', '').toLowerCase();
+        config[key] = row.option_value;
       });
 
       // Parse port as integer
@@ -173,12 +173,12 @@ class EmailService {
       // Query employees with receiveEmail = true and valid email addresses
       const db = getKysely();
       const { rows: recipients } = await sql<EmployeeRecipient>`
-                SELECT e."ID", e."employeeName", e."Email"
-                FROM "tblEmployees" e
-                WHERE e."receiveEmail" = true
-                  AND e."Email" IS NOT NULL
-                  AND e."Email" != ''
-                ORDER BY e."employeeName"
+                SELECT e."id", e."employee_name", e."email"
+                FROM "employees" e
+                WHERE e."receive_email" = true
+                  AND e."email" IS NOT NULL
+                  AND e."email" != ''
+                ORDER BY e."employee_name"
             `.execute(db);
 
       return recipients || [];
@@ -205,10 +205,10 @@ class EmailService {
       if (!recipients || options.useEmployeeRecipients !== false) {
         const employees = await this.getEmployeeRecipients();
         if (employees.length > 0) {
-          recipients = employees.map((emp) => emp.Email).join(', ');
+          recipients = employees.map((emp) => emp.email).join(', ');
           log.info('Sending email to employees', {
             count: employees.length,
-            names: employees.map((e) => e.employeeName).join(', '),
+            names: employees.map((e) => e.employee_name).join(', '),
           });
         } else if (!recipients) {
           throw new Error(
@@ -318,11 +318,11 @@ class EmailService {
 
           // Upsert: UPDATE first, INSERT only if no row matched (PG has no T-SQL MERGE).
           const res = await sql`
-            UPDATE "tbloptions" SET "OptionValue" = ${optionValue} WHERE "OptionName" = ${optionName}
+            UPDATE "options" SET "option_value" = ${optionValue} WHERE "option_name" = ${optionName}
           `.execute(db);
           if (Number(res.numAffectedRows ?? 0n) === 0) {
             await sql`
-              INSERT INTO "tbloptions" ("OptionName", "OptionValue") VALUES (${optionName}, ${optionValue})
+              INSERT INTO "options" ("option_name", "option_value") VALUES (${optionName}, ${optionValue})
             `.execute(db);
           }
 

@@ -6,9 +6,9 @@ import Modal from './Modal';
 import styles from './PatientAppointments.module.css';
 
 interface PatientAppointment {
-    appointmentID: number;
-    AppDate: string;
-    AppDetail?: string;
+    appointment_id: number;
+    app_date: string;
+    app_detail?: string;
     DrName?: string;
 }
 
@@ -55,7 +55,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
 
     const handleEdit = (appointment: PatientAppointment): void => {
         // Navigate to edit page with appointment data as state
-        navigate(`/patient/${personId}/edit-appointment/${appointment.appointmentID}`, {
+        navigate(`/patient/${personId}/edit-appointment/${appointment.appointment_id}`, {
             state: { appointment }
         });
     };
@@ -159,11 +159,11 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
             ) : (
                 <div className={styles.list}>
                     {appointments.map(appointment => {
-                        const isPast = isPastAppointment(appointment.AppDate);
+                        const isPast = isPastAppointment(appointment.app_date);
 
                         return (
                             <div
-                                key={appointment.appointmentID}
+                                key={appointment.appointment_id}
                                 className={cn(styles.card, isPast ? styles.past : styles.upcoming)}
                             >
                                 <div className={styles.main}>
@@ -172,10 +172,10 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
                                     </div>
                                     <div className={styles.details}>
                                         <div className={styles.date}>
-                                            {formatDateTime(appointment.AppDate)}
+                                            {formatDateTime(appointment.app_date)}
                                         </div>
                                         <div className={styles.type}>
-                                            {appointment.AppDetail || 'No details'}
+                                            {appointment.app_detail || 'No details'}
                                         </div>
                                         {appointment.DrName && (
                                             <div className={styles.doctor}>
@@ -196,7 +196,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
                                     )}
                                     <button
                                         className="btn-delete"
-                                        onClick={() => setDeleteConfirm(appointment.appointmentID)}
+                                        onClick={() => setDeleteConfirm(appointment.appointment_id)}
                                         title="Delete appointment"
                                     >
                                         Delete

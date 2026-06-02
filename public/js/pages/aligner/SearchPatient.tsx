@@ -6,10 +6,10 @@ import styles from './SearchPatient.module.css';
 
 interface AlignerPatient {
     workid: number;
-    PersonID: number;
-    PatientName?: string;
-    FirstName?: string;
-    LastName?: string;
+    person_id: number;
+    patient_name?: string;
+    first_name?: string;
+    last_name?: string;
     Phone?: string;
     WorkType?: string;
 }
@@ -68,7 +68,7 @@ const SearchPatient: React.FC = () => {
     };
 
     const formatPatientName = (patient: AlignerPatient): string => {
-        return patient.PatientName || `${patient.FirstName} ${patient.LastName}`;
+        return patient.patient_name || `${patient.first_name} ${patient.last_name}`;
     };
 
     return (
@@ -105,14 +105,14 @@ const SearchPatient: React.FC = () => {
                                 >
                                     <div className={styles.resultName}>
                                         {formatPatientName(patient)}
-                                        {patient.PatientName && patient.FirstName && (
+                                        {patient.patient_name && patient.first_name && (
                                             <span className={styles.resultNameSecondary}>
-                                                ({patient.FirstName} {patient.LastName})
+                                                ({patient.first_name} {patient.last_name})
                                             </span>
                                         )}
                                     </div>
                                     <div className={styles.resultMeta}>
-                                        <span><i className="fas fa-id-card"></i> {patient.PersonID}</span>
+                                        <span><i className="fas fa-id-card"></i> {patient.person_id}</span>
                                         <span><i className="fas fa-phone"></i> <PhoneDisplay phone={patient.Phone} />{!patient.Phone && 'N/A'}</span>
                                         <span><i className="fas fa-tooth"></i> {patient.WorkType}</span>
                                     </div>

@@ -5,7 +5,7 @@
  * the WebCeph system. Handles patient creation in WebCeph, image uploads,
  * and retrieval of WebCeph patient links and photo types.
  *
- * Note: Photo server routes are currently disabled as the photo-server.js
+ * note: Photo server routes are currently disabled as the photo-server.js
  * middleware file is missing. They are preserved here for future implementation.
  */
 
@@ -64,13 +64,13 @@ interface CreateWebCephPatientBody {
  * Request body for uploading image
  */
 interface UploadImageBody {
-  patientID: string;
+  patient_id: string;
   recordDate: string;
   targetClass: string;
 }
 
 /**
- * Route params for person ID
+ * Route params for person id
  */
 interface PersonIdParams {
   personId: string;
@@ -136,14 +136,14 @@ router.post('/webceph/create-patient', async (req: Request<object, object, Creat
     // Update local database with WebCeph information
     const db = getKysely();
     await sql`
-      UPDATE "tblpatients"
-      SET "WebCephPatientID" = ${result.webcephPatientId},
-          "WebCephLink" = ${result.link},
-          "WebCephCreatedAt" = LOCALTIMESTAMP
-      WHERE "PersonID" = ${personId}
+      UPDATE "patients"
+      SET "web_ceph_patient_id" = ${result.webcephPatientId},
+          "web_ceph_link" = ${result.link},
+          "web_ceph_created_at" = LOCALTIMESTAMP
+      WHERE "person_id" = ${personId}
     `.execute(db);
 
-    log.info(`[WebCeph] Patient created successfully for PersonID: ${personId}`);
+    log.info(`[WebCeph] Patient created successfully for person_id: ${personId}`);
 
     res.json({
       success: true,
@@ -167,7 +167,7 @@ router.post('/webceph/create-patient', async (req: Request<object, object, Creat
  */
 router.post('/webceph/upload-image', uploadImage, async (req: FileRequest, res: Response): Promise<void> => {
   try {
-    const { patientID, recordDate, targetClass } = req.body;
+    const { patient_id, recordDate, targetClass } = req.body;
 
     if (!req.file) {
       ErrorResponses.missingParameter(res, 'image');
@@ -176,7 +176,7 @@ router.post('/webceph/upload-image', uploadImage, async (req: FileRequest, res: 
 
     // Step 1: Create a new record for this date (if it doesn't exist)
     try {
-      await webcephService.addNewRecord(patientID, recordDate);
+      await webcephService.addNewRecord(patient_id, recordDate);
       log.info(`[WebCeph] Record created or already exists`);
     } catch (error) {
       const err = error as Error;
@@ -189,7 +189,7 @@ router.post('/webceph/upload-image', uploadImage, async (req: FileRequest, res: 
 
     // Step 2: Upload the image to the record
     const uploadData = {
-      patientID,
+      patientID: patient_id,
       recordHash: recordDate,
       targetClass,
       image: req.file.buffer,
@@ -208,7 +208,7 @@ router.post('/webceph/upload-image', uploadImage, async (req: FileRequest, res: 
     // Upload to WebCeph
     const result = await webcephService.uploadImage(uploadData);
 
-    log.info(`[WebCeph] Image uploaded successfully for patient: ${patientID}`);
+    log.info(`[WebCeph] Image uploaded successfully for patient: ${patient_id}`);
 
     res.json({
       success: true,
@@ -240,9 +240,9 @@ router.get('/webceph/patient-link/:personId', async (req: Request<PersonIdParams
 
     const db = getKysely();
     const { rows: result } = await sql<WebCephPatientLink>`
-      SELECT "WebCephPatientID" AS "webcephPatientId", "WebCephLink" AS "link", "WebCephCreatedAt" AS "createdAt"
-      FROM "tblpatients"
-      WHERE "PersonID" = ${parseInt(personId)}
+      SELECT "web_ceph_patient_id" AS "webcephPatientId", "web_ceph_link" AS "link", "web_ceph_created_at" AS "createdAt"
+      FROM "patients"
+      WHERE "person_id" = ${parseInt(personId)}
     `.execute(db);
 
     if (!result || result.length === 0 || !result[0].webcephPatientId) {

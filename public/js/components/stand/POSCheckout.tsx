@@ -3,8 +3,8 @@ import { formatNumber, parseMoneyInput } from '../../utils/formatters';
 import styles from './POSCheckout.module.css';
 
 interface PatientSearchResult {
-  PersonID: number;
-  PatientName: string;
+  person_id: number;
+  patient_name: string;
 }
 
 interface POSCheckoutProps {
@@ -125,7 +125,7 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
 
   const handlePatientSelect = useCallback((patient: PatientSearchResult) => {
     setSelectedPatient(patient);
-    setPatientQuery(patient.PatientName);
+    setPatientQuery(patient.patient_name);
     setShowPatientDropdown(false);
     setPatientResults([]);
   }, []);
@@ -159,7 +159,7 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
     onConfirm(
       amountPaid,
       paymentMethod,
-      selectedPatient?.PersonID ?? null,
+      selectedPatient?.person_id ?? null,
       customerNote.trim() || null
     );
   }, [canConfirm, amountPaid, paymentMethod, selectedPatient, customerNote, onConfirm]);
@@ -265,19 +265,19 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
         </div>
         {selectedPatient && (
           <span className={styles.patientLinked}>
-            <i className="fas fa-check-circle" /> Linked: {selectedPatient.PatientName} (#{selectedPatient.PersonID})
+            <i className="fas fa-check-circle" /> Linked: {selectedPatient.patient_name} (#{selectedPatient.person_id})
           </span>
         )}
         {showPatientDropdown && (
           <ul className={styles.patientDropdown}>
             {patientResults.map((p) => (
               <li
-                key={p.PersonID}
+                key={p.person_id}
                 className={styles.patientDropdownItem}
                 onClick={() => handlePatientSelect(p)}
               >
-                <span>{p.PatientName}</span>
-                <span className={styles.patientId}>#{p.PersonID}</span>
+                <span>{p.patient_name}</span>
+                <span className={styles.patientId}>#{p.person_id}</span>
               </li>
             ))}
           </ul>

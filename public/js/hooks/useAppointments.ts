@@ -14,9 +14,9 @@ export interface AppointmentStats {
  * Appointment data from API
  */
 export interface Appointment {
-  AppointmentID: number;
+  appointment_id: number;
   PatientID: number;
-  PatientName?: string;
+  patient_name?: string;
   AppsDate?: string;
   AppsTime?: string;
   State?: string;
@@ -179,7 +179,7 @@ export function useAppointments(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            appointmentID: appointmentId,
+            appointment_id: appointmentId,
             state: 'Present',
             time: currentTime,
           }),
@@ -227,7 +227,7 @@ export function useAppointments(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            appointmentID: appointmentId,
+            appointment_id: appointmentId,
             state: 'Seated',
             time: currentTime,
           }),
@@ -275,7 +275,7 @@ export function useAppointments(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            appointmentID: appointmentId,
+            appointment_id: appointmentId,
             state: 'Dismissed',
             time: currentTime,
           }),
@@ -326,7 +326,7 @@ export function useAppointments(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            appointmentID: appointmentId,
+            appointment_id: appointmentId,
             state: stateToUndo,
           }),
         });

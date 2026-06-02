@@ -81,7 +81,7 @@ async function streamFileFallback(
   const st = await fsp.stat(abs);
   const total = st.size;
 
-  res.setHeader('Content-Type', mime);
+  res.setHeader('Content-type', mime);
   res.setHeader('Accept-Ranges', 'bytes');
   res.setHeader('Last-Modified', st.mtime.toUTCString());
   if (download) {
@@ -150,7 +150,7 @@ router.get(
         const width = parseInt(thumbRaw, 10);
         const thumbPath = await getThumbnail(personId, relPath, isNaN(width) ? 240 : width);
         log.info('[Files] thumb', { userId: req.session?.userId, personId, relPath, width });
-        res.setHeader('Content-Type', 'image/webp');
+        res.setHeader('Content-type', 'image/webp');
         res.sendFile(
           thumbPath,
           // `dotfiles: 'allow'` is required — the cache lives under a dot dir
@@ -191,7 +191,7 @@ router.get(
       if (download) {
         res.download(abs, filename, sendOpts, onDone);
       } else {
-        res.setHeader('Content-Type', mime);
+        res.setHeader('Content-type', mime);
         res.sendFile(abs, sendOpts, onDone);
       }
     } catch (err) {
@@ -245,7 +245,7 @@ router.get(
           mtimeMs,
           isNaN(width) ? 240 : width
         );
-        res.setHeader('Content-Type', 'image/webp');
+        res.setHeader('Content-type', 'image/webp');
         res.sendFile(
           thumbPath,
           { dotfiles: 'allow', cacheControl: true, lastModified: true, maxAge: 7 * 24 * 60 * 60 * 1000 },
@@ -273,7 +273,7 @@ router.get(
       if (download) {
         res.download(abs, name, sendOpts, onDone);
       } else {
-        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Content-type', 'image/jpeg');
         res.sendFile(abs, sendOpts, onDone);
       }
     } catch (err) {

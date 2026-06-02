@@ -54,7 +54,7 @@ interface DailyInvoicesQuery {
 }
 
 /**
- * Currency totals structure
+ * currency totals structure
  */
 interface CurrencyTotals {
   IQD: number;
@@ -328,7 +328,7 @@ router.get('/daily-invoices', async (req: Request<object, object, object, DailyI
     // Delegate validation to service layer
     validateDate(date);
 
-    // Invoices paid on this date (SysStartTime already a UTC '…Z' ISO string from the query).
+    // Invoices paid on this date (sys_start_time already a UTC '…Z' ISO string from the query).
     const baseInvoices = await getDailyInvoices(date);
 
     // Delegate enrichment to service layer

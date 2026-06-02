@@ -3,7 +3,7 @@
  *
  * This module handles all visit-related API endpoints including:
  * - Visit management (CRUD operations)
- * - Wire tracking (upper/lower wire management)
+ * - wire tracking (upper/lower wire management)
  * - Visit summaries and details
  * - Work-specific visit operations
  */
@@ -38,20 +38,20 @@ interface VisitQueryParams {
 }
 
 interface AddVisitByWorkBody {
-  WorkID: number;
-  VisitDate: string;
-  UpperWireID?: number;
-  LowerWireID?: number;
-  Others?: string;
+  work_id: number;
+  visit_date: string;
+  upper_wire_id?: number;
+  lower_wire_id?: number;
+  others?: string;
   Next?: string;
 }
 
 interface UpdateVisitByWorkBody {
   visitId: number;
-  VisitDate: string;
-  UpperWireID?: number;
-  LowerWireID?: number;
-  Others?: string;
+  visit_date: string;
+  upper_wire_id?: number;
+  lower_wire_id?: number;
+  others?: string;
   Next?: string;
 }
 
@@ -66,7 +66,7 @@ interface DeleteVisitByWorkBody {
 /**
  * GET /visitsSummary
  * Get summary of all visits for a specific patient
- * Query params: PID (Patient ID)
+ * Query params: PID (Patient id)
  */
 router.get(
   '/visitsSummary',
@@ -97,7 +97,7 @@ router.get(
 /**
  * GET /getVisitDetailsByID
  * Get detailed information for a specific visit
- * Query params: VID (Visit ID)
+ * Query params: VID (Visit id)
  */
 router.get(
   '/getVisitDetailsByID',
@@ -126,7 +126,7 @@ router.get(
 );
 
 // ============================================================================
-// Wire Management Routes
+// wire Management Routes
 // ============================================================================
 
 /**
@@ -148,7 +148,7 @@ router.get(
 
 /**
  * GET /getlatestwires
- * Get latest wires (upper and lower) for a specific work ID
+ * Get latest wires (upper and lower) for a specific work id
  * Query params: workId
  */
 router.get(
@@ -179,7 +179,7 @@ router.get(
 /**
  * GET /getLatestwire
  * Get latest wire for a specific patient
- * Query params: PID (Patient ID)
+ * Query params: PID (Patient id)
  */
 router.get(
   '/getLatestwire',
@@ -213,7 +213,7 @@ router.get(
 
 /**
  * GET /getvisitsbywork
- * Get all visits for a specific work ID
+ * Get all visits for a specific work id
  * Query params: workId
  */
 router.get(
@@ -243,7 +243,7 @@ router.get(
 
 /**
  * GET /getvisitbyid
- * Get a single visit by ID
+ * Get a single visit by id
  * Query params: visitId
  */
 router.get(
@@ -265,7 +265,7 @@ router.get(
       }
       res.json(visit);
     } catch (error) {
-      log.error('Error fetching visit by ID:', error);
+      log.error('Error fetching visit by id:', error);
       ErrorResponses.internalError(
         res,
         'Failed to fetch visit',
@@ -278,7 +278,7 @@ router.get(
 /**
  * POST /addvisitbywork
  * Add a new visit for a specific work
- * Body: visitData (must include WorkID and VisitDate)
+ * Body: visitData (must include work_id and visit_date)
  */
 router.post(
   '/addvisitbywork',
@@ -288,20 +288,20 @@ router.post(
   ): Promise<void> => {
     try {
       const visitData = req.body;
-      if (!visitData.WorkID || !visitData.VisitDate) {
+      if (!visitData.work_id || !visitData.visit_date) {
         ErrorResponses.badRequest(
           res,
-          'Missing required fields: WorkID and VisitDate'
+          'Missing required fields: work_id and visit_date'
         );
         return;
       }
       // Convert string date to Date object for database query
       const visitDataWithDate = {
         ...visitData,
-        VisitDate: new Date(visitData.VisitDate)
+        visit_date: new Date(visitData.visit_date)
       };
       const result = await addVisitByWorkId(visitDataWithDate);
-      res.json({ success: true, visitId: result?.ID });
+      res.json({ success: true, visitId: result?.id });
     } catch (error) {
       log.error('Error adding visit:', error);
       ErrorResponses.internalError(res, 'Failed to add visit', error as Error);
@@ -312,7 +312,7 @@ router.post(
 /**
  * PUT /updatevisitbywork
  * Update a visit
- * Body: visitId, visitData (must include VisitDate)
+ * Body: visitId, visitData (must include visit_date)
  */
 router.put(
   '/updatevisitbywork',
@@ -322,17 +322,17 @@ router.put(
   ): Promise<void> => {
     try {
       const { visitId, ...visitData } = req.body;
-      if (!visitId || !visitData.VisitDate) {
+      if (!visitId || !visitData.visit_date) {
         ErrorResponses.badRequest(
           res,
-          'Missing required fields: visitId and VisitDate'
+          'Missing required fields: visitId and visit_date'
         );
         return;
       }
       // Convert string date to Date object for database query
       const visitDataWithDate = {
         ...visitData,
-        VisitDate: new Date(visitData.VisitDate)
+        visit_date: new Date(visitData.visit_date)
       };
       await updateVisitByWorkId(visitId, visitDataWithDate);
       res.json({ success: true });

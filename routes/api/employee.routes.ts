@@ -35,44 +35,44 @@ interface EmployeeQuery {
  * Employee record from database
  */
 interface Employee {
-  ID: number;
-  employeeName: string;
-  Position: number;
-  PositionName: string | null;
-  Email: string | null;
-  Phone: string | null;
-  Percentage: boolean;
-  receiveEmail: boolean;
-  getAppointments: boolean;
-  SortOrder: number;
-  AppointmentColor: string | null;
+  id: number;
+  employee_name: string;
+  position: number;
+  position_name: string | null;
+  email: string | null;
+  phone: string | null;
+  percentage: boolean;
+  receive_email: boolean;
+  get_appointments: boolean;
+  sort_order: number;
+  appointment_color: string | null;
 }
 
 /**
- * Position record from database
+ * position record from database
  */
-interface Position {
-  ID: number;
-  PositionName: string;
+interface position {
+  id: number;
+  position_name: string;
 }
 
 /**
  * Request body for creating/updating employee
  */
 interface EmployeeBody {
-  employeeName: string;
-  Position: number;
-  Email?: string;
-  Phone?: string;
-  Percentage?: boolean;
+  employee_name: string;
+  position: number;
+  email?: string;
+  phone?: string;
+  percentage?: boolean;
   receiveEmail?: boolean;
   getAppointments?: boolean;
-  SortOrder?: number;
-  AppointmentColor?: string | null;
+  sort_order?: number;
+  appointment_color?: string | null;
 }
 
 /**
- * Route params for employee by ID
+ * Route params for employee by id
  */
 interface EmployeeParams {
   id: string;
@@ -83,10 +83,10 @@ interface EmployeeParams {
  * Get all employees with flexible filtering
  *
  * Query Parameters (all optional):
- * - getAppointments: 'true' to filter only employees who can receive appointments
- * - receiveEmail: 'true' to filter only employees who receive email notifications
+ * - get_appointments: 'true' to filter only employees who can receive appointments
+ * - receive_email: 'true' to filter only employees who receive email notifications
  * - percentage: 'true' to filter only employees with percentage-based compensation
- * - position: position ID or name to filter by specific position
+ * - position: position id or name to filter by specific position
  */
 router.get('/employees', async (req: Request<object, object, object, EmployeeQuery>, res: Response): Promise<void> => {
   try {
@@ -97,25 +97,25 @@ router.get('/employees', async (req: Request<object, object, object, EmployeeQue
     const conditions = [];
 
     if (getAppointments === 'true') {
-      conditions.push(sql`e."getAppointments" = true`);
+      conditions.push(sql`e."get_appointments" = true`);
     }
 
     if (receiveEmail === 'true') {
-      conditions.push(sql`e."receiveEmail" = true`);
-      conditions.push(sql`e."Email" IS NOT NULL`);
-      conditions.push(sql`e."Email" != ''`);
+      conditions.push(sql`e."receive_email" = true`);
+      conditions.push(sql`e."email" IS NOT NULL`);
+      conditions.push(sql`e."email" != ''`);
     }
 
     if (percentage === 'true') {
-      conditions.push(sql`e."Percentage" = true`);
+      conditions.push(sql`e."percentage" = true`);
     }
 
     if (position) {
-      // Support filtering by position name or ID
+      // Support filtering by position name or id
       if (isNaN(Number(position))) {
-        conditions.push(sql`p."PositionName" = ${position}`);
+        conditions.push(sql`p."position_name" = ${position}`);
       } else {
-        conditions.push(sql`e."Position" = ${parseInt(position)}`);
+        conditions.push(sql`e."position" = ${parseInt(position)}`);
       }
     }
 
@@ -124,11 +124,11 @@ router.get('/employees', async (req: Request<object, object, object, EmployeeQue
       : sql``;
 
     const { rows: employees } = await sql<Employee>`
-      SELECT e."ID", e."employeeName", e."Position", p."PositionName", e."Email", e."Phone", e."Percentage", e."receiveEmail", e."getAppointments", e."SortOrder", e."AppointmentColor"
-      FROM "tblEmployees" e
-      LEFT JOIN "tblPositions" p ON e."Position" = p."ID"
+      SELECT e."id", e."employee_name", e."position", p."position_name", e."email", e."phone", e."percentage", e."receive_email", e."get_appointments", e."sort_order", e."appointment_color"
+      FROM "employees" e
+      LEFT JOIN "positions" p ON e."position" = p."id"
       ${whereClause}
-      ORDER BY e."SortOrder", e."employeeName"
+      ORDER BY e."sort_order", e."employee_name"
     `.execute(db);
 
     res.json({
@@ -149,10 +149,10 @@ router.get('/employees', async (req: Request<object, object, object, EmployeeQue
 router.get('/positions', async (_req: Request, res: Response): Promise<void> => {
   try {
     const db = getKysely();
-    const { rows: positions } = await sql<Position>`
-      SELECT "ID", "PositionName"
-      FROM "tblPositions"
-      ORDER BY "PositionName"
+    const { rows: positions } = await sql<position>`
+      SELECT "id", "position_name"
+      FROM "positions"
+      ORDER BY "position_name"
     `.execute(db);
 
     res.json({
@@ -172,36 +172,36 @@ router.get('/positions', async (_req: Request, res: Response): Promise<void> => 
  */
 router.post('/employees', async (req: Request<object, object, EmployeeBody>, res: Response): Promise<void> => {
   try {
-    const { employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments, SortOrder, AppointmentColor } = req.body;
+    const { employee_name, position, email, phone, percentage, receiveEmail, getAppointments, sort_order, appointment_color } = req.body;
 
-    if (!employeeName || employeeName.trim() === '') {
+    if (!employee_name || employee_name.trim() === '') {
       ErrorResponses.badRequest(res, 'Employee name is required');
       return;
     }
 
-    if (!Position) {
-      ErrorResponses.badRequest(res, 'Position is required');
+    if (!position) {
+      ErrorResponses.badRequest(res, 'position is required');
       return;
     }
 
     // Check if email already exists (if provided)
-    if (Email && Email.trim() !== '') {
-      if (await employeeEmailExists(Email.trim())) {
+    if (email && email.trim() !== '') {
+      if (await employeeEmailExists(email.trim())) {
         ErrorResponses.badRequest(res, 'An employee with this email already exists');
         return;
       }
     }
 
     const newID = await createEmployee({
-      employeeName: employeeName.trim(),
-      Position,
-      Email: Email && Email.trim() !== '' ? Email.trim() : null,
-      Phone: Phone && Phone.trim() !== '' ? Phone.trim() : null,
-      Percentage: !!Percentage,
-      receiveEmail: !!receiveEmail,
-      getAppointments: !!getAppointments,
-      SortOrder: SortOrder !== undefined ? SortOrder : 999,
-      AppointmentColor: AppointmentColor && AppointmentColor.trim() !== '' ? AppointmentColor.trim() : null,
+      employee_name: employee_name.trim(),
+      position,
+      email: email && email.trim() !== '' ? email.trim() : null,
+      phone: phone && phone.trim() !== '' ? phone.trim() : null,
+      percentage: !!percentage,
+      receive_email: !!receiveEmail,
+      get_appointments: !!getAppointments,
+      sort_order: sort_order !== undefined ? sort_order : 999,
+      appointment_color: appointment_color && appointment_color.trim() !== '' ? appointment_color.trim() : null,
     });
 
     res.json({
@@ -223,36 +223,36 @@ router.post('/employees', async (req: Request<object, object, EmployeeBody>, res
 router.put('/employees/:id', async (req: Request<EmployeeParams, object, EmployeeBody>, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { employeeName, Position, Email, Phone, Percentage, receiveEmail, getAppointments, SortOrder, AppointmentColor } = req.body;
+    const { employee_name, position, email, phone, percentage, receiveEmail, getAppointments, sort_order, appointment_color } = req.body;
 
-    if (!employeeName || employeeName.trim() === '') {
+    if (!employee_name || employee_name.trim() === '') {
       ErrorResponses.badRequest(res, 'Employee name is required');
       return;
     }
 
-    if (!Position) {
-      ErrorResponses.badRequest(res, 'Position is required');
+    if (!position) {
+      ErrorResponses.badRequest(res, 'position is required');
       return;
     }
 
     // Check if email already exists for another employee (if provided)
-    if (Email && Email.trim() !== '') {
-      if (await employeeEmailExists(Email.trim(), parseInt(id))) {
+    if (email && email.trim() !== '') {
+      if (await employeeEmailExists(email.trim(), parseInt(id))) {
         ErrorResponses.badRequest(res, 'Another employee with this email already exists');
         return;
       }
     }
 
     await updateEmployee(parseInt(id), {
-      employeeName: employeeName.trim(),
-      Position,
-      Email: Email && Email.trim() !== '' ? Email.trim() : null,
-      Phone: Phone && Phone.trim() !== '' ? Phone.trim() : null,
-      Percentage: !!Percentage,
-      receiveEmail: !!receiveEmail,
-      getAppointments: !!getAppointments,
-      SortOrder: SortOrder !== undefined ? SortOrder : 999,
-      AppointmentColor: AppointmentColor && AppointmentColor.trim() !== '' ? AppointmentColor.trim() : null,
+      employee_name: employee_name.trim(),
+      position,
+      email: email && email.trim() !== '' ? email.trim() : null,
+      phone: phone && phone.trim() !== '' ? phone.trim() : null,
+      percentage: !!percentage,
+      receive_email: !!receiveEmail,
+      get_appointments: !!getAppointments,
+      sort_order: sort_order !== undefined ? sort_order : 999,
+      appointment_color: appointment_color && appointment_color.trim() !== '' ? appointment_color.trim() : null,
     });
 
     res.json({

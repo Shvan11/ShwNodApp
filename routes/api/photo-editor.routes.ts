@@ -144,7 +144,7 @@ router.post(
         let newFirst = firstName?.trim() ?? '';
         let newLast = lastName?.trim() ?? '';
 
-        // No name supplied by the client → try to auto-fill by romanizing the Arabic PatientName
+        // No name supplied by the client → try to auto-fill by romanizing the Arabic patient_name
         // with Gemini. Best-effort; if it's unconfigured or can't produce a clean Latin first+last
         // we fall through to asking the user.
         if (!newFirst || !newLast) {
@@ -201,7 +201,7 @@ router.post(
             }
             await updatePhotoDate(
               personId,
-              tpDescription === 'Initial' ? 'IPhotoDate' : 'FPhotoDate',
+              tpDescription === 'Initial' ? 'i_photo_date' : 'f_photo_date',
               parsedDate
             );
             log.info('[PhotoEditor] overrode tblwork photo date', {
@@ -214,9 +214,9 @@ router.post(
         }
       }
 
-      const { tpCode } = await findOrCreateNativeTimePoint(Number(personId), tpDescription, parsedDate);
-      log.info('[PhotoEditor] prepared timepoint', { personId, tpDescription, tpDate, tpCode });
-      res.json({ success: true, tpCode });
+      const { tp_code } = await findOrCreateNativeTimePoint(Number(personId), tpDescription, parsedDate);
+      log.info('[PhotoEditor] prepared timepoint', { personId, tpDescription, tpDate, tp_code });
+      res.json({ success: true, tp_code });
     } catch (err) {
       log.error('[PhotoEditor] prepare failed', { error: (err as Error).message });
       ErrorResponses.internalError(res, 'Failed to prepare timepoint', err as Error);
@@ -257,8 +257,8 @@ router.post(
         return;
       }
 
-      // Idempotent: resolve the authoritative tpCode + timePointId for (name, date).
-      const { tpCode, timePointId } = await findOrCreateNativeTimePoint(
+      // Idempotent: resolve the authoritative tp_code + timePointId for (name, date).
+      const { tp_code, timePointId } = await findOrCreateNativeTimePoint(
         Number(personId),
         tpName,
         parsedDate
@@ -270,14 +270,14 @@ router.post(
       // So we answer 202 the instant the timepoint is resolved and finish the slots
       // in the background; the open photos grid refetches when PHOTO_TIMEPOINT_RENDERED
       // reaches it over SSE.
-      res.status(202).json({ success: true, queued: true, tpCode });
+      res.status(202).json({ success: true, queued: true, tp_code });
 
       void processRenderJob({
         personId: Number(personId),
         tpName,
         tpDate,
         parsedDate,
-        tpCode,
+        tp_code,
         timePointId,
         slots,
         userId: req.session?.userId,
@@ -296,7 +296,7 @@ interface RenderJob {
   tpName: string;
   tpDate: string;
   parsedDate: Date;
-  tpCode: number;
+  tp_code: number;
   timePointId: number;
   slots: SlotSpecBody[];
   userId?: number;
@@ -310,7 +310,7 @@ interface RenderJob {
  * completion event. Wrapped so a stray error can't become an unhandledRejection.
  */
 async function processRenderJob(job: RenderJob): Promise<void> {
-  const { personId, tpName, tpDate, parsedDate, tpCode, timePointId, slots, userId } = job;
+  const { personId, tpName, tpDate, parsedDate, tp_code, timePointId, slots, userId } = job;
   const written: string[] = [];
   const warnings: string[] = [];
   const toTag: Array<{ view: string; sourceRelPath: string }> = [];
@@ -331,7 +331,7 @@ async function processRenderJob(job: RenderJob): Promise<void> {
 
         const filename = await renderSlotToWorking({
           personId,
-          tpCode,
+          tpCode: tp_code,
           view,
           sourceRelPath: slot.sourceRelPath,
           flipH: !!slot.flipH,
@@ -346,7 +346,7 @@ async function processRenderJob(job: RenderJob): Promise<void> {
           timePointId,
           personId,
           digits,
-          `${personId}0${tpCode}.I${digits}`, // stored image-file form (uppercase I)
+          `${personId}0${tp_code}.I${digits}`, // stored image-file form (uppercase I)
           parsedDate,
           null
         );
@@ -362,7 +362,7 @@ async function processRenderJob(job: RenderJob): Promise<void> {
       }
     }
 
-    // Tag each rendered original with its view so a later reopen can restore it
+    // tag each rendered original with its view so a later reopen can restore it
     // for re-editing (our filesystem alternative to Dolphin's .v originals).
     const folder = timepointFolderName(tpName, tpDate);
     if (folder) {
@@ -378,21 +378,21 @@ async function processRenderJob(job: RenderJob): Promise<void> {
     log.info('[PhotoEditor] render complete', {
       userId,
       personId,
-      tpCode,
+      tp_code,
       written: written.length,
       warnings: warnings.length,
     });
   } catch (err) {
     log.error('[PhotoEditor] background render job failed', {
       personId,
-      tpCode,
+      tp_code,
       error: (err as Error).message,
     });
   } finally {
     // Always announce completion so the grid refetches even on partial/total failure.
     wsEmitter?.emit(InternalEmitterEvents.PHOTO_TIMEPOINT_RENDERED, {
       personId,
-      tpCode,
+      tp_code,
       written: written.length,
       warnings: warnings.length,
     });
@@ -451,7 +451,7 @@ router.delete(
       log.info('[PhotoEditor] removed view', {
         userId: req.session?.userId,
         personId,
-        tpCode: tpCodeNum,
+        tp_code: tpCodeNum,
         view,
       });
       sendSuccess(res, { removed: view });

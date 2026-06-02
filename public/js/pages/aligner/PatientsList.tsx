@@ -4,16 +4,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import styles from './PatientsList.module.css';
 
 interface Doctor {
-    DrID: number | string;
-    DoctorName: string;
+    dr_id: number | string;
+    doctor_name: string;
 }
 
 interface Patient {
-    PersonID: number;
+    person_id: number;
     workid: number;
-    PatientName?: string;
-    FirstName?: string;
-    LastName?: string;
+    patient_name?: string;
+    first_name?: string;
+    last_name?: string;
     Phone?: string;
     TotalSets?: number;
     ActiveSets?: number;
@@ -45,11 +45,11 @@ const PatientsList: React.FC = () => {
                 const doctorData = await doctorResponse.json();
 
                 if (doctorData.success) {
-                    const foundDoctor = doctorData.doctors.find((d: Doctor) => d.DrID === parseInt(doctorId || ''));
-                    setDoctor(foundDoctor || { DrID: 0, DoctorName: 'Unknown Doctor' });
+                    const foundDoctor = doctorData.doctors.find((d: Doctor) => d.dr_id === parseInt(doctorId || ''));
+                    setDoctor(foundDoctor || { dr_id: 0, doctor_name: 'Unknown Doctor' });
                 }
             } else {
-                setDoctor({ DrID: 'all', DoctorName: 'All Doctors' });
+                setDoctor({ dr_id: 'all', doctor_name: 'All Doctors' });
             }
 
             // Load patients
@@ -79,7 +79,7 @@ const PatientsList: React.FC = () => {
     };
 
     const formatPatientName = (patient: Patient): string => {
-        return patient.PatientName || `${patient.FirstName} ${patient.LastName}`;
+        return patient.patient_name || `${patient.first_name} ${patient.last_name}`;
     };
 
     const getFilteredPatients = (): Patient[] => {
@@ -91,7 +91,7 @@ const PatientsList: React.FC = () => {
         return patients.filter(p => {
             const name = formatPatientName(p).toLowerCase();
             const phone = (p.Phone || '').toLowerCase();
-            const id = String(p.PersonID);
+            const id = String(p.person_id);
 
             return name.includes(query) || phone.includes(query) || id.includes(query);
         });
@@ -128,7 +128,7 @@ const PatientsList: React.FC = () => {
             <div className={styles.sectionHeader}>
                 <h2>
                     <i className="fas fa-user-md"></i>
-                    {doctor?.DoctorName === 'Admin' ? doctor.DoctorName : `Dr. ${doctor?.DoctorName}`}'s Patients
+                    {doctor?.doctor_name === 'Admin' ? doctor.doctor_name : `Dr. ${doctor?.doctor_name}`}'s Patients
                 </h2>
                 <div className={styles.sectionInfo}>
                     <span>{patients.length} patient{patients.length !== 1 ? 's' : ''}</span>
@@ -174,7 +174,7 @@ const PatientsList: React.FC = () => {
                 <div className={styles.patientsGrid}>
                     {getFilteredPatients().map((patient) => (
                         <div
-                            key={patient.PersonID}
+                            key={patient.person_id}
                             className={`${styles.patientCard} ${patient.UnreadDoctorNotes && patient.UnreadDoctorNotes > 0 ? styles.hasActivity : ''}`}
                             onClick={() => selectPatient(patient)}
                         >
@@ -187,7 +187,7 @@ const PatientsList: React.FC = () => {
                             <div className={styles.patientCardHeader}>
                                 <div className={styles.patientCardPhoto}>
                                     <img
-                                        src={`/DolImgs/${patient.PersonID}00.i13`}
+                                        src={`/DolImgs/${patient.person_id}00.i13`}
                                         alt={`${formatPatientName(patient)} - Smile`}
                                         onError={handleImageError}
                                     />
@@ -197,15 +197,15 @@ const PatientsList: React.FC = () => {
                                 </div>
                                 <div>
                                     <h3>{formatPatientName(patient)}</h3>
-                                    {patient.PatientName && patient.FirstName && (
+                                    {patient.patient_name && patient.first_name && (
                                         <p className={styles.patientCardSubtitle}>
-                                            {patient.FirstName} {patient.LastName}
+                                            {patient.first_name} {patient.last_name}
                                         </p>
                                     )}
                                 </div>
                             </div>
                             <div className={styles.patientCardMeta}>
-                                <span><i className="fas fa-id-card"></i> {patient.PersonID}</span>
+                                <span><i className="fas fa-id-card"></i> {patient.person_id}</span>
                                 <span><i className="fas fa-phone"></i> {patient.Phone || 'N/A'}</span>
                             </div>
                             <div className={styles.patientCardStats}>

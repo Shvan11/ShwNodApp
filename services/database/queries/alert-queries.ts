@@ -2,34 +2,34 @@
  * Alert-related database queries
  *
  * Migration Phase 4: translated to typed Kysely (PostgreSQL). Reads/writes
- * tblAlerts joined to tblAlertTypes. `IsActive` is a PG boolean (was a bit), so
- * the WHERE/SET use `true`/the passed boolean directly. `CreationDate` is a PG
+ * tblAlerts joined to tblAlertTypes. `is_active` is a PG boolean (was a bit), so
+ * the WHERE/SET use `true`/the passed boolean directly. `creation_date` is a PG
  * `timestamp` → parsed to a local Date by kysely.ts.
  */
 import { getKysely } from '../kysely.js';
 
-// Type definitions
+// type definitions
 interface Alert {
-  AlertID: number;
-  PersonID: number;
-  AlertTypeID: number;
+  alert_id: number;
+  person_id: number;
+  alert_type_id: number;
   AlertTypeName: string;
-  AlertSeverity: number;
-  AlertDetails: string | null;
-  CreationDate: Date;
-  IsActive: boolean;
+  alert_severity: number;
+  alert_details: string | null;
+  creation_date: Date;
+  is_active: boolean;
 }
 
 interface AlertType {
-  AlertTypeID: number;
-  TypeName: string;
+  alert_type_id: number;
+  type_name: string;
 }
 
 interface AlertData {
-  PersonID: number;
-  AlertTypeID: number;
-  AlertSeverity: number;
-  AlertDetails: string;
+  person_id: number;
+  alert_type_id: number;
+  alert_severity: number;
+  alert_details: string;
 }
 
 /**
@@ -38,20 +38,20 @@ interface AlertData {
 export async function getAlertsByPersonId(personId: number): Promise<Alert[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblAlerts as al')
-    .innerJoin('tblAlertTypes as at', 'al.AlertTypeID', 'at.AlertTypeID')
-    .where('al.PersonID', '=', personId)
-    .where('al.IsActive', '=', true)
-    .orderBy('al.CreationDate', 'desc')
+    .selectFrom('alerts as al')
+    .innerJoin('alert_types as at', 'al.alert_type_id', 'at.alert_type_id')
+    .where('al.person_id', '=', personId)
+    .where('al.is_active', '=', true)
+    .orderBy('al.creation_date', 'desc')
     .select([
-      'al.AlertID',
-      'al.PersonID',
-      'al.AlertTypeID',
-      'at.TypeName as AlertTypeName',
-      'al.AlertSeverity',
-      'al.AlertDetails',
-      'al.CreationDate',
-      'al.IsActive',
+      'al.alert_id',
+      'al.person_id',
+      'al.alert_type_id',
+      'at.type_name as AlertTypeName',
+      'al.alert_severity',
+      'al.alert_details',
+      'al.creation_date',
+      'al.is_active',
     ])
     .execute();
 }
@@ -62,12 +62,12 @@ export async function getAlertsByPersonId(personId: number): Promise<Alert[]> {
 export async function createAlert(alertData: AlertData): Promise<void> {
   const db = getKysely();
   await db
-    .insertInto('tblAlerts')
+    .insertInto('alerts')
     .values({
-      PersonID: alertData.PersonID,
-      AlertTypeID: alertData.AlertTypeID,
-      AlertSeverity: alertData.AlertSeverity,
-      AlertDetails: alertData.AlertDetails,
+      person_id: alertData.person_id,
+      alert_type_id: alertData.alert_type_id,
+      alert_severity: alertData.alert_severity,
+      alert_details: alertData.alert_details,
     })
     .execute();
 }
@@ -78,9 +78,9 @@ export async function createAlert(alertData: AlertData): Promise<void> {
 export async function setAlertStatus(alertId: number, isActive: boolean): Promise<void> {
   const db = getKysely();
   await db
-    .updateTable('tblAlerts')
-    .set({ IsActive: isActive })
-    .where('AlertID', '=', alertId)
+    .updateTable('alerts')
+    .set({ is_active: isActive })
+    .where('alert_id', '=', alertId)
     .execute();
 }
 
@@ -95,13 +95,13 @@ export async function updateAlert(
 ): Promise<void> {
   const db = getKysely();
   await db
-    .updateTable('tblAlerts')
+    .updateTable('alerts')
     .set({
-      AlertTypeID: alertTypeId,
-      AlertSeverity: alertSeverity,
-      AlertDetails: alertDetails,
+      alert_type_id: alertTypeId,
+      alert_severity: alertSeverity,
+      alert_details: alertDetails,
     })
-    .where('AlertID', '=', alertId)
+    .where('alert_id', '=', alertId)
     .execute();
 }
 
@@ -111,8 +111,8 @@ export async function updateAlert(
 export async function getAlertTypes(): Promise<AlertType[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblAlertTypes')
-    .select(['AlertTypeID', 'TypeName'])
-    .orderBy('TypeName')
+    .selectFrom('alert_types')
+    .select(['alert_type_id', 'type_name'])
+    .orderBy('type_name')
     .execute();
 }

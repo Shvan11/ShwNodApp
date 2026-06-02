@@ -4,16 +4,16 @@
  *
  * Migration Phase 4: translated to typed Kysely (PostgreSQL). This was a facade
  * bypasser (`withTransaction` + `new sql.Request(tx)`); the bulk path now runs on a
- * Kysely transaction via `withPgTransaction`. `OptionName` is `citext`, so the LIKE
+ * Kysely transaction via `withPgTransaction`. `option_name` is `citext`, so the LIKE
  * pattern match stays case-insensitive (matches the old Arabic_CI_AS column).
  */
 import { getKysely, withPgTransaction } from '../kysely.js';
 import { log } from '../../../utils/logger.js';
 
-// Type definitions
+// type definitions
 interface Option {
-  OptionName: string;
-  OptionValue: string | null;
+  option_name: string;
+  option_value: string | null;
 }
 
 interface BulkUpdateOption {
@@ -33,9 +33,9 @@ interface BulkUpdateResult {
 export async function getAllOptions(): Promise<Option[]> {
   try {
     return await getKysely()
-      .selectFrom('tbloptions')
-      .select(['OptionName', 'OptionValue'])
-      .orderBy('OptionName')
+      .selectFrom('options')
+      .select(['option_name', 'option_value'])
+      .orderBy('option_name')
       .execute();
   } catch (error) {
     log.error('Error fetching all options', { error: (error as Error).message });
@@ -49,12 +49,12 @@ export async function getAllOptions(): Promise<Option[]> {
 export async function getOption(optionName: string): Promise<string | null> {
   try {
     const row = await getKysely()
-      .selectFrom('tbloptions')
-      .select('OptionValue')
-      .where('OptionName', '=', optionName)
+      .selectFrom('options')
+      .select('option_value')
+      .where('option_name', '=', optionName)
       .executeTakeFirst();
 
-    return row ? row.OptionValue : null;
+    return row ? row.option_value : null;
   } catch (error) {
     log.error('Error fetching option', { error: (error as Error).message });
     throw error;
@@ -67,9 +67,9 @@ export async function getOption(optionName: string): Promise<string | null> {
 export async function updateOption(optionName: string, optionValue: string): Promise<boolean> {
   try {
     const result = await getKysely()
-      .updateTable('tbloptions')
-      .set({ OptionValue: optionValue })
-      .where('OptionName', '=', optionName)
+      .updateTable('options')
+      .set({ option_value: optionValue })
+      .where('option_name', '=', optionName)
       .executeTakeFirst();
 
     return Number(result.numUpdatedRows) > 0;
@@ -85,10 +85,10 @@ export async function updateOption(optionName: string, optionValue: string): Pro
 export async function getOptionsByPattern(pattern: string): Promise<Option[]> {
   try {
     return await getKysely()
-      .selectFrom('tbloptions')
-      .select(['OptionName', 'OptionValue'])
-      .where('OptionName', 'like', pattern)
-      .orderBy('OptionName')
+      .selectFrom('options')
+      .select(['option_name', 'option_value'])
+      .where('option_name', 'like', pattern)
+      .orderBy('option_name')
       .execute();
   } catch (error) {
     log.error('Error fetching options by pattern', { error: (error as Error).message });
@@ -110,9 +110,9 @@ export async function bulkUpdateOptions(options: BulkUpdateOption[]): Promise<Bu
     await withPgTransaction(async (trx) => {
       for (const option of options) {
         const result = await trx
-          .updateTable('tbloptions')
-          .set({ OptionValue: option.value })
-          .where('OptionName', '=', option.name)
+          .updateTable('options')
+          .set({ option_value: option.value })
+          .where('option_name', '=', option.name)
           .executeTakeFirst();
 
         if (Number(result.numUpdatedRows) > 0) {

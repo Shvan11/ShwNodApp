@@ -28,15 +28,15 @@ import { log } from '../../utils/logger.js';
  * Appointment data from database
  */
 interface AppointmentData {
-  appointmentID: number | null;
-  PersonID: number | null;
-  AppDetail: string;
-  AppDay: string;
-  PatientType: string;
-  PatientName: string;
-  Phone: string;
+  appointment_id: number | null;
+  person_id: number | null;
+  app_detail: string;
+  app_day: string;
+  patient_type: string;
+  patient_name: string;
+  phone: string;
   apptime: string;
-  employeeName: string;
+  employee_name: string;
 }
 
 /**
@@ -142,9 +142,9 @@ const TABLE_CONFIG = {
   COLUMNS: [
     { key: 'time', label: 'Time', width: 70 },
     { key: 'patient', label: 'Patient Name', width: 160, align: 'center' },
-    { key: 'phone', label: 'Phone', width: 110 },
-    { key: 'type', label: 'Type', width: 90 },
-    { key: 'detail', label: 'Detail', width: 65 },
+    { key: 'phone', label: 'phone', width: 110 },
+    { key: 'type', label: 'type', width: 90 },
+    { key: 'detail', label: 'detail', width: 65 },
   ] as ColumnConfig[],
 };
 
@@ -456,7 +456,7 @@ class AppointmentPDFGenerator {
 
     doc.moveDown(0.5);
 
-    // Report Title
+    // Report title
     doc.fontSize(TYPOGRAPHY.FONTS.TITLE_SIZE).text(this.reportTitle, { align: 'center' });
 
     doc.moveDown(0.5);
@@ -661,7 +661,7 @@ class AppointmentPDFGenerator {
     });
 
     // Patient Name column (with RTL support for Arabic)
-    const patientName = safeString(appointment.PatientName);
+    const patientName = safeString(appointment.patient_name);
     const isArabicName = containsArabic(patientName);
 
     doc.text(patientName, COLUMN_POSITIONS.patient, y, {
@@ -671,22 +671,22 @@ class AppointmentPDFGenerator {
       ...textOptions,
     });
 
-    // Phone column
-    doc.text(safeString(appointment.Phone), COLUMN_POSITIONS.phone, y, {
+    // phone column
+    doc.text(safeString(appointment.phone), COLUMN_POSITIONS.phone, y, {
       width: TABLE_CONFIG.COLUMNS[2].width,
       align: 'left',
       ...textOptions,
     });
 
-    // Patient Type column
-    doc.text(safeString(appointment.PatientType), COLUMN_POSITIONS.type, y, {
+    // Patient type column
+    doc.text(safeString(appointment.patient_type), COLUMN_POSITIONS.type, y, {
       width: TABLE_CONFIG.COLUMNS[3].width,
       align: 'left',
       ...textOptions,
     });
 
-    // Detail column
-    doc.text(safeString(appointment.AppDetail), COLUMN_POSITIONS.detail, y, {
+    // detail column
+    doc.text(safeString(appointment.app_detail), COLUMN_POSITIONS.detail, y, {
       width: TABLE_CONFIG.COLUMNS[4].width,
       align: 'left',
       ...textOptions,

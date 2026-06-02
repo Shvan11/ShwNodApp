@@ -44,7 +44,7 @@ interface CalendarSlotData {
   calendarDate: string;
   dayName: string;
   dayOfWeek: number;
-  appointmentID: number | null;
+  appointment_id: number | null;
   appDetail: string | null;
   drID: number | null;
   patientName: string | null;
@@ -60,10 +60,10 @@ interface TimeSlot {
 }
 
 interface Holiday {
-  ID: number;
-  Holidaydate: Date | string;
-  HolidayName: string;
-  Description: string;
+  id: number;
+  holiday_date: Date | string;
+  holiday_name: string;
+  description: string;
 }
 
 interface SlotInfo {
@@ -73,15 +73,15 @@ interface SlotInfo {
 }
 
 interface AppointmentInfo {
-  appointmentID: number;
+  appointment_id: number;
   appDetail: string | null;
   drID: number | null;
   patientName: string | null;
   personID: number | null;
   slotStatus?: string;
   slotDateTime?: string;
-  AppDate?: string;
-  PersonID?: number | null;
+  app_date?: string;
+  person_id?: number | null;
   time?: string;
 }
 
@@ -138,7 +138,7 @@ router.get(
       const weekEnd = getWeekEnd(weekStart);
 
       const filterMsg = doctorId
-        ? ` (filtered by doctor ID: ${doctorId})`
+        ? ` (filtered by doctor id: ${doctorId})`
         : '';
       log.info(
         `📅 Fetching calendar data for week: ${weekStart} to ${weekEnd}${filterMsg}`
@@ -146,12 +146,12 @@ router.get(
 
       // Fetch max appointments per slot setting
       const db = getKysely();
-      const { rows: maxAppointmentsSetting } = await sql<{ OptionValue: string | null }>`
-        SELECT "OptionValue" FROM "tbloptions" WHERE "OptionName" = ${'MaxAppointmentsPerSlot'}
+      const { rows: maxAppointmentsSetting } = await sql<{ option_value: string | null }>`
+        SELECT "option_value" FROM "options" WHERE "option_name" = ${'MaxAppointmentsPerSlot'}
       `.execute(db);
       const maxAppointmentsPerSlot =
-        maxAppointmentsSetting.length > 0 && maxAppointmentsSetting[0].OptionValue != null
-          ? parseInt(maxAppointmentsSetting[0].OptionValue, 10)
+        maxAppointmentsSetting.length > 0 && maxAppointmentsSetting[0].option_value != null
+          ? parseInt(maxAppointmentsSetting[0].option_value, 10)
           : 3; // Default to 3 if not set
 
       log.info(`⚙️ Max appointments per slot: ${maxAppointmentsPerSlot}`);
@@ -170,8 +170,8 @@ router.get(
       const holidays = await getHolidaysInRange(weekStart, weekEnd);
       const holidayMap = new Map<string, Holiday>(
         holidays.map((h) => {
-          // Holidaydate arrives as a 'YYYY-MM-DD' string from the pg date parser.
-          const dateStr = String(h.Holidaydate).split('T')[0];
+          // holiday_date arrives as a 'YYYY-MM-DD' string from the pg date parser.
+          const dateStr = String(h.holiday_date).split('T')[0];
           return [dateStr, h] as [string, Holiday];
         })
       );
@@ -236,7 +236,7 @@ router.get(
       const monthEnd = getMonthEnd(new Date(date));
 
       const filterMsg = doctorId
-        ? ` (filtered by doctor ID: ${doctorId})`
+        ? ` (filtered by doctor id: ${doctorId})`
         : '';
       log.info(
         `📅 Fetching monthly calendar data: ${gridStart} to ${gridEnd}${filterMsg}`
@@ -244,12 +244,12 @@ router.get(
 
       // Fetch max appointments per slot setting
       const db = getKysely();
-      const { rows: maxAppointmentsSetting } = await sql<{ OptionValue: string | null }>`
-        SELECT "OptionValue" FROM "tbloptions" WHERE "OptionName" = ${'MaxAppointmentsPerSlot'}
+      const { rows: maxAppointmentsSetting } = await sql<{ option_value: string | null }>`
+        SELECT "option_value" FROM "options" WHERE "option_name" = ${'MaxAppointmentsPerSlot'}
       `.execute(db);
       const maxAppointmentsPerSlot =
-        maxAppointmentsSetting.length > 0 && maxAppointmentsSetting[0].OptionValue != null
-          ? parseInt(maxAppointmentsSetting[0].OptionValue, 10)
+        maxAppointmentsSetting.length > 0 && maxAppointmentsSetting[0].option_value != null
+          ? parseInt(maxAppointmentsSetting[0].option_value, 10)
           : 3;
 
       log.info(`⚙️ Max appointments per slot: ${maxAppointmentsPerSlot}`);
@@ -268,8 +268,8 @@ router.get(
       const holidays = await getHolidaysInRange(gridStart, gridEnd);
       const holidayMap = new Map<string, Holiday>(
         holidays.map((h) => {
-          // Holidaydate arrives as a 'YYYY-MM-DD' string from the pg date parser.
-          const dateStr = String(h.Holidaydate).split('T')[0];
+          // holiday_date arrives as a 'YYYY-MM-DD' string from the pg date parser.
+          const dateStr = String(h.holiday_date).split('T')[0];
           return [dateStr, h] as [string, Holiday];
         })
       );
@@ -377,13 +377,13 @@ router.get(
       log.info('🕐 Fetching time slots from tbltimes');
 
       const db = getKysely();
-      const { rows } = await sql<{ TimeID: number; MyTime: string | null }>`
-        SELECT "TimeID", "MyTime" FROM "tbltimes" ORDER BY "TimeID"
+      const { rows } = await sql<{ time_id: number; my_time: string | null }>`
+        SELECT "time_id", "my_time" FROM "times" ORDER BY "time_id"
       `.execute(db);
       const timeSlots: TimeSlot[] = rows.map((row) => ({
-        timeID: row.TimeID,
-        timeSlot: row.MyTime as string,
-        formattedTime: formatTimeForDisplay(row.MyTime)
+        timeID: row.time_id,
+        timeSlot: row.my_time as string,
+        formattedTime: formatTimeForDisplay(row.my_time)
       }));
 
       log.info(`✅ Retrieved ${timeSlots.length} time slots`);
@@ -544,12 +544,12 @@ router.get(
 
       // Fetch max appointments per slot setting
       const db = getKysely();
-      const { rows: maxAppointmentsSetting } = await sql<{ OptionValue: string | null }>`
-        SELECT "OptionValue" FROM "tbloptions" WHERE "OptionName" = ${'MaxAppointmentsPerSlot'}
+      const { rows: maxAppointmentsSetting } = await sql<{ option_value: string | null }>`
+        SELECT "option_value" FROM "options" WHERE "option_name" = ${'MaxAppointmentsPerSlot'}
       `.execute(db);
       const maxAppointmentsPerSlot =
-        maxAppointmentsSetting.length > 0 && maxAppointmentsSetting[0].OptionValue != null
-          ? parseInt(maxAppointmentsSetting[0].OptionValue, 10)
+        maxAppointmentsSetting.length > 0 && maxAppointmentsSetting[0].option_value != null
+          ? parseInt(maxAppointmentsSetting[0].option_value, 10)
           : 3;
 
       // Ensure calendar has enough future dates
@@ -649,12 +649,12 @@ router.get(
 
       // Fetch max appointments per slot setting
       const db = getKysely();
-      const { rows: maxAppointmentsSetting } = await sql<{ OptionValue: string | null }>`
-        SELECT "OptionValue" FROM "tbloptions" WHERE "OptionName" = ${'MaxAppointmentsPerSlot'}
+      const { rows: maxAppointmentsSetting } = await sql<{ option_value: string | null }>`
+        SELECT "option_value" FROM "options" WHERE "option_name" = ${'MaxAppointmentsPerSlot'}
       `.execute(db);
       const maxAppointmentsPerSlot =
-        maxAppointmentsSetting.length > 0 && maxAppointmentsSetting[0].OptionValue != null
-          ? parseInt(maxAppointmentsSetting[0].OptionValue, 10)
+        maxAppointmentsSetting.length > 0 && maxAppointmentsSetting[0].option_value != null
+          ? parseInt(maxAppointmentsSetting[0].option_value, 10)
           : 3;
 
       // Ensure calendar has enough future dates
@@ -670,12 +670,12 @@ router.get(
         { id: number; name: string; description: string | null }
       > = {};
       holidays.forEach((h) => {
-        // Holidaydate arrives as a 'YYYY-MM-DD' string from the pg date parser.
-        const dateStr = String(h.Holidaydate).split('T')[0];
+        // holiday_date arrives as a 'YYYY-MM-DD' string from the pg date parser.
+        const dateStr = String(h.holiday_date).split('T')[0];
         holidayMap[dateStr] = {
-          id: h.ID,
-          name: h.HolidayName,
-          description: h.Description
+          id: h.id,
+          name: h.holiday_name,
+          description: h.description
         };
       });
 
@@ -881,9 +881,9 @@ function transformToCalendarStructure(
         dayOfWeek: item.dayOfWeek,
         appointments: {},
         isHoliday: !!holiday,
-        holidayId: holiday ? holiday.ID : null,
-        holidayName: holiday ? holiday.HolidayName : null,
-        holidayDescription: holiday ? holiday.Description : null
+        holidayId: holiday ? holiday.id : null,
+        holidayName: holiday ? holiday.holiday_name : null,
+        holidayDescription: holiday ? holiday.description : null
       };
     }
 
@@ -903,17 +903,17 @@ function transformToCalendarStructure(
     }
 
     // Only add valid appointments (skip empty slots with appointmentID = 0)
-    if (item.appointmentID && item.appointmentID > 0) {
+    if (item.appointment_id && item.appointment_id > 0) {
       days[dateKey].appointments[timeKey].appointments.push({
-        appointmentID: item.appointmentID,
+        appointment_id: item.appointment_id,
         appDetail: item.appDetail,
         drID: item.drID,
         patientName: item.patientName,
         personID: item.personID,
         slotStatus: item.slotStatus,
         slotDateTime: item.slotDateTime,
-        AppDate: item.slotDateTime, // Add AppDate for compatibility with EditAppointmentForm
-        PersonID: item.personID // Add PersonID (capitalized) for compatibility
+        app_date: item.slotDateTime, // Add app_date for compatibility with EditAppointmentForm
+        person_id: item.personID // Add person_id (capitalized) for compatibility
       });
     }
 
@@ -979,18 +979,18 @@ function transformToMonthlyStructure(
         availableSlots: 0,
         bookedSlots: 0,
         isHoliday: !!holiday,
-        holidayId: holiday ? holiday.ID : null,
-        holidayName: holiday ? holiday.HolidayName : null,
-        holidayDescription: holiday ? holiday.Description : null
+        holidayId: holiday ? holiday.id : null,
+        holidayName: holiday ? holiday.holiday_name : null,
+        holidayDescription: holiday ? holiday.description : null
       };
     }
 
     dayMap[dateKey].totalSlots++;
 
     // Only count valid appointments
-    if (item.appointmentID && item.appointmentID > 0) {
+    if (item.appointment_id && item.appointment_id > 0) {
       const appointment: AppointmentInfo = {
-        appointmentID: item.appointmentID,
+        appointment_id: item.appointment_id,
         appDetail: item.appDetail,
         drID: item.drID,
         patientName: item.patientName,
@@ -1058,9 +1058,9 @@ function transformToMonthlyStructure(
         bookedSlots: 0,
         utilizationPercent: 0,
         isHoliday: !!holiday,
-        holidayId: holiday ? holiday.ID : null,
-        holidayName: holiday ? holiday.HolidayName : null,
-        holidayDescription: holiday ? holiday.Description : null
+        holidayId: holiday ? holiday.id : null,
+        holidayName: holiday ? holiday.holiday_name : null,
+        holidayDescription: holiday ? holiday.description : null
       });
     }
   }

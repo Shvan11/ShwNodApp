@@ -54,42 +54,42 @@ interface AppointmentQueryParams {
 }
 
 interface AppointmentStateBody {
-  appointmentID: number;
+  appointment_id: number;
   state: string;
   time?: string;
 }
 
 interface CreateAppointmentBody {
-  PersonID: number;
-  AppDate: string;
-  AppDetail: string;
-  DrID: number;
+  person_id: number;
+  app_date: string;
+  app_detail: string;
+  dr_id: number;
 }
 
 interface UpdateAppointmentBody {
-  PersonID: number;
-  AppDate: string;
-  AppDetail: string;
-  DrID: number;
+  person_id: number;
+  app_date: string;
+  app_detail: string;
+  dr_id: number;
 }
 
 interface QuickCheckInBody {
-  PersonID: number;
-  AppDetail: string;
-  DrID: number;
+  person_id: number;
+  app_detail: string;
+  dr_id: number;
 }
 
 interface AppointmentDetail {
-  ID: number;
-  Detail: string;
+  id: number;
+  detail: string;
 }
 
 interface AppointmentResult {
-  appointmentID: number;
-  PersonID: number;
-  AppDate: string;
-  AppDetail: string;
-  DrID: number;
+  appointment_id: number;
+  person_id: number;
+  app_date: string;
+  app_detail: string;
+  dr_id: number;
   DrName: string | null;
 }
 
@@ -107,7 +107,7 @@ router.get(
     try {
       const db = getKysely();
       const { rows } = await sql<AppointmentDetail>`
-        SELECT "ID", "Detail" FROM "tblDetail" ORDER BY "Detail"
+        SELECT "id", "detail" FROM "details" ORDER BY "detail"
       `.execute(db);
       res.json(rows);
     } catch (error) {
@@ -223,7 +223,7 @@ router.get(
 // ============================================================================
 
 /**
- * Update patient appointment state (Present, Seated, or Dismissed)
+ * Update patient appointment state (present, seated, or dismissed)
  * SIMPLIFIED: Direct update, broadcast date only
  */
 router.post(
@@ -233,8 +233,8 @@ router.post(
     res: Response
   ): Promise<void> => {
     try {
-      const { appointmentID, state, time } = req.body;
-      if (!appointmentID || !state) {
+      const { appointment_id, state, time } = req.body;
+      if (!appointment_id || !state) {
         ErrorResponses.badRequest(
           res,
           'Missing required parameters: appointmentID, state'
@@ -247,11 +247,11 @@ router.post(
         time ||
         `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       log.info(
-        `Updating appointment ${appointmentID} with state: ${state}, time: ${currentTime}`
+        `Updating appointment ${appointment_id} with state: ${state}, time: ${currentTime}`
       );
 
       // Direct update - no transaction complexity
-      await updatePresent(appointmentID, state, currentTime);
+      await updatePresent(appointment_id, state, currentTime);
 
       // Broadcast to WebSocket - just the date, clients will reload
       const year = now.getFullYear();
@@ -260,26 +260,26 @@ router.post(
       const appointmentDate = `${year}-${month}-${day}`;
 
       if (wsEmitter) {
-        log.info(`Broadcasting state change for appointment ${appointmentID}`);
+        log.info(`Broadcasting state change for appointment ${appointment_id}`);
         wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, appointmentDate);
       }
 
       res.json({
         success: true,
-        appointmentID,
+        appointment_id,
         state,
         time: currentTime
       });
     } catch (error) {
       log.error('Error updating appointment state:', error);
 
-      // State-machine rejection from the UpdatePresent proc — the caller's view
+      // state-machine rejection from the UpdatePresent proc — the caller's view
       // of the appointment was stale (typical cause: missed WebSocket update).
       const err = error as Error;
       if (err.message && err.message.includes('[INVALID_STATE_TRANSITION]')) {
         ErrorResponses.badRequest(res, err.message, {
           code: 'INVALID_STATE_TRANSITION',
-          appointmentID: req.body.appointmentID,
+          appointment_id: req.body.appointment_id,
           attempted: req.body.state
         });
         return;
@@ -305,8 +305,8 @@ router.post(
     res: Response
   ): Promise<void> => {
     try {
-      const { appointmentID, state } = req.body;
-      if (!appointmentID || !state) {
+      const { appointment_id, state } = req.body;
+      if (!appointment_id || !state) {
         ErrorResponses.badRequest(
           res,
           'Missing required parameters: appointmentID, state'
@@ -314,8 +314,8 @@ router.post(
         return;
       }
 
-      log.info(`Undoing appointment ${appointmentID} state: ${state}`);
-      const result = await undoAppointmentState(appointmentID, state);
+      log.info(`Undoing appointment ${appointment_id} state: ${state}`);
+      const result = await undoAppointmentState(appointment_id, state);
 
       // Broadcast to WebSocket - just the date, clients will reload
       const now = new Date();
@@ -341,7 +341,7 @@ router.post(
       ) {
         ErrorResponses.badRequest(res, err.message, {
           code: 'INVALID_STATE_TRANSITION',
-          appointmentID: req.body.appointmentID,
+          appointment_id: req.body.appointment_id,
           state: req.body.state
         });
         return;
@@ -371,28 +371,28 @@ router.post(
     res: Response
   ): Promise<void> => {
     try {
-      const { PersonID, AppDate, AppDetail, DrID } = req.body;
+      const { person_id, app_date, app_detail, dr_id } = req.body;
 
       // Delegate to service layer for validation and creation
       const appointment = await validateAndCreateAppointment({
-        PersonID,
-        AppDate,
-        AppDetail,
-        DrID
+        person_id,
+        app_date,
+        app_detail,
+        dr_id
       });
 
       // Emit WebSocket event for real-time updates
       if (wsEmitter) {
-        // Use the AppDate as-is if it's already in YYYY-MM-DD format
+        // Use the app_date as-is if it's already in YYYY-MM-DD format
         // Otherwise extract date from Date object using local time
         let appointmentDay: string;
         if (
-          typeof AppDate === 'string' &&
-          AppDate.match(/^\d{4}-\d{2}-\d{2}$/)
+          typeof app_date === 'string' &&
+          app_date.match(/^\d{4}-\d{2}-\d{2}$/)
         ) {
-          appointmentDay = AppDate;
+          appointmentDay = app_date;
         } else {
-          const appointmentDate = new Date(AppDate);
+          const appointmentDate = new Date(app_date);
           const year = appointmentDate.getFullYear();
           const month = String(appointmentDate.getMonth() + 1).padStart(2, '0');
           const day = String(appointmentDate.getDate()).padStart(2, '0');
@@ -403,7 +403,7 @@ router.post(
 
       res.json({
         success: true,
-        appointmentID: appointment.appointmentID,
+        appointment_id: appointment.appointment_id,
         message: 'Appointment created successfully',
         appointment
       });
@@ -446,23 +446,23 @@ router.get(
       const { personId } = req.params;
 
       if (!personId || isNaN(parseInt(personId))) {
-        ErrorResponses.badRequest(res, 'Invalid person ID');
+        ErrorResponses.badRequest(res, 'Invalid person id');
         return;
       }
 
       const db = getKysely();
       const { rows } = await sql<AppointmentResult>`
             SELECT
-                a."appointmentID",
-                a."PersonID",
-                to_char(a."AppDate", 'YYYY-MM-DD"T"HH24:MI:SS') AS "AppDate",
-                a."AppDetail",
-                a."DrID",
-                e."employeeName" AS "DrName"
-            FROM "tblappointments" a
-            LEFT JOIN "tblEmployees" e ON a."DrID" = e."ID"
-            WHERE a."PersonID" = ${parseInt(personId)}
-            ORDER BY a."AppDate" DESC
+                a."appointment_id",
+                a."person_id",
+                to_char(a."app_date", 'YYYY-MM-DD"T"HH24:MI:SS') AS "app_date",
+                a."app_detail",
+                a."dr_id",
+                e."employee_name" AS "DrName"
+            FROM "appointments" a
+            LEFT JOIN "employees" e ON a."dr_id" = e."id"
+            WHERE a."person_id" = ${parseInt(personId)}
+            ORDER BY a."app_date" DESC
         `.execute(db);
 
       res.json({
@@ -481,7 +481,7 @@ router.get(
 );
 
 /**
- * Get single appointment by ID
+ * Get single appointment by id
  * Returns detailed information for a specific appointment
  */
 router.get(
@@ -494,22 +494,22 @@ router.get(
       const { appointmentId } = req.params;
 
       if (!appointmentId || isNaN(parseInt(appointmentId))) {
-        ErrorResponses.badRequest(res, 'Invalid appointment ID');
+        ErrorResponses.badRequest(res, 'Invalid appointment id');
         return;
       }
 
       const db = getKysely();
       const { rows } = await sql<AppointmentResult>`
             SELECT
-                a."appointmentID",
-                a."PersonID",
-                to_char(a."AppDate", 'YYYY-MM-DD"T"HH24:MI:SS') AS "AppDate",
-                a."AppDetail",
-                a."DrID",
-                e."employeeName" AS "DrName"
-            FROM "tblappointments" a
-            LEFT JOIN "tblEmployees" e ON a."DrID" = e."ID"
-            WHERE a."appointmentID" = ${parseInt(appointmentId)}
+                a."appointment_id",
+                a."person_id",
+                to_char(a."app_date", 'YYYY-MM-DD"T"HH24:MI:SS') AS "app_date",
+                a."app_detail",
+                a."dr_id",
+                e."employee_name" AS "DrName"
+            FROM "appointments" a
+            LEFT JOIN "employees" e ON a."dr_id" = e."id"
+            WHERE a."appointment_id" = ${parseInt(appointmentId)}
         `.execute(db);
 
       if (!rows || rows.length === 0) {
@@ -544,31 +544,31 @@ router.put(
   ): Promise<void> => {
     try {
       const { appointmentId } = req.params;
-      const { PersonID, AppDate, AppDetail, DrID } = req.body;
+      const { person_id, app_date, app_detail, dr_id } = req.body;
 
       if (!appointmentId || isNaN(parseInt(appointmentId))) {
-        ErrorResponses.badRequest(res, 'Invalid appointment ID');
+        ErrorResponses.badRequest(res, 'Invalid appointment id');
         return;
       }
 
       // Validate required fields
-      if (!PersonID || !AppDate || !AppDetail || !DrID) {
+      if (!person_id || !app_date || !app_detail || !dr_id) {
         ErrorResponses.badRequest(
           res,
-          'PersonID, AppDate, AppDetail, and DrID are required'
+          'person_id, app_date, app_detail, and dr_id are required'
         );
         return;
       }
 
-      // Cast the AppDate string to timestamp on the PG side to avoid timezone conversion
+      // Cast the app_date string to timestamp on the PG side to avoid timezone conversion
       const db = getKysely();
       await sql`
-            UPDATE "tblappointments"
-            SET "PersonID" = ${PersonID},
-                "AppDate" = ${AppDate}::timestamp,
-                "AppDetail" = ${AppDetail},
-                "DrID" = ${DrID}
-            WHERE "appointmentID" = ${parseInt(appointmentId)}
+            UPDATE "appointments"
+            SET "person_id" = ${person_id},
+                "app_date" = ${app_date}::timestamp,
+                "app_detail" = ${app_detail},
+                "dr_id" = ${dr_id}
+            WHERE "appointment_id" = ${parseInt(appointmentId)}
         `.execute(db);
 
       res.json({
@@ -600,13 +600,13 @@ router.delete(
       const { appointmentId } = req.params;
 
       if (!appointmentId || isNaN(parseInt(appointmentId))) {
-        ErrorResponses.badRequest(res, 'Invalid appointment ID');
+        ErrorResponses.badRequest(res, 'Invalid appointment id');
         return;
       }
 
       const db = getKysely();
       await sql`
-        DELETE FROM "tblappointments" WHERE "appointmentID" = ${parseInt(appointmentId)}
+        DELETE FROM "appointments" WHERE "appointment_id" = ${parseInt(appointmentId)}
       `.execute(db);
 
       res.json({
@@ -640,13 +640,13 @@ router.post(
     res: Response
   ): Promise<void> => {
     try {
-      const { PersonID, AppDetail, DrID } = req.body;
+      const { person_id, app_detail, dr_id } = req.body;
 
       // Delegate to service layer for quick check-in logic
       const result = await quickCheckIn({
-        PersonID,
-        AppDetail,
-        DrID
+        person_id,
+        app_detail,
+        dr_id
       });
 
       // Emit WebSocket event for real-time updates

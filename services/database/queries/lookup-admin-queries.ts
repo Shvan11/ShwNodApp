@@ -12,7 +12,7 @@
  * posture to the old `@p`-param T-SQL. The positional `ColumnValue` mappers are gone;
  * rows come back as plain objects from `result.rows`.
  *
- * Type mapping vs. the old mssql path:
+ * type mapping vs. the old mssql path:
  *  - `bit` columns are now PG `boolean`, so values are coerced to JS `true`/`false`
  *    (was `1`/`0`).
  *  - referential-integrity violations surface as PG SQLSTATE `23503`
@@ -21,7 +21,7 @@
 import { sql, type RawBuilder } from 'kysely';
 import { getKysely } from '../kysely.js';
 
-// Type definitions
+// type definitions
 interface ReferenceConfig {
   table: string;
   idColumn: string;
@@ -70,38 +70,38 @@ type LookupItem = Record<string, unknown>;
  */
 const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
   tblWorkType: {
-    tableName: 'tblWorkType',
-    idColumn: 'ID',
-    displayColumn: 'WorkType',
+    tableName: 'work_types',
+    idColumn: 'id',
+    displayColumn: 'work_type',
     displayName: 'Work Types',
     icon: 'fas fa-briefcase',
     idType: 'int',
     columns: [
-      { name: 'WorkType', label: 'Work Type', type: 'varchar', maxLength: 50, required: true },
+      { name: 'work_type', label: 'Work type', type: 'varchar', maxLength: 50, required: true },
     ],
   },
   tblKeyWord: {
-    tableName: 'tblKeyWord',
-    idColumn: 'ID',
-    displayColumn: 'KeyWord',
+    tableName: 'keywords',
+    idColumn: 'id',
+    displayColumn: 'key_word',
     displayName: 'Keywords',
     icon: 'fas fa-tag',
     idType: 'int',
     columns: [
-      { name: 'KeyWord', label: 'Keyword', type: 'nvarchar', maxLength: 255, required: false },
+      { name: 'key_word', label: 'Keyword', type: 'nvarchar', maxLength: 255, required: false },
     ],
   },
   tblDetail: {
-    tableName: 'tblDetail',
-    idColumn: 'ID',
-    displayColumn: 'Detail',
+    tableName: 'details',
+    idColumn: 'id',
+    displayColumn: 'detail',
     displayName: 'Appointment Types',
     icon: 'fas fa-calendar-check',
     idType: 'int',
     columns: [
       {
-        name: 'Detail',
-        label: 'Appointment Type',
+        name: 'detail',
+        label: 'Appointment type',
         type: 'nvarchar',
         maxLength: 255,
         required: false,
@@ -109,36 +109,36 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
     ],
   },
   tblPatientType: {
-    tableName: 'tblPatientType',
-    idColumn: 'ID',
-    displayColumn: 'PatientType',
+    tableName: 'patient_types',
+    idColumn: 'id',
+    displayColumn: 'patient_type',
     displayName: 'Patient Types',
     icon: 'fas fa-user-tag',
     idType: 'int',
     columns: [
-      { name: 'PatientType', label: 'Patient Type', type: 'varchar', maxLength: 50, required: false },
+      { name: 'patient_type', label: 'Patient type', type: 'varchar', maxLength: 50, required: false },
     ],
   },
   tblTagOptions: {
-    tableName: 'tblTagOptions',
-    idColumn: 'ID',
-    displayColumn: 'Tag',
-    displayName: 'Tag Options',
+    tableName: 'tag_options',
+    idColumn: 'id',
+    displayColumn: 'tag',
+    displayName: 'tag Options',
     icon: 'fas fa-bookmark',
     idType: 'int',
-    columns: [{ name: 'Tag', label: 'Tag', type: 'nvarchar', maxLength: 50, required: true }],
+    columns: [{ name: 'tag', label: 'tag', type: 'nvarchar', maxLength: 50, required: true }],
   },
   tblReferrals: {
-    tableName: 'tblReferrals',
-    idColumn: 'ID',
-    displayColumn: 'Referral',
-    displayName: 'Referral Sources',
+    tableName: 'referrals',
+    idColumn: 'id',
+    displayColumn: 'referral',
+    displayName: 'referral Sources',
     icon: 'fas fa-handshake',
     idType: 'int',
     columns: [
       {
-        name: 'Referral',
-        label: 'Referral Source',
+        name: 'referral',
+        label: 'referral Source',
         type: 'nvarchar',
         maxLength: 255,
         required: false,
@@ -146,29 +146,29 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
     ],
   },
   tblAddress: {
-    tableName: 'tblAddress',
-    idColumn: 'ID',
-    displayColumn: 'Zone',
+    tableName: 'addresses',
+    idColumn: 'id',
+    displayColumn: 'zone',
     displayName: 'Addresses/Zones',
     icon: 'fas fa-map-marker-alt',
     idType: 'int',
     columns: [
-      { name: 'Zone', label: 'Zone/Address', type: 'nvarchar', maxLength: 255, required: false },
+      { name: 'zone', label: 'zone/Address', type: 'nvarchar', maxLength: 255, required: false },
     ],
   },
   tblAlertTypes: {
-    tableName: 'tblAlertTypes',
-    idColumn: 'AlertTypeID',
-    displayColumn: 'TypeName',
+    tableName: 'alert_types',
+    idColumn: 'alert_type_id',
+    displayColumn: 'type_name',
     displayName: 'Alert Types',
     icon: 'fas fa-exclamation-triangle',
     idType: 'int',
     columns: [
-      { name: 'TypeName', label: 'Alert Type Name', type: 'nvarchar', maxLength: 100, required: true },
+      { name: 'type_name', label: 'Alert type Name', type: 'nvarchar', maxLength: 100, required: true },
     ],
   },
   DocumentTypes: {
-    tableName: 'DocumentTypes',
+    tableName: 'document_types',
     idColumn: 'type_id',
     displayColumn: 'type_name',
     displayName: 'Document Types',
@@ -177,7 +177,7 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
     columns: [
       { name: 'type_code', label: 'Code', type: 'nvarchar', maxLength: 50, required: true },
       { name: 'type_name', label: 'Name', type: 'nvarchar', maxLength: 100, required: true },
-      { name: 'description', label: 'Description', type: 'nvarchar', maxLength: 500, required: false },
+      { name: 'description', label: 'description', type: 'nvarchar', maxLength: 500, required: false },
       { name: 'icon', label: 'Icon', type: 'nvarchar', maxLength: 50, required: false },
       { name: 'default_paper_width', label: 'Paper Width (mm)', type: 'int', required: false },
       { name: 'default_paper_height', label: 'Paper Height (mm)', type: 'int', required: false },
@@ -187,15 +187,15 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
     ],
   },
   tblImplantManufacturer: {
-    tableName: 'tblImplantManufacturer',
-    idColumn: 'ID',
-    displayColumn: 'ManufacturerName',
+    tableName: 'implant_manufacturers',
+    idColumn: 'id',
+    displayColumn: 'manufacturer_name',
     displayName: 'Implant Manufacturers',
     icon: 'fas fa-industry',
     idType: 'int',
     columns: [
       {
-        name: 'ManufacturerName',
+        name: 'manufacturer_name',
         label: 'Manufacturer Name',
         type: 'nvarchar',
         maxLength: 255,
@@ -205,54 +205,54 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
   },
   tblHolidays: {
     tableName: 'tblHolidays',
-    idColumn: 'ID',
-    displayColumn: 'HolidayName',
+    idColumn: 'id',
+    displayColumn: 'holiday_name',
     displayName: 'Holidays',
     icon: 'fas fa-calendar-times',
     idType: 'int',
     columns: [
-      { name: 'Holidaydate', label: 'Date', type: 'date', required: true },
-      { name: 'HolidayName', label: 'Holiday Name', type: 'nvarchar', maxLength: 100, required: true },
-      { name: 'Description', label: 'Description', type: 'nvarchar', maxLength: 255, required: false },
+      { name: 'holiday_date', label: 'Date', type: 'date', required: true },
+      { name: 'holiday_name', label: 'Holiday Name', type: 'nvarchar', maxLength: 100, required: true },
+      { name: 'description', label: 'description', type: 'nvarchar', maxLength: 255, required: false },
     ],
   },
   tbltimes: {
-    tableName: 'tbltimes',
-    idColumn: 'TimeID',
-    displayColumn: 'MyTime',
+    tableName: 'times',
+    idColumn: 'time_id',
+    displayColumn: 'my_time',
     displayName: 'Time Slots',
     icon: 'fas fa-clock',
     idType: 'int',
     columns: [
-      { name: 'MyTime', label: 'Time', type: 'varchar', maxLength: 30, required: true },
+      { name: 'my_time', label: 'Time', type: 'varchar', maxLength: 30, required: true },
     ],
   },
   tblExpenseCategories: {
-    tableName: 'tblExpenseCategories',
-    idColumn: 'CategoryID',
-    displayColumn: 'CategoryName',
+    tableName: 'expense_categories',
+    idColumn: 'category_id',
+    displayColumn: 'category_name',
     displayName: 'Expense Categories',
     icon: 'fas fa-folder',
     idType: 'int',
     columns: [
-      { name: 'CategoryName', label: 'Category Name', type: 'nvarchar', maxLength: 50, required: true },
+      { name: 'category_name', label: 'category Name', type: 'nvarchar', maxLength: 50, required: true },
     ],
   },
   tblExpenseSubcategories: {
-    tableName: 'tblExpenseSubcategories',
-    idColumn: 'SubcategoryID',
-    displayColumn: 'SubcategoryName',
+    tableName: 'expense_subcategories',
+    idColumn: 'subcategory_id',
+    displayColumn: 'subcategory_name',
     displayName: 'Expense Subcategories',
     icon: 'fas fa-folder-open',
     idType: 'int',
     columns: [
-      { name: 'SubcategoryName', label: 'Name', type: 'nvarchar', maxLength: 100, required: true },
+      { name: 'subcategory_name', label: 'Name', type: 'nvarchar', maxLength: 100, required: true },
       {
-        name: 'CategoryID',
-        label: 'Category',
+        name: 'category_id',
+        label: 'category',
         type: 'reference',
         required: true,
-        reference: { table: 'tblExpenseCategories', idColumn: 'CategoryID', displayColumn: 'CategoryName' },
+        reference: { table: 'expense_categories', idColumn: 'category_id', displayColumn: 'category_name' },
       },
     ],
   },
@@ -264,7 +264,7 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
  * was created lowercase (`tblholidays`) in the Phase-2 PG schema.
  */
 function pgTableName(configTableName: string): string {
-  return configTableName === 'tblHolidays' ? 'tblholidays' : configTableName;
+  return configTableName === 'tblHolidays' ? 'holidays' : configTableName;
 }
 
 /**

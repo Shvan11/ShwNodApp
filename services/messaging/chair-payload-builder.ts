@@ -19,7 +19,7 @@ export interface ChairPatientPayload {
   pid: string;
   name: string | null;
   images: Array<{ name: string }>;
-  latestVisit: { VisitDate?: Date; Summary?: string | null } | null | undefined;
+  latestVisit: { visit_date?: Date; Summary?: string | null } | null | undefined;
 }
 
 /**
@@ -51,14 +51,14 @@ export async function buildChairPatientPayload(
     });
 
     const activeWork = await getActiveWork(personId);
-    const isOrtho = !!(activeWork && ORTHO_WORK_TYPE_IDS.has(activeWork.Typeofwork as number));
+    const isOrtho = !!(activeWork && ORTHO_WORK_TYPE_IDS.has(activeWork.type_of_work as number));
     const [latestVisit, patientRecord] = await Promise.all([
       isOrtho ? getLatestVisitsSum(personId) : Promise.resolve(null),
       getPatientById(personId),
     ]);
 
-    const name = patientRecord?.PatientName?.trim() ||
-      [patientRecord?.FirstName, patientRecord?.LastName].filter(Boolean).join(' ').trim() ||
+    const name = patientRecord?.patient_name?.trim() ||
+      [patientRecord?.first_name, patientRecord?.last_name].filter(Boolean).join(' ').trim() ||
       null;
 
     return {

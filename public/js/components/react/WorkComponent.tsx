@@ -18,8 +18,8 @@ import {
 import styles from './WorkComponent.module.css';
 
 interface PatientInfo {
-    PersonID: number;
-    PatientName: string;
+    person_id: number;
+    patient_name: string;
     Name?: string;
     Phone?: string;
     estimatedCost?: number;
@@ -34,7 +34,7 @@ interface PatientInfo {
 
 interface WorkDetail {
     ID: number;
-    WorkID: number;
+    work_id: number;
     TeethIds?: number[];
     Teeth?: string;
     FillingType?: string;
@@ -55,7 +55,7 @@ interface WorkDetail {
 }
 
 interface DetailFormData {
-    WorkID: number | null;
+    work_id: number | null;
     TeethIds: number[];
     FillingType: string;
     FillingDepth: string;
@@ -87,8 +87,8 @@ interface ImplantManufacturer {
 
 interface Payment {
     InvoiceID: number;
-    Dateofpayment: string;
-    Amountpaid: number;
+    date_of_payment: string;
+    amount_paid: number;
     ActualAmount?: number;
     ActualCur?: string;
     Change?: number;
@@ -166,7 +166,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     // Work detail form state - includes all possible fields for all work types
     const [detailFormData, setDetailFormData] = useState<DetailFormData>({
-        WorkID: null,
+        work_id: null,
         TeethIds: [],
         FillingType: '',
         FillingDepth: '',
@@ -346,7 +346,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     break;
                 case 'reactivate':
                     endpoint = '/api/reactivatework';
-                    body = { workId: work.workid, personId: work.PersonID };
+                    body = { workId: work.workid, personId: work.person_id };
                     successMessage = 'Work reactivated successfully';
                     break;
             }
@@ -501,7 +501,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         if (!selectedWork) return;
         setEditingDetail(null);
         setDetailFormData({
-            WorkID: selectedWork.workid,
+            work_id: selectedWork.workid,
             TeethIds: [],
             FillingType: '',
             FillingDepth: '',
@@ -524,7 +524,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const handleEditDetail = (detail: WorkDetail) => {
         setEditingDetail(detail);
         setDetailFormData({
-            WorkID: detail.WorkID,
+            work_id: detail.work_id,
             TeethIds: detail.TeethIds || [],
             FillingType: detail.FillingType || '',
             FillingDepth: detail.FillingDepth || '',
@@ -614,7 +614,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const filteredWorks = works
         .filter(work => {
             const matchesSearch = work.Notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                work.DoctorName?.toLowerCase().includes(searchTerm.toLowerCase());
+                work.doctor_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
             const matchesFilter = filterStatus === 'all' ||
                 (filterStatus === 'active' && work.Status === WORK_STATUS.ACTIVE) ||
@@ -645,7 +645,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     };
 
     const isAlignerWork = (work: Work): boolean => {
-        return [19, 20, 21].includes(work.Typeofwork);
+        return [19, 20, 21].includes(work.type_of_work);
     };
 
     const handleAddAlignerSet = (work: Work) => {
@@ -701,7 +701,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    PersonID: personId
+                    person_id: personId
                 })
             });
 
@@ -741,7 +741,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     <div className={styles.patientPhotoContainer}>
                         <img
                             src={`/DolImgs/${personId}00.i13`}
-                            alt={`${patientInfo.PatientName} - Smile`}
+                            alt={`${patientInfo.patient_name} - Smile`}
                             className={styles.patientPhoto}
                             onError={(e: SyntheticEvent<HTMLImageElement>) => {
                                 e.currentTarget.style.display = 'none';
@@ -755,10 +755,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         <div className={styles.patientInfoRow}>
                             <div className={styles.patientInfoHeader}>
                                 <h3 className={styles.patientName}>
-                                    {patientInfo.PatientName}
+                                    {patientInfo.patient_name}
                                 </h3>
                                 <div className={styles.patientMetaInfo}>
-                                    <span><i className="fas fa-id-card"></i>{patientInfo.PersonID}</span>
+                                    <span><i className="fas fa-id-card"></i>{patientInfo.person_id}</span>
                                     {patientInfo.Phone && (
                                         <span><i className="fas fa-phone"></i>{patientInfo.Phone}</span>
                                     )}
@@ -944,8 +944,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                             <div className={styles.detailsSection}>
                                 <div className={styles.sectionHeader}>
                                     <h4>
-                                        <i className={getWorkTypeConfig(selectedWork.Typeofwork).icon}></i>
-                                        {' '}{getWorkTypeConfig(selectedWork.Typeofwork).name} Details
+                                        <i className={getWorkTypeConfig(selectedWork.type_of_work).icon}></i>
+                                        {' '}{getWorkTypeConfig(selectedWork.type_of_work).name} Details
                                     </h4>
                                     <button
                                         onClick={handleAddDetail}
@@ -959,7 +959,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <table className={styles.detailsTable}>
                                         <thead>
                                             <tr>
-                                                {getWorkTypeConfig(selectedWork.Typeofwork).displayFields.map((field: { key: string; label: string }) => (
+                                                {getWorkTypeConfig(selectedWork.type_of_work).displayFields.map((field: { key: string; label: string }) => (
                                                     <th key={field.key}>{field.label}</th>
                                                 ))}
                                                 <th>Status</th>
@@ -969,7 +969,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                         <tbody>
                                             {workDetails.map((detail) => (
                                                 <tr key={detail.ID}>
-                                                    {getWorkTypeConfig(selectedWork.Typeofwork).displayFields.map((field: { key: string; label: string }) => (
+                                                    {getWorkTypeConfig(selectedWork.type_of_work).displayFields.map((field: { key: string; label: string }) => (
                                                         <td key={field.key}>
                                                             {field.key === 'Teeth' ? (
                                                                 <span className={styles.teethBadge}>{detail.Teeth || '-'}</span>
@@ -1013,7 +1013,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                             ))}
                                             {workDetails.length === 0 && (
                                                 <tr>
-                                                    <td colSpan={getWorkTypeConfig(selectedWork.Typeofwork).displayFields.length + 2} className={styles.noData}>
+                                                    <td colSpan={getWorkTypeConfig(selectedWork.type_of_work).displayFields.length + 2} className={styles.noData}>
                                                         No treatment items recorded yet
                                                     </td>
                                                 </tr>
@@ -1036,8 +1036,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 >
                         <div className={styles.modalHeader}>
                             <h3 id="work-detail-form-title">
-                                <i className={getWorkTypeConfig(selectedWork.Typeofwork).icon}></i>
-                                {' '}{editingDetail ? 'Edit' : 'Add'} {getWorkTypeConfig(selectedWork.Typeofwork).name} Item
+                                <i className={getWorkTypeConfig(selectedWork.type_of_work).icon}></i>
+                                {' '}{editingDetail ? 'Edit' : 'Add'} {getWorkTypeConfig(selectedWork.type_of_work).name} Item
                             </h3>
                             <button
                                 onClick={() => setShowDetailForm(false)}
@@ -1048,7 +1048,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         </div>
 
                         <form onSubmit={handleDetailFormSubmit} className={styles.detailForm}>
-                            {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('teeth') && (
+                            {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('teeth') && (
                                 <div className={`${styles.formGroup} ${styles.fullWidth}`}>
                                     <label>Select Teeth</label>
                                     <TeethSelector
@@ -1066,7 +1066,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                             )}
 
                             <div className={styles.formRow}>
-                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('fillingType') && (
+                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('fillingType') && (
                                     <div className={styles.formGroup}>
                                         <label>Filling Type</label>
                                         <select
@@ -1081,7 +1081,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     </div>
                                 )}
 
-                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('fillingDepth') && (
+                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('fillingDepth') && (
                                     <div className={styles.formGroup}>
                                         <label>Filling Depth</label>
                                         <select
@@ -1096,7 +1096,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     </div>
                                 )}
 
-                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('canalsNo') && (
+                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('canalsNo') && (
                                     <div className={styles.formGroup}>
                                         <label>Number of Canals</label>
                                         <input
@@ -1110,7 +1110,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     </div>
                                 )}
 
-                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('workingLength') && (
+                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('workingLength') && (
                                     <div className={styles.formGroup}>
                                         <label>Working Length</label>
                                         <input
@@ -1122,7 +1122,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     </div>
                                 )}
 
-                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('implantManufacturer') && (
+                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('implantManufacturer') && (
                                     <div className={styles.formGroup}>
                                         <label>Manufacturer</label>
                                         <select
@@ -1137,7 +1137,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     </div>
                                 )}
 
-                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('implantLength') && (
+                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('implantLength') && (
                                     <div className={styles.formGroup}>
                                         <label>Implant Length (mm)</label>
                                         <input
@@ -1150,7 +1150,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     </div>
                                 )}
 
-                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('implantDiameter') && (
+                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('implantDiameter') && (
                                     <div className={styles.formGroup}>
                                         <label>Implant Diameter (mm)</label>
                                         <input
@@ -1163,7 +1163,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     </div>
                                 )}
 
-                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('material') && (
+                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('material') && (
                                     <div className={styles.formGroup}>
                                         <label>Material</label>
                                         <select
@@ -1178,7 +1178,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     </div>
                                 )}
 
-                                {getWorkTypeConfig(selectedWork.Typeofwork).fields.includes('labName') && (
+                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('labName') && (
                                     <div className={styles.formGroup}>
                                         <label>Lab Name</label>
                                         <input
@@ -1292,7 +1292,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <div className={styles.paymentSummaryItem}>
                                         <span className={styles.paymentSummaryLabel}>Total Required:</span>
                                         <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValueTotal}`}>
-                                            {formatCurrency(selectedWorkForPayment.TotalRequired, selectedWorkForPayment.Currency)}
+                                            {formatCurrency(selectedWorkForPayment.total_required, selectedWorkForPayment.Currency)}
                                         </span>
                                     </div>
                                     <div className={styles.paymentSummaryItem}>
@@ -1304,7 +1304,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <div className={styles.paymentSummaryItem}>
                                         <span className={styles.paymentSummaryLabel}>Balance Remaining:</span>
                                         <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValueBalance}`}>
-                                            {formatCurrency((selectedWorkForPayment.TotalRequired || 0) - (selectedWorkForPayment.TotalPaid || 0), selectedWorkForPayment.Currency)}
+                                            {formatCurrency((selectedWorkForPayment.total_required || 0) - (selectedWorkForPayment.TotalPaid || 0), selectedWorkForPayment.Currency)}
                                         </span>
                                     </div>
                                 </div>
@@ -1330,9 +1330,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                         <tbody>
                                             {paymentHistory.map((payment, index) => (
                                                 <tr key={payment.InvoiceID || index}>
-                                                    <td>{formatDate(payment.Dateofpayment)}</td>
+                                                    <td>{formatDate(payment.date_of_payment)}</td>
                                                     <td className={styles.paymentAmount}>
-                                                        {formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}
+                                                        {formatCurrency(payment.amount_paid, selectedWorkForPayment.Currency)}
                                                     </td>
                                                     <td>{payment.ActualAmount ? formatCurrency(payment.ActualAmount, payment.ActualCur) : '-'}</td>
                                                     <td>{payment.ActualCur || '-'}</td>
@@ -1341,7 +1341,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                         <div className={styles.paymentActions}>
                                                             <button
                                                                 onClick={() => {
-                                                                    toast.info(`Edit payment functionality coming soon!\n\nPayment ID: ${payment.InvoiceID}\nAmount: ${formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}`);
+                                                                    toast.info(`Edit payment functionality coming soon!\n\nPayment ID: ${payment.InvoiceID}\nAmount: ${formatCurrency(payment.amount_paid, selectedWorkForPayment.Currency)}`);
                                                                 }}
                                                                 className={styles.btnActionEdit}
                                                                 title="Edit Payment"
@@ -1350,7 +1350,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                             </button>
                                                             <button
                                                                 onClick={async () => {
-                                                                    if (await confirm(`Are you sure you want to delete this payment?\n\nAmount: ${formatCurrency(payment.Amountpaid, selectedWorkForPayment.Currency)}\nDate: ${formatDate(payment.Dateofpayment)}\n\nThis action cannot be undone.`, { title: 'Delete Payment', danger: true, confirmText: 'Delete' })) {
+                                                                    if (await confirm(`Are you sure you want to delete this payment?\n\nAmount: ${formatCurrency(payment.amount_paid, selectedWorkForPayment.Currency)}\nDate: ${formatDate(payment.date_of_payment)}\n\nThis action cannot be undone.`, { title: 'Delete Payment', danger: true, confirmText: 'Delete' })) {
                                                                         try {
                                                                             const response = await fetch(`/api/deleteInvoice/${payment.InvoiceID}`, {
                                                                                 method: 'DELETE'
@@ -1391,7 +1391,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                             )}
 
                             <div className={styles.paymentHistoryFooter}>
-                                {((selectedWorkForPayment.TotalRequired || 0) - (selectedWorkForPayment.TotalPaid || 0)) > 0 ? (
+                                {((selectedWorkForPayment.total_required || 0) - (selectedWorkForPayment.TotalPaid || 0)) > 0 ? (
                                     <button
                                         onClick={() => {
                                             setShowPaymentHistoryModal(false);
@@ -1436,10 +1436,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <strong>Work Type:</strong> {workToDelete.TypeName || 'N/A'}
                                 </p>
                                 <p className={styles.confirmDetailLine}>
-                                    <strong>Doctor:</strong> {workToDelete.DoctorName || 'N/A'}
+                                    <strong>Doctor:</strong> {workToDelete.doctor_name || 'N/A'}
                                 </p>
                                 <p className={styles.confirmDetailLine}>
-                                    <strong>Total Required:</strong> {formatCurrency(workToDelete.TotalRequired, workToDelete.Currency)}
+                                    <strong>Total Required:</strong> {formatCurrency(workToDelete.total_required, workToDelete.Currency)}
                                 </p>
                             </div>
                             <p className={`${styles.confirmWarning} ${styles.confirmWarningStrong}`}>
@@ -1489,10 +1489,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                             <strong>Work Type:</strong> {config.work.TypeName || 'N/A'}
                                         </p>
                                         <p className={styles.confirmDetailLine}>
-                                            <strong>Doctor:</strong> {config.work.DoctorName || 'N/A'}
+                                            <strong>Doctor:</strong> {config.work.doctor_name || 'N/A'}
                                         </p>
                                         <p className={styles.confirmDetailLine}>
-                                            <strong>Total Required:</strong> {formatCurrency(config.work.TotalRequired, config.work.Currency)}
+                                            <strong>Total Required:</strong> {formatCurrency(config.work.total_required, config.work.Currency)}
                                         </p>
                                     </div>
                                     <p className={styles.confirmWarning}>

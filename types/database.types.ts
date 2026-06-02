@@ -1,6 +1,6 @@
 /**
  * Database Entity Types
- * Type definitions for all database entities used in the application
+ * type definitions for all database entities used in the application
  */
 
 // ===========================================
@@ -11,25 +11,25 @@
  * Patient entity from tblpatients
  */
 export interface Patient {
-  PersonID: number;
-  PatientName: string;
-  FirstName?: string | null;
-  LastName?: string | null;
-  Phone?: string | null;
-  Phone2?: string | null;
-  Email?: string | null;
-  DateofBirth?: Date | null;
-  Gender?: number | null;
-  AddressID?: number | null;
-  ReferralSourceID?: number | null;
-  PatientTypeID?: number | null;
-  TagID?: number | null;
-  Notes?: string | null;
-  Language?: string | null;
-  CountryCode?: string | null;
-  EstimatedCost?: number | null;
-  Currency?: string | null;
-  DateAdded?: Date | null;
+  person_id: number;
+  patient_name: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  phone2?: string | null;
+  email?: string | null;
+  date_of_birth?: Date | null;
+  gender?: number | null;
+  address_id?: number | null;
+  referral_source_id?: number | null;
+  patient_type_id?: number | null;
+  tag_id?: number | null;
+  notes?: string | null;
+  language?: string | null;
+  country_code?: string | null;
+  estimated_cost?: number | null;
+  currency?: string | null;
+  date_added?: Date | null;
 }
 
 /**
@@ -38,7 +38,7 @@ export interface Patient {
 export interface PatientInfo {
   name: string;
   phone: string | null;
-  StartDate: Date | null;
+  start_date: Date | null;
   estimatedCost: number | null;
   currency: string | null;
   activeAlert: PatientAlert | null;
@@ -83,37 +83,37 @@ export interface TimePoint {
  * Appointment entity from tblappointments
  */
 export interface Appointment {
-  AppointmentID?: number;
+  appointment_id?: number;
   appointmentID?: number; // Alias for consistency
   Num?: number;
-  PersonID?: number;
-  PatientName: string;
-  PatientType?: string | null;
-  Phone?: string | null;
+  person_id?: number;
+  patient_name: string;
+  patient_type?: string | null;
+  phone?: string | null;
   AppsDate?: Date;
   apptime?: string | null;
   Time?: string | null;
-  AppDetail?: string | null;
-  Notes?: string | null;
+  app_detail?: string | null;
+  notes?: string | null;
   AppsType?: string | null;
-  Present?: string | null;
-  Seated?: string | null;
-  Dismissed?: string | null;
+  present?: string | null;
+  seated?: string | null;
+  dismissed?: string | null;
   HasVisit?: boolean | number | null;
-  Status?: AppointmentStatus;
+  status?: AppointmentStatus;
   DoctorID?: number | null;
-  WorkID?: number | null;
+  work_id?: number | null;
 }
 
 /**
  * Appointment status values
  */
-export type AppointmentStatus = 'Scheduled' | 'Present' | 'Seated' | 'Dismissed' | 'Absent';
+export type AppointmentStatus = 'Scheduled' | 'present' | 'seated' | 'dismissed' | 'Absent';
 
 /**
  * Appointment state fields that can be updated
  */
-export type AppointmentStateField = 'Present' | 'Seated' | 'Dismissed';
+export type AppointmentStateField = 'present' | 'seated' | 'dismissed';
 
 /**
  * Daily appointments response from stored procedure
@@ -168,38 +168,38 @@ export type WorkStatusValue = typeof WORK_STATUS[keyof typeof WORK_STATUS];
  * Work entity from tblwork
  */
 export interface Work {
-  workid: number;
-  PersonID: number;
-  TotalRequired?: number | null;
-  Currency?: string | null;
-  Typeofwork?: number | null;
-  Notes?: string | null;
-  Status: WorkStatusValue;
-  AdditionDate?: Date | null;
-  StartDate?: Date | null;
-  DebondDate?: Date | null;
-  FPhotoDate?: Date | null;
-  IPhotoDate?: Date | null;
-  EstimatedDuration?: number | null;
-  DrID?: number | null;
-  NotesDate?: Date | null;
-  KeyWordID1?: number | null;
-  KeyWordID2?: number | null;
-  KeywordID3?: number | null;
-  KeywordID4?: number | null;
-  KeywordID5?: number | null;
-  Discount?: number | null;
-  DiscountDate?: Date | null;
-  DiscountReason?: string | null;
+  work_id: number;
+  person_id: number;
+  total_required?: number | null;
+  currency?: string | null;
+  type_of_work?: number | null;
+  notes?: string | null;
+  status: WorkStatusValue;
+  addition_date?: Date | null;
+  start_date?: Date | null;
+  debond_date?: Date | null;
+  f_photo_date?: Date | null;
+  i_photo_date?: Date | null;
+  estimated_duration?: number | null;
+  dr_id?: number | null;
+  notes_date?: Date | null;
+  keyword_id_1?: number | null;
+  keyword_id_2?: number | null;
+  keyword_id_3?: number | null;
+  keyword_id_4?: number | null;
+  keyword_id_5?: number | null;
+  discount?: number | null;
+  discount_date?: Date | null;
+  discount_reason?: string | null;
 }
 
 /**
  * Work with joined data
  */
 export interface WorkWithDetails extends Work {
-  DoctorName?: string | null;
-  TypeName?: string | null;
-  StatusName?: string | null;
+  doctor_name?: string | null;
+  type_name?: string | null;
+  status_name?: string | null;
   Keyword1?: string | null;
   Keyword2?: string | null;
   Keyword3?: string | null;
@@ -207,7 +207,7 @@ export interface WorkWithDetails extends Work {
   Keyword5?: string | null;
   WorkStatus?: string;
   TotalPaid?: number;
-  PatientName?: string;
+  patient_name?: string;
 }
 
 // ===========================================
@@ -220,11 +220,11 @@ export interface WorkWithDetails extends Work {
 export interface Invoice {
   InvoiceID?: number;
   workid: number;
-  Amountpaid: number;
-  Dateofpayment: Date;
-  USDReceived?: number | null;
-  IQDReceived?: number | null;
-  Change?: number | null;
+  amount_paid: number;
+  date_of_payment: Date;
+  usd_received?: number | null;
+  iqd_received?: number | null;
+  change?: number | null;
 }
 
 /**
@@ -252,17 +252,17 @@ export interface Payment {
  */
 export interface WorkForInvoice {
   workid: number;
-  PersonID: number;
-  TotalRequired: number | null;
-  Currency: string | null;
-  Typeofwork: number | null;
-  StartDate: Date | null;
-  PatientName: string;
-  Phone: string | null;
+  person_id: number;
+  total_required: number | null;
+  currency: string | null;
+  type_of_work: number | null;
+  start_date: Date | null;
+  patient_name: string;
+  phone: string | null;
   TotalPaid: number;
-  Discount?: number | null;
-  DiscountDate?: Date | null;
-  DiscountReason?: string | null;
+  discount?: number | null;
+  discount_date?: Date | null;
+  discount_reason?: string | null;
 }
 
 // ===========================================
@@ -278,13 +278,13 @@ export type UserRole = 'admin' | 'secretary' | 'doctor' | 'user';
  * User entity from tblUsers
  */
 export interface User {
-  UserID: number;
-  Username: string;
-  PasswordHash?: string;
-  FullName: string;
-  Role: UserRole;
-  IsActive: boolean;
-  LastLogin?: Date | null;
+  user_id: number;
+  username: string;
+  password_hash?: string;
+  full_name: string;
+  role: UserRole;
+  is_active: boolean;
+  last_login?: Date | null;
 }
 
 /**
@@ -307,12 +307,12 @@ export interface SafeUser {
  */
 export interface Visit {
   VisitID: number;
-  WorkID: number;
-  VisitDate: Date;
-  Notes?: string | null;
+  work_id: number;
+  visit_date: Date;
+  notes?: string | null;
   UpperArch?: string | null;
   LowerArch?: string | null;
-  NextVisit?: Date | null;
+  next_visit?: Date | null;
   DoctorID?: number | null;
 }
 
@@ -321,16 +321,16 @@ export interface Visit {
 // ===========================================
 
 /**
- * Wire entity from tblWires
+ * wire entity from tblWires
  */
-export interface Wire {
+export interface wire {
   WireID: number;
-  WorkID: number;
+  work_id: number;
   WireDate: Date;
   WireType?: string | null;
   UpperWire?: string | null;
   LowerWire?: string | null;
-  Notes?: string | null;
+  notes?: string | null;
 }
 
 // ===========================================
@@ -342,14 +342,14 @@ export interface Wire {
  */
 export interface Expense {
   ExpenseID: number;
-  Description: string;
-  Amount: number;
-  Currency: string;
+  description: string;
+  amount: number;
+  currency: string;
   ExpenseDate: Date;
-  CategoryID?: number | null;
-  Notes?: string | null;
-  CreatedBy?: number | null;
-  CreatedAt?: Date | null;
+  category_id?: number | null;
+  notes?: string | null;
+  created_by?: number | null;
+  created_at?: Date | null;
 }
 
 // ===========================================
@@ -360,12 +360,12 @@ export interface Expense {
  * Employee entity from tblEmployees
  */
 export interface Employee {
-  ID: number;
-  employeeName: string;
-  Role?: string | null;
-  Phone?: string | null;
-  Email?: string | null;
-  IsActive?: boolean;
+  id: number;
+  employee_name: string;
+  role?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  is_active?: boolean;
 }
 
 // ===========================================
@@ -375,33 +375,33 @@ export interface Employee {
 /**
  * Work type from tblWorkType
  */
-export interface WorkType {
-  ID: number;
-  WorkType: string;
+export interface work_type {
+  id: number;
+  work_type: string;
 }
 
 /**
  * Keyword from tblKeyWord
  */
 export interface Keyword {
-  ID: number;
-  KeyWord: string;
+  id: number;
+  key_word: string;
 }
 
 /**
  * Patient type from tblPatientType
  */
-export interface PatientType {
-  ID: number;
-  PatientType: string;
+export interface patient_type {
+  id: number;
+  patient_type: string;
 }
 
 /**
  * Alert type from tblAlertTypes
  */
 export interface AlertType {
-  AlertTypeID: number;
-  TypeName: string;
+  alert_type_id: number;
+  type_name: string;
 }
 
 // ===========================================
@@ -413,15 +413,15 @@ export interface AlertType {
  */
 export interface AlignerSet {
   SetID: number;
-  WorkID: number;
+  work_id: number;
   DoctorID?: number | null;
   PartnerID?: number | null;
   TotalSets?: number | null;
   CurrentSet?: number | null;
-  Status?: string | null;
-  Notes?: string | null;
-  CreatedAt?: Date | null;
-  UpdatedAt?: Date | null;
+  status?: string | null;
+  notes?: string | null;
+  created_at?: Date | null;
+  updated_at?: Date | null;
 }
 
 /**
@@ -434,8 +434,8 @@ export interface AlignerBatch {
   SetsInBatch?: number | null;
   OrderDate?: Date | null;
   ReceivedDate?: Date | null;
-  Status?: string | null;
-  Notes?: string | null;
+  status?: string | null;
+  notes?: string | null;
   PdfPath?: string | null;
 }
 
@@ -445,9 +445,9 @@ export interface AlignerBatch {
 export interface AlignerPartner {
   PartnerID: number;
   PartnerName: string;
-  Email?: string | null;
-  Phone?: string | null;
-  IsActive?: boolean;
+  email?: string | null;
+  phone?: string | null;
+  is_active?: boolean;
 }
 
 // ===========================================
@@ -463,8 +463,8 @@ export interface Template {
   TemplateType: 'receipt' | 'invoice' | 'prescription' | 'report';
   Content: string;
   IsDefault?: boolean;
-  CreatedAt?: Date | null;
-  UpdatedAt?: Date | null;
+  created_at?: Date | null;
+  updated_at?: Date | null;
 }
 
 // ===========================================
@@ -476,14 +476,14 @@ export interface Template {
  */
 export interface MessageRecord {
   MessageID: number;
-  AppointmentID?: number | null;
+  appointment_id?: number | null;
   PatientID?: number | null;
-  Phone: string;
+  phone: string;
   Message: string;
-  Status: MessageStatus;
+  status: MessageStatus;
   SentAt?: Date | null;
   DeliveredAt?: Date | null;
-  ReadAt?: Date | null;
+  read_at?: Date | null;
   ErrorMessage?: string | null;
 }
 
@@ -515,78 +515,78 @@ export type StandMovementType = typeof STAND_MOVEMENT_TYPE[keyof typeof STAND_MO
  * Stand category from tblStandCategories
  */
 export interface StandCategory {
-  CategoryID: number;
-  CategoryName: string;
-  IsActive: boolean;
+  category_id: number;
+  category_name: string;
+  is_active: boolean;
 }
 
 /**
  * Stand item from tblStandItems
  */
 export interface StandItem {
-  ItemID: number;
-  ItemName: string;
-  SKU: string | null;
-  Barcode: string | null;
-  CategoryID: number | null;
-  CostPrice: number;
-  SellPrice: number;
-  CurrentStock: number;
-  ReorderLevel: number;
-  ExpiryDate: Date | null;
-  Unit: string | null;
-  Notes: string | null;
-  IsActive: boolean;
-  DateAdded: Date;
-  ModifiedDate: Date | null;
-  CreatedBy: number | null;
+  item_id: number;
+  item_name: string;
+  sku: string | null;
+  barcode: string | null;
+  category_id: number | null;
+  cost_price: number;
+  sell_price: number;
+  current_stock: number;
+  reorder_level: number;
+  expiry_date: Date | null;
+  unit: string | null;
+  notes: string | null;
+  is_active: boolean;
+  date_added: Date;
+  modified_date: Date | null;
+  created_by: number | null;
 }
 
 /**
  * Stand item with joined category name
  */
 export interface StandItemWithCategory extends StandItem {
-  CategoryName: string | null;
+  category_name: string | null;
 }
 
 /**
  * Stand sale from tblStandSales
  */
 export interface StandSale {
-  SaleID: number;
-  SaleDate: Date;
-  TotalAmount: number;
-  TotalCost: number;
-  TotalProfit: number;
-  AmountPaid: number;
-  Change: number;
-  PaymentMethod: string;
-  CustomerNote: string | null;
-  PersonID: number | null;
-  CashierID: number | null;
-  VoidedDate: Date | null;
-  VoidedBy: number | null;
-  VoidReason: string | null;
+  sale_id: number;
+  sale_date: Date;
+  total_amount: number;
+  total_cost: number;
+  total_profit: number;
+  amount_paid: number;
+  change: number;
+  payment_method: string;
+  customer_note: string | null;
+  person_id: number | null;
+  cashier_id: number | null;
+  voided_date: Date | null;
+  voided_by: number | null;
+  void_reason: string | null;
 }
 
 /**
  * Stand sale line item from tblStandSaleItems
  */
 export interface StandSaleItem {
-  SaleItemID: number;
-  SaleID: number;
-  ItemID: number;
-  Quantity: number;
-  UnitPrice: number;
-  UnitCost: number;
-  LineTotal: number;
+  sale_item_id: number;
+  sale_id: number;
+  item_id: number;
+  quantity: number;
+  unit_price: number;
+  unit_cost: number;
+  line_total: number;
 }
 
 /**
  * Stand sale line item with item name (joined)
  */
 export interface StandSaleItemWithName extends StandSaleItem {
-  ItemName: string;
+  item_name: string;
 }
 
 /**
@@ -594,7 +594,7 @@ export interface StandSaleItemWithName extends StandSaleItem {
  */
 export interface StandSaleWithItems extends StandSale {
   Items: StandSaleItemWithName[];
-  PatientName: string | null;
+  patient_name: string | null;
   CashierName: string | null;
 }
 
@@ -602,16 +602,16 @@ export interface StandSaleWithItems extends StandSale {
  * Stand stock movement from tblStandStockMovements
  */
 export interface StandStockMovement {
-  MovementID: number;
-  ItemID: number;
-  MovementType: StandMovementType;
-  Quantity: number;
-  UnitCost: number | null;
-  TotalCost: number | null;
-  RelatedSaleID: number | null;
-  Reason: string | null;
-  MovementDate: Date;
-  PerformedBy: number | null;
+  movement_id: number;
+  item_id: number;
+  movement_type: StandMovementType;
+  quantity: number;
+  unit_cost: number | null;
+  total_cost: number | null;
+  related_sale_id: number | null;
+  reason: string | null;
+  movement_date: Date;
+  performed_by: number | null;
 }
 
 /**
@@ -692,9 +692,9 @@ export interface StandDashboardKPIs {
  * Holiday entity
  */
 export interface Holiday {
-  ID: number;
-  Holidaydate: Date;
-  HolidayName: string;
-  Description?: string | null;
-  CreatedAt?: Date | null;
+  id: number;
+  holiday_date: Date;
+  holiday_name: string;
+  description?: string | null;
+  created_at?: Date | null;
 }

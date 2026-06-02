@@ -80,78 +80,78 @@ export class AlignerValidationError extends Error {
  * Set creation data
  */
 export interface SetCreateData {
-  WorkID: number;
-  AlignerDrID: number;
-  IsActive?: boolean;
+  work_id: number;
+  aligner_dr_id: number;
+  is_active?: boolean;
   TotalAligners?: number;
   RemainingAligners?: number;
-  SetCost?: number;
-  Notes?: string;
-  SetSequence?: number;
-  Type?: string;
-  UpperAlignersCount?: number;
-  LowerAlignersCount?: number;
+  set_cost?: number;
+  notes?: string;
+  set_sequence?: number;
+  type?: string;
+  upper_aligners_count?: number;
+  lower_aligners_count?: number;
 }
 
 /**
  * Set update data
  */
 export interface SetUpdateData {
-  AlignerDrID?: number;
-  IsActive?: boolean;
+  aligner_dr_id?: number;
+  is_active?: boolean;
   TotalAligners?: number;
   RemainingAligners?: number;
-  SetCost?: number;
-  Notes?: string;
-  SetSequence?: number;
-  Type?: string;
-  UpperAlignersCount?: number;
-  LowerAlignersCount?: number;
+  set_cost?: number;
+  notes?: string;
+  set_sequence?: number;
+  type?: string;
+  upper_aligners_count?: number;
+  lower_aligners_count?: number;
 }
 
 /**
  * Batch creation data
  */
 export interface BatchCreateData {
-  AlignerSetID: number;
-  IsActive?: boolean;
-  BatchSequence?: number;
+  aligner_set_id: number;
+  is_active?: boolean;
+  batch_sequence?: number;
   AlignersInBatch?: number;
-  Notes?: string;
-  UpperAlignerCount?: number;
-  LowerAlignerCount?: number;
-  UpperAlignerStartSequence?: number;
-  UpperAlignerEndSequence?: number;
-  LowerAlignerStartSequence?: number;
-  LowerAlignerEndSequence?: number;
-  Days?: number;
-  ValidityPeriod?: number;
-  HasUpperTemplate?: boolean;
-  HasLowerTemplate?: boolean;
+  notes?: string;
+  upper_aligner_count?: number;
+  lower_aligner_count?: number;
+  upper_aligner_start_sequence?: number;
+  upper_aligner_end_sequence?: number;
+  lower_aligner_start_sequence?: number;
+  lower_aligner_end_sequence?: number;
+  days?: number;
+  validity_period?: number;
+  has_upper_template?: boolean;
+  has_lower_template?: boolean;
 }
 
 /**
  * Batch update data
- * NOTE: ManufactureDate and DeliveredToPatientDate are managed via markBatchManufactured/markBatchDelivered
+ * NOTE: manufacture_date and delivered_to_patient_date are managed via markBatchManufactured/markBatchDelivered
  */
 export interface BatchUpdateData {
-  AlignerSetID?: number;
-  IsActive?: boolean;
-  BatchSequence?: number;
+  aligner_set_id?: number;
+  is_active?: boolean;
+  batch_sequence?: number;
   AlignersInBatch?: number;
-  // ManufactureDate and DeliveredToPatientDate are managed via status endpoints
-  Notes?: string;
-  UpperAlignerCount?: number;
-  LowerAlignerCount?: number;
-  UpperAlignerStartSequence?: number;
-  UpperAlignerEndSequence?: number;
-  LowerAlignerStartSequence?: number;
-  LowerAlignerEndSequence?: number;
-  Days?: number;
-  IsLast?: boolean;
-  HasUpperTemplate?: boolean;
-  HasLowerTemplate?: boolean;
-  // Note: BatchExpiryDate and ValidityPeriod are computed columns - cannot be set directly
+  // manufacture_date and delivered_to_patient_date are managed via status endpoints
+  notes?: string;
+  upper_aligner_count?: number;
+  lower_aligner_count?: number;
+  upper_aligner_start_sequence?: number;
+  upper_aligner_end_sequence?: number;
+  lower_aligner_start_sequence?: number;
+  lower_aligner_end_sequence?: number;
+  days?: number;
+  is_last?: boolean;
+  has_upper_template?: boolean;
+  has_lower_template?: boolean;
+  // note: batch_expiry_date and validity_period are computed columns - cannot be set directly
 }
 
 /**
@@ -183,24 +183,24 @@ export interface CreateBatchResult {
  * Doctor creation data
  */
 export interface DoctorCreateData {
-  DoctorName: string;
-  DoctorEmail?: string;
+  doctor_name: string;
+  doctor_email?: string;
   DoctorPhone?: string;
-  IsActive?: boolean;
+  is_active?: boolean;
   Address?: string;
-  Notes?: string;
+  notes?: string;
 }
 
 /**
  * Doctor update data
  */
 export interface DoctorUpdateData {
-  DoctorName: string;
-  DoctorEmail?: string;
+  doctor_name: string;
+  doctor_email?: string;
   DoctorPhone?: string;
-  IsActive?: boolean;
+  is_active?: boolean;
   Address?: string;
-  Notes?: string;
+  notes?: string;
 }
 
 /**
@@ -208,20 +208,20 @@ export interface DoctorUpdateData {
  */
 export interface PaymentCreateData {
   workid: number;
-  AlignerSetID: number;
-  Amountpaid: number | string;
-  Dateofpayment: string;
-  USDReceived?: number;
-  IQDReceived?: number;
-  Change?: number;
-  Notes?: string;
+  aligner_set_id: number;
+  amount_paid: number | string;
+  date_of_payment: string;
+  usd_received?: number;
+  iqd_received?: number;
+  change?: number;
+  notes?: string;
 }
 
 /**
  * Set balance info
  */
 interface SetBalanceInfo {
-  SetCost: number | null;
+  set_cost: number | null;
   TotalPaid: number;
   Balance: number;
 }
@@ -230,20 +230,20 @@ interface SetBalanceInfo {
  * Batch info for deactivation check
  */
 interface BatchInfo {
-  AlignerBatchID: number;
-  BatchSequence: number;
-  IsActive: boolean;
+  aligner_batch_id: number;
+  batch_sequence: number;
+  is_active: boolean;
 }
 
 /**
  * Aligner patient search result
  */
 export interface AlignerPatientSearchResult {
-  PersonID: number;
-  PatientName: string;
-  Phone?: string | null;
-  WorkID?: number;
-  DoctorName?: string | null;
+  person_id: number;
+  patient_name: string;
+  phone?: string | null;
+  work_id?: number;
+  doctor_name?: string | null;
   SetCount?: number;
   ActiveSetID?: number | null;
 }
@@ -256,25 +256,25 @@ export interface AlignerPatientSearchResult {
  * Validate and create a new aligner set
  *
  * Business Rules:
- * - WorkID and AlignerDrID are required
- * - If creating an active set (IsActive = 1), deactivates all other sets for the same work
+ * - work_id and aligner_dr_id are required
+ * - If creating an active set (is_active = 1), deactivates all other sets for the same work
  * - Initializes remaining aligners count equal to total count
  * - Sets creation date automatically
  *
  * @param setData - Set data
- * @returns New set ID
+ * @returns New set id
  * @throws AlignerValidationError If validation fails
  */
 export async function validateAndCreateSet(
   setData: SetCreateData
 ): Promise<number> {
   const startTime = Date.now();
-  const { WorkID, AlignerDrID } = setData;
+  const { work_id, aligner_dr_id } = setData;
 
   // Validation
-  if (!WorkID || !AlignerDrID) {
+  if (!work_id || !aligner_dr_id) {
     throw new AlignerValidationError(
-      'WorkID and AlignerDrID are required',
+      'work_id and aligner_dr_id are required',
       'MISSING_REQUIRED_FIELDS'
     );
   }
@@ -282,8 +282,8 @@ export async function validateAndCreateSet(
   // Sanitize numeric fields - convert empty strings to undefined
   const sanitizedData: SetCreateData = {
     ...setData,
-    SetCost: setData.SetCost !== undefined && setData.SetCost !== null && String(setData.SetCost) !== ''
-      ? Number(setData.SetCost)
+    set_cost: setData.set_cost !== undefined && setData.set_cost !== null && String(setData.set_cost) !== ''
+      ? Number(setData.set_cost)
       : undefined,
   };
 
@@ -305,7 +305,7 @@ export async function validateAndCreateSet(
       `⏱️  [SERVICE TIMING] Total service time: ${dbEndTime - startTime}ms`
     );
     log.info(
-      `Aligner set created successfully: Set ${newSetId} for Work ${WorkID}`
+      `Aligner set created successfully: Set ${newSetId} for Work ${work_id}`
     );
     return newSetId;
   } catch (error) {
@@ -320,9 +320,9 @@ export async function validateAndCreateSet(
  *
  * Business Rules:
  * - Set must exist
- * - If provided, AlignerDrID must be valid
+ * - If provided, aligner_dr_id must be valid
  *
- * @param setId - Set ID
+ * @param setId - Set id
  * @param setData - Set data to update
  * @throws AlignerValidationError If validation fails
  */
@@ -347,23 +347,23 @@ export async function validateAndUpdateSet(
   // Sanitize numeric fields - convert empty strings to undefined
   const sanitizedData: SetUpdateData = {
     ...setData,
-    SetCost: setData.SetCost !== undefined && setData.SetCost !== null && String(setData.SetCost) !== ''
-      ? Number(setData.SetCost)
+    set_cost: setData.set_cost !== undefined && setData.set_cost !== null && String(setData.set_cost) !== ''
+      ? Number(setData.set_cost)
       : undefined,
   };
 
   // Re-enforce the dropped CK_MoreThanTotalW invariant in TS: a set's cost must never
   // drop below what's already been paid for it, otherwise the set becomes overpaid.
-  if (sanitizedData.SetCost !== undefined) {
+  if (sanitizedData.set_cost !== undefined) {
     const balance = await alignerQueries.getAlignerSetBalance(parseInt(String(setId)));
     const alreadyPaid = Number(balance?.TotalPaid ?? 0);
-    if (Number(sanitizedData.SetCost) < alreadyPaid) {
+    if (Number(sanitizedData.set_cost) < alreadyPaid) {
       throw new AlignerValidationError(
-        `Set cost (${sanitizedData.SetCost}) cannot be less than the amount already paid for this set (${alreadyPaid}).`,
+        `Set cost (${sanitizedData.set_cost}) cannot be less than the amount already paid for this set (${alreadyPaid}).`,
         'SET_COST_BELOW_PAID',
         {
           setId: parseInt(String(setId)),
-          setCost: Number(sanitizedData.SetCost),
+          setCost: Number(sanitizedData.set_cost),
           alreadyPaid,
         }
       );
@@ -388,7 +388,7 @@ export async function validateAndUpdateSet(
  * - Set must exist
  * - Deletes all batches first (cascade delete)
  *
- * @param setId - Set ID
+ * @param setId - Set id
  * @throws AlignerValidationError If validation fails
  */
 export async function validateAndDeleteSet(
@@ -432,9 +432,9 @@ export async function validateAndDeleteSet(
  * Validate and create a new batch
  *
  * Business Rules:
- * - AlignerSetID is required
+ * - aligner_set_id is required
  * - Set must exist
- * - If IsActive=1, automatically deactivates other active batches for the same set
+ * - If is_active=1, automatically deactivates other active batches for the same set
  *
  * @param batchData - Batch data
  * @returns Object with newBatchId and deactivatedBatch info
@@ -443,37 +443,37 @@ export async function validateAndDeleteSet(
 export async function validateAndCreateBatch(
   batchData: BatchCreateData
 ): Promise<CreateBatchResult> {
-  const { AlignerSetID, IsActive } = batchData;
+  const { aligner_set_id, is_active } = batchData;
 
-  if (!AlignerSetID) {
+  if (!aligner_set_id) {
     throw new AlignerValidationError(
-      'AlignerSetID is required',
+      'aligner_set_id is required',
       'MISSING_REQUIRED_FIELDS'
     );
   }
 
   // Verify set exists
-  const setExists = await alignerQueries.getAlignerSetById(AlignerSetID);
+  const setExists = await alignerQueries.getAlignerSetById(aligner_set_id);
   if (!setExists) {
     throw new AlignerValidationError('Aligner set not found', 'SET_NOT_FOUND', {
-      setId: AlignerSetID,
+      setId: aligner_set_id,
     });
   }
 
   // Check for currently active batch (before creating new one)
   let deactivatedBatch: DeactivatedBatchInfo | null = null;
-  if (IsActive) {
+  if (is_active) {
     const batches = (await alignerQueries.getBatchesBySetId(
-      AlignerSetID
+      aligner_set_id
     )) as BatchInfo[];
-    const activeBatch = batches.find((b) => b.IsActive);
+    const activeBatch = batches.find((b) => b.is_active);
     if (activeBatch) {
       deactivatedBatch = {
-        batchId: activeBatch.AlignerBatchID,
-        batchSequence: activeBatch.BatchSequence,
+        batchId: activeBatch.aligner_batch_id,
+        batchSequence: activeBatch.batch_sequence,
       };
       log.info(
-        `Batch #${activeBatch.BatchSequence} will be deactivated when creating new active batch`
+        `Batch #${activeBatch.batch_sequence} will be deactivated when creating new active batch`
       );
     }
   }
@@ -500,17 +500,17 @@ export async function validateAndCreateBatch(
  */
 function mapBatchUpdateError(message: string): AlignerErrorCode | null {
   if (message === 'Aligner batch not found') return 'BATCH_NOT_FOUND';
-  if (message === 'Cannot change AlignerSetID') return 'INVALID_SET_CHANGE';
+  if (message === 'Cannot change aligner_set_id') return 'INVALID_SET_CHANGE';
   if (message.startsWith('Cannot update aligner batch: requested upper'))
     return 'UPPER_ALIGNER_LIMIT_EXCEEDED';
   if (message.startsWith('Cannot update aligner batch: requested lower'))
     return 'LOWER_ALIGNER_LIMIT_EXCEEDED';
-  if (message === 'Cannot set IsActive: batch must be delivered first')
+  if (message === 'Cannot set is_active: batch must be delivered first')
     return 'BATCH_NOT_DELIVERED';
   if (
     message.startsWith('Template flag') ||
-    message.includes('requires UpperAlignerCount') ||
-    message.includes('requires LowerAlignerCount')
+    message.includes('requires upper_aligner_count') ||
+    message.includes('requires lower_aligner_count')
   )
     return 'VALIDATION_ERROR';
   return null;
@@ -522,7 +522,7 @@ function mapBatchUpdateError(message: string): AlignerErrorCode | null {
  * Business Rules:
  * - Batch must exist (implicit through update)
  *
- * @param batchId - Batch ID
+ * @param batchId - Batch id
  * @param batchData - Batch data
  * @returns Update result
  * @throws AlignerValidationError If validation fails
@@ -578,7 +578,7 @@ export async function validateAndUpdateBatch(
  * Business Rules:
  * - Batch must exist (implicit through delete)
  *
- * @param batchId - Batch ID
+ * @param batchId - Batch id
  * @throws AlignerValidationError If validation fails
  */
 export async function validateAndDeleteBatch(
@@ -606,13 +606,13 @@ export async function validateAndDeleteBatch(
  * Mark batch as delivered with automatic activation for latest batch
  *
  * Business Logic:
- * - Sets DeliveredToPatientDate = GETDATE()
- * - BatchExpiryDate is auto-computed from DeliveredToPatientDate + (Days * AlignerCount)
- * - If batch is latest (highest BatchSequence) AND not already active:
+ * - Sets delivered_to_patient_date = GETDATE()
+ * - batch_expiry_date is auto-computed from delivered_to_patient_date + (days * AlignerCount)
+ * - If batch is latest (highest batch_sequence) AND not already active:
  *   - Deactivates other batches in the set
  *   - Activates this batch
  *
- * @param batchId - Batch ID
+ * @param batchId - Batch id
  * @param targetDate - Optional date for backdating/correction. If null, uses today's date
  * @returns Result with operation info and activation status
  * @throws AlignerValidationError If validation fails
@@ -656,10 +656,10 @@ export async function markBatchDelivered(
  *
  * Business Rules:
  * - Batch must exist
- * - If no targetDate and ManufactureDate already set, returns "already manufactured" (idempotent)
- * - If targetDate provided and ManufactureDate already set, updates date (allows correction)
+ * - If no targetDate and manufacture_date already set, returns "already manufactured" (idempotent)
+ * - If targetDate provided and manufacture_date already set, updates date (allows correction)
  *
- * @param batchId - Batch ID
+ * @param batchId - Batch id
  * @param targetDate - Optional date for backdating/correction. If null, uses today's date
  * @returns Result with operation info
  * @throws AlignerValidationError If validation fails
@@ -689,13 +689,13 @@ export async function markBatchManufactured(
 }
 
 /**
- * Undo manufacture - clears ManufactureDate
+ * Undo manufacture - clears manufacture_date
  *
  * Business Rules:
  * - Batch must exist
  * - Batch must not be delivered (undo delivery first)
  *
- * @param batchId - Batch ID
+ * @param batchId - Batch id
  * @returns Result with operation info
  * @throws AlignerValidationError If validation fails
  */
@@ -723,13 +723,13 @@ export async function undoManufactureBatch(
 }
 
 /**
- * Undo delivery - clears DeliveredToPatientDate and BatchExpiryDate
+ * Undo delivery - clears delivered_to_patient_date and batch_expiry_date
  *
  * Business Rules:
  * - Batch must exist
  * - Clears delivery date and expiry date, keeps manufacture date
  *
- * @param batchId - Batch ID
+ * @param batchId - Batch id
  * @returns Result with operation info
  * @throws AlignerValidationError If validation fails
  */
@@ -765,38 +765,38 @@ export async function undoDeliverBatch(
  *
  * Business Rules:
  * - Doctor name is required
- * - Email must be unique (if provided)
+ * - email must be unique (if provided)
  *
  * @param doctorData - Doctor data
- * @returns New doctor ID
+ * @returns New doctor id
  * @throws AlignerValidationError If validation fails
  */
 export async function validateAndCreateDoctor(
   doctorData: DoctorCreateData
 ): Promise<number> {
-  const { DoctorName, DoctorEmail } = doctorData;
+  const { doctor_name, doctor_email } = doctorData;
 
-  if (!DoctorName || DoctorName.trim() === '') {
+  if (!doctor_name || doctor_name.trim() === '') {
     throw new AlignerValidationError(
       'Doctor name is required',
       'MISSING_DOCTOR_NAME'
     );
   }
 
-  // Business Rule: Email must be unique (only check if email is provided)
-  const emailExists = DoctorEmail ? await alignerQueries.isDoctorEmailTaken(DoctorEmail) : false;
+  // Business Rule: email must be unique (only check if email is provided)
+  const emailExists = doctor_email ? await alignerQueries.isDoctorEmailTaken(doctor_email) : false;
   if (emailExists) {
     throw new AlignerValidationError(
       'A doctor with this email already exists',
       'EMAIL_ALREADY_EXISTS',
-      { email: DoctorEmail }
+      { email: doctor_email }
     );
   }
 
   try {
     const newDrID = (await alignerQueries.createDoctor(doctorData)) as number;
     log.info(
-      `Aligner doctor created successfully: Dr ${newDrID} - ${DoctorName}`
+      `Aligner doctor created successfully: Dr ${newDrID} - ${doctor_name}`
     );
     return newDrID;
   } catch (error) {
@@ -810,9 +810,9 @@ export async function validateAndCreateDoctor(
  *
  * Business Rules:
  * - Doctor name is required
- * - Email must be unique among other doctors (if provided)
+ * - email must be unique among other doctors (if provided)
  *
- * @param drID - Doctor ID
+ * @param drID - Doctor id
  * @param doctorData - Doctor data
  * @throws AlignerValidationError If validation fails
  */
@@ -820,31 +820,31 @@ export async function validateAndUpdateDoctor(
   drID: number | string,
   doctorData: DoctorUpdateData
 ): Promise<void> {
-  const { DoctorName, DoctorEmail } = doctorData;
+  const { doctor_name, doctor_email } = doctorData;
 
-  if (!DoctorName || DoctorName.trim() === '') {
+  if (!doctor_name || doctor_name.trim() === '') {
     throw new AlignerValidationError(
       'Doctor name is required',
       'MISSING_DOCTOR_NAME'
     );
   }
 
-  // Business Rule: Email must be unique (excluding this doctor, only check if email is provided)
-  const emailExists = DoctorEmail
-    ? await alignerQueries.isDoctorEmailTaken(DoctorEmail, parseInt(String(drID)))
+  // Business Rule: email must be unique (excluding this doctor, only check if email is provided)
+  const emailExists = doctor_email
+    ? await alignerQueries.isDoctorEmailTaken(doctor_email, parseInt(String(drID)))
     : false;
   if (emailExists) {
     throw new AlignerValidationError(
       'Another doctor with this email already exists',
       'EMAIL_ALREADY_EXISTS',
-      { email: DoctorEmail }
+      { email: doctor_email }
     );
   }
 
   try {
     await alignerQueries.updateDoctor(parseInt(String(drID)), doctorData);
     log.info(
-      `Aligner doctor updated successfully: Dr ${drID} - ${DoctorName}`
+      `Aligner doctor updated successfully: Dr ${drID} - ${doctor_name}`
     );
   } catch (error) {
     log.error('Error updating aligner doctor:', { error: error instanceof Error ? error.message : String(error) });
@@ -859,7 +859,7 @@ export async function validateAndUpdateDoctor(
  * - Cannot delete doctor if they have aligner sets
  * - Must reassign or delete sets first
  *
- * @param drID - Doctor ID
+ * @param drID - Doctor id
  * @throws AlignerValidationError If doctor has dependencies
  */
 export async function validateAndDeleteDoctor(
@@ -896,11 +896,11 @@ export async function validateAndDeleteDoctor(
  *
  * Business Rules:
  * - Set must exist
- * - Note text is required
+ * - note text is required
  *
- * @param setId - Set ID
- * @param noteText - Note text
- * @returns New note ID
+ * @param setId - Set id
+ * @param noteText - note text
+ * @returns New note id
  * @throws AlignerValidationError If validation fails
  */
 export async function validateAndCreateNote(
@@ -913,7 +913,7 @@ export async function validateAndCreateNote(
 
   if (!noteText || noteText.trim() === '') {
     throw new AlignerValidationError(
-      'Note text is required',
+      'note text is required',
       'MISSING_NOTE_TEXT'
     );
   }
@@ -946,11 +946,11 @@ export async function validateAndCreateNote(
  * Validate and update a note
  *
  * Business Rules:
- * - Note must exist
- * - Note text is required
+ * - note must exist
+ * - note text is required
  *
- * @param noteId - Note ID
- * @param noteText - Note text
+ * @param noteId - note id
+ * @param noteText - note text
  * @throws AlignerValidationError If validation fails
  */
 export async function validateAndUpdateNote(
@@ -966,7 +966,7 @@ export async function validateAndUpdateNote(
 
   if (!noteText || noteText.trim() === '') {
     throw new AlignerValidationError(
-      'Note text is required',
+      'note text is required',
       'MISSING_NOTE_TEXT'
     );
   }
@@ -976,14 +976,14 @@ export async function validateAndUpdateNote(
     parseInt(String(noteId))
   );
   if (!existingNote) {
-    throw new AlignerValidationError('Note not found', 'NOTE_NOT_FOUND', {
+    throw new AlignerValidationError('note not found', 'NOTE_NOT_FOUND', {
       noteId: parseInt(String(noteId)),
     });
   }
 
   try {
     await alignerQueries.updateNote(parseInt(String(noteId)), noteText);
-    log.info(`Note ${noteId} updated`);
+    log.info(`note ${noteId} updated`);
   } catch (error) {
     log.error('Error updating note:', { error: error instanceof Error ? error.message : String(error) });
     throw error;
@@ -994,9 +994,9 @@ export async function validateAndUpdateNote(
  * Validate and delete a note
  *
  * Business Rules:
- * - Note must exist
+ * - note must exist
  *
- * @param noteId - Note ID
+ * @param noteId - note id
  * @throws AlignerValidationError If validation fails
  */
 export async function validateAndDeleteNote(
@@ -1014,14 +1014,14 @@ export async function validateAndDeleteNote(
     parseInt(String(noteId))
   );
   if (!existingNote) {
-    throw new AlignerValidationError('Note not found', 'NOTE_NOT_FOUND', {
+    throw new AlignerValidationError('note not found', 'NOTE_NOT_FOUND', {
       noteId: parseInt(String(noteId)),
     });
   }
 
   try {
     await alignerQueries.deleteNote(parseInt(String(noteId)));
-    log.info(`Note ${noteId} deleted`);
+    log.info(`note ${noteId} deleted`);
   } catch (error) {
     log.error('Error deleting note:', { error: error instanceof Error ? error.message : String(error) });
     throw error;
@@ -1036,28 +1036,28 @@ export async function validateAndDeleteNote(
  * Validate and create a payment
  *
  * Business Rules:
- * - workid, Amountpaid, and Dateofpayment are required
+ * - workid, amount_paid, and date_of_payment are required
  *
  * @param paymentData - Payment data
- * @returns New invoice ID
+ * @returns New invoice id
  * @throws AlignerValidationError If validation fails
  */
 export async function validateAndCreatePayment(
   paymentData: PaymentCreateData
 ): Promise<number> {
-  const { workid, AlignerSetID, Amountpaid, Dateofpayment } = paymentData;
+  const { workid, aligner_set_id, amount_paid, date_of_payment } = paymentData;
 
-  if (!workid || !Amountpaid || !Dateofpayment) {
+  if (!workid || !amount_paid || !date_of_payment) {
     throw new AlignerValidationError(
-      'workid, Amountpaid, and Dateofpayment are required',
+      'workid, amount_paid, and date_of_payment are required',
       'MISSING_REQUIRED_FIELDS'
     );
   }
 
   // Validate payment doesn't exceed set balance
-  if (AlignerSetID) {
+  if (aligner_set_id) {
     const setBalance = (await alignerQueries.getAlignerSetBalance(
-      AlignerSetID
+      aligner_set_id
     )) as SetBalanceInfo | null;
 
     if (!setBalance) {
@@ -1067,14 +1067,14 @@ export async function validateAndCreatePayment(
       );
     }
 
-    if (setBalance.SetCost === null) {
+    if (setBalance.set_cost === null) {
       throw new AlignerValidationError(
         'Set cost must be defined before accepting payments',
         'SET_COST_NOT_DEFINED'
       );
     }
 
-    const paymentAmount = parseFloat(String(Amountpaid));
+    const paymentAmount = parseFloat(String(amount_paid));
 
     if (paymentAmount <= 0) {
       throw new AlignerValidationError(
@@ -1092,7 +1092,7 @@ export async function validateAndCreatePayment(
   }
 
   log.info(
-    `Adding payment for work ID: ${workid}, Set ID: ${AlignerSetID || 'general'}, Amount: ${Amountpaid}`
+    `Adding payment for work id: ${workid}, Set id: ${aligner_set_id || 'general'}, amount: ${amount_paid}`
   );
 
   try {
@@ -1118,7 +1118,7 @@ export async function validateAndCreatePayment(
  * - Search term must be at least 2 characters
  *
  * @param searchTerm - Search term
- * @param doctorId - Optional doctor ID
+ * @param doctorId - Optional doctor id
  * @returns Array of patients
  * @throws AlignerValidationError If validation fails
  */
@@ -1135,7 +1135,7 @@ export async function searchPatients(
 
   const trimmedSearch = searchTerm.trim();
   log.info(
-    `Searching for aligner patients: ${trimmedSearch}${doctorId ? ` (Doctor ID: ${doctorId})` : ''}`
+    `Searching for aligner patients: ${trimmedSearch}${doctorId ? ` (Doctor id: ${doctorId})` : ''}`
   );
 
   try {
@@ -1170,7 +1170,7 @@ export default {
   validateAndUpdateDoctor,
   validateAndDeleteDoctor,
 
-  // Notes
+  // notes
   validateAndCreateNote,
   validateAndUpdateNote,
   validateAndDeleteNote,

@@ -28,8 +28,8 @@ interface LatestWires {
 }
 
 interface VisitFormData {
-    WorkID: number;
-    VisitDate: string;
+    work_id: number;
+    visit_date: string;
     UpperWireID: number | string;
     LowerWireID: number | string;
     BracketChange: string;
@@ -47,8 +47,8 @@ interface VisitFormData {
 
 interface VisitResponse {
     ID: number;
-    WorkID: number;
-    VisitDate: string;
+    work_id: number;
+    visit_date: string;
     UpperWireID?: number;
     LowerWireID?: number;
     BracketChange?: string;
@@ -92,8 +92,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
 
     // Form state
     const [formData, setFormData] = useState<VisitFormData>({
-        WorkID: workId ?? 0,
-        VisitDate: new Date().toISOString().split('T')[0],
+        work_id: workId ?? 0,
+        visit_date: new Date().toISOString().split('T')[0],
         UpperWireID: '',
         LowerWireID: '',
         BracketChange: '',
@@ -145,8 +145,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
             const visit: VisitResponse = await response.json();
 
             setFormData({
-                WorkID: visit.WorkID,
-                VisitDate: visit.VisitDate ? new Date(visit.VisitDate).toISOString().split('T')[0] : '',
+                work_id: visit.work_id,
+                visit_date: visit.visit_date ? new Date(visit.visit_date).toISOString().split('T')[0] : '',
                 UpperWireID: visit.UpperWireID || '',
                 LowerWireID: visit.LowerWireID || '',
                 BracketChange: visit.BracketChange || '',
@@ -330,8 +330,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         <label>Visit Date <span className={styles.required}>*</span></label>
                         <input
                             type="date"
-                            value={formData.VisitDate}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('VisitDate', e.target.value)}
+                            value={formData.visit_date}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('visit_date', e.target.value)}
                             required
                         />
                     </div>

@@ -115,7 +115,7 @@ router.get(
       }
 
       log.info(
-        `WhatsApp send to patient request - PersonID: ${personId}, AppointmentID: ${appointmentId}`
+        `WhatsApp send to patient request - person_id: ${personId}, appointment_id: ${appointmentId}`
       );
 
       // Check if WhatsApp client is ready
@@ -197,7 +197,7 @@ router.get(
         });
       } else {
         log.warn('WhatsApp message send failed', { personId, appointmentId, error: result.error });
-        ErrorResponses.badRequest(res, 'Operation failed', {
+        ErrorResponses.badRequest(res, 'operation failed', {
           operation: 'send WhatsApp message',
           details: result.error
         });
@@ -217,7 +217,7 @@ router.get(
  * Send WhatsApp messages in batch for a specific date
  * GET /send (mounted at /api/wa)
  * Query params: date (YYYY-MM-DD format)
- * Note: Uses extended timeout (5 minutes) due to batch processing
+ * note: Uses extended timeout (5 minutes) due to batch processing
  */
 router.get(
   '/send',
@@ -330,7 +330,7 @@ router.post(
         return;
       }
 
-      log.info(`WhatsApp receipt send request - WorkID: ${workId}`);
+      log.info(`WhatsApp receipt send request - work_id: ${workId}`);
 
       // Check if WhatsApp client is ready
       if (!whatsapp.isReady()) {
@@ -355,9 +355,9 @@ router.post(
       }
 
       // Extract patient phone
-      const patientPhone = receiptData.patient.Phone;
+      const patientPhone = receiptData.patient.phone;
       if (!patientPhone || patientPhone.trim() === '') {
-        log.warn(`No phone number for patient ${receiptData.patient.PersonID}`);
+        log.warn(`No phone number for patient ${receiptData.patient.person_id}`);
         res.json({
           success: false,
           message: 'No phone number for patient'
@@ -381,23 +381,23 @@ router.post(
       // Compose WhatsApp message
       const message = `Receipt - Shwan Orthodontics
 
-Dear ${receiptData.patient.PatientName},
+Dear ${receiptData.patient.patient_name},
 
-Amount Paid: ${Math.round(receiptData.payment.AmountPaidToday).toLocaleString('en-US')} ${receiptData.payment.Currency}
-Remaining Balance: ${Math.round(receiptData.payment.RemainingBalance).toLocaleString('en-US')} ${receiptData.payment.Currency}
+amount Paid: ${Math.round(receiptData.payment.AmountPaidToday).toLocaleString('en-US')} ${receiptData.payment.currency}
+Remaining Balance: ${Math.round(receiptData.payment.RemainingBalance).toLocaleString('en-US')} ${receiptData.payment.currency}
 Date: ${new Date().toLocaleDateString('en-GB')}
 
 Thank you for your payment!`;
 
       log.info(
-        `Sending receipt to ${phoneNumber} for patient ${receiptData.patient.PatientName}`
+        `Sending receipt to ${phoneNumber} for patient ${receiptData.patient.patient_name}`
       );
 
       // Send message via WhatsApp
       const result = await whatsapp.sendMessage(
         phoneNumber,
         message,
-        receiptData.patient.PatientName
+        receiptData.patient.patient_name
       );
 
       if (result.success) {
@@ -457,7 +457,7 @@ router.post(
         return;
       }
 
-      log.info(`WhatsApp appointment send request - AppointmentID: ${appointmentId}`);
+      log.info(`WhatsApp appointment send request - appointment_id: ${appointmentId}`);
 
       if (!whatsapp.isReady()) {
         res.json({
@@ -477,8 +477,8 @@ router.post(
         return;
       }
 
-      if (!appointment.Phone || appointment.Phone.trim() === '') {
-        log.warn(`No phone number for patient ${appointment.PersonID}`);
+      if (!appointment.phone || appointment.phone.trim() === '') {
+        log.warn(`No phone number for patient ${appointment.person_id}`);
         res.json({
           success: false,
           message: 'No phone number for patient'
@@ -486,9 +486,9 @@ router.post(
         return;
       }
 
-      const phoneNumber = PhoneFormatter.forWhatsApp(appointment.Phone, '964');
+      const phoneNumber = PhoneFormatter.forWhatsApp(appointment.phone, '964');
       if (!PhoneFormatter.isValid(phoneNumber, '964')) {
-        log.warn(`Invalid phone format: ${appointment.Phone}`);
+        log.warn(`Invalid phone format: ${appointment.phone}`);
         res.json({
           success: false,
           message: 'Invalid phone number'
@@ -496,7 +496,7 @@ router.post(
         return;
       }
 
-      const appDateObj = new Date(appointment.AppDate);
+      const appDateObj = new Date(appointment.app_date);
       const appDate = appDateObj.toLocaleDateString('en-GB', {
         day: '2-digit',
         month: '2-digit',
@@ -506,7 +506,7 @@ router.post(
 
       const message = `Shwan Orthodontics
 
-Dear ${appointment.PatientName},
+Dear ${appointment.patient_name},
 
 Your appointment is confirmed for:
 ${appDate} (${dayOfWeek})
@@ -514,13 +514,13 @@ ${appDate} (${dayOfWeek})
 Thank you.`;
 
       log.info(
-        `Sending appointment confirmation to ${phoneNumber} for patient ${appointment.PatientName}`
+        `Sending appointment confirmation to ${phoneNumber} for patient ${appointment.patient_name}`
       );
 
       const result = await whatsapp.sendMessage(
         phoneNumber,
         message,
-        appointment.PatientName
+        appointment.patient_name
       );
 
       if (result.success) {
@@ -558,7 +558,7 @@ Thank you.`;
  * Send media (base64 encoded image) via WhatsApp
  * POST /sendmedia
  * Body: { file: base64Image, phone: phoneNumber }
- * Note: Uses extended timeout (2 minutes) for file upload
+ * note: Uses extended timeout (2 minutes) for file upload
  */
 router.post(
   '/sendmedia',
@@ -575,7 +575,7 @@ router.post(
       res.send('OK');
     } catch (error) {
       log.warn('WhatsApp send image failed', { phone, error: (error as Error).message });
-      ErrorResponses.badRequest(res, 'Operation failed', {
+      ErrorResponses.badRequest(res, 'operation failed', {
         operation: 'send image',
         details: (error as Error).message
       });
@@ -600,7 +600,7 @@ router.get(
       res.json(state);
     } catch (error) {
       log.warn('WhatsApp send X-ray failed', { phone, file, error: (error as Error).message });
-      ErrorResponses.badRequest(res, 'Operation failed', {
+      ErrorResponses.badRequest(res, 'operation failed', {
         operation: 'send X-ray file',
         details: (error as Error).message
       });
@@ -612,7 +612,7 @@ router.get(
  * Send multiple media files via WhatsApp or Telegram
  * POST /sendmedia2
  * Body: { file: comma-separated paths, phone: phoneNumber, prog: "WhatsApp"|"Telegram" }
- * Note: Uses extended timeout (2 minutes) for multiple file uploads
+ * note: Uses extended timeout (2 minutes) for multiple file uploads
  */
 router.post(
   '/sendmedia2',
@@ -628,7 +628,7 @@ router.post(
       const prog = req.body.prog;
 
       log.info(
-        `Sendmedia2 request - Program: ${prog}, Phone: ${phone}, Files: ${paths.length}`
+        `Sendmedia2 request - Program: ${prog}, phone: ${phone}, Files: ${paths.length}`
       );
 
       if (!phone || !prog || !paths.length) {
@@ -697,7 +697,7 @@ router.post(
 
       state.sentMessages = sentMessages;
       log.info(
-        `Final result - Sent: ${sentMessages}/${paths.length}, State:`,
+        `Final result - Sent: ${sentMessages}/${paths.length}, state:`,
         state
       );
       res.json(state);
@@ -717,7 +717,7 @@ router.post(
 /**
  * Get WhatsApp QR code for authentication
  * GET /qr (mounted at /api/wa)
- * Returns QR code as base64 data URL or error if not available
+ * Returns QR code as base64 data url or error if not available
  */
 router.get('/qr', async (_req: Request, res: Response): Promise<void> => {
   try {
@@ -732,7 +732,7 @@ router.get('/qr', async (_req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Convert the QR code string to a data URL
+    // Convert the QR code string to a data url
     const qrImageUrl = await qrcode.toDataURL(messageState.qr, {
       margin: 4,
       scale: 6,
@@ -850,7 +850,7 @@ router.get('/initial-state', async (_req: Request, res: Response): Promise<void>
           errorCorrectionLevel: 'M'
         });
       } catch (error) {
-        log.error('Failed to convert QR code to data URL', { error: (error as Error).message });
+        log.error('Failed to convert QR code to data url', { error: (error as Error).message });
         qrDataUrl = messageState.qr;
       }
     }
@@ -930,7 +930,7 @@ router.post(
         });
       } else {
         log.warn('WhatsApp destroy failed', { error: result.error });
-        ErrorResponses.badRequest(res, 'Operation failed', {
+        ErrorResponses.badRequest(res, 'operation failed', {
           operation: 'destroy WhatsApp client',
           details: result.error || 'Destroy failed'
         });
@@ -964,7 +964,7 @@ router.post('/logout', async (_req: Request, res: Response): Promise<void> => {
       });
     } else {
       log.warn('WhatsApp logout failed', { error: result.error });
-      ErrorResponses.badRequest(res, 'Operation failed', {
+      ErrorResponses.badRequest(res, 'operation failed', {
         operation: 'logout WhatsApp client',
         details: result.error || 'Logout failed'
       });

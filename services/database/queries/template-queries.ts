@@ -14,7 +14,7 @@ import { sql } from 'kysely';
 import type { UpdateObject } from 'kysely';
 import { getKysely, type Database } from '../kysely.js';
 
-// Type definitions
+// type definitions
 interface DocumentType {
   type_id: number;
   type_code: string;
@@ -115,7 +115,7 @@ interface TemplateUpdateData {
 export async function getDocumentTypes(): Promise<DocumentType[]> {
   const db = getKysely();
   return db
-    .selectFrom('DocumentTypes')
+    .selectFrom('document_types')
     .select([
       'type_id',
       'type_code',
@@ -135,12 +135,12 @@ export async function getDocumentTypes(): Promise<DocumentType[]> {
 }
 
 /**
- * Get a specific document type by ID
+ * Get a specific document type by id
  */
 export async function getDocumentTypeById(typeId: number): Promise<DocumentType | null> {
   const db = getKysely();
   const row = await db
-    .selectFrom('DocumentTypes')
+    .selectFrom('document_types')
     .select([
       'type_id',
       'type_code',
@@ -171,8 +171,8 @@ export async function getDocumentTemplates(
 ): Promise<DocumentTemplate[]> {
   const db = getKysely();
   let q = db
-    .selectFrom('DocumentTemplates as t')
-    .innerJoin('DocumentTypes as dt', 't.document_type_id', 'dt.type_id')
+    .selectFrom('document_templates as t')
+    .innerJoin('document_types as dt', 't.document_type_id', 'dt.type_id')
     .select([
       't.template_id',
       't.template_name',
@@ -220,13 +220,13 @@ export async function getDocumentTemplates(
 }
 
 /**
- * Get a specific template by ID (without elements)
+ * Get a specific template by id (without elements)
  */
 export async function getTemplateById(templateId: number): Promise<DocumentTemplate | null> {
   const db = getKysely();
   const row = await db
-    .selectFrom('DocumentTemplates as t')
-    .innerJoin('DocumentTypes as dt', 't.document_type_id', 'dt.type_id')
+    .selectFrom('document_templates as t')
+    .innerJoin('document_types as dt', 't.document_type_id', 'dt.type_id')
     .select([
       't.template_id',
       't.template_name',
@@ -280,8 +280,8 @@ export async function getDefaultTemplate(
 ): Promise<DocumentTemplate | null> {
   const db = getKysely();
   const row = await db
-    .selectFrom('DocumentTemplates as t')
-    .innerJoin('DocumentTypes as dt', 't.document_type_id', 'dt.type_id')
+    .selectFrom('document_templates as t')
+    .innerJoin('document_types as dt', 't.document_type_id', 'dt.type_id')
     .select([
       't.template_id',
       't.template_name',
@@ -318,7 +318,7 @@ export async function getDefaultTemplate(
 export async function createTemplate(templateData: TemplateData): Promise<number> {
   const db = getKysely();
   const row = await db
-    .insertInto('DocumentTemplates')
+    .insertInto('document_templates')
     .values({
       template_name: templateData.template_name,
       description: templateData.description ?? null,
@@ -342,7 +342,7 @@ export async function createTemplate(templateData: TemplateData): Promise<number
     .executeTakeFirst();
 
   if (!row?.template_id) {
-    throw new Error('Failed to create template: no ID returned');
+    throw new Error('Failed to create template: no id returned');
   }
 
   return row.template_id;
@@ -377,7 +377,7 @@ export async function updateTemplate(
     'modified_by',
   ];
 
-  const updateSet: UpdateObject<Database, 'DocumentTemplates'> = {};
+  const updateSet: UpdateObject<Database, 'document_templates'> = {};
   let hasFields = false;
 
   for (const field of updatableFields) {
@@ -398,7 +398,7 @@ export async function updateTemplate(
 
   const db = getKysely();
   await db
-    .updateTable('DocumentTemplates')
+    .updateTable('document_templates')
     .set(updateSet)
     .where('template_id', '=', templateId)
     .execute();
@@ -418,7 +418,7 @@ export async function deleteTemplate(templateId: number): Promise<boolean> {
 
   const db = getKysely();
   await db
-    .deleteFrom('DocumentTemplates')
+    .deleteFrom('document_templates')
     .where('template_id', '=', templateId)
     .where('is_system', '=', false)
     .execute();
@@ -481,7 +481,7 @@ export async function getTemplateElements(_templateId: number): Promise<never[]>
 }
 
 /**
- * Get a single element by ID (deprecated - file-based templates)
+ * Get a single element by id (deprecated - file-based templates)
  */
 export async function getTemplateElementById(_elementId: number): Promise<null> {
   return null;

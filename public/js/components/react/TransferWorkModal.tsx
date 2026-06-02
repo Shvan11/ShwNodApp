@@ -9,13 +9,13 @@ import PatientQuickSearch, { type SelectedPatient } from './PatientQuickSearch';
  */
 interface Work {
   workid: number;
-  PersonID: number;
+  person_id: number;
   TypeName?: string;
   StatusName?: string;
-  DoctorName?: string;
-  TotalRequired?: number;
+  doctor_name?: string;
+  total_required?: number;
   Currency?: string;
-  PatientName?: string;
+  patient_name?: string;
 }
 
 /**
@@ -107,7 +107,7 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
       const response = await fetch(`/api/work/${work.workid}/transfer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetPatientId: selectedPatient.PersonID })
+        body: JSON.stringify({ targetPatientId: selectedPatient.person_id })
       });
 
       const result = await response.json();
@@ -123,10 +123,10 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
         return;
       }
 
-      toast.success(`Work transferred to ${selectedPatient.PatientName}`);
+      toast.success(`Work transferred to ${selectedPatient.patient_name}`);
       onSuccess({
-        sourcePatientId: work.PersonID,
-        targetPatientId: selectedPatient.PersonID
+        sourcePatientId: work.person_id,
+        targetPatientId: selectedPatient.person_id
       });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Transfer failed');
@@ -175,10 +175,10 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
                   <span className={styles.infoLabel}>Status:</span>
                   <span className={styles.infoValue}>{work.StatusName || 'Unknown'}</span>
                 </div>
-                {work.DoctorName && (
+                {work.doctor_name && (
                   <div className={styles.infoRow}>
                     <span className={styles.infoLabel}>Doctor:</span>
-                    <span className={styles.infoValue}>{work.DoctorName}</span>
+                    <span className={styles.infoValue}>{work.doctor_name}</span>
                   </div>
                 )}
               </div>
@@ -190,7 +190,7 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
                 </label>
                 <PatientQuickSearch
                     onSelect={handleSelectPatient}
-                    excludePatientIds={[work.PersonID]}
+                    excludePatientIds={[work.person_id]}
                     layout="vertical"
                     showHeader={false}
                     autoFocus={true}
@@ -222,8 +222,8 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
                   </div>
                   <div className={styles.patientBox}>
                     <span className={styles.boxLabel}>To</span>
-                    <span className={styles.boxName}>{selectedPatient.PatientName}</span>
-                    <span className={styles.boxId}>#{selectedPatient.PersonID}</span>
+                    <span className={styles.boxName}>{selectedPatient.patient_name}</span>
+                    <span className={styles.boxId}>#{selectedPatient.person_id}</span>
                   </div>
                 </div>
               </div>

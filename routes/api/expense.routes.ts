@@ -59,7 +59,7 @@ interface ExpenseFilters {
 }
 
 interface CreateExpenseBody {
-  expenseDate: string;
+  expense_date: string;
   amount: number | string;
   currency?: string;
   note?: string;
@@ -68,7 +68,7 @@ interface CreateExpenseBody {
 }
 
 interface ExpenseData {
-  expenseDate: string;
+  expense_date: string;
   amount: number;
   currency: string;
   note?: string;
@@ -148,7 +148,7 @@ router.get(
 );
 
 /**
- * Get expense subcategories by category ID
+ * Get expense subcategories by category id
  */
 router.get(
   '/expenses/subcategories/:categoryId',
@@ -181,13 +181,13 @@ router.post(
     res: Response
   ): Promise<void> => {
     try {
-      const { expenseDate, amount, currency, note, categoryId, subcategoryId } =
+      const { expense_date, amount, currency, note, categoryId, subcategoryId } =
         req.body;
 
       // Validation
-      if (!expenseDate || !amount) {
+      if (!expense_date || !amount) {
         log.warn('Expense creation validation failed', {
-          expenseDate: expenseDate ?? 'missing',
+          expense_date: expense_date ?? 'missing',
           amount: amount ?? 'missing',
           receivedFields: Object.keys(req.body)
         });
@@ -199,7 +199,7 @@ router.post(
       }
 
       const expenseData: ExpenseData = {
-        expenseDate,
+        expense_date,
         amount: parseInt(String(amount)),
         currency: currency || 'IQD',
         note,
@@ -264,7 +264,7 @@ router.get(
 );
 
 /**
- * Get a single expense by ID
+ * Get a single expense by id
  * NOTE: This route MUST come after all specific /expenses/* routes
  * to avoid matching paths like /expenses/categories or /expenses/summary
  */
@@ -277,7 +277,7 @@ router.get(
       // Validate that id is a valid number
       const expenseId = parseInt(id);
       if (isNaN(expenseId)) {
-        ErrorResponses.badRequest(res, 'Invalid expense ID. Must be a number.');
+        ErrorResponses.badRequest(res, 'Invalid expense id. Must be a number.');
         return;
       }
 
@@ -319,21 +319,21 @@ router.put(
   ): Promise<void> => {
     try {
       const { id } = req.params;
-      const { expenseDate, amount, currency, note, categoryId, subcategoryId } =
+      const { expense_date, amount, currency, note, categoryId, subcategoryId } =
         req.body;
 
       // Validate that id is a valid number
       const expenseId = parseInt(id);
       if (isNaN(expenseId)) {
-        ErrorResponses.badRequest(res, 'Invalid expense ID. Must be a number.');
+        ErrorResponses.badRequest(res, 'Invalid expense id. Must be a number.');
         return;
       }
 
       // Validation
-      if (!expenseDate || !amount) {
+      if (!expense_date || !amount) {
         log.warn('Expense update validation failed', {
           expenseId,
-          expenseDate: expenseDate ?? 'missing',
+          expense_date: expense_date ?? 'missing',
           amount: amount ?? 'missing',
           receivedFields: Object.keys(req.body)
         });
@@ -345,7 +345,7 @@ router.put(
       }
 
       const expenseData: ExpenseData = {
-        expenseDate,
+        expense_date,
         amount: parseInt(String(amount)),
         currency: currency || 'IQD',
         note,
@@ -390,7 +390,7 @@ router.delete(
       // Validate that id is a valid number
       const expenseId = parseInt(id);
       if (isNaN(expenseId)) {
-        ErrorResponses.badRequest(res, 'Invalid expense ID. Must be a number.');
+        ErrorResponses.badRequest(res, 'Invalid expense id. Must be a number.');
         return;
       }
 

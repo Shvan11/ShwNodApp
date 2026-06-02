@@ -61,16 +61,16 @@ interface ApiLoaderOptions {
 }
 
 /**
- * Patient data structure
+ * Patient data structure (snake_case from /api/patients/:id/info)
  */
 export interface PatientData {
-  PersonID?: number;
+  person_id?: number;
   code?: number;
   id?: number;
   name?: string;
-  PatientName?: string;
-  FirstName?: string;
-  LastName?: string;
+  patient_name?: string;
+  first_name?: string;
+  last_name?: string;
   Phone?: string;
   [key: string]: unknown;
 }
@@ -79,8 +79,8 @@ export interface PatientData {
  * Work data structure
  */
 export interface WorkData {
-  WorkID?: number;
-  PersonID?: number;
+  work_id?: number;
+  person_id?: number;
   WorkType?: string;
   TypeName?: string;
   [key: string]: unknown;
@@ -462,16 +462,16 @@ export async function alignerPatientWorkLoader({
     cacheKey: `work_${workId}`,
   });
 
-  // Validate PersonID before fetching patient data
-  if (!data?.PersonID) {
+  // Validate person_id before fetching patient data
+  if (!data?.person_id) {
     throw new Response('Work record has no associated patient', { status: 404 });
   }
 
-  // Also load patient info (Note: getWorkDetails returns PersonID, not PatientID)
-  const patientData = await apiLoader<PatientData>(`/api/patients/${data.PersonID}/info`, {
+  // Also load patient info
+  const patientData = await apiLoader<PatientData>(`/api/patients/${data.person_id}/info`, {
     signal,
     cache: true,
-    cacheKey: `patient_${data.PersonID}`,
+    cacheKey: `patient_${data.person_id}`,
   });
 
   return {

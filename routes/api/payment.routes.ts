@@ -5,7 +5,7 @@
  * - Payment retrieval and history
  * - Invoice creation and deletion
  * - Exchange rate management
- * - Currency conversion and validation
+ * - currency conversion and validation
  * - Receipt generation
  *
  * This module includes comprehensive validation for:
@@ -53,16 +53,16 @@ interface PaymentQueryParams {
 }
 
 interface WorkForReceiptResult {
-  PersonID: number;
-  PatientName: string;
-  Phone: string | null;
+  person_id: number;
+  patient_name: string;
+  phone: string | null;
   TotalPaid: number;
-  AppDate: Date;
+  app_date: Date;
   workid: number;
-  TotalRequired: number;
-  Currency: string;
-  Discount: number | null;
-  DiscountDate: Date | null;
+  total_required: number;
+  currency: string;
+  discount: number | null;
+  discount_date: Date | null;
 }
 
 interface ExchangeRateBody {
@@ -150,31 +150,31 @@ router.get(
       }
 
       // V_Report (and its sub-views VTotPaid / VLastApp) inlined for a single work:
-      //  - TotalPaid: SUM(tblInvoice.Amountpaid) for the work (NULL when no payments, as VTotPaid yielded)
-      //  - AppDate:   the patient's latest FUTURE appointment (VLastApp: per-person MAX(AppDate) > now)
+      //  - TotalPaid: SUM(tblInvoice.amount_paid) for the work (NULL when no payments, as VTotPaid yielded)
+      //  - app_date:   the patient's latest FUTURE appointment (VLastApp: per-person MAX(app_date) > now)
       const { rows: result } = await sql<WorkForReceiptResult>`
         SELECT
-          w."PersonID",
-          p."PatientName",
-          p."Phone",
+          w."person_id",
+          p."patient_name",
+          p."phone",
           tp."TotalPaid",
-          la."AppDate",
-          w."workid",
-          w."TotalRequired",
-          w."Currency",
-          w."Discount",
-          w."DiscountDate"
-        FROM "tblwork" w
-        JOIN "tblpatients" p ON p."PersonID" = w."PersonID"
+          la."app_date",
+          w."work_id",
+          w."total_required",
+          w."currency",
+          w."discount",
+          w."discount_date"
+        FROM "works" w
+        JOIN "patients" p ON p."person_id" = w."person_id"
         LEFT JOIN (
-          SELECT "workid", SUM("Amountpaid") AS "TotalPaid"
-          FROM "tblInvoice" GROUP BY "workid"
-        ) tp ON tp."workid" = w."workid"
+          SELECT "work_id", SUM("amount_paid") AS "TotalPaid"
+          FROM "invoices" GROUP BY "work_id"
+        ) tp ON tp."work_id" = w."work_id"
         LEFT JOIN (
-          SELECT "PersonID", MAX("AppDate") AS "AppDate"
-          FROM "tblappointments" WHERE "AppDate" > LOCALTIMESTAMP GROUP BY "PersonID"
-        ) la ON la."PersonID" = w."PersonID"
-        WHERE w."workid" = ${parseInt(workId)}
+          SELECT "person_id", MAX("app_date") AS "app_date"
+          FROM "appointments" WHERE "app_date" > LOCALTIMESTAMP GROUP BY "person_id"
+        ) la ON la."person_id" = w."person_id"
+        WHERE w."work_id" = ${parseInt(workId)}
       `.execute(getKysely());
 
       if (!result || result.length === 0) {
@@ -413,10 +413,10 @@ router.post(
  *
  * Validation Rules:
  * 1. At least one currency amount (USD or IQD) must be > 0
- * 2. Currency amounts cannot be negative
+ * 2. currency amounts cannot be negative
  * 3. For same-currency payments: change is set to NULL (not tracked)
  * 4. For cross-currency payments: change is validated and saved
- * 5. Change cannot exceed IQD received (simple case)
+ * 5. change cannot exceed IQD received (simple case)
  * 6. For USD payments: change validated against total IQD value at exchange rate
  */
 router.post(
@@ -502,7 +502,7 @@ router.delete(
       }
 
       const result = await sql`
-        DELETE FROM "tblInvoice" WHERE "invoiceID" = ${parseInt(invoiceId)}
+        DELETE FROM "invoices" WHERE "invoice_id" = ${parseInt(invoiceId)}
       `.execute(getKysely());
       const rowsAffected = Number(result.numAffectedRows ?? 0n);
 

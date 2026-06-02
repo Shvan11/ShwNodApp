@@ -27,11 +27,148 @@ export type Numeric = ColumnType<string, number | string, number | string>;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface Addresses {
+  city_id: number | null;
+  id: Generated<number>;
+  zone: string | null;
+}
+
+export interface Alerts {
+  alert_details: string | null;
+  alert_id: Generated<number>;
+  alert_severity: number;
+  alert_type_id: number;
+  creation_date: Generated<Timestamp>;
+  is_active: Generated<boolean>;
+  person_id: number;
+}
+
+export interface AlertTypes {
+  alert_type_id: Generated<number>;
+  type_name: string;
+}
+
+export interface AlignerActivityFlags {
+  activity_description: string;
+  activity_id: Generated<number>;
+  activity_type: string;
+  aligner_set_id: number;
+  created_at: Generated<Timestamp | null>;
+  is_read: Generated<boolean | null>;
+  read_at: Timestamp | null;
+  related_record_id: number | null;
+}
+
+export interface AlignerBatches {
+  aligner_batch_id: Generated<number>;
+  aligner_set_id: number;
+  batch_expiry_date: Generated<Timestamp | null>;
+  batch_sequence: number;
+  creation_date: Generated<Timestamp>;
+  days: number | null;
+  delivered_to_patient_date: Timestamp | null;
+  has_lower_template: Generated<boolean>;
+  has_upper_template: Generated<boolean>;
+  is_active: Generated<boolean | null>;
+  is_last: Generated<boolean>;
+  lower_aligner_count: number;
+  lower_aligner_end_sequence: Generated<number | null>;
+  lower_aligner_start_sequence: number | null;
+  manufacture_date: Timestamp | null;
+  notes: string | null;
+  upper_aligner_count: number;
+  upper_aligner_end_sequence: Generated<number | null>;
+  upper_aligner_start_sequence: number | null;
+  validity_period: Generated<number | null>;
+}
+
 export interface AlignerDoctors {
-  DoctorEmail: string | null;
-  DoctorName: string;
-  DrID: Generated<number>;
-  LogoPath: string | null;
+  doctor_email: string | null;
+  doctor_name: string;
+  dr_id: Generated<number>;
+  logo_path: string | null;
+}
+
+export interface AlignerNotes {
+  aligner_set_id: number;
+  created_at: Generated<Timestamp | null>;
+  edited_at: Timestamp | null;
+  is_edited: Generated<boolean | null>;
+  is_read: Generated<boolean>;
+  note_id: Generated<number>;
+  note_text: string;
+  note_type: string;
+}
+
+export interface AlignerSets {
+  aligner_dr_id: number;
+  aligner_set_id: Generated<number>;
+  archform_id: number | null;
+  creation_date: Timestamp | null;
+  currency: Generated<string | null>;
+  days: number | null;
+  drive_file_id: string | null;
+  folder_path: string | null;
+  is_active: Generated<boolean | null>;
+  lower_aligners_count: number | null;
+  notes: string | null;
+  pdf_uploaded_at: Timestamp | null;
+  pdf_uploaded_by: string | null;
+  remaining_lower_aligners: number | null;
+  remaining_upper_aligners: number | null;
+  set_cost: Numeric | null;
+  set_pdf_url: string | null;
+  set_sequence: number | null;
+  set_url: string | null;
+  set_video: string | null;
+  type: string | null;
+  upper_aligners_count: number | null;
+  work_id: number;
+}
+
+export interface Appointments {
+  app_cost: string | null;
+  app_date: Timestamp;
+  app_day: Generated<Timestamp | null>;
+  app_detail: string | null;
+  app_time: Generated<string | null>;
+  appointment_id: Generated<number>;
+  delivered_timestamp: Timestamp | null;
+  delivered_wa: string | null;
+  dismissed: string | null;
+  dr_id: number | null;
+  last_updated: Timestamp | null;
+  notified: Generated<boolean | null>;
+  person_id: number;
+  present: string | null;
+  read_timestamp: Timestamp | null;
+  seated: string | null;
+  sent_timestamp: Timestamp | null;
+  sent_wa: boolean | null;
+  sms_sid: string | null;
+  sms_status: string | null;
+  wa_message_id: string | null;
+  want_notify: Generated<boolean | null>;
+  want_wa: Generated<boolean | null>;
+}
+
+export interface Bends {
+  bend: string;
+  bend_id: Generated<number>;
+}
+
+export interface Calendar {
+  app_date: Timestamp;
+}
+
+export interface CarriedWires {
+  addition_date: Timestamp;
+  id: Generated<number>;
+  person_id: number;
+  upper_lower: string;
+  wire_bag: string;
+  wire_id: number;
+  wire_slot: number;
 }
 
 export interface CdcSinkControl {
@@ -49,6 +186,65 @@ export interface ChangeLog {
   pk: string;
   sink: string;
   tbl: string;
+}
+
+export interface Cities {
+  city: string | null;
+  id: Generated<number>;
+}
+
+export interface Details {
+  detail: string | null;
+  id: Generated<number>;
+}
+
+export interface Diagnoses {
+  appliance: string | null;
+  c_anb: string | null;
+  c_fma: string | null;
+  c_lafh: string | null;
+  c_li_a_po: string | null;
+  c_li_md: string | null;
+  c_llip_e: string | null;
+  c_mma: string | null;
+  c_naso_lip: string | null;
+  c_percent_lafh: string | null;
+  c_sn_mx: string | null;
+  c_sna: string | null;
+  c_snb: string | null;
+  c_tafh: string | null;
+  c_uafh: string | null;
+  c_ui_li: string | null;
+  c_uimx: string | null;
+  c_ulip_e: string | null;
+  c_wits: string | null;
+  chief_complain: string | null;
+  diagnosis: string;
+  dx_date: Timestamp | null;
+  f_antero_posterior: string | null;
+  f_lip_competence: string | null;
+  f_naso_labial_angle: string | null;
+  f_transverse: string | null;
+  f_upper_incisor_show_rest: string | null;
+  f_upper_incisor_show_smile: string | null;
+  f_vertical: string | null;
+  i_curveof_spee: string | null;
+  i_dental_health: string | null;
+  i_lower_crowding: string | null;
+  i_lower_incisor_inclination: string | null;
+  i_teeth_present: string | null;
+  i_upper_crowding: string | null;
+  i_upper_incisor_inclination: string | null;
+  id: Generated<number>;
+  o_canine_relation: string | null;
+  o_centerlines: string | null;
+  o_functional_occlusion: string | null;
+  o_incisor_relation: string | null;
+  o_molar_relation: string | null;
+  o_overbite: string | null;
+  o_overjet: string | null;
+  treatment_plan: string;
+  work_id: number;
 }
 
 export interface DocumentTemplates {
@@ -99,15 +295,192 @@ export interface DolphinSyncMap {
   local_table: string;
 }
 
+export interface Elastics {
+  elastic: string;
+  elastic_id: Generated<number>;
+}
+
+export interface Employees {
+  appointment_color: string | null;
+  email: string | null;
+  employee_name: string;
+  get_appointments: Generated<boolean>;
+  id: Generated<number>;
+  percentage: Generated<boolean>;
+  phone: string | null;
+  position: number | null;
+  receive_email: Generated<boolean>;
+  sort_order: Generated<number>;
+}
+
+export interface Endo {
+  canal: string | null;
+  curvature: string | null;
+  detail_id: number | null;
+  id: Generated<number>;
+  note: string | null;
+  refrence_point: string | null;
+  working_length: Numeric | null;
+}
+
+export interface EstimatedCostPresets {
+  amount: Numeric;
+  currency: string;
+  display_order: Generated<number | null>;
+  preset_id: Generated<number>;
+}
+
+export interface ExpenseCategories {
+  category_id: Generated<number>;
+  category_name: string;
+}
+
+export interface Expenses {
+  amount: number;
+  category_id: number | null;
+  currency: string | null;
+  expense_date: Timestamp;
+  id: Generated<number>;
+  note: string | null;
+  subcategory_id: number | null;
+}
+
+export interface ExpenseSubcategories {
+  category_id: number;
+  subcategory_id: Generated<number>;
+  subcategory_name: string;
+}
+
+export interface Genders {
+  gender: string;
+  gender_id: number;
+}
+
+export interface Holidays {
+  description: string | null;
+  holiday_date: Timestamp;
+  holiday_name: Generated<string>;
+  id: Generated<number>;
+}
+
+export interface ImageTypes {
+  description: string | null;
+  dolphin_ityp_id: string | null;
+  image_type_code: string;
+}
+
+export interface ImplantManufacturers {
+  id: Generated<number>;
+  manufacturer_name: string;
+}
+
+export interface Implants {
+  id: Generated<number>;
+  implant_company: string | null;
+  implant_diameter: Numeric | null;
+  implant_length: Numeric | null;
+  note: string | null;
+  tooth: string | null;
+  work_id: number;
+}
+
+export interface Invoices {
+  actual_amount: number | null;
+  actual_cur: string | null;
+  aligner_set_id: number | null;
+  amount_paid: number;
+  change: number | null;
+  date_of_payment: Timestamp;
+  invoice_id: Generated<number>;
+  iqd_received: Generated<number>;
+  sys_start_time: Generated<Timestamp>;
+  usd_received: Generated<number>;
+  work_id: number;
+}
+
+export interface Keywords {
+  id: Generated<number>;
+  key_word: string | null;
+}
+
+export interface MessageStatusHistory {
+  appointment_id: number;
+  status_code: number;
+  status_history_id: Generated<number>;
+  status_text: string;
+  timestamp: Generated<Timestamp>;
+  wa_message_id: string;
+}
+
+export interface Numbers {
+  my_number: Generated<number>;
+}
+
+export interface OldOpg {
+  birth_date: Timestamp | null;
+  directory: string;
+  first_name: string;
+  id: number;
+  last_name: string;
+  sex: string;
+}
+
+export interface Options {
+  option_name: string;
+  option_value: string | null;
+}
+
+export interface PatientPortalAuth {
+  created_at: Generated<Timestamp>;
+  enabled: Generated<boolean>;
+  failed_attempts: Generated<number>;
+  last_login_at: Timestamp | null;
+  locked_until: Timestamp | null;
+  person_id: number;
+  pin_hash: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface Patients {
-  patBirthdate: Timestamp | null;
-  patFirstName: string | null;
-  patGender: string | null;
-  patID: string;
-  patLastName: string | null;
-  patName: string | null;
-  patOtherID: string | null;
-  patPhone1: string | null;
+  address_id: number | null;
+  country_code: string | null;
+  currency: string | null;
+  date_added: Generated<Timestamp | null>;
+  date_of_birth: Timestamp | null;
+  email: string | null;
+  estimated_cost: number | null;
+  first_name: string | null;
+  gender: number | null;
+  language: Generated<number | null>;
+  last_name: string | null;
+  notes: string | null;
+  patient_id: string | null;
+  patient_name: string;
+  patient_type_id: number | null;
+  person_id: Generated<number>;
+  phone: string | null;
+  phone2: string | null;
+  referral_source_id: number | null;
+  tag_id: number | null;
+  web_ceph_created_at: Timestamp | null;
+  web_ceph_link: string | null;
+  web_ceph_patient_id: string | null;
+}
+
+export interface PatientsDolphin {
+  pat_birthdate: Timestamp | null;
+  pat_first_name: string | null;
+  pat_gender: string | null;
+  pat_id: string;
+  pat_last_name: string | null;
+  pat_name: string | null;
+  pat_other_id: string | null;
+  pat_phone1: string | null;
+}
+
+export interface PatientTypes {
+  id: Generated<number>;
+  patient_type: string | null;
 }
 
 export interface Pgmigrations {
@@ -122,737 +495,364 @@ export interface PortalSessions {
   sid: string;
 }
 
+export interface Positions {
+  id: Generated<number>;
+  position_name: string | null;
+}
+
+export interface PrivatePhotos {
+  image_name: string;
+  marked_at: Generated<Timestamp>;
+  marked_by: number | null;
+  person_id: number;
+  timepoint_code: string;
+}
+
+export interface Referrals {
+  id: Generated<number>;
+  referral: string | null;
+}
+
+export interface Screws {
+  id: Generated<number>;
+  person_id: Generated<number>;
+  placement_date: Timestamp | null;
+  position: string | null;
+  state: string | null;
+  work_id: Generated<number | null>;
+}
+
+export interface Sms {
+  date: Timestamp;
+  email_sent: Generated<boolean>;
+  exchange_rate: number | null;
+  id: Generated<number>;
+  sms_id: string | null;
+  sms_sent: Generated<boolean>;
+}
+
 export interface StaffSessions {
   expire: Timestamp;
   sess: Json;
   sid: string;
 }
 
+export interface StandCategories {
+  category_id: Generated<number>;
+  category_name: string;
+  is_active: Generated<boolean>;
+}
+
+export interface StandItems {
+  barcode: string | null;
+  category_id: number | null;
+  cost_price: number;
+  created_by: number | null;
+  current_stock: Generated<number>;
+  date_added: Generated<Timestamp>;
+  expiry_date: Timestamp | null;
+  is_active: Generated<boolean>;
+  item_id: Generated<number>;
+  item_name: string;
+  modified_date: Timestamp | null;
+  notes: string | null;
+  reorder_level: Generated<number>;
+  sell_price: number;
+  sku: string | null;
+  unit: string | null;
+}
+
+export interface StandSaleItems {
+  item_id: number;
+  line_total: number;
+  quantity: number;
+  sale_id: number;
+  sale_item_id: Generated<number>;
+  unit_cost: number;
+  unit_price: number;
+}
+
+export interface StandSales {
+  amount_paid: number;
+  cashier_id: number | null;
+  change: Generated<number>;
+  customer_note: string | null;
+  payment_method: Generated<string>;
+  person_id: number | null;
+  sale_date: Generated<Timestamp>;
+  sale_id: Generated<number>;
+  total_amount: number;
+  total_cost: number;
+  total_profit: number;
+  void_reason: string | null;
+  voided_by: number | null;
+  voided_date: Timestamp | null;
+}
+
+export interface StandStockMovements {
+  item_id: number;
+  movement_date: Generated<Timestamp>;
+  movement_id: Generated<number>;
+  movement_type: string;
+  performed_by: number | null;
+  quantity: number;
+  reason: string | null;
+  related_sale_id: number | null;
+  total_cost: number | null;
+  unit_cost: number | null;
+}
+
 export interface SyncQueue {
-  Attempts: Generated<number | null>;
-  CreatedAt: Generated<Timestamp | null>;
-  JsonData: string | null;
-  LastAttempt: Timestamp | null;
-  LastError: string | null;
-  Operation: string;
-  QueueID: Generated<number>;
-  RecordID: number;
-  Status: Generated<string | null>;
-  TableName: string;
+  attempts: Generated<number | null>;
+  created_at: Generated<Timestamp | null>;
+  json_data: string | null;
+  last_attempt: Timestamp | null;
+  last_error: string | null;
+  operation: string;
+  queue_id: Generated<number>;
+  record_id: number;
+  status: Generated<string | null>;
+  table_name: string;
 }
 
-export interface TbCities {
-  City: string | null;
-  ID: Generated<number>;
-}
-
-export interface TblAddress {
-  CityID: number | null;
-  ID: Generated<number>;
-  Zone: string | null;
-}
-
-export interface TblAlerts {
-  AlertDetails: string | null;
-  AlertID: Generated<number>;
-  AlertSeverity: number;
-  AlertTypeID: number;
-  CreationDate: Generated<Timestamp>;
-  IsActive: Generated<boolean>;
-  PersonID: number;
-}
-
-export interface TblAlertTypes {
-  AlertTypeID: Generated<number>;
-  TypeName: string;
-}
-
-export interface TblAlignerActivityFlags {
-  ActivityDescription: string;
-  ActivityID: Generated<number>;
-  ActivityType: string;
-  AlignerSetID: number;
-  CreatedAt: Generated<Timestamp | null>;
-  IsRead: Generated<boolean | null>;
-  ReadAt: Timestamp | null;
-  RelatedRecordID: number | null;
-}
-
-export interface TblAlignerBatches {
-  AlignerBatchID: Generated<number>;
-  AlignerSetID: number;
-  BatchExpiryDate: Generated<Timestamp | null>;
-  BatchSequence: number;
-  CreationDate: Generated<Timestamp>;
-  Days: number | null;
-  DeliveredToPatientDate: Timestamp | null;
-  HasLowerTemplate: Generated<boolean>;
-  HasUpperTemplate: Generated<boolean>;
-  IsActive: Generated<boolean | null>;
-  IsLast: Generated<boolean>;
-  LowerAlignerCount: number;
-  LowerAlignerEndSequence: Generated<number | null>;
-  LowerAlignerStartSequence: number | null;
-  ManufactureDate: Timestamp | null;
-  Notes: string | null;
-  UpperAlignerCount: number;
-  UpperAlignerEndSequence: Generated<number | null>;
-  UpperAlignerStartSequence: number | null;
-  ValidityPeriod: Generated<number | null>;
-}
-
-export interface TblAlignerNotes {
-  AlignerSetID: number;
-  CreatedAt: Generated<Timestamp | null>;
-  EditedAt: Timestamp | null;
-  IsEdited: Generated<boolean | null>;
-  IsRead: Generated<boolean>;
-  NoteID: Generated<number>;
-  NoteText: string;
-  NoteType: string;
-}
-
-export interface TblAlignerSets {
-  AlignerDrID: number;
-  AlignerSetID: Generated<number>;
-  ArchformID: number | null;
-  CreationDate: Timestamp | null;
-  Currency: Generated<string | null>;
-  Days: number | null;
-  DriveFileId: string | null;
-  FolderPath: string | null;
-  IsActive: Generated<boolean | null>;
-  LowerAlignersCount: number | null;
-  Notes: string | null;
-  PdfUploadedAt: Timestamp | null;
-  PdfUploadedBy: string | null;
-  RemainingLowerAligners: number | null;
-  RemainingUpperAligners: number | null;
-  SetCost: Numeric | null;
-  SetPdfUrl: string | null;
-  SetSequence: number | null;
-  SetUrl: string | null;
-  SetVideo: string | null;
-  Type: string | null;
-  UpperAlignersCount: number | null;
-  WorkID: number;
-}
-
-export interface Tblappointments {
-  AppCost: string | null;
-  AppDate: Timestamp;
-  AppDay: Generated<Timestamp | null>;
-  AppDetail: string | null;
-  appointmentID: Generated<number>;
-  AppTime: Generated<string | null>;
-  DeliveredTimestamp: Timestamp | null;
-  DeliveredWa: string | null;
-  Dismissed: string | null;
-  DrID: number | null;
-  LastUpdated: Timestamp | null;
-  Notified: Generated<boolean | null>;
-  PersonID: number;
-  Present: string | null;
-  ReadTimestamp: Timestamp | null;
-  Seated: string | null;
-  SentTimestamp: Timestamp | null;
-  SentWa: boolean | null;
-  sms_sid: string | null;
-  SMSStatus: string | null;
-  WaMessageID: string | null;
-  WantNotify: Generated<boolean | null>;
-  WantWa: Generated<boolean | null>;
-}
-
-export interface Tblbends {
-  Bend: string;
-  Bend_ID: Generated<number>;
-}
-
-export interface TblCalender {
-  AppDate: Timestamp;
-}
-
-export interface TblCarriedWires {
-  AdditionDate: Timestamp;
-  Id: Generated<number>;
-  PersonID: number;
-  UpperLower: string;
-  Wire_ID: number;
-  WireBag: string;
-  WireSlot: number;
-}
-
-export interface TblDetail {
-  Detail: string | null;
-  ID: Generated<number>;
-}
-
-export interface TblDiagnosis {
-  Appliance: string | null;
-  C_ANB: string | null;
-  C_FMA: string | null;
-  C_LAFH: string | null;
-  C_LI_APo: string | null;
-  C_LIMd: string | null;
-  C_Llip_E: string | null;
-  C_MMA: string | null;
-  C_Naso_lip: string | null;
-  C_PercentLAFH: string | null;
-  C_SNA: string | null;
-  C_SNB: string | null;
-  C_SNMx: string | null;
-  C_TAFH: string | null;
-  C_UAFH: string | null;
-  C_UI_LI: string | null;
-  C_UIMX: string | null;
-  C_Ulip_E: string | null;
-  C_Wits: string | null;
-  ChiefComplain: string | null;
-  Diagnosis: string;
-  DxDate: Timestamp | null;
-  fAnteroPosterior: string | null;
-  fLipCompetence: string | null;
-  fNasoLabialAngle: string | null;
-  fTransverse: string | null;
-  fUpperIncisorShowRest: string | null;
-  fUpperIncisorShowSmile: string | null;
-  fVertical: string | null;
-  ICurveofSpee: string | null;
-  ID: Generated<number>;
-  IDentalHealth: string | null;
-  ILowerCrowding: string | null;
-  ILowerIncisorInclination: string | null;
-  ITeethPresent: string | null;
-  IUpperCrowding: string | null;
-  IUpperIncisorInclination: string | null;
-  OCanineRelation: string | null;
-  OCenterlines: string | null;
-  OFunctionalOcclusion: string | null;
-  OIncisorRelation: string | null;
-  OMolarRelation: string | null;
-  OOverbite: string | null;
-  OOverjet: string | null;
-  TreatmentPlan: string;
-  WorkID: number;
-}
-
-export interface TblElastics {
-  Elastic: string;
-  Elastic_ID: Generated<number>;
-}
-
-export interface TblEmployees {
-  AppointmentColor: string | null;
-  Email: string | null;
-  employeeName: string;
-  getAppointments: Generated<boolean>;
-  ID: Generated<number>;
-  Percentage: Generated<boolean>;
-  Phone: string | null;
-  Position: number | null;
-  receiveEmail: Generated<boolean>;
-  SortOrder: Generated<number>;
-}
-
-export interface TblEndo {
-  Canal: string | null;
-  Curvature: string | null;
-  DetailID: number | null;
-  ID: Generated<number>;
-  Note: string | null;
-  RefrencePoint: string | null;
-  WorkingLength: Numeric | null;
-}
-
-export interface TblEstimatedCostPresets {
-  Amount: Numeric;
-  Currency: string;
-  DisplayOrder: Generated<number | null>;
-  PresetID: Generated<number>;
-}
-
-export interface TblExpenseCategories {
-  CategoryID: Generated<number>;
-  CategoryName: string;
-}
-
-export interface TblExpenses {
-  Amount: number;
-  CategoryID: number | null;
-  Currency: string | null;
-  expenseDate: Timestamp;
-  ID: Generated<number>;
-  Note: string | null;
-  SubcategoryID: number | null;
-}
-
-export interface TblExpenseSubcategories {
-  CategoryID: number;
-  SubcategoryID: Generated<number>;
-  SubcategoryName: string;
-}
-
-export interface TblGender {
-  Gender: string;
-  Gender_ID: number;
-}
-
-export interface Tblholidays {
-  Description: string | null;
-  Holidaydate: Timestamp;
-  HolidayName: Generated<string>;
-  ID: Generated<number>;
-}
-
-export interface TblImageTypes {
-  Description: string | null;
-  DolphinItypID: string | null;
-  ImageTypeCode: string;
-}
-
-export interface TblImplant {
-  ID: Generated<number>;
-  ImplantCompany: string | null;
-  ImplantDiameter: Numeric | null;
-  ImplantLength: Numeric | null;
-  Note: string | null;
-  Tooth: string | null;
-  WorkID: number;
-}
-
-export interface TblImplantManufacturer {
-  ID: Generated<number>;
-  ManufacturerName: string;
-}
-
-export interface TblInvoice {
-  ActualAmount: number | null;
-  ActualCur: string | null;
-  AlignerSetID: number | null;
-  Amountpaid: number;
-  Change: number | null;
-  Dateofpayment: Timestamp;
-  invoiceID: Generated<number>;
-  IQDReceived: Generated<number>;
-  SysStartTime: Generated<Timestamp>;
-  USDReceived: Generated<number>;
-  workid: number;
-}
-
-export interface TblKeyWord {
-  ID: Generated<number>;
-  KeyWord: string | null;
-}
-
-export interface TblMessageStatusHistory {
-  AppointmentID: number;
-  StatusCode: number;
-  StatusHistoryID: Generated<number>;
-  StatusText: string;
-  Timestamp: Generated<Timestamp>;
-  WaMessageID: string;
-}
-
-export interface Tblnumbers {
-  Mynumber: Generated<number>;
-}
-
-export interface TblOldOPG {
-  birth_date: Timestamp | null;
-  directory: string;
-  first_name: string;
-  ID: number;
-  last_name: string;
-  sex: string;
-}
-
-export interface Tbloptions {
-  OptionName: string;
-  OptionValue: string | null;
-}
-
-export interface TblPatientPortalAuth {
-  CreatedAt: Generated<Timestamp>;
-  Enabled: Generated<boolean>;
-  FailedAttempts: Generated<number>;
-  LastLoginAt: Timestamp | null;
-  LockedUntil: Timestamp | null;
-  PersonID: number;
-  PinHash: string;
-  UpdatedAt: Generated<Timestamp>;
-}
-
-export interface Tblpatients {
-  AddressID: number | null;
-  CountryCode: string | null;
-  Currency: string | null;
-  DateAdded: Generated<Timestamp | null>;
-  DateofBirth: Timestamp | null;
-  Email: string | null;
-  EstimatedCost: number | null;
-  FirstName: string | null;
-  Gender: number | null;
-  Language: Generated<number | null>;
-  LastName: string | null;
-  Notes: string | null;
-  patientID: string | null;
-  PatientName: string;
-  PatientTypeID: number | null;
-  PersonID: Generated<number>;
-  Phone: string | null;
-  Phone2: string | null;
-  ReferralSourceID: number | null;
-  TagID: number | null;
-  WebCephCreatedAt: Timestamp | null;
-  WebCephLink: string | null;
-  WebCephPatientID: string | null;
-}
-
-export interface TblPatientType {
-  ID: Generated<number>;
-  PatientType: string | null;
-}
-
-export interface TblPositions {
-  ID: Generated<number>;
-  PositionName: string | null;
-}
-
-export interface TblPrivatePhotos {
-  ImageName: string;
-  MarkedAt: Generated<Timestamp>;
-  MarkedBy: number | null;
-  PersonID: number;
-  TimepointCode: string;
-}
-
-export interface TblReferrals {
-  ID: Generated<number>;
-  Referral: string | null;
-}
-
-export interface Tblscrews {
-  ID: Generated<number>;
-  PersonID: Generated<number>;
-  PlacementDate: Timestamp | null;
-  Position: string | null;
-  State: string | null;
-  WorkID: Generated<number | null>;
-}
-
-export interface Tblsms {
-  date: Timestamp;
-  emailsent: Generated<boolean>;
-  ExchangeRate: number | null;
+export interface TagOptions {
   id: Generated<number>;
-  SMSID: string | null;
-  smssent: Generated<boolean>;
+  tag: string;
 }
 
-export interface TblStandCategories {
-  CategoryID: Generated<number>;
-  CategoryName: string;
-  IsActive: Generated<boolean>;
+export interface TimePointImages {
+  dolphin_tpi_id: string | null;
+  image_date: Timestamp | null;
+  image_file: string | null;
+  image_type: string | null;
+  person_id: number;
+  time_point_id: number;
+  time_point_image_id: Generated<number>;
+  title: string | null;
 }
 
-export interface TblStandItems {
-  Barcode: string | null;
-  CategoryID: number | null;
-  CostPrice: number;
-  CreatedBy: number | null;
-  CurrentStock: Generated<number>;
-  DateAdded: Generated<Timestamp>;
-  ExpiryDate: Timestamp | null;
-  IsActive: Generated<boolean>;
-  ItemID: Generated<number>;
-  ItemName: string;
-  ModifiedDate: Timestamp | null;
-  Notes: string | null;
-  ReorderLevel: Generated<number>;
-  SellPrice: number;
-  SKU: string | null;
-  Unit: string | null;
+export interface TimePoints {
+  created_date: Generated<Timestamp>;
+  dolphin_pat_id: string | null;
+  dolphin_tp_id: string | null;
+  person_id: number;
+  time_point_id: Generated<number>;
+  tp_code: number;
+  tp_date_time: Timestamp | null;
+  tp_description: string | null;
 }
 
-export interface TblStandSaleItems {
-  ItemID: number;
-  LineTotal: number;
-  Quantity: number;
-  SaleID: number;
-  SaleItemID: Generated<number>;
-  UnitCost: number;
-  UnitPrice: number;
+export interface Times {
+  my_time: string | null;
+  time_id: Generated<number>;
 }
 
-export interface TblStandSales {
-  AmountPaid: number;
-  CashierID: number | null;
-  Change: Generated<number>;
-  CustomerNote: string | null;
-  PaymentMethod: Generated<string>;
-  PersonID: number | null;
-  SaleDate: Generated<Timestamp>;
-  SaleID: Generated<number>;
-  TotalAmount: number;
-  TotalCost: number;
-  TotalProfit: number;
-  VoidedBy: number | null;
-  VoidedDate: Timestamp | null;
-  VoidReason: string | null;
+export interface ToothNumbers {
+  id: Generated<number>;
+  is_permanent: Generated<boolean>;
+  quadrant: string;
+  sort_order: number;
+  tooth_code: string;
+  tooth_name: string;
+  tooth_number: string;
 }
 
-export interface TblStandStockMovements {
-  ItemID: number;
-  MovementDate: Generated<Timestamp>;
-  MovementID: Generated<number>;
-  MovementType: string;
-  PerformedBy: number | null;
-  Quantity: number;
-  Reason: string | null;
-  RelatedSaleID: number | null;
-  TotalCost: number | null;
-  UnitCost: number | null;
+export interface Users {
+  created_at: Generated<Timestamp | null>;
+  created_by: string | null;
+  full_name: string | null;
+  is_active: Generated<boolean | null>;
+  last_login: Timestamp | null;
+  password_hash: string;
+  role: Generated<string | null>;
+  user_id: Generated<number>;
+  username: string;
 }
 
-export interface TblTagOptions {
-  ID: Generated<number>;
-  Tag: string;
+export interface VideoCategories {
+  category: string | null;
+  vid_cat_id: Generated<number>;
 }
 
-export interface TblTimePointImages {
-  DolphinTpiID: string | null;
-  ImageDate: Timestamp | null;
-  ImageFile: string | null;
-  ImageType: string | null;
-  PersonID: number;
-  TimePointID: number;
-  TimePointImageID: Generated<number>;
-  Title: string | null;
+export interface Videos {
+  category: number | null;
+  description: string;
+  details: string | null;
+  file_name: string | null;
+  id: Generated<number>;
+  url: string | null;
+  video_extension: string | null;
 }
 
-export interface TblTimePoints {
-  CreatedDate: Generated<Timestamp>;
-  DolphinPatID: string | null;
-  DolphinTpID: string | null;
-  PersonID: number;
-  TimePointID: Generated<number>;
-  tpCode: number;
-  tpDateTime: Timestamp | null;
-  tpDescription: string | null;
+export interface Visits {
+  appliance_removed: Generated<boolean | null>;
+  bracket_change: string | null;
+  created_at: Timestamp | null;
+  elastics: string | null;
+  f_photo: Generated<boolean | null>;
+  i_photo: Generated<boolean | null>;
+  id: Generated<number>;
+  lower_wire_id: number | null;
+  next_visit: string | null;
+  operator_id: number | null;
+  opg: Generated<boolean | null>;
+  others: string | null;
+  p_photo: Generated<boolean | null>;
+  upper_wire_id: number | null;
+  visit_date: Timestamp;
+  wire_bending: string | null;
+  work_id: number;
 }
 
-export interface Tbltimes {
-  MyTime: string | null;
-  TimeID: Generated<number>;
+export interface Waiting {
+  creation_date: Timestamp;
+  id: Generated<number>;
+  person_id: number;
+  type_id: number | null;
 }
 
-export interface TblToothNumber {
-  ID: Generated<number>;
-  IsPermanent: Generated<boolean>;
-  Quadrant: string;
-  SortOrder: number;
-  ToothCode: string;
-  ToothName: string;
-  ToothNumber: string;
+export interface WaitReasons {
+  id: Generated<number>;
+  wait_type: string | null;
 }
 
-export interface TblUsers {
-  CreatedAt: Generated<Timestamp | null>;
-  CreatedBy: string | null;
-  FullName: string | null;
-  IsActive: Generated<boolean | null>;
-  LastLogin: Timestamp | null;
-  PasswordHash: string;
-  Role: Generated<string | null>;
-  UserID: Generated<number>;
-  Username: string;
+export interface Wires {
+  wire: string;
+  wire_id: Generated<number>;
 }
 
-export interface TblVidCat {
-  Category: string | null;
-  VidCatID: Generated<number>;
+export interface WorkItems {
+  canals_no: number | null;
+  completed_date: Timestamp | null;
+  filling_depth: string | null;
+  filling_type: string | null;
+  id: Generated<number>;
+  implant_diameter: Numeric | null;
+  implant_length: Numeric | null;
+  implant_manufacturer_id: number | null;
+  item_cost: number | null;
+  lab_name: string | null;
+  material: string | null;
+  note: string | null;
+  start_date: Timestamp | null;
+  work_id: number;
+  working_length: string | null;
 }
 
-export interface Tblvideos {
-  Category: number | null;
-  Description: string;
-  Details: string | null;
-  FileName: string | null;
-  ID: Generated<number>;
-  URL: string | null;
-  VideoExtension: string | null;
+export interface WorkItemTeeth {
+  id: Generated<number>;
+  tooth_id: number;
+  work_item_id: number;
 }
 
-export interface Tblvisits {
-  ApplianceRemoved: Generated<boolean | null>;
-  BracketChange: string | null;
-  CreatedAt: Timestamp | null;
-  Elastics: string | null;
-  FPhoto: Generated<boolean | null>;
-  ID: Generated<number>;
-  IPhoto: Generated<boolean | null>;
-  LowerWireID: number | null;
-  NextVisit: string | null;
-  OperatorID: number | null;
-  OPG: Generated<boolean | null>;
-  Others: string | null;
-  PPhoto: Generated<boolean | null>;
-  UpperWireID: number | null;
-  VisitDate: Timestamp;
-  WireBending: string | null;
-  WorkID: number;
+export interface Works {
+  addition_date: Generated<Timestamp | null>;
+  currency: string | null;
+  debond_date: Timestamp | null;
+  discount: number | null;
+  discount_date: Timestamp | null;
+  discount_reason: string | null;
+  dr_id: number;
+  estimated_duration: number | null;
+  f_photo_date: Timestamp | null;
+  i_photo_date: Timestamp | null;
+  keyword_id_1: number | null;
+  keyword_id_2: number | null;
+  keyword_id_3: number | null;
+  keyword_id_4: number | null;
+  keyword_id_5: number | null;
+  notes: string | null;
+  notes_date: Timestamp | null;
+  person_id: number;
+  start_date: Timestamp | null;
+  status: Generated<number>;
+  total_required: number;
+  type_of_work: number;
+  work_id: Generated<number>;
 }
 
-export interface TblWaiting {
-  Creation_Date: Timestamp;
-  ID: Generated<number>;
-  PersonID: number;
-  TypeID: number | null;
+export interface WorkStatuses {
+  status_id: number;
+  status_name: string;
 }
 
-export interface TblWaitReason {
-  ID: Generated<number>;
-  WaitType: string | null;
-}
-
-export interface TblWires {
-  Wire: string;
-  Wire_ID: Generated<number>;
-}
-
-export interface Tblwork {
-  AdditionDate: Generated<Timestamp | null>;
-  Currency: string | null;
-  DebondDate: Timestamp | null;
-  Discount: number | null;
-  DiscountDate: Timestamp | null;
-  DiscountReason: string | null;
-  DrID: number;
-  EstimatedDuration: number | null;
-  FPhotoDate: Timestamp | null;
-  IPhotoDate: Timestamp | null;
-  KeyWordID1: number | null;
-  KeyWordID2: number | null;
-  KeywordID3: number | null;
-  KeywordID4: number | null;
-  KeywordID5: number | null;
-  Notes: string | null;
-  NotesDate: Timestamp | null;
-  PersonID: number;
-  StartDate: Timestamp | null;
-  Status: Generated<number>;
-  TotalRequired: number;
-  Typeofwork: number;
-  workid: Generated<number>;
-}
-
-export interface TblWorkItems {
-  CanalsNo: number | null;
-  CompletedDate: Timestamp | null;
-  FillingDepth: string | null;
-  FillingType: string | null;
-  ID: Generated<number>;
-  ImplantDiameter: Numeric | null;
-  ImplantLength: Numeric | null;
-  ImplantManufacturerID: number | null;
-  ItemCost: number | null;
-  LabName: string | null;
-  Material: string | null;
-  Note: string | null;
-  StartDate: Timestamp | null;
-  WorkID: number;
-  WorkingLength: string | null;
-}
-
-export interface TblWorkItemTeeth {
-  ID: Generated<number>;
-  ToothID: number;
-  WorkItemID: number;
-}
-
-export interface TblWorkStatus {
-  StatusID: number;
-  StatusName: string;
-}
-
-export interface TblWorkType {
-  ID: Generated<number>;
-  WorkType: string;
+export interface WorkTypes {
+  id: Generated<number>;
+  work_type: string;
 }
 
 export interface DB {
-  AlignerDoctors: AlignerDoctors;
+  addresses: Addresses;
+  alert_types: AlertTypes;
+  alerts: Alerts;
+  aligner_activity_flags: AlignerActivityFlags;
+  aligner_batches: AlignerBatches;
+  aligner_doctors: AlignerDoctors;
+  aligner_notes: AlignerNotes;
+  aligner_sets: AlignerSets;
+  appointments: Appointments;
+  bends: Bends;
+  calendar: Calendar;
+  carried_wires: CarriedWires;
   cdc_sink_control: CdcSinkControl;
   change_log: ChangeLog;
-  DocumentTemplates: DocumentTemplates;
-  DocumentTypes: DocumentTypes;
+  cities: Cities;
+  details: Details;
+  diagnoses: Diagnoses;
+  document_templates: DocumentTemplates;
+  document_types: DocumentTypes;
   dolphin_sync_map: DolphinSyncMap;
-  Patients: Patients;
+  elastics: Elastics;
+  employees: Employees;
+  endo: Endo;
+  estimated_cost_presets: EstimatedCostPresets;
+  expense_categories: ExpenseCategories;
+  expense_subcategories: ExpenseSubcategories;
+  expenses: Expenses;
+  genders: Genders;
+  holidays: Holidays;
+  image_types: ImageTypes;
+  implant_manufacturers: ImplantManufacturers;
+  implants: Implants;
+  invoices: Invoices;
+  keywords: Keywords;
+  message_status_history: MessageStatusHistory;
+  numbers: Numbers;
+  old_opg: OldOpg;
+  options: Options;
+  patient_portal_auth: PatientPortalAuth;
+  patient_types: PatientTypes;
+  patients: Patients;
+  patients_dolphin: PatientsDolphin;
   pgmigrations: Pgmigrations;
   portal_sessions: PortalSessions;
+  positions: Positions;
+  private_photos: PrivatePhotos;
+  referrals: Referrals;
+  screws: Screws;
+  sms: Sms;
   staff_sessions: StaffSessions;
-  SyncQueue: SyncQueue;
-  tbCities: TbCities;
-  tblAddress: TblAddress;
-  tblAlerts: TblAlerts;
-  tblAlertTypes: TblAlertTypes;
-  tblAlignerActivityFlags: TblAlignerActivityFlags;
-  tblAlignerBatches: TblAlignerBatches;
-  tblAlignerNotes: TblAlignerNotes;
-  tblAlignerSets: TblAlignerSets;
-  tblappointments: Tblappointments;
-  tblbends: Tblbends;
-  tblCalender: TblCalender;
-  tblCarriedWires: TblCarriedWires;
-  tblDetail: TblDetail;
-  tblDiagnosis: TblDiagnosis;
-  tblElastics: TblElastics;
-  tblEmployees: TblEmployees;
-  tblEndo: TblEndo;
-  tblEstimatedCostPresets: TblEstimatedCostPresets;
-  tblExpenseCategories: TblExpenseCategories;
-  tblExpenses: TblExpenses;
-  tblExpenseSubcategories: TblExpenseSubcategories;
-  tblGender: TblGender;
-  tblholidays: Tblholidays;
-  tblImageTypes: TblImageTypes;
-  tblImplant: TblImplant;
-  tblImplantManufacturer: TblImplantManufacturer;
-  tblInvoice: TblInvoice;
-  tblKeyWord: TblKeyWord;
-  tblMessageStatusHistory: TblMessageStatusHistory;
-  tblnumbers: Tblnumbers;
-  tblOldOPG: TblOldOPG;
-  tbloptions: Tbloptions;
-  tblPatientPortalAuth: TblPatientPortalAuth;
-  tblpatients: Tblpatients;
-  tblPatientType: TblPatientType;
-  tblPositions: TblPositions;
-  tblPrivatePhotos: TblPrivatePhotos;
-  tblReferrals: TblReferrals;
-  tblscrews: Tblscrews;
-  tblsms: Tblsms;
-  tblStandCategories: TblStandCategories;
-  tblStandItems: TblStandItems;
-  tblStandSaleItems: TblStandSaleItems;
-  tblStandSales: TblStandSales;
-  tblStandStockMovements: TblStandStockMovements;
-  tblTagOptions: TblTagOptions;
-  tblTimePointImages: TblTimePointImages;
-  tblTimePoints: TblTimePoints;
-  tbltimes: Tbltimes;
-  tblToothNumber: TblToothNumber;
-  tblUsers: TblUsers;
-  tblVidCat: TblVidCat;
-  tblvideos: Tblvideos;
-  tblvisits: Tblvisits;
-  tblWaiting: TblWaiting;
-  tblWaitReason: TblWaitReason;
-  tblWires: TblWires;
-  tblwork: Tblwork;
-  tblWorkItems: TblWorkItems;
-  tblWorkItemTeeth: TblWorkItemTeeth;
-  tblWorkStatus: TblWorkStatus;
-  tblWorkType: TblWorkType;
+  stand_categories: StandCategories;
+  stand_items: StandItems;
+  stand_sale_items: StandSaleItems;
+  stand_sales: StandSales;
+  stand_stock_movements: StandStockMovements;
+  sync_queue: SyncQueue;
+  tag_options: TagOptions;
+  time_point_images: TimePointImages;
+  time_points: TimePoints;
+  times: Times;
+  tooth_numbers: ToothNumbers;
+  users: Users;
+  video_categories: VideoCategories;
+  videos: Videos;
+  visits: Visits;
+  wait_reasons: WaitReasons;
+  waiting: Waiting;
+  wires: Wires;
+  work_item_teeth: WorkItemTeeth;
+  work_items: WorkItems;
+  work_statuses: WorkStatuses;
+  work_types: WorkTypes;
+  works: Works;
 }

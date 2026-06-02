@@ -4,30 +4,30 @@
  * Database queries for holiday management and validation.
  * Used by appointment validation and calendar display.
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). `Holidaydate` is a PG
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). `holiday_date` is a PG
  * `date`, so the centralized pg parser (kysely.ts) returns it as a 'YYYY-MM-DD' string
  * — consumers already handle the string form (calendar.ts, AppointmentService via
- * toDateOnly). The mssql-only `CreatedAt` column does not exist in the PG schema
+ * toDateOnly). The mssql-only `created_at` column does not exist in the PG schema
  * (dropped in Phase 2), so `getAllHolidays` no longer returns it.
  */
 import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
 
-// Type definitions
+// type definitions
 interface Holiday {
-  ID: number;
-  Holidaydate: string;
-  HolidayName: string;
-  Description: string | null;
+  id: number;
+  holiday_date: string;
+  holiday_name: string;
+  description: string | null;
 }
 
 interface AppointmentOnDate {
-  appointmentID: number;
-  PersonID: number;
-  AppDate: Date;
-  AppDetail: string | null;
-  PatientName: string;
-  Phone: string | null;
+  appointment_id: number;
+  person_id: number;
+  app_date: Date;
+  app_detail: string | null;
+  patient_name: string;
+  phone: string | null;
 }
 
 /**
@@ -36,16 +36,16 @@ interface AppointmentOnDate {
 export async function isDateHoliday(date: string): Promise<Holiday | null> {
   const db = getKysely();
   const row = await db
-    .selectFrom('tblholidays')
-    // Holidaydate is a PG `date`; pass the 'YYYY-MM-DD' string as a param (PG infers the
-    // date type from the comparison). kysely-codegen types `date` as Timestamp(Date), so
+    .selectFrom('holidays')
+    // holiday_date is a PG `date`; pass the 'YYYY-MM-DD' string as a param (PG infers the
+    // date type from the comparison). kysely-codegen types `date` as timestamp(Date), so
     // the value is wrapped to satisfy the static type without changing the emitted SQL.
-    .where('Holidaydate', '=', sql<Date>`${date}`)
+    .where('holiday_date', '=', sql<Date>`${date}`)
     .select((eb) => [
-      'ID',
-      eb.ref('Holidaydate').$castTo<string>().as('Holidaydate'),
-      'HolidayName',
-      'Description',
+      'id',
+      eb.ref('holiday_date').$castTo<string>().as('holiday_date'),
+      'holiday_name',
+      'description',
     ])
     .executeTakeFirst();
 
@@ -58,15 +58,15 @@ export async function isDateHoliday(date: string): Promise<Holiday | null> {
 export async function getHolidaysInRange(startDate: string, endDate: string): Promise<Holiday[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblholidays')
-    .where('Holidaydate', '>=', sql<Date>`${startDate}`)
-    .where('Holidaydate', '<=', sql<Date>`${endDate}`)
-    .orderBy('Holidaydate')
+    .selectFrom('holidays')
+    .where('holiday_date', '>=', sql<Date>`${startDate}`)
+    .where('holiday_date', '<=', sql<Date>`${endDate}`)
+    .orderBy('holiday_date')
     .select((eb) => [
-      'ID',
-      eb.ref('Holidaydate').$castTo<string>().as('Holidaydate'),
-      'HolidayName',
-      'Description',
+      'id',
+      eb.ref('holiday_date').$castTo<string>().as('holiday_date'),
+      'holiday_name',
+      'description',
     ])
     .execute();
 }
@@ -77,11 +77,11 @@ export async function getHolidaysInRange(startDate: string, endDate: string): Pr
 export async function getAppointmentsOnDate(date: string): Promise<AppointmentOnDate[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblappointments as a')
-    .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
-    .where(sql<boolean>`cast(${sql.ref('a.AppDate')} as date) = ${date}`)
-    .orderBy('a.AppDate')
-    .select(['a.appointmentID', 'a.PersonID', 'a.AppDate', 'a.AppDetail', 'p.PatientName', 'p.Phone'])
+    .selectFrom('appointments as a')
+    .innerJoin('patients as p', 'p.person_id', 'a.person_id')
+    .where(sql<boolean>`cast(${sql.ref('a.app_date')} as date) = ${date}`)
+    .orderBy('a.app_date')
+    .select(['a.appointment_id', 'a.person_id', 'a.app_date', 'a.app_detail', 'p.patient_name', 'p.phone'])
     .execute();
 }
 
@@ -91,13 +91,13 @@ export async function getAppointmentsOnDate(date: string): Promise<AppointmentOn
 export async function getAllHolidays(): Promise<Holiday[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblholidays')
-    .orderBy('Holidaydate', 'desc')
+    .selectFrom('holidays')
+    .orderBy('holiday_date', 'desc')
     .select((eb) => [
-      'ID',
-      eb.ref('Holidaydate').$castTo<string>().as('Holidaydate'),
-      'HolidayName',
-      'Description',
+      'id',
+      eb.ref('holiday_date').$castTo<string>().as('holiday_date'),
+      'holiday_name',
+      'description',
     ])
     .execute();
 }

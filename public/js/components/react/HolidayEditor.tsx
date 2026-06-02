@@ -21,9 +21,9 @@ interface HolidayItem {
 }
 
 interface AppointmentInfo {
-    PatientName: string;
-    AppDetail?: string;
-    AppDate?: string;
+    patient_name: string;
+    app_detail?: string;
+    app_date?: string;
 }
 
 interface AppointmentWarning {
@@ -516,11 +516,11 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
                                     <div key={idx} className="appointment-item">
                                         <span className="patient-name">
                                             <i className="fas fa-user"></i>
-                                            {apt.PatientName}
+                                            {apt.patient_name}
                                         </span>
-                                        <span className="appointment-detail">{apt.AppDetail}</span>
+                                        <span className="appointment-detail">{apt.app_detail}</span>
                                         <span className="appointment-time">
-                                            {apt.AppDate ? new Date(apt.AppDate).toLocaleTimeString('en-US', {
+                                            {apt.app_date ? new Date(apt.app_date).toLocaleTimeString('en-US', {
                                                 hour: 'numeric',
                                                 minute: '2-digit'
                                             }) : ''}

@@ -71,25 +71,25 @@ const router = Router();
 // ============================================================================
 
 interface PatientSearchResult {
-  PersonID: number;
-  PatientName: string;
-  FirstName: string | null;
-  LastName: string | null;
-  Phone: string | null;
-  Phone2: string | null;
-  Email: string | null;
-  DateofBirth: Date | null;
-  Gender: number | null;
-  AddressID: number | null;
-  ReferralSourceID: number | null;
-  PatientTypeID: number | null;
-  TagID: number | null;
-  Notes: string | null;
-  Language: string | null;
-  CountryCode: string | null;
-  EstimatedCost: number | null;
-  Currency: string | null;
-  DateAdded: Date | null;
+  person_id: number;
+  patient_name: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  phone2: string | null;
+  email: string | null;
+  date_of_birth: Date | null;
+  gender: number | null;
+  address_id: number | null;
+  referral_source_id: number | null;
+  patient_type_id: number | null;
+  tag_id: number | null;
+  notes: string | null;
+  language: string | null;
+  country_code: string | null;
+  estimated_cost: number | null;
+  currency: string | null;
+  date_added: Date | null;
   GenderName: string | null;
   AddressName: string | null;
   ReferralSource: string | null;
@@ -119,23 +119,23 @@ interface CreatePatientBody {
 }
 
 interface UpdatePatientBody {
-  PatientName: string;
-  FirstName?: string;
-  LastName?: string;
-  Phone?: string;
-  Phone2?: string;
-  Email?: string;
-  DateofBirth?: string;
-  Gender?: number;
-  AddressID?: number;
-  ReferralSourceID?: number;
-  PatientTypeID?: number;
-  TagID?: number;
-  Notes?: string;
-  Language?: string;
-  CountryCode?: string;
-  EstimatedCost?: number;
-  Currency?: string;
+  patient_name: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  phone2?: string;
+  email?: string;
+  date_of_birth?: string;
+  gender?: number;
+  address_id?: number;
+  referral_source_id?: number;
+  patient_type_id?: number;
+  tag_id?: number;
+  notes?: string;
+  language?: string;
+  country_code?: string;
+  estimated_cost?: number;
+  currency?: string;
 }
 
 interface CreateAlertBody {
@@ -300,10 +300,10 @@ router.get(
  */
 router.get(
   '/patients/:personId/timepoints/:tpCode/folder',
-  async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
+  async (req: Request<{ personId: string; tp_code: string }>, res: Response): Promise<void> => {
     try {
       const personId = Number.parseInt(req.params.personId, 10);
-      const tpCode = Number.parseInt(req.params.tpCode, 10);
+      const tpCode = Number.parseInt(req.params.tp_code, 10);
       if (!Number.isInteger(personId) || !Number.isInteger(tpCode)) {
         ErrorResponses.badRequest(res, 'Invalid patient id or time point code');
         return;
@@ -313,7 +313,7 @@ router.get(
         ErrorResponses.notFound(res, 'Time point');
         return;
       }
-      const folder = timepointFolderName(existing.tpDescription ?? '', existing.tpDateTime);
+      const folder = timepointFolderName(existing.tp_description ?? '', existing.tp_date_time);
       const exists = folder ? await entryExists(personId, folder) : false;
       res.json({ folder, exists });
     } catch (error) {
@@ -342,10 +342,10 @@ function parseLocalDate(s: string): Date | null {
 router.put(
   '/patients/:personId/timepoints/:tpCode',
   authorize(['admin', 'secretary']),
-  async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
+  async (req: Request<{ personId: string; tp_code: string }>, res: Response): Promise<void> => {
     try {
       const personId = Number.parseInt(req.params.personId, 10);
-      const tpCode = Number.parseInt(req.params.tpCode, 10);
+      const tpCode = Number.parseInt(req.params.tp_code, 10);
       if (!Number.isInteger(personId) || !Number.isInteger(tpCode)) {
         ErrorResponses.badRequest(res, 'Invalid patient id or time point code');
         return;
@@ -371,8 +371,8 @@ router.put(
       }
 
       // Resolve the final (name, date) as a partial patch over the current row.
-      const finalName = (tpDescription ?? existing.tpDescription ?? '').trim();
-      const finalDate = tpDateTime ?? existing.tpDateTime;
+      const finalName = (tpDescription ?? existing.tp_description ?? '').trim();
+      const finalDate = tpDateTime ?? existing.tp_date_time;
       if (!finalName) {
         ErrorResponses.badRequest(res, 'Time point name cannot be empty');
         return;
@@ -392,7 +392,7 @@ router.put(
       }
 
       // Rename the originals folder if the (name, date)-derived folder changed.
-      const oldFolder = timepointFolderName(existing.tpDescription ?? '', existing.tpDateTime);
+      const oldFolder = timepointFolderName(existing.tp_description ?? '', existing.tp_date_time);
       const newFolder = timepointFolderName(finalName, finalDate);
       if (oldFolder && newFolder && oldFolder !== newFolder) {
         try {
@@ -415,17 +415,17 @@ router.put(
       }
 
       // Keep tblwork's Initial/Final photo date in sync when the date changed.
-      const dateChanged = tpDateTime !== undefined && finalDate !== existing.tpDateTime;
+      const dateChanged = tpDateTime !== undefined && finalDate !== existing.tp_date_time;
       const lname = finalName.toLowerCase();
       if (dateChanged && (lname === 'initial' || lname === 'final')) {
         const parsed = parseLocalDate(finalDate);
         if (parsed) {
-          await updatePhotoDate(String(personId), lname === 'initial' ? 'IPhotoDate' : 'FPhotoDate', parsed);
+          await updatePhotoDate(String(personId), lname === 'initial' ? 'i_photo_date' : 'f_photo_date', parsed);
           log.info('[TimePoint] synced tblwork photo date', { personId, field: lname, date: finalDate });
         }
       }
 
-      res.json({ success: true, tpCode, tpDescription: finalName, tpDateTime: finalDate });
+      res.json({ success: true, tpCode, tp_description: finalName, tp_date_time: finalDate });
     } catch (error) {
       log.error('Error updating time point:', error);
       ErrorResponses.internalError(res, 'Failed to update time point', error as Error);
@@ -444,10 +444,10 @@ router.put(
 router.delete(
   '/patients/:personId/timepoints/:tpCode',
   authorize(['admin', 'secretary']),
-  async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
+  async (req: Request<{ personId: string; tp_code: string }>, res: Response): Promise<void> => {
     try {
       const personId = Number.parseInt(req.params.personId, 10);
-      const tpCode = Number.parseInt(req.params.tpCode, 10);
+      const tpCode = Number.parseInt(req.params.tp_code, 10);
       if (!Number.isInteger(personId) || !Number.isInteger(tpCode)) {
         ErrorResponses.badRequest(res, 'Invalid patient id or time point code');
         return;
@@ -479,7 +479,7 @@ router.delete(
 
       // Remove the originals folder only for a full delete (best-effort).
       if (scope === 'all') {
-        const folder = timepointFolderName(existing.tpDescription ?? '', existing.tpDateTime);
+        const folder = timepointFolderName(existing.tp_description ?? '', existing.tp_date_time);
         if (folder) {
           try {
             await hardDelete(personId, folder);
@@ -610,7 +610,7 @@ router.get(
 // ============================================================================
 
 /**
- * Search patients by name, phone, ID, work type, keywords, and tags
+ * Search patients by name, phone, id, work type, keywords, and tags
  * GET /patients/search?q={query}&patientName={name}&firstName={first}&lastName={last}&workTypes={ids}&keywords={ids}&tags={ids}
  */
 router.get(
@@ -681,38 +681,38 @@ router.get(
 
       if (patientName.trim()) {
         whereConditions.push(
-          sql`p."PatientName" LIKE ${`${namePrefix}${patientName.trim()}%`}`
+          sql`p."patient_name" LIKE ${`${namePrefix}${patientName.trim()}%`}`
         );
       }
 
       if (firstName.trim()) {
         whereConditions.push(
-          sql`p."FirstName" LIKE ${`${namePrefix}${firstName.trim()}%`}`
+          sql`p."first_name" LIKE ${`${namePrefix}${firstName.trim()}%`}`
         );
       }
 
       if (lastName.trim()) {
         whereConditions.push(
-          sql`p."LastName" LIKE ${`${namePrefix}${lastName.trim()}%`}`
+          sql`p."last_name" LIKE ${`${namePrefix}${lastName.trim()}%`}`
         );
       }
 
-      // General search (phone or ID). Honours the same nameStartsWith flag as
+      // General search (phone or id). Honours the same nameStartsWith flag as
       // the name fields: prefix match (index-seekable) when set, substring
       // otherwise — substring stays the default so "last 4 digits" search works.
       if (searchQuery.trim()) {
         const searchPattern = `${namePrefix}${searchQuery.trim()}%`;
         whereConditions.push(
-          sql`(p."Phone" LIKE ${searchPattern} OR p."Phone2" LIKE ${searchPattern})`
+          sql`(p."phone" LIKE ${searchPattern} OR p."phone2" LIKE ${searchPattern})`
         );
       }
 
       // Filter by work types (ANY work, past or current)
       if (workTypeIds.length > 0) {
         whereConditions.push(sql`EXISTS (
-                SELECT 1 FROM "tblwork" w
-                WHERE w."PersonID" = p."PersonID"
-                AND w."Typeofwork" IN (${sql.join(workTypeIds)})
+                SELECT 1 FROM "works" w
+                WHERE w."person_id" = p."person_id"
+                AND w."type_of_work" IN (${sql.join(workTypeIds)})
             )`);
       }
 
@@ -720,27 +720,27 @@ router.get(
       if (keywordIds.length > 0) {
         const keywordList = sql.join(keywordIds);
         whereConditions.push(sql`EXISTS (
-                SELECT 1 FROM "tblwork" w
-                WHERE w."PersonID" = p."PersonID"
+                SELECT 1 FROM "works" w
+                WHERE w."person_id" = p."person_id"
                 AND (
-                    w."KeyWordID1" IN (${keywordList})
-                    OR w."KeyWordID2" IN (${keywordList})
-                    OR w."KeywordID3" IN (${keywordList})
-                    OR w."KeywordID4" IN (${keywordList})
-                    OR w."KeywordID5" IN (${keywordList})
+                    w."keyword_id_1" IN (${keywordList})
+                    OR w."keyword_id_2" IN (${keywordList})
+                    OR w."keyword_id_3" IN (${keywordList})
+                    OR w."keyword_id_4" IN (${keywordList})
+                    OR w."keyword_id_5" IN (${keywordList})
                 )
             )`);
       }
 
       // Filter by patient tags
       if (tagIds.length > 0) {
-        whereConditions.push(sql`p."TagID" IN (${sql.join(tagIds)})`);
+        whereConditions.push(sql`p."tag_id" IN (${sql.join(tagIds)})`);
       }
 
       // Filter by patient types
       if (patientTypeIds.length > 0) {
         whereConditions.push(
-          sql`p."PatientTypeID" IN (${sql.join(patientTypeIds)})`
+          sql`p."patient_type_id" IN (${sql.join(patientTypeIds)})`
         );
       }
 
@@ -767,11 +767,11 @@ router.get(
 
         whereConditions.push(sql`EXISTS (
           SELECT 1 FROM (
-            SELECT "PersonID", MAX("AppDate") AS "LatestApp"
-            FROM "tblappointments"
-            GROUP BY "PersonID"
+            SELECT "person_id", MAX("app_date") AS "LatestApp"
+            FROM "appointments"
+            GROUP BY "person_id"
           ) la
-          WHERE la."PersonID" = p."PersonID"
+          WHERE la."person_id" = p."person_id"
           AND la."LatestApp" < ${dateCondition}
         )`);
       }
@@ -779,9 +779,9 @@ router.get(
       // Filter by has final photos (local timepoint with 'Final' in description)
       if (hasFinalPhotos) {
         whereConditions.push(sql`EXISTS (
-                SELECT 1 FROM "tblTimePoints" tp
-                WHERE tp."PersonID" = p."PersonID"
-                AND tp."tpDescription" LIKE '%Final%'
+                SELECT 1 FROM "time_points" tp
+                WHERE tp."person_id" = p."person_id"
+                AND tp."tp_description" LIKE '%Final%'
             )`);
       }
 
@@ -790,25 +790,25 @@ router.get(
         : sql``;
 
       // Determine ORDER BY clause
-      let orderByClause: RawBuilder<unknown> = sql`ORDER BY p."PatientName" ASC`;
+      let orderByClause: RawBuilder<unknown> = sql`ORDER BY p."patient_name" ASC`;
       if (sortBy === 'date') {
         orderByClause =
           order === 'desc'
-            ? sql`ORDER BY p."DateAdded" DESC`
-            : sql`ORDER BY p."DateAdded" ASC`;
+            ? sql`ORDER BY p."date_added" DESC`
+            : sql`ORDER BY p."date_added" ASC`;
       } else {
         orderByClause =
           order === 'desc'
-            ? sql`ORDER BY p."PatientName" DESC`
-            : sql`ORDER BY p."PatientName" ASC`;
+            ? sql`ORDER BY p."patient_name" DESC`
+            : sql`ORDER BY p."patient_name" ASC`;
       }
 
       // First, get the total count of matching patients.
       // No JOINs here: every filter references p.* directly or via EXISTS
       // subqueries, so the 5 lookup-table joins added nothing to the count.
       const countResult = await sql<{ totalCount: number | string }>`
-            SELECT COUNT(DISTINCT p."PersonID") as "totalCount"
-            FROM "tblpatients" p
+            SELECT COUNT(DISTINCT p."person_id") as "totalCount"
+            FROM "patients" p
             ${whereClause}
         `.execute(db);
 
@@ -817,29 +817,29 @@ router.get(
       // Now get the paginated results
       const { rows: patients } = await sql<PatientSearchResult>`
             SELECT DISTINCT
-                    p."PersonID", p."PatientName", p."FirstName", p."LastName",
-                    p."Phone", p."Phone2", p."Email", p."DateofBirth", p."Gender",
-                    p."AddressID", p."ReferralSourceID", p."PatientTypeID", p."TagID",
-                    p."Notes", p."Language", p."CountryCode",
-                    p."EstimatedCost", p."Currency", p."DateAdded",
-                    g."Gender" as "GenderName", a."Zone" as "AddressName",
-                    r."Referral" as "ReferralSource", pt."PatientType" as "PatientTypeName",
-                    tag."Tag" as "TagName",
+                    p."person_id", p."patient_name", p."first_name", p."last_name",
+                    p."phone", p."phone2", p."email", p."date_of_birth", p."gender",
+                    p."address_id", p."referral_source_id", p."patient_type_id", p."tag_id",
+                    p."notes", p."language", p."country_code",
+                    p."estimated_cost", p."currency", p."date_added",
+                    g."gender" as "GenderName", a."zone" as "AddressName",
+                    r."referral" as "ReferralSource", pt."patient_type" as "PatientTypeName",
+                    tag."tag" as "TagName",
                     (
-                        SELECT STRING_AGG(wt."WorkType", ', ')
+                        SELECT STRING_AGG(wt."work_type", ', ')
                         FROM (
-                            SELECT DISTINCT wt2."WorkType"
-                            FROM "tblwork" w2
-                            INNER JOIN "tblWorkType" wt2 ON w2."Typeofwork" = wt2."ID"
-                            WHERE w2."PersonID" = p."PersonID" AND w2."Status" = 1
+                            SELECT DISTINCT wt2."work_type"
+                            FROM "works" w2
+                            INNER JOIN "work_types" wt2 ON w2."type_of_work" = wt2."id"
+                            WHERE w2."person_id" = p."person_id" AND w2."status" = 1
                         ) wt
                     ) as "ActiveWorkTypes"
-            FROM "tblpatients" p
-            LEFT JOIN "tblGender" g ON p."Gender" = g."Gender_ID"
-            LEFT JOIN "tblAddress" a ON p."AddressID" = a."ID"
-            LEFT JOIN "tblReferrals" r ON p."ReferralSourceID" = r."ID"
-            LEFT JOIN "tblPatientType" pt ON p."PatientTypeID" = pt."ID"
-            LEFT JOIN "tblTagOptions" tag ON p."TagID" = tag."ID"
+            FROM "patients" p
+            LEFT JOIN "genders" g ON p."gender" = g."gender_id"
+            LEFT JOIN "addresses" a ON p."address_id" = a."id"
+            LEFT JOIN "referrals" r ON p."referral_source_id" = r."id"
+            LEFT JOIN "patient_types" pt ON p."patient_type_id" = pt."id"
+            LEFT JOIN "tag_options" tag ON p."tag_id" = tag."id"
             ${whereClause}
             ${orderByClause}
             LIMIT ${limit} OFFSET ${offset}
@@ -877,7 +877,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const { rows: tags } = await sql<TagOption>`
-        SELECT "ID" as "id", "Tag" as "tag" FROM "tblTagOptions" ORDER BY "Tag"
+        SELECT "id" as "id", "tag" as "tag" FROM "tag_options" ORDER BY "tag"
       `.execute(getKysely());
       res.json(tags);
     } catch (error) {
@@ -901,7 +901,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const { rows: types } = await sql<PatientTypeOption>`
-        SELECT "ID" as "id", "PatientType" as "type" FROM "tblPatientType" ORDER BY "PatientType"
+        SELECT "id" as "id", "patient_type" as "type" FROM "patient_types" ORDER BY "patient_type"
       `.execute(getKysely());
       res.json(types);
     } catch (error) {
@@ -920,7 +920,7 @@ router.get(
 // ============================================================================
 
 /**
- * Get single patient by ID with alerts
+ * Get single patient by id with alerts
  * GET /patients/:personId
  */
 router.get(
@@ -953,7 +953,7 @@ router.get(
       }
 
       // Fetch and attach alerts
-      const alerts = await getAlertsByPersonId(patient.PersonID);
+      const alerts = await getAlertsByPersonId(patient.person_id);
       const patientWithAlerts = patient as typeof patient & { alerts: typeof alerts };
       patientWithAlerts.alerts = alerts;
 
@@ -1104,7 +1104,7 @@ router.put(
       const personId = parseInt(req.params.personId);
 
       // Basic validation
-      if (!patientData.PatientName || !patientData.PatientName.trim()) {
+      if (!patientData.patient_name || !patientData.patient_name.trim()) {
         log.warn('Update patient missing name', { personId });
         ErrorResponses.badRequest(res, 'Patient name is required');
         return;
@@ -1113,8 +1113,8 @@ router.put(
       // Convert date string to Date object for the database layer
       const updateData = {
         ...patientData,
-        DateofBirth: patientData.DateofBirth
-          ? new Date(patientData.DateofBirth)
+        date_of_birth: patientData.date_of_birth
+          ? new Date(patientData.date_of_birth)
           : undefined
       };
 
@@ -1124,13 +1124,13 @@ router.put(
       // Duplicate patient name → pg unique violation on index IX_Name_ID (was mssql 2601).
       if (isUniqueViolation(error, 'IX_Name_ID')) {
         log.warn(
-          `Duplicate patient name attempted during update: ${patientData.PatientName}`
+          `Duplicate patient name attempted during update: ${patientData.patient_name}`
         );
         res.status(409).json({
           success: false,
           error: 'A patient with this name already exists',
           code: 'DUPLICATE_PATIENT_NAME',
-          duplicateName: patientData.PatientName
+          duplicateName: patientData.patient_name
         });
         return;
       }
@@ -1245,16 +1245,16 @@ router.put(
       const { estimatedCost, currency } = req.body;
 
       if (isNaN(personId)) {
-        log.warn('Update estimated cost invalid patient ID', { personId: req.params.personId });
-        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        log.warn('Update estimated cost invalid patient id', { personId: req.params.personId });
+        ErrorResponses.badRequest(res, 'Invalid patient id');
         return;
       }
 
       await sql`
-        UPDATE "tblpatients"
-        SET "EstimatedCost" = ${estimatedCost || null},
-            "Currency" = ${currency || 'IQD'}
-        WHERE "PersonID" = ${personId}
+        UPDATE "patients"
+        SET "estimated_cost" = ${estimatedCost || null},
+            "currency" = ${currency || 'IQD'}
+        WHERE "person_id" = ${personId}
       `.execute(getKysely());
 
       res.json({
@@ -1291,8 +1291,8 @@ router.get(
       const personId = parseInt(req.params.personId, 10);
 
       if (isNaN(personId)) {
-        log.warn('Get alerts invalid patient ID', { personId: req.params.personId });
-        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        log.warn('Get alerts invalid patient id', { personId: req.params.personId });
+        ErrorResponses.badRequest(res, 'Invalid patient id');
         return;
       }
 
@@ -1333,10 +1333,10 @@ router.post(
 
       // Use defaults for quick-add (alertTypeId=1 General, alertSeverity=2 Medium)
       await createAlert({
-        PersonID: personId,
-        AlertTypeID: alertTypeId ? parseInt(String(alertTypeId), 10) : 1,
-        AlertSeverity: alertSeverity ? parseInt(String(alertSeverity), 10) : 2,
-        AlertDetails: alertDetails
+        person_id: personId,
+        alert_type_id: alertTypeId ? parseInt(String(alertTypeId), 10) : 1,
+        alert_severity: alertSeverity ? parseInt(String(alertSeverity), 10) : 2,
+        alert_details: alertDetails
       });
 
       res
@@ -1409,8 +1409,8 @@ router.put(
       const { alertTypeId, alertSeverity, alertDetails } = req.body;
 
       if (isNaN(alertId)) {
-        log.warn('Update alert invalid alert ID', { alertId: req.params.alertId });
-        ErrorResponses.badRequest(res, 'Invalid alert ID');
+        log.warn('Update alert invalid alert id', { alertId: req.params.alertId });
+        ErrorResponses.badRequest(res, 'Invalid alert id');
         return;
       }
 
@@ -1455,8 +1455,8 @@ router.get(
       const personId = parseInt(req.params.personId, 10);
 
       if (isNaN(personId)) {
-        log.warn('Has appointment check invalid patient ID', { personId: req.params.personId });
-        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        log.warn('Has appointment check invalid patient id', { personId: req.params.personId });
+        ErrorResponses.badRequest(res, 'Invalid patient id');
         return;
       }
 
@@ -1495,7 +1495,7 @@ router.get(
     try {
       const personId = parseInt(req.params.personId, 10);
       if (isNaN(personId)) {
-        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        ErrorResponses.badRequest(res, 'Invalid patient id');
         return;
       }
       const [status, qr] = await Promise.all([
@@ -1530,7 +1530,7 @@ router.post(
     try {
       const personId = parseInt(req.params.personId, 10);
       if (isNaN(personId)) {
-        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        ErrorResponses.badRequest(res, 'Invalid patient id');
         return;
       }
       const pin = await PatientPortalService.resetToDefaultPin(personId);
@@ -1558,7 +1558,7 @@ router.post(
       const personId = parseInt(req.params.personId, 10);
       const { pin } = req.body;
       if (isNaN(personId)) {
-        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        ErrorResponses.badRequest(res, 'Invalid patient id');
         return;
       }
       if (!pin || typeof pin !== 'string') {
@@ -1588,7 +1588,7 @@ router.post(
       const personId = parseInt(req.params.personId, 10);
       const { enabled } = req.body;
       if (isNaN(personId)) {
-        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        ErrorResponses.badRequest(res, 'Invalid patient id');
         return;
       }
       if (typeof enabled !== 'boolean') {
@@ -1614,7 +1614,7 @@ router.post(
     try {
       const personId = parseInt(req.params.personId, 10);
       if (isNaN(personId)) {
-        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        ErrorResponses.badRequest(res, 'Invalid patient id');
         return;
       }
       await PatientPortalService.unlock(personId);
@@ -1640,13 +1640,13 @@ router.get(
     try {
       const personId = parseInt(req.params.personId, 10);
       if (isNaN(personId)) {
-        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        ErrorResponses.badRequest(res, 'Invalid patient id');
         return;
       }
       const rows = await PatientPortalService.getPrivateList(personId);
       res.json({
         success: true,
-        privateImages: rows.map((r) => ({ tp: r.TimepointCode, name: r.ImageName })),
+        privateImages: rows.map((r) => ({ tp: r.timepoint_code, name: r.image_name })),
       });
     } catch (error) {
       ErrorResponses.internalError(res, 'Failed to load photo visibility', error as Error);
@@ -1674,7 +1674,7 @@ router.post(
       const personId = parseInt(req.params.personId, 10);
       const { tp, name, isPrivate } = req.body;
       if (isNaN(personId)) {
-        ErrorResponses.badRequest(res, 'Invalid patient ID');
+        ErrorResponses.badRequest(res, 'Invalid patient id');
         return;
       }
       if (!tp || !name || typeof isPrivate !== 'boolean') {

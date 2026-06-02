@@ -5,7 +5,7 @@ import styles from './AlignerDoctorsSettings.module.css';
 import type { AlignerDoctor } from '../../pages/aligner/aligner.types';
 
 interface FormData {
-    DoctorName: string;
+    doctor_name: string;
     DoctorEmail: string;
     LogoPath: string;
 }
@@ -23,7 +23,7 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
     const [editingId, setEditingId] = useState<number | null>(null);
     const [showAddForm, setShowAddForm] = useState(false);
     const [formData, setFormData] = useState<FormData>({
-        DoctorName: '',
+        doctor_name: '',
         DoctorEmail: '',
         LogoPath: ''
     });
@@ -54,23 +54,23 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
     };
 
     const handleAdd = () => {
-        setFormData({ DoctorName: '', DoctorEmail: '', LogoPath: '' });
+        setFormData({ doctor_name: '', DoctorEmail: '', LogoPath: '' });
         setEditingId(null);
         setShowAddForm(true);
     };
 
     const handleEdit = (doctor: AlignerDoctor) => {
         setFormData({
-            DoctorName: doctor.DoctorName || '',
+            doctor_name: doctor.doctor_name || '',
             DoctorEmail: doctor.DoctorEmail || '',
             LogoPath: doctor.LogoPath || ''
         });
-        setEditingId(doctor.DrID);
+        setEditingId(doctor.dr_id);
         setShowAddForm(true);
     };
 
     const handleCancel = () => {
-        setFormData({ DoctorName: '', DoctorEmail: '', LogoPath: '' });
+        setFormData({ doctor_name: '', DoctorEmail: '', LogoPath: '' });
         setEditingId(null);
         setShowAddForm(false);
     };
@@ -204,7 +204,7 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
                                 type="text"
                                 id="DoctorName"
                                 name="DoctorName"
-                                value={formData.DoctorName}
+                                value={formData.doctor_name}
                                 onChange={handleInputChange}
                                 required
                                 placeholder="e.g., Ahmad (without Dr. prefix)"
@@ -281,11 +281,11 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
                             </thead>
                             <tbody>
                                 {doctors.map(doctor => (
-                                    <tr key={doctor.DrID}>
-                                        <td>{doctor.DrID}</td>
+                                    <tr key={doctor.dr_id}>
+                                        <td>{doctor.dr_id}</td>
                                         <td className={styles.doctorName}>
                                             <i className="fas fa-user-md"></i>
-                                            {doctor.DoctorName === 'Admin' ? doctor.DoctorName : `Dr. ${doctor.DoctorName}`}
+                                            {doctor.doctor_name === 'Admin' ? doctor.doctor_name : `Dr. ${doctor.doctor_name}`}
                                         </td>
                                         <td>
                                             {doctor.DoctorEmail ? (
@@ -323,7 +323,7 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
                                             </button>
                                             <button
                                                 className={`${styles.btnIcon} ${styles.btnDelete}`}
-                                                onClick={() => handleDelete(doctor.DrID, doctor.DoctorName)}
+                                                onClick={() => handleDelete(doctor.dr_id, doctor.doctor_name)}
                                                 title="Delete doctor"
                                             >
                                                 <i className="fas fa-trash"></i>

@@ -333,7 +333,7 @@ const AppointmentCalendar = ({
             newTime: string,
             appt: CalendarAppointment
         ) => {
-            const personID = appt.personID ?? appt.PersonID;
+            const personID = appt.personID ?? appt.person_id;
             if (!personID || !appt.drID || !appt.appDetail) {
                 toast.error('Cannot reschedule: appointment is missing required details');
                 return;
@@ -344,10 +344,10 @@ const AppointmentCalendar = ({
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        PersonID: personID,
-                        DrID: appt.drID,
-                        AppDetail: appt.appDetail,
-                        AppDate: `${newDate}T${newTime}:00`
+                        person_id: personID,
+                        dr_id: appt.drID,
+                        app_detail: appt.appDetail,
+                        app_date: `${newDate}T${newTime}:00`
                     })
                 });
 
@@ -543,10 +543,10 @@ const AppointmentCalendar = ({
 
     // Handler for confirmed delete
     const handleDeleteConfirm = useCallback(async () => {
-        if (!deleteConfirmation?.appointmentID) return;
+        if (!deleteConfirmation?.appointment_id) return;
 
         try {
-            const response = await fetch(`/api/appointments/${deleteConfirmation.appointmentID}`, {
+            const response = await fetch(`/api/appointments/${deleteConfirmation.appointment_id}`, {
                 method: 'DELETE'
             });
 

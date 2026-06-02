@@ -93,7 +93,7 @@ const SalesHistoryTable: React.FC<SalesHistoryTableProps> = ({
                       {formatNumber(sale.TotalProfit)} IQD
                     </td>
                     <td>{sale.PaymentMethod}</td>
-                    <td>{sale.PatientName ?? '-'}</td>
+                    <td>{sale.patient_name ?? '-'}</td>
                     <td>{sale.CashierName ?? '-'}</td>
                     <td>
                       <span

@@ -10,7 +10,7 @@ import { getKysely } from '../kysely.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { getActiveWID } from './patient-queries.js';
 
-// Type definitions
+// type definitions
 interface PatientForPhotoSession {
   firstName: string | null;
   lastName: string | null;
@@ -43,14 +43,14 @@ export async function getPatientForPhotoSession(
   personId: string
 ): Promise<PatientForPhotoSession | null> {
   const row = await getKysely()
-    .selectFrom('tblpatients')
-    .where('PersonID', '=', parseInt(personId, 10))
+    .selectFrom('patients')
+    .where('person_id', '=', parseInt(personId, 10))
     .select((eb) => [
-      'FirstName as firstName',
-      'LastName as lastName',
-      'PatientName as patientName',
-      eb.ref('DateofBirth').as('dob'),
-      'Gender as gender',
+      'first_name as firstName',
+      'last_name as lastName',
+      'patient_name as patientName',
+      eb.ref('date_of_birth').as('dob'),
+      'gender as gender',
     ])
     .executeTakeFirst();
   return (row as PatientForPhotoSession | undefined) ?? null;
@@ -67,9 +67,9 @@ export async function updatePatientName(
   lastName: string
 ): Promise<void> {
   await getKysely()
-    .updateTable('tblpatients')
-    .set({ FirstName: firstName, LastName: lastName })
-    .where('PersonID', '=', parseInt(personId, 10))
+    .updateTable('patients')
+    .set({ first_name: firstName, last_name: lastName })
+    .where('person_id', '=', parseInt(personId, 10))
     .execute();
 }
 
@@ -79,23 +79,23 @@ export async function updatePatientName(
 export async function getPhotoSessionAppointments(
   personId: string
 ): Promise<PhotoSessionAppointment[]> {
-  // was: ApposforOne — `SELECT CAST(AppDate AS date) ... ORDER BY AppDate DESC`. The proc returned
+  // was: ApposforOne — `SELECT CAST(app_date AS date) ... ORDER BY app_date DESC`. The proc returned
   // only the date, so `description` was always '' (the old positional mapper read a non-existent
-  // 2nd column). Preserved verbatim. `AppDay` is the generated `AppDate::date` column.
+  // 2nd column). Preserved verbatim. `app_day` is the generated `app_date::date` column.
   const rows = await getKysely()
-    .selectFrom('tblappointments')
-    .where('PersonID', '=', parseInt(personId, 10))
-    .orderBy('AppDate', 'desc')
-    .select('AppDay')
+    .selectFrom('appointments')
+    .where('person_id', '=', parseInt(personId, 10))
+    .orderBy('app_date', 'desc')
+    .select('app_day')
     .execute();
-  return rows.map((r) => ({ date: r.AppDay as unknown as Date, description: '' }));
+  return rows.map((r) => ({ date: r.app_day as unknown as Date, description: '' }));
 }
 
 /**
  * Get visits with photo flags for date selection. (was: VisitsPhotoforOne)
  *
  * Deviation (flagged for Phase 7): the old positional mapper read the proc's columns in the wrong
- * order (proc emitted `Type, VisitDate`; the mapper assigned col0→visitDate, col1→hasInitialPhoto…),
+ * order (proc emitted `type, visit_date`; the mapper assigned col0→visitDate, col1→hasInitialPhoto…),
  * so the mssql result was effectively garbage (a string in `visitDate`). This returns the
  * interface-correct result the field names intend: the photo-bearing visits of the active work
  * with each visit's real date and photo flags.
@@ -104,46 +104,46 @@ export async function getPhotoSessionVisits(personId: string): Promise<PhotoSess
   const WID = await getActiveWID(parseInt(personId, 10));
   if (WID == null) return [];
   const rows = await getKysely()
-    .selectFrom('tblvisits')
-    .where('WorkID', '=', WID)
-    .where((eb) => eb.or([eb('IPhoto', '=', true), eb('FPhoto', '=', true), eb('PPhoto', '=', true)]))
-    .orderBy('VisitDate')
-    .select(['VisitDate', 'IPhoto', 'FPhoto', 'PPhoto'])
+    .selectFrom('visits')
+    .where('work_id', '=', WID)
+    .where((eb) => eb.or([eb('i_photo', '=', true), eb('f_photo', '=', true), eb('p_photo', '=', true)]))
+    .orderBy('visit_date')
+    .select(['visit_date', 'i_photo', 'f_photo', 'p_photo'])
     .execute();
   return rows.map((r) => ({
-    visitDate: r.VisitDate as unknown as Date,
-    hasInitialPhoto: r.IPhoto,
-    hasFinalPhoto: r.FPhoto,
-    hasProgressPhoto: r.PPhoto,
+    visitDate: r.visit_date as unknown as Date,
+    hasInitialPhoto: r.i_photo,
+    hasFinalPhoto: r.f_photo,
+    hasProgressPhoto: r.p_photo,
   }));
 }
 
 /**
- * Get existing IPhotoDate/FPhotoDate from tblwork for conflict detection.
+ * Get existing i_photo_date/f_photo_date from tblwork for conflict detection.
  */
 export async function getExistingPhotoDate(personId: string): Promise<ExistingPhotoDate | null> {
-  // IPhotoDate/FPhotoDate are PG `date` → 'YYYY-MM-DD' strings at runtime (typed Date
+  // i_photo_date/f_photo_date are PG `date` → 'YYYY-MM-DD' strings at runtime (typed Date
   // by codegen; declared ExistingPhotoDate types preserved). Phase 6/7 consumer review.
   const row = await getKysely()
-    .selectFrom('tblwork')
-    .where('PersonID', '=', parseInt(personId, 10))
-    .where('Status', '=', 1)
-    .select(['IPhotoDate as iPhotoDate', 'FPhotoDate as fPhotoDate'])
+    .selectFrom('works')
+    .where('person_id', '=', parseInt(personId, 10))
+    .where('status', '=', 1)
+    .select(['i_photo_date as iPhotoDate', 'f_photo_date as fPhotoDate'])
     .executeTakeFirst();
   return (row as ExistingPhotoDate | undefined) ?? null;
 }
 
 /**
- * Update IPhotoDate or FPhotoDate in tblwork (override existing date).
+ * Update i_photo_date or f_photo_date in tblwork (override existing date).
  */
 export async function updatePhotoDate(
   personId: string,
-  field: 'IPhotoDate' | 'FPhotoDate',
+  field: 'i_photo_date' | 'f_photo_date',
   newDate: Date
 ): Promise<void> {
   const pid = parseInt(personId, 10);
   // Date-only column; bind a 'YYYY-MM-DD' string to avoid a UTC midnight shift.
   const dateStr = toDateOnly(newDate);
-  const q = getKysely().updateTable('tblwork').where('PersonID', '=', pid).where('Status', '=', 1);
-  await (field === 'IPhotoDate' ? q.set({ IPhotoDate: dateStr }) : q.set({ FPhotoDate: dateStr })).execute();
+  const q = getKysely().updateTable('works').where('person_id', '=', pid).where('status', '=', 1);
+  await (field === 'i_photo_date' ? q.set({ i_photo_date: dateStr }) : q.set({ f_photo_date: dateStr })).execute();
 }

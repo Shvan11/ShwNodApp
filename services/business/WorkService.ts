@@ -139,25 +139,25 @@ export type WorkStatusType = 1 | 2 | 3;
  * Work creation data
  */
 export interface WorkCreateData {
-  PersonID: number | string;
-  DrID: number | string;
-  Typeofwork: number | string;
-  TotalRequired?: number | string | null;
-  Currency?: string;
-  Notes?: string;
-  StartDate?: string | Date;
-  DebondDate?: string | Date;
-  FPhotoDate?: string | Date;
-  IPhotoDate?: string | Date;
-  NotesDate?: string | Date;
+  person_id: number | string;
+  dr_id: number | string;
+  type_of_work: number | string;
+  total_required?: number | string | null;
+  currency?: string;
+  notes?: string;
+  start_date?: string | Date;
+  debond_date?: string | Date;
+  f_photo_date?: string | Date;
+  i_photo_date?: string | Date;
+  notes_date?: string | Date;
   createAsFinished?: boolean;
-  Status?: WorkStatusType;
-  EstimatedDuration?: number;
-  KeyWordID1?: number;
-  KeyWordID2?: number;
-  KeywordID3?: number;
-  KeywordID4?: number;
-  KeywordID5?: number;
+  status?: WorkStatusType;
+  estimated_duration?: number;
+  keyword_id_1?: number;
+  keyword_id_2?: number;
+  keyword_id_3?: number;
+  keyword_id_4?: number;
+  keyword_id_5?: number;
   // Index signature for dynamic date field access
   [key: string]: string | number | boolean | Date | null | undefined;
 }
@@ -166,11 +166,11 @@ export interface WorkCreateData {
  * Date field names
  */
 const DATE_FIELDS = [
-  'StartDate',
-  'DebondDate',
-  'FPhotoDate',
-  'IPhotoDate',
-  'NotesDate',
+  'start_date',
+  'debond_date',
+  'f_photo_date',
+  'i_photo_date',
+  'notes_date',
 ] as const;
 
 /**
@@ -211,28 +211,28 @@ function normalizeDateFields(
  */
 function validateWorkRequiredFields(workData: WorkCreateData): void {
   // Validate required fields
-  if (!workData.PersonID || !workData.DrID) {
+  if (!workData.person_id || !workData.dr_id) {
     throw new WorkValidationError(
-      'Missing required fields: PersonID and DrID are required',
+      'Missing required fields: person_id and dr_id are required',
       'MISSING_REQUIRED_FIELDS'
     );
   }
 
-  // Validate Typeofwork is required
-  if (!workData.Typeofwork) {
+  // Validate type_of_work is required
+  if (!workData.type_of_work) {
     throw new WorkValidationError(
-      'Typeofwork is required',
+      'type_of_work is required',
       'MISSING_TYPE_OF_WORK'
     );
   }
 
   // Validate data types
   if (
-    isNaN(parseInt(String(workData.PersonID))) ||
-    isNaN(parseInt(String(workData.DrID)))
+    isNaN(parseInt(String(workData.person_id))) ||
+    isNaN(parseInt(String(workData.dr_id)))
   ) {
     throw new WorkValidationError(
-      'PersonID and DrID must be valid numbers',
+      'person_id and dr_id must be valid numbers',
       'INVALID_DATA_TYPE'
     );
   }
@@ -252,21 +252,21 @@ function validateFinishedWorkRequiredFields(workData: WorkCreateData): void {
     );
   }
 
-  // Validate TotalRequired
+  // Validate total_required
   if (
-    !workData.TotalRequired ||
-    parseFloat(String(workData.TotalRequired)) <= 0
+    !workData.total_required ||
+    parseFloat(String(workData.total_required)) <= 0
   ) {
     throw new WorkValidationError(
-      'TotalRequired must be greater than 0 for finished work with invoice',
+      'total_required must be greater than 0 for finished work with invoice',
       'INVALID_TOTAL_REQUIRED'
     );
   }
 
-  // Validate Currency
-  if (!workData.Currency) {
+  // Validate currency
+  if (!workData.currency) {
     throw new WorkValidationError(
-      'Currency is required for finished work with invoice',
+      'currency is required for finished work with invoice',
       'MISSING_CURRENCY'
     );
   }
@@ -274,7 +274,7 @@ function validateFinishedWorkRequiredFields(workData: WorkCreateData): void {
 
 /**
  * Format duplicate active work error with existing work details
- * @param personId - Patient ID
+ * @param personId - Patient id
  * @returns Error details with existing work information
  */
 async function formatDuplicateActiveWorkError(
@@ -290,13 +290,13 @@ async function formatDuplicateActiveWorkError(
       code: 'DUPLICATE_ACTIVE_WORK',
       existingWork: existingWork
         ? {
-            workId: existingWork.workid,
-            typeOfWork: existingWork.Typeofwork ?? null,
-            typeName: existingWork.TypeName ?? null,
-            doctor: existingWork.DoctorName ?? null,
-            additionDate: existingWork.AdditionDate ?? null,
-            totalRequired: existingWork.TotalRequired ?? null,
-            currency: existingWork.Currency ?? null,
+            workId: existingWork.work_id,
+            typeOfWork: existingWork.type_of_work ?? null,
+            typeName: existingWork.type_name ?? null,
+            doctor: existingWork.doctor_name ?? null,
+            additionDate: existingWork.addition_date ?? null,
+            totalRequired: existingWork.total_required ?? null,
+            currency: existingWork.currency ?? null,
           }
         : null,
     };
@@ -322,14 +322,14 @@ export async function validateAndCreateWork(
   // Validate required fields
   validateWorkRequiredFields(workData);
 
-  // Default TotalRequired to 0 if empty or not provided
+  // Default total_required to 0 if empty or not provided
   const normalizedData = { ...workData };
   if (
-    normalizedData.TotalRequired === '' ||
-    normalizedData.TotalRequired === null ||
-    normalizedData.TotalRequired === undefined
+    normalizedData.total_required === '' ||
+    normalizedData.total_required === null ||
+    normalizedData.total_required === undefined
   ) {
-    normalizedData.TotalRequired = 0;
+    normalizedData.total_required = 0;
   }
 
   // Normalize date fields
@@ -339,15 +339,15 @@ export async function validateAndCreateWork(
     // Convert to proper types for database
     const dbData = {
       ...dataWithDates,
-      PersonID: parseInt(String(dataWithDates.PersonID), 10),
-      DrID: parseInt(String(dataWithDates.DrID), 10),
-      Typeofwork: parseInt(String(dataWithDates.Typeofwork), 10),
-      TotalRequired: dataWithDates.TotalRequired != null ? parseFloat(String(dataWithDates.TotalRequired)) : null,
+      person_id: parseInt(String(dataWithDates.person_id), 10),
+      dr_id: parseInt(String(dataWithDates.dr_id), 10),
+      type_of_work: parseInt(String(dataWithDates.type_of_work), 10),
+      total_required: dataWithDates.total_required != null ? parseFloat(String(dataWithDates.total_required)) : null,
     };
     // Create work in database
-    const result = (await addWork(dbData)) as Work;
+    const result = (await addWork(dbData)) as unknown as Work;
     log.info(
-      `Work created successfully: Work ${result.workid} for Patient ${workData.PersonID}`
+      `Work created successfully: Work ${result.work_id} for Patient ${workData.person_id}`
     );
     return result;
   } catch (error) {
@@ -355,7 +355,7 @@ export async function validateAndCreateWork(
     // pg reports this as SQLSTATE 23505 + constraint name — NOT the old mssql 2601.
     if (isUniqueViolation(error, 'UNQ_tblWork_Active')) {
       const errorDetails = await formatDuplicateActiveWorkError(
-        workData.PersonID
+        workData.person_id
       );
       throw new WorkValidationError(
         'Patient already has an active work',
@@ -393,17 +393,17 @@ export async function validateAndCreateWorkWithInvoice(
     // Convert to proper types for database
     const dbData = {
       ...dataWithDates,
-      PersonID: parseInt(String(dataWithDates.PersonID), 10),
-      DrID: parseInt(String(dataWithDates.DrID), 10),
-      Typeofwork: parseInt(String(dataWithDates.Typeofwork), 10),
-      TotalRequired: dataWithDates.TotalRequired != null ? parseFloat(String(dataWithDates.TotalRequired)) : null,
+      person_id: parseInt(String(dataWithDates.person_id), 10),
+      dr_id: parseInt(String(dataWithDates.dr_id), 10),
+      type_of_work: parseInt(String(dataWithDates.type_of_work), 10),
+      total_required: dataWithDates.total_required != null ? parseFloat(String(dataWithDates.total_required)) : null,
     };
     // Create work and invoice in database (transaction handled by query layer)
     const result = (await dbAddWorkWithInvoice(
       dbData
     )) as WorkWithInvoiceResult;
     log.info(
-      `Work with invoice created successfully: Work ${result.workId}, Invoice ${result.invoiceId} for Patient ${workData.PersonID}`
+      `Work with invoice created successfully: Work ${result.workId}, Invoice ${result.invoiceId} for Patient ${workData.person_id}`
     );
     return result;
   } catch (error) {
@@ -411,7 +411,7 @@ export async function validateAndCreateWorkWithInvoice(
     // pg reports this as SQLSTATE 23505 + constraint name — NOT the old mssql 2601.
     if (isUniqueViolation(error, 'UNQ_tblWork_Active')) {
       const errorDetails = await formatDuplicateActiveWorkError(
-        workData.PersonID
+        workData.person_id
       );
       throw new WorkValidationError(
         'Patient already has an active work',
@@ -424,14 +424,14 @@ export async function validateAndCreateWorkWithInvoice(
 }
 
 /**
- * Validate a proposed discount amount against a work's TotalRequired and TotalPaid.
+ * Validate a proposed discount amount against a work's total_required and TotalPaid.
  *
  * Rules:
- * - Discount must be a non-negative finite number
- * - Discount + TotalPaid must not exceed TotalRequired (cannot create a refund situation)
+ * - discount must be a non-negative finite number
+ * - discount + TotalPaid must not exceed total_required (cannot create a refund situation)
  *
  * @param discount - Proposed discount amount (0 or null means no discount)
- * @param totalRequired - Work's TotalRequired
+ * @param totalRequired - Work's total_required
  * @param totalPaid - Current sum of invoices paid for this work
  * @throws WorkValidationError when rules are violated
  */
@@ -444,9 +444,9 @@ export function validateDiscount(
 
   if (!Number.isFinite(discount) || discount < 0) {
     throw new WorkValidationError(
-      'Discount must be a non-negative number',
+      'discount must be a non-negative number',
       'INVALID_DISCOUNT',
-      { field: 'Discount', value: discount }
+      { field: 'discount', value: discount }
     );
   }
 
@@ -456,16 +456,16 @@ export function validateDiscount(
 
   if (discount > remaining) {
     throw new WorkValidationError(
-      `Discount (${discount}) cannot exceed remaining balance (${remaining}). Refund the difference first or lower the discount.`,
+      `discount (${discount}) cannot exceed remaining balance (${remaining}). Refund the difference first or lower the discount.`,
       'DISCOUNT_EXCEEDS_REMAINING',
-      { field: 'Discount', value: discount, totalRequired: total, totalPaid: paid }
+      { field: 'discount', value: discount, totalRequired: total, totalPaid: paid }
     );
   }
 }
 
 /**
  * Check work dependencies before deletion
- * @param workId - Work ID
+ * @param workId - Work id
  * @returns Dependency information
  */
 export async function checkWorkDependencies(
@@ -507,7 +507,7 @@ export async function checkWorkDependencies(
 
 /**
  * Validate and delete a work record
- * @param workId - Work ID
+ * @param workId - Work id
  * @returns Deletion result with rowsAffected
  * @throws WorkValidationError If work has dependencies
  */
@@ -538,8 +538,8 @@ export type { WorkRelatedCounts, TransferWorkResult };
  * - Cannot transfer to same patient
  * - If work is ACTIVE, target patient cannot have an active work
  *
- * @param workId - Work ID to transfer
- * @param targetPatientId - Target patient ID
+ * @param workId - Work id to transfer
+ * @param targetPatientId - Target patient id
  * @returns Transfer result with source/target info and related counts
  * @throws WorkValidationError If validation fails
  */
@@ -560,11 +560,11 @@ export async function validateAndTransferWork(
   }
 
   // 2. Check not transferring to same patient
-  if (work.PersonID === targetPatientId) {
+  if (work.person_id === targetPatientId) {
     throw new WorkValidationError(
       'Cannot transfer work to the same patient',
       'SAME_PATIENT',
-      { workId, sourcePatientId: work.PersonID, targetPatientId }
+      { workId, sourcePatientId: work.person_id, targetPatientId }
     );
   }
 
@@ -579,7 +579,7 @@ export async function validateAndTransferWork(
   }
 
   // 4. If work is ACTIVE, check for active work conflict
-  if (work.Status === WORK_STATUS.ACTIVE) {
+  if (work.status === WORK_STATUS.ACTIVE) {
     const targetActiveWork = await getActiveWork(targetPatientId);
     if (targetActiveWork) {
       throw new WorkValidationError(
@@ -588,13 +588,13 @@ export async function validateAndTransferWork(
         {
           targetPatientId,
           existingWork: {
-            workId: targetActiveWork.workid,
-            typeOfWork: targetActiveWork.Typeofwork ?? null,
-            typeName: targetActiveWork.TypeName ?? null,
-            doctor: targetActiveWork.DoctorName ?? null,
-            additionDate: targetActiveWork.AdditionDate ?? null,
-            totalRequired: targetActiveWork.TotalRequired ?? null,
-            currency: targetActiveWork.Currency ?? null,
+            workId: targetActiveWork.work_id,
+            typeOfWork: targetActiveWork.type_of_work ?? null,
+            typeName: targetActiveWork.type_name ?? null,
+            doctor: targetActiveWork.doctor_name ?? null,
+            additionDate: targetActiveWork.addition_date ?? null,
+            totalRequired: targetActiveWork.total_required ?? null,
+            currency: targetActiveWork.currency ?? null,
           },
         }
       );
@@ -602,7 +602,7 @@ export async function validateAndTransferWork(
   }
 
   // 5. Execute the transfer
-  log.info(`Executing work transfer: Work ${workId} from Patient ${work.PersonID} to Patient ${targetPatientId}`);
+  log.info(`Executing work transfer: Work ${workId} from Patient ${work.person_id} to Patient ${targetPatientId}`);
   const result = await dbTransferWork(workId, targetPatientId);
   log.info(`Work transfer complete:`, result);
 
@@ -611,7 +611,7 @@ export async function validateAndTransferWork(
 
 /**
  * Get transfer preview (related record counts)
- * @param workId - Work ID
+ * @param workId - Work id
  * @returns Related record counts
  */
 export async function getTransferPreview(workId: number): Promise<WorkRelatedCounts> {

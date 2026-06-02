@@ -122,7 +122,7 @@ const HolidayQuickModal = ({
                                     {appointmentWarning.appointments?.slice(0, 3).map((apt, idx) => (
                                         <div key={idx} className="warning-appointment">
                                             <i className="fas fa-user"></i>
-                                            {apt.PatientName}
+                                            {apt.patient_name}
                                         </div>
                                     ))}
                                     {appointmentWarning.count > 3 && (

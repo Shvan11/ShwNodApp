@@ -11,36 +11,36 @@ import styles from './Diagnosis.module.css';
  */
 
 interface DiagnosisData {
-    WorkID: number;
-    DxDate: string;
-    Diagnosis: string;
-    TreatmentPlan: string;
-    ChiefComplain: string;
-    Appliance: string;
+    work_id: number;
+    dx_date: string;
+    diagnosis: string;
+    treatment_plan: string;
+    chief_complain: string;
+    appliance: string;
     // Facial Analysis
-    fAnteroPosterior: string;
-    fVertical: string;
-    fTransverse: string;
-    fLipCompetence: string;
-    fNasoLabialAngle: string;
-    fUpperIncisorShowRest: string;
-    fUpperIncisorShowSmile: string;
+    f_antero_posterior: string;
+    f_vertical: string;
+    f_transverse: string;
+    f_lip_competence: string;
+    f_naso_labial_angle: string;
+    f_upper_incisor_show_rest: string;
+    f_upper_incisor_show_smile: string;
     // Intraoral Analysis
-    ITeethPresent: string;
-    IDentalHealth: string;
-    ILowerCrowding: string;
-    ILowerIncisorInclination: string;
-    ICurveofSpee: string;
-    IUpperCrowding: string;
-    IUpperIncisorInclination: string;
+    i_teeth_present: string;
+    i_dental_health: string;
+    i_lower_crowding: string;
+    i_lower_incisor_inclination: string;
+    i_curveof_spee: string;
+    i_upper_crowding: string;
+    i_upper_incisor_inclination: string;
     // Occlusion Analysis
-    OIncisorRelation: string;
-    OOverjet: string;
-    OOverbite: string;
-    OCenterlines: string;
-    OMolarRelation: string;
-    OCanineRelation: string;
-    OFunctionalOcclusion: string;
+    o_incisor_relation: string;
+    o_overjet: string;
+    o_overbite: string;
+    o_centerlines: string;
+    o_molar_relation: string;
+    o_canine_relation: string;
+    o_functional_occlusion: string;
     // Cephalometric Analysis
     C_SNA: string;
     C_SNB: string;
@@ -64,7 +64,7 @@ interface DiagnosisData {
 
 interface PatientInfo {
     Name: string;
-    PersonID?: number;
+    person_id?: number;
     [key: string]: unknown;
 }
 
@@ -97,36 +97,36 @@ const Diagnosis = () => {
     const [diagnosisExists, setDiagnosisExists] = useState(false);
 
     const [diagnosisData, setDiagnosisData] = useState<DiagnosisData>({
-        WorkID: parseInt(workId || '0'),
-        DxDate: new Date().toISOString().split('T')[0],
-        Diagnosis: '',
-        TreatmentPlan: '',
-        ChiefComplain: '',
-        Appliance: '',
+        work_id: parseInt(workId || '0'),
+        dx_date: new Date().toISOString().split('T')[0],
+        diagnosis: '',
+        treatment_plan: '',
+        chief_complain: '',
+        appliance: '',
         // Facial Analysis
-        fAnteroPosterior: '',
-        fVertical: '',
-        fTransverse: '',
-        fLipCompetence: '',
-        fNasoLabialAngle: '',
-        fUpperIncisorShowRest: '',
-        fUpperIncisorShowSmile: '',
+        f_antero_posterior: '',
+        f_vertical: '',
+        f_transverse: '',
+        f_lip_competence: '',
+        f_naso_labial_angle: '',
+        f_upper_incisor_show_rest: '',
+        f_upper_incisor_show_smile: '',
         // Intraoral Analysis
-        ITeethPresent: '',
-        IDentalHealth: '',
-        ILowerCrowding: '',
-        ILowerIncisorInclination: '',
-        ICurveofSpee: '',
-        IUpperCrowding: '',
-        IUpperIncisorInclination: '',
+        i_teeth_present: '',
+        i_dental_health: '',
+        i_lower_crowding: '',
+        i_lower_incisor_inclination: '',
+        i_curveof_spee: '',
+        i_upper_crowding: '',
+        i_upper_incisor_inclination: '',
         // Occlusion Analysis
-        OIncisorRelation: '',
-        OOverjet: '',
-        OOverbite: '',
-        OCenterlines: '',
-        OMolarRelation: '',
-        OCanineRelation: '',
-        OFunctionalOcclusion: '',
+        o_incisor_relation: '',
+        o_overjet: '',
+        o_overbite: '',
+        o_centerlines: '',
+        o_molar_relation: '',
+        o_canine_relation: '',
+        o_functional_occlusion: '',
         // Cephalometric Analysis
         C_SNA: '',
         C_SNB: '',
@@ -179,8 +179,8 @@ const Diagnosis = () => {
                 const diagnosis: Partial<DiagnosisData> = await diagnosisResponse.json();
                 if (diagnosis) {
                     // Format date to YYYY-MM-DD for input
-                    if (diagnosis.DxDate) {
-                        diagnosis.DxDate = new Date(diagnosis.DxDate).toISOString().split('T')[0];
+                    if (diagnosis.dx_date) {
+                        diagnosis.dx_date = new Date(diagnosis.dx_date).toISOString().split('T')[0];
                     }
                     setDiagnosisData(prev => ({ ...prev, ...diagnosis }));
                     setDiagnosisExists(true);
@@ -200,12 +200,12 @@ const Diagnosis = () => {
 
     const handleSave = async () => {
         // Validate required fields
-        if (!diagnosisData.Diagnosis.trim()) {
+        if (!diagnosisData.diagnosis.trim()) {
             toast.warning('Diagnosis is required');
             setActiveTab('general');
             return;
         }
-        if (!diagnosisData.TreatmentPlan.trim()) {
+        if (!diagnosisData.treatment_plan.trim()) {
             toast.warning('Treatment Plan is required');
             setActiveTab('general');
             return;
@@ -242,7 +242,7 @@ const Diagnosis = () => {
 
     const handleReset = async () => {
         // Show confirmation
-        const confirmMessage = `Are you sure you want to reset/delete this diagnosis?\n\nWork: ${workInfo?.TypeName || 'N/A'}\nDate: ${diagnosisData.DxDate}\n\n⚠️ This action cannot be undone!`;
+        const confirmMessage = `Are you sure you want to reset/delete this diagnosis?\n\nWork: ${workInfo?.TypeName || 'N/A'}\nDate: ${diagnosisData.dx_date}\n\n⚠️ This action cannot be undone!`;
 
         if (!await confirm(confirmMessage, { title: 'Delete Diagnosis', danger: true, confirmText: 'Delete' })) return;
 
@@ -404,8 +404,8 @@ const Diagnosis = () => {
                                 <input
                                     type="date"
                                     className={styles.formInput}
-                                    value={diagnosisData.DxDate}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('DxDate', e.target.value)}
+                                    value={diagnosisData.dx_date}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('dx_date', e.target.value)}
                                 />
                             </div>
 
@@ -414,8 +414,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.Appliance || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('Appliance', e.target.value)}
+                                    value={diagnosisData.appliance || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('appliance', e.target.value)}
                                     placeholder="e.g., Roth, MBT, Damon..."
                                 />
                             </div>
@@ -425,8 +425,8 @@ const Diagnosis = () => {
                                 <textarea
                                     className={styles.formTextarea}
                                     rows={3}
-                                    value={diagnosisData.ChiefComplain || ''}
-                                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleChange('ChiefComplain', e.target.value)}
+                                    value={diagnosisData.chief_complain || ''}
+                                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleChange('chief_complain', e.target.value)}
                                     placeholder="Patient's main concern or reason for seeking treatment..."
                                 />
                             </div>
@@ -438,8 +438,8 @@ const Diagnosis = () => {
                                 <textarea
                                     className={styles.formTextarea}
                                     rows={5}
-                                    value={diagnosisData.Diagnosis || ''}
-                                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleChange('Diagnosis', e.target.value)}
+                                    value={diagnosisData.diagnosis || ''}
+                                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleChange('diagnosis', e.target.value)}
                                     placeholder="Complete orthodontic diagnosis (e.g., Class II Division 1 malocclusion, severe crowding, deep bite...)"
                                     required
                                 />
@@ -452,8 +452,8 @@ const Diagnosis = () => {
                                 <textarea
                                     className={styles.formTextarea}
                                     rows={5}
-                                    value={diagnosisData.TreatmentPlan || ''}
-                                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleChange('TreatmentPlan', e.target.value)}
+                                    value={diagnosisData.treatment_plan || ''}
+                                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleChange('treatment_plan', e.target.value)}
                                     placeholder="Detailed treatment plan including extractions, mechanics, duration, etc..."
                                     required
                                 />
@@ -472,8 +472,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.fAnteroPosterior || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('fAnteroPosterior', e.target.value)}
+                                    value={diagnosisData.f_antero_posterior || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('f_antero_posterior', e.target.value)}
                                     placeholder="e.g., Convex, Straight, Concave"
                                 />
                             </div>
@@ -483,8 +483,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.fVertical || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('fVertical', e.target.value)}
+                                    value={diagnosisData.f_vertical || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('f_vertical', e.target.value)}
                                     placeholder="e.g., Average, Long, Short"
                                 />
                             </div>
@@ -494,8 +494,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.fTransverse || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('fTransverse', e.target.value)}
+                                    value={diagnosisData.f_transverse || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('f_transverse', e.target.value)}
                                     placeholder="e.g., Symmetric, Asymmetric"
                                 />
                             </div>
@@ -505,8 +505,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.fLipCompetence || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('fLipCompetence', e.target.value)}
+                                    value={diagnosisData.f_lip_competence || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('f_lip_competence', e.target.value)}
                                     placeholder="e.g., Competent, Incompetent"
                                 />
                             </div>
@@ -516,8 +516,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.fNasoLabialAngle || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('fNasoLabialAngle', e.target.value)}
+                                    value={diagnosisData.f_naso_labial_angle || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('f_naso_labial_angle', e.target.value)}
                                     placeholder="e.g., 90-110°, Normal: 102°±8"
                                 />
                             </div>
@@ -527,8 +527,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.fUpperIncisorShowRest || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('fUpperIncisorShowRest', e.target.value)}
+                                    value={diagnosisData.f_upper_incisor_show_rest || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('f_upper_incisor_show_rest', e.target.value)}
                                     placeholder="e.g., 2-3mm (normal)"
                                 />
                             </div>
@@ -538,8 +538,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.fUpperIncisorShowSmile || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('fUpperIncisorShowSmile', e.target.value)}
+                                    value={diagnosisData.f_upper_incisor_show_smile || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('f_upper_incisor_show_smile', e.target.value)}
                                     placeholder="e.g., 100%, with gingiva"
                                 />
                             </div>
@@ -557,8 +557,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.ITeethPresent || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('ITeethPresent', e.target.value)}
+                                    value={diagnosisData.i_teeth_present || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('i_teeth_present', e.target.value)}
                                     placeholder="e.g., All permanent teeth, Mixed dentition"
                                 />
                             </div>
@@ -568,8 +568,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.IDentalHealth || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('IDentalHealth', e.target.value)}
+                                    value={diagnosisData.i_dental_health || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('i_dental_health', e.target.value)}
                                     placeholder="e.g., Good oral hygiene, No active caries"
                                 />
                             </div>
@@ -579,8 +579,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.IUpperCrowding || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('IUpperCrowding', e.target.value)}
+                                    value={diagnosisData.i_upper_crowding || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('i_upper_crowding', e.target.value)}
                                     placeholder="e.g., -5mm (negative = crowding)"
                                 />
                             </div>
@@ -590,8 +590,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.IUpperIncisorInclination || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('IUpperIncisorInclination', e.target.value)}
+                                    value={diagnosisData.i_upper_incisor_inclination || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('i_upper_incisor_inclination', e.target.value)}
                                     placeholder="e.g., Proclined, Retroclined, Normal"
                                 />
                             </div>
@@ -601,8 +601,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.ILowerCrowding || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('ILowerCrowding', e.target.value)}
+                                    value={diagnosisData.i_lower_crowding || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('i_lower_crowding', e.target.value)}
                                     placeholder="e.g., -3mm (negative = crowding)"
                                 />
                             </div>
@@ -612,8 +612,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.ILowerIncisorInclination || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('ILowerIncisorInclination', e.target.value)}
+                                    value={diagnosisData.i_lower_incisor_inclination || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('i_lower_incisor_inclination', e.target.value)}
                                     placeholder="e.g., Upright, Proclined, Retroclined"
                                 />
                             </div>
@@ -623,8 +623,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.ICurveofSpee || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('ICurveofSpee', e.target.value)}
+                                    value={diagnosisData.i_curveof_spee || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('i_curveof_spee', e.target.value)}
                                     placeholder="e.g., Moderate 3mm, Flat, Deep"
                                 />
                             </div>
@@ -642,8 +642,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.OIncisorRelation || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('OIncisorRelation', e.target.value)}
+                                    value={diagnosisData.o_incisor_relation || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('o_incisor_relation', e.target.value)}
                                     placeholder="e.g., Class I, Class II, Class III"
                                 />
                             </div>
@@ -653,8 +653,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.OOverjet || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('OOverjet', e.target.value)}
+                                    value={diagnosisData.o_overjet || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('o_overjet', e.target.value)}
                                     placeholder="e.g., 5mm (normal: 2-3mm)"
                                 />
                             </div>
@@ -664,8 +664,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.OOverbite || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('OOverbite', e.target.value)}
+                                    value={diagnosisData.o_overbite || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('o_overbite', e.target.value)}
                                     placeholder="e.g., 50%, Deep, Open"
                                 />
                             </div>
@@ -675,8 +675,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.OCenterlines || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('OCenterlines', e.target.value)}
+                                    value={diagnosisData.o_centerlines || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('o_centerlines', e.target.value)}
                                     placeholder="e.g., Coincident, Upper right 2mm"
                                 />
                             </div>
@@ -686,8 +686,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.OMolarRelation || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('OMolarRelation', e.target.value)}
+                                    value={diagnosisData.o_molar_relation || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('o_molar_relation', e.target.value)}
                                     placeholder="e.g., Class I / Class II, Full cusp Class II"
                                 />
                             </div>
@@ -697,8 +697,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.OCanineRelation || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('OCanineRelation', e.target.value)}
+                                    value={diagnosisData.o_canine_relation || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('o_canine_relation', e.target.value)}
                                     placeholder="e.g., Class I / Class II"
                                 />
                             </div>
@@ -708,8 +708,8 @@ const Diagnosis = () => {
                                 <input
                                     type="text"
                                     className={styles.formInput}
-                                    value={diagnosisData.OFunctionalOcclusion || ''}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('OFunctionalOcclusion', e.target.value)}
+                                    value={diagnosisData.o_functional_occlusion || ''}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange('o_functional_occlusion', e.target.value)}
                                     placeholder="e.g., No premature contacts, Crossbite on #24"
                                 />
                             </div>

@@ -35,10 +35,10 @@ interface ExistingWorkData {
 }
 
 interface WorkFormData {
-    PersonID: string;
-    TotalRequired: number;
+    person_id: string;
+    total_required: number;
     Currency: string;
-    Typeofwork: string;
+    type_of_work: string;
     Notes: string;
     Status: number;
     StartDate: string;
@@ -46,7 +46,7 @@ interface WorkFormData {
     FPhotoDate: string;
     IPhotoDate: string;
     EstimatedDuration: string;
-    DrID: string;
+    dr_id: string;
     NotesDate: string;
     KeyWordID1: string;
     KeyWordID2: string;
@@ -61,9 +61,9 @@ interface WorkFormData {
 
 interface WorkResponse {
     workid: number;
-    PersonID: number;
-    Typeofwork?: number;
-    TotalRequired?: number;
+    person_id: number;
+    type_of_work?: number;
+    total_required?: number;
     Currency?: string;
     Notes?: string;
     Status?: number;
@@ -72,7 +72,7 @@ interface WorkResponse {
     FPhotoDate?: string;
     IPhotoDate?: string;
     EstimatedDuration?: number;
-    DrID?: number;
+    dr_id?: number;
     NotesDate?: string;
     KeyWordID1?: number;
     KeyWordID2?: number;
@@ -108,10 +108,10 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
 
     // Form state
     const [formData, setFormData] = useState<WorkFormData>({
-        PersonID: personId ? String(personId) : '',
-        TotalRequired: 0, // Default to 0 instead of empty string (matches DB default)
+        person_id: personId ? String(personId) : '',
+        total_required: 0, // Default to 0 instead of empty string (matches DB default)
         Currency: 'USD',
-        Typeofwork: '',
+        type_of_work: '',
         Notes: '',
         Status: 1, // 1=Active, 2=Finished, 3=Discontinued
         StartDate: '',
@@ -119,7 +119,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
         FPhotoDate: '',
         IPhotoDate: '',
         EstimatedDuration: '',
-        DrID: '',
+        dr_id: '',
         NotesDate: '',
         KeyWordID1: '',
         KeyWordID2: '',
@@ -134,7 +134,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
 
     // Display state for formatted values
     const [displayValues, setDisplayValues] = useState({
-        TotalRequired: '',
+        total_required: '',
         Discount: ''
     });
 
@@ -156,9 +156,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
     useEffect(() => {
         setDisplayValues(prev => ({
             ...prev,
-            TotalRequired: formatNumber(formData.TotalRequired)
+            total_required: formatNumber(formData.total_required)
         }));
-    }, [formData.TotalRequired]);
+    }, [formData.total_required]);
 
     useEffect(() => {
         setDisplayValues(prev => ({
@@ -209,10 +209,10 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 const discountDateISO = work.DiscountDate ? new Date(work.DiscountDate).toISOString().split('T')[0] : '';
                 const discountValue = Number(work.Discount ?? 0);
                 setFormData({
-                    PersonID: String(work.PersonID),
-                    TotalRequired: work.TotalRequired ?? 0, // Use nullish coalescing to preserve 0
+                    person_id: String(work.person_id),
+                    total_required: work.total_required ?? 0, // Use nullish coalescing to preserve 0
                     Currency: work.Currency || 'USD',
-                    Typeofwork: String(work.Typeofwork || ''),
+                    type_of_work: String(work.type_of_work || ''),
                     Notes: work.Notes || '',
                     Status: work.Status ?? 1, // Use nullish coalescing to preserve 0 if somehow status is 0
                     StartDate: work.StartDate ? new Date(work.StartDate).toISOString().split('T')[0] : '',
@@ -220,7 +220,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     FPhotoDate: work.FPhotoDate ? new Date(work.FPhotoDate).toISOString().split('T')[0] : '',
                     IPhotoDate: work.IPhotoDate ? new Date(work.IPhotoDate).toISOString().split('T')[0] : '',
                     EstimatedDuration: String(work.EstimatedDuration || ''),
-                    DrID: String(work.DrID || ''),
+                    dr_id: String(work.dr_id || ''),
                     NotesDate: work.NotesDate ? new Date(work.NotesDate).toISOString().split('T')[0] : '',
                     KeyWordID1: String(work.KeyWordID1 || ''),
                     KeyWordID2: String(work.KeyWordID2 || ''),
@@ -248,7 +248,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
         // If createAsFinished is checked and we're adding a new work, show confirmation dialog
         if (!workId && formData.createAsFinished) {
             // Validate before showing confirmation
-            if (!formData.TotalRequired || formData.TotalRequired <= 0) {
+            if (!formData.total_required || formData.total_required <= 0) {
                 setError('Cannot create finished work: Total Required must be greater than 0');
                 return;
             }
@@ -498,13 +498,13 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 <div className={styles.detailSection}>
                                     <h4><i className="fas fa-tooth"></i> New Work (FINISHED)</h4>
                                     <div className={styles.detailRow}>
-                                        <strong>Type:</strong> {workTypes.find(t => String(t.ID) === formData.Typeofwork)?.WorkType || 'N/A'}
+                                        <strong>Type:</strong> {workTypes.find(t => String(t.ID) === formData.type_of_work)?.WorkType || 'N/A'}
                                     </div>
                                     <div className={styles.detailRow}>
-                                        <strong>Doctor:</strong> {doctors.find(d => String(d.ID) === formData.DrID)?.employeeName || 'N/A'}
+                                        <strong>Doctor:</strong> {doctors.find(d => String(d.ID) === formData.dr_id)?.employeeName || 'N/A'}
                                     </div>
                                     <div className={styles.detailRow}>
-                                        <strong>Total:</strong> {formData.TotalRequired} {formData.Currency}
+                                        <strong>Total:</strong> {formData.total_required} {formData.Currency}
                                     </div>
                                     <div className={styles.detailRow}>
                                         <strong>Status:</strong> <span className={styles.statusCompleted}>Completed</span>
@@ -513,7 +513,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 <div className={styles.detailSection}>
                                     <h4><i className="fas fa-file-invoice-dollar"></i> Full Payment Invoice</h4>
                                     <div className={styles.detailRow}>
-                                        <strong>Amount:</strong> {formData.TotalRequired} {formData.Currency}
+                                        <strong>Amount:</strong> {formData.total_required} {formData.Currency}
                                     </div>
                                     <div className={styles.detailRow}>
                                         <strong>Date:</strong> Today ({new Date().toLocaleDateString()})
@@ -589,8 +589,8 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         <div className={styles.formGroup}>
                             <label>Work Type <span className={styles.required}>*</span></label>
                             <select
-                                value={formData.Typeofwork}
-                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, Typeofwork: e.target.value})}
+                                value={formData.type_of_work}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, type_of_work: e.target.value})}
                                 required
                             >
                                 <option value="">Select Type</option>
@@ -605,8 +605,8 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         <div className={styles.formGroup}>
                             <label>Doctor <span className={styles.required}>*</span></label>
                             <select
-                                value={formData.DrID}
-                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, DrID: e.target.value})}
+                                value={formData.dr_id}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, dr_id: e.target.value})}
                                 required
                             >
                                 <option value="">Select Doctor</option>
@@ -651,16 +651,16 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                             <label>Total Required</label>
                             <input
                                 type="text"
-                                value={displayValues.TotalRequired}
+                                value={displayValues.total_required}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                     const numericValue = parseFormattedNumber(e.target.value) || 0;
                                     // Auto-switch to IQD if amount > 10,000 (USD amounts are typically < 10,000)
                                     const newCurrency = numericValue > 10000 ? 'IQD' : formData.Currency;
-                                    setFormData({...formData, TotalRequired: numericValue, Currency: newCurrency});
-                                    setDisplayValues(prev => ({...prev, TotalRequired: e.target.value}));
+                                    setFormData({...formData, total_required: numericValue, Currency: newCurrency});
+                                    setDisplayValues(prev => ({...prev, total_required: e.target.value}));
                                 }}
                                 onBlur={() => {
-                                    setDisplayValues(prev => ({...prev, TotalRequired: formatNumber(formData.TotalRequired)}));
+                                    setDisplayValues(prev => ({...prev, total_required: formatNumber(formData.total_required)}));
                                 }}
                                 placeholder="Enter amount (defaults to 0)"
                             />
@@ -687,7 +687,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                         type="checkbox"
                                         checked={formData.createAsFinished}
                                         onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, createAsFinished: e.target.checked})}
-                                        disabled={!formData.TotalRequired || formData.TotalRequired <= 0}
+                                        disabled={!formData.total_required || formData.total_required <= 0}
                                     />
                                     <span>
                                         <i className="fas fa-check-circle"></i> Mark as fully paid and finished
@@ -729,9 +729,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                         }}
                                         placeholder="0"
                                     />
-                                    {formData.Discount > 0 && formData.Discount > (formData.TotalRequired - existingTotalPaid) && (
+                                    {formData.Discount > 0 && formData.Discount > (formData.total_required - existingTotalPaid) && (
                                         <small className={`${styles.formHint} ${styles.textWarning}`}>
-                                            <i className="fas fa-exclamation-triangle"></i> Discount cannot exceed Total Required minus Total Paid ({formatNumber(formData.TotalRequired - existingTotalPaid)} {formData.Currency})
+                                            <i className="fas fa-exclamation-triangle"></i> Discount cannot exceed Total Required minus Total Paid ({formatNumber(formData.total_required - existingTotalPaid)} {formData.Currency})
                                         </small>
                                     )}
                                 </div>

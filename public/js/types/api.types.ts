@@ -84,13 +84,13 @@ export interface HistoryResult {
 // =============================================================================
 
 /**
- * Body of POST /api/Addinvoice from the aligner payment-form-drawer flow.
- * UI form state with `Amountpaid: string | number` lives inline in
+ * Body of POST /api/aligner/payments from the aligner payment-form-drawer flow.
+ * UI form state with `amount_paid: string | number` lives inline in
  * PaymentFormDrawer; this is the narrowed shape sent to the server.
  */
 export interface PaymentSaveData {
-    Amountpaid: number;
-    Dateofpayment: string;
+    amount_paid: number;
+    date_of_payment: string;
     ActualAmount: null;
     ActualCur: string;
     Change: null;
@@ -222,9 +222,9 @@ export interface PortalPaymentsResponse {
 }
 
 export interface PortalNextAppointment {
-    appointmentID: number;
-    AppDate: string;
-    AppDetail: string | null;
+    appointment_id: number;
+    app_date: string;
+    app_detail: string | null;
     DrName: string | null;
 }
 
@@ -240,15 +240,15 @@ export interface PortalNextAppointmentResponse {
  * Distinct from the staff-side VisitSummary in services/appointment.ts — different shape.
  */
 export interface PortalVisitSummary {
-    PatientName: string;
-    WorkID: number;
-    ID: number;
-    VisitDate: string;
-    OPG: boolean;
-    IPhoto: boolean;
-    FPhoto: boolean;
-    PPhoto: boolean;
-    ApplianceRemoved: boolean;
+    patient_name: string;
+    work_id: number;
+    id: number;
+    visit_date: string;
+    opg: boolean;
+    i_photo: boolean;
+    f_photo: boolean;
+    p_photo: boolean;
+    appliance_removed: boolean;
     Summary: string | null;
 }
 

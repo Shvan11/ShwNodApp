@@ -5,7 +5,7 @@
  * - PIN derivation (default from phone / date-of-birth), hashing, verification
  * - Failed-attempt lockout bookkeeping
  * - Photo visibility filter (public by default; tblPrivatePhotos stores exceptions)
- * - QR code generation for the portal URL
+ * - QR code generation for the portal url
  */
 import bcrypt from 'bcryptjs';
 import QRCode from 'qrcode';
@@ -33,13 +33,13 @@ const BCRYPT_ROUNDS = 12;
 const LOCKOUT_MINUTES = 30;
 
 export interface PatientPortalProfile {
-  PersonID: number;
-  PatientName: string | null;
-  FirstName: string | null;
-  LastName: string | null;
-  Phone: string | null;
-  DateofBirth: Date | null;
-  Language: number | null;
+  person_id: number;
+  patient_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  date_of_birth: Date | null;
+  language: number | null;
 }
 
 export interface PortalLoginResult {
@@ -64,25 +64,25 @@ export interface PortalStatus {
 export async function getPatientProfile(personId: number): Promise<PatientPortalProfile | null> {
   const db = getKysely();
   const { rows } = await sql<PatientPortalProfile>`
-    SELECT "PersonID", "PatientName", "FirstName", "LastName", "Phone", "DateofBirth", "Language"
-     FROM "tblpatients" WHERE "PersonID" = ${personId}
+    SELECT "person_id", "patient_name", "first_name", "last_name", "phone", "date_of_birth", "language"
+     FROM "patients" WHERE "person_id" = ${personId}
      LIMIT 1`.execute(db);
   return rows[0] ?? null;
 }
 
 /**
  * Derive a default 4-digit PIN:
- *   1. Last 4 digits of Phone (digits only), or
- *   2. DDMM of DateofBirth, or
+ *   1. Last 4 digits of phone (digits only), or
+ *   2. DDMM of date_of_birth, or
  *   3. null (staff must set it manually).
  */
 export function deriveDefaultPin(profile: PatientPortalProfile): string | null {
-  if (profile.Phone) {
-    const digits = profile.Phone.replace(/\D/g, '');
+  if (profile.phone) {
+    const digits = profile.phone.replace(/\D/g, '');
     if (digits.length >= 4) return digits.slice(-4);
   }
-  if (profile.DateofBirth) {
-    const d = profile.DateofBirth instanceof Date ? profile.DateofBirth : new Date(profile.DateofBirth);
+  if (profile.date_of_birth) {
+    const d = profile.date_of_birth instanceof Date ? profile.date_of_birth : new Date(profile.date_of_birth);
     if (!isNaN(d.getTime())) {
       const dd = String(d.getUTCDate()).padStart(2, '0');
       const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
@@ -140,18 +140,18 @@ export async function verifyPin(personId: number, pin: string): Promise<PortalLo
   if (!auth) {
     return { ok: false, error: 'Portal access is not enabled for this patient.' };
   }
-  if (!auth.Enabled) {
+  if (!auth.enabled) {
     return { ok: false, error: 'Portal access is disabled for this patient.' };
   }
-  if (auth.LockedUntil && auth.LockedUntil.getTime() > Date.now()) {
+  if (auth.locked_until && auth.locked_until.getTime() > Date.now()) {
     return {
       ok: false,
       error: 'Too many failed attempts. Please try again later.',
-      lockedUntil: auth.LockedUntil,
+      lockedUntil: auth.locked_until,
     };
   }
 
-  const match = await bcrypt.compare(pin, auth.PinHash);
+  const match = await bcrypt.compare(pin, auth.pin_hash);
   if (!match) {
     const { lockedUntil } = await recordFailedAttempt(personId);
     return {
@@ -166,8 +166,8 @@ export async function verifyPin(personId: number, pin: string): Promise<PortalLo
   await recordSuccessfulLogin(personId);
   return {
     ok: true,
-    patientName: profile.PatientName,
-    language: profile.Language,
+    patientName: profile.patient_name,
+    language: profile.language,
   };
 }
 
@@ -183,12 +183,12 @@ export async function getStatus(personId: number): Promise<PortalStatus> {
     };
   }
   return {
-    enabled: auth.Enabled,
+    enabled: auth.enabled,
     hasPin: true,
     lockedUntil:
-      auth.LockedUntil && auth.LockedUntil.getTime() > Date.now() ? auth.LockedUntil : null,
-    lastLoginAt: auth.LastLoginAt,
-    failedAttempts: auth.FailedAttempts,
+      auth.locked_until && auth.locked_until.getTime() > Date.now() ? auth.locked_until : null,
+    lastLoginAt: auth.last_login_at,
+    failedAttempts: auth.failed_attempts,
   };
 }
 
@@ -201,7 +201,7 @@ export async function unlock(personId: number): Promise<void> {
 }
 
 /**
- * Build the portal URL for this patient's QR code.
+ * Build the portal url for this patient's QR code.
  */
 export function portalUrlFor(personId: number): string {
   const publicUrl = config.urls.publicUrl || 'https://remote.shwan-orthodontics.com';
@@ -209,7 +209,7 @@ export function portalUrlFor(personId: number): string {
 }
 
 /**
- * Render a QR code (data URL) that points to the patient's portal login page.
+ * Render a QR code (data url) that points to the patient's portal login page.
  */
 export async function getQrDataUrl(personId: number): Promise<{ qr: string; url: string }> {
   const url = portalUrlFor(personId);
@@ -242,7 +242,7 @@ export async function getVisiblePhotos(
     getImageSizes(String(personId), tp),
     listPrivateForTimepoint(personId, tp),
   ]);
-  const privateSet = new Set(privateRows.map((r) => r.ImageName.toLowerCase()));
+  const privateSet = new Set(privateRows.map((r) => r.image_name.toLowerCase()));
   const visible: ImageDimension[] = [];
   for (const entry of sizes) {
     if (!entry) continue;

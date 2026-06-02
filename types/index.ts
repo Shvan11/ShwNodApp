@@ -45,7 +45,7 @@ export type {
   Visit,
 
   // Wire types
-  Wire,
+  wire as Wire,
 
   // Expense types
   Expense,
@@ -54,9 +54,9 @@ export type {
   Employee,
 
   // Lookup types
-  WorkType,
+  work_type as WorkType,
   Keyword,
-  PatientType,
+  patient_type as PatientType,
   AlertType,
 
   // Aligner types

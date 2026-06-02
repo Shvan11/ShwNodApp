@@ -6,31 +6,31 @@
  * Migration Phase 4: translated to typed Kysely (PostgreSQL). The dbo.V_Videos
  * view does not exist in the PG schema (views are recreated in Phase 5), so its
  * logic is inlined here: the `VideosPath` option (tbloptions) is concatenated with
- * `FileName`/`VideoExtension` to build the `Video` and `Image` URLs, mirroring the
- * original `CTE.Path + FileName + '.' + VideoExtension` / `+ '.jpg'` view. CRUD
+ * `file_name`/`video_extension` to build the `Video` and `Image` URLs, mirroring the
+ * original `CTE.Path + file_name + '.' + video_extension` / `+ '.jpg'` view. CRUD
  * still targets the tblvideos table.
  */
 import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
 import { log } from '../../../utils/logger.js';
 
-// Type definitions
+// type definitions
 export interface Video {
-  ID: number;
-  Description: string;
+  id: number;
+  description: string;
   Video: string;
   Image: string;
-  Category: number | null;
-  Details: string | null;
+  category: number | null;
+  details: string | null;
 }
 
 export interface VideoRecord {
-  ID: number;
-  Description: string;
-  Category: number | null;
-  Details: string | null;
-  FileName: string | null;
-  VideoExtension: string | null;
+  id: number;
+  description: string;
+  category: number | null;
+  details: string | null;
+  file_name: string | null;
+  video_extension: string | null;
 }
 
 interface CreateVideoData {
@@ -54,26 +54,26 @@ export async function getAllVideos(): Promise<Video[]> {
   try {
     const db = getKysely();
     return await db
-      .selectFrom('tblvideos as v')
+      .selectFrom('videos as v')
       .crossJoin(
         (eb) =>
           eb
-            .selectFrom('tbloptions')
-            .select('OptionValue as Path')
-            .where('OptionName', '=', 'VideosPath')
+            .selectFrom('options')
+            .select('option_value as Path')
+            .where('option_name', '=', 'VideosPath')
             .as('p')
       )
       .select((eb) => [
-        'v.ID',
-        'v.Description',
-        sql<string>`${eb.ref('p.Path')} || ${eb.ref('v.FileName')} || '.' || ${eb.ref('v.VideoExtension')}`.as(
+        'v.id',
+        'v.description',
+        sql<string>`${eb.ref('p.Path')} || ${eb.ref('v.file_name')} || '.' || ${eb.ref('v.video_extension')}`.as(
           'Video'
         ),
-        sql<string>`${eb.ref('p.Path')} || ${eb.ref('v.FileName')} || '.jpg'`.as('Image'),
-        'v.Category',
-        'v.Details',
+        sql<string>`${eb.ref('p.Path')} || ${eb.ref('v.file_name')} || '.jpg'`.as('Image'),
+        'v.category',
+        'v.details',
       ])
-      .orderBy('v.Description')
+      .orderBy('v.description')
       .execute();
   } catch (error) {
     log.error('Error fetching all videos', { error: (error as Error).message });
@@ -82,37 +82,37 @@ export async function getAllVideos(): Promise<Video[]> {
 }
 
 /**
- * Get video by ID (inlines the former V_Videos view)
+ * Get video by id (inlines the former V_Videos view)
  */
 export async function getVideoById(id: number): Promise<Video | null> {
   try {
     const db = getKysely();
     const row = await db
-      .selectFrom('tblvideos as v')
+      .selectFrom('videos as v')
       .crossJoin(
         (eb) =>
           eb
-            .selectFrom('tbloptions')
-            .select('OptionValue as Path')
-            .where('OptionName', '=', 'VideosPath')
+            .selectFrom('options')
+            .select('option_value as Path')
+            .where('option_name', '=', 'VideosPath')
             .as('p')
       )
-      .where('v.ID', '=', id)
+      .where('v.id', '=', id)
       .select((eb) => [
-        'v.ID',
-        'v.Description',
-        sql<string>`${eb.ref('p.Path')} || ${eb.ref('v.FileName')} || '.' || ${eb.ref('v.VideoExtension')}`.as(
+        'v.id',
+        'v.description',
+        sql<string>`${eb.ref('p.Path')} || ${eb.ref('v.file_name')} || '.' || ${eb.ref('v.video_extension')}`.as(
           'Video'
         ),
-        sql<string>`${eb.ref('p.Path')} || ${eb.ref('v.FileName')} || '.jpg'`.as('Image'),
-        'v.Category',
-        'v.Details',
+        sql<string>`${eb.ref('p.Path')} || ${eb.ref('v.file_name')} || '.jpg'`.as('Image'),
+        'v.category',
+        'v.details',
       ])
       .executeTakeFirst();
 
     return row ?? null;
   } catch (error) {
-    log.error('Error fetching video by ID', { id, error: (error as Error).message });
+    log.error('Error fetching video by id', { id, error: (error as Error).message });
     throw error;
   }
 }
@@ -124,9 +124,9 @@ export async function getVideoRecord(id: number): Promise<VideoRecord | null> {
   try {
     const db = getKysely();
     const row = await db
-      .selectFrom('tblvideos')
-      .where('ID', '=', id)
-      .select(['ID', 'Description', 'Category', 'Details', 'FileName', 'VideoExtension'])
+      .selectFrom('videos')
+      .where('id', '=', id)
+      .select(['id', 'description', 'category', 'details', 'file_name', 'video_extension'])
       .executeTakeFirst();
 
     return row ?? null;
@@ -143,16 +143,16 @@ export async function getVideosPath(): Promise<string> {
   try {
     const db = getKysely();
     const row = await db
-      .selectFrom('tbloptions')
-      .select('OptionValue')
-      .where('OptionName', '=', 'VideosPath')
+      .selectFrom('options')
+      .select('option_value')
+      .where('option_name', '=', 'VideosPath')
       .executeTakeFirst();
 
-    if (!row || !row.OptionValue) {
+    if (!row || !row.option_value) {
       throw new Error('VideosPath not configured in tbloptions');
     }
 
-    return row.OptionValue;
+    return row.option_value;
   } catch (error) {
     log.error('Error fetching videos path', { error: (error as Error).message });
     throw error;
@@ -160,7 +160,7 @@ export async function getVideosPath(): Promise<string> {
 }
 
 /**
- * Video category with ID and name
+ * Video category with id and name
  */
 export interface VideoCategory {
   id: number;
@@ -174,9 +174,9 @@ export async function getVideoCategories(): Promise<VideoCategory[]> {
   try {
     const db = getKysely();
     return await db
-      .selectFrom('tblVidCat')
-      .select((eb) => ['VidCatID as id', eb.ref('Category').$castTo<string>().as('name')])
-      .orderBy('VidCatID')
+      .selectFrom('video_categories')
+      .select((eb) => ['vid_cat_id as id', eb.ref('category').$castTo<string>().as('name')])
+      .orderBy('vid_cat_id')
       .execute();
   } catch (error) {
     log.error('Error fetching video categories', { error: (error as Error).message });
@@ -186,25 +186,25 @@ export async function getVideoCategories(): Promise<VideoCategory[]> {
 
 /**
  * Create new video record
- * @returns The ID of the newly created video
+ * @returns The id of the newly created video
  */
 export async function createVideo(data: CreateVideoData): Promise<number> {
   try {
     const db = getKysely();
     const row = await db
-      .insertInto('tblvideos')
+      .insertInto('videos')
       .values({
-        Description: data.description,
-        Category: data.category ?? null,
-        Details: data.details ?? null,
-        FileName: data.fileName,
-        VideoExtension: data.videoExtension,
+        description: data.description,
+        category: data.category ?? null,
+        details: data.details ?? null,
+        file_name: data.fileName,
+        video_extension: data.videoExtension,
       })
-      .returning('ID')
+      .returning('id')
       .executeTakeFirstOrThrow();
 
-    log.info('Video record created', { id: row.ID, description: data.description });
-    return row.ID;
+    log.info('Video record created', { id: row.id, description: data.description });
+    return row.id;
   } catch (error) {
     log.error('Error creating video record', { error: (error as Error).message });
     throw error;
@@ -219,13 +219,13 @@ export async function updateVideo(id: number, data: UpdateVideoData): Promise<bo
     const setValues: Record<string, unknown> = {};
 
     if (data.description !== undefined) {
-      setValues.Description = data.description;
+      setValues.description = data.description;
     }
     if (data.category !== undefined) {
-      setValues.Category = data.category;
+      setValues.category = data.category;
     }
     if (data.details !== undefined) {
-      setValues.Details = data.details;
+      setValues.details = data.details;
     }
 
     if (Object.keys(setValues).length === 0) {
@@ -234,9 +234,9 @@ export async function updateVideo(id: number, data: UpdateVideoData): Promise<bo
 
     const db = getKysely();
     const result = await db
-      .updateTable('tblvideos')
+      .updateTable('videos')
       .set(setValues)
-      .where('ID', '=', id)
+      .where('id', '=', id)
       .executeTakeFirst();
 
     const updated = Number(result.numUpdatedRows) > 0;
@@ -259,8 +259,8 @@ export async function deleteVideo(id: number): Promise<boolean> {
   try {
     const db = getKysely();
     const result = await db
-      .deleteFrom('tblvideos')
-      .where('ID', '=', id)
+      .deleteFrom('videos')
+      .where('id', '=', id)
       .executeTakeFirst();
 
     const deleted = Number(result.numDeletedRows) > 0;

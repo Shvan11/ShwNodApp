@@ -28,11 +28,11 @@ interface AppointmentDetail {
 }
 
 interface ExistingAppointment {
-    appointmentID?: number;
-    PersonID?: number;
-    AppDate: string;
-    AppDetail?: string;
-    DrID?: number | string;
+    appointment_id?: number;
+    person_id?: number;
+    app_date: string;
+    app_detail?: string;
+    dr_id?: number | string;
 }
 
 interface EditAppointmentFormProps {
@@ -116,7 +116,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     };
 
     const prefillFormData = (appointment: ExistingAppointment): void => {
-        const dateTime = new Date(appointment.AppDate);
+        const dateTime = new Date(appointment.app_date);
         const year = dateTime.getFullYear();
         const month = String(dateTime.getMonth() + 1).padStart(2, '0');
         const day = String(dateTime.getDate()).padStart(2, '0');
@@ -125,11 +125,11 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
         const datePart = `${year}-${month}-${day}`;
         setFormData({
-            PersonID: appointment.PersonID ?? '',
+            PersonID: appointment.person_id ?? '',
             AppDate: datePart,
             AppTime: `${hours}:${minutes}`,
-            AppDetail: appointment.AppDetail || '',
-            DrID: String(appointment.DrID || '')
+            AppDetail: appointment.app_detail || '',
+            DrID: String(appointment.dr_id || '')
         });
         setOriginalDate(datePart);
     };
@@ -250,14 +250,14 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
         try {
             const appointmentDateTime = `${formData.AppDate}T${formData.AppTime}:00`;
-            const response = await fetch(`/api/appointments/${appointmentId || existingAppointment?.appointmentID}`, {
+            const response = await fetch(`/api/appointments/${appointmentId || existingAppointment?.appointment_id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    PersonID: parseInt(String(formData.PersonID)),
-                    AppDate: appointmentDateTime,
-                    AppDetail: formData.AppDetail,
-                    DrID: parseInt(formData.DrID)
+                    person_id: parseInt(String(formData.PersonID)),
+                    app_date: appointmentDateTime,
+                    app_detail: formData.AppDetail,
+                    dr_id: parseInt(formData.DrID)
                 })
             });
 
@@ -269,7 +269,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
             const result = await response.json();
             if (result.success) {
                 const dateChanged = formData.AppDate !== originalDate;
-                const apptId = appointmentId || existingAppointment?.appointmentID;
+                const apptId = appointmentId || existingAppointment?.appointment_id;
 
                 if (dateChanged && apptId) {
                     fetch('/api/wa/send-appointment', {

@@ -26,8 +26,8 @@ interface SelectOption {
  * Selected patient data returned to parent
  */
 export interface SelectedPatient {
-    PersonID: number;
-    PatientName: string;
+    person_id: number;
+    patient_name: string;
     Phone?: string;
 }
 
@@ -115,8 +115,8 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
         const patient = filteredPatients.find(p => p.id === option.value);
         if (patient) {
             onSelect({
-                PersonID: patient.id,
-                PatientName: patient.name || '',
+                person_id: patient.id,
+                patient_name: patient.name || '',
                 Phone: patient.phone
             });
         }

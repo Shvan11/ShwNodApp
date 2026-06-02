@@ -65,7 +65,7 @@ interface DatabaseMessageStatus {
 
 /**
  * WhatsApp messages array type: [numbers, messages, ids, names]
- * Note: ids are numbers from the database
+ * note: ids are numbers from the database
  */
 type WhatsAppMessagesResult = [string[], string[], number[], string[]];
 

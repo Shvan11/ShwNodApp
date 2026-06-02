@@ -429,7 +429,7 @@ router.post(
       const { reason } = req.body;
 
       log.info(
-        `Application restart requested. Reason: ${reason || 'Manual restart'}`
+        `Application restart requested. reason: ${reason || 'Manual restart'}`
       );
 
       // Send response before restarting

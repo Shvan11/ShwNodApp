@@ -30,21 +30,21 @@ interface Label {
 }
 
 interface Batch {
-    BatchSequence?: number;
-    UpperAlignerStartSequence?: number | null;
-    UpperAlignerEndSequence?: number | null;
-    LowerAlignerStartSequence?: number | null;
-    LowerAlignerEndSequence?: number | null;
+    batch_sequence?: number;
+    upper_aligner_start_sequence?: number | null;
+    upper_aligner_end_sequence?: number | null;
+    lower_aligner_start_sequence?: number | null;
+    lower_aligner_end_sequence?: number | null;
 }
 
 interface Set {
-    SetSequence?: number;
+    set_sequence?: number;
 }
 
 interface Patient {
-    PatientName?: string;
-    FirstName?: string;
-    LastName?: string;
+    patient_name?: string;
+    first_name?: string;
+    last_name?: string;
 }
 
 interface QueuedItem {
@@ -209,9 +209,9 @@ const LabelPreviewModal = ({
     // Initialize single batch mode
     useEffect(() => {
         if (!queueMode && isOpen && batch && patient) {
-            const name = patient.PatientName ||
-                (patient.FirstName && patient.LastName
-                    ? `${patient.FirstName} ${patient.LastName}`
+            const name = patient.patient_name ||
+                (patient.first_name && patient.last_name
+                    ? `${patient.first_name} ${patient.last_name}`
                     : 'Unknown Patient');
             setPatientName(name);
 
@@ -220,10 +220,10 @@ const LabelPreviewModal = ({
             setIncludeLogo(true);
 
             const defaultLabels = buildLabelsFromRanges(
-                batch.UpperAlignerStartSequence,
-                batch.UpperAlignerEndSequence,
-                batch.LowerAlignerStartSequence,
-                batch.LowerAlignerEndSequence
+                batch.upper_aligner_start_sequence,
+                batch.upper_aligner_end_sequence,
+                batch.lower_aligner_start_sequence,
+                batch.lower_aligner_end_sequence
             );
             setLabels(defaultLabels);
             setStartingPosition(1);
@@ -327,10 +327,10 @@ const LabelPreviewModal = ({
     const resetToDefault = useCallback(() => {
         if (batch) {
             setLabels(buildLabelsFromRanges(
-                batch.UpperAlignerStartSequence,
-                batch.UpperAlignerEndSequence,
-                batch.LowerAlignerStartSequence,
-                batch.LowerAlignerEndSequence
+                batch.upper_aligner_start_sequence,
+                batch.upper_aligner_end_sequence,
+                batch.lower_aligner_start_sequence,
+                batch.lower_aligner_end_sequence
             ));
         }
     }, [batch]);
@@ -905,7 +905,7 @@ const LabelPreviewModal = ({
                             <label>Source Batch</label>
                             <input
                                 type="text"
-                                value={`Batch #${batch?.BatchSequence || 'N/A'} (Set #${set?.SetSequence || 'N/A'})`}
+                                value={`Batch #${batch?.batch_sequence || 'N/A'} (Set #${set?.set_sequence || 'N/A'})`}
                                 disabled
                                 className={styles.inputDisabled}
                             />
@@ -913,14 +913,14 @@ const LabelPreviewModal = ({
 
                         <div className={styles.originalRangesInfo}>
                             <span className={styles.infoLabel}>Original ranges:</span>
-                            {batch?.UpperAlignerStartSequence != null && batch?.UpperAlignerEndSequence != null && (
+                            {batch?.upper_aligner_start_sequence != null && batch?.upper_aligner_end_sequence != null && (
                                 <span className={`${styles.rangeBadge} ${styles.rangeBadgeUpper}`}>
-                                    U{batch.UpperAlignerStartSequence}-{batch.UpperAlignerEndSequence}
+                                    U{batch.upper_aligner_start_sequence}-{batch.upper_aligner_end_sequence}
                                 </span>
                             )}
-                            {batch?.LowerAlignerStartSequence != null && batch?.LowerAlignerEndSequence != null && (
+                            {batch?.lower_aligner_start_sequence != null && batch?.lower_aligner_end_sequence != null && (
                                 <span className={`${styles.rangeBadge} ${styles.rangeBadgeLower}`}>
-                                    L{batch.LowerAlignerStartSequence}-{batch.LowerAlignerEndSequence}
+                                    L{batch.lower_aligner_start_sequence}-{batch.lower_aligner_end_sequence}
                                 </span>
                             )}
                         </div>

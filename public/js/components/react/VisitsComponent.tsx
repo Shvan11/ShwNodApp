@@ -12,8 +12,8 @@ import styles from './VisitsComponent.module.css';
 
 interface Visit {
     ID: number;
-    WorkID: number;
-    VisitDate: string;
+    work_id: number;
+    visit_date: string;
     OperatorID?: number;
     OperatorName?: string;
     UpperWireID?: number;
@@ -91,7 +91,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
             if (!response.ok) throw new Error('Failed to fetch visits');
             const data: Visit[] = await response.json();
             // Sort by visit date descending (most recent first)
-            const sortedData = data.sort((a, b) => new Date(b.VisitDate).getTime() - new Date(a.VisitDate).getTime());
+            const sortedData = data.sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime());
             setVisits(sortedData);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An error occurred');
@@ -205,7 +205,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                         <div className={styles.cardHeader}>
                             <div>
                                 <h3 className={styles.cardTitle}>
-                                    <i className="fas fa-calendar-check"></i> {formatDate(visit.VisitDate)}
+                                    <i className="fas fa-calendar-check"></i> {formatDate(visit.visit_date)}
                                 </h3>
                                 <div className={styles.cardMeta}>
                                     {visit.OperatorName && (

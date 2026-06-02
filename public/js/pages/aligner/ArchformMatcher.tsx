@@ -123,8 +123,8 @@ const ArchformMatcher: React.FC = () => {
     const getArchformToSetMap = (): Map<number, number> => {
         const map = new Map<number, number>();
         for (const set of alignerSets) {
-            if (set.ArchformID != null) {
-                map.set(set.ArchformID, set.AlignerSetID);
+            if (set.archform_id != null) {
+                map.set(set.archform_id, set.aligner_set_id);
             }
         }
         return map;
@@ -134,26 +134,26 @@ const ArchformMatcher: React.FC = () => {
     const getMatchedSetIds = (): Set<number> => {
         const matched = new Set<number>();
         for (const set of alignerSets) {
-            if (set.ArchformID != null) {
-                matched.add(set.AlignerSetID);
+            if (set.archform_id != null) {
+                matched.add(set.aligner_set_id);
             }
         }
         return matched;
     };
 
     const formatSetLabel = (set: AlignerSetForMatch): string => {
-        const parts = [set.PatientName];
-        if (set.SetSequence != null) parts.push(`Set ${set.SetSequence}`);
-        if (set.DoctorName) parts.push(`Dr. ${set.DoctorName}`);
+        const parts = [set.patient_name];
+        if (set.set_sequence != null) parts.push(`Set ${set.set_sequence}`);
+        if (set.doctor_name) parts.push(`Dr. ${set.doctor_name}`);
         return parts.join(' - ');
     };
 
     const setOptions = useMemo((): SetOption[] => {
         const matched = getMatchedSetIds();
         return alignerSets.map((set) => ({
-            value: set.AlignerSetID,
+            value: set.aligner_set_id,
             label: formatSetLabel(set),
-            isDisabled: matched.has(set.AlignerSetID),
+            isDisabled: matched.has(set.aligner_set_id),
         }));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [alignerSets]);
@@ -198,7 +198,7 @@ const ArchformMatcher: React.FC = () => {
             toast.success('Match saved');
             setAlignerSets((prev) =>
                 prev.map((s) =>
-                    s.AlignerSetID === selectedSetId
+                    s.aligner_set_id === selectedSetId
                         ? { ...s, ArchformID: archformId }
                         : s
                 )
@@ -240,7 +240,7 @@ const ArchformMatcher: React.FC = () => {
             toast.success('Match removed');
             setAlignerSets((prev) =>
                 prev.map((s) =>
-                    s.AlignerSetID === setId ? { ...s, ArchformID: null } : s
+                    s.aligner_set_id === setId ? { ...s, ArchformID: null } : s
                 )
             );
         } catch (err) {
@@ -271,8 +271,8 @@ const ArchformMatcher: React.FC = () => {
             let bVal: string | number | null;
 
             if (sortColumn === 'Name') {
-                aVal = `${a.Name} ${a.LastName}`.toLowerCase();
-                bVal = `${b.Name} ${b.LastName}`.toLowerCase();
+                aVal = `${a.LastName}`.toLowerCase();
+                bVal = `${b.LastName}`.toLowerCase();
             } else if (sortColumn === 'CreatedDate') {
                 aVal = a.CreatedDate ? new Date(a.CreatedDate).getTime() : null;
                 bVal = b.CreatedDate ? new Date(b.CreatedDate).getTime() : null;
@@ -315,8 +315,7 @@ const ArchformMatcher: React.FC = () => {
 
     const handleStartEdit = (patient: ArchformPatient): void => {
         setEditingPatientId(patient.Id);
-        setEditName(patient.Name);
-        setEditLastName(patient.LastName);
+        setEditName(patient.LastName);
     };
 
     const handleCancelEdit = (): void => {
@@ -369,13 +368,13 @@ const ArchformMatcher: React.FC = () => {
     };
 
     const handleAutoRename = async (patient: ArchformPatient, set: AlignerSetForMatch): Promise<void> => {
-        const firstName = set.FirstName?.trim();
-        const lastName = set.LastName?.trim();
+        const firstName = set.first_name?.trim();
+        const lastName = set.last_name?.trim();
 
         // Validate English name fields exist and contain Latin characters
         if (!isEnglishName(firstName) && !isEnglishName(lastName)) {
             toast.warning(
-                `Cannot auto-rename: "${set.PatientName}" has no English first/last name in the database. Use the edit button to rename manually.`
+                `Cannot auto-rename: "${set.patient_name}" has no English first/last name in the database. Use the edit button to rename manually.`
             );
             return;
         }
@@ -390,8 +389,8 @@ const ArchformMatcher: React.FC = () => {
 
         // Archform Name = "FirstName LastName", Archform LastName = "Dr_DoctorName_SetSequence"
         const newName = `${firstName} ${lastName}`;
-        const doctorName = set.DoctorName?.trim() || 'Unknown';
-        const newLastName = `Dr_${doctorName}_${set.SetSequence ?? 0}`;
+        const doctorName = set.doctor_name?.trim() || 'Unknown';
+        const newLastName = `Dr_${doctorName}_${set.set_sequence ?? 0}`;
 
         setEditSaving(true);
         try {
@@ -441,7 +440,7 @@ const ArchformMatcher: React.FC = () => {
                 throw new Error(data.error || 'Failed to delete patient');
             }
 
-            toast.success(`Deleted ${deleteTarget.Name} ${deleteTarget.LastName}`);
+            toast.success(`Deleted ${deleteTarget.LastName}`);
 
             // Remove patient from local state
             setArchformPatients((prev) => prev.filter((p) => p.Id !== deleteTarget.Id));
@@ -449,7 +448,7 @@ const ArchformMatcher: React.FC = () => {
             // Clear any ArchformID matches referencing this patient
             setAlignerSets((prev) =>
                 prev.map((s) =>
-                    s.ArchformID === deleteTarget.Id ? { ...s, ArchformID: null } : s
+                    s.archform_id === deleteTarget.Id ? { ...s, ArchformID: null } : s
                 )
             );
 
@@ -478,7 +477,7 @@ const ArchformMatcher: React.FC = () => {
             const query = filter.toLowerCase();
             filtered = filtered.filter((p) => {
                 const fullName =
-                    `${p.Name} ${p.LastName}`.toLowerCase();
+                    `${p.LastName}`.toLowerCase();
                 return fullName.includes(query);
             });
         }
@@ -639,7 +638,7 @@ const ArchformMatcher: React.FC = () => {
                                 const matchedSet = isMatched
                                     ? alignerSets.find(
                                           (s) =>
-                                              s.AlignerSetID === matchedSetId
+                                              s.aligner_set_id === matchedSetId
                                       )
                                     : null;
 
@@ -694,7 +693,7 @@ const ArchformMatcher: React.FC = () => {
                                             ) : (
                                                 <span className={styles.nameCell}>
                                                     <span className={styles.archformName}>
-                                                        {patient.Name} {patient.LastName}
+                                                        {patient.LastName}
                                                     </span>
                                                     <button
                                                         className={styles.btnEdit}
@@ -709,8 +708,8 @@ const ArchformMatcher: React.FC = () => {
                                                             onClick={() => handleAutoRename(patient, matchedSet)}
                                                             disabled={editSaving}
                                                             title={
-                                                                isEnglishName(matchedSet.FirstName) && isEnglishName(matchedSet.LastName)
-                                                                    ? `Auto-rename to: ${matchedSet.FirstName} ${matchedSet.LastName} | Dr_${matchedSet.DoctorName}_${matchedSet.SetSequence ?? 0}`
+                                                                isEnglishName(matchedSet.first_name) && isEnglishName(matchedSet.last_name)
+                                                                    ? `Auto-rename to: ${matchedSet.first_name} ${matchedSet.last_name} | Dr_${matchedSet.doctor_name}_${matchedSet.set_sequence ?? 0}`
                                                                     : 'No English name available'
                                                             }
                                                         >
@@ -810,7 +809,7 @@ const ArchformMatcher: React.FC = () => {
                                                 {matchedSet && (
                                                     <button
                                                         className={styles.btnEditPatient}
-                                                        onClick={() => navigate(`/patient/${matchedSet.PersonID}/edit-patient`)}
+                                                        onClick={() => navigate(`/patient/${matchedSet.person_id}/edit-patient`)}
                                                         title="Edit patient info"
                                                     >
                                                         <i className="fas fa-user-edit"></i>
@@ -841,7 +840,7 @@ const ArchformMatcher: React.FC = () => {
                     deleteTarget ? (
                         <>
                             Are you sure you want to permanently delete{' '}
-                            <strong>{deleteTarget.Name} {deleteTarget.LastName}</strong>?
+                            <strong>{deleteTarget.LastName}</strong>?
                             This will remove the patient from Archform and clear any aligner set matches.
                             This action cannot be undone.
                         </>

@@ -244,7 +244,7 @@ router.post(
 
       // Update password in database
       const db = getKysely();
-      await sql`UPDATE "tblUsers" SET "PasswordHash" = ${newHash} WHERE "UserID" = ${req.session.userId}`.execute(db);
+      await sql`UPDATE "users" SET "password_hash" = ${newHash} WHERE "user_id" = ${req.session.userId}`.execute(db);
 
       log.info('Password changed', { username: req.session.username });
 

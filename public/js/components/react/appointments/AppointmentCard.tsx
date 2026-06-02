@@ -2,28 +2,27 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './AppointmentCard.module.css';
 
-// Daily appointment interface with all fields from stored procedure
+// Daily appointment interface matching getDailyAppointmentsOptimized output
 export interface DailyAppointment {
-    appointmentID?: number;
-    AppointmentID?: number;
-    PersonID?: number;
-    PatientName?: string;
-    PatientType?: string | null;
+    appointment_id?: number;
+    person_id?: number;
+    patient_name?: string;
+    patient_type?: string | null;
     Phone?: string | null;
     apptime?: string | null;
-    AppDetail?: string | null;
+    app_detail?: string | null;
     Notes?: string | null;
-    Present?: string | null;
-    Seated?: string | null;
-    Dismissed?: string | null;
+    present?: string | null;
+    seated?: string | null;
+    dismissed?: string | null;
     PresentTime?: string | null;
     SeatedTime?: string | null;
     DismissedTime?: string | null;
     hasActiveAlert?: boolean;
     IsOrthoVisit?: boolean;
     HasVisit?: boolean | number | null;
-    DoctorID?: number | null;
-    WorkID?: number | null;
+    app_date?: Date | string | null;
+    app_cost?: number | null;
 }
 
 interface AppointmentCardProps {
@@ -80,20 +79,20 @@ const AppointmentCard = ({
     // Determine current status
     const getCurrentStatus = (): string => {
         if (!showStatus) {
-            return appointment.Present || appointment.Seated || appointment.Dismissed ? 'Checked In' : 'Scheduled';
+            return appointment.present || appointment.seated || appointment.dismissed ? 'Checked In' : 'Scheduled';
         }
 
-        if (appointment.Dismissed) return 'Dismissed';
-        if (appointment.Seated) return 'Seated';
-        if (appointment.Present) return 'Present';
+        if (appointment.dismissed) return 'Dismissed';
+        if (appointment.seated) return 'Seated';
+        if (appointment.present) return 'Present';
         return 'Scheduled';
     };
 
     const status = getCurrentStatus();
     const statusClass = status.toLowerCase().replace(' ', '-');
 
-    // Check if patient is waiting (Present but not Seated and not Dismissed)
-    const isWaiting = showStatus && appointment.Present && !appointment.Seated && !appointment.Dismissed;
+    // Check if patient is waiting (present but not seated and not dismissed)
+    const isWaiting = showStatus && appointment.present && !appointment.seated && !appointment.dismissed;
 
     const navigate = useNavigate();
 
@@ -101,8 +100,8 @@ const AppointmentCard = ({
     const handlePatientClick = (e: React.MouseEvent): void => {
         e.preventDefault();
         e.stopPropagation();
-        if (appointment.PersonID) {
-            navigate(`/patient/${appointment.PersonID}/works`);
+        if (appointment.person_id) {
+            navigate(`/patient/${appointment.person_id}/works`);
         }
     };
 
@@ -121,7 +120,7 @@ const AppointmentCard = ({
 
     // Render action buttons based on status
     const renderActions = (): React.ReactNode => {
-        const appointmentId = appointment.appointmentID || appointment.AppointmentID;
+        const appointmentId = appointment.appointment_id;
         if (!appointmentId) return <></>;
 
         if (!showStatus) {
@@ -233,7 +232,7 @@ const AppointmentCard = ({
     return (
         <div
             className={`${cardClass}${animationClass ? ' ' + animationClass : ''}`}
-            data-appointment-id={appointment.appointmentID || appointment.AppointmentID}
+            data-appointment-id={appointment.appointment_id}
             data-status={statusClass}
         >
             <div className={styles.time}>
@@ -250,22 +249,22 @@ const AppointmentCard = ({
                             onClick={handlePatientClick}
                         >
                             <i className={`fas fa-user-circle ${styles.patientLinkIcon}`}></i>
-                            {appointment.PatientName || 'Unknown'}
+                            {appointment.patient_name || 'Unknown'}
                         </a>
                         {appointment.hasActiveAlert && (
                             <i className={`fas fa-bell ${styles.alertIcon}`} title="Patient has an active alert"></i>
                         )}
-                        {appointment.PatientType && (
+                        {appointment.patient_type && (
                             <span className={styles.patientTypeBadge}>
                                 <i className="fas fa-tag"></i>
-                                {appointment.PatientType}
+                                {appointment.patient_type}
                             </span>
                         )}
                     </div>
-                    {appointment.AppDetail && (
+                    {appointment.app_detail && (
                         <div className={styles.appointmentType}>
                             <i className={`fas fa-stethoscope ${styles.appointmentTypeIcon}`}></i>
-                            {appointment.AppDetail}
+                            {appointment.app_detail}
                         </div>
                     )}
                 </div>

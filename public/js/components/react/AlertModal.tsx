@@ -4,8 +4,8 @@ import { useToast } from '../../contexts/ToastContext';
 import Modal from './Modal';
 
 interface AlertType {
-    AlertTypeID: number;
-    TypeName: string;
+    alert_type_id: number;
+    type_name: string;
 }
 
 interface AlertFormData {
@@ -21,10 +21,10 @@ interface FormErrors {
 }
 
 interface EditAlertData {
-    AlertID: number;
-    AlertTypeID?: number;
-    AlertSeverity?: number;
-    AlertDetails: string;
+    alert_id: number;
+    alert_type_id?: number;
+    alert_severity?: number;
+    alert_details: string;
 }
 
 interface AlertModalProps {
@@ -57,9 +57,9 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
     useEffect(() => {
         if (editAlert && isOpen) {
             setFormData({
-                alertTypeId: editAlert.AlertTypeID?.toString() || '',
-                alertSeverity: editAlert.AlertSeverity?.toString() || '2',
-                alertDetails: editAlert.AlertDetails || ''
+                alertTypeId: editAlert.alert_type_id?.toString() || '',
+                alertSeverity: editAlert.alert_severity?.toString() || '2',
+                alertDetails: editAlert.alert_details || ''
             });
         } else if (!isOpen) {
             // Reset form when modal closes
@@ -116,7 +116,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
 
         try {
             const url = isEditMode
-                ? `/api/alerts/${editAlert!.AlertID}`
+                ? `/api/alerts/${editAlert!.alert_id}`
                 : `/api/patients/${personId}/alerts`;
 
             const response = await fetch(url, {
@@ -212,8 +212,8 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                             >
                                 <option value="">Select alert type...</option>
                                 {alertTypes.map(type => (
-                                    <option key={type.AlertTypeID} value={type.AlertTypeID}>
-                                        {type.TypeName}
+                                    <option key={type.alert_type_id} value={type.alert_type_id}>
+                                        {type.type_name}
                                     </option>
                                 ))}
                             </select>

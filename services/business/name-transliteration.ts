@@ -2,7 +2,7 @@
  * English transliteration of patient names via Gemini.
  *
  * Dolphin Imaging's patient-name columns are varchar with a Latin1 collation, so non-Latin (Arabic)
- * text is stored as '?'. When a patient has only an Arabic `PatientName` and no Latin First/Last, we
+ * text is stored as '?'. When a patient has only an Arabic `patient_name` and no Latin First/Last, we
  * ask Gemini to romanize it so the CDC dolphin sink can replicate a searchable patient instead of a
  * '????' / empty-index row. Best-effort: returns null if Gemini is unconfigured, errors, or yields
  * anything that isn't a clean Latin-1 first + last — callers then fall back to asking the user.

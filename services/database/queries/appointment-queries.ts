@@ -9,23 +9,23 @@
 import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
 
-// Type definitions
+// type definitions
 export interface AppointmentRow {
   Num: number;
   apptime: string;
-  PatientType: string;
-  PatientName: string;
-  AppDetail: string;
-  Present: string | null;
-  Seated: string | null;
-  Dismissed: string | null;
+  patient_type: string;
+  patient_name: string;
+  app_detail: string;
+  present: string | null;
+  seated: string | null;
+  dismissed: string | null;
   HasVisit: boolean;
-  appointmentID: number;
-  PersonID?: number;
-  Phone?: string | null;
-  Notes?: string | null;
-  DrID?: number | null;
-  WorkID?: number | null;
+  appointment_id: number;
+  person_id?: number;
+  phone?: string | null;
+  notes?: string | null;
+  dr_id?: number | null;
+  work_id?: number | null;
 }
 
 interface AppointmentStats {
@@ -43,13 +43,13 @@ interface AppointmentsResponse extends AppointmentStats {
 
 interface UpdatePresentResult {
   success: boolean;
-  appointmentID: number;
+  appointment_id: number;
   state: string;
   time: string;
 }
 
 interface UndoStateResult {
-  appointmentID: number;
+  appointment_id: number;
   stateCleared: string;
   success: boolean;
 }
@@ -101,51 +101,51 @@ function toDateStr(d: Date | string): string {
 
 /**
  * Retrieves checked-in (present, not dismissed) appointments for a date + the day's counts.
- * (was: PTodayAppsWeb — note its result placed PersonID in the `pid`/appointmentID slot; preserved.)
+ * (was: PTodayAppsWeb — note its result placed person_id in the `pid`/appointmentID slot; preserved.)
  */
 export async function getPresentAps(PDate: string): Promise<AppointmentsResponse> {
   const dateStr = toDateStr(PDate);
   const db = getKysely();
 
   const rows = await db
-    .selectFrom('tblappointments as a')
-    .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
-    .leftJoin('tblPatientType as pt', 'pt.ID', 'p.PatientTypeID')
-    .where('a.AppDay', '=', sql<Date>`${dateStr}::date`)
-    .where('a.Present', 'is not', null)
-    .where('a.Dismissed', 'is', null)
-    .orderBy('a.Present')
+    .selectFrom('appointments as a')
+    .innerJoin('patients as p', 'p.person_id', 'a.person_id')
+    .leftJoin('patient_types as pt', 'pt.id', 'p.patient_type_id')
+    .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
+    .where('a.present', 'is not', null)
+    .where('a.dismissed', 'is', null)
+    .orderBy('a.present')
     .select([
-      'a.appointmentID', 'a.PersonID', 'a.AppDate', 'a.Present', 'a.Seated', 'a.Dismissed',
-      'a.AppDetail', 'p.PatientName', 'pt.PatientType',
-      sql<boolean>`EXISTS(SELECT 1 FROM "tblwork" w JOIN "tblvisits" v ON v."WorkID"=w."workid" WHERE w."PersonID"=a."PersonID" AND v."VisitDate"=${dateStr}::date)`.as('hasVisit'),
+      'a.appointment_id', 'a.person_id', 'a.app_date', 'a.present', 'a.seated', 'a.dismissed',
+      'a.app_detail', 'p.patient_name', 'pt.patient_type',
+      sql<boolean>`EXISTS(SELECT 1 FROM "works" w JOIN "visits" v ON v."work_id"=w."work_id" WHERE w."person_id"=a."person_id" AND v."visit_date"=${dateStr}::date)`.as('hasVisit'),
     ])
     .execute();
 
   const appointments: AppointmentRow[] = rows.map((r, i) => {
-    const appDate = r.AppDate as unknown as Date;
+    const appDate = r.app_date as unknown as Date;
     return {
       Num: i + 1,
       apptime: isMidnight(appDate) ? (null as unknown as string) : fmtClock(appDate, false),
-      PatientType: r.PatientType ?? '',
-      PatientName: r.PatientName,
-      AppDetail: r.AppDetail ?? '',
-      Present: fmtTimeStr(r.Present as string | null),
-      Seated: fmtTimeStr(r.Seated as string | null),
-      Dismissed: fmtTimeStr(r.Dismissed as string | null),
+      patient_type: r.patient_type ?? '',
+      patient_name: r.patient_name,
+      app_detail: r.app_detail ?? '',
+      present: fmtTimeStr(r.present as string | null),
+      seated: fmtTimeStr(r.seated as string | null),
+      dismissed: fmtTimeStr(r.dismissed as string | null),
       HasVisit: r.hasVisit,
-      appointmentID: r.PersonID, // preserves the proc's `pid AS <last col>` (consumer reads it here)
+      appointment_id: r.person_id, // preserves the proc's `pid AS <last col>` (consumer reads it here)
     };
   });
 
   const counts = await db
-    .selectFrom('tblappointments')
-    .where('AppDay', '=', sql<Date>`${dateStr}::date`)
+    .selectFrom('appointments')
+    .where('app_day', '=', sql<Date>`${dateStr}::date`)
     .select((eb) => [
       eb.fn.countAll<number>().as('all'),
-      eb.fn.sum<number>(sql`CASE WHEN "Present" IS NOT NULL THEN 1 ELSE 0 END`).as('present'),
-      eb.fn.sum<number>(sql`CASE WHEN "Present" IS NOT NULL AND "Seated" IS NULL THEN 1 ELSE 0 END`).as('waiting'),
-      eb.fn.sum<number>(sql`CASE WHEN "Dismissed" IS NOT NULL THEN 1 ELSE 0 END`).as('completed'),
+      eb.fn.sum<number>(sql`CASE WHEN "present" IS NOT NULL THEN 1 ELSE 0 END`).as('present'),
+      eb.fn.sum<number>(sql`CASE WHEN "present" IS NOT NULL AND "seated" IS NULL THEN 1 ELSE 0 END`).as('waiting'),
+      eb.fn.sum<number>(sql`CASE WHEN "dismissed" IS NOT NULL THEN 1 ELSE 0 END`).as('completed'),
     ])
     .executeTakeFirst();
 
@@ -159,7 +159,7 @@ export async function getPresentAps(PDate: string): Promise<AppointmentsResponse
 }
 
 /**
- * Updates patient appointment state (Present, Seated, Dismissed) with transition guards.
+ * Updates patient appointment state (present, seated, dismissed) with transition guards.
  * (was: UpdatePresent — row-locked, transactional; throws on an invalid transition.)
  */
 export async function updatePresent(
@@ -169,37 +169,37 @@ export async function updatePresent(
 ): Promise<UpdatePresentResult> {
   await withPgTransaction(async (trx) => {
     const row = await trx
-      .selectFrom('tblappointments')
-      .select(['Present', 'Seated', 'Dismissed'])
-      .where('appointmentID', '=', Aid)
+      .selectFrom('appointments')
+      .select(['present', 'seated', 'dismissed'])
+      .where('appointment_id', '=', Aid)
       .forUpdate()
       .executeTakeFirst();
 
     if (!row) throw new Error('Appointment not found');
-    const present = row.Present as string | null;
-    const seated = row.Seated as string | null;
-    const dismissed = row.Dismissed as string | null;
+    const present = row.present as string | null;
+    const seated = row.seated as string | null;
+    const dismissed = row.dismissed as string | null;
     const now = new Date();
 
-    if (state === 'Present') {
+    if (state === 'present') {
       if (present !== null || seated !== null || dismissed !== null) {
         throw new Error('[INVALID_STATE_TRANSITION] Cannot check in: patient is already checked in, seated, or dismissed');
       }
-      await trx.updateTable('tblappointments').set({ Present: Tim, LastUpdated: now }).where('appointmentID', '=', Aid).execute();
-    } else if (state === 'Seated') {
+      await trx.updateTable('appointments').set({ present: Tim, last_updated: now }).where('appointment_id', '=', Aid).execute();
+    } else if (state === 'seated') {
       if (present === null) throw new Error('[INVALID_STATE_TRANSITION] Cannot seat: patient is not checked in');
       if (seated !== null) throw new Error('[INVALID_STATE_TRANSITION] Cannot seat: patient is already seated');
       if (dismissed !== null) throw new Error('[INVALID_STATE_TRANSITION] Cannot seat: patient is already dismissed');
-      await trx.updateTable('tblappointments').set({ Seated: Tim, LastUpdated: now }).where('appointmentID', '=', Aid).execute();
-    } else if (state === 'Dismissed') {
+      await trx.updateTable('appointments').set({ seated: Tim, last_updated: now }).where('appointment_id', '=', Aid).execute();
+    } else if (state === 'dismissed') {
       if (seated === null) throw new Error('[INVALID_STATE_TRANSITION] Cannot dismiss: patient is not seated');
       if (dismissed !== null) throw new Error('[INVALID_STATE_TRANSITION] Cannot dismiss: patient is already dismissed');
-      await trx.updateTable('tblappointments').set({ Dismissed: Tim, LastUpdated: now }).where('appointmentID', '=', Aid).execute();
+      await trx.updateTable('appointments').set({ dismissed: Tim, last_updated: now }).where('appointment_id', '=', Aid).execute();
     } else {
-      throw new Error('Invalid state parameter. Must be Present, Seated, or Dismissed.');
+      throw new Error('Invalid state parameter. Must be present, seated, or dismissed.');
     }
   });
-  return { success: true, appointmentID: Aid, state, time: Tim };
+  return { success: true, appointment_id: Aid, state, time: Tim };
 }
 
 /**
@@ -207,37 +207,37 @@ export async function updatePresent(
  * (was: UndoAppointmentState)
  */
 export async function undoAppointmentState(
-  appointmentID: number,
+  appointment_id: number,
   stateField: string
 ): Promise<UndoStateResult> {
-  if (stateField !== 'Present' && stateField !== 'Seated' && stateField !== 'Dismissed') {
-    throw new Error('Invalid state field. Must be Present, Seated, or Dismissed.');
+  if (stateField !== 'present' && stateField !== 'seated' && stateField !== 'dismissed') {
+    throw new Error('Invalid state field. Must be present, seated, or dismissed.');
   }
 
   await withPgTransaction(async (trx) => {
     const row = await trx
-      .selectFrom('tblappointments')
-      .select(['Present', 'Seated', 'Dismissed'])
-      .where('appointmentID', '=', appointmentID)
+      .selectFrom('appointments')
+      .select(['present', 'seated', 'dismissed'])
+      .where('appointment_id', '=', appointment_id)
       .forUpdate()
       .executeTakeFirst();
 
-    const seated = (row?.Seated as string | null) ?? null;
-    const dismissed = (row?.Dismissed as string | null) ?? null;
-    if (stateField === 'Present' && seated !== null) throw new Error('Cannot undo check-in: Patient is already seated');
-    if (stateField === 'Seated' && dismissed !== null) throw new Error('Cannot undo seated: Patient visit is already completed');
+    const seated = (row?.seated as string | null) ?? null;
+    const dismissed = (row?.dismissed as string | null) ?? null;
+    if (stateField === 'present' && seated !== null) throw new Error('Cannot undo check-in: Patient is already seated');
+    if (stateField === 'seated' && dismissed !== null) throw new Error('Cannot undo seated: Patient visit is already completed');
 
     const set =
-      stateField === 'Present' ? { Present: null } : stateField === 'Seated' ? { Seated: null } : { Dismissed: null };
-    await trx.updateTable('tblappointments').set(set).where('appointmentID', '=', appointmentID).execute();
+      stateField === 'present' ? { present: null } : stateField === 'seated' ? { seated: null } : { dismissed: null };
+    await trx.updateTable('appointments').set(set).where('appointment_id', '=', appointment_id).execute();
   });
 
-  return { appointmentID, stateCleared: stateField, success: true };
+  return { appointment_id, stateCleared: stateField, success: true };
 }
 
 /**
  * Get daily appointments (was: GetDailyAppointmentsOptimized — 3 result sets folded into one query).
- * `allAppointments` = absent (Present IS NULL), `checkedInAppointments` = Present IS NOT NULL,
+ * `allAppointments` = absent (present IS NULL), `checkedInAppointments` = present IS NOT NULL,
  * plus aggregate stats — preserving the proc's exact column names per set.
  */
 export async function getDailyAppointmentsOptimized(
@@ -246,66 +246,66 @@ export async function getDailyAppointmentsOptimized(
   const dateStr = toDateStr(AppsDate);
 
   const base = await getKysely()
-    .selectFrom('tblappointments as a')
-    .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
-    .leftJoin('tblPatientType as pt', 'pt.ID', 'p.PatientTypeID')
-    .where('a.AppDay', '=', sql<Date>`${dateStr}::date`)
+    .selectFrom('appointments as a')
+    .innerJoin('patients as p', 'p.person_id', 'a.person_id')
+    .leftJoin('patient_types as pt', 'pt.id', 'p.patient_type_id')
+    .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
     .select([
-      'a.appointmentID', 'a.PersonID', 'a.AppDetail', 'a.Present', 'a.Seated', 'a.Dismissed',
-      'a.AppDate', 'a.AppCost', 'p.PatientName', 'pt.PatientType',
-      sql<boolean>`EXISTS(SELECT 1 FROM "tblAlerts" al WHERE al."PersonID"=p."PersonID" AND al."IsActive"=true)`.as('hasActiveAlert'),
-      sql<boolean>`COALESCE((SELECT (w."Typeofwork" IN (1,2,11,19,20)) FROM "tblwork" w WHERE w."PersonID"=a."PersonID" AND w."Status"=1 LIMIT 1), false)`.as('isOrthoVisit'),
-      sql<boolean>`EXISTS(SELECT 1 FROM "tblwork" w2 JOIN "tblvisits" vis ON vis."WorkID"=w2."workid" WHERE w2."PersonID"=a."PersonID" AND vis."VisitDate"=${dateStr}::date)`.as('hasVisit'),
+      'a.appointment_id', 'a.person_id', 'a.app_detail', 'a.present', 'a.seated', 'a.dismissed',
+      'a.app_date', 'a.app_cost', 'p.patient_name', 'pt.patient_type',
+      sql<boolean>`EXISTS(SELECT 1 FROM "alerts" al WHERE al."person_id"=p."person_id" AND al."is_active"=true)`.as('hasActiveAlert'),
+      sql<boolean>`COALESCE((SELECT (w."type_of_work" IN (1,2,11,19,20)) FROM "works" w WHERE w."person_id"=a."person_id" AND w."status"=1 LIMIT 1), false)`.as('isOrthoVisit'),
+      sql<boolean>`EXISTS(SELECT 1 FROM "works" w2 JOIN "visits" vis ON vis."work_id"=w2."work_id" WHERE w2."person_id"=a."person_id" AND vis."visit_date"=${dateStr}::date)`.as('hasVisit'),
     ])
     .execute();
 
   const enriched = base.map((r) => {
-    const appDate = r.AppDate as unknown as Date;
+    const appDate = r.app_date as unknown as Date;
     return {
       ...r,
       appDate,
       apptime: isMidnight(appDate) ? null : fmtClock(appDate, true),
-      presentTime: fmtTimeStr(r.Present as string | null),
-      seatedTime: fmtTimeStr(r.Seated as string | null),
-      dismissedTime: fmtTimeStr(r.Dismissed as string | null),
+      presentTime: fmtTimeStr(r.present as string | null),
+      seatedTime: fmtTimeStr(r.seated as string | null),
+      dismissedTime: fmtTimeStr(r.dismissed as string | null),
     };
   });
 
-  // Result set 1 (proc names it as `allAppointments`): absent — Present IS NULL.
+  // Result set 1 (proc names it as `allAppointments`): absent — present IS NULL.
   const allAppointments = enriched
-    .filter((r) => r.Present === null)
+    .filter((r) => r.present === null)
     .sort((a, b) => {
       const am = isMidnight(a.appDate) ? 1 : 0;
       const bm = isMidnight(b.appDate) ? 1 : 0;
       return am - bm || a.appDate.getTime() - b.appDate.getTime();
     })
     .map((r) => ({
-      appointmentID: r.appointmentID,
-      PersonID: r.PersonID,
-      AppDetail: r.AppDetail,
-      AppDate: r.appDate,
-      PatientType: r.PatientType,
-      PatientName: r.PatientName,
+      appointment_id: r.appointment_id,
+      person_id: r.person_id,
+      app_detail: r.app_detail,
+      app_date: r.appDate,
+      patient_type: r.patient_type,
+      patient_name: r.patient_name,
       hasActiveAlert: r.hasActiveAlert,
       apptime: r.apptime,
     }));
 
-  // Result set 2: checked-in — Present IS NOT NULL, ordered by presentTime.
+  // Result set 2: checked-in — present IS NOT NULL, ordered by presentTime.
   const checkedInAppointments = enriched
-    .filter((r) => r.Present !== null)
+    .filter((r) => r.present !== null)
     .sort((a, b) => (a.presentTime ?? '').localeCompare(b.presentTime ?? ''))
     .map((r) => ({
-      appointmentID: r.appointmentID,
-      PersonID: r.PersonID,
-      AppDetail: r.AppDetail,
+      appointment_id: r.appointment_id,
+      person_id: r.person_id,
+      app_detail: r.app_detail,
       PresentTime: r.presentTime,
       SeatedTime: r.seatedTime,
       DismissedTime: r.dismissedTime,
-      AppDate: r.appDate,
-      AppCost: r.AppCost,
+      app_date: r.appDate,
+      app_cost: r.app_cost,
       apptime: r.apptime,
-      PatientType: r.PatientType,
-      PatientName: r.PatientName,
+      patient_type: r.patient_type,
+      patient_name: r.patient_name,
       hasActiveAlert: r.hasActiveAlert,
       HasVisit: r.hasVisit,
       IsOrthoVisit: r.isOrthoVisit,
@@ -317,18 +317,18 @@ export async function getDailyAppointmentsOptimized(
     total,
     checkedIn,
     absent: total - checkedIn,
-    waiting: enriched.filter((r) => r.Present !== null && r.Seated === null && r.Dismissed === null).length,
+    waiting: enriched.filter((r) => r.present !== null && r.seated === null && r.dismissed === null).length,
   };
 
   return { allAppointments, checkedInAppointments, stats };
 }
 
 export interface AppointmentNotificationRow {
-  AppointmentID: number;
-  AppDate: Date;
-  PatientName: string;
-  Phone: string | null;
-  PersonID: number;
+  appointment_id: number;
+  app_date: Date;
+  patient_name: string;
+  phone: string | null;
+  person_id: number;
 }
 
 /**
@@ -338,58 +338,58 @@ export interface AppointmentNotificationRow {
  * `SCOPE_IDENTITY()` and `GETDATE()` — none valid in PG). AppoPatientType: when the new
  * appointment has a real (non-midnight) time and the patient is type 4, promote them to type 3.
  *
- * @param AppDate ISO datetime string ('YYYY-MM-DDTHH:MM:SS'); bound to the `timestamp` column.
- * @param Present optional 'HH:MM:SS' check-in time (quick check-in path).
+ * @param app_date ISO datetime string ('YYYY-MM-DDTHH:MM:SS'); bound to the `timestamp` column.
+ * @param present optional 'HH:MM:SS' check-in time (quick check-in path).
  */
 export async function createAppointment(data: {
-  PersonID: number;
-  AppDate: string;
-  AppDetail: string | null;
-  DrID: number | null;
-  Present?: string | null;
+  person_id: number;
+  app_date: string;
+  app_detail: string | null;
+  dr_id: number | null;
+  present?: string | null;
 }): Promise<number> {
   return withPgTransaction(async (trx) => {
     const row = await trx
-      .insertInto('tblappointments')
+      .insertInto('appointments')
       .values({
-        PersonID: data.PersonID,
-        AppDate: data.AppDate,
-        AppDetail: data.AppDetail,
-        DrID: data.DrID,
-        Present: data.Present ?? null,
-        LastUpdated: new Date(),
+        person_id: data.person_id,
+        app_date: data.app_date,
+        app_detail: data.app_detail,
+        dr_id: data.dr_id,
+        present: data.present ?? null,
+        last_updated: new Date(),
       })
-      .returning('appointmentID')
+      .returning('appointment_id')
       .executeTakeFirstOrThrow();
 
     // AppoPatientType: promote a type-4 patient to type 3 on a timed appointment.
-    const timePart = data.AppDate.includes('T') ? data.AppDate.split('T')[1] : data.AppDate.split(' ')[1];
+    const timePart = data.app_date.includes('T') ? data.app_date.split('T')[1] : data.app_date.split(' ')[1];
     const isMidnightAppt = !timePart || /^00:00(:00)?/.test(timePart);
     if (!isMidnightAppt) {
       const patient = await trx
-        .selectFrom('tblpatients')
-        .select('PatientTypeID')
-        .where('PersonID', '=', data.PersonID)
+        .selectFrom('patients')
+        .select('patient_type_id')
+        .where('person_id', '=', data.person_id)
         .executeTakeFirst();
-      if (patient?.PatientTypeID === 4) {
-        await trx.updateTable('tblpatients').set({ PatientTypeID: 3 }).where('PersonID', '=', data.PersonID).execute();
+      if (patient?.patient_type_id === 4) {
+        await trx.updateTable('patients').set({ patient_type_id: 3 }).where('person_id', '=', data.person_id).execute();
       }
     }
 
-    return row.appointmentID;
+    return row.appointment_id;
   });
 }
 
 export interface AppointmentWithPhone {
-  appointmentID: number | null;
-  PersonID: number | null;
-  AppDetail: string;
-  AppDay: string;
-  PatientType: string;
-  PatientName: string;
-  Phone: string;
+  appointment_id: number | null;
+  person_id: number | null;
+  app_detail: string;
+  app_day: string;
+  patient_type: string;
+  patient_name: string;
+  phone: string;
   apptime: string;
-  employeeName: string;
+  employee_name: string;
 }
 
 /**
@@ -399,31 +399,31 @@ export interface AppointmentWithPhone {
 export async function getAppointmentsWithPhones(date: string): Promise<AppointmentWithPhone[]> {
   const dateStr = toDateStr(date);
   const rows = await getKysely()
-    .selectFrom('tblappointments as a')
-    .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
-    .leftJoin('tblPatientType as pt', 'pt.ID', 'p.PatientTypeID')
-    .leftJoin('tblEmployees as e', 'e.ID', 'a.DrID')
-    .where('a.AppDay', '=', sql<Date>`${dateStr}::date`)
-    .where('a.Present', 'is', null)
-    .orderBy('a.AppDate')
+    .selectFrom('appointments as a')
+    .innerJoin('patients as p', 'p.person_id', 'a.person_id')
+    .leftJoin('patient_types as pt', 'pt.id', 'p.patient_type_id')
+    .leftJoin('employees as e', 'e.id', 'a.dr_id')
+    .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
+    .where('a.present', 'is', null)
+    .orderBy('a.app_date')
     .select([
-      'a.appointmentID', 'a.PersonID', 'a.AppDetail',
-      sql<string>`to_char(a."AppDay", 'YYYY-MM-DD')`.as('AppDay'),
-      'pt.PatientType', 'p.PatientName', 'p.Phone',
-      sql<string>`to_char(a."AppDate", 'HH12:MI')`.as('apptime'),
-      'e.employeeName',
+      'a.appointment_id', 'a.person_id', 'a.app_detail',
+      sql<string>`to_char(a."app_day", 'YYYY-MM-DD')`.as('app_day'),
+      'pt.patient_type', 'p.patient_name', 'p.phone',
+      sql<string>`to_char(a."app_date", 'HH12:MI')`.as('apptime'),
+      'e.employee_name',
     ])
     .execute();
   return rows.map((r) => ({
-    appointmentID: r.appointmentID ?? null,
-    PersonID: r.PersonID ?? null,
-    AppDetail: r.AppDetail ?? '',
-    AppDay: r.AppDay ?? '',
-    PatientType: r.PatientType ?? '',
-    PatientName: r.PatientName ?? '',
-    Phone: r.Phone ?? '',
+    appointment_id: r.appointment_id ?? null,
+    person_id: r.person_id ?? null,
+    app_detail: r.app_detail ?? '',
+    app_day: r.app_day ?? '',
+    patient_type: r.patient_type ?? '',
+    patient_name: r.patient_name ?? '',
+    phone: r.phone ?? '',
     apptime: r.apptime ?? '',
-    employeeName: r.employeeName ?? '',
+    employee_name: r.employee_name ?? '',
   }));
 }
 
@@ -431,10 +431,10 @@ export async function getAppointmentForNotification(
   appointmentId: number
 ): Promise<AppointmentNotificationRow | null> {
   const row = await getKysely()
-    .selectFrom('tblappointments as a')
-    .innerJoin('tblpatients as p', 'p.PersonID', 'a.PersonID')
-    .where('a.appointmentID', '=', appointmentId)
-    .select(['a.appointmentID as AppointmentID', 'a.AppDate', 'p.PatientName', 'p.Phone', 'p.PersonID'])
+    .selectFrom('appointments as a')
+    .innerJoin('patients as p', 'p.person_id', 'a.person_id')
+    .where('a.appointment_id', '=', appointmentId)
+    .select(['a.appointment_id as appointment_id', 'a.app_date', 'p.patient_name', 'p.phone', 'p.person_id'])
     .executeTakeFirst();
   return (row as AppointmentNotificationRow | undefined) ?? null;
 }

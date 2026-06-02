@@ -11,14 +11,14 @@ interface Timepoint {
 }
 
 interface PatientInfo {
-    PatientName?: string;
+    patient_name?: string;
     patientName?: string;
     Name?: string;
     name?: string;
     FullName?: string;
     fullName?: string;
-    FirstName?: string;
-    LastName?: string;
+    first_name?: string;
+    last_name?: string;
     [key: string]: unknown;
 }
 
@@ -167,7 +167,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
             console.log('Patient Info Keys:', patientInfo ? Object.keys(patientInfo) : 'null');
 
             // Try different possible field names for patient name
-            const patientName = patientInfo?.PatientName
+            const patientName = patientInfo?.patient_name
                 || patientInfo?.patientName
                 || patientInfo?.Name
                 || patientInfo?.name
@@ -195,7 +195,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
 
     const handleOpen3Shape = () => {
         try {
-            const patientName = patientInfo?.PatientName
+            const patientName = patientInfo?.patient_name
                 || patientInfo?.patientName
                 || patientInfo?.Name
                 || patientInfo?.name

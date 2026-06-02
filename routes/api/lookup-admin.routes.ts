@@ -167,7 +167,7 @@ router.put(
       }
 
       if (!id) {
-        ErrorResponses.badRequest(res, 'Item ID is required');
+        ErrorResponses.badRequest(res, 'Item id is required');
         return;
       }
 
@@ -223,7 +223,7 @@ router.delete(
       }
 
       if (!id) {
-        ErrorResponses.badRequest(res, 'Item ID is required');
+        ErrorResponses.badRequest(res, 'Item id is required');
         return;
       }
 

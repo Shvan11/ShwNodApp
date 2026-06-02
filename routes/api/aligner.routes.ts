@@ -66,87 +66,87 @@ interface AlignerQueryParams {
 
 interface AddPaymentBody {
   workid: number;
-  AlignerSetID: number;
-  Amountpaid: number | string;
-  Dateofpayment: string;
-  Currency?: string;
-  USDReceived?: number;
-  IQDReceived?: number;
-  Change?: number;
-  Notes?: string;
+  aligner_set_id: number;
+  amount_paid: number | string;
+  date_of_payment: string;
+  currency?: string;
+  usd_received?: number;
+  iqd_received?: number;
+  change?: number;
+  notes?: string;
 }
 
 interface CreateSetBody {
-  WorkID: number;
-  AlignerDrID: number;
+  work_id: number;
+  aligner_dr_id: number;
   DoctorID?: number;
-  Notes?: string;
+  notes?: string;
   OrderDate?: string;
-  IsActive?: boolean;
+  is_active?: boolean;
   TotalAligners?: number;
   RemainingAligners?: number;
-  SetCost?: number;
-  SetSequence?: number;
-  Type?: string;
-  UpperAlignersCount?: number;
-  LowerAlignersCount?: number;
+  set_cost?: number;
+  set_sequence?: number;
+  type?: string;
+  upper_aligners_count?: number;
+  lower_aligners_count?: number;
 }
 
 interface UpdateSetBody {
   DoctorID?: number;
-  Notes?: string;
+  notes?: string;
   OrderDate?: string;
 }
 
 interface CreateBatchBody {
-  AlignerSetID: number;
-  UpperAlignerCount?: number;
-  LowerAlignerCount?: number;
-  IsActive?: boolean;
-  IsLast?: boolean;
-  Notes?: string;
-  Days?: number;
-  HasUpperTemplate?: boolean;
-  HasLowerTemplate?: boolean;
+  aligner_set_id: number;
+  upper_aligner_count?: number;
+  lower_aligner_count?: number;
+  is_active?: boolean;
+  is_last?: boolean;
+  notes?: string;
+  days?: number;
+  has_upper_template?: boolean;
+  has_lower_template?: boolean;
 }
 
 interface UpdateBatchBody {
-  AlignerSetID?: number;
-  UpperAlignerCount?: number;
-  LowerAlignerCount?: number;
-  IsActive?: boolean;
-  IsLast?: boolean;
-  Notes?: string;
-  Days?: number;
-  HasUpperTemplate?: boolean;
-  HasLowerTemplate?: boolean;
+  aligner_set_id?: number;
+  upper_aligner_count?: number;
+  lower_aligner_count?: number;
+  is_active?: boolean;
+  is_last?: boolean;
+  notes?: string;
+  days?: number;
+  has_upper_template?: boolean;
+  has_lower_template?: boolean;
 }
 
 interface CreateNoteBody {
-  AlignerSetID: number;
-  NoteText: string;
+  aligner_set_id: number;
+  note_text: string;
 }
 
 interface UpdateNoteBody {
-  NoteText: string;
+  note_text: string;
 }
 
 interface CreateDoctorBody {
-  DoctorName: string;
-  DoctorEmail?: string;
+  doctor_name: string;
+  doctor_email?: string;
   DoctorPhone?: string;
-  IsActive?: boolean;
+  is_active?: boolean;
   Address?: string;
-  Notes?: string;
+  notes?: string;
 }
 
 interface UpdateDoctorBody {
-  DoctorName: string;
-  DoctorEmail?: string;
+  doctor_name: string;
+  doctor_email?: string;
   DoctorPhone?: string;
-  IsActive?: boolean;
+  is_active?: boolean;
   Address?: string;
-  Notes?: string;
+  notes?: string;
 }
 
 interface LabelData {
@@ -165,7 +165,7 @@ interface GenerateLabelsBody {
 interface AlignerSetRow {
   NextBatchPresent?: string;
   UnreadActivityCount?: number;
-  AlignerSetID?: number;
+  aligner_set_id?: number;
 }
 
 // ============================================================================
@@ -254,7 +254,7 @@ router.get(
 );
 
 /**
- * Get all patients by doctor ID
+ * Get all patients by doctor id
  */
 router.get(
   '/aligner/patients/by-doctor/:doctorId',
@@ -270,7 +270,7 @@ router.get(
         return;
       }
 
-      log.info(`Fetching all patients for doctor ID: ${doctorId}`);
+      log.info(`Fetching all patients for doctor id: ${doctorId}`);
       const patients = await alignerQueries.getAlignerPatientsByDoctor(parseInt(doctorId, 10));
 
       res.json({
@@ -340,7 +340,7 @@ router.get(
         return;
       }
 
-      log.info(`Fetching aligner sets for work ID: ${workId}`);
+      log.info(`Fetching aligner sets for work id: ${workId}`);
       const sets = (await alignerQueries.getAlignerSetsByWorkId(
         parseInt(workId, 10)
       )) as AlignerSetRow[];
@@ -353,7 +353,7 @@ router.get(
         log.info(
           '🔔 [MAIN APP] Sets with unread doctor notes:',
           setsWithUnread.map((s) => ({
-            SetID: s.AlignerSetID,
+            SetID: s.aligner_set_id,
             UnreadCount: s.UnreadActivityCount
           }))
         );
@@ -394,7 +394,7 @@ router.post(
 
       res.json({
         success: true,
-        invoiceID: invoiceID,
+        invoice_id: invoiceID,
         message: 'Payment added successfully'
       });
     } catch (error) {
@@ -422,7 +422,7 @@ router.get(
         return;
       }
 
-      log.info(`Fetching batches for aligner set ID: ${setId}`);
+      log.info(`Fetching batches for aligner set id: ${setId}`);
       const batches = await alignerQueries.getBatchesBySetId(parseInt(setId, 10));
 
       res.json({
@@ -605,17 +605,17 @@ router.post(
     res: Response
   ): Promise<void> => {
     try {
-      const { AlignerSetID, NoteText } = req.body;
+      const { aligner_set_id, note_text } = req.body;
 
       const noteId = await AlignerService.validateAndCreateNote(
-        AlignerSetID,
-        NoteText
+        aligner_set_id,
+        note_text
       );
 
       res.json({
         success: true,
         noteId: noteId,
-        message: 'Note added successfully'
+        message: 'note added successfully'
       });
     } catch (error) {
       if (error instanceof AlignerValidationError) {
@@ -642,7 +642,7 @@ router.patch(
       const { noteId } = req.params;
 
       if (!noteId || isNaN(parseInt(noteId))) {
-        ErrorResponses.badRequest(res, 'Valid note ID is required');
+        ErrorResponses.badRequest(res, 'Valid note id is required');
         return;
       }
 
@@ -650,7 +650,7 @@ router.patch(
 
       res.json({
         success: true,
-        message: 'Note read status toggled successfully'
+        message: 'note read status toggled successfully'
       });
     } catch (error) {
       log.error('Error toggling note read status:', error);
@@ -674,18 +674,18 @@ router.patch(
   ): Promise<void> => {
     try {
       const { noteId } = req.params;
-      const { NoteText } = req.body;
+      const { note_text } = req.body;
 
-      await AlignerService.validateAndUpdateNote(noteId, NoteText);
+      await AlignerService.validateAndUpdateNote(noteId, note_text);
 
       res.json({
         success: true,
-        message: 'Note updated successfully'
+        message: 'note updated successfully'
       });
     } catch (error) {
       if (error instanceof AlignerValidationError) {
         if (error.code === 'NOTE_NOT_FOUND') {
-          ErrorResponses.notFound(res, 'Note');
+          ErrorResponses.notFound(res, 'note');
           return;
         }
         ErrorResponses.badRequest(res, error.message, { code: error.code });
@@ -710,12 +710,12 @@ router.delete(
 
       res.json({
         success: true,
-        message: 'Note deleted successfully'
+        message: 'note deleted successfully'
       });
     } catch (error) {
       if (error instanceof AlignerValidationError) {
         if (error.code === 'NOTE_NOT_FOUND') {
-          ErrorResponses.notFound(res, 'Note');
+          ErrorResponses.notFound(res, 'note');
           return;
         }
         ErrorResponses.badRequest(res, error.message, { code: error.code });
@@ -737,7 +737,7 @@ router.get(
       const { noteId } = req.params;
 
       if (!noteId || isNaN(parseInt(noteId))) {
-        ErrorResponses.badRequest(res, 'Valid note ID is required');
+        ErrorResponses.badRequest(res, 'Valid note id is required');
         return;
       }
 
@@ -749,7 +749,7 @@ router.get(
           isRead: isRead
         });
       } else {
-        ErrorResponses.notFound(res, 'Note');
+        ErrorResponses.notFound(res, 'note');
       }
     } catch (error) {
       log.error('Error getting note status:', error);
@@ -990,7 +990,7 @@ router.patch(
 
 /**
  * Mark batch as delivered with automatic activation for latest batch
- * BatchExpiryDate is auto-computed from DeliveredToPatientDate + (Days * AlignerCount)
+ * batch_expiry_date is auto-computed from delivered_to_patient_date + (days * AlignerCount)
  * @body targetDate - Optional ISO date string for backdating/correction
  */
 router.patch(
@@ -1280,7 +1280,7 @@ router.get(
 );
 
 /**
- * Get all aligner sets with ArchformID data for matching UI
+ * Get all aligner sets with archform_id data for matching UI
  */
 router.get(
   '/aligner/archform/matches',
@@ -1306,7 +1306,7 @@ router.get(
 );
 
 /**
- * Save or clear ArchformID on an aligner set
+ * Save or clear archform_id on an aligner set
  */
 router.patch(
   '/aligner/sets/:setId/archform',
@@ -1328,7 +1328,7 @@ router.patch(
         archformId ?? null
       );
 
-      log.info('Updated ArchformID', { setId, archformId });
+      log.info('Updated archform_id', { setId, archformId });
 
       res.json({
         success: true,
@@ -1337,7 +1337,7 @@ router.patch(
           : 'Archform match removed successfully'
       });
     } catch (error) {
-      log.error('Error updating ArchformID:', error);
+      log.error('Error updating archform_id:', error);
       ErrorResponses.internalError(
         res,
         'Failed to update Archform match',
@@ -1359,7 +1359,7 @@ router.put(
     try {
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) {
-        ErrorResponses.badRequest(res, 'Valid patient ID is required');
+        ErrorResponses.badRequest(res, 'Valid patient id is required');
         return;
       }
 
@@ -1405,7 +1405,7 @@ router.delete(
     try {
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) {
-        ErrorResponses.badRequest(res, 'Valid patient ID is required');
+        ErrorResponses.badRequest(res, 'Valid patient id is required');
         return;
       }
 
@@ -1527,11 +1527,11 @@ router.post(
         .substring(0, 30);
       const filename = `Labels_${firstPatient}.pdf`;
 
-      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
       res.setHeader('X-Total-Labels', String(result.totalLabels));
       res.setHeader('X-Total-Pages', String(result.totalPages));
-      res.setHeader('X-Next-Position', String(result.nextPosition));
+      res.setHeader('X-Next-position', String(result.nextPosition));
       res.send(result.buffer);
     } catch (error) {
       log.error('Error generating aligner labels:', error);

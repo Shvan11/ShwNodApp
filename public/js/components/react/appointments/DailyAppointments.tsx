@@ -171,13 +171,13 @@ const DailyAppointments = () => {
     // Filter appointments by search term
     const filteredAllAppointments = searchTerm
         ? (allAppointments as DailyAppointment[]).filter((apt) =>
-            apt.PatientName?.toLowerCase().includes(searchTerm.toLowerCase())
+            apt.patient_name?.toLowerCase().includes(searchTerm.toLowerCase())
         )
         : (allAppointments as DailyAppointment[]);
 
     const filteredCheckedInAppointments = searchTerm
         ? (checkedInAppointments as DailyAppointment[]).filter((apt) =>
-            apt.PatientName?.toLowerCase().includes(searchTerm.toLowerCase())
+            apt.patient_name?.toLowerCase().includes(searchTerm.toLowerCase())
         )
         : (checkedInAppointments as DailyAppointment[]);
 

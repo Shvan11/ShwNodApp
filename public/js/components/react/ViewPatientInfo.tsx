@@ -12,22 +12,22 @@ interface Props {
 }
 
 interface Alert {
-    AlertID: number;
-    AlertDetails: string;
-    AlertTypeID?: number;
-    AlertSeverity?: number;
+    alert_id: number;
+    alert_details: string;
+    alert_type_id?: number;
+    alert_severity?: number;
     CreationDate?: string;
 }
 
 interface PatientInfo {
-    PersonID: number;
-    PatientName?: string;
-    FirstName?: string;
-    LastName?: string;
+    person_id: number;
+    patient_name?: string;
+    first_name?: string;
+    last_name?: string;
     Phone?: string;
     Phone2?: string;
     Email?: string;
-    DateOfBirth?: string;
+    date_of_birth?: string;
     Gender?: string;
     GenderDisplay?: string;
     Address?: string;
@@ -59,8 +59,8 @@ interface CostPreset {
 }
 
 interface AlertType {
-    AlertTypeID: number;
-    TypeName: string;
+    alert_type_id: number;
+    type_name: string;
 }
 
 const ViewPatientInfo = ({ personId }: Props) => {
@@ -83,8 +83,8 @@ const ViewPatientInfo = ({ personId }: Props) => {
     const [costPresets, setCostPresets] = useState<CostPreset[]>([]);
     const [presetsLoading, setPresetsLoading] = useState(false);
 
-    // Use validated PersonID from loader, fallback to patientInfo.PersonID
-    const validPersonId = personId ?? patientInfo?.PersonID ?? null;
+    // Use validated PersonID from loader, fallback to patientInfo.person_id
+    const validPersonId = personId ?? patientInfo?.person_id ?? null;
 
     const formatPhoneDisplay = (countryCode: string | undefined, phone: string | undefined): string => {
         if (!phone) return '-';
@@ -359,12 +359,12 @@ const ViewPatientInfo = ({ personId }: Props) => {
                     <i className={`fas fa-user-circle ${styles.patientAvatarIcon}`}></i>
                 </div>
                 <div className={styles.patientHeaderDetails}>
-                    <h2 className={styles.patientPrimaryName}>{patientInfo.PatientName}</h2>
+                    <h2 className={styles.patientPrimaryName}>{patientInfo.patient_name}</h2>
                     <p className={styles.patientSecondaryName}>
-                        {(patientInfo.FirstName || patientInfo.LastName) && (
-                            <span>{patientInfo.FirstName} {patientInfo.LastName}</span>
+                        {(patientInfo.first_name || patientInfo.last_name) && (
+                            <span>{patientInfo.first_name} {patientInfo.last_name}</span>
                         )}
-                        <span className={styles.patientId}>ID: {patientInfo.PersonID}</span>
+                        <span className={styles.patientId}>ID: {patientInfo.person_id}</span>
                     </p>
                 </div>
                 <div className={styles.patientHeaderActions}>
@@ -413,9 +413,9 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 ) : alerts.length > 0 ? (
                     <div className={styles.patientAlertsList}>
                         {alerts.map(alert => (
-                            <div key={alert.AlertID} className={styles.patientAlertItem}>
+                            <div key={alert.alert_id} className={styles.patientAlertItem}>
                                 <div className={styles.patientAlertContent}>
-                                    <span className={styles.patientAlertText}>{alert.AlertDetails}</span>
+                                    <span className={styles.patientAlertText}>{alert.alert_details}</span>
                                     {alert.CreationDate && (
                                         <span className={styles.patientAlertDate}>
                                             {new Date(alert.CreationDate).toLocaleDateString('en-US', {
@@ -438,12 +438,12 @@ const ViewPatientInfo = ({ personId }: Props) => {
                                         <i className="fas fa-pencil-alt"></i>
                                     </button>
                                     <button
-                                        onClick={() => handleDeleteAlert(alert.AlertID)}
-                                        disabled={deletingAlertId === alert.AlertID}
+                                        onClick={() => handleDeleteAlert(alert.alert_id)}
+                                        disabled={deletingAlertId === alert.alert_id}
                                         className={styles.patientAlertDelete}
                                         title="Archive alert"
                                     >
-                                        {deletingAlertId === alert.AlertID ? (
+                                        {deletingAlertId === alert.alert_id ? (
                                             <i className="fas fa-spinner fa-spin"></i>
                                         ) : (
                                             <i className="fas fa-times"></i>
@@ -502,13 +502,13 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Date of Birth:</span>
                             <span className={styles.patientInfoValue}>
-                                {formatDateDisplay(patientInfo.DateOfBirth)}
+                                {formatDateDisplay(patientInfo.date_of_birth)}
                             </span>
                         </div>
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Age:</span>
                             <span className={styles.patientInfoValue}>
-                                {calculateAge(patientInfo.DateOfBirth)}
+                                {calculateAge(patientInfo.date_of_birth)}
                             </span>
                         </div>
                         <div className={styles.patientInfoRow}>

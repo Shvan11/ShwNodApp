@@ -37,10 +37,10 @@ import styles from './PatientSets.module.css';
 
 // Page-specific types
 interface Patient {
-    PersonID: number;
-    PatientName?: string;
-    FirstName?: string;
-    LastName?: string;
+    person_id: number;
+    patient_name?: string;
+    first_name?: string;
+    last_name?: string;
     Phone?: string;
     WorkType?: string;
     workid: number;
@@ -91,12 +91,12 @@ const PatientSets: React.FC = () => {
 
     // Initialize patient from loader data (already validated in loader)
     const initialPatient: Patient | null = loaderData?.patient && loaderData?.work ? {
-        PersonID: loaderData.patient.PersonID ?? 0,
-        PatientName: loaderData.patient.PatientName,
-        FirstName: loaderData.patient.FirstName,
-        LastName: loaderData.patient.LastName,
-        Phone: loaderData.patient.Phone,
-        WorkType: loaderData.work.TypeName,
+        person_id: (loaderData.patient.person_id as number) ?? 0,
+        patient_name: loaderData.patient.patient_name as string | undefined,
+        first_name: loaderData.patient.first_name as string | undefined,
+        last_name: loaderData.patient.last_name as string | undefined,
+        Phone: loaderData.patient.Phone as string | undefined,
+        WorkType: loaderData.work.TypeName as string | undefined,
         workid: parseInt(workId || '0'),
     } : null;
 
@@ -234,9 +234,9 @@ const PatientSets: React.FC = () => {
             setAlignerSets(sets);
 
             // Auto-expand the active set
-            const activeSet = sets.find(s => s.IsActive === true);
+            const activeSet = sets.find(s => s.is_active === true);
             if (activeSet) {
-                const setId = activeSet.AlignerSetID;
+                const setId = activeSet.aligner_set_id;
                 if (!batchesData[setId]) {
                     await loadBatches(setId);
                 }
@@ -282,12 +282,12 @@ const PatientSets: React.FC = () => {
             // Auto-mark unread doctor notes as read
             if (autoMarkRead) {
                 const unreadDoctorNotes = (data.notes || []).filter((note: AlignerNote) =>
-                    note.NoteType === 'Doctor' && note.IsRead === false
+                    note.note_type === 'Doctor' && note.is_read === false
                 );
 
                 if (unreadDoctorNotes.length > 0) {
                     for (const note of unreadDoctorNotes) {
-                        await markNoteAsRead(note.NoteID);
+                        await markNoteAsRead(note.note_id);
                     }
                     await loadNotes(setId, workIdParam, false);
                 }
@@ -358,18 +358,18 @@ const PatientSets: React.FC = () => {
     };
 
     const calculateProgress = (set: AlignerSet): number => {
-        const delivered = set.UpperAlignersCount + set.LowerAlignersCount - set.RemainingUpperAligners - set.RemainingLowerAligners;
-        const total = set.UpperAlignersCount + set.LowerAlignersCount;
+        const delivered = set.upper_aligners_count + set.lower_aligners_count - set.remaining_upper_aligners - set.remaining_lower_aligners;
+        const total = set.upper_aligners_count + set.lower_aligners_count;
         return total > 0 ? Math.round((delivered / total) * 100) : 0;
     };
 
     const formatPatientName = (p: Patient | null): string => {
-        return p?.PatientName || `${p?.FirstName || ''} ${p?.LastName || ''}`.trim() || 'N/A';
+        return p?.patient_name || `${p?.first_name || ''} ${p?.last_name || ''}`.trim() || 'N/A';
     };
 
     const generateFolderPath = (set: AlignerSet): string | null => {
         if (!patient || !set) return null;
-        const folderPath = `\\\\WORK_PC\\Aligner_Sets\\${set.AlignerDrID}\\${patient.PersonID}\\${set.SetSequence}`;
+        const folderPath = `\\\\WORK_PC\\Aligner_Sets\\${set.aligner_dr_id}\\${patient.person_id}\\${set.set_sequence}`;
         return folderPath;
     };
 
@@ -429,9 +429,9 @@ const PatientSets: React.FC = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 workid: patient.workid,
-                AlignerSetID: currentSetForPayment.AlignerSetID,
-                Amountpaid: paymentData.Amountpaid,
-                Dateofpayment: paymentData.Dateofpayment,
+                aligner_set_id: currentSetForPayment.aligner_set_id,
+                amount_paid: paymentData.amount_paid,
+                date_of_payment: paymentData.date_of_payment,
                 PaymentMethod: 'Cash', // Default method
                 ActualAmount: paymentData.ActualAmount,
                 ActualCur: paymentData.ActualCur,
@@ -456,10 +456,10 @@ const PatientSets: React.FC = () => {
         setConfirmDialog({
             isOpen: true,
             title: 'Delete Aligner Set?',
-            message: `Are you sure you want to delete Set #${set.SetSequence}? This will also delete all associated batches and notes. This action cannot be undone.`,
+            message: `Are you sure you want to delete Set #${set.set_sequence}? This will also delete all associated batches and notes. This action cannot be undone.`,
             onConfirm: async () => {
                 try {
-                    const response = await fetch(`/api/aligner/sets/${set.AlignerSetID}`, {
+                    const response = await fetch(`/api/aligner/sets/${set.aligner_set_id}`, {
                         method: 'DELETE'
                     });
                     const data = await response.json();
@@ -486,10 +486,10 @@ const PatientSets: React.FC = () => {
         setConfirmDialog({
             isOpen: true,
             title: 'Mark as Delivered?',
-            message: `Mark Batch #${batch.BatchSequence} as delivered? This will set the delivery date to today.`,
+            message: `Mark Batch #${batch.batch_sequence} as delivered? This will set the delivery date to today.`,
             onConfirm: async () => {
                 try {
-                    const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/deliver`, {
+                    const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}/deliver`, {
                         method: 'PATCH'
                     });
                     const data: MarkDeliveredResponse = await response.json();
@@ -509,7 +509,7 @@ const PatientSets: React.FC = () => {
                         toast.success('Batch marked as delivered');
                     }
 
-                    await loadBatches(batch.AlignerSetID);
+                    await loadBatches(batch.aligner_set_id);
                     if (patient) {
                         await loadAlignerSets(patient.workid);
                     }
@@ -527,10 +527,10 @@ const PatientSets: React.FC = () => {
         setConfirmDialog({
             isOpen: true,
             title: 'Mark as Manufactured?',
-            message: `Mark Batch #${batch.BatchSequence} as manufactured? This will set the manufacture date to today.`,
+            message: `Mark Batch #${batch.batch_sequence} as manufactured? This will set the manufacture date to today.`,
             onConfirm: async () => {
                 try {
-                    const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/manufacture`, {
+                    const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}/manufacture`, {
                         method: 'PATCH'
                     });
                     const data: BatchStatusResponse = await response.json();
@@ -546,7 +546,7 @@ const PatientSets: React.FC = () => {
                         toast.success('Batch marked as manufactured');
                     }
 
-                    await loadBatches(batch.AlignerSetID);
+                    await loadBatches(batch.aligner_set_id);
                     if (patient) {
                         await loadAlignerSets(patient.workid);
                     }
@@ -561,7 +561,7 @@ const PatientSets: React.FC = () => {
 
     const handleUndoManufactured = async (batch: AlignerBatch, e: MouseEvent<HTMLButtonElement>): Promise<void> => {
         e.stopPropagation();
-        const hasDelivery = batch.DeliveredToPatientDate !== null;
+        const hasDelivery = batch.delivered_to_patient_date !== null;
 
         // Prevent undo manufacture if batch is delivered - show error instead of confirmation
         if (hasDelivery) {
@@ -572,10 +572,10 @@ const PatientSets: React.FC = () => {
         setConfirmDialog({
             isOpen: true,
             title: 'Undo Manufacture?',
-            message: `Undo manufacture for Batch #${batch.BatchSequence}?`,
+            message: `Undo manufacture for Batch #${batch.batch_sequence}?`,
             onConfirm: async () => {
                 try {
-                    const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/undo-manufacture`, {
+                    const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}/undo-manufacture`, {
                         method: 'PATCH'
                     });
                     const data: BatchStatusResponse = await response.json();
@@ -585,7 +585,7 @@ const PatientSets: React.FC = () => {
                     }
 
                     toast.success('Manufacture undone');
-                    await loadBatches(batch.AlignerSetID);
+                    await loadBatches(batch.aligner_set_id);
                     if (patient) {
                         await loadAlignerSets(patient.workid);
                     }
@@ -609,10 +609,10 @@ const PatientSets: React.FC = () => {
         setConfirmDialog({
             isOpen: true,
             title: 'Undo Delivery?',
-            message: `Undo delivery for Batch #${batch.BatchSequence}? This will also clear the batch expiry date.`,
+            message: `Undo delivery for Batch #${batch.batch_sequence}? This will also clear the batch expiry date.`,
             onConfirm: async () => {
                 try {
-                    const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}/undo-deliver`, {
+                    const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}/undo-deliver`, {
                         method: 'PATCH'
                     });
                     const data: BatchStatusResponse = await response.json();
@@ -622,7 +622,7 @@ const PatientSets: React.FC = () => {
                     }
 
                     toast.success('Delivery undone');
-                    await loadBatches(batch.AlignerSetID);
+                    await loadBatches(batch.aligner_set_id);
                     if (patient) {
                         await loadAlignerSets(patient.workid);
                     }
@@ -640,10 +640,10 @@ const PatientSets: React.FC = () => {
         setConfirmDialog({
             isOpen: true,
             title: 'Delete Batch?',
-            message: `Are you sure you want to delete Batch #${batch.BatchSequence}? This action cannot be undone.`,
+            message: `Are you sure you want to delete Batch #${batch.batch_sequence}? This action cannot be undone.`,
             onConfirm: async () => {
                 try {
-                    const response = await fetch(`/api/aligner/batches/${batch.AlignerBatchID}`, {
+                    const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}`, {
                         method: 'DELETE'
                     });
                     const data = await response.json();
@@ -653,7 +653,7 @@ const PatientSets: React.FC = () => {
                     }
 
                     toast.success('Batch deleted successfully');
-                    await loadBatches(batch.AlignerSetID);
+                    await loadBatches(batch.aligner_set_id);
                     if (patient) {
                         await loadAlignerSets(patient.workid);
                     }
@@ -670,7 +670,7 @@ const PatientSets: React.FC = () => {
     const handlePrintLabels = (batch: AlignerBatch, set: AlignerSet, e: MouseEvent<HTMLButtonElement>): void => {
         e.stopPropagation();
 
-        if (!patient || !batch.AlignerBatchID) {
+        if (!patient || !batch.aligner_batch_id) {
             toast.error('Missing required information for printing labels');
             return;
         }
@@ -682,39 +682,39 @@ const PatientSets: React.FC = () => {
     const handleToggleQueue = (batch: AlignerBatch, set: AlignerSet, e: MouseEvent<HTMLButtonElement>): void => {
         e.stopPropagation();
 
-        if (!patient || !batch.AlignerBatchID) {
+        if (!patient || !batch.aligner_batch_id) {
             toast.error('Missing required information');
             return;
         }
 
-        const batchId = batch.AlignerBatchID;
+        const batchId = batch.aligner_batch_id;
 
         if (isInQueue(batchId)) {
             removeByBatchId(batchId);
             toast.info('Removed from print queue');
         } else {
             // Find the doctor info
-            const doctor = doctors.find(d => d.id === set.AlignerDrID || d.DrID === set.AlignerDrID) || {
-                id: set.AlignerDrID || 0,
+            const doctor = doctors.find(d => d.id === set.aligner_dr_id || d.dr_id === set.aligner_dr_id) || {
+                id: set.aligner_dr_id || 0,
                 name: set.AlignerDoctorName || '',
                 logoPath: null
             };
 
             addToQueue(
                 {
-                    batchId: batch.AlignerBatchID,
-                    batchNumber: batch.BatchSequence,
-                    upperStart: batch.UpperAlignerStartSequence || 0,
-                    upperEnd: batch.UpperAlignerEndSequence || 0,
-                    lowerStart: batch.LowerAlignerStartSequence || 0,
-                    lowerEnd: batch.LowerAlignerEndSequence || 0
+                    batchId: batch.aligner_batch_id,
+                    batchNumber: batch.batch_sequence,
+                    upperStart: batch.upper_aligner_start_sequence || 0,
+                    upperEnd: batch.upper_aligner_end_sequence || 0,
+                    lowerStart: batch.lower_aligner_start_sequence || 0,
+                    lowerEnd: batch.lower_aligner_end_sequence || 0
                 },
                 {
-                    code: String(patient.PersonID),
+                    code: String(patient.person_id),
                     name: formatPatientName(patient)
                 },
                 doctor,
-                { setId: set.AlignerSetID }
+                { setId: set.aligner_set_id }
             );
             toast.success('Added to print queue');
         }
@@ -723,8 +723,8 @@ const PatientSets: React.FC = () => {
     // Quick URL handlers
     const handleStartEditUrl = (set: AlignerSet, e: MouseEvent<HTMLButtonElement>): void => {
         e.stopPropagation();
-        setEditingUrlForSet(set.AlignerSetID);
-        setQuickUrlValue(set.SetUrl || '');
+        setEditingUrlForSet(set.aligner_set_id);
+        setQuickUrlValue(set.set_url || '');
     };
 
     const handleCancelEditUrl = (): void => {
@@ -737,7 +737,7 @@ const PatientSets: React.FC = () => {
             setSavingUrl(true);
 
             // Get current set data
-            const currentSet = alignerSets.find(s => s.AlignerSetID === setId);
+            const currentSet = alignerSets.find(s => s.aligner_set_id === setId);
             if (!currentSet) {
                 throw new Error('Set not found');
             }
@@ -907,9 +907,9 @@ const PatientSets: React.FC = () => {
             // Navigate to the specific set folder
             const setFolderHandle = await navigateToSetFolder(
                 baseHandle,
-                set.AlignerDrID || 0,
-                patient?.PersonID || 0,
-                set.SetSequence
+                set.aligner_dr_id || 0,
+                patient?.person_id || 0,
+                set.set_sequence
             );
 
             // Open file picker starting in the set folder
@@ -948,7 +948,7 @@ const PatientSets: React.FC = () => {
                 return;
             }
 
-            await handlePdfUpload(set.AlignerSetID, file);
+            await handlePdfUpload(set.aligner_set_id, file);
 
         } catch (error) {
             if ((error as Error).name !== 'AbortError') {
@@ -967,7 +967,7 @@ const PatientSets: React.FC = () => {
 
         // Trigger hidden file input
         if (fileInputRef.current) {
-            fileInputRef.current.dataset.setId = String(set.AlignerSetID);
+            fileInputRef.current.dataset.setId = String(set.aligner_set_id);
             fileInputRef.current.click();
         }
     };
@@ -1040,7 +1040,7 @@ const PatientSets: React.FC = () => {
             setSavingPdfUrl(true);
 
             // Get current set data
-            const currentSet = alignerSets.find(s => s.AlignerSetID === setId);
+            const currentSet = alignerSets.find(s => s.aligner_set_id === setId);
             if (!currentSet) {
                 throw new Error('Set not found');
             }
@@ -1088,8 +1088,8 @@ const PatientSets: React.FC = () => {
 
     const handleStartEditVideo = (set: AlignerSet, e: MouseEvent<HTMLButtonElement>): void => {
         e.stopPropagation();
-        setEditingVideoForSet(set.AlignerSetID);
-        setQuickVideoValue(set.SetVideo || '');
+        setEditingVideoForSet(set.aligner_set_id);
+        setQuickVideoValue(set.set_video || '');
     };
 
     const handleCancelEditVideo = (): void => {
@@ -1107,7 +1107,7 @@ const PatientSets: React.FC = () => {
                 return;
             }
 
-            const currentSet = alignerSets.find(s => s.AlignerSetID === setId);
+            const currentSet = alignerSets.find(s => s.aligner_set_id === setId);
             if (!currentSet) {
                 throw new Error('Set not found');
             }
@@ -1153,7 +1153,7 @@ const PatientSets: React.FC = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    AlignerSetID: setId,
+                    aligner_set_id: setId,
                     NoteType: 'Lab',
                     NoteText: labNoteText.trim()
                 })
@@ -1176,8 +1176,8 @@ const PatientSets: React.FC = () => {
     };
 
     const handleStartEditNote = (note: AlignerNote): void => {
-        setEditingNoteId(note.NoteID);
-        setEditNoteText(note.NoteText);
+        setEditingNoteId(note.note_id);
+        setEditNoteText(note.note_text);
     };
 
     const handleCancelEditNote = (): void => {
@@ -1321,14 +1321,14 @@ const PatientSets: React.FC = () => {
                     <div className={styles.patientDetails}>
                         <h2>
                             {formatPatientName(patient)}
-                            {patient.PatientName && patient.FirstName && (
+                            {patient.patient_name && patient.first_name && (
                                 <span className={styles.patientSubtitle}>
-                                    ({patient.FirstName} {patient.LastName})
+                                    ({patient.first_name} {patient.last_name})
                                 </span>
                             )}
                         </h2>
                         <div className={styles.patientMeta}>
-                            <span><i className="fas fa-id-card"></i> {patient.PersonID}</span>
+                            <span><i className="fas fa-id-card"></i> {patient.person_id}</span>
                             <span><i className="fas fa-phone"></i> {patient.Phone || 'N/A'}</span>
                             <span><i className="fas fa-tooth"></i> {patient.WorkType}</span>
                         </div>
@@ -1354,14 +1354,14 @@ const PatientSets: React.FC = () => {
 
                         <button
                             className="btn btn-success"
-                            onClick={() => navigate(`/patient/${patient.PersonID}/edit-patient`)}
+                            onClick={() => navigate(`/patient/${patient.person_id}/edit-patient`)}
                         >
                             <i className="fas fa-edit"></i>
                             Edit Patient
                         </button>
                         <button
                             className="btn btn-info"
-                            onClick={() => navigate(`/patient/${patient.PersonID}/new-work?workId=${patient.workid}`)}
+                            onClick={() => navigate(`/patient/${patient.person_id}/new-work?workId=${patient.workid}`)}
                         >
                             <i className="fas fa-tooth"></i>
                             Edit Work
@@ -1397,11 +1397,11 @@ const PatientSets: React.FC = () => {
                     <div className="aligner-sets">
                         {alignerSets.map((set) => {
                             const progress = calculateProgress(set);
-                            const delivered = set.UpperAlignersCount + set.LowerAlignersCount - set.RemainingUpperAligners - set.RemainingLowerAligners;
-                            const total = set.UpperAlignersCount + set.LowerAlignersCount;
+                            const delivered = set.upper_aligners_count + set.lower_aligners_count - set.remaining_upper_aligners - set.remaining_lower_aligners;
+                            const total = set.upper_aligners_count + set.lower_aligners_count;
 
                             return (
-                                <div key={set.AlignerSetID} className={`aligner-set-card ${set.IsActive ? 'active' : 'inactive'} ${(set.UnreadActivityCount || 0) > 0 ? 'has-activity' : ''}`}>
+                                <div key={set.aligner_set_id} className={`aligner-set-card ${set.is_active ? 'active' : 'inactive'} ${(set.UnreadActivityCount || 0) > 0 ? 'has-activity' : ''}`}>
                                     {/* Activity Banner */}
                                     {(set.UnreadActivityCount || 0) > 0 && (
                                         <div className="activity-banner">
@@ -1410,14 +1410,14 @@ const PatientSets: React.FC = () => {
                                         </div>
                                     )}
 
-                                    <div className="set-header" onClick={() => toggleBatches(set.AlignerSetID)}>
+                                    <div className="set-header" onClick={() => toggleBatches(set.aligner_set_id)}>
                                         <div className="set-title">
                                             <h4>
-                                                Set #{set.SetSequence}
-                                                <span className={`set-badge ${set.IsActive ? 'active' : 'inactive'}`}>
-                                                    {set.IsActive ? 'Active' : 'Inactive'}
+                                                Set #{set.set_sequence}
+                                                <span className={`set-badge ${set.is_active ? 'active' : 'inactive'}`}>
+                                                    {set.is_active ? 'Active' : 'Inactive'}
                                                 </span>
-                                                {set.Type && <span className="set-type">{set.Type}</span>}
+                                                {set.type && <span className="set-type">{set.type}</span>}
                                             </h4>
                                         </div>
                                         <div className="set-header-actions">
@@ -1443,25 +1443,25 @@ const PatientSets: React.FC = () => {
                                                 <i className="fas fa-folder-open"></i>
                                                 <span>Open Folder</span>
                                             </button>
-                                            {set.SetPdfUrl && (
+                                            {set.set_pdf_url && (
                                                 <button
                                                     className="pdf-btn"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        window.open(set.SetPdfUrl, '_blank');
+                                                        window.open(set.set_pdf_url, '_blank');
                                                     }}
-                                                    title={set.SetPdfUrl}
+                                                    title={set.set_pdf_url}
                                                 >
                                                     <i className="fas fa-file-pdf"></i>
                                                     <span>View PDF</span>
                                                 </button>
                                             )}
-                                            {set.SetVideo && (
+                                            {set.set_video && (
                                                 <button
                                                     className="video-btn bg-error"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        window.open(set.SetVideo, '_blank');
+                                                        window.open(set.set_video, '_blank');
                                                     }}
                                                     title="Watch case explanation video"
                                                 >
@@ -1469,12 +1469,12 @@ const PatientSets: React.FC = () => {
                                                     <span>Case Video</span>
                                                 </button>
                                             )}
-                                            {set.ArchformID && (
+                                            {set.archform_id && (
                                                 <button
                                                     className="archform-btn"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        window.location.href = `archformlocal:${set.ArchformID}`;
+                                                        window.location.href = `archformlocal:${set.archform_id}`;
                                                     }}
                                                     title="Open in Archform"
                                                 >
@@ -1482,7 +1482,7 @@ const PatientSets: React.FC = () => {
                                                     <span>Archform</span>
                                                 </button>
                                             )}
-                                            {set.SetCost && (set.Balance || 0) > 0 && (
+                                            {set.set_cost && (set.Balance || 0) > 0 && (
                                                 <button
                                                     className="btn btn-primary btn-sm"
                                                     onClick={(e) => {
@@ -1506,7 +1506,7 @@ const PatientSets: React.FC = () => {
                                                 <i className="fas fa-trash"></i>
                                                 <span>Delete</span>
                                             </button>
-                                            <button className={`toggle-batches-btn ${expandedSets[set.AlignerSetID] ? 'expanded' : ''}`}>
+                                            <button className={`toggle-batches-btn ${expandedSets[set.aligner_set_id] ? 'expanded' : ''}`}>
                                                 <span>View Batches ({set.TotalBatches})</span>
                                                 <i className="fas fa-chevron-down"></i>
                                             </button>
@@ -1516,27 +1516,27 @@ const PatientSets: React.FC = () => {
                                     <div className="set-info">
                                         <div className="set-info-item">
                                             <i className="fas fa-teeth"></i>
-                                            <span>Upper: <strong>{set.UpperAlignersCount}</strong></span>
+                                            <span>Upper: <strong>{set.upper_aligners_count}</strong></span>
                                         </div>
                                         <div className="set-info-item">
                                             <i className="fas fa-teeth"></i>
-                                            <span>Lower: <strong>{set.LowerAlignersCount}</strong></span>
+                                            <span>Lower: <strong>{set.lower_aligners_count}</strong></span>
                                         </div>
                                         <div className="set-info-item">
                                             <i className="fas fa-box-open"></i>
-                                            <span>Remaining Upper: <strong>{set.RemainingUpperAligners}</strong></span>
+                                            <span>Remaining Upper: <strong>{set.remaining_upper_aligners}</strong></span>
                                         </div>
                                         <div className="set-info-item">
                                             <i className="fas fa-box-open"></i>
-                                            <span>Remaining Lower: <strong>{set.RemainingLowerAligners}</strong></span>
+                                            <span>Remaining Lower: <strong>{set.remaining_lower_aligners}</strong></span>
                                         </div>
                                         <div className="set-info-item">
                                             <i className="fas fa-calendar"></i>
-                                            <span>Created: <strong>{formatDate(set.CreationDate)}</strong></span>
+                                            <span>Created: <strong>{formatDate(set.creation_date)}</strong></span>
                                         </div>
                                         <div className="set-info-item">
                                             <i className="fas fa-clock"></i>
-                                            <span>Days: <strong>{set.Days || 'N/A'}</strong></span>
+                                            <span>Days: <strong>{set.days || 'N/A'}</strong></span>
                                         </div>
                                         <div className="set-info-item">
                                             <i className="fas fa-user-md"></i>
@@ -1548,17 +1548,17 @@ const PatientSets: React.FC = () => {
                                         </div>
                                         <div className="set-info-item">
                                             <i className="fas fa-dollar-sign"></i>
-                                            <span>Cost: <strong>{set.SetCost ? `${set.SetCost} ${set.Currency || 'USD'}` : 'Not set'}</strong></span>
+                                            <span>Cost: <strong>{set.set_cost ? `${set.set_cost} ${set.currency || 'USD'}` : 'Not set'}</strong></span>
                                         </div>
-                                        {set.SetCost && (
+                                        {set.set_cost && (
                                             <>
                                                 <div className="set-info-item">
                                                     <i className="fas fa-money-bill-wave"></i>
-                                                    <span>Paid: <strong>{set.TotalPaid || 0} {set.Currency || 'USD'}</strong></span>
+                                                    <span>Paid: <strong>{set.TotalPaid || 0} {set.currency || 'USD'}</strong></span>
                                                 </div>
                                                 <div className="set-info-item">
                                                     <i className="fas fa-balance-scale"></i>
-                                                    <span>Balance: <strong>{set.Balance || set.SetCost} {set.Currency || 'USD'}</strong></span>
+                                                    <span>Balance: <strong>{set.Balance || set.set_cost} {set.currency || 'USD'}</strong></span>
                                                 </div>
                                                 <div className="set-info-item">
                                                     <span className={`payment-status-badge ${set.PaymentStatus?.toLowerCase().replace(/\s+/g, '-') || 'unpaid'}`}>
@@ -1570,7 +1570,7 @@ const PatientSets: React.FC = () => {
                                         <div className="set-info-item grid-col-full-flex">
                                             <i className="fas fa-external-link-alt"></i>
                                             <span className="flex-1">
-                                                Set URL: {editingUrlForSet === set.AlignerSetID ? (
+                                                Set URL: {editingUrlForSet === set.aligner_set_id ? (
                                                     <div className="inline-buttons-container">
                                                         <input
                                                             type="url"
@@ -1582,21 +1582,21 @@ const PatientSets: React.FC = () => {
                                                             onClick={(e: MouseEvent) => e.stopPropagation()}
                                                         />
                                                     </div>
-                                                ) : set.SetUrl ? (
-                                                    <a href={set.SetUrl} target="_blank" rel="noopener noreferrer" className="url-link">
-                                                        {set.SetUrl}
+                                                ) : set.set_url ? (
+                                                    <a href={set.set_url} target="_blank" rel="noopener noreferrer" className="url-link">
+                                                        {set.set_url}
                                                     </a>
                                                 ) : (
                                                     <em className="url-not-set">Not set</em>
                                                 )}
                                             </span>
-                                            {editingUrlForSet === set.AlignerSetID ? (
+                                            {editingUrlForSet === set.aligner_set_id ? (
                                                 <div className="flex-gap-sm">
                                                     <button
                                                         className="action-icon-btn edit btn-small"
                                                         onClick={(e: MouseEvent<HTMLButtonElement>) => {
                                                             e.stopPropagation();
-                                                            handleSaveUrl(set.AlignerSetID);
+                                                            handleSaveUrl(set.aligner_set_id);
                                                         }}
                                                         disabled={savingUrl}
                                                         title="Save URL"
@@ -1618,16 +1618,16 @@ const PatientSets: React.FC = () => {
                                                 <button
                                                     className="action-icon-btn edit btn-medium"
                                                     onClick={(e: MouseEvent<HTMLButtonElement>) => handleStartEditUrl(set, e)}
-                                                    title={set.SetUrl ? "Edit URL" : "Add URL"}
+                                                    title={set.set_url ? "Edit URL" : "Add URL"}
                                                 >
-                                                    <i className={set.SetUrl ? "fas fa-edit" : "fas fa-plus"}></i>
+                                                    <i className={set.set_url ? "fas fa-edit" : "fas fa-plus"}></i>
                                                 </button>
                                             )}
                                         </div>
                                         <div className="set-info-item grid-col-full-flex">
                                             <i className="fas fa-file-pdf"></i>
                                             <span className="flex-1">
-                                                PDF URL: {editingPdfUrlForSet === set.AlignerSetID ? (
+                                                PDF URL: {editingPdfUrlForSet === set.aligner_set_id ? (
                                                     <div className="inline-buttons-container">
                                                         <input
                                                             type="url"
@@ -1639,21 +1639,21 @@ const PatientSets: React.FC = () => {
                                                             onClick={(e: MouseEvent) => e.stopPropagation()}
                                                         />
                                                     </div>
-                                                ) : set.SetPdfUrl ? (
-                                                    <a href={set.SetPdfUrl} target="_blank" rel="noopener noreferrer" className="url-link">
-                                                        {set.SetPdfUrl}
+                                                ) : set.set_pdf_url ? (
+                                                    <a href={set.set_pdf_url} target="_blank" rel="noopener noreferrer" className="url-link">
+                                                        {set.set_pdf_url}
                                                     </a>
                                                 ) : (
                                                     <em className="url-not-set">Not set</em>
                                                 )}
                                             </span>
-                                            {editingPdfUrlForSet === set.AlignerSetID ? (
+                                            {editingPdfUrlForSet === set.aligner_set_id ? (
                                                 <div className="flex-gap-sm">
                                                     <button
                                                         className="action-icon-btn edit btn-small"
                                                         onClick={(e: MouseEvent<HTMLButtonElement>) => {
                                                             e.stopPropagation();
-                                                            handleSavePdfUrl(set.AlignerSetID);
+                                                            handleSavePdfUrl(set.aligner_set_id);
                                                         }}
                                                         disabled={savingPdfUrl}
                                                         title="Save PDF URL"
@@ -1675,13 +1675,13 @@ const PatientSets: React.FC = () => {
                                                 <button
                                                     className="action-icon-btn edit btn-medium"
                                                     onClick={(e: MouseEvent<HTMLButtonElement>) => handleStartEditPdfUrl(set, e)}
-                                                    title={set.SetPdfUrl ? "Edit PDF URL" : "Add PDF URL"}
+                                                    title={set.set_pdf_url ? "Edit PDF URL" : "Add PDF URL"}
                                                     disabled={uploadingPdf}
                                                 >
                                                     {uploadingPdf ? (
                                                         <i className="fas fa-spinner fa-spin"></i>
                                                     ) : (
-                                                        <i className={set.SetPdfUrl ? "fas fa-edit" : "fas fa-plus"}></i>
+                                                        <i className={set.set_pdf_url ? "fas fa-edit" : "fas fa-plus"}></i>
                                                     )}
                                                 </button>
                                             )}
@@ -1689,7 +1689,7 @@ const PatientSets: React.FC = () => {
                                         <div className="set-info-item grid-col-full-flex">
                                             <i className="fas fa-video"></i>
                                             <span className="flex-1">
-                                                Case Video: {editingVideoForSet === set.AlignerSetID ? (
+                                                Case Video: {editingVideoForSet === set.aligner_set_id ? (
                                                     <div className="inline-buttons-container">
                                                         <input
                                                             type="url"
@@ -1701,8 +1701,8 @@ const PatientSets: React.FC = () => {
                                                             onClick={(e: MouseEvent) => e.stopPropagation()}
                                                         />
                                                     </div>
-                                                ) : set.SetVideo ? (
-                                                    <a href={set.SetVideo} target="_blank" rel="noopener noreferrer" className="video-link-youtube">
+                                                ) : set.set_video ? (
+                                                    <a href={set.set_video} target="_blank" rel="noopener noreferrer" className="video-link-youtube">
                                                         <i className="fab fa-youtube icon-gap-xs"></i>
                                                         Watch Case Video
                                                     </a>
@@ -1710,13 +1710,13 @@ const PatientSets: React.FC = () => {
                                                     <em className="url-not-set">Not set</em>
                                                 )}
                                             </span>
-                                            {editingVideoForSet === set.AlignerSetID ? (
+                                            {editingVideoForSet === set.aligner_set_id ? (
                                                 <div className="flex-gap-sm">
                                                     <button
                                                         className="action-icon-btn edit btn-small"
                                                         onClick={(e: MouseEvent<HTMLButtonElement>) => {
                                                             e.stopPropagation();
-                                                            handleSaveVideo(set.AlignerSetID);
+                                                            handleSaveVideo(set.aligner_set_id);
                                                         }}
                                                         disabled={savingVideo}
                                                         title="Save Video URL"
@@ -1738,18 +1738,18 @@ const PatientSets: React.FC = () => {
                                                 <button
                                                     className="action-icon-btn edit btn-medium"
                                                     onClick={(e: MouseEvent<HTMLButtonElement>) => handleStartEditVideo(set, e)}
-                                                    title={set.SetVideo ? "Edit Video URL" : "Add Video URL"}
+                                                    title={set.set_video ? "Edit Video URL" : "Add Video URL"}
                                                 >
-                                                    <i className={set.SetVideo ? "fas fa-edit" : "fas fa-plus"}></i>
+                                                    <i className={set.set_video ? "fas fa-edit" : "fas fa-plus"}></i>
                                                 </button>
                                             )}
                                         </div>
                                     </div>
 
-                                    {set.Notes && (
+                                    {set.notes && (
                                         <div className="set-info-item">
                                             <i className="fas fa-sticky-note"></i>
-                                            <span>Notes: {set.Notes}</span>
+                                            <span>Notes: {set.notes}</span>
                                         </div>
                                     )}
 
@@ -1764,30 +1764,30 @@ const PatientSets: React.FC = () => {
                                     </div>
 
                                     {/* Batches Container */}
-                                    {expandedSets[set.AlignerSetID] && (
+                                    {expandedSets[set.aligner_set_id] && (
                                         <div className="batches-container expanded">
                                             <div className="batches-header">
                                                 <h5>Batches</h5>
                                                 <button
                                                     className="btn btn-success btn-sm"
                                                     onClick={() => openAddBatchDrawer(set)}
-                                                    disabled={!set.IsActive}
-                                                    title={!set.IsActive ? 'Cannot add batches to inactive sets' : 'Add new batch'}
+                                                    disabled={!set.is_active}
+                                                    title={!set.is_active ? 'Cannot add batches to inactive sets' : 'Add new batch'}
                                                 >
                                                     <i className="fas fa-plus"></i> Add Batch
                                                 </button>
                                             </div>
-                                            {!batchesData[set.AlignerSetID] ? (
+                                            {!batchesData[set.aligner_set_id] ? (
                                                 <div className="loading">
                                                     <div className="spinner"></div>
                                                     <p>Loading batches...</p>
                                                 </div>
-                                            ) : batchesData[set.AlignerSetID].length === 0 ? (
+                                            ) : batchesData[set.aligner_set_id].length === 0 ? (
                                                 <p className="empty-state">No batches found for this set</p>
                                             ) : (
-                                                batchesData[set.AlignerSetID].map((batch) => {
-                                                    const isManufactured = batch.ManufactureDate !== null;
-                                                    const isDelivered = batch.DeliveredToPatientDate !== null;
+                                                batchesData[set.aligner_set_id].map((batch) => {
+                                                    const isManufactured = batch.manufacture_date !== null;
+                                                    const isDelivered = batch.delivered_to_patient_date !== null;
                                                     // Three states: pending-manufacture, pending-delivery, delivered
                                                     const batchState = !isManufactured ? 'pending-manufacture'
                                                         : !isDelivered ? 'pending-delivery'
@@ -1796,9 +1796,9 @@ const PatientSets: React.FC = () => {
                                                         : !isDelivered ? 'Pending Delivery'
                                                         : 'Delivered';
                                                     return (
-                                                        <div key={batch.AlignerBatchID} className={`batch-item ${batchState}`}>
+                                                        <div key={batch.aligner_batch_id} className={`batch-item ${batchState}`}>
                                                             <div className="batch-header">
-                                                                <div className="batch-title">Batch #{batch.BatchSequence}</div>
+                                                                <div className="batch-title">Batch #{batch.batch_sequence}</div>
                                                                 <div className="batch-actions">
                                                                     <span className={`batch-status ${batchState}`}>
                                                                         {batchStateLabel}
@@ -1825,11 +1825,11 @@ const PatientSets: React.FC = () => {
                                                                     )}
                                                                     {/* Undo buttons moved to Edit Batch modal */}
                                                                     <button
-                                                                        className={`action-icon-btn queue-labels ${isInQueue(batch.AlignerBatchID) ? 'in-queue' : ''}`}
+                                                                        className={`action-icon-btn queue-labels ${isInQueue(batch.aligner_batch_id) ? 'in-queue' : ''}`}
                                                                         onClick={(e: MouseEvent<HTMLButtonElement>) => handleToggleQueue(batch, set, e)}
-                                                                        title={isInQueue(batch.AlignerBatchID) ? 'Remove from print queue' : 'Add to print queue'}
+                                                                        title={isInQueue(batch.aligner_batch_id) ? 'Remove from print queue' : 'Add to print queue'}
                                                                     >
-                                                                        <i className={isInQueue(batch.AlignerBatchID) ? 'fas fa-check' : 'fas fa-cart-plus'}></i>
+                                                                        <i className={isInQueue(batch.aligner_batch_id) ? 'fas fa-check' : 'fas fa-cart-plus'}></i>
                                                                     </button>
                                                                     <button
                                                                         className="action-icon-btn print-labels bg-purple"
@@ -1857,46 +1857,46 @@ const PatientSets: React.FC = () => {
                                                             <div className="batch-details">
                                                                 <div className="batch-detail">
                                                                     <i className="fas fa-teeth"></i>
-                                                                    <span>Upper: {batch.UpperAlignerStartSequence}-{batch.UpperAlignerEndSequence} ({batch.UpperAlignerCount})</span>
+                                                                    <span>Upper: {batch.upper_aligner_start_sequence}-{batch.upper_aligner_end_sequence} ({batch.upper_aligner_count})</span>
                                                                 </div>
                                                                 <div className="batch-detail">
                                                                     <i className="fas fa-teeth"></i>
-                                                                    <span>Lower: {batch.LowerAlignerStartSequence}-{batch.LowerAlignerEndSequence} ({batch.LowerAlignerCount})</span>
+                                                                    <span>Lower: {batch.lower_aligner_start_sequence}-{batch.lower_aligner_end_sequence} ({batch.lower_aligner_count})</span>
                                                                 </div>
-                                                                {batch.CreationDate && (
+                                                                {batch.creation_date && (
                                                                     <div className="batch-detail">
                                                                         <i className="fas fa-plus-circle"></i>
-                                                                        <span>Created: {formatDate(batch.CreationDate)}</span>
+                                                                        <span>Created: {formatDate(batch.creation_date)}</span>
                                                                     </div>
                                                                 )}
                                                                 <div className="batch-detail">
                                                                     <i className="fas fa-industry"></i>
-                                                                    <span>Manufactured: {batch.ManufactureDate ? formatDate(batch.ManufactureDate) : 'Not yet'}</span>
+                                                                    <span>Manufactured: {batch.manufacture_date ? formatDate(batch.manufacture_date) : 'Not yet'}</span>
                                                                 </div>
                                                                 {isDelivered && (
                                                                     <div className="batch-detail">
                                                                         <i className="fas fa-truck"></i>
-                                                                        <span>Delivered: {formatDate(batch.DeliveredToPatientDate)}</span>
+                                                                        <span>Delivered: {formatDate(batch.delivered_to_patient_date)}</span>
                                                                     </div>
                                                                 )}
                                                                 <div className="batch-detail">
                                                                     <i className="fas fa-clock"></i>
-                                                                    <span>Days: {batch.Days || 'N/A'}</span>
+                                                                    <span>Days: {batch.days || 'N/A'}</span>
                                                                 </div>
                                                                 <div className="batch-detail">
                                                                     <i className="fas fa-hourglass-half"></i>
-                                                                    <span>Validity: {batch.ValidityPeriod || 'N/A'} days</span>
+                                                                    <span>Validity: {batch.validity_period || 'N/A'} days</span>
                                                                 </div>
-                                                                {batch.BatchExpiryDate && (
+                                                                {batch.batch_expiry_date && (
                                                                     <div className="batch-detail">
                                                                         <i className="fas fa-calendar-check"></i>
-                                                                        <span>Batch Expiry: {formatDate(batch.BatchExpiryDate)}</span>
+                                                                        <span>Batch Expiry: {formatDate(batch.batch_expiry_date)}</span>
                                                                     </div>
                                                                 )}
-                                                                {batch.Notes && (
+                                                                {batch.notes && (
                                                                     <div className="batch-detail batch-detail-full">
                                                                         <i className="fas fa-sticky-note"></i>
-                                                                        <span>Notes: {batch.Notes}</span>
+                                                                        <span>Notes: {batch.notes}</span>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -1910,17 +1910,17 @@ const PatientSets: React.FC = () => {
                                     {/* Communication Section */}
                                     <div className="communication-section">
                                         <button
-                                            className={`communication-toggle-btn ${expandedCommunication[set.AlignerSetID] ? 'expanded' : ''}`}
-                                            onClick={() => toggleCommunication(set.AlignerSetID)}
+                                            className={`communication-toggle-btn ${expandedCommunication[set.aligner_set_id] ? 'expanded' : ''}`}
+                                            onClick={() => toggleCommunication(set.aligner_set_id)}
                                         >
                                             <i className="fas fa-comments"></i>
                                             <span>Communication with Doctor</span>
                                             <i className="fas fa-chevron-down"></i>
                                         </button>
 
-                                        {expandedCommunication[set.AlignerSetID] && (
+                                        {expandedCommunication[set.aligner_set_id] && (
                                             <div className="communication-content expanded">
-                                                {!notesData[set.AlignerSetID] ? (
+                                                {!notesData[set.aligner_set_id] ? (
                                                     <div className="loading">
                                                         <div className="spinner"></div>
                                                         <p>Loading communication...</p>
@@ -1929,10 +1929,10 @@ const PatientSets: React.FC = () => {
                                                     <>
                                                         {/* Add Note Form */}
                                                         <div className="add-note-section">
-                                                            {!showAddLabNote[set.AlignerSetID] ? (
+                                                            {!showAddLabNote[set.aligner_set_id] ? (
                                                                 <button
                                                                     className="btn btn-primary btn-sm"
-                                                                    onClick={() => setShowAddLabNote(prev => ({ ...prev, [set.AlignerSetID]: true }))}
+                                                                    onClick={() => setShowAddLabNote(prev => ({ ...prev, [set.aligner_set_id]: true }))}
                                                                 >
                                                                     <i className="fas fa-plus"></i> Send Note to Doctor
                                                                 </button>
@@ -1948,7 +1948,7 @@ const PatientSets: React.FC = () => {
                                                                         <button
                                                                             className="btn btn-secondary btn-sm"
                                                                             onClick={() => {
-                                                                                setShowAddLabNote(prev => ({ ...prev, [set.AlignerSetID]: false }));
+                                                                                setShowAddLabNote(prev => ({ ...prev, [set.aligner_set_id]: false }));
                                                                                 setLabNoteText('');
                                                                             }}
                                                                         >
@@ -1956,7 +1956,7 @@ const PatientSets: React.FC = () => {
                                                                         </button>
                                                                         <button
                                                                             className="btn btn-primary btn-sm"
-                                                                            onClick={() => handleAddLabNote(set.AlignerSetID)}
+                                                                            onClick={() => handleAddLabNote(set.aligner_set_id)}
                                                                         >
                                                                             <i className="fas fa-paper-plane"></i> Send Note
                                                                         </button>
@@ -1966,7 +1966,7 @@ const PatientSets: React.FC = () => {
                                                         </div>
 
                                                         {/* Notes Timeline */}
-                                                        {notesData[set.AlignerSetID].length === 0 ? (
+                                                        {notesData[set.aligner_set_id].length === 0 ? (
                                                             <div className="empty-communication">
                                                                 <i className="fas fa-inbox"></i>
                                                                 <p>No messages yet</p>
@@ -1974,9 +1974,9 @@ const PatientSets: React.FC = () => {
                                                             </div>
                                                         ) : (
                                                             <div className="notes-timeline">
-                                                                {notesData[set.AlignerSetID].map((note) => (
-                                                                    <div key={note.NoteID} className={`note-item ${note.NoteType === 'Lab' ? 'lab-note' : 'doctor-note'}`}>
-                                                                        {editingNoteId === note.NoteID ? (
+                                                                {notesData[set.aligner_set_id].map((note) => (
+                                                                    <div key={note.note_id} className={`note-item ${note.note_type === 'Lab' ? 'lab-note' : 'doctor-note'}`}>
+                                                                        {editingNoteId === note.note_id ? (
                                                                             /* Editing Mode */
                                                                             <div className="note-edit-form">
                                                                                 <textarea
@@ -1993,7 +1993,7 @@ const PatientSets: React.FC = () => {
                                                                                     </button>
                                                                                     <button
                                                                                         className="days-save-btn btn-small"
-                                                                                        onClick={() => saveEditNote(note.NoteID, set.AlignerSetID)}
+                                                                                        onClick={() => saveEditNote(note.note_id, set.aligner_set_id)}
                                                                                     >
                                                                                         Save
                                                                                     </button>
@@ -2008,25 +2008,25 @@ const PatientSets: React.FC = () => {
                                                                                         <label className="note-checkbox-label">
                                                                                             <input
                                                                                                 type="checkbox"
-                                                                                                checked={note.IsRead !== false}
-                                                                                                onChange={() => handleToggleNoteRead(note.NoteID, set.AlignerSetID)}
+                                                                                                checked={note.is_read !== false}
+                                                                                                onChange={() => handleToggleNoteRead(note.note_id, set.aligner_set_id)}
                                                                                                 className="note-checkbox"
-                                                                                                title={note.IsRead !== false ? 'Mark as unread' : 'Mark as read'}
+                                                                                                title={note.is_read !== false ? 'Mark as unread' : 'Mark as read'}
                                                                                             />
                                                                                         </label>
-                                                                                        <div className={`note-author ${note.NoteType === 'Lab' ? 'lab' : 'doctor'} ${note.IsRead === false ? 'font-bold' : 'font-normal'}`}>
-                                                                                            <i className={note.NoteType === 'Lab' ? 'fas fa-flask' : 'fas fa-user-md'}></i>
-                                                                                            {note.NoteType === 'Lab' ? 'Shwan Lab' : `Dr. ${note.DoctorName}`}
+                                                                                        <div className={`note-author ${note.note_type === 'Lab' ? 'lab' : 'doctor'} ${note.is_read === false ? 'font-bold' : 'font-normal'}`}>
+                                                                                            <i className={note.note_type === 'Lab' ? 'fas fa-flask' : 'fas fa-user-md'}></i>
+                                                                                            {note.note_type === 'Lab' ? 'Shwan Lab' : `Dr. ${note.doctor_name}`}
                                                                                         </div>
                                                                                         <div className="note-date">
-                                                                                            {formatDateTime(note.CreatedAt)}
-                                                                                            {note.IsEdited && ' (edited)'}
+                                                                                            {formatDateTime(note.created_at)}
+                                                                                            {note.is_edited && ' (edited)'}
                                                                                         </div>
                                                                                     </div>
                                                                                     {/* Show edit/delete buttons */}
                                                                                     <div className="flex-gap-sm">
                                                                                         {/* Only Lab notes can be edited */}
-                                                                                        {note.NoteType === 'Lab' && (
+                                                                                        {note.note_type === 'Lab' && (
                                                                                             <button
                                                                                                 className="action-icon-btn edit btn-compact"
                                                                                                 onClick={() => handleStartEditNote(note)}
@@ -2038,14 +2038,14 @@ const PatientSets: React.FC = () => {
                                                                                         {/* All notes can be deleted */}
                                                                                         <button
                                                                                             className="action-icon-btn delete btn-compact"
-                                                                                            onClick={() => handleDeleteNote(note.NoteID, set.AlignerSetID)}
+                                                                                            onClick={() => handleDeleteNote(note.note_id, set.aligner_set_id)}
                                                                                             title="Delete Note"
                                                                                         >
                                                                                             <i className="fas fa-trash"></i>
                                                                                         </button>
                                                                                     </div>
                                                                                 </div>
-                                                                                <p className={`note-text ${note.IsRead === false ? 'font-bold' : 'font-normal'}`}>{note.NoteText}</p>
+                                                                                <p className={`note-text ${note.is_read === false ? 'font-bold' : 'font-normal'}`}>{note.note_text}</p>
                                                                             </>
                                                                         )}
                                                                     </div>
@@ -2086,7 +2086,7 @@ const PatientSets: React.FC = () => {
                     onSave={handleBatchSaved}
                     batch={editingBatch}
                     set={currentSetForBatch}
-                    existingBatches={currentSetForBatch ? (batchesData[currentSetForBatch.AlignerSetID] || []) : []}
+                    existingBatches={currentSetForBatch ? (batchesData[currentSetForBatch.aligner_set_id] || []) : []}
                     onUndoManufacture={handleUndoManufactured}
                     onUndoDelivery={handleUndoDelivered}
                 />

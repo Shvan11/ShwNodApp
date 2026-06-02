@@ -75,7 +75,7 @@ const AppointmentTab = () => {
     );
   }
 
-  const { date, time } = formatAppointmentDate(appt.AppDate);
+  const { date, time } = formatAppointmentDate(appt.app_date);
 
   return (
     <div className={styles.tabPanel}>
@@ -88,9 +88,9 @@ const AppointmentTab = () => {
             <i className="fas fa-user-md" aria-hidden="true" /> Dr. {appt.DrName}
           </div>
         )}
-        {appt.AppDetail && (
+        {appt.app_detail && (
           <div className={styles.appointmentRow}>
-            <i className="fas fa-clipboard-list" aria-hidden="true" /> {appt.AppDetail}
+            <i className="fas fa-clipboard-list" aria-hidden="true" /> {appt.app_detail}
           </div>
         )}
       </div>

@@ -139,7 +139,7 @@ export async function getPatientCreationDate(req: Request): Promise<Date> {
   const { personId } = req.params;
 
   const { rows: result } = await sql<RecordDateResult>`
-    SELECT "DateAdded" AS "createdAt" FROM "tblpatients" WHERE "PersonID" = ${personId}
+    SELECT "date_added" AS "createdAt" FROM "patients" WHERE "person_id" = ${personId}
   `.execute(getKysely());
 
   if (!result || result.length === 0) {
@@ -172,7 +172,7 @@ export async function getWorkCreationDate(req: Request): Promise<Date> {
   }
 
   const { rows: result } = await sql<RecordDateResult>`
-    SELECT "AdditionDate" AS "createdAt" FROM "tblwork" WHERE "workid" = ${parseInt(String(workId))}
+    SELECT "addition_date" AS "createdAt" FROM "works" WHERE "work_id" = ${parseInt(String(workId))}
   `.execute(getKysely());
 
   if (!result || result.length === 0) {
@@ -191,7 +191,7 @@ export async function getInvoiceCreationDate(req: Request): Promise<Date> {
   const { invoiceId } = req.params;
 
   const { rows: result } = await sql<RecordDateResult>`
-    SELECT "Dateofpayment" AS "createdAt" FROM "tblInvoice" WHERE "invoiceID" = ${invoiceId}
+    SELECT "date_of_payment" AS "createdAt" FROM "invoices" WHERE "invoice_id" = ${invoiceId}
   `.execute(getKysely());
 
   if (!result || result.length === 0) {
@@ -210,7 +210,7 @@ export async function getExpenseCreationDate(req: Request): Promise<Date> {
   const { id } = req.params;
 
   const { rows: result } = await sql<RecordDateResult>`
-    SELECT "expenseDate" AS "createdAt" FROM "tblExpenses" WHERE "ID" = ${id}
+    SELECT "expense_date" AS "createdAt" FROM "expenses" WHERE "id" = ${id}
   `.execute(getKysely());
 
   if (!result || result.length === 0) {

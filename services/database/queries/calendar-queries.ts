@@ -17,7 +17,7 @@ export interface CalendarSlotRow {
   calendarDate: string;
   dayName: string;
   dayOfWeek: number;
-  appointmentID: number | null;
+  appointment_id: number | null;
   appDetail: string | null;
   drID: number | null;
   patientName: string | null;
@@ -37,7 +37,7 @@ export interface CalendarStatsRow {
 }
 
 export interface CalendarDayRow {
-  appointmentID: number | null;
+  appointment_id: number | null;
   appDetail: string | null;
   drID: number | null;
   patientName: string | null;
@@ -65,33 +65,33 @@ export async function getWeeklyCalendarSlots(
 ): Promise<CalendarSlotRow[]> {
   const { rows } = await sql<CalendarSlotRow>`
     SELECT
-      to_char(tc."AppDate", 'YYYY-MM-DD HH24:MI:SS')       AS "slotDateTime",
-      to_char(tc."AppDate"::date, 'YYYY-MM-DD')            AS "calendarDate",
-      trim(to_char(tc."AppDate", 'FMDay'))                 AS "dayName",
-      (EXTRACT(DOW FROM tc."AppDate")::int + 1)            AS "dayOfWeek",
-      COALESCE(ta."appointmentID", 0)                      AS "appointmentID",
-      COALESCE(ta."AppDetail", '')                         AS "appDetail",
-      COALESCE(ta."DrID", 0)                               AS "drID",
-      COALESCE(tp."PatientName", '')                       AS "patientName",
-      COALESCE(ta."PersonID", 0)                           AS "personID",
+      to_char(tc."app_date", 'YYYY-MM-DD HH24:MI:SS')       AS "slotDateTime",
+      to_char(tc."app_date"::date, 'YYYY-MM-DD')            AS "calendarDate",
+      trim(to_char(tc."app_date", 'FMDay'))                 AS "dayName",
+      (EXTRACT(DOW FROM tc."app_date")::int + 1)            AS "dayOfWeek",
+      COALESCE(ta."appointment_id", 0)                      AS "appointment_id",
+      COALESCE(ta."app_detail", '')                         AS "appDetail",
+      COALESCE(ta."dr_id", 0)                               AS "drID",
+      COALESCE(tp."patient_name", '')                       AS "patientName",
+      COALESCE(ta."person_id", 0)                           AS "personID",
       CASE
-        WHEN EXISTS (SELECT 1 FROM "tblappointments" tac
-                     WHERE tac."AppDate" = tc."AppDate"
-                       AND (${doctorId}::int IS NULL OR tac."DrID" = ${doctorId}::int)) THEN 'booked'
-        WHEN tc."AppDate" < LOCALTIMESTAMP THEN 'past'
+        WHEN EXISTS (SELECT 1 FROM "appointments" tac
+                     WHERE tac."app_date" = tc."app_date"
+                       AND (${doctorId}::int IS NULL OR tac."dr_id" = ${doctorId}::int)) THEN 'booked'
+        WHEN tc."app_date" < LOCALTIMESTAMP THEN 'past'
         ELSE 'available'
       END                                                  AS "slotStatus",
-      (SELECT COUNT(*)::int FROM "tblappointments" tcnt
-       WHERE tcnt."AppDate" = tc."AppDate"
-         AND (${doctorId}::int IS NULL OR tcnt."DrID" = ${doctorId}::int)) AS "appointmentCount"
-    FROM "tblCalender" tc
-    LEFT JOIN "tblappointments" ta
-      ON tc."AppDate" = ta."AppDate" AND (${doctorId}::int IS NULL OR ta."DrID" = ${doctorId}::int)
-    LEFT JOIN "tblpatients" tp ON ta."PersonID" = tp."PersonID"
-    WHERE tc."AppDate" >= ${startDate}::date
-      AND tc."AppDate" < (${endDate}::date + INTERVAL '1 day')
-      AND EXTRACT(DOW FROM tc."AppDate") <> 5
-    ORDER BY tc."AppDate", ta."appointmentID"
+      (SELECT COUNT(*)::int FROM "appointments" tcnt
+       WHERE tcnt."app_date" = tc."app_date"
+         AND (${doctorId}::int IS NULL OR tcnt."dr_id" = ${doctorId}::int)) AS "appointmentCount"
+    FROM "calendar" tc
+    LEFT JOIN "appointments" ta
+      ON tc."app_date" = ta."app_date" AND (${doctorId}::int IS NULL OR ta."dr_id" = ${doctorId}::int)
+    LEFT JOIN "patients" tp ON ta."person_id" = tp."person_id"
+    WHERE tc."app_date" >= ${startDate}::date
+      AND tc."app_date" < (${endDate}::date + INTERVAL '1 day')
+      AND EXTRACT(DOW FROM tc."app_date") <> 5
+    ORDER BY tc."app_date", ta."appointment_id"
   `.execute(getKysely());
   return rows;
 }
@@ -114,13 +114,13 @@ export async function getCalendarStats(startDate: string, endDate: string): Prom
     FROM (
       SELECT
         CASE
-          WHEN EXISTS (SELECT 1 FROM "tblappointments" tac WHERE tac."AppDate" = tc."AppDate") THEN 'booked'
-          WHEN tc."AppDate" < LOCALTIMESTAMP THEN 'past'
+          WHEN EXISTS (SELECT 1 FROM "appointments" tac WHERE tac."app_date" = tc."app_date") THEN 'booked'
+          WHEN tc."app_date" < LOCALTIMESTAMP THEN 'past'
           ELSE 'available'
         END AS slotstatus
-      FROM "tblCalender" tc
-      WHERE tc."AppDate"::date BETWEEN ${startDate}::date AND ${endDate}::date
-        AND EXTRACT(DOW FROM tc."AppDate") <> 5
+      FROM "calendar" tc
+      WHERE tc."app_date"::date BETWEEN ${startDate}::date AND ${endDate}::date
+        AND EXTRACT(DOW FROM tc."app_date") <> 5
     ) s
   `.execute(getKysely());
   return rows[0];
@@ -132,18 +132,18 @@ export async function getCalendarStats(startDate: string, endDate: string): Prom
 export async function getCalendarDay(date: string): Promise<CalendarDayRow[]> {
   const { rows } = await sql<CalendarDayRow>`
     SELECT
-      a."appointmentID"                       AS "appointmentID",
-      a."AppDetail"                           AS "appDetail",
-      a."DrID"                                AS "drID",
-      p."PatientName"                         AS "patientName",
-      tc."AppDate"                            AS "appDate",
-      to_char(tc."AppDate", 'HH12:MI')        AS "appTime"
-    FROM "tblCalender" tc
-    LEFT JOIN "tblappointments" a ON a."AppDate" = tc."AppDate"
-    LEFT JOIN "tblpatients" p ON a."PersonID" = p."PersonID"
-    WHERE tc."AppDate" >= ${date}::date
-      AND tc."AppDate" < (${date}::date + INTERVAL '1 day')
-    ORDER BY tc."AppDate"
+      a."appointment_id"                       AS "appointment_id",
+      a."app_detail"                           AS "appDetail",
+      a."dr_id"                                AS "drID",
+      p."patient_name"                         AS "patientName",
+      tc."app_date"                            AS "appDate",
+      to_char(tc."app_date", 'HH12:MI')        AS "appTime"
+    FROM "calendar" tc
+    LEFT JOIN "appointments" a ON a."app_date" = tc."app_date"
+    LEFT JOIN "patients" p ON a."person_id" = p."person_id"
+    WHERE tc."app_date" >= ${date}::date
+      AND tc."app_date" < (${date}::date + INTERVAL '1 day')
+    ORDER BY tc."app_date"
   `.execute(getKysely());
   return rows;
 }
@@ -162,7 +162,7 @@ export async function ensureCalendarRange(daysAhead = 60): Promise<EnsureRangeRe
         THEN 'Calendar needs updating' ELSE 'Calendar is current' END AS "status",
       to_char(m.maxdate, 'YYYY-MM-DD') AS "previousMaxDate",
       ${futureStr} AS "newMaxDate"
-    FROM (SELECT MAX("AppDate"::date) AS maxdate FROM "tblCalender") m
+    FROM (SELECT MAX("app_date"::date) AS maxdate FROM "calendar") m
   `.execute(getKysely());
   return rows[0];
 }
@@ -173,21 +173,21 @@ export async function ensureCalendarRange(daysAhead = 60): Promise<EnsureRangeRe
  */
 export async function fillCalendar(): Promise<{ DaysAdded: number }> {
   return withPgTransaction(async (trx) => {
-    await sql`DELETE FROM "tblCalender" WHERE "AppDate" < CURRENT_DATE`.execute(trx);
+    await sql`DELETE FROM "calendar" WHERE "app_date" < CURRENT_DATE`.execute(trx);
 
     const result = await sql`
-      INSERT INTO "tblCalender" ("AppDate")
-      SELECT (d.precal + t."MyTime")
+      INSERT INTO "calendar" ("app_date")
+      SELECT (d.precal + t."my_time")
       FROM (
-        SELECT (CURRENT_DATE + n."Mynumber") AS precal
-        FROM "tblnumbers" n
-        LEFT JOIN "tblholidays" h ON (CURRENT_DATE + n."Mynumber") = h."Holidaydate"
-        WHERE h."Holidaydate" IS NULL
-          AND EXTRACT(DOW FROM (CURRENT_DATE + n."Mynumber")) <> 5
+        SELECT (CURRENT_DATE + n."my_number") AS precal
+        FROM "numbers" n
+        LEFT JOIN "holidays" h ON (CURRENT_DATE + n."my_number") = h."holiday_date"
+        WHERE h."holiday_date" IS NULL
+          AND EXTRACT(DOW FROM (CURRENT_DATE + n."my_number")) <> 5
       ) d
-      CROSS JOIN "tbltimes" t
+      CROSS JOIN "times" t
       WHERE NOT EXISTS (
-        SELECT 1 FROM "tblCalender" c WHERE c."AppDate" = (d.precal + t."MyTime")
+        SELECT 1 FROM "calendar" c WHERE c."app_date" = (d.precal + t."my_time")
       )
     `.execute(trx);
 

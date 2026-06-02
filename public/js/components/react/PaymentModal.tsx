@@ -11,7 +11,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 interface WorkData {
     workid: number;
     TypeName?: string;
-    TotalRequired?: number;
+    total_required?: number;
     TotalPaid?: number;
     Currency?: 'USD' | 'IQD';
     Discount?: number | null;
@@ -250,7 +250,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
     const initializeFormData = () => {
         if (!workData) return;
-        const remainingBalance = (workData.TotalRequired || 0) - Number(workData.Discount ?? 0) - (workData.TotalPaid || 0);
+        const remainingBalance = (workData.total_required || 0) - Number(workData.Discount ?? 0) - (workData.TotalPaid || 0);
         const accountCurrency = workData.Currency || 'IQD';
 
         setCalculations(prev => ({
@@ -751,7 +751,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                     usdReceived: actualUSD,
                     iqdReceived: actualIQD,
                     change: parseInt(String(formData.change)) || 0,
-                    newBalance: ((workData!.TotalRequired || 0) - Number(workData!.Discount ?? 0) - (workData!.TotalPaid || 0) - amountPaid)
+                    newBalance: ((workData!.total_required || 0) - Number(workData!.Discount ?? 0) - (workData!.TotalPaid || 0) - amountPaid)
                 });
 
                 fetch('/api/wa/send-receipt', {

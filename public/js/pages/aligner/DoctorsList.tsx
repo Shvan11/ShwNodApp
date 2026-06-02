@@ -4,8 +4,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import styles from './DoctorsList.module.css';
 
 interface Doctor {
-    DrID: number;
-    DoctorName: string;
+    dr_id: number;
+    doctor_name: string;
     UnreadDoctorNotes?: number;
 }
 
@@ -34,8 +34,8 @@ const DoctorsList: React.FC = () => {
         }
     };
 
-    const selectDoctor = (doctor: { DrID: number | string; DoctorName: string }): void => {
-        navigate(`/aligner/doctor/${doctor.DrID}`);
+    const selectDoctor = (doctor: { dr_id: number | string; doctor_name: string }): void => {
+        navigate(`/aligner/doctor/${doctor.dr_id}`);
     };
 
     if (loading) {
@@ -71,7 +71,7 @@ const DoctorsList: React.FC = () => {
                 {/* All Doctors Card */}
                 <div
                     className={`${styles.doctorCard} ${styles.allDoctors}`}
-                    onClick={() => selectDoctor({ DrID: 'all', DoctorName: 'All Doctors' })}
+                    onClick={() => selectDoctor({ dr_id: 'all', doctor_name: 'All Doctors' })}
                 >
                     <i className={`fas fa-users ${styles.doctorIcon}`}></i>
                     <h3>All Doctors</h3>
@@ -82,7 +82,7 @@ const DoctorsList: React.FC = () => {
                 {/* Individual Doctor Cards */}
                 {doctors.map((doctor) => (
                     <div
-                        key={doctor.DrID}
+                        key={doctor.dr_id}
                         className={`${styles.doctorCard} ${doctor.UnreadDoctorNotes && doctor.UnreadDoctorNotes > 0 ? styles.hasActivity : ''}`}
                         onClick={() => selectDoctor(doctor)}
                     >
@@ -93,7 +93,7 @@ const DoctorsList: React.FC = () => {
                             </div>
                         )}
                         <i className={`fas fa-user-md ${styles.doctorIcon}`}></i>
-                        <h3>{doctor.DoctorName === 'Admin' ? doctor.DoctorName : `Dr. ${doctor.DoctorName}`}</h3>
+                        <h3>{doctor.doctor_name === 'Admin' ? doctor.doctor_name : `Dr. ${doctor.doctor_name}`}</h3>
                         <i className={`fas fa-chevron-right ${styles.arrowIcon}`}></i>
                     </div>
                 ))}

@@ -4,7 +4,7 @@
  * This module handles all work (treatment) related operations including:
  * - Work CRUD operations (create, read, update, delete)
  * - Work details management (treatment details)
- * - Diagnosis and treatment planning (comprehensive orthodontic diagnosis)
+ * - diagnosis and treatment planning (comprehensive orthodontic diagnosis)
  * - Work types and keywords lookup
  * - Active work tracking
  * - Work completion/finishing
@@ -40,7 +40,7 @@ import {
   addWorkItem,
   updateWorkItem,
   deleteWorkItem,
-  // Tooth number functions
+  // tooth number functions
   getToothNumbers,
   getWorkItemTeeth
 } from '../../services/database/queries/work-queries.js';
@@ -78,50 +78,50 @@ interface WorkQueryParams {
 }
 
 interface WorkResult {
-  workid: number;
-  PersonID: number;
-  TotalRequired: number;
-  Currency: string;
-  Typeofwork: number;
-  Notes: string | null;
-  Status: number;
-  DrID: number;
-  DoctorName: string | null;
-  TypeName: string | null;
-  StatusName: string | null;
+  work_id: number;
+  person_id: number;
+  total_required: number;
+  currency: string;
+  type_of_work: number;
+  notes: string | null;
+  status: number;
+  dr_id: number;
+  doctor_name: string | null;
+  type_name: string | null;
+  status_name: string | null;
   [key: string]: string | number | null;
 }
 
 /**
- * Work data returned from getWorkById - includes Status as number for DB compatibility
+ * Work data returned from getWorkById - includes status as number for DB compatibility
  */
 interface WorkData {
-  workid: number;
-  PersonID: number;
-  TotalRequired: number | null;
-  Currency: string | null;
-  Typeofwork: number | null;
-  Notes: string | null;
-  Status: number;
-  DrID: number | null;
-  DoctorName: string | null;
-  TypeName: string | null;
-  StatusName: string | null;
+  work_id: number;
+  person_id: number;
+  total_required: number | null;
+  currency: string | null;
+  type_of_work: number | null;
+  notes: string | null;
+  status: number;
+  dr_id: number | null;
+  doctor_name: string | null;
+  type_name: string | null;
+  status_name: string | null;
 }
 
 interface AddWorkBody {
-  PersonID: number;
-  TotalRequired: number;
-  Currency: string;
-  Typeofwork: number;
-  DrID: number;
-  Notes?: string;
-  StartDate?: string;
-  KeyWordID1?: number;
-  KeyWordID2?: number;
-  KeywordID3?: number;
-  KeywordID4?: number;
-  KeywordID5?: number;
+  person_id: number;
+  total_required: number;
+  currency: string;
+  type_of_work: number;
+  dr_id: number;
+  notes?: string;
+  start_date?: string;
+  keyword_id_1?: number;
+  keyword_id_2?: number;
+  keyword_id_3?: number;
+  keyword_id_4?: number;
+  keyword_id_5?: number;
   [key: string]: string | number | boolean | Date | null | undefined;
 }
 
@@ -135,26 +135,26 @@ interface AddWorkWithInvoiceBody extends AddWorkBody {
 
 interface UpdateWorkBody {
   workId: number;
-  PersonID?: number;
-  TotalRequired?: number;
-  Currency?: string;
-  Typeofwork?: number;
-  DrID: number;
-  Notes?: string;
-  Status?: WorkStatusType;
-  StartDate?: string;
-  DebondDate?: string;
-  FPhotoDate?: string;
-  IPhotoDate?: string;
-  NotesDate?: string;
-  KeyWordID1?: number;
-  KeyWordID2?: number;
-  KeywordID3?: number;
-  KeywordID4?: number;
-  KeywordID5?: number;
-  Discount?: number | null;
-  DiscountDate?: string | null;
-  DiscountReason?: string | null;
+  person_id?: number;
+  total_required?: number;
+  currency?: string;
+  type_of_work?: number;
+  dr_id: number;
+  notes?: string;
+  status?: WorkStatusType;
+  start_date?: string;
+  debond_date?: string;
+  f_photo_date?: string;
+  i_photo_date?: string;
+  notes_date?: string;
+  keyword_id_1?: number;
+  keyword_id_2?: number;
+  keyword_id_3?: number;
+  keyword_id_4?: number;
+  keyword_id_5?: number;
+  discount?: number | null;
+  discount_date?: string | null;
+  discount_reason?: string | null;
 }
 
 interface WorkStatusBody {
@@ -167,71 +167,71 @@ interface DeleteWorkBody {
 }
 
 interface WorkDetailBody {
-  WorkID?: number;
+  work_id?: number;
   detailId?: number;
   itemId?: number;
-  CanalsNo?: number;
-  ItemCost?: number;
+  canals_no?: number;
+  item_cost?: number;
   TeethIds?: number[];
-  FillingType?: string;
-  FillingDepth?: string;
-  WorkingLength?: string;
-  ImplantLength?: number;
-  ImplantDiameter?: number;
-  ImplantManufacturerID?: number;
-  Material?: string;
-  LabName?: string;
-  StartDate?: Date | string;
-  CompletedDate?: Date | string;
-  Note?: string;
+  filling_type?: string;
+  filling_depth?: string;
+  working_length?: string;
+  implant_length?: number;
+  implant_diameter?: number;
+  implant_manufacturer_id?: number;
+  material?: string;
+  lab_name?: string;
+  start_date?: Date | string;
+  completed_date?: Date | string;
+  note?: string;
 }
 
 interface DiagnosisData {
-  WorkID: number;
-  DxDate?: string;
-  Diagnosis: string;
-  TreatmentPlan: string;
-  ChiefComplain?: string;
-  Appliance?: string;
-  fAnteroPosterior?: string;
-  fVertical?: string;
-  fTransverse?: string;
-  fLipCompetence?: string;
-  fNasoLabialAngle?: string;
-  fUpperIncisorShowRest?: string;
-  fUpperIncisorShowSmile?: string;
-  ITeethPresent?: string;
-  IDentalHealth?: string;
-  ILowerCrowding?: string;
-  ILowerIncisorInclination?: string;
-  ICurveofSpee?: string;
-  IUpperCrowding?: string;
-  IUpperIncisorInclination?: string;
-  OIncisorRelation?: string;
-  OOverjet?: string;
-  OOverbite?: string;
-  OCenterlines?: string;
-  OMolarRelation?: string;
-  OCanineRelation?: string;
-  OFunctionalOcclusion?: string;
-  C_SNA?: string;
-  C_SNB?: string;
-  C_ANB?: string;
-  C_SNMx?: string;
-  C_Wits?: string;
-  C_FMA?: string;
-  C_MMA?: string;
-  C_UIMX?: string;
-  C_LIMd?: string;
-  C_UI_LI?: string;
-  C_LI_APo?: string;
-  C_Ulip_E?: string;
-  C_Llip_E?: string;
-  C_Naso_lip?: string;
-  C_TAFH?: string;
-  C_UAFH?: string;
-  C_LAFH?: string;
-  C_PercentLAFH?: string;
+  work_id: number;
+  dx_date?: string;
+  diagnosis: string;
+  treatment_plan: string;
+  chief_complain?: string;
+  appliance?: string;
+  f_antero_posterior?: string;
+  f_vertical?: string;
+  f_transverse?: string;
+  f_lip_competence?: string;
+  f_naso_labial_angle?: string;
+  f_upper_incisor_show_rest?: string;
+  f_upper_incisor_show_smile?: string;
+  i_teeth_present?: string;
+  i_dental_health?: string;
+  i_lower_crowding?: string;
+  i_lower_incisor_inclination?: string;
+  i_curveof_spee?: string;
+  i_upper_crowding?: string;
+  i_upper_incisor_inclination?: string;
+  o_incisor_relation?: string;
+  o_overjet?: string;
+  o_overbite?: string;
+  o_centerlines?: string;
+  o_molar_relation?: string;
+  o_canine_relation?: string;
+  o_functional_occlusion?: string;
+  c_sna?: string;
+  c_snb?: string;
+  c_anb?: string;
+  c_sn_mx?: string;
+  c_wits?: string;
+  c_fma?: string;
+  c_mma?: string;
+  c_uimx?: string;
+  c_li_md?: string;
+  c_ui_li?: string;
+  c_li_a_po?: string;
+  c_ulip_e?: string;
+  c_llip_e?: string;
+  c_naso_lip?: string;
+  c_tafh?: string;
+  c_uafh?: string;
+  c_lafh?: string;
+  c_percent_lafh?: string;
 }
 
 // ============================================================================
@@ -280,8 +280,8 @@ router.get(
     try {
       const { code: personId } = req.query;
       if (!personId) {
-        log.warn('Get works request missing PersonID parameter');
-        ErrorResponses.missingParameter(res, 'code (PersonID)');
+        log.warn('Get works request missing person_id parameter');
+        ErrorResponses.missingParameter(res, 'code (person_id)');
         return;
       }
 
@@ -295,7 +295,7 @@ router.get(
 );
 
 /**
- * Get single work by ID
+ * Get single work by id
  */
 router.get(
   '/getwork/:workId',
@@ -310,28 +310,28 @@ router.get(
 
       const { rows } = await sql<WorkResult>`
             SELECT
-                w."workid",
-                w."PersonID",
-                w."TotalRequired",
-                w."Currency",
-                w."Typeofwork",
-                w."Notes",
-                w."Status",
-                w."DrID",
-                e."employeeName" as "DoctorName",
-                wt."WorkType" as "TypeName",
-                ws."StatusName"
-            FROM "tblwork" w
-            LEFT JOIN "tblEmployees" e ON w."DrID" = e."ID"
-            LEFT JOIN "tblWorkType" wt ON w."Typeofwork" = wt."ID"
-            LEFT JOIN "tblWorkStatus" ws ON w."Status" = ws."StatusID"
-            WHERE w."workid" = ${parseInt(workId)}
+                w."work_id",
+                w."person_id",
+                w."total_required",
+                w."currency",
+                w."type_of_work",
+                w."notes",
+                w."status",
+                w."dr_id",
+                e."employee_name" as "doctor_name",
+                wt."work_type" as "type_name",
+                ws."status_name"
+            FROM "works" w
+            LEFT JOIN "employees" e ON w."dr_id" = e."id"
+            LEFT JOIN "work_types" wt ON w."type_of_work" = wt."id"
+            LEFT JOIN "work_statuses" ws ON w."status" = ws."status_id"
+            WHERE w."work_id" = ${parseInt(workId)}
         `.execute(getKysely());
 
       const work = rows.length > 0 ? rows[0] : null;
 
       if (!work) {
-        log.warn('Work not found by ID', { workId });
+        log.warn('Work not found by id', { workId });
         ErrorResponses.notFound(res, 'Work');
         return;
       }
@@ -359,7 +359,7 @@ router.post(
 
       res.json({
         success: true,
-        workId: result.workid,
+        workId: result.work_id,
         message: 'Work added successfully'
       });
     } catch (error) {
@@ -368,7 +368,7 @@ router.post(
       if (error instanceof WorkValidationError) {
         log.warn('Work creation rejected by validation', {
           code: error.code,
-          personId: req.body?.PersonID
+          personId: req.body?.person_id
         });
         if (error.code === 'DUPLICATE_ACTIVE_WORK') {
           ErrorResponses.conflict(
@@ -416,7 +416,7 @@ router.post(
       if (error instanceof WorkValidationError) {
         log.warn('Work-with-invoice creation rejected by validation', {
           code: error.code,
-          personId: req.body?.PersonID
+          personId: req.body?.person_id
         });
         if (error.code === 'DUPLICATE_ACTIVE_WORK') {
           ErrorResponses.conflict(
@@ -456,28 +456,28 @@ router.put(
         return;
       }
 
-      // Validate DrID is provided
-      if (!workData.DrID) {
-        log.warn('Update work request missing DrID', { workId });
-        ErrorResponses.badRequest(res, 'DrID is required');
+      // Validate dr_id is provided
+      if (!workData.dr_id) {
+        log.warn('Update work request missing dr_id', { workId });
+        ErrorResponses.badRequest(res, 'dr_id is required');
         return;
       }
 
       // Validate data types
-      if (isNaN(parseInt(String(workId))) || isNaN(parseInt(String(workData.DrID)))) {
-        log.warn('Update work invalid parameters', { workId, DrID: workData.DrID });
-        ErrorResponses.badRequest(res, 'workId and DrID must be valid numbers');
+      if (isNaN(parseInt(String(workId))) || isNaN(parseInt(String(workData.dr_id)))) {
+        log.warn('Update work invalid parameters', { workId, dr_id: workData.dr_id });
+        ErrorResponses.badRequest(res, 'workId and dr_id must be valid numbers');
         return;
       }
 
       // Convert date strings to proper Date objects if provided
       const dateFields = [
-        'StartDate',
-        'DebondDate',
-        'FPhotoDate',
-        'IPhotoDate',
-        'NotesDate',
-        'DiscountDate'
+        'start_date',
+        'debond_date',
+        'f_photo_date',
+        'i_photo_date',
+        'notes_date',
+        'discount_date'
       ];
       for (const field of dateFields) {
         const value = (workData as Record<string, unknown>)[field];
@@ -494,9 +494,9 @@ router.put(
 
       // Fetch current work once if needed for validation
       const needsCurrentWork =
-        workData.Status !== undefined ||
+        workData.status !== undefined ||
         (req.session?.userRole !== 'admin' &&
-          ['TotalRequired', 'Currency'].some((field) =>
+          ['total_required', 'currency'].some((field) =>
             Object.prototype.hasOwnProperty.call(workData, field)
           ));
 
@@ -512,17 +512,17 @@ router.put(
       }
 
       // ===== STATUS CHANGE VALIDATION =====
-      if (workData.Status !== undefined && currentWork) {
-        if (currentWork.Status !== workData.Status) {
+      if (workData.status !== undefined && currentWork) {
+        if (currentWork.status !== workData.status) {
           const validation = await validateStatusChange(
             parseInt(String(workId)),
-            workData.Status,
-            (workData.PersonID || currentWork.PersonID) as number
+            workData.status,
+            (workData.person_id || currentWork.person_id) as number
           );
 
           if (!validation.valid) {
             res.status(409).json({
-              error: 'Status Change Conflict',
+              error: 'status change Conflict',
               message: validation.error,
               existingWork: validation.existingWork
             });
@@ -533,7 +533,7 @@ router.put(
       // ===== END STATUS VALIDATION =====
 
       // ===== FINANCIAL FIELDS PERMISSION CHECK =====
-      const financialFields = ['TotalRequired', 'Currency'];
+      const financialFields = ['total_required', 'currency'];
       let isChangingFinancialFields = false;
 
       if (
@@ -543,13 +543,13 @@ router.put(
           Object.prototype.hasOwnProperty.call(workData, field)
         )
       ) {
-        // Check if TotalRequired is changing
-        const totalRequiredChanged = workData.TotalRequired !== undefined &&
-          Number(workData.TotalRequired) !== Number(currentWork.TotalRequired);
+        // Check if total_required is changing
+        const totalRequiredChanged = workData.total_required !== undefined &&
+          Number(workData.total_required) !== Number(currentWork.total_required);
 
-        // Check if Currency is changing
-        const currencyChanged = workData.Currency !== undefined &&
-          String(workData.Currency) !== String(currentWork.Currency);
+        // Check if currency is changing
+        const currencyChanged = workData.currency !== undefined &&
+          String(workData.currency) !== String(currentWork.currency);
 
         isChangingFinancialFields = totalRequiredChanged || currencyChanged;
       }
@@ -560,7 +560,7 @@ router.put(
           res.status(403).json({
             error: 'Forbidden',
             message:
-              'Cannot edit financial fields (Total Required, Currency) for work not created today. Contact admin.',
+              'Cannot edit financial fields (Total Required, currency) for work not created today. Contact admin.',
             restrictedFields: financialFields
           });
           return;
@@ -569,15 +569,15 @@ router.put(
       // ===== END FINANCIAL FIELDS PERMISSION CHECK =====
 
       // ===== TOTAL-REQUIRED vs PAID GUARD (was DB CHECK CK_MoreThanTotalW) =====
-      // A work's TotalRequired must never drop below what's already been paid, or the
+      // A work's total_required must never drop below what's already been paid, or the
       // work becomes overpaid. PostgreSQL can't host the old function-based CHECK, so
-      // enforce it here. (NULL/absent TotalRequired = no change / no limit → skip.)
+      // enforce it here. (NULL/absent total_required = no change / no limit → skip.)
       if (
-        Object.prototype.hasOwnProperty.call(workData, 'TotalRequired') &&
-        workData.TotalRequired !== null &&
-        workData.TotalRequired !== undefined
+        Object.prototype.hasOwnProperty.call(workData, 'total_required') &&
+        workData.total_required !== null &&
+        workData.total_required !== undefined
       ) {
-        const newTotal = Number(workData.TotalRequired);
+        const newTotal = Number(workData.total_required);
         const workForTotal = await getWorkDetailsFromQueries(
           parseInt(String(workId))
         );
@@ -595,9 +595,9 @@ router.put(
       }
 
       // ===== DISCOUNT FIELDS PERMISSION + VALIDATION =====
-      // Discount and DiscountDate are admin-only (financial concession).
-      // DiscountReason is editable by any authenticated user.
-      const discountAdminFields = ['Discount', 'DiscountDate'] as const;
+      // discount and discount_date are admin-only (financial concession).
+      // discount_reason is editable by any authenticated user.
+      const discountAdminFields = ['discount', 'discount_date'] as const;
       const hasDiscountFieldInPayload = discountAdminFields.some((field) =>
         Object.prototype.hasOwnProperty.call(workData, field)
       );
@@ -610,10 +610,10 @@ router.put(
           return;
         }
 
-        const discountChanged = workData.Discount !== undefined &&
-          Number(workData.Discount ?? 0) !== Number(workWithPaid.Discount ?? 0);
-        const discountDateChanged = workData.DiscountDate !== undefined &&
-          String(workData.DiscountDate ?? '') !== String(workWithPaid.DiscountDate ?? '');
+        const discountChanged = workData.discount !== undefined &&
+          Number(workData.discount ?? 0) !== Number(workWithPaid.discount ?? 0);
+        const discountDateChanged = workData.discount_date !== undefined &&
+          String(workData.discount_date ?? '') !== String(workWithPaid.discount_date ?? '');
 
         if ((discountChanged || discountDateChanged) && req.session?.userRole !== 'admin') {
           res.status(403).json({
@@ -627,8 +627,8 @@ router.put(
         if (discountChanged) {
           try {
             validateDiscount(
-              workData.Discount ?? null,
-              workWithPaid.TotalRequired,
+              workData.discount ?? null,
+              workWithPaid.total_required,
               (workWithPaid as { TotalPaid?: number }).TotalPaid ?? 0
             );
           } catch (err) {
@@ -764,13 +764,13 @@ router.post(
       // Check if patient already has an active work
       if (personId) {
         const activeWork = await getActiveWork(parseInt(String(personId)));
-        if (activeWork && activeWork.workid !== parseInt(String(workId))) {
+        if (activeWork && activeWork.work_id !== parseInt(String(workId))) {
           ErrorResponses.conflict(
             res,
             'Patient already has an active work. Please finish or discontinue it first.',
             {
-              existingWorkId: activeWork.workid,
-              existingWorkType: activeWork.TypeName
+              existingWorkId: activeWork.work_id,
+              existingWorkType: activeWork.type_name
             }
           );
           return;
@@ -784,7 +784,7 @@ router.post(
         rowsAffected: result.rowCount
       });
     } catch (error) {
-      // Reactivating sets Status=1, which can collide with the patient's existing
+      // Reactivating sets status=1, which can collide with the patient's existing
       // active work (partial unique index UNQ_tblWork_Active → pg SQLSTATE 23505).
       if (isUniqueViolation(error, 'UNQ_tblWork_Active')) {
         ErrorResponses.conflict(
@@ -884,8 +884,8 @@ router.get(
     try {
       const { code: personId } = req.query;
       if (!personId) {
-        log.warn('Get active work request missing PersonID');
-        ErrorResponses.missingParameter(res, 'code (PersonID)');
+        log.warn('Get active work request missing person_id');
+        ErrorResponses.missingParameter(res, 'code (person_id)');
         return;
       }
 
@@ -1028,36 +1028,36 @@ router.post(
       const workDetailData = req.body;
 
       // Validate required fields
-      if (!workDetailData.WorkID) {
-        log.warn('Add work detail missing WorkID');
-        ErrorResponses.missingParameter(res, 'WorkID');
+      if (!workDetailData.work_id) {
+        log.warn('Add work detail missing work_id');
+        ErrorResponses.missingParameter(res, 'work_id');
         return;
       }
 
       // Validate data types
-      if (isNaN(parseInt(String(workDetailData.WorkID)))) {
-        log.warn('Add work detail invalid WorkID', { WorkID: workDetailData.WorkID });
-        ErrorResponses.badRequest(res, 'WorkID must be a valid number');
+      if (isNaN(parseInt(String(workDetailData.work_id)))) {
+        log.warn('Add work detail invalid work_id', { work_id: workDetailData.work_id });
+        ErrorResponses.badRequest(res, 'work_id must be a valid number');
         return;
       }
 
-      // Validate CanalsNo if provided
+      // Validate canals_no if provided
       if (
-        workDetailData.CanalsNo &&
-        isNaN(parseInt(String(workDetailData.CanalsNo)))
+        workDetailData.canals_no &&
+        isNaN(parseInt(String(workDetailData.canals_no)))
       ) {
-        log.warn('Add work detail invalid CanalsNo', { CanalsNo: workDetailData.CanalsNo });
-        ErrorResponses.badRequest(res, 'CanalsNo must be a valid number');
+        log.warn('Add work detail invalid canals_no', { canals_no: workDetailData.canals_no });
+        ErrorResponses.badRequest(res, 'canals_no must be a valid number');
         return;
       }
 
-      // Validate ItemCost if provided
+      // Validate item_cost if provided
       if (
-        workDetailData.ItemCost &&
-        isNaN(parseInt(String(workDetailData.ItemCost)))
+        workDetailData.item_cost &&
+        isNaN(parseInt(String(workDetailData.item_cost)))
       ) {
-        log.warn('Add work detail invalid ItemCost', { ItemCost: workDetailData.ItemCost });
-        ErrorResponses.badRequest(res, 'ItemCost must be a valid number');
+        log.warn('Add work detail invalid item_cost', { item_cost: workDetailData.item_cost });
+        ErrorResponses.badRequest(res, 'item_cost must be a valid number');
         return;
       }
 
@@ -1071,17 +1071,17 @@ router.post(
         return;
       }
 
-      // Create item data with required WorkID
+      // Create item data with required work_id
       const itemData = {
-        WorkID: workDetailData.WorkID,
+        work_id: workDetailData.work_id,
         ...workDetailData
       };
 
       const result = await addWorkDetail(itemData);
       res.json({
         success: true,
-        detailId: result?.ID,
-        itemId: result?.ID, // Alias for new naming
+        detailId: result?.id,
+        itemId: result?.id, // Alias for new naming
         message: 'Work item added successfully'
       });
     } catch (error) {
@@ -1120,23 +1120,23 @@ router.put(
         return;
       }
 
-      // Validate CanalsNo if provided
+      // Validate canals_no if provided
       if (
-        workDetailData.CanalsNo &&
-        isNaN(parseInt(String(workDetailData.CanalsNo)))
+        workDetailData.canals_no &&
+        isNaN(parseInt(String(workDetailData.canals_no)))
       ) {
-        log.warn('Update work detail invalid CanalsNo', { id, CanalsNo: workDetailData.CanalsNo });
-        ErrorResponses.badRequest(res, 'CanalsNo must be a valid number');
+        log.warn('Update work detail invalid canals_no', { id, canals_no: workDetailData.canals_no });
+        ErrorResponses.badRequest(res, 'canals_no must be a valid number');
         return;
       }
 
-      // Validate ItemCost if provided
+      // Validate item_cost if provided
       if (
-        workDetailData.ItemCost &&
-        isNaN(parseInt(String(workDetailData.ItemCost)))
+        workDetailData.item_cost &&
+        isNaN(parseInt(String(workDetailData.item_cost)))
       ) {
-        log.warn('Update work detail invalid ItemCost', { id, ItemCost: workDetailData.ItemCost });
-        ErrorResponses.badRequest(res, 'ItemCost must be a valid number');
+        log.warn('Update work detail invalid item_cost', { id, item_cost: workDetailData.item_cost });
+        ErrorResponses.badRequest(res, 'item_cost must be a valid number');
         return;
       }
 
@@ -1267,16 +1267,16 @@ router.post(
         return;
       }
 
-      // Create item data with required WorkID from URL
+      // Create item data with required work_id from url
       const workItemData = {
         ...itemData,
-        WorkID: parseInt(workId)
+        work_id: parseInt(workId)
       };
 
       const result = await addWorkItem(workItemData);
       res.json({
         success: true,
-        itemId: result?.ID,
+        itemId: result?.id,
         message: 'Work item added successfully'
       });
     } catch (error) {
@@ -1380,54 +1380,54 @@ router.get(
 
       const { rows } = await sql`
             SELECT
-                "ID",
-                "DxDate",
-                "WorkID",
-                "Diagnosis",
-                "TreatmentPlan",
-                "ChiefComplain",
-                "fAnteroPosterior",
-                "fVertical",
-                "fTransverse",
-                "fLipCompetence",
-                "fNasoLabialAngle",
-                "fUpperIncisorShowRest",
-                "fUpperIncisorShowSmile",
-                "ITeethPresent",
-                "IDentalHealth",
-                "ILowerCrowding",
-                "ILowerIncisorInclination",
-                "ICurveofSpee",
-                "IUpperCrowding",
-                "IUpperIncisorInclination",
-                "OIncisorRelation",
-                "OOverjet",
-                "OOverbite",
-                "OCenterlines",
-                "OMolarRelation",
-                "OCanineRelation",
-                "OFunctionalOcclusion",
-                "C_SNA",
-                "C_SNB",
-                "C_ANB",
-                "C_SNMx",
-                "C_Wits",
-                "C_FMA",
-                "C_MMA",
-                "C_UIMX",
-                "C_LIMd",
-                "C_UI_LI",
-                "C_LI_APo",
-                "C_Ulip_E",
-                "C_Llip_E",
-                "C_Naso_lip",
-                "C_TAFH",
-                "C_UAFH",
-                "C_LAFH",
-                "C_PercentLAFH",
-                "Appliance"
-            FROM "tblDiagnosis"
-            WHERE "WorkID" = ${parseInt(workId)}
+                "id",
+                "dx_date",
+                "work_id",
+                "diagnosis",
+                "treatment_plan",
+                "chief_complain",
+                "f_antero_posterior",
+                "f_vertical",
+                "f_transverse",
+                "f_lip_competence",
+                "f_naso_labial_angle",
+                "f_upper_incisor_show_rest",
+                "f_upper_incisor_show_smile",
+                "i_teeth_present",
+                "i_dental_health",
+                "i_lower_crowding",
+                "i_lower_incisor_inclination",
+                "i_curveof_spee",
+                "i_upper_crowding",
+                "i_upper_incisor_inclination",
+                "o_incisor_relation",
+                "o_overjet",
+                "o_overbite",
+                "o_centerlines",
+                "o_molar_relation",
+                "o_canine_relation",
+                "o_functional_occlusion",
+                "c_sna",
+                "c_snb",
+                "c_anb",
+                "c_sn_mx",
+                "c_wits",
+                "c_fma",
+                "c_mma",
+                "c_uimx",
+                "c_li_md",
+                "c_ui_li",
+                "c_li_a_po",
+                "c_ulip_e",
+                "c_llip_e",
+                "c_naso_lip",
+                "c_tafh",
+                "c_uafh",
+                "c_lafh",
+                "c_percent_lafh",
+                "appliance"
+            FROM "diagnoses"
+            WHERE "work_id" = ${parseInt(workId)}
         `.execute(getKysely());
 
       // Return null if no diagnosis found (not an error)
@@ -1458,147 +1458,147 @@ router.post(
       const diagnosisData = req.body;
 
       // Validate required fields
-      if (!diagnosisData.WorkID) {
-        log.warn('Save diagnosis missing WorkID');
-        ErrorResponses.missingParameter(res, 'WorkID');
+      if (!diagnosisData.work_id) {
+        log.warn('Save diagnosis missing work_id');
+        ErrorResponses.missingParameter(res, 'work_id');
         return;
       }
-      if (!diagnosisData.Diagnosis || !diagnosisData.Diagnosis.trim()) {
-        log.warn('Save diagnosis missing Diagnosis', { WorkID: diagnosisData.WorkID });
-        ErrorResponses.missingParameter(res, 'Diagnosis');
+      if (!diagnosisData.diagnosis || !diagnosisData.diagnosis.trim()) {
+        log.warn('Save diagnosis missing diagnosis', { work_id: diagnosisData.work_id });
+        ErrorResponses.missingParameter(res, 'diagnosis');
         return;
       }
-      if (!diagnosisData.TreatmentPlan || !diagnosisData.TreatmentPlan.trim()) {
-        log.warn('Save diagnosis missing TreatmentPlan', { WorkID: diagnosisData.WorkID });
-        ErrorResponses.missingParameter(res, 'TreatmentPlan');
+      if (!diagnosisData.treatment_plan || !diagnosisData.treatment_plan.trim()) {
+        log.warn('Save diagnosis missing treatment_plan', { work_id: diagnosisData.work_id });
+        ErrorResponses.missingParameter(res, 'treatment_plan');
         return;
       }
 
       const db = getKysely();
-      const workIdNum = parseInt(String(diagnosisData.WorkID));
+      const workIdNum = parseInt(String(diagnosisData.work_id));
 
       // Normalized column values (null for empty strings — preserves original semantics).
-      const dxDate = diagnosisData.DxDate
-        ? new Date(diagnosisData.DxDate)
+      const dxDate = diagnosisData.dx_date
+        ? new Date(diagnosisData.dx_date)
         : new Date();
-      const diagnosis = diagnosisData.Diagnosis;
-      const treatmentPlan = diagnosisData.TreatmentPlan;
-      const chiefComplain = diagnosisData.ChiefComplain || null;
-      const appliance = diagnosisData.Appliance || null;
+      const diagnosis = diagnosisData.diagnosis;
+      const treatmentPlan = diagnosisData.treatment_plan;
+      const chiefComplain = diagnosisData.chief_complain || null;
+      const appliance = diagnosisData.appliance || null;
       // Facial Analysis
-      const fAnteroPosterior = diagnosisData.fAnteroPosterior || null;
-      const fVertical = diagnosisData.fVertical || null;
-      const fTransverse = diagnosisData.fTransverse || null;
-      const fLipCompetence = diagnosisData.fLipCompetence || null;
-      const fNasoLabialAngle = diagnosisData.fNasoLabialAngle || null;
-      const fUpperIncisorShowRest = diagnosisData.fUpperIncisorShowRest || null;
-      const fUpperIncisorShowSmile = diagnosisData.fUpperIncisorShowSmile || null;
+      const fAnteroPosterior = diagnosisData.f_antero_posterior || null;
+      const fVertical = diagnosisData.f_vertical || null;
+      const fTransverse = diagnosisData.f_transverse || null;
+      const fLipCompetence = diagnosisData.f_lip_competence || null;
+      const fNasoLabialAngle = diagnosisData.f_naso_labial_angle || null;
+      const fUpperIncisorShowRest = diagnosisData.f_upper_incisor_show_rest || null;
+      const fUpperIncisorShowSmile = diagnosisData.f_upper_incisor_show_smile || null;
       // Intraoral Analysis
-      const iTeethPresent = diagnosisData.ITeethPresent || null;
-      const iDentalHealth = diagnosisData.IDentalHealth || null;
-      const iLowerCrowding = diagnosisData.ILowerCrowding || null;
-      const iLowerIncisorInclination = diagnosisData.ILowerIncisorInclination || null;
-      const iCurveofSpee = diagnosisData.ICurveofSpee || null;
-      const iUpperCrowding = diagnosisData.IUpperCrowding || null;
-      const iUpperIncisorInclination = diagnosisData.IUpperIncisorInclination || null;
+      const iTeethPresent = diagnosisData.i_teeth_present || null;
+      const iDentalHealth = diagnosisData.i_dental_health || null;
+      const iLowerCrowding = diagnosisData.i_lower_crowding || null;
+      const iLowerIncisorInclination = diagnosisData.i_lower_incisor_inclination || null;
+      const iCurveofSpee = diagnosisData.i_curveof_spee || null;
+      const iUpperCrowding = diagnosisData.i_upper_crowding || null;
+      const iUpperIncisorInclination = diagnosisData.i_upper_incisor_inclination || null;
       // Occlusion Analysis
-      const oIncisorRelation = diagnosisData.OIncisorRelation || null;
-      const oOverjet = diagnosisData.OOverjet || null;
-      const oOverbite = diagnosisData.OOverbite || null;
-      const oCenterlines = diagnosisData.OCenterlines || null;
-      const oMolarRelation = diagnosisData.OMolarRelation || null;
-      const oCanineRelation = diagnosisData.OCanineRelation || null;
-      const oFunctionalOcclusion = diagnosisData.OFunctionalOcclusion || null;
+      const oIncisorRelation = diagnosisData.o_incisor_relation || null;
+      const oOverjet = diagnosisData.o_overjet || null;
+      const oOverbite = diagnosisData.o_overbite || null;
+      const oCenterlines = diagnosisData.o_centerlines || null;
+      const oMolarRelation = diagnosisData.o_molar_relation || null;
+      const oCanineRelation = diagnosisData.o_canine_relation || null;
+      const oFunctionalOcclusion = diagnosisData.o_functional_occlusion || null;
       // Cephalometric Analysis
-      const c_SNA = diagnosisData.C_SNA || null;
-      const c_SNB = diagnosisData.C_SNB || null;
-      const c_ANB = diagnosisData.C_ANB || null;
-      const c_SNMx = diagnosisData.C_SNMx || null;
-      const c_Wits = diagnosisData.C_Wits || null;
-      const c_FMA = diagnosisData.C_FMA || null;
-      const c_MMA = diagnosisData.C_MMA || null;
-      const c_UIMX = diagnosisData.C_UIMX || null;
-      const c_LIMd = diagnosisData.C_LIMd || null;
-      const c_UI_LI = diagnosisData.C_UI_LI || null;
-      const c_LI_APo = diagnosisData.C_LI_APo || null;
-      const c_Ulip_E = diagnosisData.C_Ulip_E || null;
-      const c_Llip_E = diagnosisData.C_Llip_E || null;
-      const c_Naso_lip = diagnosisData.C_Naso_lip || null;
-      const c_TAFH = diagnosisData.C_TAFH || null;
-      const c_UAFH = diagnosisData.C_UAFH || null;
-      const c_LAFH = diagnosisData.C_LAFH || null;
-      const c_PercentLAFH = diagnosisData.C_PercentLAFH || null;
+      const c_SNA = diagnosisData.c_sna || null;
+      const c_SNB = diagnosisData.c_snb || null;
+      const c_ANB = diagnosisData.c_anb || null;
+      const c_SNMx = diagnosisData.c_sn_mx || null;
+      const c_Wits = diagnosisData.c_wits || null;
+      const c_FMA = diagnosisData.c_fma || null;
+      const c_MMA = diagnosisData.c_mma || null;
+      const c_UIMX = diagnosisData.c_uimx || null;
+      const c_LIMd = diagnosisData.c_li_md || null;
+      const c_UI_LI = diagnosisData.c_ui_li || null;
+      const c_LI_APo = diagnosisData.c_li_a_po || null;
+      const c_Ulip_E = diagnosisData.c_ulip_e || null;
+      const c_Llip_E = diagnosisData.c_llip_e || null;
+      const c_Naso_lip = diagnosisData.c_naso_lip || null;
+      const c_TAFH = diagnosisData.c_tafh || null;
+      const c_UAFH = diagnosisData.c_uafh || null;
+      const c_LAFH = diagnosisData.c_lafh || null;
+      const c_PercentLAFH = diagnosisData.c_percent_lafh || null;
 
       // Upsert: try UPDATE first; INSERT only if no existing row was updated.
       // (The original IF-EXISTS check at L1460 collapses into the rowCount test.)
       const updateResult = await sql`
-                UPDATE "tblDiagnosis"
+                UPDATE "diagnoses"
                 SET
-                    "DxDate" = ${dxDate},
-                    "Diagnosis" = ${diagnosis},
-                    "TreatmentPlan" = ${treatmentPlan},
-                    "ChiefComplain" = ${chiefComplain},
-                    "Appliance" = ${appliance},
-                    "fAnteroPosterior" = ${fAnteroPosterior},
-                    "fVertical" = ${fVertical},
-                    "fTransverse" = ${fTransverse},
-                    "fLipCompetence" = ${fLipCompetence},
-                    "fNasoLabialAngle" = ${fNasoLabialAngle},
-                    "fUpperIncisorShowRest" = ${fUpperIncisorShowRest},
-                    "fUpperIncisorShowSmile" = ${fUpperIncisorShowSmile},
-                    "ITeethPresent" = ${iTeethPresent},
-                    "IDentalHealth" = ${iDentalHealth},
-                    "ILowerCrowding" = ${iLowerCrowding},
-                    "ILowerIncisorInclination" = ${iLowerIncisorInclination},
-                    "ICurveofSpee" = ${iCurveofSpee},
-                    "IUpperCrowding" = ${iUpperCrowding},
-                    "IUpperIncisorInclination" = ${iUpperIncisorInclination},
-                    "OIncisorRelation" = ${oIncisorRelation},
-                    "OOverjet" = ${oOverjet},
-                    "OOverbite" = ${oOverbite},
-                    "OCenterlines" = ${oCenterlines},
-                    "OMolarRelation" = ${oMolarRelation},
-                    "OCanineRelation" = ${oCanineRelation},
-                    "OFunctionalOcclusion" = ${oFunctionalOcclusion},
-                    "C_SNA" = ${c_SNA},
-                    "C_SNB" = ${c_SNB},
-                    "C_ANB" = ${c_ANB},
-                    "C_SNMx" = ${c_SNMx},
-                    "C_Wits" = ${c_Wits},
-                    "C_FMA" = ${c_FMA},
-                    "C_MMA" = ${c_MMA},
-                    "C_UIMX" = ${c_UIMX},
-                    "C_LIMd" = ${c_LIMd},
-                    "C_UI_LI" = ${c_UI_LI},
-                    "C_LI_APo" = ${c_LI_APo},
-                    "C_Ulip_E" = ${c_Ulip_E},
-                    "C_Llip_E" = ${c_Llip_E},
-                    "C_Naso_lip" = ${c_Naso_lip},
-                    "C_TAFH" = ${c_TAFH},
-                    "C_UAFH" = ${c_UAFH},
-                    "C_LAFH" = ${c_LAFH},
-                    "C_PercentLAFH" = ${c_PercentLAFH}
-                WHERE "WorkID" = ${workIdNum}
+                    "dx_date" = ${dxDate},
+                    "diagnosis" = ${diagnosis},
+                    "treatment_plan" = ${treatmentPlan},
+                    "chief_complain" = ${chiefComplain},
+                    "appliance" = ${appliance},
+                    "f_antero_posterior" = ${fAnteroPosterior},
+                    "f_vertical" = ${fVertical},
+                    "f_transverse" = ${fTransverse},
+                    "f_lip_competence" = ${fLipCompetence},
+                    "f_naso_labial_angle" = ${fNasoLabialAngle},
+                    "f_upper_incisor_show_rest" = ${fUpperIncisorShowRest},
+                    "f_upper_incisor_show_smile" = ${fUpperIncisorShowSmile},
+                    "i_teeth_present" = ${iTeethPresent},
+                    "i_dental_health" = ${iDentalHealth},
+                    "i_lower_crowding" = ${iLowerCrowding},
+                    "i_lower_incisor_inclination" = ${iLowerIncisorInclination},
+                    "i_curveof_spee" = ${iCurveofSpee},
+                    "i_upper_crowding" = ${iUpperCrowding},
+                    "i_upper_incisor_inclination" = ${iUpperIncisorInclination},
+                    "o_incisor_relation" = ${oIncisorRelation},
+                    "o_overjet" = ${oOverjet},
+                    "o_overbite" = ${oOverbite},
+                    "o_centerlines" = ${oCenterlines},
+                    "o_molar_relation" = ${oMolarRelation},
+                    "o_canine_relation" = ${oCanineRelation},
+                    "o_functional_occlusion" = ${oFunctionalOcclusion},
+                    "c_sna" = ${c_SNA},
+                    "c_snb" = ${c_SNB},
+                    "c_anb" = ${c_ANB},
+                    "c_sn_mx" = ${c_SNMx},
+                    "c_wits" = ${c_Wits},
+                    "c_fma" = ${c_FMA},
+                    "c_mma" = ${c_MMA},
+                    "c_uimx" = ${c_UIMX},
+                    "c_li_md" = ${c_LIMd},
+                    "c_ui_li" = ${c_UI_LI},
+                    "c_li_a_po" = ${c_LI_APo},
+                    "c_ulip_e" = ${c_Ulip_E},
+                    "c_llip_e" = ${c_Llip_E},
+                    "c_naso_lip" = ${c_Naso_lip},
+                    "c_tafh" = ${c_TAFH},
+                    "c_uafh" = ${c_UAFH},
+                    "c_lafh" = ${c_LAFH},
+                    "c_percent_lafh" = ${c_PercentLAFH}
+                WHERE "work_id" = ${workIdNum}
             `.execute(db);
 
       let successMessage: string;
 
       if (Number(updateResult.numAffectedRows ?? 0) > 0) {
-        successMessage = 'Diagnosis updated successfully';
+        successMessage = 'diagnosis updated successfully';
       } else {
         // INSERT new diagnosis
         await sql`
-                INSERT INTO "tblDiagnosis" (
-                    "DxDate", "WorkID", "Diagnosis", "TreatmentPlan", "ChiefComplain", "Appliance",
-                    "fAnteroPosterior", "fVertical", "fTransverse", "fLipCompetence", "fNasoLabialAngle",
-                    "fUpperIncisorShowRest", "fUpperIncisorShowSmile",
-                    "ITeethPresent", "IDentalHealth", "ILowerCrowding", "ILowerIncisorInclination",
-                    "ICurveofSpee", "IUpperCrowding", "IUpperIncisorInclination",
-                    "OIncisorRelation", "OOverjet", "OOverbite", "OCenterlines", "OMolarRelation",
-                    "OCanineRelation", "OFunctionalOcclusion",
-                    "C_SNA", "C_SNB", "C_ANB", "C_SNMx", "C_Wits", "C_FMA", "C_MMA", "C_UIMX", "C_LIMd",
-                    "C_UI_LI", "C_LI_APo", "C_Ulip_E", "C_Llip_E", "C_Naso_lip",
-                    "C_TAFH", "C_UAFH", "C_LAFH", "C_PercentLAFH"
+                INSERT INTO "diagnoses" (
+                    "dx_date", "work_id", "diagnosis", "treatment_plan", "chief_complain", "appliance",
+                    "f_antero_posterior", "f_vertical", "f_transverse", "f_lip_competence", "f_naso_labial_angle",
+                    "f_upper_incisor_show_rest", "f_upper_incisor_show_smile",
+                    "i_teeth_present", "i_dental_health", "i_lower_crowding", "i_lower_incisor_inclination",
+                    "i_curveof_spee", "i_upper_crowding", "i_upper_incisor_inclination",
+                    "o_incisor_relation", "o_overjet", "o_overbite", "o_centerlines", "o_molar_relation",
+                    "o_canine_relation", "o_functional_occlusion",
+                    "c_sna", "c_snb", "c_anb", "c_sn_mx", "c_wits", "c_fma", "c_mma", "c_uimx", "c_li_md",
+                    "c_ui_li", "c_li_a_po", "c_ulip_e", "c_llip_e", "c_naso_lip",
+                    "c_tafh", "c_uafh", "c_lafh", "c_percent_lafh"
                 )
                 VALUES (
                     ${dxDate}, ${workIdNum}, ${diagnosis}, ${treatmentPlan}, ${chiefComplain}, ${appliance},
@@ -1613,7 +1613,7 @@ router.post(
                     ${c_TAFH}, ${c_UAFH}, ${c_LAFH}, ${c_PercentLAFH}
                 )
             `.execute(db);
-        successMessage = 'Diagnosis created successfully';
+        successMessage = 'diagnosis created successfully';
       }
 
       res.json({
@@ -1643,13 +1643,13 @@ router.delete(
         return;
       }
 
-      await sql`DELETE FROM "tblDiagnosis" WHERE "WorkID" = ${parseInt(workId)}`.execute(
+      await sql`DELETE FROM "diagnoses" WHERE "work_id" = ${parseInt(workId)}`.execute(
         getKysely()
       );
 
       res.json({
         success: true,
-        message: 'Diagnosis deleted successfully'
+        message: 'diagnosis deleted successfully'
       });
     } catch (error) {
       log.error('Error deleting diagnosis:', error);
@@ -1702,15 +1702,15 @@ router.get(
       res.json({
         success: true,
         work: {
-          workId: work.workid,
-          type: work.TypeName,
-          status: work.StatusName,
-          doctor: work.DoctorName,
-          totalRequired: work.TotalRequired,
-          currency: work.Currency,
+          workId: work.work_id,
+          type: work.type_name,
+          status: work.status_name,
+          doctor: work.doctor_name,
+          totalRequired: work.total_required,
+          currency: work.currency,
           currentPatient: {
-            personId: work.PersonID,
-            name: work.PatientName
+            personId: work.person_id,
+            name: work.patient_name
           }
         },
         relatedRecords: relatedCounts

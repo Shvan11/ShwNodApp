@@ -5,14 +5,14 @@
  * pool regardless of DB_DRIVER — the positional `ColumnValue[]` mappers are gone and
  * the bodies return plain objects.
  *
- * Notes for this module:
- *  - Money/amount aggregates (`SUM(tblInvoice.Amountpaid)`) come back from PG as a
+ * notes for this module:
+ *  - Money/amount aggregates (`SUM(tblInvoice.amount_paid)`) come back from PG as a
  *    `numeric`; the centralized pg parser (kysely.ts) returns a JS number, so the
  *    aggregate is coalesced and typed `number`.
- *  - The work-table date columns `StartDate`/`DebondDate`/`FPhotoDate`/`IPhotoDate`/
- *    `NotesDate`/`DiscountDate` (and `tblWorkItems.StartDate`/`CompletedDate`) are PG
+ *  - The work-table date columns `start_date`/`debond_date`/`f_photo_date`/`i_photo_date`/
+ *    `notes_date`/`discount_date` (and `tblWorkItems.start_date`/`completed_date`) are PG
  *    `date` columns, so the parser yields `'YYYY-MM-DD'` strings at runtime (mssql
- *    returned `Date`). `AdditionDate` is a `timestamp` and still returns a `Date`.
+ *    returned `Date`). `addition_date` is a `timestamp` and still returns a `Date`.
  *    Declared return interfaces are preserved (callers unchanged) — see FLAGS.
  */
 import { sql, type Kysely } from 'kysely';
@@ -20,7 +20,7 @@ import { getKysely, withPgTransaction, type Database } from '../kysely.js';
 import { toDateOnly } from '../../../utils/date.js';
 
 /**
- * Work Status Constants
+ * Work status Constants
  * 1 = Active (ongoing treatment)
  * 2 = Finished (completed successfully)
  * 3 = Discontinued (abandoned by patient)
@@ -48,34 +48,34 @@ function numOrNull(value: unknown): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-// Type definitions
+// type definitions
 interface Work {
-  workid: number;
-  PersonID: number;
-  TotalRequired: number | null;
-  Currency: string | null;
-  Typeofwork: number | null;
-  Notes: string | null;
-  Status: number;
-  AdditionDate: Date | null;
-  StartDate: Date | null;
-  DebondDate: Date | null;
-  FPhotoDate: Date | null;
-  IPhotoDate: Date | null;
-  EstimatedDuration: number | null;
-  DrID: number | null;
-  NotesDate: Date | null;
-  KeyWordID1: number | null;
-  KeyWordID2: number | null;
-  KeywordID3: number | null;
-  KeywordID4: number | null;
-  KeywordID5: number | null;
-  Discount: number | null;
-  DiscountDate: Date | null;
-  DiscountReason: string | null;
-  DoctorName: string | null;
-  TypeName: string | null;
-  StatusName: string | null;
+  work_id: number;
+  person_id: number;
+  total_required: number | null;
+  currency: string | null;
+  type_of_work: number | null;
+  notes: string | null;
+  status: number;
+  addition_date: Date | null;
+  start_date: Date | null;
+  debond_date: Date | null;
+  f_photo_date: Date | null;
+  i_photo_date: Date | null;
+  estimated_duration: number | null;
+  dr_id: number | null;
+  notes_date: Date | null;
+  keyword_id_1: number | null;
+  keyword_id_2: number | null;
+  keyword_id_3: number | null;
+  keyword_id_4: number | null;
+  keyword_id_5: number | null;
+  discount: number | null;
+  discount_date: Date | null;
+  discount_reason: string | null;
+  doctor_name: string | null;
+  type_name: string | null;
+  status_name: string | null;
   Keyword1: string | null;
   Keyword2: string | null;
   Keyword3: string | null;
@@ -86,90 +86,90 @@ interface Work {
 }
 
 interface WorkDetails extends Work {
-  PatientName: string;
+  patient_name: string;
 }
 
 interface WorkItem {
-  ID: number;
-  WorkID: number;
-  FillingType: string | null;
-  FillingDepth: string | null;
-  CanalsNo: number | null;
-  WorkingLength: string | null;
-  ImplantLength: number | null;
-  ImplantDiameter: number | null;
-  ImplantManufacturerID: number | null;
+  id: number;
+  work_id: number;
+  filling_type: string | null;
+  filling_depth: string | null;
+  canals_no: number | null;
+  working_length: string | null;
+  implant_length: number | null;
+  implant_diameter: number | null;
+  implant_manufacturer_id: number | null;
   ImplantManufacturerName: string | null;
-  Material: string | null;
-  LabName: string | null;
-  ItemCost: number | null;
-  StartDate: Date | null;
-  CompletedDate: Date | null;
-  Note: string | null;
+  material: string | null;
+  lab_name: string | null;
+  item_cost: number | null;
+  start_date: Date | null;
+  completed_date: Date | null;
+  note: string | null;
   Teeth: string | null;
   TeethIds: number[];
 }
 
 interface WorkData {
-  PersonID: number;
-  TotalRequired?: number | null;
-  Currency?: string | null;
-  Typeofwork?: number | null;
-  Notes?: string | null;
-  Status?: WorkStatusType;
-  StartDate?: Date | string | null;
-  DebondDate?: Date | string | null;
-  FPhotoDate?: Date | string | null;
-  IPhotoDate?: Date | string | null;
-  EstimatedDuration?: number | null;
-  DrID: number;
-  NotesDate?: Date | string | null;
-  KeyWordID1?: number | null;
-  KeyWordID2?: number | null;
-  KeywordID3?: number | null;
-  KeywordID4?: number | null;
-  KeywordID5?: number | null;
-  Discount?: number | null;
-  DiscountDate?: Date | string | null;
-  DiscountReason?: string | null;
+  person_id: number;
+  total_required?: number | null;
+  currency?: string | null;
+  type_of_work?: number | null;
+  notes?: string | null;
+  status?: WorkStatusType;
+  start_date?: Date | string | null;
+  debond_date?: Date | string | null;
+  f_photo_date?: Date | string | null;
+  i_photo_date?: Date | string | null;
+  estimated_duration?: number | null;
+  dr_id: number;
+  notes_date?: Date | string | null;
+  keyword_id_1?: number | null;
+  keyword_id_2?: number | null;
+  keyword_id_3?: number | null;
+  keyword_id_4?: number | null;
+  keyword_id_5?: number | null;
+  discount?: number | null;
+  discount_date?: Date | string | null;
+  discount_reason?: string | null;
 }
 
 interface WorkItemData {
-  WorkID: number;
-  FillingType?: string | null;
-  FillingDepth?: string | null;
-  CanalsNo?: number | null;
-  WorkingLength?: string | null;
-  ImplantLength?: number | null;
-  ImplantDiameter?: number | null;
-  ImplantManufacturerID?: number | null;
-  Material?: string | null;
-  LabName?: string | null;
-  ItemCost?: number | null;
-  StartDate?: Date | string | null;
-  CompletedDate?: Date | string | null;
-  Note?: string | null;
+  work_id: number;
+  filling_type?: string | null;
+  filling_depth?: string | null;
+  canals_no?: number | null;
+  working_length?: string | null;
+  implant_length?: number | null;
+  implant_diameter?: number | null;
+  implant_manufacturer_id?: number | null;
+  material?: string | null;
+  lab_name?: string | null;
+  item_cost?: number | null;
+  start_date?: Date | string | null;
+  completed_date?: Date | string | null;
+  note?: string | null;
   TeethIds?: number[];
 }
 
-interface WorkType {
-  ID: number;
-  WorkType: string;
+interface work_type {
+  id: number;
+  work_type: string;
 }
 
 interface Keyword {
-  ID: number;
-  KeyWord: string;
+  id: number;
+  key_word: string;
 }
 
-interface ToothNumber {
-  ID: number;
-  ToothCode: string;
-  ToothName: string;
-  Quadrant: number;
-  ToothNumber?: number;
-  IsPermanent: boolean;
-  SortOrder?: number;
+interface tooth_number {
+  id: number;
+  tooth_code: string;
+  tooth_name: string;
+  quadrant: number;
+  tooth_number?: number;
+  is_permanent: boolean;
+  sort_order?: number;
 }
 
 interface DependencyCheck {
@@ -186,7 +186,7 @@ interface ValidationResult {
   valid: boolean;
   error?: string;
   existingWork?: {
-    workid: number;
+    work_id: number;
     type: string | null;
     doctor: string | null;
   };
@@ -200,178 +200,178 @@ interface ImplantManufacturer {
 export async function getWorksByPatient(personId: number): Promise<Work[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblwork as w')
-    .leftJoin('tblEmployees as e', 'e.ID', 'w.DrID')
-    .leftJoin('tblWorkType as wt', 'wt.ID', 'w.Typeofwork')
-    .leftJoin('tblWorkStatus as ws', 'ws.StatusID', 'w.Status')
-    .leftJoin('tblKeyWord as k1', 'k1.ID', 'w.KeyWordID1')
-    .leftJoin('tblKeyWord as k2', 'k2.ID', 'w.KeyWordID2')
-    .leftJoin('tblKeyWord as k3', 'k3.ID', 'w.KeywordID3')
-    .leftJoin('tblKeyWord as k4', 'k4.ID', 'w.KeywordID4')
-    .leftJoin('tblKeyWord as k5', 'k5.ID', 'w.KeywordID5')
-    .leftJoin('tblInvoice as i', 'i.workid', 'w.workid')
-    .where('w.PersonID', '=', personId)
+    .selectFrom('works as w')
+    .leftJoin('employees as e', 'e.id', 'w.dr_id')
+    .leftJoin('work_types as wt', 'wt.id', 'w.type_of_work')
+    .leftJoin('work_statuses as ws', 'ws.status_id', 'w.status')
+    .leftJoin('keywords as k1', 'k1.id', 'w.keyword_id_1')
+    .leftJoin('keywords as k2', 'k2.id', 'w.keyword_id_2')
+    .leftJoin('keywords as k3', 'k3.id', 'w.keyword_id_3')
+    .leftJoin('keywords as k4', 'k4.id', 'w.keyword_id_4')
+    .leftJoin('keywords as k5', 'k5.id', 'w.keyword_id_5')
+    .leftJoin('invoices as i', 'i.work_id', 'w.work_id')
+    .where('w.person_id', '=', personId)
     .select((eb) => [
-      'w.workid',
-      'w.PersonID',
-      'w.TotalRequired',
-      'w.Currency',
-      'w.Typeofwork',
-      'w.Notes',
-      'w.Status',
-      'w.AdditionDate',
-      'w.StartDate',
-      'w.DebondDate',
-      'w.FPhotoDate',
-      'w.IPhotoDate',
-      'w.EstimatedDuration',
-      'w.DrID',
-      'w.NotesDate',
-      'w.KeyWordID1',
-      'w.KeyWordID2',
-      'w.KeywordID3',
-      'w.KeywordID4',
-      'w.KeywordID5',
-      'w.Discount',
-      'w.DiscountDate',
-      'w.DiscountReason',
-      'e.employeeName as DoctorName',
-      'wt.WorkType as TypeName',
-      'ws.StatusName',
-      'k1.KeyWord as Keyword1',
-      'k2.KeyWord as Keyword2',
-      'k3.KeyWord as Keyword3',
-      'k4.KeyWord as Keyword4',
-      'k5.KeyWord as Keyword5',
+      'w.work_id',
+      'w.person_id',
+      'w.total_required',
+      'w.currency',
+      'w.type_of_work',
+      'w.notes',
+      'w.status',
+      'w.addition_date',
+      'w.start_date',
+      'w.debond_date',
+      'w.f_photo_date',
+      'w.i_photo_date',
+      'w.estimated_duration',
+      'w.dr_id',
+      'w.notes_date',
+      'w.keyword_id_1',
+      'w.keyword_id_2',
+      'w.keyword_id_3',
+      'w.keyword_id_4',
+      'w.keyword_id_5',
+      'w.discount',
+      'w.discount_date',
+      'w.discount_reason',
+      'e.employee_name as doctor_name',
+      'wt.work_type as type_name',
+      'ws.status_name',
+      'k1.key_word as Keyword1',
+      'k2.key_word as Keyword2',
+      'k3.key_word as Keyword3',
+      'k4.key_word as Keyword4',
+      'k5.key_word as Keyword5',
       sql<string>`CASE
-        WHEN ${eb.ref('w.Status')} = 2 THEN 'Completed'
-        WHEN ${eb.ref('w.Status')} = 3 THEN 'Discontinued'
-        WHEN ${eb.ref('w.StartDate')} IS NOT NULL THEN 'In Progress'
+        WHEN ${eb.ref('w.status')} = 2 THEN 'Completed'
+        WHEN ${eb.ref('w.status')} = 3 THEN 'Discontinued'
+        WHEN ${eb.ref('w.start_date')} IS NOT NULL THEN 'In Progress'
         ELSE 'Planned'
       END`.as('WorkStatus'),
-      eb.fn.coalesce(eb.fn.sum('i.Amountpaid'), sql<number>`0`).$castTo<number>().as('TotalPaid'),
+      eb.fn.coalesce(eb.fn.sum('i.amount_paid'), sql<number>`0`).$castTo<number>().as('TotalPaid'),
     ])
     .groupBy([
-      'w.workid',
-      'w.PersonID',
-      'w.TotalRequired',
-      'w.Currency',
-      'w.Typeofwork',
-      'w.Notes',
-      'w.Status',
-      'w.AdditionDate',
-      'w.StartDate',
-      'w.DebondDate',
-      'w.FPhotoDate',
-      'w.IPhotoDate',
-      'w.EstimatedDuration',
-      'w.DrID',
-      'w.NotesDate',
-      'w.KeyWordID1',
-      'w.KeyWordID2',
-      'w.KeywordID3',
-      'w.KeywordID4',
-      'w.KeywordID5',
-      'w.Discount',
-      'w.DiscountDate',
-      'w.DiscountReason',
-      'e.employeeName',
-      'wt.WorkType',
-      'ws.StatusName',
-      'k1.KeyWord',
-      'k2.KeyWord',
-      'k3.KeyWord',
-      'k4.KeyWord',
-      'k5.KeyWord',
+      'w.work_id',
+      'w.person_id',
+      'w.total_required',
+      'w.currency',
+      'w.type_of_work',
+      'w.notes',
+      'w.status',
+      'w.addition_date',
+      'w.start_date',
+      'w.debond_date',
+      'w.f_photo_date',
+      'w.i_photo_date',
+      'w.estimated_duration',
+      'w.dr_id',
+      'w.notes_date',
+      'w.keyword_id_1',
+      'w.keyword_id_2',
+      'w.keyword_id_3',
+      'w.keyword_id_4',
+      'w.keyword_id_5',
+      'w.discount',
+      'w.discount_date',
+      'w.discount_reason',
+      'e.employee_name',
+      'wt.work_type',
+      'ws.status_name',
+      'k1.key_word',
+      'k2.key_word',
+      'k3.key_word',
+      'k4.key_word',
+      'k5.key_word',
     ])
     // NULLS LAST so undated (legacy) works sort to the bottom, matching SQL Server.
-    .orderBy('w.AdditionDate', sql`desc nulls last`)
+    .orderBy('w.addition_date', sql`desc nulls last`)
     .execute() as Promise<Work[]>;
 }
 
 export async function getWorkDetails(workId: number): Promise<WorkDetails | null> {
   const db = getKysely();
   const row = await db
-    .selectFrom('tblwork as w')
-    .leftJoin('tblEmployees as e', 'e.ID', 'w.DrID')
-    .leftJoin('tblWorkType as wt', 'wt.ID', 'w.Typeofwork')
-    .leftJoin('tblWorkStatus as ws', 'ws.StatusID', 'w.Status')
-    .leftJoin('tblKeyWord as k1', 'k1.ID', 'w.KeyWordID1')
-    .leftJoin('tblKeyWord as k2', 'k2.ID', 'w.KeyWordID2')
-    .leftJoin('tblKeyWord as k3', 'k3.ID', 'w.KeywordID3')
-    .leftJoin('tblKeyWord as k4', 'k4.ID', 'w.KeywordID4')
-    .leftJoin('tblKeyWord as k5', 'k5.ID', 'w.KeywordID5')
-    .leftJoin('tblpatients as p', 'p.PersonID', 'w.PersonID')
-    .leftJoin('tblInvoice as i', 'i.workid', 'w.workid')
-    .where('w.workid', '=', workId)
+    .selectFrom('works as w')
+    .leftJoin('employees as e', 'e.id', 'w.dr_id')
+    .leftJoin('work_types as wt', 'wt.id', 'w.type_of_work')
+    .leftJoin('work_statuses as ws', 'ws.status_id', 'w.status')
+    .leftJoin('keywords as k1', 'k1.id', 'w.keyword_id_1')
+    .leftJoin('keywords as k2', 'k2.id', 'w.keyword_id_2')
+    .leftJoin('keywords as k3', 'k3.id', 'w.keyword_id_3')
+    .leftJoin('keywords as k4', 'k4.id', 'w.keyword_id_4')
+    .leftJoin('keywords as k5', 'k5.id', 'w.keyword_id_5')
+    .leftJoin('patients as p', 'p.person_id', 'w.person_id')
+    .leftJoin('invoices as i', 'i.work_id', 'w.work_id')
+    .where('w.work_id', '=', workId)
     .select((eb) => [
-      'w.workid',
-      'w.PersonID',
-      'w.TotalRequired',
-      'w.Currency',
-      'w.Typeofwork',
-      'w.Notes',
-      'w.Status',
-      'w.AdditionDate',
-      'w.StartDate',
-      'w.DebondDate',
-      'w.FPhotoDate',
-      'w.IPhotoDate',
-      'w.EstimatedDuration',
-      'w.DrID',
-      'w.NotesDate',
-      'w.KeyWordID1',
-      'w.KeyWordID2',
-      'w.KeywordID3',
-      'w.KeywordID4',
-      'w.KeywordID5',
-      'w.Discount',
-      'w.DiscountDate',
-      'w.DiscountReason',
-      'e.employeeName as DoctorName',
-      'wt.WorkType as TypeName',
-      'ws.StatusName',
-      'k1.KeyWord as Keyword1',
-      'k2.KeyWord as Keyword2',
-      'k3.KeyWord as Keyword3',
-      'k4.KeyWord as Keyword4',
-      'k5.KeyWord as Keyword5',
-      'p.PatientName',
-      eb.fn.coalesce(eb.fn.sum('i.Amountpaid'), sql<number>`0`).$castTo<number>().as('TotalPaid'),
+      'w.work_id',
+      'w.person_id',
+      'w.total_required',
+      'w.currency',
+      'w.type_of_work',
+      'w.notes',
+      'w.status',
+      'w.addition_date',
+      'w.start_date',
+      'w.debond_date',
+      'w.f_photo_date',
+      'w.i_photo_date',
+      'w.estimated_duration',
+      'w.dr_id',
+      'w.notes_date',
+      'w.keyword_id_1',
+      'w.keyword_id_2',
+      'w.keyword_id_3',
+      'w.keyword_id_4',
+      'w.keyword_id_5',
+      'w.discount',
+      'w.discount_date',
+      'w.discount_reason',
+      'e.employee_name as doctor_name',
+      'wt.work_type as type_name',
+      'ws.status_name',
+      'k1.key_word as Keyword1',
+      'k2.key_word as Keyword2',
+      'k3.key_word as Keyword3',
+      'k4.key_word as Keyword4',
+      'k5.key_word as Keyword5',
+      'p.patient_name',
+      eb.fn.coalesce(eb.fn.sum('i.amount_paid'), sql<number>`0`).$castTo<number>().as('TotalPaid'),
     ])
     .groupBy([
-      'w.workid',
-      'w.PersonID',
-      'w.TotalRequired',
-      'w.Currency',
-      'w.Typeofwork',
-      'w.Notes',
-      'w.Status',
-      'w.AdditionDate',
-      'w.StartDate',
-      'w.DebondDate',
-      'w.FPhotoDate',
-      'w.IPhotoDate',
-      'w.EstimatedDuration',
-      'w.DrID',
-      'w.NotesDate',
-      'w.KeyWordID1',
-      'w.KeyWordID2',
-      'w.KeywordID3',
-      'w.KeywordID4',
-      'w.KeywordID5',
-      'w.Discount',
-      'w.DiscountDate',
-      'w.DiscountReason',
-      'e.employeeName',
-      'wt.WorkType',
-      'ws.StatusName',
-      'k1.KeyWord',
-      'k2.KeyWord',
-      'k3.KeyWord',
-      'k4.KeyWord',
-      'k5.KeyWord',
-      'p.PatientName',
+      'w.work_id',
+      'w.person_id',
+      'w.total_required',
+      'w.currency',
+      'w.type_of_work',
+      'w.notes',
+      'w.status',
+      'w.addition_date',
+      'w.start_date',
+      'w.debond_date',
+      'w.f_photo_date',
+      'w.i_photo_date',
+      'w.estimated_duration',
+      'w.dr_id',
+      'w.notes_date',
+      'w.keyword_id_1',
+      'w.keyword_id_2',
+      'w.keyword_id_3',
+      'w.keyword_id_4',
+      'w.keyword_id_5',
+      'w.discount',
+      'w.discount_date',
+      'w.discount_reason',
+      'e.employee_name',
+      'wt.work_type',
+      'ws.status_name',
+      'k1.key_word',
+      'k2.key_word',
+      'k3.key_word',
+      'k4.key_word',
+      'k5.key_word',
+      'p.patient_name',
     ])
     .executeTakeFirst();
 
@@ -382,50 +382,50 @@ export async function getWorkDetails(workId: number): Promise<WorkDetails | null
 export async function getWorkDetailsList(workId: number): Promise<WorkItem[]> {
   const db = getKysely();
   const results = await db
-    .selectFrom('tblWorkItems as wi')
-    .leftJoin('tblWorkItemTeeth as wit', 'wit.WorkItemID', 'wi.ID')
-    .leftJoin('tblToothNumber as tn', 'tn.ID', 'wit.ToothID')
-    .leftJoin('tblImplantManufacturer as im', 'im.ID', 'wi.ImplantManufacturerID')
-    .where('wi.WorkID', '=', workId)
+    .selectFrom('work_items as wi')
+    .leftJoin('work_item_teeth as wit', 'wit.work_item_id', 'wi.id')
+    .leftJoin('tooth_numbers as tn', 'tn.id', 'wit.tooth_id')
+    .leftJoin('implant_manufacturers as im', 'im.id', 'wi.implant_manufacturer_id')
+    .where('wi.work_id', '=', workId)
     .select((eb) => [
-      'wi.ID',
-      'wi.WorkID',
-      'wi.FillingType',
-      'wi.FillingDepth',
-      'wi.CanalsNo',
-      'wi.WorkingLength',
-      eb.ref('wi.ImplantLength').$castTo<number>().as('ImplantLength'),
-      eb.ref('wi.ImplantDiameter').$castTo<number>().as('ImplantDiameter'),
-      'wi.ImplantManufacturerID',
-      'im.ManufacturerName as ImplantManufacturerName',
-      'wi.Material',
-      'wi.LabName',
-      'wi.ItemCost',
-      'wi.StartDate',
-      'wi.CompletedDate',
-      'wi.Note',
-      sql<string | null>`string_agg(${eb.ref('tn.ToothCode')}, ', ')`.as('Teeth'),
-      sql<string | null>`string_agg(cast(${eb.ref('tn.ID')} as varchar), ',')`.as('TeethIds'),
+      'wi.id',
+      'wi.work_id',
+      'wi.filling_type',
+      'wi.filling_depth',
+      'wi.canals_no',
+      'wi.working_length',
+      eb.ref('wi.implant_length').$castTo<number>().as('implant_length'),
+      eb.ref('wi.implant_diameter').$castTo<number>().as('implant_diameter'),
+      'wi.implant_manufacturer_id',
+      'im.manufacturer_name as ImplantManufacturerName',
+      'wi.material',
+      'wi.lab_name',
+      'wi.item_cost',
+      'wi.start_date',
+      'wi.completed_date',
+      'wi.note',
+      sql<string | null>`string_agg(${eb.ref('tn.tooth_code')}, ', ')`.as('Teeth'),
+      sql<string | null>`string_agg(cast(${eb.ref('tn.id')} as varchar), ',')`.as('TeethIds'),
     ])
     .groupBy([
-      'wi.ID',
-      'wi.WorkID',
-      'wi.FillingType',
-      'wi.FillingDepth',
-      'wi.CanalsNo',
-      'wi.WorkingLength',
-      'wi.ImplantLength',
-      'wi.ImplantDiameter',
-      'wi.ImplantManufacturerID',
-      'im.ManufacturerName',
-      'wi.Material',
-      'wi.LabName',
-      'wi.ItemCost',
-      'wi.StartDate',
-      'wi.CompletedDate',
-      'wi.Note',
+      'wi.id',
+      'wi.work_id',
+      'wi.filling_type',
+      'wi.filling_depth',
+      'wi.canals_no',
+      'wi.working_length',
+      'wi.implant_length',
+      'wi.implant_diameter',
+      'wi.implant_manufacturer_id',
+      'im.manufacturer_name',
+      'wi.material',
+      'wi.lab_name',
+      'wi.item_cost',
+      'wi.start_date',
+      'wi.completed_date',
+      'wi.note',
     ])
-    .orderBy('wi.ID')
+    .orderBy('wi.id')
     .execute();
 
   // Convert TeethIds string to array of integers
@@ -438,36 +438,36 @@ export async function getWorkDetailsList(workId: number): Promise<WorkItem[]> {
 // Alias for new naming convention
 export const getWorkItems = getWorkDetailsList;
 
-export async function addWorkDetail(workDetailData: WorkItemData): Promise<{ ID: number } | null> {
+export async function addWorkDetail(workDetailData: WorkItemData): Promise<{ id: number } | null> {
   // One transaction: the item insert + its teeth write commit together, so a failed
   // teeth insert can't leave a half-written item behind.
   return withPgTransaction(async (trx) => {
     const inserted = await trx
-      .insertInto('tblWorkItems')
+      .insertInto('work_items')
       .values({
-        WorkID: workDetailData.WorkID,
-        FillingType: workDetailData.FillingType || null,
-        FillingDepth: workDetailData.FillingDepth || null,
-        CanalsNo: workDetailData.CanalsNo || null,
-        WorkingLength: workDetailData.WorkingLength || null,
-        ImplantLength: workDetailData.ImplantLength ?? null,
-        ImplantDiameter: workDetailData.ImplantDiameter ?? null,
-        ImplantManufacturerID: workDetailData.ImplantManufacturerID || null,
-        Material: workDetailData.Material || null,
-        LabName: workDetailData.LabName || null,
-        ItemCost: workDetailData.ItemCost || null,
-        StartDate: (workDetailData.StartDate as Date | string | null) || null,
-        CompletedDate: (workDetailData.CompletedDate as Date | string | null) || null,
-        Note: workDetailData.Note || null,
+        work_id: workDetailData.work_id,
+        filling_type: workDetailData.filling_type || null,
+        filling_depth: workDetailData.filling_depth || null,
+        canals_no: workDetailData.canals_no || null,
+        working_length: workDetailData.working_length || null,
+        implant_length: workDetailData.implant_length ?? null,
+        implant_diameter: workDetailData.implant_diameter ?? null,
+        implant_manufacturer_id: workDetailData.implant_manufacturer_id || null,
+        material: workDetailData.material || null,
+        lab_name: workDetailData.lab_name || null,
+        item_cost: workDetailData.item_cost || null,
+        start_date: (workDetailData.start_date as Date | string | null) || null,
+        completed_date: (workDetailData.completed_date as Date | string | null) || null,
+        note: workDetailData.note || null,
       })
-      .returning('ID')
+      .returning('id')
       .executeTakeFirst();
 
-    const result = inserted ? { ID: inserted.ID } : null;
+    const result = inserted ? { id: inserted.id } : null;
 
     // If teeth are provided, add them to junction table (same trx → atomic with the insert)
-    if (result && result.ID && workDetailData.TeethIds && workDetailData.TeethIds.length > 0) {
-      await setWorkItemTeeth(result.ID, workDetailData.TeethIds, trx);
+    if (result && result.id && workDetailData.TeethIds && workDetailData.TeethIds.length > 0) {
+      await setWorkItemTeeth(result.id, workDetailData.TeethIds, trx);
     }
 
     return result;
@@ -479,29 +479,29 @@ export const addWorkItem = addWorkDetail;
 
 export async function updateWorkDetail(
   detailId: number,
-  workDetailData: Omit<WorkItemData, 'WorkID'>
+  workDetailData: Omit<WorkItemData, 'work_id'>
 ): Promise<{ success: boolean; rowCount: number }> {
   // One transaction: the item update + its teeth replacement commit together, so a
   // failed teeth insert can't strip the item's teeth with no rollback.
   return withPgTransaction(async (trx) => {
     const updateResult = await trx
-      .updateTable('tblWorkItems')
+      .updateTable('work_items')
       .set({
-        FillingType: workDetailData.FillingType || null,
-        FillingDepth: workDetailData.FillingDepth || null,
-        CanalsNo: workDetailData.CanalsNo || null,
-        WorkingLength: workDetailData.WorkingLength || null,
-        ImplantLength: workDetailData.ImplantLength ?? null,
-        ImplantDiameter: workDetailData.ImplantDiameter ?? null,
-        ImplantManufacturerID: workDetailData.ImplantManufacturerID || null,
-        Material: workDetailData.Material || null,
-        LabName: workDetailData.LabName || null,
-        ItemCost: workDetailData.ItemCost || null,
-        StartDate: (workDetailData.StartDate as Date | string | null) || null,
-        CompletedDate: (workDetailData.CompletedDate as Date | string | null) || null,
-        Note: workDetailData.Note || null,
+        filling_type: workDetailData.filling_type || null,
+        filling_depth: workDetailData.filling_depth || null,
+        canals_no: workDetailData.canals_no || null,
+        working_length: workDetailData.working_length || null,
+        implant_length: workDetailData.implant_length ?? null,
+        implant_diameter: workDetailData.implant_diameter ?? null,
+        implant_manufacturer_id: workDetailData.implant_manufacturer_id || null,
+        material: workDetailData.material || null,
+        lab_name: workDetailData.lab_name || null,
+        item_cost: workDetailData.item_cost || null,
+        start_date: (workDetailData.start_date as Date | string | null) || null,
+        completed_date: (workDetailData.completed_date as Date | string | null) || null,
+        note: workDetailData.note || null,
       })
-      .where('ID', '=', detailId)
+      .where('id', '=', detailId)
       .executeTakeFirst();
 
     const result = {
@@ -526,8 +526,8 @@ export async function deleteWorkDetail(
 ): Promise<{ success: boolean; rowCount: number }> {
   const db = getKysely();
   const result = await db
-    .deleteFrom('tblWorkItems')
-    .where('ID', '=', detailId)
+    .deleteFrom('work_items')
+    .where('id', '=', detailId)
     .executeTakeFirst();
 
   return { success: true, rowCount: Number(result.numDeletedRows) };
@@ -536,38 +536,38 @@ export async function deleteWorkDetail(
 // Alias for new naming convention
 export const deleteWorkItem = deleteWorkDetail;
 
-export async function addWork(workData: WorkData): Promise<{ workid: number } | null> {
-  const status = workData.Status || WORK_STATUS.ACTIVE;
+export async function addWork(workData: WorkData): Promise<{ work_id: number } | null> {
+  const status = workData.status || WORK_STATUS.ACTIVE;
 
   const db = getKysely();
   const inserted = await db
-    .insertInto('tblwork')
+    .insertInto('works')
     .values({
-      PersonID: workData.PersonID,
-      // TotalRequired / Typeofwork are NOT NULL in the PG schema; the WorkData type
+      person_id: workData.person_id,
+      // total_required / type_of_work are NOT NULL in the PG schema; the WorkData type
       // allows them optional, so keep the legacy `?? null` runtime (PG enforces NOT NULL).
-      TotalRequired: numOrNull(workData.TotalRequired) as number,
-      Currency: workData.Currency || null,
-      Typeofwork: numOrNull(workData.Typeofwork) as number,
-      Notes: workData.Notes || null,
-      Status: status,
-      StartDate: (workData.StartDate as Date | string | null) || null,
-      DebondDate: (workData.DebondDate as Date | string | null) || null,
-      FPhotoDate: (workData.FPhotoDate as Date | string | null) || null,
-      IPhotoDate: (workData.IPhotoDate as Date | string | null) || null,
-      EstimatedDuration: numOrNull(workData.EstimatedDuration),
-      DrID: workData.DrID,
-      NotesDate: (workData.NotesDate as Date | string | null) || null,
-      KeyWordID1: numOrNull(workData.KeyWordID1),
-      KeyWordID2: numOrNull(workData.KeyWordID2),
-      KeywordID3: numOrNull(workData.KeywordID3),
-      KeywordID4: numOrNull(workData.KeywordID4),
-      KeywordID5: numOrNull(workData.KeywordID5),
+      total_required: numOrNull(workData.total_required) as number,
+      currency: workData.currency || null,
+      type_of_work: numOrNull(workData.type_of_work) as number,
+      notes: workData.notes || null,
+      status: status,
+      start_date: (workData.start_date as Date | string | null) || null,
+      debond_date: (workData.debond_date as Date | string | null) || null,
+      f_photo_date: (workData.f_photo_date as Date | string | null) || null,
+      i_photo_date: (workData.i_photo_date as Date | string | null) || null,
+      estimated_duration: numOrNull(workData.estimated_duration),
+      dr_id: workData.dr_id,
+      notes_date: (workData.notes_date as Date | string | null) || null,
+      keyword_id_1: numOrNull(workData.keyword_id_1),
+      keyword_id_2: numOrNull(workData.keyword_id_2),
+      keyword_id_3: numOrNull(workData.keyword_id_3),
+      keyword_id_4: numOrNull(workData.keyword_id_4),
+      keyword_id_5: numOrNull(workData.keyword_id_5),
     })
-    .returning('workid')
+    .returning('work_id')
     .executeTakeFirst();
 
-  return inserted ? { workid: inserted.workid } : null;
+  return inserted ? { work_id: inserted.work_id } : null;
 }
 
 export async function updateWork(
@@ -578,26 +578,26 @@ export async function updateWork(
   const updateValues: Record<string, unknown> = {};
 
   const fieldValues: Record<string, unknown> = {
-    TotalRequired: numOrNull(workData.TotalRequired),
-    Currency: workData.Currency || null,
-    Typeofwork: numOrNull(workData.Typeofwork),
-    Notes: workData.Notes || null,
-    Status: workData.Status ?? WORK_STATUS.ACTIVE,
-    StartDate: (workData.StartDate as Date | string | null) || null,
-    DebondDate: (workData.DebondDate as Date | string | null) || null,
-    FPhotoDate: (workData.FPhotoDate as Date | string | null) || null,
-    IPhotoDate: (workData.IPhotoDate as Date | string | null) || null,
-    EstimatedDuration: numOrNull(workData.EstimatedDuration),
-    DrID: workData.DrID,
-    NotesDate: (workData.NotesDate as Date | string | null) || null,
-    KeyWordID1: numOrNull(workData.KeyWordID1),
-    KeyWordID2: numOrNull(workData.KeyWordID2),
-    KeywordID3: numOrNull(workData.KeywordID3),
-    KeywordID4: numOrNull(workData.KeywordID4),
-    KeywordID5: numOrNull(workData.KeywordID5),
-    Discount: numOrNull(workData.Discount),
-    DiscountDate: (workData.DiscountDate as Date | string | null) || null,
-    DiscountReason: workData.DiscountReason ?? null,
+    total_required: numOrNull(workData.total_required),
+    currency: workData.currency || null,
+    type_of_work: numOrNull(workData.type_of_work),
+    notes: workData.notes || null,
+    status: workData.status ?? WORK_STATUS.ACTIVE,
+    start_date: (workData.start_date as Date | string | null) || null,
+    debond_date: (workData.debond_date as Date | string | null) || null,
+    f_photo_date: (workData.f_photo_date as Date | string | null) || null,
+    i_photo_date: (workData.i_photo_date as Date | string | null) || null,
+    estimated_duration: numOrNull(workData.estimated_duration),
+    dr_id: workData.dr_id,
+    notes_date: (workData.notes_date as Date | string | null) || null,
+    keyword_id_1: numOrNull(workData.keyword_id_1),
+    keyword_id_2: numOrNull(workData.keyword_id_2),
+    keyword_id_3: numOrNull(workData.keyword_id_3),
+    keyword_id_4: numOrNull(workData.keyword_id_4),
+    keyword_id_5: numOrNull(workData.keyword_id_5),
+    discount: numOrNull(workData.discount),
+    discount_date: (workData.discount_date as Date | string | null) || null,
+    discount_reason: workData.discount_reason ?? null,
   };
 
   // Only include fields that are present in workData
@@ -614,9 +614,9 @@ export async function updateWork(
 
   return withPgTransaction(async (trx) => {
     const result = await trx
-      .updateTable('tblwork')
+      .updateTable('works')
       .set(updateValues as never)
-      .where('workid', '=', workId)
+      .where('work_id', '=', workId)
       .executeTakeFirst();
 
     return { success: true, rowCount: Number(result.numUpdatedRows) };
@@ -626,9 +626,9 @@ export async function updateWork(
 export async function finishWork(workId: number): Promise<{ success: boolean; rowCount: number }> {
   return withPgTransaction(async (trx) => {
     const result = await trx
-      .updateTable('tblwork')
-      .set({ Status: WORK_STATUS.FINISHED })
-      .where('workid', '=', workId)
+      .updateTable('works')
+      .set({ status: WORK_STATUS.FINISHED })
+      .where('work_id', '=', workId)
       .executeTakeFirst();
 
     return { success: true, rowCount: Number(result.numUpdatedRows) };
@@ -640,9 +640,9 @@ export async function discontinueWork(
 ): Promise<{ success: boolean; rowCount: number }> {
   return withPgTransaction(async (trx) => {
     const result = await trx
-      .updateTable('tblwork')
-      .set({ Status: WORK_STATUS.DISCONTINUED })
-      .where('workid', '=', workId)
+      .updateTable('works')
+      .set({ status: WORK_STATUS.DISCONTINUED })
+      .where('work_id', '=', workId)
       .executeTakeFirst();
 
     return { success: true, rowCount: Number(result.numUpdatedRows) };
@@ -654,9 +654,9 @@ export async function reactivateWork(
 ): Promise<{ success: boolean; rowCount: number }> {
   return withPgTransaction(async (trx) => {
     const result = await trx
-      .updateTable('tblwork')
-      .set({ Status: WORK_STATUS.ACTIVE })
-      .where('workid', '=', workId)
+      .updateTable('works')
+      .set({ status: WORK_STATUS.ACTIVE })
+      .where('work_id', '=', workId)
       .executeTakeFirst();
 
     return { success: true, rowCount: Number(result.numUpdatedRows) };
@@ -667,55 +667,55 @@ export async function addWorkWithInvoice(
   workData: WorkData
 ): Promise<{ workId: number; invoiceId: number }> {
   const today = toDateOnly(new Date());
-  const totalRequired = numOrNull(workData.TotalRequired);
+  const totalRequired = numOrNull(workData.total_required);
   const usdReceived =
-    workData.Currency === 'USD' || workData.Currency === 'EUR' ? totalRequired : 0;
-  const iqdReceived = workData.Currency === 'IQD' ? totalRequired : 0;
+    workData.currency === 'USD' || workData.currency === 'EUR' ? totalRequired : 0;
+  const iqdReceived = workData.currency === 'IQD' ? totalRequired : 0;
 
   // Atomic work + invoice insert (the original ran one BEGIN/COMMIT TRANSACTION batch).
-  // Status is hard-coded to 2 (Finished) here, matching the original VALUES list.
+  // status is hard-coded to 2 (Finished) here, matching the original VALUES list.
   return getKysely()
     .transaction()
     .execute(async (trx) => {
       const work = await trx
-        .insertInto('tblwork')
+        .insertInto('works')
         .values({
-          PersonID: workData.PersonID,
-          TotalRequired: numOrNull(workData.TotalRequired) as number,
-          Currency: workData.Currency || null,
-          Typeofwork: numOrNull(workData.Typeofwork) as number,
-          Notes: workData.Notes || null,
-          Status: WORK_STATUS.FINISHED,
-          StartDate: (workData.StartDate as Date | string | null) || null,
-          DebondDate: (workData.DebondDate as Date | string | null) || null,
-          FPhotoDate: (workData.FPhotoDate as Date | string | null) || null,
-          IPhotoDate: (workData.IPhotoDate as Date | string | null) || null,
-          EstimatedDuration: numOrNull(workData.EstimatedDuration),
-          DrID: workData.DrID,
-          NotesDate: (workData.NotesDate as Date | string | null) || null,
-          KeyWordID1: numOrNull(workData.KeyWordID1),
-          KeyWordID2: numOrNull(workData.KeyWordID2),
-          KeywordID3: numOrNull(workData.KeywordID3),
-          KeywordID4: numOrNull(workData.KeywordID4),
-          KeywordID5: numOrNull(workData.KeywordID5),
+          person_id: workData.person_id,
+          total_required: numOrNull(workData.total_required) as number,
+          currency: workData.currency || null,
+          type_of_work: numOrNull(workData.type_of_work) as number,
+          notes: workData.notes || null,
+          status: WORK_STATUS.FINISHED,
+          start_date: (workData.start_date as Date | string | null) || null,
+          debond_date: (workData.debond_date as Date | string | null) || null,
+          f_photo_date: (workData.f_photo_date as Date | string | null) || null,
+          i_photo_date: (workData.i_photo_date as Date | string | null) || null,
+          estimated_duration: numOrNull(workData.estimated_duration),
+          dr_id: workData.dr_id,
+          notes_date: (workData.notes_date as Date | string | null) || null,
+          keyword_id_1: numOrNull(workData.keyword_id_1),
+          keyword_id_2: numOrNull(workData.keyword_id_2),
+          keyword_id_3: numOrNull(workData.keyword_id_3),
+          keyword_id_4: numOrNull(workData.keyword_id_4),
+          keyword_id_5: numOrNull(workData.keyword_id_5),
         })
-        .returning('workid')
+        .returning('work_id')
         .executeTakeFirstOrThrow();
 
       const invoice = await trx
-        .insertInto('tblInvoice')
+        .insertInto('invoices')
         .values({
-          workid: work.workid,
-          Amountpaid: totalRequired ?? 0,
-          Dateofpayment: today,
-          USDReceived: usdReceived ?? 0,
-          IQDReceived: iqdReceived ?? 0,
-          Change: null,
+          work_id: work.work_id,
+          amount_paid: totalRequired ?? 0,
+          date_of_payment: today,
+          usd_received: usdReceived ?? 0,
+          iqd_received: iqdReceived ?? 0,
+          change: null,
         })
-        .returning('invoiceID')
+        .returning('invoice_id')
         .executeTakeFirstOrThrow();
 
-      return { workId: work.workid, invoiceId: invoice.invoiceID };
+      return { workId: work.work_id, invoiceId: invoice.invoice_id };
     });
 }
 
@@ -726,43 +726,43 @@ export async function deleteWork(
   const dependencyCheck = await db
     .selectNoFrom((eb) => [
       eb
-        .selectFrom('tblInvoice')
+        .selectFrom('invoices')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('workid', '=', workId)
+        .where('work_id', '=', workId)
         .as('InvoiceCount'),
       eb
-        .selectFrom('tblvisits')
+        .selectFrom('visits')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('WorkID', '=', workId)
+        .where('work_id', '=', workId)
         .as('VisitCount'),
       eb
-        .selectFrom('tblWorkItems')
+        .selectFrom('work_items')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('WorkID', '=', workId)
+        .where('work_id', '=', workId)
         .as('ItemCount'),
       eb
-        .selectFrom('tblDiagnosis')
+        .selectFrom('diagnoses')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('WorkID', '=', workId)
+        .where('work_id', '=', workId)
         .as('DiagnosisCount'),
       eb
-        .selectFrom('tblImplant')
+        .selectFrom('implants')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('WorkID', '=', workId)
+        .where('work_id', '=', workId)
         .as('ImplantCount'),
       eb
-        .selectFrom('tblscrews')
+        .selectFrom('screws')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('WorkID', '=', workId)
+        .where('work_id', '=', workId)
         .as('ScrewCount'),
-      // Aligner sets hang off WorkID too; without this the work was deletable while
+      // Aligner sets hang off work_id too; without this the work was deletable while
       // its aligner sets remained (orphaned — there is no DB-level cascade guarding it
       // until the FK_tblAlignerSets_tblwork migration). Block the delete so the user
       // gets the WORK_HAS_DEPENDENCIES warning instead of losing aligner records.
       eb
-        .selectFrom('tblAlignerSets')
+        .selectFrom('aligner_sets')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('WorkID', '=', workId)
+        .where('work_id', '=', workId)
         .as('AlignerSetCount'),
     ])
     .executeTakeFirstOrThrow();
@@ -794,7 +794,7 @@ export async function deleteWork(
   }
 
   // If no dependencies, proceed with deletion
-  const result = await db.deleteFrom('tblwork').where('workid', '=', workId).executeTakeFirst();
+  const result = await db.deleteFrom('works').where('work_id', '=', workId).executeTakeFirst();
 
   return {
     canDelete: true,
@@ -806,22 +806,22 @@ export async function deleteWork(
 export async function getActiveWork(personId: number): Promise<Work | null> {
   const db = getKysely();
   const row = await db
-    .selectFrom('tblwork as w')
-    .leftJoin('tblEmployees as e', 'e.ID', 'w.DrID')
-    .leftJoin('tblWorkType as wt', 'wt.ID', 'w.Typeofwork')
-    .leftJoin('tblWorkStatus as ws', 'ws.StatusID', 'w.Status')
-    .where('w.PersonID', '=', personId)
-    .where('w.Status', '=', 1)
+    .selectFrom('works as w')
+    .leftJoin('employees as e', 'e.id', 'w.dr_id')
+    .leftJoin('work_types as wt', 'wt.id', 'w.type_of_work')
+    .leftJoin('work_statuses as ws', 'ws.status_id', 'w.status')
+    .where('w.person_id', '=', personId)
+    .where('w.status', '=', 1)
     .selectAll('w')
     .select([
-      'e.employeeName as DoctorName',
-      'wt.WorkType as TypeName',
-      'ws.StatusName',
+      'e.employee_name as doctor_name',
+      'wt.work_type as type_name',
+      'ws.status_name',
     ])
     // NULLS LAST: PG sorts NULLs first on DESC (SQL Server sorted them last), so a
-    // legacy Status=1 row with a NULL AdditionDate would otherwise be picked as "the"
+    // legacy status=1 row with a NULL addition_date would otherwise be picked as "the"
     // active work ahead of real-dated rows. Keep dated works winning the LIMIT 1.
-    .orderBy('w.AdditionDate', sql`desc nulls last`)
+    .orderBy('w.addition_date', sql`desc nulls last`)
     .limit(1)
     .executeTakeFirst();
 
@@ -831,16 +831,16 @@ export async function getActiveWork(personId: number): Promise<Work | null> {
 export async function getWorkById(workId: number): Promise<Work | null> {
   const db = getKysely();
   const row = await db
-    .selectFrom('tblwork as w')
-    .leftJoin('tblEmployees as e', 'e.ID', 'w.DrID')
-    .leftJoin('tblWorkType as wt', 'wt.ID', 'w.Typeofwork')
-    .leftJoin('tblWorkStatus as ws', 'ws.StatusID', 'w.Status')
-    .where('w.workid', '=', workId)
+    .selectFrom('works as w')
+    .leftJoin('employees as e', 'e.id', 'w.dr_id')
+    .leftJoin('work_types as wt', 'wt.id', 'w.type_of_work')
+    .leftJoin('work_statuses as ws', 'ws.status_id', 'w.status')
+    .where('w.work_id', '=', workId)
     .selectAll('w')
     .select([
-      'e.employeeName as DoctorName',
-      'wt.WorkType as TypeName',
-      'ws.StatusName',
+      'e.employee_name as doctor_name',
+      'wt.work_type as type_name',
+      'ws.status_name',
     ])
     .executeTakeFirst();
 
@@ -857,14 +857,14 @@ export async function validateStatusChange(
     const activeWork = await getActiveWork(personId);
 
     // If there's an active work and it's NOT the one being updated
-    if (activeWork && activeWork.workid !== workId) {
+    if (activeWork && activeWork.work_id !== workId) {
       return {
         valid: false,
         error: 'Patient already has an active work',
         existingWork: {
-          workid: activeWork.workid,
-          type: activeWork.TypeName,
-          doctor: activeWork.DoctorName,
+          work_id: activeWork.work_id,
+          type: activeWork.type_name,
+          doctor: activeWork.doctor_name,
         },
       };
     }
@@ -873,21 +873,21 @@ export async function validateStatusChange(
   return { valid: true };
 }
 
-export async function getWorkTypes(): Promise<WorkType[]> {
+export async function getWorkTypes(): Promise<work_type[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblWorkType')
-    .select(['ID', 'WorkType'])
-    .orderBy('WorkType')
-    .execute() as Promise<WorkType[]>;
+    .selectFrom('work_types')
+    .select(['id', 'work_type'])
+    .orderBy('work_type')
+    .execute() as Promise<work_type[]>;
 }
 
 export async function getWorkKeywords(): Promise<Keyword[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblKeyWord')
-    .select(['ID', 'KeyWord'])
-    .orderBy('KeyWord')
+    .selectFrom('keywords')
+    .select(['id', 'key_word'])
+    .orderBy('key_word')
     .execute() as Promise<Keyword[]>;
 }
 
@@ -896,33 +896,33 @@ export async function getWorkKeywords(): Promise<Keyword[]> {
 export async function getToothNumbers(
   includePermanent = true,
   includeDeciduous = true
-): Promise<ToothNumber[]> {
+): Promise<tooth_number[]> {
   const db = getKysely();
   let q = db
-    .selectFrom('tblToothNumber')
+    .selectFrom('tooth_numbers')
     .select((eb) => [
-      'ID',
-      'ToothCode',
-      'ToothName',
-      eb.ref('Quadrant').$castTo<number>().as('Quadrant'),
-      eb.ref('ToothNumber').$castTo<number>().as('ToothNumber'),
-      'IsPermanent',
-      'SortOrder',
+      'id',
+      'tooth_code',
+      'tooth_name',
+      eb.ref('quadrant').$castTo<number>().as('quadrant'),
+      eb.ref('tooth_number').$castTo<number>().as('tooth_number'),
+      'is_permanent',
+      'sort_order',
     ]);
 
   if (includePermanent && !includeDeciduous) {
-    q = q.where('IsPermanent', '=', true);
+    q = q.where('is_permanent', '=', true);
   } else if (!includePermanent && includeDeciduous) {
-    q = q.where('IsPermanent', '=', false);
+    q = q.where('is_permanent', '=', false);
   }
 
-  return q.orderBy('SortOrder').execute() as Promise<ToothNumber[]>;
+  return q.orderBy('sort_order').execute() as Promise<tooth_number[]>;
 }
 
 /**
  * Replace a work item's tooth associations (DELETE existing + INSERT new).
  *
- * The DELETE+INSERT must be atomic: if the INSERT fails (e.g. a bad ToothID trips
+ * The DELETE+INSERT must be atomic: if the INSERT fails (e.g. a bad tooth_id trips
  * FK_WorkItemTeeth_Tooth, or a connection blip) after the DELETE has committed, the
  * item would be left with its teeth permanently stripped and no rollback. When a
  * caller's transaction is supplied (`executor`) we reuse it so the item write and the
@@ -943,7 +943,7 @@ async function replaceWorkItemTeeth(
   teethIds: number[]
 ): Promise<{ success: boolean; count: number }> {
   // First, delete existing teeth for this work item
-  await db.deleteFrom('tblWorkItemTeeth').where('WorkItemID', '=', workItemId).execute();
+  await db.deleteFrom('work_item_teeth').where('work_item_id', '=', workItemId).execute();
 
   // If no teeth to add, return early
   if (!teethIds || teethIds.length === 0) {
@@ -952,36 +952,36 @@ async function replaceWorkItemTeeth(
 
   // Insert new teeth
   await db
-    .insertInto('tblWorkItemTeeth')
-    .values(teethIds.map((toothId) => ({ WorkItemID: workItemId, ToothID: toothId })))
+    .insertInto('work_item_teeth')
+    .values(teethIds.map((toothId) => ({ work_item_id: workItemId, tooth_id: toothId })))
     .execute();
 
   return { success: true, count: teethIds.length };
 }
 
-export async function getWorkItemTeeth(workItemId: number): Promise<ToothNumber[]> {
+export async function getWorkItemTeeth(workItemId: number): Promise<tooth_number[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblWorkItemTeeth as wit')
-    .innerJoin('tblToothNumber as tn', 'tn.ID', 'wit.ToothID')
-    .where('wit.WorkItemID', '=', workItemId)
+    .selectFrom('work_item_teeth as wit')
+    .innerJoin('tooth_numbers as tn', 'tn.id', 'wit.tooth_id')
+    .where('wit.work_item_id', '=', workItemId)
     .select((eb) => [
-      'tn.ID',
-      'tn.ToothCode',
-      'tn.ToothName',
-      eb.ref('tn.Quadrant').$castTo<number>().as('Quadrant'),
-      'tn.IsPermanent',
+      'tn.id',
+      'tn.tooth_code',
+      'tn.tooth_name',
+      eb.ref('tn.quadrant').$castTo<number>().as('quadrant'),
+      'tn.is_permanent',
     ])
-    .orderBy('tn.SortOrder')
-    .execute() as Promise<ToothNumber[]>;
+    .orderBy('tn.sort_order')
+    .execute() as Promise<tooth_number[]>;
 }
 
 export async function getImplantManufacturers(): Promise<ImplantManufacturer[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblImplantManufacturer')
-    .select(['ID as id', 'ManufacturerName as name'])
-    .orderBy('ManufacturerName')
+    .selectFrom('implant_manufacturers')
+    .select(['id as id', 'manufacturer_name as name'])
+    .orderBy('manufacturer_name')
     .execute() as Promise<ImplantManufacturer[]>;
 }
 
@@ -1022,52 +1022,52 @@ export async function getWorkRelatedCounts(workId: number): Promise<WorkRelatedC
   const row = await db
     .selectNoFrom((eb) => [
       eb
-        .selectFrom('tblvisits')
+        .selectFrom('visits')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('WorkID', '=', workId)
+        .where('work_id', '=', workId)
         .as('visits'),
       eb
-        .selectFrom('tblInvoice')
+        .selectFrom('invoices')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('workid', '=', workId)
+        .where('work_id', '=', workId)
         .as('invoices'),
       eb
-        .selectFrom('tblDiagnosis')
+        .selectFrom('diagnoses')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('WorkID', '=', workId)
+        .where('work_id', '=', workId)
         .as('diagnoses'),
       eb
-        .selectFrom('tblWorkItems')
+        .selectFrom('work_items')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('WorkID', '=', workId)
+        .where('work_id', '=', workId)
         .as('workItems'),
       eb
-        .selectFrom('tblAlignerSets')
+        .selectFrom('aligner_sets')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('WorkID', '=', workId)
+        .where('work_id', '=', workId)
         .as('alignerSets'),
       eb
-        .selectFrom('tblAlignerBatches as ab')
-        .innerJoin('tblAlignerSets as s', 's.AlignerSetID', 'ab.AlignerSetID')
+        .selectFrom('aligner_batches as ab')
+        .innerJoin('aligner_sets as s', 's.aligner_set_id', 'ab.aligner_set_id')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('s.WorkID', '=', workId)
+        .where('s.work_id', '=', workId)
         .as('alignerBatches'),
       // Distinct upper + lower wire ids referenced by this work's visits.
       sql<number>`(
-        SELECT COUNT(DISTINCT "UpperWireID") + COUNT(DISTINCT "LowerWireID")
-        FROM "tblvisits"
-        WHERE "WorkID" = ${workId}
-          AND ("UpperWireID" IS NOT NULL OR "LowerWireID" IS NOT NULL)
+        SELECT COUNT(DISTINCT "upper_wire_id") + COUNT(DISTINCT "lower_wire_id")
+        FROM "visits"
+        WHERE "work_id" = ${workId}
+          AND ("upper_wire_id" IS NOT NULL OR "lower_wire_id" IS NOT NULL)
       )`.as('wires'),
       eb
-        .selectFrom('tblImplant')
+        .selectFrom('implants')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('WorkID', '=', workId)
+        .where('work_id', '=', workId)
         .as('implants'),
       eb
-        .selectFrom('tblscrews')
+        .selectFrom('screws')
         .select(eb.fn.countAll<number>().as('c'))
-        .where('WorkID', '=', workId)
+        .where('work_id', '=', workId)
         .as('screws'),
     ])
     .executeTakeFirstOrThrow();
@@ -1088,27 +1088,27 @@ export async function getWorkRelatedCounts(workId: number): Promise<WorkRelatedC
 /**
  * Transfer a work to a new patient
  * All related records (visits, invoices, wires, etc.) automatically follow
- * because they link via WorkID, not PersonID
+ * because they link via work_id, not person_id
  */
 export async function transferWork(
   workId: number,
   targetPatientId: number
 ): Promise<TransferWorkResult> {
-  // Get source patient ID and related counts before transfer
+  // Get source patient id and related counts before transfer
   const work = await getWorkById(workId);
   if (!work) {
     throw new Error(`Work ${workId} not found`);
   }
 
   const relatedCounts = await getWorkRelatedCounts(workId);
-  const sourcePatientId = work.PersonID;
+  const sourcePatientId = work.person_id;
 
-  // Execute the transfer - simple UPDATE since all related tables link via WorkID
+  // Execute the transfer - simple UPDATE since all related tables link via work_id
   await withPgTransaction(async (trx) => {
     await trx
-      .updateTable('tblwork')
-      .set({ PersonID: targetPatientId })
-      .where('workid', '=', workId)
+      .updateTable('works')
+      .set({ person_id: targetPatientId })
+      .where('work_id', '=', workId)
       .execute();
 
   });

@@ -17,13 +17,13 @@
  * `createNote` folds in trg_AlignerNotes_DoctorActivity (Doctor-note → activity flag).
  *
  * The batch procs only adjust `tblAlignerSets.Remaining{Upper,Lower}Aligners`, which touches none
- * of the tblAlignerSets UPDATE triggers (they fire only on Days/SetCost/Currency/CreationDate),
+ * of the tblAlignerSets UPDATE triggers (they fire only on days/set_cost/currency/creation_date),
  * so no extra set-trigger cascade is needed here.
  *
  * Two SQL Server views are inlined (no PG equivalent): `v_allsets` → `getAllAlignerSets`;
  * `vw_AlignerSetPayments` → `getAlignerSetsByWorkId` + `getAlignerSetBalance`.
  *
- * FLAG (Phase 7 parity): `createAlignerSet`/`updateAlignerSet` preserve the inline SetSequence /
+ * FLAG (Phase 7 parity): `createAlignerSet`/`updateAlignerSet` preserve the inline set_sequence /
  * work-total / remaining-aligner logic carried over from Phase 4 (the tblAlignerSets INSERT-trigger
  * effects); verify against the SQL Server baseline.
  */
@@ -39,10 +39,10 @@ import { log } from '../../../utils/logger.js';
 // ==============================
 
 interface AlignerDoctor {
-  DrID: number;
-  DoctorName: string;
-  DoctorEmail: string | null;
-  LogoPath: string | null;
+  dr_id: number;
+  doctor_name: string;
+  doctor_email: string | null;
+  logo_path: string | null;
 }
 
 interface AlignerDoctorWithUnread extends AlignerDoctor {
@@ -54,32 +54,32 @@ interface AlignerDoctorWithUnread extends AlignerDoctor {
 }
 
 interface DoctorData {
-  DoctorName: string;
-  DoctorEmail?: string | null;
-  LogoPath?: string | null;
+  doctor_name: string;
+  doctor_email?: string | null;
+  logo_path?: string | null;
 }
 
 interface AlignerSet {
-  AlignerSetID: number;
-  WorkID: number;
-  SetSequence: number | null;
-  Type: string | null;
-  UpperAlignersCount: number;
-  LowerAlignersCount: number;
-  RemainingUpperAligners: number;
-  RemainingLowerAligners: number;
-  CreationDate: Date;
-  Days: number | null;
-  IsActive: boolean;
-  Notes: string | null;
-  FolderPath: string | null;
-  AlignerDrID: number;
-  SetUrl: string | null;
-  SetPdfUrl: string | null;
-  SetVideo: string | null;
-  SetCost: number | null;
-  Currency: string | null;
-  ArchformID: number | null;
+  aligner_set_id: number;
+  work_id: number;
+  set_sequence: number | null;
+  type: string | null;
+  upper_aligners_count: number;
+  lower_aligners_count: number;
+  remaining_upper_aligners: number;
+  remaining_lower_aligners: number;
+  creation_date: Date;
+  days: number | null;
+  is_active: boolean;
+  notes: string | null;
+  folder_path: string | null;
+  aligner_dr_id: number;
+  set_url: string | null;
+  set_pdf_url: string | null;
+  set_video: string | null;
+  set_cost: number | null;
+  currency: string | null;
+  archform_id: number | null;
 }
 
 interface AlignerSetWithDetails extends AlignerSet {
@@ -93,162 +93,162 @@ interface AlignerSetWithDetails extends AlignerSet {
 }
 
 interface AlignerSetFromView {
-  PersonID: number;
-  PatientName: string;
-  WorkID: number;
-  AlignerDrID: number;
-  AlignerSetID: number;
-  SetSequence: number | null;
+  person_id: number;
+  patient_name: string;
+  work_id: number;
+  aligner_dr_id: number;
+  aligner_set_id: number;
+  set_sequence: number | null;
   SetIsActive: boolean;
-  BatchSequence: number | null;
-  CreationDate: Date | null;
+  batch_sequence: number | null;
+  creation_date: Date | null;
   BatchCreationDate: Date | null;
-  ManufactureDate: Date | null;
-  DeliveredToPatientDate: Date | null;
+  manufacture_date: Date | null;
+  delivered_to_patient_date: Date | null;
   NextDueDate: Date | null;
-  Notes: string | null;
-  IsLast: boolean | null;
+  notes: string | null;
+  is_last: boolean | null;
   NextBatchPresent: string | null;
   LabStatus: string | null;
-  DoctorName: string;
+  doctor_name: string;
   WorkStatus: number | null;
   WorkStatusName: string | null;
 }
 
 interface AlignerSetData {
-  WorkID: number;
-  SetSequence?: number | null;
-  Type?: string | null;
-  UpperAlignersCount?: number;
-  LowerAlignersCount?: number;
-  Days?: number | null;
-  AlignerDrID: number;
-  SetUrl?: string | null;
-  SetPdfUrl?: string | null;
-  SetCost?: number | null;
-  Currency?: string | null;
-  Notes?: string | null;
-  IsActive?: boolean;
+  work_id: number;
+  set_sequence?: number | null;
+  type?: string | null;
+  upper_aligners_count?: number;
+  lower_aligners_count?: number;
+  days?: number | null;
+  aligner_dr_id: number;
+  set_url?: string | null;
+  set_pdf_url?: string | null;
+  set_cost?: number | null;
+  currency?: string | null;
+  notes?: string | null;
+  is_active?: boolean;
 }
 
 interface AlignerSetUpdateData {
-  SetSequence?: number | null;
-  Type?: string | null;
-  UpperAlignersCount?: number;
-  LowerAlignersCount?: number;
-  Days?: number | null;
-  AlignerDrID?: number | null;
-  SetUrl?: string | null;
-  SetPdfUrl?: string | null;
-  SetVideo?: string | null;
-  SetCost?: number | null;
-  Currency?: string | null;
-  Notes?: string | null;
-  IsActive?: boolean;
+  set_sequence?: number | null;
+  type?: string | null;
+  upper_aligners_count?: number;
+  lower_aligners_count?: number;
+  days?: number | null;
+  aligner_dr_id?: number | null;
+  set_url?: string | null;
+  set_pdf_url?: string | null;
+  set_video?: string | null;
+  set_cost?: number | null;
+  currency?: string | null;
+  notes?: string | null;
+  is_active?: boolean;
 }
 
 interface AlignerPatient {
-  PersonID: number;
-  FirstName: string | null;
-  LastName: string | null;
-  PatientName: string;
-  Phone: string | null;
+  person_id: number;
+  first_name: string | null;
+  last_name: string | null;
+  patient_name: string;
+  phone: string | null;
   workid: number;
-  WorkType: string;
+  work_type: string;
   WorkTypeID: number;
   TotalSets?: number;
   ActiveSets?: number;
   UnreadDoctorNotes?: number;
   DateOfBirth?: Date | null;
-  StartDate?: Date | null;
+  start_date?: Date | null;
 }
 
 interface AlignerBatch {
-  AlignerBatchID: number;
-  AlignerSetID: number;
-  BatchSequence: number;
-  UpperAlignerCount: number;
-  LowerAlignerCount: number;
-  UpperAlignerStartSequence: number | null;
-  UpperAlignerEndSequence: number | null;
-  LowerAlignerStartSequence: number | null;
-  LowerAlignerEndSequence: number | null;
-  CreationDate: Date;
-  ManufactureDate: Date | null;
-  DeliveredToPatientDate: Date | null;
-  Days: number | null;
-  ValidityPeriod: number | null;
-  BatchExpiryDate: Date | null;
-  Notes: string | null;
-  IsActive: boolean;
-  IsLast: boolean;
-  HasUpperTemplate: boolean;
-  HasLowerTemplate: boolean;
+  aligner_batch_id: number;
+  aligner_set_id: number;
+  batch_sequence: number;
+  upper_aligner_count: number;
+  lower_aligner_count: number;
+  upper_aligner_start_sequence: number | null;
+  upper_aligner_end_sequence: number | null;
+  lower_aligner_start_sequence: number | null;
+  lower_aligner_end_sequence: number | null;
+  creation_date: Date;
+  manufacture_date: Date | null;
+  delivered_to_patient_date: Date | null;
+  days: number | null;
+  validity_period: number | null;
+  batch_expiry_date: Date | null;
+  notes: string | null;
+  is_active: boolean;
+  is_last: boolean;
+  has_upper_template: boolean;
+  has_lower_template: boolean;
 }
 
 interface BatchData {
-  AlignerSetID: number;
-  UpperAlignerCount?: number;
-  LowerAlignerCount?: number;
-  // NOTE: ManufactureDate and DeliveredToPatientDate are managed via updateBatchStatus()
-  Days?: number | null;
-  Notes?: string | null;
-  IsActive?: boolean;
-  HasUpperTemplate?: boolean;
-  HasLowerTemplate?: boolean;
-  IsLast?: boolean;
-  BatchSequence?: number;
+  aligner_set_id: number;
+  upper_aligner_count?: number;
+  lower_aligner_count?: number;
+  // NOTE: manufacture_date and delivered_to_patient_date are managed via updateBatchStatus()
+  days?: number | null;
+  notes?: string | null;
+  is_active?: boolean;
+  has_upper_template?: boolean;
+  has_lower_template?: boolean;
+  is_last?: boolean;
+  batch_sequence?: number;
   AlignersInBatch?: number;
-  UpperAlignerStartSequence?: number;
-  UpperAlignerEndSequence?: number;
-  LowerAlignerStartSequence?: number;
-  LowerAlignerEndSequence?: number;
-  // Note: BatchExpiryDate and ValidityPeriod are computed columns - cannot be set directly
+  upper_aligner_start_sequence?: number;
+  upper_aligner_end_sequence?: number;
+  lower_aligner_start_sequence?: number;
+  lower_aligner_end_sequence?: number;
+  // note: batch_expiry_date and validity_period are computed columns - cannot be set directly
 }
 
-interface BatchUpdateData extends Omit<BatchData, 'AlignerSetID'> {
-  AlignerSetID?: number;
+interface BatchUpdateData extends Omit<BatchData, 'aligner_set_id'> {
+  aligner_set_id?: number;
 }
 
 interface AlignerNote {
-  NoteID: number;
-  AlignerSetID: number;
-  NoteType: 'Lab' | 'Doctor';
-  NoteText: string;
-  CreatedAt: Date;
-  IsEdited: boolean;
-  EditedAt: Date | null;
-  IsRead: boolean;
-  DoctorName: string;
+  note_id: number;
+  aligner_set_id: number;
+  note_type: 'Lab' | 'Doctor';
+  note_text: string;
+  created_at: Date;
+  is_edited: boolean;
+  edited_at: Date | null;
+  is_read: boolean;
+  doctor_name: string;
 }
 
 interface AlignerActivity {
-  ActivityID: number;
-  AlignerSetID: number;
-  ActivityType: string;
-  ActivityDescription: string;
-  CreatedAt: Date;
-  IsRead: boolean;
-  ReadAt: Date | null;
-  RelatedRecordID: number | null;
+  activity_id: number;
+  aligner_set_id: number;
+  activity_type: string;
+  activity_description: string;
+  created_at: Date;
+  is_read: boolean;
+  read_at: Date | null;
+  related_record_id: number | null;
 }
 
 interface AlignerPaymentData {
   workid: number;
-  AlignerSetID: number | null;
-  Amountpaid: number | string;
-  Dateofpayment: Date | string;
-  ActualAmount?: number | null;
-  ActualCur?: string | null;
-  Change?: number | null;
-  USDReceived?: number;
-  IQDReceived?: number;
-  Notes?: string;
+  aligner_set_id: number | null;
+  amount_paid: number | string;
+  date_of_payment: Date | string;
+  actual_amount?: number | null;
+  actual_cur?: string | null;
+  change?: number | null;
+  usd_received?: number;
+  iqd_received?: number;
+  notes?: string;
 }
 
 interface AlignerSetBalance {
-  AlignerSetID: number;
-  SetCost: number | null;
+  aligner_set_id: number;
+  set_cost: number | null;
   TotalPaid: number | null;
   Balance: number | null;
 }
@@ -286,34 +286,34 @@ export interface UpdateBatchStatusResult {
 export async function getDoctorsWithUnreadCounts(): Promise<AlignerDoctorWithUnread[]> {
   try {
     const rows = await getKysely()
-      .selectFrom('AlignerDoctors as ad')
+      .selectFrom('aligner_doctors as ad')
       .select((eb) => [
-        'ad.DrID',
-        'ad.DoctorName',
-        'ad.LogoPath',
+        'ad.dr_id',
+        'ad.doctor_name',
+        'ad.logo_path',
         eb
-          .selectFrom('tblAlignerNotes as n')
-          .innerJoin('tblAlignerSets as s', 'n.AlignerSetID', 's.AlignerSetID')
-          .whereRef('s.AlignerDrID', '=', 'ad.DrID')
-          .where('n.NoteType', '=', 'Doctor')
-          .where('n.IsRead', '=', false)
+          .selectFrom('aligner_notes as n')
+          .innerJoin('aligner_sets as s', 'n.aligner_set_id', 's.aligner_set_id')
+          .whereRef('s.aligner_dr_id', '=', 'ad.dr_id')
+          .where('n.note_type', '=', 'Doctor')
+          .where('n.is_read', '=', false)
           .select((e) => e.fn.countAll().as('cnt'))
           .as('UnreadDoctorNotes'),
       ])
       .distinct()
-      .orderBy('ad.DoctorName')
+      .orderBy('ad.doctor_name')
       .execute();
 
     return rows.map((r) => ({
-      DrID: r.DrID,
-      DoctorName: r.DoctorName,
-      DoctorEmail: null,
-      LogoPath: r.LogoPath,
+      dr_id: r.dr_id,
+      doctor_name: r.doctor_name,
+      doctor_email: null,
+      logo_path: r.logo_path,
       UnreadDoctorNotes: Number(r.UnreadDoctorNotes) || 0,
       // Aliased properties for frontend compatibility (PrintQueueContext expects these)
-      id: r.DrID,
-      name: r.DoctorName,
-      logoPath: r.LogoPath,
+      id: r.dr_id,
+      name: r.doctor_name,
+      logoPath: r.logo_path,
     }));
   } catch (err) {
     log.error('Failed to get doctors with unread counts', {
@@ -329,9 +329,9 @@ export async function getDoctorsWithUnreadCounts(): Promise<AlignerDoctorWithUnr
 export async function getAllDoctors(): Promise<AlignerDoctor[]> {
   try {
     return (await getKysely()
-      .selectFrom('AlignerDoctors')
-      .select(['DrID', 'DoctorName', 'DoctorEmail', 'LogoPath'])
-      .orderBy('DoctorName')
+      .selectFrom('aligner_doctors')
+      .select(['dr_id', 'doctor_name', 'doctor_email', 'logo_path'])
+      .orderBy('doctor_name')
       .execute()) as AlignerDoctor[];
   } catch (err) {
     log.error('Failed to get all doctors', {
@@ -354,13 +354,13 @@ export async function isDoctorEmailTaken(
 
   try {
     let q = getKysely()
-      .selectFrom('AlignerDoctors')
-      .select('DrID')
-      // DoctorEmail is citext → case-insensitive comparison, matching Arabic_CI_AS.
-      .where('DoctorEmail', '=', email.trim());
+      .selectFrom('aligner_doctors')
+      .select('dr_id')
+      // doctor_email is citext → case-insensitive comparison, matching Arabic_CI_AS.
+      .where('doctor_email', '=', email.trim());
 
     if (excludeDrID) {
-      q = q.where('DrID', '!=', excludeDrID);
+      q = q.where('dr_id', '!=', excludeDrID);
     }
 
     const row = await q.executeTakeFirst();
@@ -379,8 +379,8 @@ export async function isDoctorEmailTaken(
 export async function getDoctorSetCount(drID: number): Promise<number> {
   try {
     const row = await getKysely()
-      .selectFrom('tblAlignerSets')
-      .where('AlignerDrID', '=', drID)
+      .selectFrom('aligner_sets')
+      .where('aligner_dr_id', '=', drID)
       .select((eb) => eb.fn.countAll().as('SetCount'))
       .executeTakeFirst();
 
@@ -397,21 +397,21 @@ export async function getDoctorSetCount(drID: number): Promise<number> {
  * Create a new aligner doctor
  */
 export async function createDoctor(doctorData: DoctorData): Promise<number | null> {
-  const { DoctorName, DoctorEmail, LogoPath } = doctorData;
+  const { doctor_name, doctor_email, logo_path } = doctorData;
 
   try {
     return await withPgTransaction(async (trx) => {
       const row = await trx
-        .insertInto('AlignerDoctors')
+        .insertInto('aligner_doctors')
         .values({
-          DoctorName: DoctorName.trim(),
-          DoctorEmail: DoctorEmail && DoctorEmail.trim() !== '' ? DoctorEmail.trim() : null,
-          LogoPath: LogoPath && LogoPath.trim() !== '' ? LogoPath.trim() : null,
+          doctor_name: doctor_name.trim(),
+          doctor_email: doctor_email && doctor_email.trim() !== '' ? doctor_email.trim() : null,
+          logo_path: logo_path && logo_path.trim() !== '' ? logo_path.trim() : null,
         })
-        .returning('DrID')
+        .returning('dr_id')
         .executeTakeFirstOrThrow();
 
-      return row.DrID;
+      return row.dr_id;
     });
   } catch (err) {
     log.error('Failed to create doctor', {
@@ -425,18 +425,18 @@ export async function createDoctor(doctorData: DoctorData): Promise<number | nul
  * Update an aligner doctor
  */
 export async function updateDoctor(drID: number, doctorData: DoctorData): Promise<void> {
-  const { DoctorName, DoctorEmail, LogoPath } = doctorData;
+  const { doctor_name, doctor_email, logo_path } = doctorData;
 
   try {
     await withPgTransaction(async (trx) => {
       await trx
-        .updateTable('AlignerDoctors')
+        .updateTable('aligner_doctors')
         .set({
-          DoctorName: DoctorName.trim(),
-          DoctorEmail: DoctorEmail && DoctorEmail.trim() !== '' ? DoctorEmail.trim() : null,
-          LogoPath: LogoPath && LogoPath.trim() !== '' ? LogoPath.trim() : null,
+          doctor_name: doctor_name.trim(),
+          doctor_email: doctor_email && doctor_email.trim() !== '' ? doctor_email.trim() : null,
+          logo_path: logo_path && logo_path.trim() !== '' ? logo_path.trim() : null,
         })
-        .where('DrID', '=', drID)
+        .where('dr_id', '=', drID)
         .execute();
 
     });
@@ -454,7 +454,7 @@ export async function updateDoctor(drID: number, doctorData: DoctorData): Promis
 export async function deleteDoctor(drID: number): Promise<void> {
   try {
     await withPgTransaction(async (trx) => {
-      await trx.deleteFrom('AlignerDoctors').where('DrID', '=', drID).execute();
+      await trx.deleteFrom('aligner_doctors').where('dr_id', '=', drID).execute();
     });
   } catch (err) {
     log.error('Failed to delete doctor', {
@@ -473,13 +473,13 @@ export async function deleteDoctor(drID: number): Promise<void> {
  *
  * FLAG (inlined view): the SQL Server `dbo.v_allsets` view does not exist in the PG
  * schema (views land in Phase 5). Its logic is inlined here:
- *   - "latest batch" per set: ROW_NUMBER() OVER (PARTITION BY AlignerSetID
- *     ORDER BY active-first, BatchSequence DESC) = 1
- *   - NextDueDate: BatchExpiryDate of the latest DELIVERED batch
+ *   - "latest batch" per set: ROW_NUMBER() OVER (PARTITION BY aligner_set_id
+ *     ORDER BY active-first, batch_sequence DESC) = 1
+ *   - NextDueDate: batch_expiry_date of the latest DELIVERED batch
  *   - NextBatchPresent ('True'/'False'): a manufactured-but-undelivered batch exists
  *     beyond the last delivered sequence
  *   - LabStatus: no_batches / in_lab / needs_mfg / all_delivered
- *   - the view itself filters Typeofwork IN (19,20,21)
+ *   - the view itself filters type_of_work IN (19,20,21)
  */
 export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
   try {
@@ -488,102 +488,102 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
     const rows = await db
       .with('lb', (qb) =>
         qb
-          .selectFrom('tblAlignerBatches')
+          .selectFrom('aligner_batches')
           .select((_eb) => [
-            'AlignerSetID',
-            'AlignerBatchID',
-            'BatchSequence',
-            'CreationDate',
-            'ManufactureDate',
-            'DeliveredToPatientDate',
-            'BatchExpiryDate',
-            'Notes',
-            'IsLast',
-            sql<number>`row_number() over (partition by "AlignerSetID" order by case when "IsActive" = true then 0 else 1 end, "BatchSequence" desc)`.as(
+            'aligner_set_id',
+            'aligner_batch_id',
+            'batch_sequence',
+            'creation_date',
+            'manufacture_date',
+            'delivered_to_patient_date',
+            'batch_expiry_date',
+            'notes',
+            'is_last',
+            sql<number>`row_number() over (partition by "aligner_set_id" order by case when "is_active" = true then 0 else 1 end, "batch_sequence" desc)`.as(
               'RowNum'
             ),
           ])
       )
-      .selectFrom('tblpatients as p')
-      .innerJoin('tblwork as w', 'w.PersonID', 'p.PersonID')
-      .innerJoin('tblAlignerSets as s', 'w.workid', 's.WorkID')
-      .innerJoin('AlignerDoctors as ad', 's.AlignerDrID', 'ad.DrID')
+      .selectFrom('patients as p')
+      .innerJoin('works as w', 'w.person_id', 'p.person_id')
+      .innerJoin('aligner_sets as s', 'w.work_id', 's.work_id')
+      .innerJoin('aligner_doctors as ad', 's.aligner_dr_id', 'ad.dr_id')
       .leftJoin('lb', (join) =>
-        join.onRef('s.AlignerSetID', '=', 'lb.AlignerSetID').on('lb.RowNum', '=', 1)
+        join.onRef('s.aligner_set_id', '=', 'lb.aligner_set_id').on('lb.RowNum', '=', 1)
       )
-      .leftJoin('tblWorkStatus as ws', 'w.Status', 'ws.StatusID')
+      .leftJoin('work_statuses as ws', 'w.status', 'ws.status_id')
       .where((eb) =>
         eb.or([
-          eb('w.Typeofwork', '=', 19),
-          eb('w.Typeofwork', '=', 20),
-          eb('w.Typeofwork', '=', 21),
+          eb('w.type_of_work', '=', 19),
+          eb('w.type_of_work', '=', 20),
+          eb('w.type_of_work', '=', 21),
         ])
       )
       .select((eb) => [
-        'w.PersonID as PersonID',
-        'p.PatientName as PatientName',
-        's.WorkID as WorkID',
-        's.AlignerDrID as AlignerDrID',
-        's.AlignerSetID as AlignerSetID',
-        's.SetSequence as SetSequence',
-        's.IsActive as SetIsActive',
-        'lb.BatchSequence as BatchSequence',
-        eb.ref('s.CreationDate').$castTo<Date | null>().as('CreationDate'),
-        eb.ref('lb.CreationDate').$castTo<Date | null>().as('BatchCreationDate'),
-        eb.ref('lb.ManufactureDate').$castTo<Date | null>().as('ManufactureDate'),
-        eb.ref('lb.DeliveredToPatientDate').$castTo<Date | null>().as('DeliveredToPatientDate'),
-        // NextDueDate: BatchExpiryDate of the latest DELIVERED batch
+        'w.person_id as person_id',
+        'p.patient_name as patient_name',
+        's.work_id as work_id',
+        's.aligner_dr_id as aligner_dr_id',
+        's.aligner_set_id as aligner_set_id',
+        's.set_sequence as set_sequence',
+        's.is_active as SetIsActive',
+        'lb.batch_sequence as batch_sequence',
+        eb.ref('s.creation_date').$castTo<Date | null>().as('creation_date'),
+        eb.ref('lb.creation_date').$castTo<Date | null>().as('BatchCreationDate'),
+        eb.ref('lb.manufacture_date').$castTo<Date | null>().as('manufacture_date'),
+        eb.ref('lb.delivered_to_patient_date').$castTo<Date | null>().as('delivered_to_patient_date'),
+        // NextDueDate: batch_expiry_date of the latest DELIVERED batch
         eb
-          .selectFrom('tblAlignerBatches as b')
-          .whereRef('b.AlignerSetID', '=', 's.AlignerSetID')
-          .where('b.DeliveredToPatientDate', 'is not', null)
-          .orderBy('b.BatchSequence', 'desc')
-          .select('b.BatchExpiryDate')
+          .selectFrom('aligner_batches as b')
+          .whereRef('b.aligner_set_id', '=', 's.aligner_set_id')
+          .where('b.delivered_to_patient_date', 'is not', null)
+          .orderBy('b.batch_sequence', 'desc')
+          .select('b.batch_expiry_date')
           .limit(1)
           .$castTo<Date | null>()
           .as('NextDueDate'),
-        'lb.Notes as Notes',
-        'lb.IsLast as IsLast',
+        'lb.notes as notes',
+        'lb.is_last as is_last',
         // NextBatchPresent: a manufactured-but-undelivered batch beyond the last delivered seq?
         sql<string>`case when exists (
-          select 1 from "tblAlignerBatches" "ReadyBatch"
-          where "ReadyBatch"."AlignerSetID" = ${eb.ref('s.AlignerSetID')}
-            and "ReadyBatch"."ManufactureDate" is not null
-            and "ReadyBatch"."DeliveredToPatientDate" is null
-            and "ReadyBatch"."BatchSequence" > coalesce(
-              (select max("b2"."BatchSequence") from "tblAlignerBatches" "b2"
-               where "b2"."AlignerSetID" = ${eb.ref('s.AlignerSetID')}
-                 and "b2"."DeliveredToPatientDate" is not null), 0)
+          select 1 from "aligner_batches" "ReadyBatch"
+          where "ReadyBatch"."aligner_set_id" = ${eb.ref('s.aligner_set_id')}
+            and "ReadyBatch"."manufacture_date" is not null
+            and "ReadyBatch"."delivered_to_patient_date" is null
+            and "ReadyBatch"."batch_sequence" > coalesce(
+              (select max("b2"."batch_sequence") from "aligner_batches" "b2"
+               where "b2"."aligner_set_id" = ${eb.ref('s.aligner_set_id')}
+                 and "b2"."delivered_to_patient_date" is not null), 0)
         ) then 'True' else 'False' end`.as('NextBatchPresent'),
         // LabStatus
         sql<string>`case
-          when not exists (select 1 from "tblAlignerBatches" "b2" where "b2"."AlignerSetID" = ${eb.ref('s.AlignerSetID')}) then 'no_batches'
-          when exists (select 1 from "tblAlignerBatches" "b2" where "b2"."AlignerSetID" = ${eb.ref('s.AlignerSetID')} and "b2"."ManufactureDate" is not null and "b2"."DeliveredToPatientDate" is null) then 'in_lab'
-          when exists (select 1 from "tblAlignerBatches" "b2" where "b2"."AlignerSetID" = ${eb.ref('s.AlignerSetID')} and "b2"."ManufactureDate" is null) then 'needs_mfg'
+          when not exists (select 1 from "aligner_batches" "b2" where "b2"."aligner_set_id" = ${eb.ref('s.aligner_set_id')}) then 'no_batches'
+          when exists (select 1 from "aligner_batches" "b2" where "b2"."aligner_set_id" = ${eb.ref('s.aligner_set_id')} and "b2"."manufacture_date" is not null and "b2"."delivered_to_patient_date" is null) then 'in_lab'
+          when exists (select 1 from "aligner_batches" "b2" where "b2"."aligner_set_id" = ${eb.ref('s.aligner_set_id')} and "b2"."manufacture_date" is null) then 'needs_mfg'
           else 'all_delivered' end`.as('LabStatus'),
-        'ad.DoctorName as DoctorName',
-        'w.Status as WorkStatus',
-        'ws.StatusName as WorkStatusName',
+        'ad.doctor_name as doctor_name',
+        'w.status as WorkStatus',
+        'ws.status_name as WorkStatusName',
       ])
-      .orderBy(sql`case when "s"."IsActive" = true then 0 else 1 end`)
+      .orderBy(sql`case when "s"."is_active" = true then 0 else 1 end`)
       .orderBy(
         sql`case when (case when exists (
-          select 1 from "tblAlignerBatches" "ReadyBatch"
-          where "ReadyBatch"."AlignerSetID" = "s"."AlignerSetID"
-            and "ReadyBatch"."ManufactureDate" is not null
-            and "ReadyBatch"."DeliveredToPatientDate" is null
-            and "ReadyBatch"."BatchSequence" > coalesce(
-              (select max("b2"."BatchSequence") from "tblAlignerBatches" "b2"
-               where "b2"."AlignerSetID" = "s"."AlignerSetID"
-                 and "b2"."DeliveredToPatientDate" is not null), 0)
+          select 1 from "aligner_batches" "ReadyBatch"
+          where "ReadyBatch"."aligner_set_id" = "s"."aligner_set_id"
+            and "ReadyBatch"."manufacture_date" is not null
+            and "ReadyBatch"."delivered_to_patient_date" is null
+            and "ReadyBatch"."batch_sequence" > coalesce(
+              (select max("b2"."batch_sequence") from "aligner_batches" "b2"
+               where "b2"."aligner_set_id" = "s"."aligner_set_id"
+                 and "b2"."delivered_to_patient_date" is not null), 0)
         ) then 'True' else 'False' end) = 'False' then 0 else 1 end`
       )
       .orderBy(
-        sql`(select b."BatchExpiryDate" from "tblAlignerBatches" b
-          where b."AlignerSetID" = "s"."AlignerSetID" and b."DeliveredToPatientDate" is not null
-          order by b."BatchSequence" desc limit 1) asc`
+        sql`(select b."batch_expiry_date" from "aligner_batches" b
+          where b."aligner_set_id" = "s"."aligner_set_id" and b."delivered_to_patient_date" is not null
+          order by b."batch_sequence" desc limit 1) asc`
       )
-      .orderBy('p.PatientName')
+      .orderBy('p.patient_name')
       .execute();
 
     return rows as unknown as AlignerSetFromView[];
@@ -596,7 +596,7 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
 }
 
 /**
- * Get aligner sets for a specific work ID.
+ * Get aligner sets for a specific work id.
  *
  * FLAG (inlined view): joins the `vw_AlignerSetPayments` view (absent from PG — Phase 5).
  * Its TotalPaid/Balance/PaymentStatus logic is inlined as a per-set aggregate subquery.
@@ -606,107 +606,107 @@ export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSet
     const db = getKysely();
 
     const rows = await db
-      .selectFrom('tblAlignerSets as s')
-      .leftJoin('tblAlignerBatches as b', 's.AlignerSetID', 'b.AlignerSetID')
-      .leftJoin('AlignerDoctors as ad', 's.AlignerDrID', 'ad.DrID')
-      .where('s.WorkID', '=', workId)
+      .selectFrom('aligner_sets as s')
+      .leftJoin('aligner_batches as b', 's.aligner_set_id', 'b.aligner_set_id')
+      .leftJoin('aligner_doctors as ad', 's.aligner_dr_id', 'ad.dr_id')
+      .where('s.work_id', '=', workId)
       .groupBy([
-        's.AlignerSetID',
-        's.WorkID',
-        's.SetSequence',
-        's.Type',
-        's.UpperAlignersCount',
-        's.LowerAlignersCount',
-        's.RemainingUpperAligners',
-        's.RemainingLowerAligners',
-        's.CreationDate',
-        's.Days',
-        's.IsActive',
-        's.Notes',
-        's.FolderPath',
-        's.AlignerDrID',
-        's.SetUrl',
-        's.SetPdfUrl',
-        's.SetVideo',
-        's.SetCost',
-        's.Currency',
-        's.ArchformID',
-        'ad.DoctorName',
+        's.aligner_set_id',
+        's.work_id',
+        's.set_sequence',
+        's.type',
+        's.upper_aligners_count',
+        's.lower_aligners_count',
+        's.remaining_upper_aligners',
+        's.remaining_lower_aligners',
+        's.creation_date',
+        's.days',
+        's.is_active',
+        's.notes',
+        's.folder_path',
+        's.aligner_dr_id',
+        's.set_url',
+        's.set_pdf_url',
+        's.set_video',
+        's.set_cost',
+        's.currency',
+        's.archform_id',
+        'ad.doctor_name',
       ])
       .select((eb) => [
-        's.AlignerSetID',
-        's.WorkID',
-        's.SetSequence',
-        's.Type',
-        's.UpperAlignersCount',
-        's.LowerAlignersCount',
-        's.RemainingUpperAligners',
-        's.RemainingLowerAligners',
-        eb.ref('s.CreationDate').$castTo<Date>().as('CreationDate'),
-        's.Days',
-        's.IsActive',
-        's.Notes',
-        's.FolderPath',
-        's.AlignerDrID',
-        's.SetUrl',
-        's.SetPdfUrl',
-        's.SetVideo',
-        eb.ref('s.SetCost').$castTo<number | null>().as('SetCost'),
-        's.Currency',
-        's.ArchformID',
-        'ad.DoctorName as AlignerDoctorName',
-        eb.fn.count('b.AlignerBatchID').as('TotalBatches'),
+        's.aligner_set_id',
+        's.work_id',
+        's.set_sequence',
+        's.type',
+        's.upper_aligners_count',
+        's.lower_aligners_count',
+        's.remaining_upper_aligners',
+        's.remaining_lower_aligners',
+        eb.ref('s.creation_date').$castTo<Date>().as('creation_date'),
+        's.days',
+        's.is_active',
+        's.notes',
+        's.folder_path',
+        's.aligner_dr_id',
+        's.set_url',
+        's.set_pdf_url',
+        's.set_video',
+        eb.ref('s.set_cost').$castTo<number | null>().as('set_cost'),
+        's.currency',
+        's.archform_id',
+        'ad.doctor_name as AlignerDoctorName',
+        eb.fn.count('b.aligner_batch_id').as('TotalBatches'),
         eb.fn
-          .sum(sql<number>`case when "b"."DeliveredToPatientDate" is not null then 1 else 0 end`)
+          .sum(sql<number>`case when "b"."delivered_to_patient_date" is not null then 1 else 0 end`)
           .as('DeliveredBatches'),
         // vw_AlignerSetPayments inlined: TotalPaid / Balance / PaymentStatus
         eb
-          .selectFrom('tblInvoice as i')
-          .whereRef('i.AlignerSetID', '=', 's.AlignerSetID')
-          .select((e) => e.fn.coalesce(e.fn.sum('i.Amountpaid'), sql<number>`0`).as('tp'))
+          .selectFrom('invoices as i')
+          .whereRef('i.aligner_set_id', '=', 's.aligner_set_id')
+          .select((e) => e.fn.coalesce(e.fn.sum('i.amount_paid'), sql<number>`0`).as('tp'))
           .$castTo<number | null>()
           .as('TotalPaid'),
-        sql<number | null>`(${eb.ref('s.SetCost')} - coalesce((select sum(i."Amountpaid") from "tblInvoice" i where i."AlignerSetID" = ${eb.ref('s.AlignerSetID')}), 0))`.as(
+        sql<number | null>`(${eb.ref('s.set_cost')} - coalesce((select sum(i."amount_paid") from "invoices" i where i."aligner_set_id" = ${eb.ref('s.aligner_set_id')}), 0))`.as(
           'Balance'
         ),
         sql<string | null>`case
-          when ${eb.ref('s.SetCost')} is null then 'No Cost Set'
-          when coalesce((select sum(i."Amountpaid") from "tblInvoice" i where i."AlignerSetID" = ${eb.ref('s.AlignerSetID')}), 0) = 0 then 'Unpaid'
-          when coalesce((select sum(i."Amountpaid") from "tblInvoice" i where i."AlignerSetID" = ${eb.ref('s.AlignerSetID')}), 0) < ${eb.ref('s.SetCost')} then 'Partial'
-          when coalesce((select sum(i."Amountpaid") from "tblInvoice" i where i."AlignerSetID" = ${eb.ref('s.AlignerSetID')}), 0) >= ${eb.ref('s.SetCost')} then 'Paid'
+          when ${eb.ref('s.set_cost')} is null then 'No Cost Set'
+          when coalesce((select sum(i."amount_paid") from "invoices" i where i."aligner_set_id" = ${eb.ref('s.aligner_set_id')}), 0) = 0 then 'Unpaid'
+          when coalesce((select sum(i."amount_paid") from "invoices" i where i."aligner_set_id" = ${eb.ref('s.aligner_set_id')}), 0) < ${eb.ref('s.set_cost')} then 'Partial'
+          when coalesce((select sum(i."amount_paid") from "invoices" i where i."aligner_set_id" = ${eb.ref('s.aligner_set_id')}), 0) >= ${eb.ref('s.set_cost')} then 'Paid'
           else 'Unknown' end`.as('PaymentStatus'),
         eb
-          .selectFrom('tblAlignerNotes as n')
-          .whereRef('n.AlignerSetID', '=', 's.AlignerSetID')
-          .where('n.NoteType', '=', 'Doctor')
-          .where('n.IsRead', '=', false)
+          .selectFrom('aligner_notes as n')
+          .whereRef('n.aligner_set_id', '=', 's.aligner_set_id')
+          .where('n.note_type', '=', 'Doctor')
+          .where('n.is_read', '=', false)
           .select((e) => e.fn.countAll().as('cnt'))
           .as('UnreadActivityCount'),
       ])
-      .orderBy('s.SetSequence')
+      .orderBy('s.set_sequence')
       .execute();
 
     return rows.map((r) => ({
-      AlignerSetID: r.AlignerSetID,
-      WorkID: r.WorkID,
-      SetSequence: r.SetSequence,
-      Type: r.Type,
-      UpperAlignersCount: r.UpperAlignersCount ?? 0,
-      LowerAlignersCount: r.LowerAlignersCount ?? 0,
-      RemainingUpperAligners: r.RemainingUpperAligners ?? 0,
-      RemainingLowerAligners: r.RemainingLowerAligners ?? 0,
-      CreationDate: r.CreationDate,
-      Days: r.Days,
-      IsActive: !!r.IsActive,
-      Notes: r.Notes,
-      FolderPath: r.FolderPath,
-      AlignerDrID: r.AlignerDrID,
-      SetUrl: r.SetUrl,
-      SetPdfUrl: r.SetPdfUrl,
-      SetVideo: r.SetVideo,
-      SetCost: r.SetCost,
-      Currency: r.Currency,
-      ArchformID: r.ArchformID,
+      aligner_set_id: r.aligner_set_id,
+      work_id: r.work_id,
+      set_sequence: r.set_sequence,
+      type: r.type,
+      upper_aligners_count: r.upper_aligners_count ?? 0,
+      lower_aligners_count: r.lower_aligners_count ?? 0,
+      remaining_upper_aligners: r.remaining_upper_aligners ?? 0,
+      remaining_lower_aligners: r.remaining_lower_aligners ?? 0,
+      creation_date: r.creation_date,
+      days: r.days,
+      is_active: !!r.is_active,
+      notes: r.notes,
+      folder_path: r.folder_path,
+      aligner_dr_id: r.aligner_dr_id,
+      set_url: r.set_url,
+      set_pdf_url: r.set_pdf_url,
+      set_video: r.set_video,
+      set_cost: r.set_cost,
+      currency: r.currency,
+      archform_id: r.archform_id,
       AlignerDoctorName: r.AlignerDoctorName,
       TotalBatches: Number(r.TotalBatches) || 0,
       DeliveredBatches: Number(r.DeliveredBatches) || 0,
@@ -724,60 +724,60 @@ export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSet
 }
 
 /**
- * Get a single aligner set by ID
+ * Get a single aligner set by id
  */
 export async function getAlignerSetById(setId: number): Promise<AlignerSet | null> {
   try {
     const row = await getKysely()
-      .selectFrom('tblAlignerSets')
-      .where('AlignerSetID', '=', setId)
+      .selectFrom('aligner_sets')
+      .where('aligner_set_id', '=', setId)
       .select((eb) => [
-        'AlignerSetID',
-        'WorkID',
-        'SetSequence',
-        'Type',
-        'UpperAlignersCount',
-        'LowerAlignersCount',
-        'RemainingUpperAligners',
-        'RemainingLowerAligners',
-        eb.ref('CreationDate').$castTo<Date>().as('CreationDate'),
-        'Days',
-        'IsActive',
-        'Notes',
-        'FolderPath',
-        'AlignerDrID',
-        'SetUrl',
-        'SetPdfUrl',
-        'SetVideo',
-        eb.ref('SetCost').$castTo<number | null>().as('SetCost'),
-        'Currency',
-        'ArchformID',
+        'aligner_set_id',
+        'work_id',
+        'set_sequence',
+        'type',
+        'upper_aligners_count',
+        'lower_aligners_count',
+        'remaining_upper_aligners',
+        'remaining_lower_aligners',
+        eb.ref('creation_date').$castTo<Date>().as('creation_date'),
+        'days',
+        'is_active',
+        'notes',
+        'folder_path',
+        'aligner_dr_id',
+        'set_url',
+        'set_pdf_url',
+        'set_video',
+        eb.ref('set_cost').$castTo<number | null>().as('set_cost'),
+        'currency',
+        'archform_id',
       ])
       .executeTakeFirst();
 
     if (!row) return null;
 
     return {
-      AlignerSetID: row.AlignerSetID,
-      WorkID: row.WorkID,
-      SetSequence: row.SetSequence,
-      Type: row.Type,
-      UpperAlignersCount: row.UpperAlignersCount ?? 0,
-      LowerAlignersCount: row.LowerAlignersCount ?? 0,
-      RemainingUpperAligners: row.RemainingUpperAligners ?? 0,
-      RemainingLowerAligners: row.RemainingLowerAligners ?? 0,
-      CreationDate: row.CreationDate,
-      Days: row.Days,
-      IsActive: !!row.IsActive,
-      Notes: row.Notes,
-      FolderPath: row.FolderPath,
-      AlignerDrID: row.AlignerDrID,
-      SetUrl: row.SetUrl,
-      SetPdfUrl: row.SetPdfUrl,
-      SetVideo: row.SetVideo,
-      SetCost: row.SetCost,
-      Currency: row.Currency,
-      ArchformID: row.ArchformID,
+      aligner_set_id: row.aligner_set_id,
+      work_id: row.work_id,
+      set_sequence: row.set_sequence,
+      type: row.type,
+      upper_aligners_count: row.upper_aligners_count ?? 0,
+      lower_aligners_count: row.lower_aligners_count ?? 0,
+      remaining_upper_aligners: row.remaining_upper_aligners ?? 0,
+      remaining_lower_aligners: row.remaining_lower_aligners ?? 0,
+      creation_date: row.creation_date,
+      days: row.days,
+      is_active: !!row.is_active,
+      notes: row.notes,
+      folder_path: row.folder_path,
+      aligner_dr_id: row.aligner_dr_id,
+      set_url: row.set_url,
+      set_pdf_url: row.set_pdf_url,
+      set_video: row.set_video,
+      set_cost: row.set_cost,
+      currency: row.currency,
+      archform_id: row.archform_id,
     };
   } catch (err) {
     log.error('Failed to get aligner set by id', {
@@ -792,71 +792,71 @@ export async function getAlignerSetById(setId: number): Promise<AlignerSet | nul
  * Deactivates other sets if creating an active set.
  *
  * FLAG (Phase 5 / trigger-dependent): under SQL Server, INSERT triggers on
- * `tblAlignerSets` maintain derived state (SetSequence allocation, work-total roll-up,
+ * `tblAlignerSets` maintain derived state (set_sequence allocation, work-total roll-up,
  * remaining-aligner seeding). Those triggers don't exist in PG. This translation seeds
- * RemainingUpper/LowerAligners = Upper/LowerAlignersCount explicitly (as the original
- * INSERT did) and writes the provided SetSequence verbatim; any other trigger-maintained
+ * RemainingUpper/LowerAligners = Upper/lower_aligners_count explicitly (as the original
+ * INSERT did) and writes the provided set_sequence verbatim; any other trigger-maintained
  * column must be reconciled in the Phase-5 AlignerService write path.
  */
 export async function createAlignerSet(setData: AlignerSetData): Promise<number | null> {
   const startTime = Date.now();
   const {
-    WorkID,
-    SetSequence,
-    Type,
-    UpperAlignersCount,
-    LowerAlignersCount,
-    Days,
-    AlignerDrID,
-    SetUrl,
-    SetPdfUrl,
-    SetCost,
-    Currency,
-    Notes,
-    IsActive,
+    work_id,
+    set_sequence,
+    type,
+    upper_aligners_count,
+    lower_aligners_count,
+    days,
+    aligner_dr_id,
+    set_url,
+    set_pdf_url,
+    set_cost,
+    currency,
+    notes,
+    is_active,
   } = setData;
 
-  const isActive = IsActive !== undefined ? IsActive : true;
-  const upper = UpperAlignersCount ?? 0;
-  const lower = LowerAlignersCount ?? 0;
+  const isActive = is_active !== undefined ? is_active : true;
+  const upper = upper_aligners_count ?? 0;
+  const lower = lower_aligners_count ?? 0;
 
   try {
     return await withPgTransaction(async (trx) => {
       // Deactivate all other sets for this work if creating an active set
       if (isActive) {
         await trx
-          .updateTable('tblAlignerSets')
-          .set({ IsActive: false })
-          .where('WorkID', '=', WorkID)
-          .where('IsActive', '=', true)
+          .updateTable('aligner_sets')
+          .set({ is_active: false })
+          .where('work_id', '=', work_id)
+          .where('is_active', '=', true)
           .execute();
       }
 
       const inserted = await trx
-        .insertInto('tblAlignerSets')
+        .insertInto('aligner_sets')
         .values({
-          WorkID,
-          SetSequence: SetSequence ?? null,
-          Type: Type || null,
-          UpperAlignersCount: upper,
-          LowerAlignersCount: lower,
-          RemainingUpperAligners: upper,
-          RemainingLowerAligners: lower,
-          Days: Days ?? null,
-          AlignerDrID,
-          SetUrl: SetUrl || null,
-          SetPdfUrl: SetPdfUrl || null,
-          SetCost: SetCost ?? null,
-          Currency: Currency || null,
-          Notes: Notes || null,
-          IsActive: isActive,
-          CreationDate: sql`localtimestamp`,
+          work_id,
+          set_sequence: set_sequence ?? null,
+          type: type || null,
+          upper_aligners_count: upper,
+          lower_aligners_count: lower,
+          remaining_upper_aligners: upper,
+          remaining_lower_aligners: lower,
+          days: days ?? null,
+          aligner_dr_id,
+          set_url: set_url || null,
+          set_pdf_url: set_pdf_url || null,
+          set_cost: set_cost ?? null,
+          currency: currency || null,
+          notes: notes || null,
+          is_active: isActive,
+          creation_date: sql`localtimestamp`,
         })
-        .returning('AlignerSetID')
+        .returning('aligner_set_id')
         .executeTakeFirstOrThrow();
 
       log.debug(`[DB QUERY TIMING] Total createAlignerSet() took: ${Date.now() - startTime}ms`);
-      return inserted.AlignerSetID;
+      return inserted.aligner_set_id;
     });
   } catch (err) {
     log.error('Failed to create aligner set', {
@@ -878,23 +878,23 @@ export async function updateAlignerSet(
   setData: AlignerSetUpdateData
 ): Promise<void> {
   const {
-    SetSequence,
-    Type,
-    UpperAlignersCount,
-    LowerAlignersCount,
-    Days,
-    AlignerDrID,
-    SetUrl,
-    SetPdfUrl,
-    SetVideo,
-    SetCost,
-    Currency,
-    Notes,
-    IsActive,
+    set_sequence,
+    type,
+    upper_aligners_count,
+    lower_aligners_count,
+    days,
+    aligner_dr_id,
+    set_url,
+    set_pdf_url,
+    set_video,
+    set_cost,
+    currency,
+    notes,
+    is_active,
   } = setData;
 
-  const newUpperCount = UpperAlignersCount ?? 0;
-  const newLowerCount = LowerAlignersCount ?? 0;
+  const newUpperCount = upper_aligners_count ?? 0;
+  const newLowerCount = lower_aligners_count ?? 0;
 
   // First, get current set data to validate the change
   const currentSet = await getAlignerSetById(setId);
@@ -903,8 +903,8 @@ export async function updateAlignerSet(
   }
 
   // Calculate how many aligners are already used in batches
-  const usedUpper = currentSet.UpperAlignersCount - currentSet.RemainingUpperAligners;
-  const usedLower = currentSet.LowerAlignersCount - currentSet.RemainingLowerAligners;
+  const usedUpper = currentSet.upper_aligners_count - currentSet.remaining_upper_aligners;
+  const usedLower = currentSet.lower_aligners_count - currentSet.remaining_lower_aligners;
 
   // Validate: new total cannot be less than what's already used in batches
   if (newUpperCount < usedUpper) {
@@ -920,37 +920,37 @@ export async function updateAlignerSet(
 
   try {
     await withPgTransaction(async (trx) => {
-      // AlignerDrID is NOT NULL. Only assign it when a real doctor id is supplied;
+      // aligner_dr_id is NOT NULL. Only assign it when a real doctor id is supplied;
       // otherwise omit the column so the UPDATE leaves the existing value intact,
       // rather than binding NULL/'' — which throw 23502 / 22P02 under PG. (The old
       // SQL Server path silently bound NULL here: a latent bug PG now enforces.)
-      const rawDrId = AlignerDrID as number | string | null | undefined;
+      const rawDrId = aligner_dr_id as number | string | null | undefined;
       const drId =
         rawDrId === null || rawDrId === undefined || rawDrId === ''
           ? undefined
           : Number(rawDrId);
       await trx
-        .updateTable('tblAlignerSets')
+        .updateTable('aligner_sets')
         .set((eb) => ({
-          SetSequence: SetSequence ?? null,
-          Type: Type || null,
-          RemainingUpperAligners: sql<number>`${eb.ref('RemainingUpperAligners')} + (${newUpperCount} - ${eb.ref('UpperAlignersCount')})`,
-          RemainingLowerAligners: sql<number>`${eb.ref('RemainingLowerAligners')} + (${newLowerCount} - ${eb.ref('LowerAlignersCount')})`,
-          UpperAlignersCount: newUpperCount,
-          LowerAlignersCount: newLowerCount,
-          Days: Days ?? null,
+          set_sequence: set_sequence ?? null,
+          type: type || null,
+          remaining_upper_aligners: sql<number>`${eb.ref('remaining_upper_aligners')} + (${newUpperCount} - ${eb.ref('upper_aligners_count')})`,
+          remaining_lower_aligners: sql<number>`${eb.ref('remaining_lower_aligners')} + (${newLowerCount} - ${eb.ref('lower_aligners_count')})`,
+          upper_aligners_count: newUpperCount,
+          lower_aligners_count: newLowerCount,
+          days: days ?? null,
           ...(drId !== undefined && Number.isFinite(drId)
-            ? { AlignerDrID: drId }
+            ? { aligner_dr_id: drId }
             : {}),
-          SetUrl: SetUrl || null,
-          SetPdfUrl: SetPdfUrl || null,
-          SetVideo: SetVideo || null,
-          SetCost: SetCost ?? null,
-          Currency: Currency || null,
-          Notes: Notes || null,
-          IsActive: IsActive !== undefined ? IsActive : true,
+          set_url: set_url || null,
+          set_pdf_url: set_pdf_url || null,
+          set_video: set_video || null,
+          set_cost: set_cost ?? null,
+          currency: currency || null,
+          notes: notes || null,
+          is_active: is_active !== undefined ? is_active : true,
         }))
-        .where('AlignerSetID', '=', setId)
+        .where('aligner_set_id', '=', setId)
         .execute();
 
     });
@@ -967,7 +967,7 @@ export async function updateAlignerSet(
  */
 export async function deleteBatchesBySetId(setId: number): Promise<void> {
   try {
-    await getKysely().deleteFrom('tblAlignerBatches').where('AlignerSetID', '=', setId).execute();
+    await getKysely().deleteFrom('aligner_batches').where('aligner_set_id', '=', setId).execute();
   } catch (err) {
     log.error('Failed to delete batches by set id', {
       error: err instanceof Error ? err.message : String(err),
@@ -982,7 +982,7 @@ export async function deleteBatchesBySetId(setId: number): Promise<void> {
 export async function deleteAlignerSet(setId: number): Promise<void> {
   try {
     await withPgTransaction(async (trx) => {
-      await trx.deleteFrom('tblAlignerSets').where('AlignerSetID', '=', setId).execute();
+      await trx.deleteFrom('aligner_sets').where('aligner_set_id', '=', setId).execute();
     });
   } catch (err) {
     log.error('Failed to delete aligner set', {
@@ -1002,49 +1002,49 @@ export async function deleteAlignerSet(setId: number): Promise<void> {
 export async function getAllAlignerPatients(): Promise<AlignerPatient[]> {
   try {
     const rows = await getKysely()
-      .selectFrom('tblpatients as p')
-      .innerJoin('tblwork as w', 'p.PersonID', 'w.PersonID')
-      .innerJoin('tblWorkType as wt', 'w.Typeofwork', 'wt.ID')
-      .innerJoin('tblAlignerSets as s', 'w.workid', 's.WorkID')
-      .where('wt.ID', 'in', [19, 20, 21])
+      .selectFrom('patients as p')
+      .innerJoin('works as w', 'p.person_id', 'w.person_id')
+      .innerJoin('work_types as wt', 'w.type_of_work', 'wt.id')
+      .innerJoin('aligner_sets as s', 'w.work_id', 's.work_id')
+      .where('wt.id', 'in', [19, 20, 21])
       .groupBy([
-        'p.PersonID',
-        'p.FirstName',
-        'p.LastName',
-        'p.PatientName',
-        'p.Phone',
-        'w.workid',
-        'wt.WorkType',
-        'w.Typeofwork',
+        'p.person_id',
+        'p.first_name',
+        'p.last_name',
+        'p.patient_name',
+        'p.phone',
+        'w.work_id',
+        'wt.work_type',
+        'w.type_of_work',
       ])
       .select((eb) => [
-        'p.PersonID',
-        'p.FirstName',
-        'p.LastName',
-        'p.PatientName',
-        'p.Phone',
-        'w.workid',
-        'wt.WorkType',
-        'w.Typeofwork as WorkTypeID',
-        eb.fn.count('s.AlignerSetID').distinct().as('TotalSets'),
+        'p.person_id',
+        'p.first_name',
+        'p.last_name',
+        'p.patient_name',
+        'p.phone',
+        'w.work_id',
+        'wt.work_type',
+        'w.type_of_work as WorkTypeID',
+        eb.fn.count('s.aligner_set_id').distinct().as('TotalSets'),
         eb.fn
-          .sum(sql<number>`case when "s"."IsActive" = true then 1 else 0 end`)
+          .sum(sql<number>`case when "s"."is_active" = true then 1 else 0 end`)
           .as('ActiveSets'),
       ])
-      .orderBy('p.PatientName')
-      .orderBy('p.FirstName')
-      .orderBy('p.LastName')
+      .orderBy('p.patient_name')
+      .orderBy('p.first_name')
+      .orderBy('p.last_name')
       .distinct()
       .execute();
 
     return rows.map((r) => ({
-      PersonID: r.PersonID,
-      FirstName: r.FirstName,
-      LastName: r.LastName,
-      PatientName: r.PatientName,
-      Phone: r.Phone,
-      workid: r.workid,
-      WorkType: r.WorkType,
+      person_id: r.person_id,
+      first_name: r.first_name,
+      last_name: r.last_name,
+      patient_name: r.patient_name,
+      phone: r.phone,
+      workid: r.work_id,
+      work_type: r.work_type,
       WorkTypeID: r.WorkTypeID,
       TotalSets: Number(r.TotalSets) || 0,
       ActiveSets: Number(r.ActiveSets) || 0,
@@ -1058,63 +1058,63 @@ export async function getAllAlignerPatients(): Promise<AlignerPatient[]> {
 }
 
 /**
- * Get aligner patients by doctor ID
+ * Get aligner patients by doctor id
  */
 export async function getAlignerPatientsByDoctor(doctorId: number): Promise<AlignerPatient[]> {
   try {
     const rows = await getKysely()
-      .selectFrom('tblpatients as p')
-      .innerJoin('tblwork as w', 'p.PersonID', 'w.PersonID')
-      .innerJoin('tblWorkType as wt', 'w.Typeofwork', 'wt.ID')
-      .innerJoin('tblAlignerSets as s', 'w.workid', 's.WorkID')
-      .where('wt.ID', 'in', [19, 20, 21])
-      .where('s.AlignerDrID', '=', doctorId)
+      .selectFrom('patients as p')
+      .innerJoin('works as w', 'p.person_id', 'w.person_id')
+      .innerJoin('work_types as wt', 'w.type_of_work', 'wt.id')
+      .innerJoin('aligner_sets as s', 'w.work_id', 's.work_id')
+      .where('wt.id', 'in', [19, 20, 21])
+      .where('s.aligner_dr_id', '=', doctorId)
       .groupBy([
-        'p.PersonID',
-        'p.FirstName',
-        'p.LastName',
-        'p.PatientName',
-        'p.Phone',
-        'w.workid',
-        'wt.WorkType',
-        'w.Typeofwork',
+        'p.person_id',
+        'p.first_name',
+        'p.last_name',
+        'p.patient_name',
+        'p.phone',
+        'w.work_id',
+        'wt.work_type',
+        'w.type_of_work',
       ])
       .select((eb) => [
-        'p.PersonID',
-        'p.FirstName',
-        'p.LastName',
-        'p.PatientName',
-        'p.Phone',
-        'w.workid',
-        'wt.WorkType',
-        'w.Typeofwork as WorkTypeID',
-        eb.fn.count('s.AlignerSetID').distinct().as('TotalSets'),
+        'p.person_id',
+        'p.first_name',
+        'p.last_name',
+        'p.patient_name',
+        'p.phone',
+        'w.work_id',
+        'wt.work_type',
+        'w.type_of_work as WorkTypeID',
+        eb.fn.count('s.aligner_set_id').distinct().as('TotalSets'),
         eb.fn
-          .sum(sql<number>`case when "s"."IsActive" = true then 1 else 0 end`)
+          .sum(sql<number>`case when "s"."is_active" = true then 1 else 0 end`)
           .as('ActiveSets'),
         eb
-          .selectFrom('tblAlignerNotes as n')
-          .innerJoin('tblAlignerSets as sets', 'n.AlignerSetID', 'sets.AlignerSetID')
-          .whereRef('sets.WorkID', '=', 'w.workid')
-          .where('n.NoteType', '=', 'Doctor')
-          .where('n.IsRead', '=', false)
+          .selectFrom('aligner_notes as n')
+          .innerJoin('aligner_sets as sets', 'n.aligner_set_id', 'sets.aligner_set_id')
+          .whereRef('sets.work_id', '=', 'w.work_id')
+          .where('n.note_type', '=', 'Doctor')
+          .where('n.is_read', '=', false)
           .select((e) => e.fn.countAll().as('cnt'))
           .as('UnreadDoctorNotes'),
       ])
-      .orderBy('p.PatientName')
-      .orderBy('p.FirstName')
-      .orderBy('p.LastName')
+      .orderBy('p.patient_name')
+      .orderBy('p.first_name')
+      .orderBy('p.last_name')
       .distinct()
       .execute();
 
     return rows.map((r) => ({
-      PersonID: r.PersonID,
-      FirstName: r.FirstName,
-      LastName: r.LastName,
-      PatientName: r.PatientName,
-      Phone: r.Phone,
-      workid: r.workid,
-      WorkType: r.WorkType,
+      person_id: r.person_id,
+      first_name: r.first_name,
+      last_name: r.last_name,
+      patient_name: r.patient_name,
+      phone: r.phone,
+      workid: r.work_id,
+      work_type: r.work_type,
       WorkTypeID: r.WorkTypeID,
       TotalSets: Number(r.TotalSets) || 0,
       ActiveSets: Number(r.ActiveSets) || 0,
@@ -1139,40 +1139,40 @@ export async function searchAlignerPatients(
     const like = `%${searchTerm}%`;
 
     let q = getKysely()
-      .selectFrom('tblpatients as p')
-      .innerJoin('tblwork as w', 'p.PersonID', 'w.PersonID')
-      .innerJoin('tblWorkType as wt', 'w.Typeofwork', 'wt.ID')
-      .innerJoin('tblAlignerSets as s', 'w.workid', 's.WorkID')
-      .where('wt.ID', 'in', [19, 20, 21])
+      .selectFrom('patients as p')
+      .innerJoin('works as w', 'p.person_id', 'w.person_id')
+      .innerJoin('work_types as wt', 'w.type_of_work', 'wt.id')
+      .innerJoin('aligner_sets as s', 'w.work_id', 's.work_id')
+      .where('wt.id', 'in', [19, 20, 21])
       .where((eb) =>
         eb.or([
           // citext columns → case-insensitive LIKE, matching Arabic_CI_AS.
-          eb('p.FirstName', 'like', like),
-          eb('p.LastName', 'like', like),
-          eb('p.PatientName', 'like', like),
-          eb('p.Phone', 'like', like),
-          eb(sql<string>`${eb.ref('p.FirstName')} || ' ' || ${eb.ref('p.LastName')}`, 'like', like),
+          eb('p.first_name', 'like', like),
+          eb('p.last_name', 'like', like),
+          eb('p.patient_name', 'like', like),
+          eb('p.phone', 'like', like),
+          eb(sql<string>`${eb.ref('p.first_name')} || ' ' || ${eb.ref('p.last_name')}`, 'like', like),
         ])
       );
 
     if (doctorId && !isNaN(doctorId)) {
-      q = q.where('s.AlignerDrID', '=', doctorId);
+      q = q.where('s.aligner_dr_id', '=', doctorId);
     }
 
     const rows = await q
       .select([
-        'p.PersonID',
-        'p.FirstName',
-        'p.LastName',
-        'p.PatientName',
-        'p.Phone',
-        'w.workid',
-        'wt.WorkType',
-        'w.Typeofwork as WorkTypeID',
+        'p.person_id',
+        'p.first_name',
+        'p.last_name',
+        'p.patient_name',
+        'p.phone',
+        'w.work_id as workid',
+        'wt.work_type',
+        'w.type_of_work as WorkTypeID',
       ])
       .distinct()
-      .orderBy('p.FirstName')
-      .orderBy('p.LastName')
+      .orderBy('p.first_name')
+      .orderBy('p.last_name')
       .execute();
 
     return rows as AlignerPatient[];
@@ -1194,54 +1194,54 @@ export async function searchAlignerPatients(
 export async function getBatchesBySetId(setId: number): Promise<AlignerBatch[]> {
   try {
     const rows = await getKysely()
-      .selectFrom('tblAlignerBatches')
-      .where('AlignerSetID', '=', setId)
+      .selectFrom('aligner_batches')
+      .where('aligner_set_id', '=', setId)
       .select((eb) => [
-        'AlignerBatchID',
-        'AlignerSetID',
-        'BatchSequence',
-        'UpperAlignerCount',
-        'LowerAlignerCount',
-        'UpperAlignerStartSequence',
-        'UpperAlignerEndSequence',
-        'LowerAlignerStartSequence',
-        'LowerAlignerEndSequence',
-        eb.ref('CreationDate').$castTo<Date>().as('CreationDate'),
-        eb.ref('ManufactureDate').$castTo<Date | null>().as('ManufactureDate'),
-        eb.ref('DeliveredToPatientDate').$castTo<Date | null>().as('DeliveredToPatientDate'),
-        'Days',
-        'ValidityPeriod',
-        eb.ref('BatchExpiryDate').$castTo<Date | null>().as('BatchExpiryDate'),
-        'Notes',
-        'IsActive',
-        'IsLast',
-        'HasUpperTemplate',
-        'HasLowerTemplate',
+        'aligner_batch_id',
+        'aligner_set_id',
+        'batch_sequence',
+        'upper_aligner_count',
+        'lower_aligner_count',
+        'upper_aligner_start_sequence',
+        'upper_aligner_end_sequence',
+        'lower_aligner_start_sequence',
+        'lower_aligner_end_sequence',
+        eb.ref('creation_date').$castTo<Date>().as('creation_date'),
+        eb.ref('manufacture_date').$castTo<Date | null>().as('manufacture_date'),
+        eb.ref('delivered_to_patient_date').$castTo<Date | null>().as('delivered_to_patient_date'),
+        'days',
+        'validity_period',
+        eb.ref('batch_expiry_date').$castTo<Date | null>().as('batch_expiry_date'),
+        'notes',
+        'is_active',
+        'is_last',
+        'has_upper_template',
+        'has_lower_template',
       ])
-      .orderBy('BatchSequence')
+      .orderBy('batch_sequence')
       .execute();
 
     return rows.map((r) => ({
-      AlignerBatchID: r.AlignerBatchID,
-      AlignerSetID: r.AlignerSetID,
-      BatchSequence: r.BatchSequence,
-      UpperAlignerCount: r.UpperAlignerCount,
-      LowerAlignerCount: r.LowerAlignerCount,
-      UpperAlignerStartSequence: r.UpperAlignerStartSequence,
-      UpperAlignerEndSequence: r.UpperAlignerEndSequence,
-      LowerAlignerStartSequence: r.LowerAlignerStartSequence,
-      LowerAlignerEndSequence: r.LowerAlignerEndSequence,
-      CreationDate: r.CreationDate,
-      ManufactureDate: r.ManufactureDate,
-      DeliveredToPatientDate: r.DeliveredToPatientDate,
-      Days: r.Days,
-      ValidityPeriod: r.ValidityPeriod,
-      BatchExpiryDate: r.BatchExpiryDate,
-      Notes: r.Notes,
-      IsActive: !!r.IsActive,
-      IsLast: r.IsLast,
-      HasUpperTemplate: r.HasUpperTemplate,
-      HasLowerTemplate: r.HasLowerTemplate,
+      aligner_batch_id: r.aligner_batch_id,
+      aligner_set_id: r.aligner_set_id,
+      batch_sequence: r.batch_sequence,
+      upper_aligner_count: r.upper_aligner_count,
+      lower_aligner_count: r.lower_aligner_count,
+      upper_aligner_start_sequence: r.upper_aligner_start_sequence,
+      upper_aligner_end_sequence: r.upper_aligner_end_sequence,
+      lower_aligner_start_sequence: r.lower_aligner_start_sequence,
+      lower_aligner_end_sequence: r.lower_aligner_end_sequence,
+      creation_date: r.creation_date,
+      manufacture_date: r.manufacture_date,
+      delivered_to_patient_date: r.delivered_to_patient_date,
+      days: r.days,
+      validity_period: r.validity_period,
+      batch_expiry_date: r.batch_expiry_date,
+      notes: r.notes,
+      is_active: !!r.is_active,
+      is_last: r.is_last,
+      has_upper_template: r.has_upper_template,
+      has_lower_template: r.has_lower_template,
     }));
   } catch (err) {
     log.error('Failed to get batches by set id', {
@@ -1253,140 +1253,140 @@ export async function getBatchesBySetId(setId: number): Promise<AlignerBatch[]> 
 
 /**
  * Create a new aligner batch using optimized stored procedure
- * Note: ManufactureDate and DeliveredToPatientDate are not set during creation
+ * note: manufacture_date and delivered_to_patient_date are not set during creation
  * They should be set via usp_UpdateBatchStatus (MANUFACTURE/DELIVER actions)
  *
  * Phase 5: reimplemented as a TS write path; still routes to the proc stub for now.
  */
 export async function createBatch(batchData: BatchData): Promise<number | null> {
   const {
-    AlignerSetID,
-    UpperAlignerCount,
-    LowerAlignerCount,
-    Days,
-    Notes,
-    IsActive,
-    HasUpperTemplate,
-    HasLowerTemplate,
-    IsLast,
+    aligner_set_id,
+    upper_aligner_count,
+    lower_aligner_count,
+    days,
+    notes,
+    is_active,
+    has_upper_template,
+    has_lower_template,
+    is_last,
   } = batchData;
 
-  const upper = UpperAlignerCount ?? 0;
-  const lower = LowerAlignerCount ?? 0;
-  const hasU = HasUpperTemplate ?? false;
-  const hasL = HasLowerTemplate ?? false;
-  const isActive = IsActive ?? false;
-  const isLast = IsLast ?? false;
+  const upper = upper_aligner_count ?? 0;
+  const lower = lower_aligner_count ?? 0;
+  const hasU = has_upper_template ?? false;
+  const hasL = has_lower_template ?? false;
+  const isActive = is_active ?? false;
+  const isLast = is_last ?? false;
 
   return withPgTransaction(async (trx) => {
     const existing = await trx
-      .selectFrom('tblAlignerBatches')
+      .selectFrom('aligner_batches')
       .select((eb) => eb.fn.countAll<number>().as('n'))
-      .where('AlignerSetID', '=', AlignerSetID)
+      .where('aligner_set_id', '=', aligner_set_id)
       .executeTakeFirst();
     if (Number(existing?.n ?? 0) > 0 && (hasU || hasL)) {
       throw new Error('Template flag can only be set on the first batch in a set');
     }
-    if (hasU && upper < 1) throw new Error('HasUpperTemplate = 1 requires UpperAlignerCount >= 1');
-    if (hasL && lower < 1) throw new Error('HasLowerTemplate = 1 requires LowerAlignerCount >= 1');
+    if (hasU && upper < 1) throw new Error('has_upper_template = 1 requires upper_aligner_count >= 1');
+    if (hasL && lower < 1) throw new Error('has_lower_template = 1 requires lower_aligner_count >= 1');
 
     const set = await trx
-      .selectFrom('tblAlignerSets')
-      .select(['RemainingUpperAligners', 'RemainingLowerAligners'])
-      .where('AlignerSetID', '=', AlignerSetID)
+      .selectFrom('aligner_sets')
+      .select(['remaining_upper_aligners', 'remaining_lower_aligners'])
+      .where('aligner_set_id', '=', aligner_set_id)
       .forUpdate()
       .executeTakeFirst();
-    if (!set || set.RemainingUpperAligners == null) throw new Error('AlignerSet not found');
-    const remU = set.RemainingUpperAligners;
-    const remL = set.RemainingLowerAligners ?? 0;
+    if (!set || set.remaining_upper_aligners == null) throw new Error('AlignerSet not found');
+    const remU = set.remaining_upper_aligners;
+    const remL = set.remaining_lower_aligners ?? 0;
     const upConsumed = upper - (hasU ? 1 : 0);
     const loConsumed = lower - (hasL ? 1 : 0);
     if (upConsumed > remU) throw new Error(`Cannot add aligner batch: requested upper aligners (${upConsumed}) exceed remaining count (${remU})`);
     if (loConsumed > remL) throw new Error(`Cannot add aligner batch: requested lower aligners (${loConsumed}) exceed remaining count (${remL})`);
 
     if (isActive) {
-      await trx.updateTable('tblAlignerBatches').set({ IsActive: false }).where('AlignerSetID', '=', AlignerSetID).where('IsActive', '=', true).execute();
+      await trx.updateTable('aligner_batches').set({ is_active: false }).where('aligner_set_id', '=', aligner_set_id).where('is_active', '=', true).execute();
     }
 
     const upperBase = hasU ? -1 : 0;
     const lowerBase = hasL ? -1 : 0;
     const agg = await sql<{ upperstart: number; lowerstart: number; batchseq: number }>`
-      SELECT COALESCE(MAX("UpperAlignerEndSequence"), ${upperBase}) + 1 AS upperstart,
-             COALESCE(MAX("LowerAlignerEndSequence"), ${lowerBase}) + 1 AS lowerstart,
-             COALESCE(MAX("BatchSequence"), 0) + 1 AS batchseq
-      FROM "tblAlignerBatches" WHERE "AlignerSetID" = ${AlignerSetID}
+      SELECT COALESCE(MAX("upper_aligner_end_sequence"), ${upperBase}) + 1 AS upperstart,
+             COALESCE(MAX("lower_aligner_end_sequence"), ${lowerBase}) + 1 AS lowerstart,
+             COALESCE(MAX("batch_sequence"), 0) + 1 AS batchseq
+      FROM "aligner_batches" WHERE "aligner_set_id" = ${aligner_set_id}
     `.execute(trx);
     const a = agg.rows[0];
 
     const row = await trx
-      .insertInto('tblAlignerBatches')
+      .insertInto('aligner_batches')
       .values({
-        AlignerSetID,
-        UpperAlignerCount: upper,
-        LowerAlignerCount: lower,
-        ManufactureDate: null,
-        DeliveredToPatientDate: null,
-        Days: Days ?? null,
-        Notes: Notes || null,
-        IsActive: isActive,
-        IsLast: isLast,
-        BatchSequence: a.batchseq,
-        UpperAlignerStartSequence: upper === 0 ? null : a.upperstart,
-        LowerAlignerStartSequence: lower === 0 ? null : a.lowerstart,
-        HasUpperTemplate: hasU,
-        HasLowerTemplate: hasL,
+        aligner_set_id,
+        upper_aligner_count: upper,
+        lower_aligner_count: lower,
+        manufacture_date: null,
+        delivered_to_patient_date: null,
+        days: days ?? null,
+        notes: notes || null,
+        is_active: isActive,
+        is_last: isLast,
+        batch_sequence: a.batchseq,
+        upper_aligner_start_sequence: upper === 0 ? null : a.upperstart,
+        lower_aligner_start_sequence: lower === 0 ? null : a.lowerstart,
+        has_upper_template: hasU,
+        has_lower_template: hasL,
       })
-      .returning('AlignerBatchID')
+      .returning('aligner_batch_id')
       .executeTakeFirstOrThrow();
 
     await trx
-      .updateTable('tblAlignerSets')
-      .set({ RemainingUpperAligners: remU - upConsumed, RemainingLowerAligners: remL - loConsumed })
-      .where('AlignerSetID', '=', AlignerSetID)
+      .updateTable('aligner_sets')
+      .set({ remaining_upper_aligners: remU - upConsumed, remaining_lower_aligners: remL - loConsumed })
+      .where('aligner_set_id', '=', aligner_set_id)
       .execute();
 
-    return row.AlignerBatchID;
+    return row.aligner_batch_id;
   });
 }
 
 /**
- * Recompute BatchSequence + Upper/LowerAlignerStartSequence for all batches in a set, ordered by
- * (ManufactureDate, AlignerBatchID). Verbatim port of the resequencing CTEs in the delete/update procs.
+ * Recompute batch_sequence + Upper/lower_aligner_start_sequence for all batches in a set, ordered by
+ * (manufacture_date, aligner_batch_id). Verbatim port of the resequencing CTEs in the delete/update procs.
  */
 async function resequenceBatches(trx: PgTransaction, setId: number): Promise<void> {
   await sql`
     WITH ordered AS (
-      SELECT "AlignerBatchID", ROW_NUMBER() OVER (ORDER BY "ManufactureDate", "AlignerBatchID") AS newseq
-      FROM "tblAlignerBatches" WHERE "AlignerSetID" = ${setId}
+      SELECT "aligner_batch_id", ROW_NUMBER() OVER (ORDER BY "manufacture_date", "aligner_batch_id") AS newseq
+      FROM "aligner_batches" WHERE "aligner_set_id" = ${setId}
     )
-    UPDATE "tblAlignerBatches" b SET "BatchSequence" = o.newseq
-    FROM ordered o WHERE b."AlignerBatchID" = o."AlignerBatchID" AND b."BatchSequence" <> o.newseq
+    UPDATE "aligner_batches" b SET "batch_sequence" = o.newseq
+    FROM ordered o WHERE b."aligner_batch_id" = o."aligner_batch_id" AND b."batch_sequence" <> o.newseq
   `.execute(trx);
 
   await sql`
     WITH ordered AS (
-      SELECT "AlignerBatchID", "UpperAlignerCount", "LowerAlignerCount", "HasUpperTemplate", "HasLowerTemplate",
-             ROW_NUMBER() OVER (ORDER BY "ManufactureDate", "AlignerBatchID") AS rownum
-      FROM "tblAlignerBatches" WHERE "AlignerSetID" = ${setId}
+      SELECT "aligner_batch_id", "upper_aligner_count", "lower_aligner_count", "has_upper_template", "has_lower_template",
+             ROW_NUMBER() OVER (ORDER BY "manufacture_date", "aligner_batch_id") AS rownum
+      FROM "aligner_batches" WHERE "aligner_set_id" = ${setId}
     ),
     cumulative AS (
-      SELECT "AlignerBatchID", "UpperAlignerCount", "LowerAlignerCount", rownum,
-        COALESCE(SUM("UpperAlignerCount") OVER (ORDER BY rownum ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS prevupper,
-        COALESCE(SUM("LowerAlignerCount") OVER (ORDER BY rownum ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS prevlower,
-        FIRST_VALUE("HasUpperTemplate") OVER (ORDER BY rownum) AS firsthasupper,
-        FIRST_VALUE("HasLowerTemplate") OVER (ORDER BY rownum) AS firsthaslower
+      SELECT "aligner_batch_id", "upper_aligner_count", "lower_aligner_count", rownum,
+        COALESCE(SUM("upper_aligner_count") OVER (ORDER BY rownum ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS prevupper,
+        COALESCE(SUM("lower_aligner_count") OVER (ORDER BY rownum ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS prevlower,
+        FIRST_VALUE("has_upper_template") OVER (ORDER BY rownum) AS firsthasupper,
+        FIRST_VALUE("has_lower_template") OVER (ORDER BY rownum) AS firsthaslower
       FROM ordered
     )
-    UPDATE "tblAlignerBatches" b SET
-      "UpperAlignerStartSequence" = CASE WHEN c."UpperAlignerCount" > 0 THEN c.prevupper + CASE WHEN c.firsthasupper THEN 0 ELSE 1 END ELSE NULL END,
-      "LowerAlignerStartSequence" = CASE WHEN c."LowerAlignerCount" > 0 THEN c.prevlower + CASE WHEN c.firsthaslower THEN 0 ELSE 1 END ELSE NULL END
-    FROM cumulative c WHERE b."AlignerBatchID" = c."AlignerBatchID"
+    UPDATE "aligner_batches" b SET
+      "upper_aligner_start_sequence" = CASE WHEN c."upper_aligner_count" > 0 THEN c.prevupper + CASE WHEN c.firsthasupper THEN 0 ELSE 1 END ELSE NULL END,
+      "lower_aligner_start_sequence" = CASE WHEN c."lower_aligner_count" > 0 THEN c.prevlower + CASE WHEN c.firsthaslower THEN 0 ELSE 1 END ELSE NULL END
+    FROM cumulative c WHERE b."aligner_batch_id" = c."aligner_batch_id"
   `.execute(trx);
 }
 
 /**
  * Update an aligner batch using optimized stored procedure
- * NOTE: ManufactureDate and DeliveredToPatientDate are managed via updateBatchStatus()
+ * NOTE: manufacture_date and delivered_to_patient_date are managed via updateBatchStatus()
  *
  * Phase 5: reimplemented as a TS write path; still routes to the proc stub for now.
  */
@@ -1395,111 +1395,111 @@ export async function updateBatch(
   batchData: BatchUpdateData
 ): Promise<DeactivatedBatchInfo | null> {
   const {
-    AlignerSetID,
-    UpperAlignerCount,
-    LowerAlignerCount,
-    Notes,
-    IsActive,
-    Days,
-    IsLast,
-    HasUpperTemplate,
-    HasLowerTemplate,
+    aligner_set_id,
+    upper_aligner_count,
+    lower_aligner_count,
+    notes,
+    is_active,
+    days,
+    is_last,
+    has_upper_template,
+    has_lower_template,
   } = batchData;
 
-  const upper = UpperAlignerCount ?? 0;
-  const lower = LowerAlignerCount ?? 0;
+  const upper = upper_aligner_count ?? 0;
+  const lower = lower_aligner_count ?? 0;
 
   await withPgTransaction(async (trx) => {
     const old = await trx
-      .selectFrom('tblAlignerBatches')
-      .select(['AlignerSetID', 'UpperAlignerCount', 'LowerAlignerCount', 'Days', 'HasUpperTemplate', 'HasLowerTemplate', 'DeliveredToPatientDate', 'BatchSequence'])
-      .where('AlignerBatchID', '=', batchId)
+      .selectFrom('aligner_batches')
+      .select(['aligner_set_id', 'upper_aligner_count', 'lower_aligner_count', 'days', 'has_upper_template', 'has_lower_template', 'delivered_to_patient_date', 'batch_sequence'])
+      .where('aligner_batch_id', '=', batchId)
       .executeTakeFirst();
     if (!old) throw new Error('Aligner batch not found');
-    if (AlignerSetID !== old.AlignerSetID) throw new Error('Cannot change AlignerSetID');
+    if (aligner_set_id !== old.aligner_set_id) throw new Error('Cannot change aligner_set_id');
 
-    const oldHasU = old.HasUpperTemplate ?? false;
-    const oldHasL = old.HasLowerTemplate ?? false;
-    const newHasU = HasUpperTemplate ?? oldHasU;
-    const newHasL = HasLowerTemplate ?? oldHasL;
+    const oldHasU = old.has_upper_template ?? false;
+    const oldHasL = old.has_lower_template ?? false;
+    const newHasU = has_upper_template ?? oldHasU;
+    const newHasL = has_lower_template ?? oldHasL;
 
     if (newHasU || newHasL) {
       const earlier = await trx
-        .selectFrom('tblAlignerBatches')
-        .select('AlignerBatchID')
-        .where('AlignerSetID', '=', AlignerSetID)
-        .where('AlignerBatchID', '<>', batchId)
-        .where('BatchSequence', '<', old.BatchSequence)
+        .selectFrom('aligner_batches')
+        .select('aligner_batch_id')
+        .where('aligner_set_id', '=', aligner_set_id)
+        .where('aligner_batch_id', '<>', batchId)
+        .where('batch_sequence', '<', old.batch_sequence)
         .executeTakeFirst();
       if (earlier) throw new Error('Template flag can only be set on the first batch in a set');
     }
-    if (newHasU && upper < 1) throw new Error('HasUpperTemplate = 1 requires UpperAlignerCount >= 1');
-    if (newHasL && lower < 1) throw new Error('HasLowerTemplate = 1 requires LowerAlignerCount >= 1');
+    if (newHasU && upper < 1) throw new Error('has_upper_template = 1 requires upper_aligner_count >= 1');
+    if (newHasL && lower < 1) throw new Error('has_lower_template = 1 requires lower_aligner_count >= 1');
 
     const set = await trx
-      .selectFrom('tblAlignerSets')
-      .select(['RemainingUpperAligners', 'RemainingLowerAligners'])
-      .where('AlignerSetID', '=', AlignerSetID)
+      .selectFrom('aligner_sets')
+      .select(['remaining_upper_aligners', 'remaining_lower_aligners'])
+      .where('aligner_set_id', '=', aligner_set_id)
       .forUpdate()
       .executeTakeFirst();
-    const remU = set?.RemainingUpperAligners ?? 0;
-    const remL = set?.RemainingLowerAligners ?? 0;
-    const oldUpConsumed = (old.UpperAlignerCount ?? 0) - (oldHasU ? 1 : 0);
-    const oldLoConsumed = (old.LowerAlignerCount ?? 0) - (oldHasL ? 1 : 0);
+    const remU = set?.remaining_upper_aligners ?? 0;
+    const remL = set?.remaining_lower_aligners ?? 0;
+    const oldUpConsumed = (old.upper_aligner_count ?? 0) - (oldHasU ? 1 : 0);
+    const oldLoConsumed = (old.lower_aligner_count ?? 0) - (oldHasL ? 1 : 0);
     const newUpConsumed = upper - (newHasU ? 1 : 0);
     const newLoConsumed = lower - (newHasL ? 1 : 0);
     if (newUpConsumed > remU + oldUpConsumed) throw new Error(`Cannot update aligner batch: requested upper aligners (${newUpConsumed}) exceed available count (${remU + oldUpConsumed})`);
     if (newLoConsumed > remL + oldLoConsumed) throw new Error(`Cannot update aligner batch: requested lower aligners (${newLoConsumed}) exceed available count (${remL + oldLoConsumed})`);
 
-    if (IsLast === true) {
-      await trx.updateTable('tblAlignerBatches').set({ IsLast: false }).where('AlignerSetID', '=', AlignerSetID).where('AlignerBatchID', '<>', batchId).where('IsLast', '=', true).execute();
+    if (is_last === true) {
+      await trx.updateTable('aligner_batches').set({ is_last: false }).where('aligner_set_id', '=', aligner_set_id).where('aligner_batch_id', '<>', batchId).where('is_last', '=', true).execute();
     }
-    if (IsActive === true) {
-      if (!old.DeliveredToPatientDate) throw new Error('Cannot set IsActive: batch must be delivered first');
-      await trx.updateTable('tblAlignerBatches').set({ IsActive: false }).where('AlignerSetID', '=', AlignerSetID).where('AlignerBatchID', '<>', batchId).where('IsActive', '=', true).execute();
+    if (is_active === true) {
+      if (!old.delivered_to_patient_date) throw new Error('Cannot set is_active: batch must be delivered first');
+      await trx.updateTable('aligner_batches').set({ is_active: false }).where('aligner_set_id', '=', aligner_set_id).where('aligner_batch_id', '<>', batchId).where('is_active', '=', true).execute();
     }
 
-    const countsChanged = upper !== (old.UpperAlignerCount ?? 0) || lower !== (old.LowerAlignerCount ?? 0);
+    const countsChanged = upper !== (old.upper_aligner_count ?? 0) || lower !== (old.lower_aligner_count ?? 0);
     const templateChanged = newHasU !== oldHasU || newHasL !== oldHasL;
-    const daysChanged = (Days ?? null) !== (old.Days ?? null);
+    const daysChanged = (days ?? null) !== (old.days ?? null);
 
     await trx
-      .updateTable('tblAlignerBatches')
+      .updateTable('aligner_batches')
       .set({
-        UpperAlignerCount: upper,
-        LowerAlignerCount: lower,
-        Days: Days ?? null,
-        Notes: Notes || null,
-        IsActive: IsActive ?? undefined,
-        IsLast: IsLast ?? undefined,
-        HasUpperTemplate: newHasU,
-        HasLowerTemplate: newHasL,
+        upper_aligner_count: upper,
+        lower_aligner_count: lower,
+        days: days ?? null,
+        notes: notes || null,
+        is_active: is_active ?? undefined,
+        is_last: is_last ?? undefined,
+        has_upper_template: newHasU,
+        has_lower_template: newHasL,
       })
-      .where('AlignerBatchID', '=', batchId)
+      .where('aligner_batch_id', '=', batchId)
       .execute();
 
     if (countsChanged || templateChanged) {
-      await resequenceBatches(trx, AlignerSetID);
+      await resequenceBatches(trx, aligner_set_id);
     }
 
     const upperDelta = newUpConsumed - oldUpConsumed;
     const lowerDelta = newLoConsumed - oldLoConsumed;
     if (upperDelta !== 0 || lowerDelta !== 0) {
       await trx
-        .updateTable('tblAlignerSets')
-        .set({ RemainingUpperAligners: remU - upperDelta, RemainingLowerAligners: remL - lowerDelta })
-        .where('AlignerSetID', '=', AlignerSetID)
+        .updateTable('aligner_sets')
+        .set({ remaining_upper_aligners: remU - upperDelta, remaining_lower_aligners: remL - lowerDelta })
+        .where('aligner_set_id', '=', aligner_set_id)
         .execute();
     }
 
     if (daysChanged) {
       await trx
-        .insertInto('tblAlignerActivityFlags')
+        .insertInto('aligner_activity_flags')
         .values({
-          AlignerSetID,
-          ActivityType: 'DaysChanged',
-          ActivityDescription: `Days changed from ${old.Days ?? 'not set'} to ${Days ?? 'not set'}`,
-          RelatedRecordID: batchId,
+          aligner_set_id,
+          activity_type: 'DaysChanged',
+          activity_description: `days changed from ${old.days ?? 'not set'} to ${days ?? 'not set'}`,
+          related_record_id: batchId,
         })
         .execute();
     }
@@ -1514,17 +1514,17 @@ export async function updateBatch(
  * Update batch status using consolidated stored procedure
  *
  * Actions:
- * - MANUFACTURE: Sets ManufactureDate = @targetDate or GETDATE()
+ * - MANUFACTURE: Sets manufacture_date = @targetDate or GETDATE()
  *                If @targetDate provided and already manufactured, updates date
- * - DELIVER: Sets DeliveredToPatientDate = @targetDate or GETDATE()
- *            BatchExpiryDate is auto-computed from DeliveredToPatientDate + (Days * AlignerCount)
- *            If batch is latest (highest BatchSequence) AND not already active:
+ * - DELIVER: Sets delivered_to_patient_date = @targetDate or GETDATE()
+ *            batch_expiry_date is auto-computed from delivered_to_patient_date + (days * AlignerCount)
+ *            If batch is latest (highest batch_sequence) AND not already active:
  *            - Deactivates other batches in the set
  *            - Activates this batch
- * - UNDO_MANUFACTURE: Clears ManufactureDate (requires batch not yet delivered)
- * - UNDO_DELIVERY: Clears DeliveredToPatientDate (BatchExpiryDate auto-clears as computed)
+ * - UNDO_MANUFACTURE: Clears manufacture_date (requires batch not yet delivered)
+ * - UNDO_DELIVERY: Clears delivered_to_patient_date (batch_expiry_date auto-clears as computed)
  *
- * @param batchId - The batch ID to update
+ * @param batchId - The batch id to update
  * @param action - The action to perform
  * @param targetDate - Optional date for backdating/correction. If null, uses GETDATE()
  * @returns Result with operation info and activation status
@@ -1540,18 +1540,18 @@ export async function updateBatchStatus(
 
   return withPgTransaction(async (trx) => {
     const batch = await trx
-      .selectFrom('tblAlignerBatches')
-      .select(['AlignerSetID', 'BatchSequence', 'ManufactureDate', 'DeliveredToPatientDate', 'IsActive'])
-      .where('AlignerBatchID', '=', batchId)
+      .selectFrom('aligner_batches')
+      .select(['aligner_set_id', 'batch_sequence', 'manufacture_date', 'delivered_to_patient_date', 'is_active'])
+      .where('aligner_batch_id', '=', batchId)
       .forUpdate()
       .executeTakeFirst();
     if (!batch) throw new Error('Aligner batch not found');
 
-    const setId = batch.AlignerSetID;
-    const batchSequence = batch.BatchSequence;
-    const isCurrentlyActive = batch.IsActive ?? false;
-    const manufactured = !!batch.ManufactureDate;
-    const delivered = !!batch.DeliveredToPatientDate;
+    const setId = batch.aligner_set_id;
+    const batchSequence = batch.batch_sequence;
+    const isCurrentlyActive = batch.is_active ?? false;
+    const manufactured = !!batch.manufacture_date;
+    const delivered = !!batch.delivered_to_patient_date;
     const today = toDateOnly(new Date());
 
     const base = {
@@ -1564,7 +1564,7 @@ export async function updateBatchStatus(
       if (manufactured && target === null) {
         return { ...base, message: 'Batch already manufactured' };
       }
-      await trx.updateTable('tblAlignerBatches').set({ ManufactureDate: target ?? today }).where('AlignerBatchID', '=', batchId).execute();      return { ...base, message: manufactured ? 'Manufacture date updated' : 'Batch marked as manufactured' };
+      await trx.updateTable('aligner_batches').set({ manufacture_date: target ?? today }).where('aligner_batch_id', '=', batchId).execute();      return { ...base, message: manufactured ? 'Manufacture date updated' : 'Batch marked as manufactured' };
     }
 
     if (action === 'DELIVER') {
@@ -1572,39 +1572,39 @@ export async function updateBatchStatus(
       if (delivered && target === null) {
         return { ...base, wasAlreadyDelivered: true, message: 'Batch already delivered' };
       }
-      await trx.updateTable('tblAlignerBatches').set({ DeliveredToPatientDate: target ?? today }).where('AlignerBatchID', '=', batchId).execute();
+      await trx.updateTable('aligner_batches').set({ delivered_to_patient_date: target ?? today }).where('aligner_batch_id', '=', batchId).execute();
 
       const maxSeq = await trx
-        .selectFrom('tblAlignerBatches')
-        .select((eb) => eb.fn.max('BatchSequence').as('m'))
-        .where('AlignerSetID', '=', setId)
+        .selectFrom('aligner_batches')
+        .select((eb) => eb.fn.max('batch_sequence').as('m'))
+        .where('aligner_set_id', '=', setId)
         .executeTakeFirst();
 
       let wasActivated = false;
       let previouslyActiveBatchSequence: number | null = null;
       if (batchSequence === maxSeq?.m && !isCurrentlyActive) {
         const prev = await trx
-          .selectFrom('tblAlignerBatches')
-          .select('BatchSequence')
-          .where('AlignerSetID', '=', setId)
-          .where('IsActive', '=', true)
-          .where('AlignerBatchID', '<>', batchId)
+          .selectFrom('aligner_batches')
+          .select('batch_sequence')
+          .where('aligner_set_id', '=', setId)
+          .where('is_active', '=', true)
+          .where('aligner_batch_id', '<>', batchId)
           .limit(1)
           .executeTakeFirst();
-        previouslyActiveBatchSequence = prev?.BatchSequence ?? null;
-        await trx.updateTable('tblAlignerBatches').set({ IsActive: false }).where('AlignerSetID', '=', setId).where('AlignerBatchID', '<>', batchId).where('IsActive', '=', true).execute();
-        await trx.updateTable('tblAlignerBatches').set({ IsActive: true }).where('AlignerBatchID', '=', batchId).execute();
+        previouslyActiveBatchSequence = prev?.batch_sequence ?? null;
+        await trx.updateTable('aligner_batches').set({ is_active: false }).where('aligner_set_id', '=', setId).where('aligner_batch_id', '<>', batchId).where('is_active', '=', true).execute();
+        await trx.updateTable('aligner_batches').set({ is_active: true }).where('aligner_batch_id', '=', batchId).execute();
         wasActivated = true;
       }      return { ...base, wasActivated, previouslyActiveBatchSequence, message: delivered ? 'Delivery date updated' : 'Batch marked as delivered' };
     }
 
     if (action === 'UNDO_MANUFACTURE') {
       if (delivered) throw new Error('Cannot undo manufacture: batch already delivered. Undo delivery first.');
-      await trx.updateTable('tblAlignerBatches').set({ ManufactureDate: null }).where('AlignerBatchID', '=', batchId).execute();      return { ...base, message: 'Manufacture undone' };
+      await trx.updateTable('aligner_batches').set({ manufacture_date: null }).where('aligner_batch_id', '=', batchId).execute();      return { ...base, message: 'Manufacture undone' };
     }
 
     if (action === 'UNDO_DELIVERY') {
-      await trx.updateTable('tblAlignerBatches').set({ DeliveredToPatientDate: null, IsActive: false }).where('AlignerBatchID', '=', batchId).execute();      return { ...base, message: 'Delivery undone (batch deactivated)' };
+      await trx.updateTable('aligner_batches').set({ delivered_to_patient_date: null, is_active: false }).where('aligner_batch_id', '=', batchId).execute();      return { ...base, message: 'Delivery undone (batch deactivated)' };
     }
 
     throw new Error('Invalid action. Must be MANUFACTURE, DELIVER, UNDO_MANUFACTURE, or UNDO_DELIVERY');
@@ -1619,24 +1619,24 @@ export async function updateBatchStatus(
 export async function deleteBatch(batchId: number): Promise<void> {
   await withPgTransaction(async (trx) => {
     const batch = await trx
-      .selectFrom('tblAlignerBatches')
-      .select(['AlignerSetID', 'UpperAlignerCount', 'LowerAlignerCount', 'HasUpperTemplate', 'HasLowerTemplate'])
-      .where('AlignerBatchID', '=', batchId)
+      .selectFrom('aligner_batches')
+      .select(['aligner_set_id', 'upper_aligner_count', 'lower_aligner_count', 'has_upper_template', 'has_lower_template'])
+      .where('aligner_batch_id', '=', batchId)
       .executeTakeFirst();
     if (!batch) throw new Error('Aligner batch not found');
 
-    await trx.deleteFrom('tblAlignerBatches').where('AlignerBatchID', '=', batchId).execute();
+    await trx.deleteFrom('aligner_batches').where('aligner_batch_id', '=', batchId).execute();
 
-    const upperRestored = (batch.UpperAlignerCount ?? 0) - (batch.HasUpperTemplate ? 1 : 0);
-    const lowerRestored = (batch.LowerAlignerCount ?? 0) - (batch.HasLowerTemplate ? 1 : 0);
+    const upperRestored = (batch.upper_aligner_count ?? 0) - (batch.has_upper_template ? 1 : 0);
+    const lowerRestored = (batch.lower_aligner_count ?? 0) - (batch.has_lower_template ? 1 : 0);
     await sql`
-      UPDATE "tblAlignerSets"
-      SET "RemainingUpperAligners" = "RemainingUpperAligners" + ${upperRestored},
-          "RemainingLowerAligners" = "RemainingLowerAligners" + ${lowerRestored}
-      WHERE "AlignerSetID" = ${batch.AlignerSetID}
+      UPDATE "aligner_sets"
+      SET "remaining_upper_aligners" = "remaining_upper_aligners" + ${upperRestored},
+          "remaining_lower_aligners" = "remaining_lower_aligners" + ${lowerRestored}
+      WHERE "aligner_set_id" = ${batch.aligner_set_id}
     `.execute(trx);
 
-    await resequenceBatches(trx, batch.AlignerSetID);
+    await resequenceBatches(trx, batch.aligner_set_id);
 
   });
 }
@@ -1651,34 +1651,34 @@ export async function deleteBatch(batchId: number): Promise<void> {
 export async function getNotesBySetId(setId: number): Promise<AlignerNote[]> {
   try {
     const rows = await getKysely()
-      .selectFrom('tblAlignerNotes as n')
-      .innerJoin('tblAlignerSets as s', 'n.AlignerSetID', 's.AlignerSetID')
-      .innerJoin('AlignerDoctors as d', 's.AlignerDrID', 'd.DrID')
-      .where('n.AlignerSetID', '=', setId)
+      .selectFrom('aligner_notes as n')
+      .innerJoin('aligner_sets as s', 'n.aligner_set_id', 's.aligner_set_id')
+      .innerJoin('aligner_doctors as d', 's.aligner_dr_id', 'd.dr_id')
+      .where('n.aligner_set_id', '=', setId)
       .select((eb) => [
-        'n.NoteID',
-        'n.AlignerSetID',
-        'n.NoteType',
-        'n.NoteText',
-        eb.ref('n.CreatedAt').$castTo<Date>().as('CreatedAt'),
-        'n.IsEdited',
-        eb.ref('n.EditedAt').$castTo<Date | null>().as('EditedAt'),
-        'n.IsRead',
-        'd.DoctorName',
+        'n.note_id',
+        'n.aligner_set_id',
+        'n.note_type',
+        'n.note_text',
+        eb.ref('n.created_at').$castTo<Date>().as('created_at'),
+        'n.is_edited',
+        eb.ref('n.edited_at').$castTo<Date | null>().as('edited_at'),
+        'n.is_read',
+        'd.doctor_name',
       ])
-      .orderBy('n.CreatedAt', 'desc')
+      .orderBy('n.created_at', 'desc')
       .execute();
 
     return rows.map((r) => ({
-      NoteID: r.NoteID,
-      AlignerSetID: r.AlignerSetID,
-      NoteType: r.NoteType as 'Lab' | 'Doctor',
-      NoteText: r.NoteText,
-      CreatedAt: r.CreatedAt,
-      IsEdited: !!r.IsEdited,
-      EditedAt: r.EditedAt,
-      IsRead: r.IsRead,
-      DoctorName: r.DoctorName,
+      note_id: r.note_id,
+      aligner_set_id: r.aligner_set_id,
+      note_type: r.note_type as 'Lab' | 'Doctor',
+      note_text: r.note_text,
+      created_at: r.created_at,
+      is_edited: !!r.is_edited,
+      edited_at: r.edited_at,
+      is_read: r.is_read,
+      doctor_name: r.doctor_name,
     }));
   } catch (err) {
     log.error('Failed to get notes by set id', {
@@ -1694,9 +1694,9 @@ export async function getNotesBySetId(setId: number): Promise<AlignerNote[]> {
 export async function alignerSetExists(setId: number): Promise<boolean> {
   try {
     const row = await getKysely()
-      .selectFrom('tblAlignerSets')
-      .select('AlignerSetID')
-      .where('AlignerSetID', '=', setId)
+      .selectFrom('aligner_sets')
+      .select('aligner_set_id')
+      .where('aligner_set_id', '=', setId)
       .executeTakeFirst();
 
     return !!row;
@@ -1723,35 +1723,35 @@ export async function createNote(
   try {
     return await withPgTransaction(async (trx) => {
       const row = await trx
-        .insertInto('tblAlignerNotes')
+        .insertInto('aligner_notes')
         .values({
-          AlignerSetID: setId,
-          NoteType: noteType,
-          NoteText: noteText.trim(),
+          aligner_set_id: setId,
+          note_type: noteType,
+          note_text: noteText.trim(),
         })
-        .returning('NoteID')
+        .returning('note_id')
         .executeTakeFirstOrThrow();
 
       // trg_AlignerNotes_DoctorActivity: a Doctor note logs a "DoctorNote" activity flag.
       if (noteType === 'Doctor') {
         const doc = await trx
-          .selectFrom('tblAlignerSets as s')
-          .leftJoin('AlignerDoctors as d', 'd.DrID', 's.AlignerDrID')
-          .where('s.AlignerSetID', '=', setId)
-          .select('d.DoctorName')
+          .selectFrom('aligner_sets as s')
+          .leftJoin('aligner_doctors as d', 'd.dr_id', 's.aligner_dr_id')
+          .where('s.aligner_set_id', '=', setId)
+          .select('d.doctor_name')
           .executeTakeFirst();
         await trx
-          .insertInto('tblAlignerActivityFlags')
+          .insertInto('aligner_activity_flags')
           .values({
-            AlignerSetID: setId,
-            ActivityType: 'DoctorNote',
-            ActivityDescription: `Dr. ${doc?.DoctorName ?? 'Unknown'} added a note`,
-            RelatedRecordID: row.NoteID,
+            aligner_set_id: setId,
+            activity_type: 'DoctorNote',
+            activity_description: `Dr. ${doc?.doctor_name ?? 'Unknown'} added a note`,
+            related_record_id: row.note_id,
           })
           .execute();
       }
 
-      return row.NoteID;
+      return row.note_id;
     });
   } catch (err) {
     log.error('Failed to create note', {
@@ -1762,8 +1762,8 @@ export async function createNote(
 }
 
 interface NoteInfo {
-  NoteID: number;
-  NoteType: 'Lab' | 'Doctor';
+  note_id: number;
+  note_type: 'Lab' | 'Doctor';
 }
 
 /**
@@ -1772,13 +1772,13 @@ interface NoteInfo {
 export async function getNoteById(noteId: number): Promise<NoteInfo | null> {
   try {
     const row = await getKysely()
-      .selectFrom('tblAlignerNotes')
-      .select(['NoteID', 'NoteType'])
-      .where('NoteID', '=', noteId)
+      .selectFrom('aligner_notes')
+      .select(['note_id', 'note_type'])
+      .where('note_id', '=', noteId)
       .executeTakeFirst();
 
     if (!row) return null;
-    return { NoteID: row.NoteID, NoteType: row.NoteType as 'Lab' | 'Doctor' };
+    return { note_id: row.note_id, note_type: row.note_type as 'Lab' | 'Doctor' };
   } catch (err) {
     log.error('Failed to get note by id', {
       error: err instanceof Error ? err.message : String(err),
@@ -1794,9 +1794,9 @@ export async function updateNote(noteId: number, noteText: string): Promise<void
   try {
     await withPgTransaction(async (trx) => {
       await trx
-        .updateTable('tblAlignerNotes')
-        .set({ NoteText: noteText.trim(), IsEdited: true, EditedAt: sql`localtimestamp` })
-        .where('NoteID', '=', noteId)
+        .updateTable('aligner_notes')
+        .set({ note_text: noteText.trim(), is_edited: true, edited_at: sql`localtimestamp` })
+        .where('note_id', '=', noteId)
         .execute();
     });
   } catch (err) {
@@ -1814,11 +1814,11 @@ export async function toggleNoteReadStatus(noteId: number): Promise<void> {
   try {
     await withPgTransaction(async (trx) => {
       await trx
-        .updateTable('tblAlignerNotes')
+        .updateTable('aligner_notes')
         .set((eb) => ({
-          IsRead: sql<boolean>`case when ${eb.ref('IsRead')} = true then false else true end`,
+          is_read: sql<boolean>`case when ${eb.ref('is_read')} = true then false else true end`,
         }))
-        .where('NoteID', '=', noteId)
+        .where('note_id', '=', noteId)
         .execute();
     });
   } catch (err) {
@@ -1835,7 +1835,7 @@ export async function toggleNoteReadStatus(noteId: number): Promise<void> {
 export async function deleteNote(noteId: number): Promise<void> {
   try {
     await withPgTransaction(async (trx) => {
-      await trx.deleteFrom('tblAlignerNotes').where('NoteID', '=', noteId).execute();
+      await trx.deleteFrom('aligner_notes').where('note_id', '=', noteId).execute();
     });
   } catch (err) {
     log.error('Failed to delete note', {
@@ -1851,12 +1851,12 @@ export async function deleteNote(noteId: number): Promise<void> {
 export async function getNoteReadStatus(noteId: number): Promise<boolean | null> {
   try {
     const row = await getKysely()
-      .selectFrom('tblAlignerNotes')
-      .select('IsRead')
-      .where('NoteID', '=', noteId)
+      .selectFrom('aligner_notes')
+      .select('is_read')
+      .where('note_id', '=', noteId)
       .executeTakeFirst();
 
-    return row ? row.IsRead : null;
+    return row ? row.is_read : null;
   } catch (err) {
     log.error('Failed to get note read status', {
       error: err instanceof Error ? err.message : String(err),
@@ -1875,31 +1875,31 @@ export async function getNoteReadStatus(noteId: number): Promise<boolean | null>
 export async function getUnreadActivitiesBySetId(setId: number): Promise<AlignerActivity[]> {
   try {
     const rows = await getKysely()
-      .selectFrom('tblAlignerActivityFlags')
-      .where('AlignerSetID', '=', setId)
-      .where('IsRead', '=', false)
+      .selectFrom('aligner_activity_flags')
+      .where('aligner_set_id', '=', setId)
+      .where('is_read', '=', false)
       .select((eb) => [
-        'ActivityID',
-        'AlignerSetID',
-        'ActivityType',
-        'ActivityDescription',
-        eb.ref('CreatedAt').$castTo<Date>().as('CreatedAt'),
-        'IsRead',
-        eb.ref('ReadAt').$castTo<Date | null>().as('ReadAt'),
-        'RelatedRecordID',
+        'activity_id',
+        'aligner_set_id',
+        'activity_type',
+        'activity_description',
+        eb.ref('created_at').$castTo<Date>().as('created_at'),
+        'is_read',
+        eb.ref('read_at').$castTo<Date | null>().as('read_at'),
+        'related_record_id',
       ])
-      .orderBy('CreatedAt', 'desc')
+      .orderBy('created_at', 'desc')
       .execute();
 
     return rows.map((r) => ({
-      ActivityID: r.ActivityID,
-      AlignerSetID: r.AlignerSetID,
-      ActivityType: r.ActivityType,
-      ActivityDescription: r.ActivityDescription,
-      CreatedAt: r.CreatedAt,
-      IsRead: !!r.IsRead,
-      ReadAt: r.ReadAt,
-      RelatedRecordID: r.RelatedRecordID,
+      activity_id: r.activity_id,
+      aligner_set_id: r.aligner_set_id,
+      activity_type: r.activity_type,
+      activity_description: r.activity_description,
+      created_at: r.created_at,
+      is_read: !!r.is_read,
+      read_at: r.read_at,
+      related_record_id: r.related_record_id,
     }));
   } catch (err) {
     log.error('Failed to get unread activities by set id', {
@@ -1915,9 +1915,9 @@ export async function getUnreadActivitiesBySetId(setId: number): Promise<Aligner
 export async function markActivityAsRead(activityId: number): Promise<void> {
   try {
     await getKysely()
-      .updateTable('tblAlignerActivityFlags')
-      .set({ IsRead: true, ReadAt: sql`localtimestamp` })
-      .where('ActivityID', '=', activityId)
+      .updateTable('aligner_activity_flags')
+      .set({ is_read: true, read_at: sql`localtimestamp` })
+      .where('activity_id', '=', activityId)
       .execute();
   } catch (err) {
     log.error('Failed to mark activity as read', {
@@ -1933,10 +1933,10 @@ export async function markActivityAsRead(activityId: number): Promise<void> {
 export async function markAllActivitiesAsRead(setId: number): Promise<void> {
   try {
     await getKysely()
-      .updateTable('tblAlignerActivityFlags')
-      .set({ IsRead: true, ReadAt: sql`localtimestamp` })
-      .where('AlignerSetID', '=', setId)
-      .where('IsRead', '=', false)
+      .updateTable('aligner_activity_flags')
+      .set({ is_read: true, read_at: sql`localtimestamp` })
+      .where('aligner_set_id', '=', setId)
+      .where('is_read', '=', false)
       .execute();
   } catch (err) {
     log.error('Failed to mark all activities as read', {
@@ -1953,55 +1953,55 @@ export async function markAllActivitiesAsRead(setId: number): Promise<void> {
 /**
  * Add payment for an aligner set
  *
- * FLAG (date-string): `tblInvoice.Dateofpayment` is a PG `date` column; the value is
+ * FLAG (date-string): `tblInvoice.date_of_payment` is a PG `date` column; the value is
  * bound as a 'YYYY-MM-DD' string (via toDateOnly) wrapped in `sql<Date>` so PG infers the
  * date type and the column isn't shifted by a UTC conversion (see CLAUDE.md date gotcha).
- * `Amountpaid`/`ActualAmount`/`Change`/`USDReceived`/`IQDReceived` are plain integer columns.
+ * `amount_paid`/`actual_amount`/`change`/`usd_received`/`iqd_received` are plain integer columns.
  */
 export async function createAlignerPayment(
   paymentData: AlignerPaymentData
 ): Promise<number | null> {
-  const { workid, AlignerSetID, Amountpaid, Dateofpayment, ActualAmount, ActualCur, Change } =
+  const { workid, aligner_set_id, amount_paid, date_of_payment, actual_amount, actual_cur, change } =
     paymentData;
 
   // Determine USD vs IQD based on currency (default to USD for aligner payments)
-  const currency = ActualCur || 'USD';
-  const parsedAmount = typeof Amountpaid === 'string' ? parseFloat(Amountpaid) : Amountpaid;
-  const amount = Math.round(parsedAmount); // Round to integer for USDReceived/IQDReceived columns
+  const currency = actual_cur || 'USD';
+  const parsedAmount = typeof amount_paid === 'string' ? parseFloat(amount_paid) : amount_paid;
+  const amount = Math.round(parsedAmount); // Round to integer for usd_received/iqd_received columns
   const usdReceived = currency === 'USD' ? amount : 0;
   const iqdReceived = currency === 'IQD' ? amount : 0;
 
   log.info('Creating aligner payment', {
     workid,
-    AlignerSetID,
-    Amountpaid,
+    aligner_set_id,
+    amount_paid,
     currency,
     usdReceived,
     iqdReceived,
   });
 
   try {
-    const dateStr = toDateOnly(new Date(Dateofpayment as string));
+    const dateStr = toDateOnly(new Date(date_of_payment as string));
     const paidAmount =
-      typeof Amountpaid === 'string' ? parseFloat(Amountpaid) : Amountpaid;
+      typeof amount_paid === 'string' ? parseFloat(amount_paid) : amount_paid;
 
     const row = await getKysely()
-      .insertInto('tblInvoice')
+      .insertInto('invoices')
       .values({
-        workid,
-        Amountpaid: Math.round(paidAmount),
-        Dateofpayment: sql<Date>`${dateStr}`,
-        ActualAmount: ActualAmount ?? null,
-        ActualCur: ActualCur || null,
-        Change: Change ?? null,
-        AlignerSetID: AlignerSetID || null,
-        USDReceived: usdReceived,
-        IQDReceived: iqdReceived,
+        work_id: workid,
+        amount_paid: Math.round(paidAmount),
+        date_of_payment: sql<Date>`${dateStr}`,
+        actual_amount: actual_amount ?? null,
+        actual_cur: actual_cur || null,
+        change: change ?? null,
+        aligner_set_id: aligner_set_id || null,
+        usd_received: usdReceived,
+        iqd_received: iqdReceived,
       })
-      .returning('invoiceID')
+      .returning('invoice_id')
       .executeTakeFirstOrThrow();
 
-    return row.invoiceID;
+    return row.invoice_id;
   } catch (err) {
     log.error('Failed to create aligner payment', {
       error: err instanceof Error ? err.message : String(err),
@@ -2014,27 +2014,27 @@ export async function createAlignerPayment(
  * Get aligner set balance information for validation.
  *
  * FLAG (inlined view): `vw_AlignerSetPayments` is absent from the PG schema (Phase 5);
- * its SetCost / TotalPaid / Balance logic is inlined as a single aggregate query.
+ * its set_cost / TotalPaid / Balance logic is inlined as a single aggregate query.
  */
 export async function getAlignerSetBalance(alignerSetId: number): Promise<AlignerSetBalance | null> {
   try {
     const row = await getKysely()
-      .selectFrom('tblAlignerSets as s')
-      .leftJoin('tblInvoice as i', 's.AlignerSetID', 'i.AlignerSetID')
-      .where('s.AlignerSetID', '=', alignerSetId)
-      .groupBy(['s.AlignerSetID', 's.SetCost'])
+      .selectFrom('aligner_sets as s')
+      .leftJoin('invoices as i', 's.aligner_set_id', 'i.aligner_set_id')
+      .where('s.aligner_set_id', '=', alignerSetId)
+      .groupBy(['s.aligner_set_id', 's.set_cost'])
       .select((eb) => [
-        's.AlignerSetID',
-        eb.ref('s.SetCost').$castTo<number | null>().as('SetCost'),
-        eb.fn.coalesce(eb.fn.sum('i.Amountpaid'), sql<number>`0`).$castTo<number>().as('TotalPaid'),
-        sql<number | null>`${eb.ref('s.SetCost')} - coalesce(sum(i."Amountpaid"), 0)`.as('Balance'),
+        's.aligner_set_id',
+        eb.ref('s.set_cost').$castTo<number | null>().as('set_cost'),
+        eb.fn.coalesce(eb.fn.sum('i.amount_paid'), sql<number>`0`).$castTo<number>().as('TotalPaid'),
+        sql<number | null>`${eb.ref('s.set_cost')} - coalesce(sum(i."amount_paid"), 0)`.as('Balance'),
       ])
       .executeTakeFirst();
 
     if (!row) return null;
     return {
-      AlignerSetID: row.AlignerSetID,
-      SetCost: row.SetCost,
+      aligner_set_id: row.aligner_set_id,
+      set_cost: row.set_cost,
       TotalPaid: row.TotalPaid,
       Balance: row.Balance,
     };
@@ -2051,56 +2051,56 @@ export async function getAlignerSetBalance(alignerSetId: number): Promise<Aligne
 // ==============================
 
 /**
- * Get a single batch by ID
+ * Get a single batch by id
  */
 export async function getBatchById(batchId: number): Promise<AlignerBatch[]> {
   try {
     const rows = await getKysely()
-      .selectFrom('tblAlignerBatches')
-      .where('AlignerBatchID', '=', batchId)
+      .selectFrom('aligner_batches')
+      .where('aligner_batch_id', '=', batchId)
       .select((eb) => [
-        'AlignerBatchID',
-        'AlignerSetID',
-        'BatchSequence',
-        'UpperAlignerCount',
-        'LowerAlignerCount',
-        'UpperAlignerStartSequence',
-        'UpperAlignerEndSequence',
-        'LowerAlignerStartSequence',
-        'LowerAlignerEndSequence',
-        eb.ref('CreationDate').$castTo<Date>().as('CreationDate'),
-        eb.ref('ManufactureDate').$castTo<Date | null>().as('ManufactureDate'),
-        eb.ref('DeliveredToPatientDate').$castTo<Date | null>().as('DeliveredToPatientDate'),
-        'Days',
-        'Notes',
-        'IsActive',
-        'IsLast',
-        'HasUpperTemplate',
-        'HasLowerTemplate',
+        'aligner_batch_id',
+        'aligner_set_id',
+        'batch_sequence',
+        'upper_aligner_count',
+        'lower_aligner_count',
+        'upper_aligner_start_sequence',
+        'upper_aligner_end_sequence',
+        'lower_aligner_start_sequence',
+        'lower_aligner_end_sequence',
+        eb.ref('creation_date').$castTo<Date>().as('creation_date'),
+        eb.ref('manufacture_date').$castTo<Date | null>().as('manufacture_date'),
+        eb.ref('delivered_to_patient_date').$castTo<Date | null>().as('delivered_to_patient_date'),
+        'days',
+        'notes',
+        'is_active',
+        'is_last',
+        'has_upper_template',
+        'has_lower_template',
       ])
       .execute();
 
     return rows.map((r) => ({
-      AlignerBatchID: r.AlignerBatchID,
-      AlignerSetID: r.AlignerSetID,
-      BatchSequence: r.BatchSequence,
-      UpperAlignerCount: r.UpperAlignerCount,
-      LowerAlignerCount: r.LowerAlignerCount,
-      UpperAlignerStartSequence: r.UpperAlignerStartSequence,
-      UpperAlignerEndSequence: r.UpperAlignerEndSequence,
-      LowerAlignerStartSequence: r.LowerAlignerStartSequence,
-      LowerAlignerEndSequence: r.LowerAlignerEndSequence,
-      CreationDate: r.CreationDate,
-      ManufactureDate: r.ManufactureDate,
-      DeliveredToPatientDate: r.DeliveredToPatientDate,
-      Days: r.Days,
-      ValidityPeriod: null,
-      BatchExpiryDate: null,
-      Notes: r.Notes,
-      IsActive: !!r.IsActive,
-      IsLast: r.IsLast,
-      HasUpperTemplate: r.HasUpperTemplate,
-      HasLowerTemplate: r.HasLowerTemplate,
+      aligner_batch_id: r.aligner_batch_id,
+      aligner_set_id: r.aligner_set_id,
+      batch_sequence: r.batch_sequence,
+      upper_aligner_count: r.upper_aligner_count,
+      lower_aligner_count: r.lower_aligner_count,
+      upper_aligner_start_sequence: r.upper_aligner_start_sequence,
+      upper_aligner_end_sequence: r.upper_aligner_end_sequence,
+      lower_aligner_start_sequence: r.lower_aligner_start_sequence,
+      lower_aligner_end_sequence: r.lower_aligner_end_sequence,
+      creation_date: r.creation_date,
+      manufacture_date: r.manufacture_date,
+      delivered_to_patient_date: r.delivered_to_patient_date,
+      days: r.days,
+      validity_period: null,
+      batch_expiry_date: null,
+      notes: r.notes,
+      is_active: !!r.is_active,
+      is_last: r.is_last,
+      has_upper_template: r.has_upper_template,
+      has_lower_template: r.has_lower_template,
     }));
   } catch (err) {
     log.error('Failed to get batch by id', {
@@ -2115,13 +2115,13 @@ export async function getBatchById(batchId: number): Promise<AlignerBatch[]> {
 // ==============================
 
 export interface AlignerSetForMatch {
-  AlignerSetID: number;
-  WorkID: number;
-  PersonID: number;
-  ArchformID: number | null;
-  PatientName: string;
-  SetSequence: number | null;
-  DoctorName: string;
+  aligner_set_id: number;
+  work_id: number;
+  person_id: number;
+  archform_id: number | null;
+  patient_name: string;
+  set_sequence: number | null;
+  doctor_name: string;
 }
 
 /**
@@ -2130,22 +2130,22 @@ export interface AlignerSetForMatch {
 export async function getSetsWithArchformIds(): Promise<AlignerSetForMatch[]> {
   try {
     const rows = await getKysely()
-      .selectFrom('tblAlignerSets as s')
-      .innerJoin('tblwork as w', 's.WorkID', 'w.workid')
-      .innerJoin('tblpatients as p', 'w.PersonID', 'p.PersonID')
-      .leftJoin('AlignerDoctors as ad', 's.AlignerDrID', 'ad.DrID')
+      .selectFrom('aligner_sets as s')
+      .innerJoin('works as w', 's.work_id', 'w.work_id')
+      .innerJoin('patients as p', 'w.person_id', 'p.person_id')
+      .leftJoin('aligner_doctors as ad', 's.aligner_dr_id', 'ad.dr_id')
       .select((eb) => [
-        's.AlignerSetID',
-        's.WorkID',
-        'p.PersonID',
-        's.ArchformID',
-        'p.PatientName',
-        'p.FirstName',
-        'p.LastName',
-        's.SetSequence',
-        eb.fn.coalesce('ad.DoctorName', sql<string>`''`).as('DoctorName'),
+        's.aligner_set_id',
+        's.work_id',
+        'p.person_id',
+        's.archform_id',
+        'p.patient_name',
+        'p.first_name',
+        'p.last_name',
+        's.set_sequence',
+        eb.fn.coalesce('ad.doctor_name', sql<string>`''`).as('doctor_name'),
       ])
-      .orderBy('p.PatientName')
+      .orderBy('p.patient_name')
       .execute();
 
     return rows as unknown as AlignerSetForMatch[];
@@ -2158,7 +2158,7 @@ export async function getSetsWithArchformIds(): Promise<AlignerSetForMatch[]> {
 }
 
 /**
- * Update the ArchformID on an aligner set (set or clear)
+ * Update the archform_id on an aligner set (set or clear)
  */
 export async function updateArchformId(
   setId: number,
@@ -2166,9 +2166,9 @@ export async function updateArchformId(
 ): Promise<void> {
   try {
     await getKysely()
-      .updateTable('tblAlignerSets')
-      .set({ ArchformID: archformId })
-      .where('AlignerSetID', '=', setId)
+      .updateTable('aligner_sets')
+      .set({ archform_id: archformId })
+      .where('aligner_set_id', '=', setId)
       .execute();
   } catch (err) {
     log.error('Failed to update archform id', {
@@ -2179,15 +2179,15 @@ export async function updateArchformId(
 }
 
 /**
- * Clear ArchformID from all aligner sets that reference a given Archform patient.
+ * Clear archform_id from all aligner sets that reference a given Archform patient.
  * Used before deleting an Archform patient to prevent orphaned references.
  */
 export async function clearArchformIdByPatientId(archformPatientId: number): Promise<void> {
   try {
     await getKysely()
-      .updateTable('tblAlignerSets')
-      .set({ ArchformID: null })
-      .where('ArchformID', '=', archformPatientId)
+      .updateTable('aligner_sets')
+      .set({ archform_id: null })
+      .where('archform_id', '=', archformPatientId)
       .execute();
   } catch (err) {
     log.error('Failed to clear archform id by patient id', {
@@ -2198,14 +2198,14 @@ export async function clearArchformIdByPatientId(archformPatientId: number): Pro
 }
 
 /**
- * Get a single doctor by ID
+ * Get a single doctor by id
  */
 export async function getDoctorById(drId: number): Promise<AlignerDoctor[]> {
   try {
     return (await getKysely()
-      .selectFrom('AlignerDoctors')
-      .select(['DrID', 'DoctorName', 'DoctorEmail', 'LogoPath'])
-      .where('DrID', '=', drId)
+      .selectFrom('aligner_doctors')
+      .select(['dr_id', 'doctor_name', 'doctor_email', 'logo_path'])
+      .where('dr_id', '=', drId)
       .execute()) as AlignerDoctor[];
   } catch (err) {
     log.error('Failed to get doctor by id', {

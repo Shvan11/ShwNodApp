@@ -5,7 +5,7 @@
  * bypasser (`withTransaction` + `new sql.Request(tx)`); the delete-cascade now runs on
  * a Kysely transaction via `withPgTransaction`. The `V_rptNoWork` → `VLastApp` view
  * chain (not yet recreated in PG — views are Phase 5) is inlined here as a correlated
- * "latest future appointment" subquery. `PatientName`/`Currency`/`CountryCode` are
+ * "latest future appointment" subquery. `patient_name`/`currency`/`country_code` are
  * `citext`, so the duplicate-name check stays case-insensitive (matches Arabic_CI_AS).
  */
 import { sql } from 'kysely';
@@ -18,36 +18,34 @@ import { createPathResolver } from '../../../utils/path-resolver.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 
-// Type definitions
+// type definitions
 interface PatientInfo {
-  PersonID: number;
-  PatientName: string | null;
-  FirstName: string | null;
-  LastName: string | null;
-  Phone: string | null;
-  Phone2: string | null;
-  Email: string | null;
+  person_id: number;
+  patient_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  phone2: string | null;
+  email: string | null;
   DateOfBirth: string | null;
-  Gender: number | null;
+  gender: number | null;
   GenderDisplay: string | null;
   Address: string | null;
   ReferralSource: string | null;
-  PatientType: string | null;
-  Tag: string | null;
-  Notes: string | null;
-  Language: number | null;
-  CountryCode: string | null;
-  EstimatedCost: number | null;
-  Currency: string | null;
+  patient_type: string | null;
+  tag: string | null;
+  notes: string | null;
+  language: number | null;
+  country_code: string | null;
+  estimated_cost: number | null;
+  currency: string | null;
   DolphinId: number | null;
-  DateAdded: string | null;
+  date_added: string | null;
   AlertCount: number;
   // Legacy fields for backwards compatibility
   name: string | null;
-  phone: string | null;
-  StartDate: Date | null;
+  start_date: Date | null;
   estimatedCost: number | null;
-  currency: string | null;
   activeAlert: ActiveAlert | null;
 }
 
@@ -105,52 +103,52 @@ interface LookupItem {
 }
 
 interface PatientDetails {
-  PersonID: number;
-  PatientName: string;
-  FirstName: string | null;
-  LastName: string | null;
-  Phone: string | null;
-  Phone2: string | null;
-  Email: string | null;
-  DateofBirth: Date | null;
-  Gender: number | null;
-  AddressID: number | null;
-  ReferralSourceID: number | null;
-  PatientTypeID: number | null;
-  Notes: string | null;
-  Language: number | null;
-  CountryCode: string | null;
-  EstimatedCost: number | null;
-  Currency: string | null;
-  TagID: number | null;
-  DateAdded: Date | null;
+  person_id: number;
+  patient_name: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  phone2: string | null;
+  email: string | null;
+  date_of_birth: Date | null;
+  gender: number | null;
+  address_id: number | null;
+  referral_source_id: number | null;
+  patient_type_id: number | null;
+  notes: string | null;
+  language: number | null;
+  country_code: string | null;
+  estimated_cost: number | null;
+  currency: string | null;
+  tag_id: number | null;
+  date_added: Date | null;
 }
 
 interface UpdatePatientData {
-  PatientName: string;
-  FirstName?: string;
-  LastName?: string;
-  Phone?: string;
-  Phone2?: string;
-  Email?: string;
-  DateofBirth?: Date;
-  Gender?: string | number;
-  AddressID?: string | number;
-  ReferralSourceID?: string | number;
-  PatientTypeID?: string | number;
-  Notes?: string;
-  Language?: string | number;
-  CountryCode?: string;
-  EstimatedCost?: string | number;
-  Currency?: string;
-  TagID?: string | number;
+  patient_name: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  phone2?: string;
+  email?: string;
+  date_of_birth?: Date;
+  gender?: string | number;
+  address_id?: string | number;
+  referral_source_id?: string | number;
+  patient_type_id?: string | number;
+  notes?: string;
+  language?: string | number;
+  country_code?: string;
+  estimated_cost?: string | number;
+  currency?: string;
+  tag_id?: string | number;
 }
 
 interface NoWorkReceiptData {
-  PersonID: number;
-  PatientName: string;
-  Phone: string | null;
-  AppDate: Date | null;
+  person_id: number;
+  patient_name: string;
+  phone: string | null;
+  app_date: Date | null;
 }
 
 interface DuplicatePatientError extends Error {
@@ -171,73 +169,73 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 /**
- * Retrieves patient information for a given patient ID.
+ * Retrieves patient information for a given patient id.
  * Returns full patient details with all related lookup values.
  */
 export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets> {
   const row = await getKysely()
-    .selectFrom('tblpatients as p')
-    .leftJoin('tblGender as g', 'g.Gender_ID', 'p.Gender')
-    .leftJoin('tblAddress as a', 'a.ID', 'p.AddressID')
-    .leftJoin('tblReferrals as r', 'r.ID', 'p.ReferralSourceID')
-    .leftJoin('tblPatientType as pt', 'pt.ID', 'p.PatientTypeID')
-    .leftJoin('tblTagOptions as tag', 'tag.ID', 'p.TagID')
-    // First active work (Status=1); a patient can have several — executeTakeFirst keeps one.
+    .selectFrom('patients as p')
+    .leftJoin('genders as g', 'g.gender_id', 'p.gender')
+    .leftJoin('addresses as a', 'a.id', 'p.address_id')
+    .leftJoin('referrals as r', 'r.id', 'p.referral_source_id')
+    .leftJoin('patient_types as pt', 'pt.id', 'p.patient_type_id')
+    .leftJoin('tag_options as tag', 'tag.id', 'p.tag_id')
+    // First active work (status=1); a patient can have several — executeTakeFirst keeps one.
     .leftJoin(
-      (eb) => eb.selectFrom('tblwork').select(['PersonID', 'StartDate']).where('Status', '=', 1).as('w'),
-      (join) => join.onRef('w.PersonID', '=', 'p.PersonID')
+      (eb) => eb.selectFrom('works').select(['person_id', 'start_date']).where('status', '=', 1).as('w'),
+      (join) => join.onRef('w.person_id', '=', 'p.person_id')
     )
-    // Most-severe active alert (was TOP 1 … ORDER BY AlertSeverity DESC, CreationDate DESC).
+    // Most-severe active alert (was TOP 1 … ORDER BY alert_severity DESC, creation_date DESC).
     .leftJoin(
       (eb) =>
         eb
-          .selectFrom('tblAlerts')
-          .select(['AlertID', 'PersonID', 'AlertTypeID', 'AlertDetails', 'AlertSeverity'])
-          .where('PersonID', '=', PID)
-          .where('IsActive', '=', true)
-          .orderBy('AlertSeverity', 'desc')
-          .orderBy('CreationDate', 'desc')
+          .selectFrom('alerts')
+          .select(['alert_id', 'person_id', 'alert_type_id', 'alert_details', 'alert_severity'])
+          .where('person_id', '=', PID)
+          .where('is_active', '=', true)
+          .orderBy('alert_severity', 'desc')
+          .orderBy('creation_date', 'desc')
           .limit(1)
           .as('alert'),
-      (join) => join.onRef('alert.PersonID', '=', 'p.PersonID')
+      (join) => join.onRef('alert.person_id', '=', 'p.person_id')
     )
-    .leftJoin('tblAlertTypes as at', 'at.AlertTypeID', 'alert.AlertTypeID')
-    .where('p.PersonID', '=', PID)
+    .leftJoin('alert_types as at', 'at.alert_type_id', 'alert.alert_type_id')
+    .where('p.person_id', '=', PID)
     .select((eb) => [
-      'p.PersonID',
-      'p.PatientName',
-      'p.FirstName',
-      'p.LastName',
-      'p.Phone',
-      'p.Phone2',
-      'p.Email',
-      // DateofBirth is a PG `date` → the parser already returns 'YYYY-MM-DD' (was CONVERT(...,23)).
-      eb.ref('p.DateofBirth').$castTo<string>().as('DateOfBirth'),
-      'p.Gender',
-      'g.Gender as GenderDisplay',
-      'a.Zone as Address',
-      'r.Referral as ReferralSource',
-      'pt.PatientType',
-      'tag.Tag',
-      'p.Notes',
-      'p.Language',
-      'p.CountryCode',
-      'p.EstimatedCost',
-      'p.Currency',
+      'p.person_id',
+      'p.patient_name',
+      'p.first_name',
+      'p.last_name',
+      'p.phone',
+      'p.phone2',
+      'p.email',
+      // date_of_birth is a PG `date` → the parser already returns 'YYYY-MM-DD' (was CONVERT(...,23)).
+      eb.ref('p.date_of_birth').$castTo<string>().as('DateOfBirth'),
+      'p.gender',
+      'g.gender as GenderDisplay',
+      'a.zone as Address',
+      'r.referral as ReferralSource',
+      'pt.patient_type',
+      'tag.tag',
+      'p.notes',
+      'p.language',
+      'p.country_code',
+      'p.estimated_cost',
+      'p.currency',
       sql<number | null>`null`.as('DolphinId'),
-      // DateAdded is a `timestamp`; force the date-only form the old CONVERT(...,23) produced.
-      sql<string | null>`to_char(${eb.ref('p.DateAdded')}, 'YYYY-MM-DD')`.as('DateAdded'),
+      // date_added is a `timestamp`; force the date-only form the old CONVERT(...,23) produced.
+      sql<string | null>`to_char(${eb.ref('p.date_added')}, 'YYYY-MM-DD')`.as('date_added'),
       eb
-        .selectFrom('tblAlerts')
+        .selectFrom('alerts')
         .select((e) => e.fn.countAll<number>().as('c'))
-        .where('PersonID', '=', PID)
-        .where('IsActive', '=', true)
+        .where('person_id', '=', PID)
+        .where('is_active', '=', true)
         .as('AlertCount'),
-      'w.StartDate',
-      eb.ref('alert.AlertID').as('AlertID'),
-      'at.TypeName as AlertType',
-      eb.ref('alert.AlertDetails').as('AlertDetails'),
-      eb.ref('alert.AlertSeverity').as('AlertSeverity'),
+      'w.start_date',
+      eb.ref('alert.alert_id').as('alert_id'),
+      'at.type_name as AlertType',
+      eb.ref('alert.alert_details').as('alert_details'),
+      eb.ref('alert.alert_severity').as('alert_severity'),
     ])
     .executeTakeFirst();
 
@@ -245,41 +243,39 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
 
   const patientInfo: PatientInfo = row
     ? {
-        PersonID: row.PersonID,
-        PatientName: row.PatientName,
-        FirstName: row.FirstName,
-        LastName: row.LastName,
-        Phone: row.Phone,
-        Phone2: row.Phone2,
-        Email: row.Email,
+        person_id: row.person_id,
+        patient_name: row.patient_name,
+        first_name: row.first_name,
+        last_name: row.last_name,
+        phone: row.phone,
+        phone2: row.phone2,
+        email: row.email,
         DateOfBirth: row.DateOfBirth,
-        Gender: row.Gender,
+        gender: row.gender,
         GenderDisplay: row.GenderDisplay,
         Address: row.Address,
         ReferralSource: row.ReferralSource,
-        PatientType: row.PatientType,
-        Tag: row.Tag,
-        Notes: row.Notes,
-        Language: row.Language,
-        CountryCode: row.CountryCode,
-        EstimatedCost: row.EstimatedCost,
-        Currency: row.Currency,
+        patient_type: row.patient_type,
+        tag: row.tag,
+        notes: row.notes,
+        language: row.language,
+        country_code: row.country_code,
+        estimated_cost: row.estimated_cost,
+        currency: row.currency,
         DolphinId: row.DolphinId,
-        DateAdded: row.DateAdded,
+        date_added: row.date_added,
         AlertCount: Number(row.AlertCount ?? 0),
-        StartDate: row.StartDate as Date | null,
+        start_date: row.start_date as Date | null,
         // Legacy fields for backwards compatibility
-        name: row.PatientName,
-        phone: row.Phone,
-        estimatedCost: row.EstimatedCost,
-        currency: row.Currency,
+        name: row.patient_name,
+        estimatedCost: row.estimated_cost,
         activeAlert:
-          row.AlertID != null
+          row.alert_id != null
             ? {
-                alertId: row.AlertID,
+                alertId: row.alert_id,
                 alertType: row.AlertType as string,
-                alertDetails: row.AlertDetails as string,
-                alertSeverity: row.AlertSeverity as number,
+                alertDetails: row.alert_details as string,
+                alertSeverity: row.alert_severity as number,
               }
             : null,
       }
@@ -289,7 +285,7 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
 }
 
 /**
- * Retrieves asset information (X-rays and other assets) for a given patient ID.
+ * Retrieves asset information (X-rays and other assets) for a given patient id.
  */
 async function getAssets(pid: number): Promise<PatientAssets> {
   const pathResolver = createPathResolver(config.fileSystem.machinePath || '');
@@ -340,7 +336,7 @@ async function getXrays(
           );
 
           if (await pathExists(previewPath)) {
-            xray.previewImagePartialPath = `/OPG/.csi_data/.version_4.4/${subDir}/t.png`;
+            xray.previewImagePartialPath = `/opg/.csi_data/.version_4.4/${subDir}/t.png`;
           }
 
           const metaFile = pathResolver(
@@ -400,22 +396,22 @@ async function extractDate(metaFile: string): Promise<string | null> {
  */
 export function getPatientsPhones(): Promise<PatientPhone[]> {
   return getKysely()
-    .selectFrom('tblpatients')
-    .select(['PersonID as id', 'PatientName as name', 'Phone as phone'])
+    .selectFrom('patients')
+    .select(['person_id as id', 'patient_name as name', 'phone as phone'])
     .execute() as Promise<PatientPhone[]>;
 }
 
 /**
- * Retrieves the active work ID for a given patient ID.
+ * Retrieves the active work id for a given patient id.
  */
 export async function getActiveWID(PID: number): Promise<number | null> {
   const row = await getKysely()
-    .selectFrom('tblwork')
-    .select('workid')
-    .where('PersonID', '=', PID)
-    .where('Status', '=', 1)
+    .selectFrom('works')
+    .select('work_id')
+    .where('person_id', '=', PID)
+    .where('status', '=', 1)
     .executeTakeFirst();
-  return row?.workid ?? null;
+  return row?.work_id ?? null;
 }
 
 /**
@@ -424,11 +420,11 @@ export async function getActiveWID(PID: number): Promise<number | null> {
 export async function createPatient(patientData: PatientData): Promise<CreatePatientResult> {
   const db = getKysely();
 
-  // PatientName is citext → this duplicate check is case-insensitive (matches Arabic_CI_AS).
+  // patient_name is citext → this duplicate check is case-insensitive (matches Arabic_CI_AS).
   const duplicateCheck = await db
-    .selectFrom('tblpatients')
-    .select(['PersonID', 'PatientName'])
-    .where('PatientName', '=', patientData.patientName)
+    .selectFrom('patients')
+    .select(['person_id', 'patient_name'])
+    .where('patient_name', '=', patientData.patientName)
     .execute();
 
   if (duplicateCheck.length > 0) {
@@ -436,7 +432,7 @@ export async function createPatient(patientData: PatientData): Promise<CreatePat
       `A patient with the name "${patientData.patientName}" already exists.`
     ) as DuplicatePatientError;
     error.code = 'DUPLICATE_PATIENT_NAME';
-    error.existingPatientId = duplicateCheck[0].PersonID;
+    error.existingPatientId = duplicateCheck[0].person_id;
     throw error;
   }
 
@@ -444,29 +440,29 @@ export async function createPatient(patientData: PatientData): Promise<CreatePat
     v ? parseInt(String(v), 10) : null;
 
   const inserted = await db
-    .insertInto('tblpatients')
+    .insertInto('patients')
     .values({
-      PatientName: patientData.patientName,
-      Phone: patientData.phone || null,
-      FirstName: patientData.firstName || null,
-      LastName: patientData.lastName || null,
-      DateofBirth: patientData.dateOfBirth ? toDateOnly(patientData.dateOfBirth) : null,
-      Gender: toInt(patientData.gender),
-      Phone2: patientData.phone2 || null,
-      Email: patientData.email || null,
-      AddressID: toInt(patientData.addressID),
-      ReferralSourceID: toInt(patientData.referralSourceID),
-      PatientTypeID: toInt(patientData.patientTypeID),
-      Notes: patientData.notes || null,
-      Language: patientData.language ? parseInt(String(patientData.language), 10) : 0,
-      CountryCode: patientData.countryCode || null,
-      EstimatedCost: toInt(patientData.estimatedCost),
-      Currency: patientData.currency || null,
+      patient_name: patientData.patientName,
+      phone: patientData.phone || null,
+      first_name: patientData.firstName || null,
+      last_name: patientData.lastName || null,
+      date_of_birth: patientData.dateOfBirth ? toDateOnly(patientData.dateOfBirth) : null,
+      gender: toInt(patientData.gender),
+      phone2: patientData.phone2 || null,
+      email: patientData.email || null,
+      address_id: toInt(patientData.addressID),
+      referral_source_id: toInt(patientData.referralSourceID),
+      patient_type_id: toInt(patientData.patientTypeID),
+      notes: patientData.notes || null,
+      language: patientData.language ? parseInt(String(patientData.language), 10) : 0,
+      country_code: patientData.countryCode || null,
+      estimated_cost: toInt(patientData.estimatedCost),
+      currency: patientData.currency || null,
     })
-    .returning('PersonID')
+    .returning('person_id')
     .executeTakeFirstOrThrow();
 
-  return { personId: inserted.PersonID };
+  return { personId: inserted.person_id };
 }
 
 /**
@@ -474,9 +470,9 @@ export async function createPatient(patientData: PatientData): Promise<CreatePat
  */
 export function getReferralSources(): Promise<LookupItem[]> {
   return getKysely()
-    .selectFrom('tblReferrals')
-    .select(['ID as id', 'Referral as name'])
-    .orderBy('Referral')
+    .selectFrom('referrals')
+    .select(['id as id', 'referral as name'])
+    .orderBy('referral')
     .execute() as Promise<LookupItem[]>;
 }
 
@@ -485,9 +481,9 @@ export function getReferralSources(): Promise<LookupItem[]> {
  */
 export function getPatientTypes(): Promise<LookupItem[]> {
   return getKysely()
-    .selectFrom('tblPatientType')
-    .select(['ID as id', 'PatientType as name'])
-    .orderBy('PatientType')
+    .selectFrom('patient_types')
+    .select(['id as id', 'patient_type as name'])
+    .orderBy('patient_type')
     .execute() as Promise<LookupItem[]>;
 }
 
@@ -496,9 +492,9 @@ export function getPatientTypes(): Promise<LookupItem[]> {
  */
 export function getAddresses(): Promise<LookupItem[]> {
   return getKysely()
-    .selectFrom('tblAddress')
-    .select(['ID as id', 'Zone as name'])
-    .orderBy('Zone')
+    .selectFrom('addresses')
+    .select(['id as id', 'zone as name'])
+    .orderBy('zone')
     .execute() as Promise<LookupItem[]>;
 }
 
@@ -507,42 +503,42 @@ export function getAddresses(): Promise<LookupItem[]> {
  */
 export function getGenders(): Promise<LookupItem[]> {
   return getKysely()
-    .selectFrom('tblGender')
-    .select(['Gender_ID as id', 'Gender as name'])
-    .orderBy('Gender')
+    .selectFrom('genders')
+    .select(['gender_id as id', 'gender as name'])
+    .orderBy('gender')
     .execute() as Promise<LookupItem[]>;
 }
 
 /**
- * Retrieves a single patient's full details by PersonID.
+ * Retrieves a single patient's full details by person_id.
  */
 export async function getPatientById(personId: number): Promise<PatientDetails | null> {
-  // NOTE: DateofBirth is a PG `date` so its runtime value is a 'YYYY-MM-DD' string
-  // (kysely-codegen still types it as Date — the declared PatientDetails.DateofBirth
-  // type is preserved). DateAdded is a `timestamp` → genuine Date. (Phase 6/7 review.)
+  // NOTE: date_of_birth is a PG `date` so its runtime value is a 'YYYY-MM-DD' string
+  // (kysely-codegen still types it as Date — the declared PatientDetails.date_of_birth
+  // type is preserved). date_added is a `timestamp` → genuine Date. (Phase 6/7 review.)
   const row = await getKysely()
-    .selectFrom('tblpatients as p')
-    .where('p.PersonID', '=', personId)
+    .selectFrom('patients as p')
+    .where('p.person_id', '=', personId)
     .select([
-      'p.PersonID',
-      'p.PatientName',
-      'p.FirstName',
-      'p.LastName',
-      'p.Phone',
-      'p.Phone2',
-      'p.Email',
-      'p.DateofBirth',
-      'p.Gender',
-      'p.AddressID',
-      'p.ReferralSourceID',
-      'p.PatientTypeID',
-      'p.Notes',
-      'p.Language',
-      'p.CountryCode',
-      'p.EstimatedCost',
-      'p.Currency',
-      'p.TagID',
-      'p.DateAdded',
+      'p.person_id',
+      'p.patient_name',
+      'p.first_name',
+      'p.last_name',
+      'p.phone',
+      'p.phone2',
+      'p.email',
+      'p.date_of_birth',
+      'p.gender',
+      'p.address_id',
+      'p.referral_source_id',
+      'p.patient_type_id',
+      'p.notes',
+      'p.language',
+      'p.country_code',
+      'p.estimated_cost',
+      'p.currency',
+      'p.tag_id',
+      'p.date_added',
     ])
     .executeTakeFirst();
   return (row as PatientDetails | undefined) ?? null;
@@ -560,27 +556,27 @@ export async function updatePatient(
 
   await withPgTransaction(async (trx) => {
     await trx
-      .updateTable('tblpatients')
+      .updateTable('patients')
       .set({
-        PatientName: patientData.PatientName,
-        FirstName: patientData.FirstName || null,
-        LastName: patientData.LastName || null,
-        Phone: patientData.Phone || null,
-        Phone2: patientData.Phone2 || null,
-        Email: patientData.Email || null,
-        DateofBirth: patientData.DateofBirth ? toDateOnly(patientData.DateofBirth) : null,
-        Gender: toInt(patientData.Gender),
-        AddressID: toInt(patientData.AddressID),
-        ReferralSourceID: toInt(patientData.ReferralSourceID),
-        PatientTypeID: toInt(patientData.PatientTypeID),
-        Notes: patientData.Notes || null,
-        Language: patientData.Language ? parseInt(String(patientData.Language), 10) : 0,
-        CountryCode: patientData.CountryCode || null,
-        EstimatedCost: toInt(patientData.EstimatedCost),
-        Currency: patientData.Currency || null,
-        TagID: toInt(patientData.TagID),
+        patient_name: patientData.patient_name,
+        first_name: patientData.first_name || null,
+        last_name: patientData.last_name || null,
+        phone: patientData.phone || null,
+        phone2: patientData.phone2 || null,
+        email: patientData.email || null,
+        date_of_birth: patientData.date_of_birth ? toDateOnly(patientData.date_of_birth) : null,
+        gender: toInt(patientData.gender),
+        address_id: toInt(patientData.address_id),
+        referral_source_id: toInt(patientData.referral_source_id),
+        patient_type_id: toInt(patientData.patient_type_id),
+        notes: patientData.notes || null,
+        language: patientData.language ? parseInt(String(patientData.language), 10) : 0,
+        country_code: patientData.country_code || null,
+        estimated_cost: toInt(patientData.estimated_cost),
+        currency: patientData.currency || null,
+        tag_id: toInt(patientData.tag_id),
       })
-      .where('PersonID', '=', personId)
+      .where('person_id', '=', personId)
       .execute();
 
   });
@@ -596,12 +592,12 @@ export async function deletePatient(personId: number): Promise<{ success: boolea
     // mid-cascade failure rolls back fully — no FK orphans / half-deleted patient.
     // Children before parent, matching the original delete order.
     await withPgTransaction(async (trx) => {
-      await trx.deleteFrom('tblwork').where('PersonID', '=', personId).execute();
-      await trx.deleteFrom('tblCarriedWires').where('PersonID', '=', personId).execute();
-      await trx.deleteFrom('tblWaiting').where('PersonID', '=', personId).execute();
-      await trx.deleteFrom('tblappointments').where('PersonID', '=', personId).execute();
-      await trx.deleteFrom('tblscrews').where('PersonID', '=', personId).execute();
-      await trx.deleteFrom('tblpatients').where('PersonID', '=', personId).execute();
+      await trx.deleteFrom('works').where('person_id', '=', personId).execute();
+      await trx.deleteFrom('carried_wires').where('person_id', '=', personId).execute();
+      await trx.deleteFrom('waiting').where('person_id', '=', personId).execute();
+      await trx.deleteFrom('appointments').where('person_id', '=', personId).execute();
+      await trx.deleteFrom('screws').where('person_id', '=', personId).execute();
+      await trx.deleteFrom('patients').where('person_id', '=', personId).execute();
     });
 
     return { success: true };
@@ -618,22 +614,22 @@ export async function getPatientNoWorkReceiptData(
   patientId: number
 ): Promise<NoWorkReceiptData | null> {
   try {
-    // Inlined V_rptNoWork → VLastApp: AppDate is the patient's latest FUTURE appointment
-    // (max AppDate filtered to > local now), or NULL. For a single patient this equals
+    // Inlined V_rptNoWork → VLastApp: app_date is the patient's latest FUTURE appointment
+    // (max app_date filtered to > local now), or NULL. For a single patient this equals
     // the view's "max-over-all-appts where that max is in the future" semantics.
     const row = await getKysely()
-      .selectFrom('tblpatients as p')
-      .where('p.PersonID', '=', patientId)
+      .selectFrom('patients as p')
+      .where('p.person_id', '=', patientId)
       .select((eb) => [
-        'p.PersonID',
-        'p.PatientName',
-        'p.Phone',
+        'p.person_id',
+        'p.patient_name',
+        'p.phone',
         eb
-          .selectFrom('tblappointments as a')
-          .whereRef('a.PersonID', '=', 'p.PersonID')
-          .where('a.AppDate', '>', sql<Date>`localtimestamp`)
-          .select((e) => e.fn.max('a.AppDate').as('m'))
-          .as('AppDate'),
+          .selectFrom('appointments as a')
+          .whereRef('a.person_id', '=', 'p.person_id')
+          .where('a.app_date', '>', sql<Date>`localtimestamp`)
+          .select((e) => e.fn.max('a.app_date').as('m'))
+          .as('app_date'),
       ])
       .executeTakeFirst();
 
@@ -649,11 +645,11 @@ export async function getPatientNoWorkReceiptData(
  */
 export async function hasNextAppointment(patientId: number): Promise<boolean> {
   try {
-    // Inlined V_rptNoWork: "AppDate IS NOT NULL" ⟺ the patient has a future appointment.
+    // Inlined V_rptNoWork: "app_date IS NOT NULL" ⟺ the patient has a future appointment.
     const row = await getKysely()
-      .selectFrom('tblappointments as a')
-      .where('a.PersonID', '=', patientId)
-      .where('a.AppDate', '>', sql<Date>`localtimestamp`)
+      .selectFrom('appointments as a')
+      .where('a.person_id', '=', patientId)
+      .where('a.app_date', '>', sql<Date>`localtimestamp`)
       .select((eb) => eb.fn.countAll<number>().as('count'))
       .executeTakeFirst();
 

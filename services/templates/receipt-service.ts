@@ -18,18 +18,18 @@ import { log } from '../../utils/logger.js';
  * Receipt data from V_Report view
  */
 interface ReceiptRow {
-  PersonID: number;
-  PatientName: string;
-  Phone: string;
+  person_id: number;
+  patient_name: string;
+  phone: string;
   TotalPaid: number;
-  AppDate: Date;
-  Dateofpayment: Date;
-  Amountpaid: number;
+  app_date: Date;
+  date_of_payment: Date;
+  amount_paid: number;
   workid: number;
-  TotalRequired: number;
-  Currency: string;
-  Discount: number | null;
-  DiscountDate: Date | null;
+  total_required: number;
+  currency: string;
+  discount: number | null;
+  discount_date: Date | null;
   [key: string]: string | number | Date | null;
 }
 
@@ -37,21 +37,21 @@ interface ReceiptRow {
  * Patient data for receipt
  */
 export interface ReceiptPatientData {
-  PersonID: number;
-  PatientName: string;
-  Phone: string;
-  AppDate: Date;
+  person_id: number;
+  patient_name: string;
+  phone: string;
+  app_date: Date;
 }
 
 /**
  * Work data for receipt
  */
 export interface ReceiptWorkData {
-  WorkID: number;
-  TotalRequired: number;
-  Currency: string;
-  Discount: number;
-  DiscountDate: Date | null;
+  work_id: number;
+  total_required: number;
+  currency: string;
+  discount: number;
+  discount_date: Date | null;
   HasDiscount: boolean;
   NetRequired: number;
 }
@@ -65,7 +65,7 @@ export interface ReceiptPaymentData {
   PreviouslyPaid: number;
   TotalPaid: number;
   RemainingBalance: number;
-  Currency: string;
+  currency: string;
 }
 
 /**
@@ -82,10 +82,10 @@ export interface ReceiptData {
  */
 export interface NoWorkReceiptData {
   patient: {
-    PersonID: number;
-    PatientName: string;
-    Phone: string;
-    AppDate: Date;
+    person_id: number;
+    patient_name: string;
+    phone: string;
+    app_date: Date;
   };
   receipt: {
     PrintedDate: Date;
@@ -99,7 +99,7 @@ type PrimitiveValue = string | number | boolean | Date | null | undefined;
 
 /**
  * Template data for rendering
- * Note: Intentionally uses Record type because templates can have any dynamic fields
+ * note: Intentionally uses Record type because templates can have any dynamic fields
  * based on the template design. The actual fields depend on template placeholders.
  */
 interface TemplateData {
@@ -112,48 +112,48 @@ interface TemplateData {
 
 /**
  * Get receipt data for a specific payment/work using V_Report view
- * @param workId - Work ID
+ * @param workId - Work id
  * @returns Receipt data
  */
 export async function getReceiptData(workId: number): Promise<ReceiptData> {
   // V_Report inlined (sub-views VTotPaid / VLastApp / V_TodayPayment) for a single work:
-  //  - TotalPaid:           SUM(tblInvoice.Amountpaid) for the work
-  //  - AppDate:             patient's latest FUTURE appointment (per-person MAX(AppDate) > now)
-  //  - Dateofpayment/Amountpaid: the work's latest payment IFF it landed today (else NULL)
+  //  - TotalPaid:           SUM(tblInvoice.amount_paid) for the work
+  //  - app_date:             patient's latest FUTURE appointment (per-person MAX(app_date) > now)
+  //  - date_of_payment/amount_paid: the work's latest payment IFF it landed today (else NULL)
   const { rows: results } = await sql<ReceiptRow>`
         SELECT
-            w."PersonID",
-            p."PatientName",
-            p."Phone",
+            w."person_id",
+            p."patient_name",
+            p."phone",
             tp."TotalPaid",
-            la."AppDate",
-            today."Dateofpayment",
-            today."Amountpaid",
-            w."workid",
-            w."TotalRequired",
-            w."Currency",
-            w."Discount",
-            w."DiscountDate"
-        FROM "tblwork" w
-        JOIN "tblpatients" p ON p."PersonID" = w."PersonID"
+            la."app_date",
+            today."date_of_payment",
+            today."amount_paid",
+            w."work_id",
+            w."total_required",
+            w."currency",
+            w."discount",
+            w."discount_date"
+        FROM "works" w
+        JOIN "patients" p ON p."person_id" = w."person_id"
         LEFT JOIN (
-            SELECT "workid", SUM("Amountpaid") AS "TotalPaid"
-            FROM "tblInvoice" GROUP BY "workid"
-        ) tp ON tp."workid" = w."workid"
+            SELECT "work_id", SUM("amount_paid") AS "TotalPaid"
+            FROM "invoices" GROUP BY "work_id"
+        ) tp ON tp."work_id" = w."work_id"
         LEFT JOIN (
-            SELECT "PersonID", MAX("AppDate") AS "AppDate"
-            FROM "tblappointments" WHERE "AppDate" > LOCALTIMESTAMP GROUP BY "PersonID"
-        ) la ON la."PersonID" = w."PersonID"
+            SELECT "person_id", MAX("app_date") AS "app_date"
+            FROM "appointments" WHERE "app_date" > LOCALTIMESTAMP GROUP BY "person_id"
+        ) la ON la."person_id" = w."person_id"
         LEFT JOIN (
-            SELECT i."workid", i."Amountpaid", i."Dateofpayment"
-            FROM "tblInvoice" i
+            SELECT i."work_id", i."amount_paid", i."date_of_payment"
+            FROM "invoices" i
             JOIN (
-                SELECT "workid", MAX("Dateofpayment") AS "LastPayment"
-                FROM "tblInvoice" GROUP BY "workid"
-            ) m ON m."workid" = i."workid" AND m."LastPayment" = i."Dateofpayment"
+                SELECT "work_id", MAX("date_of_payment") AS "LastPayment"
+                FROM "invoices" GROUP BY "work_id"
+            ) m ON m."work_id" = i."work_id" AND m."LastPayment" = i."date_of_payment"
             WHERE m."LastPayment"::date = CURRENT_DATE
-        ) today ON today."workid" = w."workid"
-        WHERE w."workid" = ${workId}
+        ) today ON today."work_id" = w."work_id"
+        WHERE w."work_id" = ${workId}
     `.execute(getKysely());
 
   if (results.length === 0) {
@@ -164,36 +164,36 @@ export async function getReceiptData(workId: number): Promise<ReceiptData> {
 
   // Calculate balances (discount reduces the net amount owed)
   const totalPaid = data.TotalPaid || 0;
-  const amountPaidToday = data.Amountpaid || 0;
+  const amountPaidToday = data.amount_paid || 0;
   const previouslyPaid = totalPaid - amountPaidToday;
-  const discount = data.Discount || 0;
-  const netRequired = (data.TotalRequired || 0) - discount;
+  const discount = data.discount || 0;
+  const netRequired = (data.total_required || 0) - discount;
   const remainingBalance = netRequired - totalPaid;
 
   // Structure data for template
   return {
     patient: {
-      PersonID: data.PersonID,
-      PatientName: data.PatientName,
-      Phone: data.Phone,
-      AppDate: data.AppDate,
+      person_id: data.person_id,
+      patient_name: data.patient_name,
+      phone: data.phone,
+      app_date: data.app_date,
     },
     work: {
-      WorkID: data.workid,
-      TotalRequired: data.TotalRequired,
-      Currency: data.Currency,
-      Discount: discount,
-      DiscountDate: data.DiscountDate,
+      work_id: data.workid,
+      total_required: data.total_required,
+      currency: data.currency,
+      discount: discount,
+      discount_date: data.discount_date,
       HasDiscount: discount > 0,
       NetRequired: netRequired,
     },
     payment: {
-      PaymentDateTime: data.Dateofpayment || new Date(),
+      PaymentDateTime: data.date_of_payment || new Date(),
       AmountPaidToday: amountPaidToday,
       PreviouslyPaid: previouslyPaid,
       TotalPaid: totalPaid,
       RemainingBalance: remainingBalance,
-      Currency: data.Currency,
+      currency: data.currency,
     },
   };
 }
@@ -205,7 +205,7 @@ export async function getReceiptData(workId: number): Promise<ReceiptData> {
 async function getDefaultTemplatePath(): Promise<string> {
   const { rows: results } = await sql<{ template_file_path: string | null }>`
         SELECT "template_file_path"
-        FROM "DocumentTemplates"
+        FROM "document_templates"
         WHERE "document_type_id" = 1
         AND "is_default" = true
         AND "is_active" = true
@@ -245,7 +245,7 @@ function renderTemplate(templateHTML: string, data: TemplateData): string {
     const dataPath = parts[0].trim();
     const filters = parts.slice(1).map((f) => f.trim());
 
-    // Resolve data path (e.g., 'patient.PatientName')
+    // Resolve data path (e.g., 'patient.patient_name')
     let value = resolveDataPath(dataPath, data);
 
     // Apply filters
@@ -260,7 +260,7 @@ function renderTemplate(templateHTML: string, data: TemplateData): string {
 }
 
 /**
- * Resolve data path (e.g., 'patient.PatientName')
+ * Resolve data path (e.g., 'patient.patient_name')
  * @param dataPath - Dot-notation path
  * @param data - Data object
  * @returns Resolved value
@@ -294,7 +294,7 @@ function applyFilter(value: unknown, filter: string): string {
     return '';
   }
 
-  // Currency filter
+  // currency filter
   if (filter === 'currency') {
     const num = parseFloat(String(value));
     if (isNaN(num)) return '0';
@@ -394,7 +394,7 @@ function formatDate(dateValue: unknown, pattern: string): string {
 
 /**
  * Generate receipt HTML for a payment
- * @param workId - Work ID
+ * @param workId - Work id
  * @returns Receipt HTML
  */
 export async function generateReceiptHTML(workId: number): Promise<string> {
@@ -421,7 +421,7 @@ export async function generateReceiptHTML(workId: number): Promise<string> {
 async function getNoWorkTemplatePath(): Promise<string> {
   const { rows: results } = await sql<{ template_file_path: string | null }>`
         SELECT "template_file_path"
-        FROM "DocumentTemplates"
+        FROM "document_templates"
         WHERE "template_name" = 'No-Work Appointment Receipt'
         AND "is_active" = true
     `.execute(getKysely());
@@ -437,7 +437,7 @@ async function getNoWorkTemplatePath(): Promise<string> {
 
 /**
  * Generate no-work appointment receipt HTML for a patient
- * @param patientId - Patient ID
+ * @param patientId - Patient id
  * @returns Receipt HTML
  */
 export async function generateNoWorkReceiptHTML(patientId: number): Promise<string> {
@@ -450,14 +450,14 @@ export async function generateNoWorkReceiptHTML(patientId: number): Promise<stri
     throw new Error(`Patient not found: ${patientId}`);
   }
 
-  if (!patientData.AppDate) {
+  if (!patientData.app_date) {
     throw new Error(`Patient ${patientId} has no scheduled appointment`);
   }
 
   log.debug('[RECEIPT-SERVICE] Patient data retrieved', {
-    PersonID: patientData.PersonID,
-    PatientName: patientData.PatientName,
-    hasAppointment: !!patientData.AppDate,
+    person_id: patientData.person_id,
+    patient_name: patientData.patient_name,
+    hasAppointment: !!patientData.app_date,
   });
 
   // Get template file path
@@ -472,10 +472,10 @@ export async function generateNoWorkReceiptHTML(patientId: number): Promise<stri
   // Prepare data for template
   const data: NoWorkReceiptData = {
     patient: {
-      PersonID: patientData.PersonID,
-      PatientName: patientData.PatientName,
-      Phone: patientData.Phone || 'N/A',
-      AppDate: patientData.AppDate,
+      person_id: patientData.person_id,
+      patient_name: patientData.patient_name,
+      phone: patientData.phone || 'N/A',
+      app_date: patientData.app_date,
     },
     receipt: {
       PrintedDate: new Date(),

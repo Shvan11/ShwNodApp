@@ -23,7 +23,7 @@ const router = Router();
 /**
  * Valid currency types
  */
-type Currency = 'IQD' | 'USD' | 'EUR';
+type currency = 'IQD' | 'USD' | 'EUR';
 
 /**
  * Query params for filtering cost presets
@@ -37,12 +37,12 @@ interface CostPresetQuery {
  */
 interface CostPresetBody {
   amount: number;
-  currency: Currency;
+  currency: currency;
   displayOrder?: number;
 }
 
 /**
- * Route params for cost preset by ID.
+ * Route params for cost preset by id.
  * Declared as a `type` (not `interface`) so it carries an implicit index
  * signature and stays assignable to Express's ParamsDictionary on the
  * multi-handler (authenticate + authorize) overload used below.
@@ -51,7 +51,7 @@ type CostPresetParams = {
   id: string;
 };
 
-const VALID_CURRENCIES: Currency[] = ['IQD', 'USD', 'EUR'];
+const VALID_CURRENCIES: currency[] = ['IQD', 'USD', 'EUR'];
 
 /**
  * GET /settings/cost-presets
@@ -93,17 +93,17 @@ router.post('/settings/cost-presets', authenticate, authorize(['admin']), async 
 
     // Validation
     if (!amount || !currency) {
-      ErrorResponses.badRequest(res, 'Amount and currency are required');
+      ErrorResponses.badRequest(res, 'amount and currency are required');
       return;
     }
 
     if (isNaN(amount) || amount <= 0) {
-      ErrorResponses.badRequest(res, 'Amount must be a positive number');
+      ErrorResponses.badRequest(res, 'amount must be a positive number');
       return;
     }
 
     if (!VALID_CURRENCIES.includes(currency)) {
-      ErrorResponses.badRequest(res, `Currency must be one of: ${VALID_CURRENCIES.join(', ')}`);
+      ErrorResponses.badRequest(res, `currency must be one of: ${VALID_CURRENCIES.join(', ')}`);
       return;
     }
 
@@ -132,17 +132,17 @@ router.put('/settings/cost-presets/:id', authenticate, authorize(['admin']), asy
 
     // Validation
     if (!amount || !currency) {
-      ErrorResponses.badRequest(res, 'Amount and currency are required');
+      ErrorResponses.badRequest(res, 'amount and currency are required');
       return;
     }
 
     if (isNaN(amount) || amount <= 0) {
-      ErrorResponses.badRequest(res, 'Amount must be a positive number');
+      ErrorResponses.badRequest(res, 'amount must be a positive number');
       return;
     }
 
     if (!VALID_CURRENCIES.includes(currency)) {
-      ErrorResponses.badRequest(res, `Currency must be one of: ${VALID_CURRENCIES.join(', ')}`);
+      ErrorResponses.badRequest(res, `currency must be one of: ${VALID_CURRENCIES.join(', ')}`);
       return;
     }
 
@@ -167,7 +167,7 @@ router.delete('/settings/cost-presets/:id', authenticate, authorize(['admin']), 
     const presetId = parseInt(req.params.id);
 
     if (isNaN(presetId)) {
-      ErrorResponses.badRequest(res, 'Invalid preset ID');
+      ErrorResponses.badRequest(res, 'Invalid preset id');
       return;
     }
 

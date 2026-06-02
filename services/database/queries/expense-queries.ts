@@ -1,18 +1,18 @@
 /**
  * Expense-related database queries
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). `tblExpenses.Amount` is
+ * Migration Phase 4: translated to typed Kysely (PostgreSQL). `tblExpenses.amount` is
  * PG `integer` (maps straight to a JS number; no numeric cast). `expenseDate` is a PG
  * `date`, which the centralized pg parser (kysely.ts) returns as a 'YYYY-MM-DD' string;
  * the declared return types still say `Date`, preserved via `$castTo<Date>()` — the
- * runtime value is now a string (see FLAGS). `Currency` is `citext`, so equality is
+ * runtime value is now a string (see FLAGS). `currency` is `citext`, so equality is
  * already case-insensitive (matches the old Arabic_CI_AS column); we keep the trim
  * (`LTRIM(RTRIM(...))`) via PG `btrim()` so the grouping/filtering behavior is identical.
  */
 import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
 
-// Type definitions
+// type definitions
 interface ExpenseFilters {
   startDate?: string;
   endDate?: string;
@@ -28,31 +28,31 @@ interface ExpenseFilters {
 const MAX_PAGE_SIZE = 1000;
 
 interface Expense {
-  ID: number;
-  expenseDate: Date;
-  Amount: number;
-  Currency: string | null;
-  Note: string | null;
-  CategoryID: number | null;
-  SubcategoryID: number | null;
-  CategoryName: string | null;
-  SubcategoryName: string | null;
+  id: number;
+  expense_date: Date;
+  amount: number;
+  currency: string | null;
+  note: string | null;
+  category_id: number | null;
+  subcategory_id: number | null;
+  category_name: string | null;
+  subcategory_name: string | null;
 }
 
 interface ExpenseCategory {
-  CategoryID: number;
-  CategoryName: string;
+  category_id: number;
+  category_name: string;
 }
 
 interface ExpenseSubcategory {
-  SubcategoryID: number;
-  SubcategoryName: string;
-  CategoryID: number;
-  CategoryName: string | null;
+  subcategory_id: number;
+  subcategory_name: string;
+  category_id: number;
+  category_name: string | null;
 }
 
 interface ExpenseData {
-  expenseDate: string;
+  expense_date: string;
   amount: number;
   currency?: string;
   note?: string;
@@ -61,16 +61,16 @@ interface ExpenseData {
 }
 
 interface ExpenseSummary {
-  CategoryName: string | null;
-  Currency: string;
+  category_name: string | null;
+  currency: string;
   ExpenseCount: number;
-  TotalAmount: number;
+  total_amount: number;
 }
 
 interface ExpenseTotal {
-  Currency: string;
+  currency: string;
   ExpenseCount: number;
-  TotalAmount: number;
+  total_amount: number;
 }
 
 /**
@@ -80,39 +80,39 @@ export async function getAllExpenses(filters: ExpenseFilters = {}): Promise<Expe
   const db = getKysely();
 
   let q = db
-    .selectFrom('tblExpenses as e')
-    .leftJoin('tblExpenseCategories as c', 'e.CategoryID', 'c.CategoryID')
-    .leftJoin('tblExpenseSubcategories as s', 'e.SubcategoryID', 's.SubcategoryID')
+    .selectFrom('expenses as e')
+    .leftJoin('expense_categories as c', 'e.category_id', 'c.category_id')
+    .leftJoin('expense_subcategories as s', 'e.subcategory_id', 's.subcategory_id')
     .select((eb) => [
-      'e.ID',
-      eb.ref('e.expenseDate').$castTo<Date>().as('expenseDate'),
-      'e.Amount',
-      'e.Currency',
-      'e.Note',
-      'e.CategoryID',
-      'e.SubcategoryID',
-      'c.CategoryName',
-      's.SubcategoryName',
+      'e.id',
+      eb.ref('e.expense_date').$castTo<Date>().as('expense_date'),
+      'e.amount',
+      'e.currency',
+      'e.note',
+      'e.category_id',
+      'e.subcategory_id',
+      'c.category_name',
+      's.subcategory_name',
     ]);
 
   if (filters.startDate) {
-    q = q.where('e.expenseDate', '>=', sql<Date>`${filters.startDate}`);
+    q = q.where('e.expense_date', '>=', sql<Date>`${filters.startDate}`);
   }
   if (filters.endDate) {
-    q = q.where('e.expenseDate', '<=', sql<Date>`${filters.endDate}`);
+    q = q.where('e.expense_date', '<=', sql<Date>`${filters.endDate}`);
   }
   if (filters.categoryId) {
-    q = q.where('e.CategoryID', '=', filters.categoryId);
+    q = q.where('e.category_id', '=', filters.categoryId);
   }
   if (filters.subcategoryId) {
-    q = q.where('e.SubcategoryID', '=', filters.subcategoryId);
+    q = q.where('e.subcategory_id', '=', filters.subcategoryId);
   }
   if (filters.currency) {
     // citext is case-insensitive; keep the trim to match LTRIM(RTRIM(...)).
-    q = q.where(sql<boolean>`btrim(${sql.ref('e.Currency')}) = ${filters.currency}`);
+    q = q.where(sql<boolean>`btrim(${sql.ref('e.currency')}) = ${filters.currency}`);
   }
 
-  q = q.orderBy('e.expenseDate', 'desc').orderBy('e.ID', 'desc');
+  q = q.orderBy('e.expense_date', 'desc').orderBy('e.id', 'desc');
 
   // Opt-in pagination (mirrors the old OFFSET/FETCH; requires the ORDER BY above).
   if (filters.limit != null) {
@@ -125,25 +125,25 @@ export async function getAllExpenses(filters: ExpenseFilters = {}): Promise<Expe
 }
 
 /**
- * Retrieves a single expense by ID
+ * Retrieves a single expense by id
  */
 export async function getExpenseById(id: number): Promise<Expense | null> {
   const db = getKysely();
   const row = await db
-    .selectFrom('tblExpenses as e')
-    .leftJoin('tblExpenseCategories as c', 'e.CategoryID', 'c.CategoryID')
-    .leftJoin('tblExpenseSubcategories as s', 'e.SubcategoryID', 's.SubcategoryID')
-    .where('e.ID', '=', id)
+    .selectFrom('expenses as e')
+    .leftJoin('expense_categories as c', 'e.category_id', 'c.category_id')
+    .leftJoin('expense_subcategories as s', 'e.subcategory_id', 's.subcategory_id')
+    .where('e.id', '=', id)
     .select((eb) => [
-      'e.ID',
-      eb.ref('e.expenseDate').$castTo<Date>().as('expenseDate'),
-      'e.Amount',
-      'e.Currency',
-      'e.Note',
-      'e.CategoryID',
-      'e.SubcategoryID',
-      'c.CategoryName',
-      's.SubcategoryName',
+      'e.id',
+      eb.ref('e.expense_date').$castTo<Date>().as('expense_date'),
+      'e.amount',
+      'e.currency',
+      'e.note',
+      'e.category_id',
+      'e.subcategory_id',
+      'c.category_name',
+      's.subcategory_name',
     ])
     .executeTakeFirst();
 
@@ -156,9 +156,9 @@ export async function getExpenseById(id: number): Promise<Expense | null> {
 export async function getExpenseCategories(): Promise<ExpenseCategory[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblExpenseCategories')
-    .select(['CategoryID', 'CategoryName'])
-    .orderBy('CategoryName')
+    .selectFrom('expense_categories')
+    .select(['category_id', 'category_name'])
+    .orderBy('category_name')
     .execute();
 }
 
@@ -170,15 +170,15 @@ export async function getExpenseSubcategories(
 ): Promise<ExpenseSubcategory[]> {
   const db = getKysely();
   let q = db
-    .selectFrom('tblExpenseSubcategories as s')
-    .leftJoin('tblExpenseCategories as c', 's.CategoryID', 'c.CategoryID')
-    .select(['s.SubcategoryID', 's.SubcategoryName', 's.CategoryID', 'c.CategoryName']);
+    .selectFrom('expense_subcategories as s')
+    .leftJoin('expense_categories as c', 's.category_id', 'c.category_id')
+    .select(['s.subcategory_id', 's.subcategory_name', 's.category_id', 'c.category_name']);
 
   if (categoryId) {
-    q = q.where('s.CategoryID', '=', categoryId);
+    q = q.where('s.category_id', '=', categoryId);
   }
 
-  q = q.orderBy('s.SubcategoryName');
+  q = q.orderBy('s.subcategory_name');
 
   return q.execute() as Promise<ExpenseSubcategory[]>;
 }
@@ -189,20 +189,20 @@ export async function getExpenseSubcategories(
 export async function addExpense(expenseData: ExpenseData): Promise<{ NewID: number }> {
   const db = getKysely();
   const row = await db
-    .insertInto('tblExpenses')
+    .insertInto('expenses')
     .values({
-      expenseDate: sql<Date>`${expenseData.expenseDate}`,
-      Amount: expenseData.amount,
-      Currency: expenseData.currency || 'IQD',
-      Note: expenseData.note || null,
-      CategoryID: expenseData.categoryId || null,
-      SubcategoryID: expenseData.subcategoryId || null,
+      expense_date: sql<Date>`${expenseData.expense_date}`,
+      amount: expenseData.amount,
+      currency: expenseData.currency || 'IQD',
+      note: expenseData.note || null,
+      category_id: expenseData.categoryId || null,
+      subcategory_id: expenseData.subcategoryId || null,
     })
-    .returning('ID as NewID')
+    .returning('id as NewID')
     .executeTakeFirst();
 
   if (!row) {
-    throw new Error('Failed to create expense: no ID returned');
+    throw new Error('Failed to create expense: no id returned');
   }
 
   return row;
@@ -217,16 +217,16 @@ export async function updateExpense(
 ): Promise<{ success: boolean; id: number }> {
   const db = getKysely();
   await db
-    .updateTable('tblExpenses')
+    .updateTable('expenses')
     .set({
-      expenseDate: sql<Date>`${expenseData.expenseDate}`,
-      Amount: expenseData.amount,
-      Currency: expenseData.currency || 'IQD',
-      Note: expenseData.note || null,
-      CategoryID: expenseData.categoryId || null,
-      SubcategoryID: expenseData.subcategoryId || null,
+      expense_date: sql<Date>`${expenseData.expense_date}`,
+      amount: expenseData.amount,
+      currency: expenseData.currency || 'IQD',
+      note: expenseData.note || null,
+      category_id: expenseData.categoryId || null,
+      subcategory_id: expenseData.subcategoryId || null,
     })
-    .where('ID', '=', id)
+    .where('id', '=', id)
     .execute();
 
   return { success: true, id };
@@ -237,7 +237,7 @@ export async function updateExpense(
  */
 export async function deleteExpense(id: number): Promise<{ success: boolean; id: number }> {
   const db = getKysely();
-  await db.deleteFrom('tblExpenses').where('ID', '=', id).execute();
+  await db.deleteFrom('expenses').where('id', '=', id).execute();
   return { success: true, id };
 }
 
@@ -250,18 +250,18 @@ export async function getExpenseSummary(
 ): Promise<ExpenseSummary[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblExpenses as e')
-    .leftJoin('tblExpenseCategories as c', 'e.CategoryID', 'c.CategoryID')
-    .where('e.expenseDate', '>=', sql<Date>`${startDate}`)
-    .where('e.expenseDate', '<=', sql<Date>`${endDate}`)
-    .groupBy(['c.CategoryName', sql`btrim(${sql.ref('e.Currency')})`])
-    .orderBy('c.CategoryName')
-    .orderBy(sql`btrim(${sql.ref('e.Currency')})`)
+    .selectFrom('expenses as e')
+    .leftJoin('expense_categories as c', 'e.category_id', 'c.category_id')
+    .where('e.expense_date', '>=', sql<Date>`${startDate}`)
+    .where('e.expense_date', '<=', sql<Date>`${endDate}`)
+    .groupBy(['c.category_name', sql`btrim(${sql.ref('e.currency')})`])
+    .orderBy('c.category_name')
+    .orderBy(sql`btrim(${sql.ref('e.currency')})`)
     .select((eb) => [
-      'c.CategoryName',
-      sql<string>`btrim(${sql.ref('e.Currency')})`.as('Currency'),
+      'c.category_name',
+      sql<string>`btrim(${sql.ref('e.currency')})`.as('currency'),
       eb.fn.countAll<number>().as('ExpenseCount'),
-      eb.fn.sum('e.Amount').$castTo<number>().as('TotalAmount'),
+      eb.fn.sum('e.amount').$castTo<number>().as('total_amount'),
     ])
     .execute() as Promise<ExpenseSummary[]>;
 }
@@ -275,15 +275,15 @@ export async function getExpenseTotalsByCurrency(
 ): Promise<ExpenseTotal[]> {
   const db = getKysely();
   return db
-    .selectFrom('tblExpenses')
-    .where('expenseDate', '>=', sql<Date>`${startDate}`)
-    .where('expenseDate', '<=', sql<Date>`${endDate}`)
-    .groupBy(sql`btrim(${sql.ref('Currency')})`)
-    .orderBy(sql`btrim(${sql.ref('Currency')})`)
+    .selectFrom('expenses')
+    .where('expense_date', '>=', sql<Date>`${startDate}`)
+    .where('expense_date', '<=', sql<Date>`${endDate}`)
+    .groupBy(sql`btrim(${sql.ref('currency')})`)
+    .orderBy(sql`btrim(${sql.ref('currency')})`)
     .select((eb) => [
-      sql<string>`btrim(${sql.ref('Currency')})`.as('Currency'),
+      sql<string>`btrim(${sql.ref('currency')})`.as('currency'),
       eb.fn.countAll<number>().as('ExpenseCount'),
-      eb.fn.sum('Amount').$castTo<number>().as('TotalAmount'),
+      eb.fn.sum('amount').$castTo<number>().as('total_amount'),
     ])
     .execute() as Promise<ExpenseTotal[]>;
 }

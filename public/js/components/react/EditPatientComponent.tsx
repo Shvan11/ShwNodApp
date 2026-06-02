@@ -45,14 +45,14 @@ interface WebcephData {
 }
 
 interface PatientData {
-    PersonID: number;
-    PatientName?: string;
-    FirstName?: string;
-    LastName?: string;
+    person_id: number;
+    patient_name?: string;
+    first_name?: string;
+    last_name?: string;
     Phone?: string;
-    Phone2?: string;
+    phone2?: string;
     Email?: string;
-    DateofBirth?: string;
+    date_of_birth?: string;
     Gender?: string;
     AddressID?: string;
     ReferralSourceID?: string;
@@ -66,14 +66,14 @@ interface PatientData {
 }
 
 interface FormData {
-    PersonID: string | number;
-    PatientName: string;
-    FirstName: string;
-    LastName: string;
+    person_id: string | number;
+    patient_name: string;
+    first_name: string;
+    last_name: string;
     Phone: string;
     Phone2: string;
     Email: string;
-    DateofBirth: string;
+    date_of_birth: string;
     Gender: string;
     AddressID: string;
     ReferralSourceID: string;
@@ -101,8 +101,8 @@ const EditPatientComponent = ({ personId }: Props) => {
     const [successMessage, setSuccessMessage] = useState('');
     const [patientData, setPatientData] = useState<PatientData | null>(null);
 
-    // Use validated PersonID from loader, fallback to patientData.PersonID
-    const validPersonId = personId ?? patientData?.PersonID ?? null;
+    // Use validated PersonID from loader, fallback to patientData.person_id
+    const validPersonId = personId ?? patientData?.person_id ?? null;
 
     // Dropdown data
     const [genders, setGenders] = useState<Gender[]>([]);
@@ -125,14 +125,14 @@ const EditPatientComponent = ({ personId }: Props) => {
 
     // Form data
     const [formData, setFormData] = useState<FormData>({
-        PersonID: '',
-        PatientName: '',
-        FirstName: '',
-        LastName: '',
+        person_id: '',
+        patient_name: '',
+        first_name: '',
+        last_name: '',
         Phone: '',
         Phone2: '',
         Email: '',
-        DateofBirth: '',
+        date_of_birth: '',
         Gender: '',
         AddressID: '',
         ReferralSourceID: '',
@@ -183,14 +183,14 @@ const EditPatientComponent = ({ personId }: Props) => {
 
             // Populate form
             setFormData({
-                PersonID: data.PersonID,
-                PatientName: data.PatientName || '',
-                FirstName: data.FirstName || '',
-                LastName: data.LastName || '',
+                person_id: data.person_id,
+                patient_name: data.patient_name || '',
+                first_name: data.first_name || '',
+                last_name: data.last_name || '',
                 Phone: data.Phone || '',
-                Phone2: data.Phone2 || '',
+                Phone2: data.phone2 || '',
                 Email: data.Email || '',
-                DateofBirth: data.DateofBirth ? new Date(data.DateofBirth).toISOString().split('T')[0] : '',
+                date_of_birth: data.date_of_birth ? new Date(data.date_of_birth).toISOString().split('T')[0] : '',
                 Gender: data.Gender || '',
                 AddressID: data.AddressID || '',
                 ReferralSourceID: data.ReferralSourceID || '',
@@ -264,17 +264,17 @@ const EditPatientComponent = ({ personId }: Props) => {
             }
 
             // Pad PersonID with zeros to meet 6-character minimum
-            let paddedPatientID = patientData.PersonID.toString();
+            let paddedPatientID = patientData.person_id.toString();
             if (paddedPatientID.length < 6) {
                 paddedPatientID = paddedPatientID.padStart(6, '0');
             }
 
             const webcephPatientData = {
                 patientID: paddedPatientID,
-                firstName: formData.FirstName || '',
-                lastName: formData.LastName || '',
+                firstName: formData.first_name || '',
+                lastName: formData.last_name || '',
                 gender: genderName,
-                birthday: formData.DateofBirth || '',
+                birthday: formData.date_of_birth || '',
                 race: 'Asian' // Default value
             };
 
@@ -284,7 +284,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    personId: patientData.PersonID,
+                    personId: patientData.person_id,
                     patientData: webcephPatientData
                 })
             });
@@ -324,7 +324,7 @@ const EditPatientComponent = ({ personId }: Props) => {
 
             const formDataObj = new FormData();
             formDataObj.append('image', uploadData.imageFile);
-            formDataObj.append('patientID', patientData?.PersonID.toString() || '');
+            formDataObj.append('patientID', patientData?.person_id.toString() || '');
             formDataObj.append('recordDate', uploadData.recordDate);
             formDataObj.append('targetClass', uploadData.targetClass);
 
@@ -363,14 +363,14 @@ const EditPatientComponent = ({ personId }: Props) => {
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        if (!formData.PatientName.trim()) {
+        if (!formData.patient_name.trim()) {
             setError('Patient Name is required');
             toast.warning('Patient Name is required');
             return;
         }
 
         // Use validated PersonID for API call
-        const pid = validPersonId ?? formData.PersonID;
+        const pid = validPersonId ?? formData.person_id;
         if (!pid) {
             setError('Invalid patient ID');
             toast.error('Invalid patient ID');
@@ -394,7 +394,7 @@ const EditPatientComponent = ({ personId }: Props) => {
 
                 // Handle duplicate patient name specifically
                 if (errorData.code === 'DUPLICATE_PATIENT_NAME') {
-                    const duplicateName = errorData.duplicateName || formData.PatientName;
+                    const duplicateName = errorData.duplicateName || formData.patient_name;
                     toast.error(`A patient with the name "${duplicateName}" already exists`);
                     setError(`A patient with the name "${duplicateName}" already exists. Please use a different name.`);
                     return;
@@ -447,7 +447,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                 </h2>
                 {patientData && (
                     <p className={styles.editPatientDescription}>
-                        Editing: <strong>{patientData.PatientName}</strong> (ID: {patientData.PersonID})
+                        Editing: <strong>{patientData.patient_name}</strong> (ID: {patientData.person_id})
                     </p>
                 )}
             </div>
@@ -503,8 +503,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <label>Patient Name (Arabic) <span className={styles.requiredAsterisk}>*</span></label>
                         <input
                             type="text"
-                            value={formData.PatientName}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, PatientName: e.target.value})}
+                            value={formData.patient_name}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, patient_name: e.target.value})}
                             required
                             className={styles.inputHeightConsistent}
                         />
@@ -516,16 +516,16 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <label>First Name</label>
                         <input
                             type="text"
-                            value={formData.FirstName}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, FirstName: e.target.value})}
+                            value={formData.first_name}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, first_name: e.target.value})}
                         />
                     </div>
                     <div className={styles.formGroup}>
                         <label>Last Name</label>
                         <input
                             type="text"
-                            value={formData.LastName}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, LastName: e.target.value})}
+                            value={formData.last_name}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, last_name: e.target.value})}
                         />
                     </div>
                 </div>
@@ -569,8 +569,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <label>Date of Birth</label>
                         <input
                             type="date"
-                            value={formData.DateofBirth}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, DateofBirth: e.target.value})}
+                            value={formData.date_of_birth}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, date_of_birth: e.target.value})}
                         />
                     </div>
                 </div>

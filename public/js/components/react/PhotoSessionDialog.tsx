@@ -7,8 +7,8 @@ import styles from './PhotoSessionDialog.module.css';
 interface Props {
     personId?: string;
     patientInfo: {
-        FirstName?: string;
-        PatientName?: string;
+        first_name?: string;
+        patient_name?: string;
     } | null;
     onClose: () => void;
     /** Called once a timepoint is prepared, to hand off to the in-app editor. */
@@ -101,7 +101,7 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
     const isLatin1 = (s: string) => /^[ -ÿ]+$/.test(s);
 
     const handleSubmit = async (overrideDate = false) => {
-        if (!patientInfo?.FirstName && !patientInfo?.PatientName) {
+        if (!patientInfo?.first_name && !patientInfo?.patient_name) {
             toast.error('Patient name is required');
             return;
         }

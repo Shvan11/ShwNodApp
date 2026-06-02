@@ -122,7 +122,7 @@ const extractAppointments = (
 };
 
 const validOnly = (appts: CalendarAppointment[]): CalendarAppointment[] =>
-    appts.filter(a => a && (a.patientName || a.appointmentID));
+    appts.filter(a => a && (a.patientName || a.appointment_id));
 
 const isToday = (date: string): boolean => {
     const today = new Date();
@@ -202,7 +202,7 @@ const CalendarGrid = ({
         dayName: day.dayName,
         appointments: appts,
         slotStatus: appts.length > 0 ? 'booked' : 'available',
-        appointmentID: appts.length > 0 ? appts[0].appointmentID : undefined,
+        appointment_id: appts.length > 0 ? appts[0].appointment_id : undefined,
         appDetail: appts.length > 0 ? appts[0].appDetail : undefined,
         patientName: appts.length > 0 ? appts[0].patientName : undefined
     });
@@ -243,9 +243,9 @@ const CalendarGrid = ({
             const srcDay = days.find(d => d.date === src.date);
             if (!srcDay) return;
             const appt = getSlotAppointments(srcDay, src.time)[src.index];
-            if (!appt || appt.appointmentID == null) return;
+            if (!appt || appt.appointment_id == null) return;
 
-            onReschedule(appt.appointmentID, destDate, destTime, appt);
+            onReschedule(appt.appointment_id, destDate, destTime, appt);
         };
 
     const renderLane = (

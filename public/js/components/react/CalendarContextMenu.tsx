@@ -54,8 +54,8 @@ const CalendarContextMenu = ({ position, appointment, onClose, onDelete }: Calen
 
     const handleEdit = (e: MouseEvent<HTMLDivElement>) => {
         e.stopPropagation();
-        if (appointment.PersonID && appointment.appointmentID) {
-            navigate(`/patient/${appointment.PersonID}/edit-appointment/${appointment.appointmentID}`, {
+        if (appointment.personID && appointment.appointment_id) {
+            navigate(`/patient/${appointment.personID}/edit-appointment/${appointment.appointment_id}`, {
                 state: { appointment }
             });
         }

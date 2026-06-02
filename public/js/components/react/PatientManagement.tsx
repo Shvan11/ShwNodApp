@@ -9,10 +9,10 @@ import Modal from './Modal';
 import styles from './PatientManagement.module.css';
 
 interface Patient {
-    PersonID: number;
-    PatientName: string;
-    FirstName?: string;
-    LastName?: string;
+    person_id: number;
+    patient_name: string;
+    first_name?: string;
+    last_name?: string;
     Phone?: string;
     DateAdded?: string;
     TagName?: string;
@@ -370,7 +370,7 @@ const PatientManagement = () => {
             const res = await fetch('/api/appointments/quick-checkin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ PersonID: patient.PersonID })
+                body: JSON.stringify({ person_id: patient.person_id })
             });
             if(!res.ok) throw new Error((await res.json()).error);
             const data = await res.json();
@@ -386,7 +386,7 @@ const PatientManagement = () => {
     const handleDeleteConfirm = async () => {
         if (!selectedPatient) return;
         try {
-            const res = await fetch(`/api/patients/${selectedPatient.PersonID}`, { method: 'DELETE' });
+            const res = await fetch(`/api/patients/${selectedPatient.person_id}`, { method: 'DELETE' });
             if(!res.ok) throw new Error('Delete failed');
             const data = await res.json().catch(() => ({}));
             executeSearch();
@@ -401,7 +401,7 @@ const PatientManagement = () => {
         }
     };
 
-    const handleQuickSearchSelect = (patient: SelectedPatient) => navigate(`/patient/${patient.PersonID}/works`);
+    const handleQuickSearchSelect = (patient: SelectedPatient) => navigate(`/patient/${patient.person_id}/works`);
 
     return (
         <div className={styles.page}>
@@ -575,17 +575,17 @@ const PatientManagement = () => {
                         <thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Date</th><th>Tag</th><th>Actions</th></tr></thead>
                         <tbody>
                             {patients.map(p => (
-                                <tr key={p.PersonID}>
-                                    <td data-label="ID">{p.PersonID}</td>
+                                <tr key={p.person_id}>
+                                    <td data-label="ID">{p.person_id}</td>
                                     <td data-label="Name">
                                         <strong
                                             className={styles.patientNameLink}
-                                            onClick={() => navigate(`/patient/${p.PersonID}/works`)}
+                                            onClick={() => navigate(`/patient/${p.person_id}/works`)}
                                             title="View Patient"
                                         >
-                                            {p.PatientName}
+                                            {p.patient_name}
                                         </strong>
-                                        {p.FirstName && <div>{p.FirstName} {p.LastName}</div>}
+                                        {p.first_name && <div>{p.first_name} {p.last_name}</div>}
                                     </td>
                                     <td data-label="Phone"><PhoneDisplay phone={p.Phone} /> {!p.Phone && '-'}</td>
                                     <td data-label="Date">{p.DateAdded ? new Date(p.DateAdded).toLocaleDateString() : '-'}</td>
@@ -593,8 +593,8 @@ const PatientManagement = () => {
                                     <td data-label="Actions">
                                         <div className={styles.actionButtons}>
                                             <button onClick={(e) => handleQuickCheckin(e, p)} className="btn btn-icon btn-outline-success" title="Quick Check-in"><i className="fas fa-user-check"></i></button>
-                                            <button onClick={() => navigate(`/patient/${p.PersonID}/works`)} className="btn btn-icon btn-outline-primary" title="View Patient"><i className="fas fa-eye"></i></button>
-                                            <button onClick={() => navigate(`/patient/${p.PersonID}/edit-patient`)} className="btn btn-icon btn-outline-warning" title="Edit Patient"><i className="fas fa-edit"></i></button>
+                                            <button onClick={() => navigate(`/patient/${p.person_id}/works`)} className="btn btn-icon btn-outline-primary" title="View Patient"><i className="fas fa-eye"></i></button>
+                                            <button onClick={() => navigate(`/patient/${p.person_id}/edit-patient`)} className="btn btn-icon btn-outline-warning" title="Edit Patient"><i className="fas fa-edit"></i></button>
                                             <button onClick={() => handleDeleteClick(p)} className="btn btn-icon btn-outline-danger" title="Delete Patient"><i className="fas fa-trash"></i></button>
                                         </div>
                                     </td>
@@ -641,7 +641,7 @@ const PatientManagement = () => {
                             <button onClick={() => setShowDeleteConfirm(false)} className={styles.deleteModalClose}>×</button>
                         </div>
                         <div className={styles.deleteModalContent}>
-                            <p>Are you sure you want to delete <strong>{selectedPatient.PatientName}</strong>?</p>
+                            <p>Are you sure you want to delete <strong>{selectedPatient.patient_name}</strong>?</p>
                             <p className={styles.deleteModalWarning}>
                                 <i className="fas fa-exclamation-triangle"></i> This permanently deletes the patient record
                                 <strong> and the patient's entire photo folder on the share</strong> (all photos and files).

@@ -13,7 +13,7 @@ import * as videoQueries from '../../services/database/queries/video-queries.js'
 
 const router = Router();
 
-// Type definitions
+// type definitions
 interface VideoIdParams {
   id: string;
 }
@@ -50,7 +50,7 @@ router.get('/:id/info', async (req: Request<VideoIdParams>, res: Response): Prom
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
-      res.status(400).json({ error: 'Invalid video ID' });
+      res.status(400).json({ error: 'Invalid video id' });
       return;
     }
 
@@ -61,9 +61,9 @@ router.get('/:id/info', async (req: Request<VideoIdParams>, res: Response): Prom
     }
 
     res.json({
-      id: video.ID,
-      title: video.Description,
-      details: video.Details,
+      id: video.id,
+      title: video.description,
+      details: video.details,
     });
   } catch (error) {
     log.error('[Public Video] Error fetching video info:', error);
@@ -79,7 +79,7 @@ router.get('/:id/stream', async (req: Request<VideoIdParams>, res: Response): Pr
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
-      res.status(400).json({ error: 'Invalid video ID' });
+      res.status(400).json({ error: 'Invalid video id' });
       return;
     }
 
@@ -115,14 +115,14 @@ router.get('/:id/stream', async (req: Request<VideoIdParams>, res: Response): Pr
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
         'Accept-Ranges': 'bytes',
         'Content-Length': chunkSize,
-        'Content-Type': mimeType,
+        'Content-type': mimeType,
       });
 
       fileStream.pipe(res);
     } else {
       res.writeHead(200, {
         'Content-Length': fileSize,
-        'Content-Type': mimeType,
+        'Content-type': mimeType,
         'Accept-Ranges': 'bytes',
       });
 
@@ -142,7 +142,7 @@ router.get('/:id/download', async (req: Request<VideoIdParams>, res: Response): 
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
-      res.status(400).json({ error: 'Invalid video ID' });
+      res.status(400).json({ error: 'Invalid video id' });
       return;
     }
 
@@ -162,12 +162,12 @@ router.get('/:id/download', async (req: Request<VideoIdParams>, res: Response): 
       res.status(404).json({ error: 'Video file not found' });
       return;
     }
-    const fileName = `${video.Description.replace(/[^a-zA-Z0-9\s-]/g, '').trim()}${path.extname(filePath)}`;
+    const fileName = `${video.description.replace(/[^a-zA-Z0-9\s-]/g, '').trim()}${path.extname(filePath)}`;
     const mimeType = getMediaMimeType(filePath);
 
     res.writeHead(200, {
       'Content-Length': stat.size,
-      'Content-Type': mimeType,
+      'Content-type': mimeType,
       'Content-Disposition': `attachment; filename="${fileName}"`,
     });
 
@@ -186,7 +186,7 @@ router.get('/:id', async (req: Request<VideoIdParams>, res: Response): Promise<v
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
-      res.status(400).send('Invalid video ID');
+      res.status(400).send('Invalid video id');
       return;
     }
 
@@ -202,7 +202,7 @@ router.get('/:id', async (req: Request<VideoIdParams>, res: Response): Promise<v
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(video.Description)} - Shwan Orthodontics</title>
+  <title>${escapeHtml(video.description)} - Shwan Orthodontics</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -329,8 +329,8 @@ router.get('/:id', async (req: Request<VideoIdParams>, res: Response): Promise<v
       </video>
     </div>
     <div class="content">
-      <h2 class="title">${escapeHtml(video.Description)}</h2>
-      ${video.Details ? `<p class="details">${escapeHtml(video.Details)}</p>` : ''}
+      <h2 class="title">${escapeHtml(video.description)}</h2>
+      ${video.details ? `<p class="details">${escapeHtml(video.details)}</p>` : ''}
       <div class="buttons">
         <a href="/v/${id}/download" class="download-btn">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -357,7 +357,7 @@ router.get('/:id', async (req: Request<VideoIdParams>, res: Response): Promise<v
       var cachedBlob = { url: null, blob: null, fetchId: 0 };
       var isSharing = false;
       var videoUrl = '/v/${id}/stream';
-      var videoTitle = '${escapeHtml(video.Description).replace(/'/g, "\\'")}';
+      var videoTitle = '${escapeHtml(video.description).replace(/'/g, "\\'")}';
 
       // Toast notification
       function showToast(message, type) {
@@ -432,7 +432,7 @@ router.get('/:id', async (req: Request<VideoIdParams>, res: Response): Promise<v
 </body>
 </html>`;
 
-    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Content-type', 'text/html');
     res.send(html);
   } catch (error) {
     log.error('[Public Video] Error rendering video page:', error);

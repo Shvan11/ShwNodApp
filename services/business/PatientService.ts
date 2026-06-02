@@ -3,7 +3,7 @@
  *
  * This service handles all patient business logic including:
  * - Patient data retrieval with validation
- * - Patient ID validation (ensuring valid numeric IDs)
+ * - Patient id validation (ensuring valid numeric IDs)
  * - Time points and imaging data retrieval
  * - Patient existence verification
  *
@@ -25,34 +25,32 @@ import type { Payment } from '../../types/database.types.js';
  */
 interface PatientInfoResult {
   // Full patient details
-  PersonID: number;
-  PatientName: string | null;
-  FirstName: string | null;
-  LastName: string | null;
-  Phone: string | null;
-  Phone2: string | null;
-  Email: string | null;
+  person_id: number;
+  patient_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  phone2: string | null;
+  email: string | null;
   DateOfBirth: string | null;
-  Gender: number | null;
+  gender: number | null;
   GenderDisplay: string | null;
   Address: string | null;
   ReferralSource: string | null;
-  PatientType: string | null;
-  Tag: string | null;
-  Notes: string | null;
-  Language: number | null;
-  CountryCode: string | null;
-  EstimatedCost: number | null;
-  Currency: string | null;
+  patient_type: string | null;
+  tag: string | null;
+  notes: string | null;
+  language: number | null;
+  country_code: string | null;
+  estimated_cost: number | null;
+  currency: string | null;
   DolphinId: number | null;
-  DateAdded: string | null;
+  date_added: string | null;
   AlertCount: number;
   // Legacy fields for backwards compatibility
   name: string | null;
-  phone: string | null;
-  StartDate: Date | null;
+  start_date: Date | null;
   estimatedCost: number | null;
-  currency: string | null;
   activeAlert: {
     alertId: number;
     alertType: string;
@@ -67,9 +65,9 @@ interface PatientInfoResult {
  * Time point returned from service
  */
 interface TimePointResult {
-  tpCode: string;
-  tpDateTime: string;
-  tpDescription: string;
+  tp_code: string;
+  tp_date_time: string;
+  tp_description: string;
 }
 
 /**
@@ -124,16 +122,16 @@ export interface TimePointImage {
 }
 
 /**
- * Validate patient ID
- * @param patientId - Patient ID to validate
+ * Validate patient id
+ * @param patientId - Patient id to validate
  * @throws PatientValidationError If validation fails
- * @returns Validated patient ID as string
+ * @returns Validated patient id as string
  */
 function validatePatientId(patientId: string | number | undefined | null): string {
   // Check if provided
   if (!patientId && patientId !== 0) {
     throw new PatientValidationError(
-      'Patient ID is required',
+      'Patient id is required',
       'MISSING_PATIENT_ID'
     );
   }
@@ -145,7 +143,7 @@ function validatePatientId(patientId: string | number | undefined | null): strin
   const pid = parseInt(pidString, 10);
   if (isNaN(pid)) {
     throw new PatientValidationError(
-      'Patient ID must be a valid number',
+      'Patient id must be a valid number',
       'INVALID_PATIENT_ID',
       { provided: patientId }
     );
@@ -154,7 +152,7 @@ function validatePatientId(patientId: string | number | undefined | null): strin
   // Check if positive
   if (pid < 1) {
     throw new PatientValidationError(
-      'Patient ID must be a positive number',
+      'Patient id must be a positive number',
       'INVALID_PATIENT_ID',
       { provided: pid }
     );
@@ -166,7 +164,7 @@ function validatePatientId(patientId: string | number | undefined | null): strin
 
 /**
  * Get patient information with validation
- * @param patientId - Patient ID
+ * @param patientId - Patient id
  * @returns Patient information
  * @throws PatientValidationError If validation fails
  */
@@ -190,14 +188,14 @@ export async function getPatientInfo(
     if (error instanceof PatientValidationError) {
       throw error;
     }
-    log.error(`Error fetching patient info for ID ${pid}:`, { error: error instanceof Error ? error.message : String(error) });
+    log.error(`Error fetching patient info for id ${pid}:`, { error: error instanceof Error ? error.message : String(error) });
     throw new Error('Failed to fetch patient information');
   }
 }
 
 /**
  * Get patient time points with validation
- * @param patientId - Patient ID
+ * @param patientId - Patient id
  * @returns Array of time points
  * @throws PatientValidationError If validation fails
  */
@@ -220,7 +218,7 @@ export async function getPatientTimePoints(
 
 /**
  * Get patient time point images with validation
- * @param patientId - Patient ID
+ * @param patientId - Patient id
  * @param timePoint - Time point code
  * @returns Array of time point images
  * @throws PatientValidationError If validation fails
@@ -253,7 +251,7 @@ export async function getPatientTimePointImages(
 
 /**
  * Get patient payments with validation
- * @param patientId - Patient ID
+ * @param patientId - Patient id
  * @returns Array of payments
  * @throws PatientValidationError If validation fails
  */
