@@ -8,6 +8,7 @@ import EditTimepointModal from './EditTimepointModal';
 import DeleteTimepointModal from './DeleteTimepointModal';
 import TimepointActionsMenu, { type DeleteScope, type FolderState } from './TimepointActionsMenu';
 import { encodeRelPath } from './files/fileHelpers';
+import sseAppointments from '../../services/sse-appointments';
 
 interface Props {
     personId?: number | null;
@@ -626,6 +627,38 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         if (personId) {
             loadGalleryImages();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [personId, tpCode]);
+
+    // Hold the appointments SSE stream open while this grid is mounted — it also
+    // carries `photos_rendered`, fired when a background photo-editor save finishes.
+    useEffect(() => {
+        void sseAppointments.ensureConnected().catch(() => {
+            /* transport errors are surfaced by the appointments connection UI */
+        });
+        return () => {
+            sseAppointments.release();
+        };
+    }, []);
+
+    // When a background render for THIS patient+timepoint completes, refetch the
+    // gallery (and timepoints, in case the save created a brand-new one) so the new
+    // photos appear without a manual reload.
+    useEffect(() => {
+        const onPhotosRendered = (payload: unknown): void => {
+            const p = payload as { personId?: number | string; tpCode?: number | string; warnings?: number };
+            if (!personId) return;
+            if (String(p.personId) !== String(personId) || String(p.tpCode) !== String(tpCode)) return;
+            void loadGalleryImages();
+            void loadTimepoints();
+            if (p.warnings && p.warnings > 0) {
+                toast.warning(`${p.warnings} photo(s) had issues while saving.`);
+            }
+        };
+        sseAppointments.on('photos_rendered', onPhotosRendered);
+        return () => {
+            sseAppointments.off('photos_rendered', onPhotosRendered);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [personId, tpCode]);
 

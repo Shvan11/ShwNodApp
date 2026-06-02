@@ -6,20 +6,21 @@ import { promises as fs, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { cwd } from 'process';
 import { authenticate } from '@google-cloud/local-auth';
-import { google, people_v1 } from 'googleapis';
+import { people, people_v1 } from '@googleapis/people';
+import { auth as googleAuth } from 'google-auth-library';
 import { log } from '../../utils/logger.js';
 
 // Import OAuth2Client type for authenticate() return type
 import type { OAuth2Client } from 'google-auth-library';
 
-// The actual return type of google.auth.fromJSON
-type JSONClient = ReturnType<typeof google.auth.fromJSON>;
+// The actual return type of googleAuth.fromJSON
+type JSONClient = ReturnType<typeof googleAuth.fromJSON>;
 
 // Union type for all auth clients we use
 type AuthClient = JSONClient | OAuth2Client;
 
-// Auth client type for google.people() - use the actual type expected
-type GoogleAuthClient = Parameters<typeof google.people>[0] extends { auth?: infer A } ? NonNullable<A> : never;
+// Auth client type for people() - use the actual type expected
+type GoogleAuthClient = Parameters<typeof people>[0] extends { auth?: infer A } ? NonNullable<A> : never;
 
 // ===========================================
 // TYPES
@@ -128,7 +129,7 @@ async function loadSavedCredentialsIfExist(tokenPath: string): Promise<AuthClien
   try {
     const content = await fs.readFile(tokenPath, 'utf-8');
     const credentials = JSON.parse(content) as TokenData;
-    const client = google.auth.fromJSON(credentials);
+    const client = googleAuth.fromJSON(credentials);
     return client;
   } catch (err) {
     log.debug(`No existing token found at ${tokenPath} or error reading it`, {
@@ -250,8 +251,11 @@ async function authorize(source: string): Promise<AuthClient> {
       keyfilePath: CREDENTIALS_PATH,
     });
 
-    // authenticate() returns OAuth2Client which is compatible with our AuthClient union
-    client = authenticatedClient;
+    // authenticate() (from @google-cloud/local-auth) returns an OAuth2Client from
+    // its own pinned google-auth-library v9, while our types resolve to the v10 copy
+    // the @googleapis/* packages use. They're structurally identical at runtime
+    // (and people({auth}) call sites already cast), so bridge the type-identity gap.
+    client = authenticatedClient as unknown as AuthClient;
 
     log.info('New authentication successful');
 
@@ -302,7 +306,7 @@ function prepareContacts(contacts: people_v1.Schema$Person[]): PreparedContact[]
  */
 async function createGroup(auth: GoogleAuthClient, group: string): Promise<string> {
   try {
-    const service = google.people({ version: 'v1', auth });
+    const service = people({ version: 'v1', auth });
 
     log.info(`Creating group "${group}"...`);
     const res = await service.contactGroups.create({
@@ -354,7 +358,7 @@ async function addPerson(
   resourceName?: string
 ): Promise<people_v1.Schema$Person> {
   try {
-    const service = google.people({ version: 'v1', auth });
+    const service = people({ version: 'v1', auth });
 
     log.info(`Adding contact: ${contact.name} (${contact.phone})`);
 
@@ -408,7 +412,7 @@ export async function getContacts(source: string): Promise<PreparedContact[]> {
   try {
     const client = await authorize(source);
 
-    const service = google.people({ version: 'v1', auth: client as GoogleAuthClient });
+    const service = people({ version: 'v1', auth: client as GoogleAuthClient });
     let connections: people_v1.Schema$Person[] = [];
     let nextPageToken: string | null | undefined = undefined;
 

@@ -44,6 +44,8 @@
   "dependencies": {
     "@google-cloud/local-auth": "^3.0.1",
     "@google/genai": "^1.49.0",
+    "@googleapis/drive": "^20.2.0",
+    "@googleapis/people": "^7.0.1",
     "@supabase/supabase-js": "^2.81.1",
     "@tanstack/react-virtual": "^3.13.25",
     "@types/mssql": "^12.3.0",
@@ -58,7 +60,7 @@
     "express-rate-limit": "^8.3.2",
     "express-session": "^1.18.2",
     "form-data": "^4.0.4",
-    "googleapis": "^166.0.0",
+    "google-auth-library": "^10.6.2",
     "grapesjs": "^0.22.13",
     "grapesjs-preset-newsletter": "^1.0.2",
     "image-size": "^2.0.2",

@@ -232,7 +232,7 @@ router.get(
       const download = isTruthy(req.query.download);
       const thumbRaw = queryString(req.query.thumb);
 
-      // Strictly validated to `{personId}0…​.iNN` — no separators, no traversal.
+      // Strictly validated to `{personId}0….iNN` — no separators, no traversal.
       const { abs, mtimeMs } = await resolveWorkingFile(personId, name);
 
       // ── Thumbnail branch ──

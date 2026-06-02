@@ -78,14 +78,29 @@ function ensureInitialized(emitter: EventEmitter): void {
     safeWrite(res, 'event: chair_display_patient_cleared\ndata: {}\n\n');
   };
 
+  // A background photo render finished — notify every appointments-stream viewer
+  // (the photos grid rides this same stream). Clients filter by personId/tpCode.
+  const onPhotoTimepointRendered = (payload: {
+    personId: number | string;
+    tpCode: number | string;
+    written?: number;
+    warnings?: number;
+  }): void => {
+    if (appointmentsClients.size === 0) return;
+    const frame = `event: photos_rendered\ndata: ${JSON.stringify(payload)}\n\n`;
+    for (const res of appointmentsClients) safeWrite(res, frame);
+  };
+
   emitter.on(InternalEmitterEvents.DATA_UPDATED, onAppointmentsUpdated);
   emitter.on(InternalEmitterEvents.CHAIR_PATIENT_LOAD, onChairPatientLoad);
   emitter.on(InternalEmitterEvents.CHAIR_PATIENT_CLEAR, onChairPatientClear);
+  emitter.on(InternalEmitterEvents.PHOTO_TIMEPOINT_RENDERED, onPhotoTimepointRendered);
 
   listenerRefs = [
     { event: InternalEmitterEvents.DATA_UPDATED, fn: onAppointmentsUpdated as (...args: unknown[]) => void },
     { event: InternalEmitterEvents.CHAIR_PATIENT_LOAD, fn: onChairPatientLoad as (...args: unknown[]) => void },
     { event: InternalEmitterEvents.CHAIR_PATIENT_CLEAR, fn: onChairPatientClear as (...args: unknown[]) => void },
+    { event: InternalEmitterEvents.PHOTO_TIMEPOINT_RENDERED, fn: onPhotoTimepointRendered as (...args: unknown[]) => void },
   ];
 
   // Single shared timer fans `:\n\n` (SSE comment frame) to every open stream.

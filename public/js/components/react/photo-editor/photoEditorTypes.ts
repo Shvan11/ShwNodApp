@@ -88,6 +88,49 @@ export function defaultFlipV(view: PhotoViewCode): boolean {
   return view === 'i23' || view === 'i24';
 }
 
+/**
+ * Framing guide lines drawn over the live cropper, as fractions (0–1) of the crop
+ * area. Because each slot's crop area exactly fills its aspect-locked cell, these
+ * fractions map 1:1 onto the rendered output.
+ *   facial (Profile/Rest/Smile) → 3 horizontal lines splitting the frame into
+ *     4 bands: top margin, face upper-third, face lower-two-thirds, bottom margin.
+ *     With a 15% top/bottom margin the face occupies the middle 70%, so the
+ *     thirds split sits at 15% + 70%/3 ≈ 38.3%.
+ *   occlusal (Upper/Lower)      → one vertical midline (dental midline reference).
+ *   lower three (Right/Center/Left) → one horizontal bisecting line (occlusal-plane reference).
+ */
+export interface SlotGridLines {
+  /** Horizontal lines as fractions of crop-area height (top→bottom). */
+  horizontal: number[];
+  /** Vertical lines as fractions of crop-area width (left→right). */
+  vertical: number[];
+}
+
+const FACIAL_MARGIN = 0.15;
+const FACIAL_LINES = [
+  FACIAL_MARGIN,
+  FACIAL_MARGIN + (1 - 2 * FACIAL_MARGIN) / 3,
+  1 - FACIAL_MARGIN,
+];
+
+export function gridLinesForView(view: PhotoViewCode): SlotGridLines {
+  switch (view) {
+    case 'i10': // Profile
+    case 'i12': // Rest
+    case 'i13': // Smile
+      return { horizontal: FACIAL_LINES, vertical: [] };
+    case 'i23': // Upper occlusal
+    case 'i24': // Lower occlusal
+      return { horizontal: [], vertical: [0.5] };
+    case 'i20': // Right
+    case 'i22': // Center
+    case 'i21': // Left
+      return { horizontal: [0.5], vertical: [] };
+    default:
+      return { horizontal: [], vertical: [] };
+  }
+}
+
 /** Crop rect in source pixels (react-easy-crop's croppedAreaPixels shape). */
 export interface CropArea {
   x: number;

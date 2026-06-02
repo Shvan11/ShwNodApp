@@ -157,10 +157,15 @@ export interface PhotoRenderRequest {
     slots: SlotRenderSpec[];
 }
 
-/** POST /api/photo-editor/:personId/render response data. */
+/**
+ * POST /api/photo-editor/:personId/render response (202 Accepted). The render runs
+ * in the background; completion is announced over SSE (`photos_rendered`), so the
+ * synchronous response only confirms the timepoint was resolved and work was queued.
+ */
 export interface PhotoRenderResult {
-    written: string[];
-    warnings?: string[];
+    success: true;
+    queued: true;
+    tpCode: number;
 }
 
 /** POST /api/portal/login (patient portal). */

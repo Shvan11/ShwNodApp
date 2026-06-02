@@ -42,6 +42,9 @@ export interface AppointmentData {
  */
 export type AppointmentsCache = Record<string, AppointmentData[]>;
 
+/** Cap on distinct dates retained in the in-memory appointments cache (LRU-ish). */
+const MAX_CACHED_APPOINTMENT_DATES = 14;
+
 /**
  * Global state context value
  */
@@ -186,7 +189,20 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
   };
 
   const updateAppointmentsCache = (date: string, appointments: AppointmentData[]): void => {
-    setAppointmentsCache((prev) => ({ ...prev, [date]: appointments }));
+    setAppointmentsCache((prev) => {
+      // Bound the cache to the most-recently-touched dates so it can't grow
+      // unbounded over a long-lived tab (one entry per unique date viewed).
+      // Re-insert `date` last (refresh its recency), then drop the oldest keys.
+      const { [date]: _drop, ...rest } = prev;
+      const next: AppointmentsCache = { ...rest, [date]: appointments };
+      const keys = Object.keys(next);
+      if (keys.length > MAX_CACHED_APPOINTMENT_DATES) {
+        for (const stale of keys.slice(0, keys.length - MAX_CACHED_APPOINTMENT_DATES)) {
+          delete next[stale];
+        }
+      }
+      return next;
+    });
   };
 
   const value: GlobalStateContextValue = {

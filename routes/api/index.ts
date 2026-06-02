@@ -48,7 +48,7 @@ import mediaRoutes from './media.routes.js';
 import lookupRoutes from './lookup.routes.js';
 import reportsRoutes from './reports.routes.js';
 import utilityRoutes from './utility.routes.js';
-import photoEditorRoutes from './photo-editor.routes.js';
+import photoEditorRoutes, { setWebSocketEmitter as setPhotoEditorWS } from './photo-editor.routes.js';
 import costPresetRoutes from './cost-preset.routes.js';
 import holidayRoutes from './holiday.routes.js';
 import videoRoutes from './video.routes.js';
@@ -68,6 +68,7 @@ export function setWebSocketEmitter(emitter: EventEmitter): void {
   // Inject WebSocket emitter into modules that need it
   setAppointmentWS(emitter);
   setChairDisplayWS(emitter);
+  setPhotoEditorWS(emitter);
 }
 
 // Mount template routes

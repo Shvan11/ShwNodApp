@@ -761,6 +761,17 @@ class WhatsAppService extends EventEmitter {
           '--disable-gpu',
           '--disable-web-security',
           '--disable-features=VizDisplayCompositor',
+          // Conservative footprint trims — strip Chrome subsystems WA Web never
+          // uses. Safe (no behavior change); deliberately NOT --single-process
+          // (breaks whatsapp-web.js) and NOT a renderer heap cap (WA Web's DOM
+          // is heavy; an undersized --max-old-space-size crashes the page).
+          '--disable-extensions',
+          '--disable-default-apps',
+          '--disable-sync',
+          '--disable-translate',
+          '--mute-audio',
+          '--disable-background-networking',
+          '--disable-component-extensions-with-background-pages',
         ],
       },
     }) as unknown as WhatsAppClient;

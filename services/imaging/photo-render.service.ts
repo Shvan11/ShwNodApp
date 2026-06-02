@@ -42,6 +42,21 @@ export interface RenderSlotInput {
 
 const pathResolver = createPathResolver(config.fileSystem.machinePath || '');
 
+// Cap libvips' per-pipeline thread pool (process-wide, set once at import). Its default
+// is one thread per CPU core, which — times the MAX_CONCURRENT pipelines below — pegs
+// every core during a save and starves the Node event loop, so the whole app (SSE
+// heartbeats, route loaders, image serving) stalls and appears frozen. One thread per
+// pipeline keeps renders off the critical path; now that renders run in the background
+// (see photo-editor.routes.ts), a little more wall-clock per image is a fine trade for
+// a server that stays responsive to everyone else mid-save.
+sharp.concurrency(1);
+
+// Release libvips' operation cache between pipelines. Its default retains up to
+// ~50 MB / 100 ops across renders to speed repeated work — but this clinic renders
+// photos intermittently, so that's just idle resident memory. Drop it; the per-render
+// cost is negligible against keeping the process lean.
+sharp.cache(false);
+
 // ── Bounded concurrency: at most MAX_CONCURRENT decodes in flight across requests.
 // Pairs with per-request sequential processing in the route to cap peak RAM.
 const MAX_CONCURRENT = 2;

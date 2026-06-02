@@ -6,6 +6,12 @@ import type { FileEntry } from '@/types/api.types';
 export interface ContentUrlOptions {
   download?: boolean;
   thumb?: number;
+  /**
+   * Cache-busting version token (typically the file's mtime). Appended as `v=…`
+   * so a re-rendered file gets a fresh URL — without it, the thumbnail endpoint's
+   * 7-day `max-age` makes the browser keep serving a stale cached thumbnail.
+   */
+  v?: string | number;
 }
 
 /** Build a content endpoint URL for previewing / downloading / thumbnailing. */
@@ -17,6 +23,7 @@ export function buildContentUrl(
   const params = new URLSearchParams({ path: relPath });
   if (opts.download) params.set('download', '1');
   if (opts.thumb) params.set('thumb', String(opts.thumb));
+  if (opts.v != null) params.set('v', String(opts.v));
   return `/api/patients/${personId}/files/content?${params.toString()}`;
 }
 
@@ -33,6 +40,7 @@ export function buildWorkingContentUrl(
   const params = new URLSearchParams({ name });
   if (opts.download) params.set('download', '1');
   if (opts.thumb) params.set('thumb', String(opts.thumb));
+  if (opts.v != null) params.set('v', String(opts.v));
   return `/api/patients/${personId}/working-files/content?${params.toString()}`;
 }
 

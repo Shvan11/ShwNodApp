@@ -97,21 +97,50 @@ export function createWhatsappSseRouter(emitter: EventEmitter): Router {
     const viewerId = generateViewerId(req);
     whatsappClients.set(viewerId, { res, viewerId });
 
-    // Every SSE subscriber is a QR viewer. Triggers QR data-URL generation
-    // and gates the on-demand init in /api/wa/initial-state.
-    await messageState.registerQRViewer(viewerId);
-    log.debug('SSE whatsapp client connected', {
-      viewerId,
-      count: whatsappClients.size,
-    });
-
-    req.on('close', () => {
+    // Pair each registerQRViewer with exactly one unregisterQRViewer regardless
+    // of timing. The 'close' listener is attached BEFORE the await so a
+    // disconnect during registration isn't lost; if it fires before register
+    // resolves, cleanup is deferred so we never unregister before we register.
+    let registered = false;
+    let closedEarly = false;
+    const cleanup = (): void => {
       whatsappClients.delete(viewerId);
-      void messageState.unregisterQRViewer(viewerId);
+      void messageState.unregisterQRViewer(viewerId).catch(() => {
+        /* state already torn down */
+      });
       log.debug('SSE whatsapp client disconnected', {
         viewerId,
         count: whatsappClients.size,
       });
+    };
+
+    req.on('close', () => {
+      if (registered) cleanup();
+      else closedEarly = true;
+    });
+
+    // Every SSE subscriber is a QR viewer. Triggers QR data-URL generation
+    // and gates the on-demand init in /api/wa/initial-state.
+    try {
+      await messageState.registerQRViewer(viewerId);
+    } catch (err) {
+      log.error('registerQRViewer failed', {
+        viewerId,
+        error: (err as Error).message,
+      });
+      whatsappClients.delete(viewerId);
+      return; // headers already flushed; nothing more to do
+    }
+    registered = true;
+    if (closedEarly) {
+      // Socket closed while registration was in flight — run the deferred
+      // cleanup now (synchronous after the flag flip, so no interleave).
+      cleanup();
+      return;
+    }
+    log.debug('SSE whatsapp client connected', {
+      viewerId,
+      count: whatsappClients.size,
     });
   });
 
@@ -132,7 +161,7 @@ export function teardownWhatsappSseBroadcaster(): void {
   listenerRefs = [];
   for (const { res, viewerId } of whatsappClients.values()) {
     try { res.end(); } catch { /* ignore */ }
-    void messageState.unregisterQRViewer(viewerId);
+    void messageState.unregisterQRViewer(viewerId).catch(() => { /* state already torn down */ });
   }
   whatsappClients.clear();
   initialized = false;

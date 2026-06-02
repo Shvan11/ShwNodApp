@@ -12,6 +12,9 @@ export const InternalEmitterEvents = {
   CHAIR_PATIENT_LOAD: 'chair_patient_load',
   /** Staff cleared a chair — tell the kiosk via SSE to return to idle */
   CHAIR_PATIENT_CLEAR: 'chair_patient_clear',
+  /** A photo-editor timepoint finished rendering in the background — tell any
+   *  open photos grid for that patient/timepoint to refetch its gallery. */
+  PHOTO_TIMEPOINT_RENDERED: 'photo_timepoint_rendered',
 
   // WhatsApp — typed payloads fan out via SSE to /api/sse/whatsapp.
   WHATSAPP_QR_UPDATED: 'whatsapp_qr_updated',

@@ -751,6 +751,3 @@ export { AppointmentPDFGenerator };
 // Export default singleton for convenience
 const defaultGenerator = new AppointmentPDFGenerator();
 export default defaultGenerator;
-
-// Export utility functions for testing
-export { formatDate, formatTime, containsArabic, isValidDate, safeString };

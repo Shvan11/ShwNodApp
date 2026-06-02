@@ -165,6 +165,17 @@ class SseAppointments {
         console.error('[sse-appointments] bad appointments_updated payload', err);
       }
     });
+
+    // A background photo render finished (photo-editor save). The photos grid rides
+    // this stream and refetches its gallery; everyone else ignores the event.
+    es.addEventListener('photos_rendered', (evt) => {
+      try {
+        const data = JSON.parse((evt as MessageEvent).data) as Record<string, unknown>;
+        this.emit('photos_rendered', data);
+      } catch (err) {
+        console.error('[sse-appointments] bad photos_rendered payload', err);
+      }
+    });
   }
 
   private disconnect(): void {

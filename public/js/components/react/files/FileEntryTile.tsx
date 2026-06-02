@@ -66,10 +66,13 @@ const FileEntryTile = ({
     else onOpen(entry);
   };
 
+  // Version the thumbnail URL by the file's mtime so a re-rendered image busts
+  // the browser's (7-day) thumbnail cache instead of showing a stale crop.
+  const thumbVersion = entry.modified ? Date.parse(entry.modified) || undefined : undefined;
   const visual = showThumb ? (
     <img
       className={styles.thumb}
-      src={buildUrl(personId, entry.relPath, { thumb: 240 })}
+      src={buildUrl(personId, entry.relPath, { thumb: 240, v: thumbVersion })}
       loading="lazy"
       alt=""
       onError={() => setThumbFailed(true)}

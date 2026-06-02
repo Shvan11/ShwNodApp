@@ -6,15 +6,35 @@
  * focused. Inactive slots render the same cropper non-interactively; empty slots
  * show the practice logo placeholder.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import Cropper from 'react-easy-crop';
 import type { Area, Point } from 'react-easy-crop';
 import styles from './SlotCanvas.module.css';
-import type { CropArea, SlotState } from './photoEditorTypes';
-import { aspectForView, labelForView, ZOOM_MIN, ZOOM_MAX, ZOOM_SPEED } from './photoEditorTypes';
+import type { CropArea, PhotoViewCode, SlotState } from './photoEditorTypes';
+import { aspectForView, gridLinesForView, labelForView, ZOOM_MIN, ZOOM_MAX, ZOOM_SPEED } from './photoEditorTypes';
 
 /** Inert crop handler for inactive slots (react-easy-crop requires onCropChange). */
 const noop = (): void => {};
+
+/**
+ * Per-view framing guides, absolutely positioned over the slot content. The crop
+ * area / saved image fills the aspect-locked cell, so these fractions map 1:1 onto
+ * the rendered output. pointer-events:none so the lines never intercept pan/zoom.
+ */
+function GridLines({ view }: { view: PhotoViewCode }): ReactElement | null {
+  const lines = gridLinesForView(view);
+  if (!lines.horizontal.length && !lines.vertical.length) return null;
+  return (
+    <div className={styles.gridOverlay} aria-hidden="true">
+      {lines.horizontal.map((f, i) => (
+        <div key={`h${i}`} className={styles.hLine} style={{ top: `${f * 100}%` }} />
+      ))}
+      {lines.vertical.map((f, i) => (
+        <div key={`v${i}`} className={styles.vLine} style={{ left: `${f * 100}%` }} />
+      ))}
+    </div>
+  );
+}
 
 interface Props {
   personId: number;
@@ -113,6 +133,7 @@ const SlotCanvas = ({ personId, slot, active, onCropChange, onZoomChange, onCrop
             className={styles.savedImg}
             loading="lazy"
           />
+          <GridLines view={slot.view} />
         </div>
       );
     }
@@ -165,6 +186,7 @@ const SlotCanvas = ({ personId, slot, active, onCropChange, onZoomChange, onCrop
           }}
         />
       )}
+      {mediaUrl && <GridLines view={slot.view} />}
     </div>
   );
 };

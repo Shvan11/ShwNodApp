@@ -2,13 +2,13 @@
  * Google Drive API Client
  * Handles authentication and basic Drive API operations
  */
-import { google, drive_v3 } from 'googleapis';
-import type { Credentials } from 'google-auth-library';
+import { drive, drive_v3 } from '@googleapis/drive';
+import { OAuth2Client, type Credentials } from 'google-auth-library';
 import config from '../../config/config.js';
 import { log } from '../../utils/logger.js';
 
-// Use the OAuth2Client type from googleapis for compatibility
-type OAuth2ClientType = InstanceType<typeof google.auth.OAuth2>;
+// OAuth2 client type (drive() accepts this as its `auth`)
+type OAuth2ClientType = OAuth2Client;
 
 // ===========================================
 // TYPES
@@ -78,7 +78,7 @@ class GoogleDriveClient {
       }
 
       // Create OAuth2 client
-      this.oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+      this.oauth2Client = new OAuth2Client(clientId, clientSecret, redirectUri);
 
       // Set refresh token if available
       if (refreshToken) {
@@ -88,7 +88,7 @@ class GoogleDriveClient {
       }
 
       // Initialize Drive API
-      this.drive = google.drive({
+      this.drive = drive({
         version: 'v3',
         auth: this.oauth2Client,
       });

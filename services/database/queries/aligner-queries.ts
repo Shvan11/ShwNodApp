@@ -32,7 +32,6 @@ import { getKysely, withPgTransaction, type Database } from '../kysely.js';
 
 type PgTransaction = Transaction<Database>;
 import { toDateOnly } from '../../../utils/date.js';
-import config from '../../../config/config.js';
 import { log } from '../../../utils/logger.js';
 
 // ==============================

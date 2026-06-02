@@ -18,6 +18,39 @@ interface CachedData<T> {
   timestamp: number;
 }
 
+/** sessionStorage key prefix + TTL for loader response caching. */
+const LOADER_CACHE_PREFIX = 'loader_cache_';
+const LOADER_CACHE_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Best-effort sweep of expired loader cache entries. Entries are only evicted
+ * lazily on a re-read of the same key, so dates/patients/works browsed once
+ * otherwise accumulate until they hit the sessionStorage quota. Run on each
+ * write to keep the keyspace bounded. Never throws (storage access can fail).
+ */
+function pruneExpiredLoaderCache(): void {
+  try {
+    const now = Date.now();
+    const stale: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (!key || !key.startsWith(LOADER_CACHE_PREFIX)) continue;
+      try {
+        const raw = sessionStorage.getItem(key);
+        const { timestamp } = JSON.parse(raw ?? '{}') as Partial<CachedData<unknown>>;
+        if (typeof timestamp !== 'number' || now - timestamp >= LOADER_CACHE_TTL_MS) {
+          stale.push(key);
+        }
+      } catch {
+        stale.push(key); // unparseable entry — drop it
+      }
+    }
+    for (const key of stale) sessionStorage.removeItem(key);
+  } catch {
+    // sessionStorage unavailable — nothing to prune.
+  }
+}
+
 /**
  * API loader options
  */
@@ -130,19 +163,18 @@ export async function apiLoader<T = unknown>(
 
   // Check cache first (if enabled)
   if (cache && cacheKey) {
-    const cached = sessionStorage.getItem(`loader_cache_${cacheKey}`);
+    const cached = sessionStorage.getItem(`${LOADER_CACHE_PREFIX}${cacheKey}`);
     if (cached) {
       try {
         const { data, timestamp } = JSON.parse(cached) as CachedData<T>;
         const age = Date.now() - timestamp;
-        // Cache valid for 5 minutes
-        if (age < 5 * 60 * 1000) {
+        if (age < LOADER_CACHE_TTL_MS) {
           if (import.meta.env.DEV) console.log(`[Loader] Cache hit for ${cacheKey}`);
           return data;
         }
       } catch {
         // Invalid cache, continue to fetch
-        sessionStorage.removeItem(`loader_cache_${cacheKey}`);
+        sessionStorage.removeItem(`${LOADER_CACHE_PREFIX}${cacheKey}`);
       }
     }
   }
@@ -169,9 +201,12 @@ export async function apiLoader<T = unknown>(
     // Cache response if enabled (best-effort — a large payload can throw
     // QuotaExceededError, which must not fail the route loader).
     if (cache && cacheKey) {
+      // Evict expired entries before writing so the keyspace stays bounded
+      // (and to free room that might otherwise trip the quota below).
+      pruneExpiredLoaderCache();
       try {
         sessionStorage.setItem(
-          `loader_cache_${cacheKey}`,
+          `${LOADER_CACHE_PREFIX}${cacheKey}`,
           JSON.stringify({
             data,
             timestamp: Date.now(),
@@ -511,7 +546,7 @@ export async function templateDesignerLoader({
 export function clearLoaderCache(): void {
   const keys = Object.keys(sessionStorage);
   keys.forEach((key) => {
-    if (key.startsWith('loader_cache_')) {
+    if (key.startsWith(LOADER_CACHE_PREFIX)) {
       sessionStorage.removeItem(key);
     }
   });
@@ -524,7 +559,7 @@ export function clearLoaderCache(): void {
  * @param cacheKey - Cache key to clear
  */
 export function clearLoaderCacheKey(cacheKey: string): void {
-  sessionStorage.removeItem(`loader_cache_${cacheKey}`);
+  sessionStorage.removeItem(`${LOADER_CACHE_PREFIX}${cacheKey}`);
   if (import.meta.env.DEV) console.log(`[Loader] Cache cleared for ${cacheKey}`);
 }
 

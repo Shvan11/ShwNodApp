@@ -231,19 +231,20 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
 
     setSaving(true);
     try {
+      // The server resolves the timepoint, answers 202, and renders the slots in the
+      // background — so this resolves in well under a second regardless of slot count.
+      // We navigate straight to the photos grid, which fills in over SSE as the render
+      // completes (see GridComponent's photos_rendered handler).
       const res = await fetch(`/api/photo-editor/${personId}/render`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tpName, tpDate, slots }),
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
         throw new Error(json?.error || 'Render failed');
       }
-      const written: string[] = json.data?.written || [];
-      const warnings: string[] = json.data?.warnings || [];
-      if (written.length) toast.success(`Saved ${written.length} photo(s).`);
-      if (warnings.length) toast.warning(`${warnings.length} slot(s) had issues.`);
+      toast.info(`Saving ${slots.length} photo(s) in the background…`);
       navigate(`/patient/${personId}/photos/tp${tpCode}`);
     } catch (err) {
       toast.error(`Save failed: ${err instanceof Error ? err.message : 'unknown error'}`);

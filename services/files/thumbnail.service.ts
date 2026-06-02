@@ -15,6 +15,11 @@ import { log } from '../../utils/logger.js';
 import { getFileCategory } from '../../utils/file-mime.js';
 import { FileExplorerError, resolveFileForServe } from './file-explorer.service.js';
 
+// Don't retain libvips' operation cache between thumbnails (process-wide, set
+// once). Mirrors photo-render.service so the lean setting holds regardless of
+// which sharp consumer loads first; thumbnails are one-shot disk-cached renders.
+sharp.cache(false);
+
 /** Fixed set so the endpoint can't be driven to generate unbounded sizes. */
 const ALLOWED_WIDTHS = new Set([120, 240, 480]);
 

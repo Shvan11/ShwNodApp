@@ -63,3 +63,32 @@
   max-width: none;
   max-height: none;
 }
+
+/* Framing guide overlay — sits above the cropper, never intercepts pointer
+   events (pan/zoom pass through to react-easy-crop underneath). */
+.gridOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Cyan hairlines with a dark drop-shadow so they read on both light skin/teeth
+   and dark intra-oral backgrounds. */
+.hLine,
+.vLine {
+  position: absolute;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.75));
+}
+
+.hLine {
+  left: 0;
+  right: 0;
+  border-top: 1.5px solid rgba(0, 224, 255, 0.9);
+}
+
+.vLine {
+  top: 0;
+  bottom: 0;
+  border-left: 1.5px solid rgba(0, 224, 255, 0.9);
+}
