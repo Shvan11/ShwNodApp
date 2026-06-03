@@ -547,7 +547,11 @@ export async function validateAndUpdateWork(
   const { workId, userRole } = input;
   const workData: Record<string, unknown> = { ...input.workData };
 
-  // Convert provided date strings to Date objects (behaviour preserved from the route).
+  // Normalize provided date fields to 'YYYY-MM-DD' strings. These are all PG `date`
+  // columns (typed string in db.d.ts), so they must be bound as date-only strings,
+  // NOT Date objects — a Date can tz-shift on insert, and it also broke the
+  // discount_date change-detection below (String(Date) never equals 'YYYY-MM-DD').
+  // Mirrors the create path's normalizeDateFields/toDateOnly.
   for (const field of UPDATE_WORK_DATE_FIELDS) {
     const value = workData[field];
     if (value && typeof value === 'string') {
@@ -556,7 +560,7 @@ export async function validateAndUpdateWork(
         log.warn('Update work invalid date format', { workId, field, value });
         throw new WorkUpdateError('badRequest', `Invalid date format for ${field}`);
       }
-      workData[field] = date;
+      workData[field] = toDateOnly(date);
     }
   }
 
@@ -573,7 +577,8 @@ export async function validateAndUpdateWork(
     currentWork = await getWorkById(workId);
     if (!currentWork) {
       log.warn('Work not found for update', { workId });
-      throw new WorkUpdateError('notFound', 'Work not found');
+      // notFound message is the resource NOUN — ErrorResponses.notFound appends " not found".
+      throw new WorkUpdateError('notFound', 'Work');
     }
   }
 
@@ -651,7 +656,7 @@ export async function validateAndUpdateWork(
   if (hasDiscountFieldInPayload) {
     const workWithPaid = await getWorkDetails(workId);
     if (!workWithPaid) {
-      throw new WorkUpdateError('notFound', 'Work not found');
+      throw new WorkUpdateError('notFound', 'Work'); // resource noun; see above
     }
 
     const discount = workData.discount as number | null | undefined;

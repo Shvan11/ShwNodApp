@@ -469,6 +469,7 @@ router.put(
         const details = error.details ?? null;
         switch (error.kind) {
           case 'notFound':
+            // For notFound the error message is the resource noun; notFound appends " not found".
             ErrorResponses.notFound(res, error.message, details);
             return;
           case 'conflict':
