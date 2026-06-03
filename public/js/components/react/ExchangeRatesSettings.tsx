@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import type { ApiResult, ExchangeRateResult, HistoryEntry, HistoryResult } from '@/types/api.types';
+import type { ApiResponse, ExchangeRateResult, HistoryEntry, HistoryResult } from '@/types/api.types';
 import { useToast } from '../../contexts/ToastContext';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
 import styles from './ExchangeRatesSettings.module.css';
@@ -41,8 +41,8 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
                 return;
             }
             const result: ExchangeRateResult = await response.json();
-            if (result.status === 'success' && result.exchangeRate) {
-                setTodayRate(result.exchangeRate);
+            if (result.success && result.data?.exchangeRate) {
+                setTodayRate(result.data.exchangeRate);
             } else {
                 setTodayRate(null);
             }
@@ -60,8 +60,8 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
             setHistoryLoading(true);
             const response = await fetch(`/api/exchange-rates?from=${from}&to=${to}`);
             const result: HistoryResult = await response.json();
-            if (result.status === 'success' && result.rates) {
-                setHistory(result.rates);
+            if (result.success && result.data?.rates) {
+                setHistory(result.data.rates);
             } else {
                 setHistory([]);
                 toast.error(result.message || 'Failed to load rate history');
@@ -116,8 +116,8 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ date: today, exchangeRate: Math.round(rate) }),
             });
-            const result: ApiResult = await response.json();
-            if (result.status === 'success') {
+            const result: ApiResponse = await response.json();
+            if (result.success) {
                 toast.success("Today's exchange rate updated");
                 setTodayRate(Math.round(rate));
                 setEditing(false);

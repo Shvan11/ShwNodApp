@@ -62,7 +62,7 @@ function TemplateDesigner() {
             const result: ApiStatusResponse<Template> = await response.json();
             console.log('Template loaded:', result);
 
-            if (result.status === 'success') {
+            if (result.success) {
                 setTemplate(result.data);
                 setError(null);
             } else {
@@ -108,7 +108,7 @@ function TemplateDesigner() {
 
             const result: ApiStatusResponse<unknown> = await response.json();
 
-            if (result.status === 'success') {
+            if (result.success) {
                 toast.success('Template saved successfully!');
             } else {
                 throw new Error(result.message || 'Failed to save template');

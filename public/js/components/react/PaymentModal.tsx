@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent, FocusEvent } from 'react';
-import type { ApiResult, ExchangeRateResult } from '@/types/api.types';
+import type { ApiResponse, ExchangeRateResult } from '@/types/api.types';
 import styles from './PaymentModal.module.css';
 import Modal from './Modal';
 import { parseFormattedNumber } from '../../utils/formatters';
@@ -33,7 +33,7 @@ interface ReceiptData extends WorkData {
 interface PaymentModalProps {
     workData: WorkData | null;
     onClose: () => void;
-    onSuccess?: (result: ApiResult) => void;
+    onSuccess?: (result: ApiResponse) => void;
 }
 
 interface FormData {
@@ -199,8 +199,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             const response = await fetch(`/api/getExchangeRateForDate?date=${date}`);
             const result: ExchangeRateResult = await response.json();
 
-            if (result.status === 'success' && result.exchangeRate) {
-                setExchangeRate(result.exchangeRate);
+            if (result.success && result.data?.exchangeRate) {
+                setExchangeRate(result.data.exchangeRate);
                 setExchangeRateError(false);
             } else {
                 setExchangeRate(null);
@@ -231,9 +231,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                 })
             });
 
-            const result: ApiResult = await response.json();
+            const result: ApiResponse = await response.json();
 
-            if (result.status === 'success') {
+            if (result.success) {
                 setExchangeRate(Math.round(rate));
                 setExchangeRateError(false);
                 setShowRateInput(false);
@@ -737,9 +737,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                 body: JSON.stringify(invoiceData)
             });
 
-            const result: ApiResult = await response.json();
+            const result: ApiResponse = await response.json();
 
-            if (result.status === 'success') {
+            if (result.success) {
                 // Set success state and prepare receipt data with complete work data
                 setPaymentSuccess(true);
                 setReceiptData({

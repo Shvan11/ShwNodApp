@@ -12,22 +12,14 @@
 // =============================================================================
 
 /**
- * Status-string convention used by older /api/payment, /api/exchangeRate, and
- * /api/templates endpoints. Prefer ApiResponse<T> in new code.
- */
-export interface ApiResult {
-    status: 'success' | 'error';
-    message?: string;
-}
-
-/**
- * Status-convention with a typed data payload. Used by /api/templates endpoints.
- * For the boolean-success variant, use ApiResponse<T>.
+ * Boolean-success wrapper with a typed data payload. Used by the /api/templates
+ * endpoints. Mirrors the backend `{ success, data, message?, error? }` envelope.
  */
 export interface ApiStatusResponse<T> {
-    status: 'success' | 'error';
+    success: boolean;
     data: T;
     message?: string;
+    error?: string;
 }
 
 /**
@@ -60,12 +52,8 @@ export interface ApiErrorResponse {
 // EXCHANGE RATE
 // =============================================================================
 
-/** GET /api/getCurrentExchangeRate, POST /api/updateExchangeRateForDate. */
-export interface ExchangeRateResult {
-    status: 'success' | 'error';
-    exchangeRate?: number;
-    message?: string;
-}
+/** GET /api/getCurrentExchangeRate, GET /api/getExchangeRateForDate. */
+export type ExchangeRateResult = ApiResponse<{ exchangeRate?: number; date?: string }>;
 
 export interface HistoryEntry {
     date: string;
@@ -73,11 +61,7 @@ export interface HistoryEntry {
 }
 
 /** GET /api/exchange-rates?from=&to=. */
-export interface HistoryResult {
-    status: 'success' | 'error';
-    rates?: HistoryEntry[];
-    message?: string;
-}
+export type HistoryResult = ApiResponse<{ rates?: HistoryEntry[] }>;
 
 // =============================================================================
 // PAYMENT

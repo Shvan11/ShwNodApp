@@ -517,9 +517,7 @@ router.put(
           );
 
           if (!validation.valid) {
-            res.status(409).json({
-              error: 'status change Conflict',
-              message: validation.error,
+            ErrorResponses.conflict(res, validation.error || 'Status change conflict', {
               existingWork: validation.existingWork
             });
             return;
@@ -553,12 +551,11 @@ router.put(
       if (isChangingFinancialFields) {
         const workCreationDate = await getWorkCreationDate(req);
         if (!isToday(workCreationDate)) {
-          res.status(403).json({
-            error: 'Forbidden',
-            message:
-              'Cannot edit financial fields (Total Required, currency) for work not created today. Contact admin.',
-            restrictedFields: financialFields
-          });
+          ErrorResponses.forbidden(
+            res,
+            'Cannot edit financial fields (Total Required, currency) for work not created today. Contact admin.',
+            { restrictedFields: financialFields }
+          );
           return;
         }
       }
@@ -581,11 +578,11 @@ router.put(
           (workForTotal as { TotalPaid?: number } | null)?.TotalPaid ?? 0
         );
         if (Number.isFinite(newTotal) && newTotal < alreadyPaid) {
-          res.status(400).json({
-            error: 'Invalid total',
-            code: 'TOTAL_BELOW_PAID',
-            message: `Total required (${newTotal}) cannot be less than the amount already paid (${alreadyPaid}).`
-          });
+          ErrorResponses.badRequest(
+            res,
+            `Total required (${newTotal}) cannot be less than the amount already paid (${alreadyPaid}).`,
+            { code: 'TOTAL_BELOW_PAID' }
+          );
           return;
         }
       }
@@ -612,9 +609,7 @@ router.put(
           String(workData.discount_date ?? '') !== String(workWithPaid.discount_date ?? '');
 
         if ((discountChanged || discountDateChanged) && req.session?.userRole !== 'admin') {
-          res.status(403).json({
-            error: 'Forbidden',
-            message: 'Only admin can add or edit discount.',
+          ErrorResponses.forbidden(res, 'Only admin can add or edit discount.', {
             restrictedFields: [...discountAdminFields]
           });
           return;
@@ -629,11 +624,9 @@ router.put(
             );
           } catch (err) {
             if (err instanceof WorkValidationError) {
-              res.status(400).json({
-                error: 'Invalid discount',
+              ErrorResponses.badRequest(res, err.message, {
                 code: err.code,
-                message: err.message,
-                details: err.details
+                ...(err.details ?? {})
               });
               return;
             }

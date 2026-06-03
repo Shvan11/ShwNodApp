@@ -58,7 +58,7 @@ function TemplateManagement() {
             const response = await fetch('/api/templates/document-types');
             const result: ApiStatusResponse<DocumentType[]> = await response.json();
 
-            if (result.status === 'success') {
+            if (result.success) {
                 setDocumentTypes(result.data);
             } else {
                 throw new Error(result.message || 'Failed to load document types');
@@ -75,7 +75,7 @@ function TemplateManagement() {
             const response = await fetch('/api/templates');
             const result: ApiStatusResponse<Template[]> = await response.json();
 
-            if (result.status === 'success') {
+            if (result.success) {
                 setAllTemplates(result.data);
                 setError(null);
             } else {
@@ -113,7 +113,7 @@ function TemplateManagement() {
 
             const result: ApiStatusResponse<{ template_id: number }> = await response.json();
 
-            if (result.status === 'success') {
+            if (result.success) {
                 setIsCreateModalOpen(false);
                 // Navigate to designer
                 navigate(`/templates/designer/${result.data.template_id}`);
@@ -148,7 +148,7 @@ function TemplateManagement() {
 
             const result: ApiStatusResponse<unknown> = await response.json();
 
-            if (result.status === 'success') {
+            if (result.success) {
                 await loadAllTemplates();
                 toast.success('Template set as default!');
             } else {
@@ -173,7 +173,7 @@ function TemplateManagement() {
 
             const result: ApiStatusResponse<unknown> = await response.json();
 
-            if (result.status === 'success') {
+            if (result.success) {
                 await loadAllTemplates();
                 toast.success('Template deleted successfully!');
             } else {

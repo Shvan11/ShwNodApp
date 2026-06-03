@@ -321,9 +321,12 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     return;
                 }
 
-                // Handle 409 Conflict - Status change conflict (Active work already exists)
-                if (response.status === 409 && errorData.existingWork) {
-                    const existingWork = errorData.existingWork;
+                // Handle 409 Conflict - Status change conflict (Active work already exists).
+                // existingWork now arrives under `details` (standard error envelope); keep the
+                // top-level fallback for any older shape.
+                const conflictWork = errorData.details?.existingWork || errorData.existingWork;
+                if (response.status === 409 && conflictWork) {
+                    const existingWork = conflictWork;
                     const errorMessage = `Cannot activate this work: Patient already has an active work:\n\n` +
                         `Work Type: ${existingWork.type || 'N/A'}\n` +
                         `Doctor: ${existingWork.doctor || 'N/A'}\n` +
@@ -332,8 +335,10 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     throw new Error(errorMessage);
                 }
 
-                // Extract error message properly (details.message > message > details > error)
-                const errorMessage = errorData.details?.message || errorData.message || errorData.details || errorData.error || 'Failed to save work';
+                // Extract error message properly (details.message > message > error).
+                // Note: errorData.details is an object in the standard envelope, so it is NOT a
+                // message fallback (that previously surfaced "[object Object]").
+                const errorMessage = errorData.details?.message || errorData.message || errorData.error || 'Failed to save work';
                 throw new Error(errorMessage);
             }
 

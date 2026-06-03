@@ -33,7 +33,7 @@ import {
   requireRecordAge,
   getInvoiceCreationDate
 } from '../../middleware/time-based-auth.js';
-import { ErrorResponses } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
 import {
   validateAndCreateInvoice,
   PaymentValidationError
@@ -212,7 +212,7 @@ router.get(
       }
 
       const workData = await getActiveWorkForInvoice(parseInt(PID, 10));
-      res.json({ status: 'success', data: workData });
+      sendSuccess(res, workData);
     } catch (error) {
       log.error('Error getting active work for invoice:', error);
       ErrorResponses.internalError(
@@ -247,7 +247,7 @@ router.get(
         return;
       }
 
-      res.json({ status: 'success', exchangeRate });
+      sendSuccess(res, { exchangeRate });
     } catch (error) {
       log.error('Error getting exchange rate:', error);
       ErrorResponses.internalError(
@@ -284,7 +284,7 @@ router.get(
         return;
       }
 
-      res.json({ status: 'success', exchangeRate, date });
+      sendSuccess(res, { exchangeRate, date });
     } catch (error) {
       log.error('Error getting exchange rate for date:', error);
       ErrorResponses.internalError(
@@ -315,7 +315,7 @@ router.get(
       }
 
       const rates = await listExchangeRates(from, to);
-      res.json({ status: 'success', rates });
+      sendSuccess(res, { rates });
     } catch (error) {
       log.error('Error listing exchange rates:', error);
       ErrorResponses.internalError(
@@ -347,7 +347,7 @@ router.post(
       }
 
       const result = await updateExchangeRate(exchangeRate);
-      res.json({ status: 'success', data: result });
+      sendSuccess(res, result);
     } catch (error) {
       log.error('Error updating exchange rate:', error);
       ErrorResponses.internalError(
@@ -382,7 +382,7 @@ router.post(
       }
 
       const result = await updateExchangeRateForDate(date, exchangeRate);
-      res.json({ status: 'success', data: result, date, exchangeRate });
+      sendSuccess(res, { result, date, exchangeRate });
     } catch (error) {
       log.error('Error updating exchange rate for date:', error);
       ErrorResponses.internalError(
@@ -447,7 +447,7 @@ router.post(
         change: change ?? 0
       });
 
-      res.json({ status: 'success', data: result });
+      sendSuccess(res, result);
     } catch (error) {
       log.error('Error adding invoice:', error);
 
@@ -511,11 +511,7 @@ router.delete(
         return;
       }
 
-      res.json({
-        status: 'success',
-        message: 'Invoice deleted successfully',
-        rowsAffected
-      });
+      sendSuccess(res, { rowsAffected }, 'Invoice deleted successfully');
     } catch (error) {
       log.error('Error deleting invoice:', error);
       ErrorResponses.internalError(

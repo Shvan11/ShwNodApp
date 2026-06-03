@@ -119,13 +119,13 @@ router.get(
     try {
       const documentTypes = await templateQueries.getDocumentTypes();
       res.json({
-        status: 'success',
+        success: true,
         data: documentTypes
       });
     } catch (error) {
       log.error('Error fetching document types', { error: (error as Error).message });
       res.status(500).json({
-        status: 'error',
+        success: false,
         message: 'Failed to fetch document types',
         error: (error as Error).message
       });
@@ -148,20 +148,20 @@ router.get(
 
       if (!documentType) {
         res.status(404).json({
-          status: 'error',
+          success: false,
           message: 'Document type not found'
         });
         return;
       }
 
       res.json({
-        status: 'success',
+        success: true,
         data: documentType
       });
     } catch (error) {
       log.error('Error fetching document type', { error: (error as Error).message });
       res.status(500).json({
-        status: 'error',
+        success: false,
         message: 'Failed to fetch document type',
         error: (error as Error).message
       });
@@ -204,13 +204,13 @@ router.get(
       const templates = await templateQueries.getDocumentTemplates(filters);
 
       res.json({
-        status: 'success',
+        success: true,
         data: templates
       });
     } catch (error) {
       log.error('Error fetching templates', { error: (error as Error).message });
       res.status(500).json({
-        status: 'error',
+        success: false,
         message: 'Failed to fetch templates',
         error: (error as Error).message
       });
@@ -233,20 +233,20 @@ router.get(
 
       if (!template) {
         res.status(404).json({
-          status: 'error',
+          success: false,
           message: 'Template not found'
         });
         return;
       }
 
       res.json({
-        status: 'success',
+        success: true,
         data: template
       });
     } catch (error) {
       log.error('Error fetching template', { error: (error as Error).message });
       res.status(500).json({
-        status: 'error',
+        success: false,
         message: 'Failed to fetch template',
         error: (error as Error).message
       });
@@ -272,20 +272,20 @@ router.get(
 
       if (!template) {
         res.status(404).json({
-          status: 'error',
+          success: false,
           message: 'No default template found for this document type'
         });
         return;
       }
 
       res.json({
-        status: 'success',
+        success: true,
         data: template
       });
     } catch (error) {
       log.error('Error fetching default template', { error: (error as Error).message });
       res.status(500).json({
-        status: 'error',
+        success: false,
         message: 'Failed to fetch default template',
         error: (error as Error).message
       });
@@ -309,7 +309,7 @@ router.post(
       // Validate required fields
       if (!templateData.template_name || !templateData.document_type_id) {
         res.status(400).json({
-          status: 'error',
+          success: false,
           message: 'Missing required fields: template_name, document_type_id'
         });
         return;
@@ -318,14 +318,14 @@ router.post(
       const templateId = await templateQueries.createTemplate(templateData);
 
       res.status(201).json({
-        status: 'success',
+        success: true,
         message: 'Template created successfully',
         data: { template_id: templateId }
       });
     } catch (error) {
       log.error('Error creating template', { error: (error as Error).message });
       res.status(500).json({
-        status: 'error',
+        success: false,
         message: 'Failed to create template',
         error: (error as Error).message
       });
@@ -353,7 +353,7 @@ router.put(
       );
       if (!existingTemplate) {
         res.status(404).json({
-          status: 'error',
+          success: false,
           message: 'Template not found'
         });
         return;
@@ -362,7 +362,7 @@ router.put(
       // Check if it's a system template
       if (existingTemplate.is_system && templateData.is_system === false) {
         res.status(403).json({
-          status: 'error',
+          success: false,
           message: 'Cannot modify system template flag'
         });
         return;
@@ -371,13 +371,13 @@ router.put(
       await templateQueries.updateTemplate(parseInt(templateId), templateData);
 
       res.json({
-        status: 'success',
+        success: true,
         message: 'Template updated successfully'
       });
     } catch (error) {
       log.error('Error updating template', { error: (error as Error).message });
       res.status(500).json({
-        status: 'error',
+        success: false,
         message: 'Failed to update template',
         error: (error as Error).message
       });
@@ -398,7 +398,7 @@ router.delete(
       await templateQueries.deleteTemplate(parseInt(templateId));
 
       res.json({
-        status: 'success',
+        success: true,
         message: 'Template deleted successfully'
       });
     } catch (error) {
@@ -406,14 +406,14 @@ router.delete(
 
       if ((error as Error).message.includes('system template')) {
         res.status(403).json({
-          status: 'error',
+          success: false,
           message: (error as Error).message
         });
         return;
       }
 
       res.status(500).json({
-        status: 'error',
+        success: false,
         message: 'Failed to delete template',
         error: (error as Error).message
       });
@@ -441,7 +441,7 @@ router.post(
 
       if (!html) {
         res.status(400).json({
-          status: 'error',
+          success: false,
           message: 'Missing HTML content'
         });
         return;
@@ -453,7 +453,7 @@ router.post(
       );
       if (!template) {
         res.status(404).json({
-          status: 'error',
+          success: false,
           message: 'Template not found'
         });
         return;
@@ -481,14 +481,14 @@ router.post(
       await fs.writeFile(fullPath, html, 'utf-8');
 
       res.json({
-        status: 'success',
+        success: true,
         message: 'Template saved successfully',
         data: { file_path: filePath }
       });
     } catch (error) {
       log.error('Error saving template HTML', { error: (error as Error).message });
       res.status(500).json({
-        status: 'error',
+        success: false,
         message: 'Failed to save template',
         error: (error as Error).message
       });
@@ -515,12 +515,12 @@ router.get(
         parseInt(templateId)
       );
       if (!template) {
-        res.status(404).json({ status: 'error', message: 'Template not found' });
+        res.status(404).json({ success: false, message: 'Template not found' });
         return;
       }
       if (!template.template_file_path) {
         res.status(404).json({
-          status: 'error',
+          success: false,
           message: 'Template has no saved HTML yet'
         });
         return;
@@ -535,14 +535,14 @@ router.get(
       const err = error as NodeJS.ErrnoException;
       if (err.code === 'ENOENT') {
         res.status(404).json({
-          status: 'error',
+          success: false,
           message: 'Template file not found on disk'
         });
         return;
       }
       log.error('Error reading template HTML', { error: err.message });
       res.status(500).json({
-        status: 'error',
+        success: false,
         message: 'Failed to read template',
         error: err.message
       });
@@ -578,7 +578,7 @@ router.get(
     } catch (error) {
       log.error('Error generating receipt', { error: (error as Error).message });
       res.status(500).json({
-        status: 'error',
+        success: false,
         message: 'Failed to generate receipt',
         error: (error as Error).message
       });
@@ -621,7 +621,7 @@ router.get(
           : 500;
 
       res.status(statusCode).json({
-        status: 'error',
+        success: false,
         message: 'Failed to generate appointment receipt',
         error: (error as Error).message
       });

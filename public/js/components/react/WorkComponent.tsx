@@ -1358,7 +1358,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                                                 method: 'DELETE'
                                                                             });
                                                                             const result = await response.json();
-                                                                            if (result.status === 'success') {
+                                                                            if (result.success) {
                                                                                 toast.success('Payment deleted successfully!');
                                                                                 loadPaymentHistory(selectedWorkForPayment.work_id);
                                                                                 loadWorks();
