@@ -266,8 +266,12 @@ async function initializeApplication(): Promise<AppInitResult> {
     // ===== AUTHENTICATION MIDDLEWARE (MUST BE BEFORE ROUTES) =====
     // Public routes - NO authentication required
     app.use('/api/auth', authRoutes);
-    app.use('/api', costPresetRoutes); // Cost preset routes (public - no auth needed)
-    app.use('/api', lookupRoutes); // Lookup routes (public - no auth needed)
+    // Reference-data routes mounted BEFORE the auth gate so their GETs are public.
+    // costPresetRoutes' mutations (POST/PUT/DELETE) self-guard with inline
+    // authenticate/authorize(['admin']); lookupRoutes is read-only. These are the
+    // only mount points — the post-gate router (routes/api/index.ts) does not remount them.
+    app.use('/api', costPresetRoutes);
+    app.use('/api', lookupRoutes);
     app.use('/v', publicVideoRoutes); // Public video sharing (no auth - educational content)
     app.use('/api/portal', portalRoutes); // Patient portal (own session, own auth)
     app.use('/api/aligner-portal', alignerPortalRoutes); // External aligner portal auth bridge (own CF Access verification)

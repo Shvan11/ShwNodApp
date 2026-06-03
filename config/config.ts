@@ -99,7 +99,9 @@ const config: AppConfig = {
   },
   telegram: {
     token: process.env.TELEGRAM_TOKEN,
-    chatId: process.env.TELEGRAM_CHAT_ID
+    chatId: process.env.TELEGRAM_CHAT_ID,
+    apiId: process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : undefined,
+    apiHash: process.env.TELEGRAM_API_HASH
   },
   twilio: {
     accountSid: process.env.TWILIO_ACCOUNT_SID,

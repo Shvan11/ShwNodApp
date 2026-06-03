@@ -78,6 +78,11 @@ export class FailoverSink implements SyncSink {
   private pool: Pool | null = null;
   private pkCache: Map<string, string> | null = null;
   private genColsCache: Map<string, Set<string>> | null = null;
+  // Tables whose generated-cols we've already resolved. A table absent from
+  // genColsCache means "no generated columns" (the load query only returns
+  // tables that have them), so we can't use cache membership to detect a
+  // newly-captured table — track seen tables explicitly and refresh once each.
+  private genColsSeen: Set<string> | null = null;
 
   async init(): Promise<void> {
     const url = process.env.SUPABASE_FAILOVER_DB_URL ?? '';
@@ -92,6 +97,7 @@ export class FailoverSink implements SyncSink {
     this.pool.on('error', (e: Error) => log.error('[cdc:failover] replica pool error', { error: e.message }));
     this.pkCache = null;
     this.genColsCache = null;
+    this.genColsSeen = null;
   }
 
   async close(): Promise<void> {
@@ -114,7 +120,16 @@ export class FailoverSink implements SyncSink {
 
   private async generatedColsFor(table: string): Promise<Set<string>> {
     const local = getPgPool();
-    if (!this.genColsCache) this.genColsCache = await loadGeneratedCols(local);
+    if (!this.genColsCache || !this.genColsSeen) {
+      this.genColsCache = await loadGeneratedCols(local);
+      this.genColsSeen = new Set();
+    }
+    if (!this.genColsSeen.has(table)) {
+      // First time seeing this table — refresh once in case it was captured
+      // after init (mirrors the pkCache new-trigger refresh).
+      this.genColsCache = await loadGeneratedCols(local);
+      this.genColsSeen.add(table);
+    }
     return this.genColsCache.get(table) ?? new Set();
   }
 

@@ -90,6 +90,13 @@ export function setupMiddleware(app: Application): void {
   // that combination) and an attractive footgun for future cross-origin work.
   // If a real cross-origin need appears, add a narrow allowlist here.
 
+  // Tight body cap on the unauthenticated login endpoints — credentials are a
+  // few hundred bytes, so 16kb is generous. Registered BEFORE the global parser:
+  // express.json() skips bodies already parsed, so this limit wins for these
+  // paths and a hostile client can't push a 10mb body at an anonymous route.
+  app.use('/api/auth/login', express.json({ limit: '16kb' }));
+  app.use('/api/portal/login', express.json({ limit: '16kb' }));
+
   // Body parser middleware — 10mb is plenty for the JSON payloads this app
   // emits (templates, dental chart state, etc). File uploads go through
   // multer (multipart/form-data) and don't need this raised.

@@ -174,7 +174,9 @@ async function pathExists(path: string): Promise<boolean> {
  * Returns full patient details with all related lookup values.
  */
 export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets> {
-  const row = await getKysely()
+  // The patient row and the asset bundle are independent reads — issue them
+  // concurrently rather than serially.
+  const rowPromise = getKysely()
     .selectFrom('patients as p')
     .leftJoin('genders as g', 'g.gender_id', 'p.gender')
     .leftJoin('addresses as a', 'a.id', 'p.address_id')
@@ -240,7 +242,7 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
     ])
     .executeTakeFirst();
 
-  const assets = await getAssets(PID);
+  const [row, assets] = await Promise.all([rowPromise, getAssets(PID)]);
 
   const patientInfo: PatientInfo = row
     ? {

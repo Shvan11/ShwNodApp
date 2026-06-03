@@ -36,8 +36,8 @@ type ExtendedTelegramClient = TelegramClient & {
 // CONSTANTS
 // ===========================================
 
-const TELEGRAM_API_ID = 22110800;
-const TELEGRAM_API_HASH = 'c0611e1cf17abb5e98607e38f900641e';
+// Telegram MTProto app credentials (api_id/api_hash from my.telegram.org).
+// Sourced from env (config.telegram) so they are not committed to source.
 
 // ===========================================
 // FUNCTIONS
@@ -97,6 +97,16 @@ export async function sendgramfile(phone: string, filepath: string): Promise<Sen
     };
   }
 
+  const apiId = config.telegram.apiId;
+  const apiHash = config.telegram.apiHash;
+  if (!apiId || !apiHash) {
+    log.error('Telegram API credentials not configured in environment variables');
+    return {
+      result: 'ERROR',
+      error: 'Telegram API credentials not configured. Please set TELEGRAM_API_ID and TELEGRAM_API_HASH.',
+    };
+  }
+
   // Validate phone number format
   if (!phone.startsWith('+')) {
     log.error(`Invalid phone number format: ${phone}. Must start with +`);
@@ -109,7 +119,7 @@ export async function sendgramfile(phone: string, filepath: string): Promise<Sen
   let client: ExtendedTelegramClient | undefined;
   try {
     const stringSession = new StringSession(gramSession);
-    client = new TelegramClient(stringSession, TELEGRAM_API_ID, TELEGRAM_API_HASH, {
+    client = new TelegramClient(stringSession, apiId, apiHash, {
       connectionRetries: 5,
       timeout: 30000, // 30 second timeout
       autoReconnect: false, // Disable auto-reconnect to prevent hanging

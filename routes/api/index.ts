@@ -45,11 +45,11 @@ import healthRoutes from './health.routes.js';
 import settingsRoutes from './settings.routes.js';
 import staffRoutes from './staff.routes.js';
 import mediaRoutes from './media.routes.js';
-import lookupRoutes from './lookup.routes.js';
+// lookupRoutes + costPresetRoutes are mounted pre-auth in index.ts (public reference
+// data / self-guarded mutations) and intentionally NOT remounted on this post-auth router.
 import reportsRoutes from './reports.routes.js';
 import utilityRoutes from './utility.routes.js';
 import photoEditorRoutes, { setWebSocketEmitter as setPhotoEditorWS } from './photo-editor.routes.js';
-import costPresetRoutes from './cost-preset.routes.js';
 import holidayRoutes from './holiday.routes.js';
 import videoRoutes from './video.routes.js';
 import standRoutes from './stand.routes.js';
@@ -102,12 +102,13 @@ router.use('/', expenseRoutes);        // Legacy expense routes at root
 // System and configuration routes
 router.use('/health', healthRoutes);   // Health monitoring (mounted at /health)
 router.use('/', settingsRoutes);       // Settings and configuration
-router.use('/', costPresetRoutes);     // Cost presets
+// costPresetRoutes is mounted pre-auth in index.ts (its GETs are public reference
+// data; its mutations self-guard with inline authenticate/authorize) — no mount here.
 
 // Lookup and reference data
 router.use('/', staffRoutes);          // Doctors and operators
 router.use('/', mediaRoutes);          // Photo server and WebCeph
-router.use('/', lookupRoutes);         // Reference data
+// lookupRoutes is mounted pre-auth in index.ts (read-only public reference data) — no mount here.
 
 // Reports and utilities
 router.use('/', reportsRoutes);        // Financial reports and statistics

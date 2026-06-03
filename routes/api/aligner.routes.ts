@@ -454,34 +454,15 @@ router.post(
     req: Request<unknown, unknown, CreateSetBody>,
     res: Response
   ): Promise<void> => {
-    const startTime = Date.now();
-    log.info('⏱️  [TIMING] POST /aligner/sets - Request received');
-
     try {
-      const serviceStartTime = Date.now();
       const newSetId = await AlignerService.validateAndCreateSet(req.body);
-      const serviceEndTime = Date.now();
-
-      log.info(
-        `⏱️  [TIMING] Service layer took: ${serviceEndTime - serviceStartTime}ms`
-      );
-
-      const totalTime = Date.now() - startTime;
-      log.info(`⏱️  [TIMING] TOTAL request time: ${totalTime}ms`);
 
       res.json({
         success: true,
         setId: newSetId,
-        message: 'Aligner set created successfully',
-        _timing: {
-          total_ms: totalTime,
-          service_ms: serviceEndTime - serviceStartTime
-        }
+        message: 'Aligner set created successfully'
       });
     } catch (error) {
-      const errorTime = Date.now() - startTime;
-      log.error(`⏱️  [TIMING] Error after ${errorTime}ms:`, error);
-
       if (error instanceof AlignerValidationError) {
         ErrorResponses.badRequest(res, error.message, {
           code: error.code,

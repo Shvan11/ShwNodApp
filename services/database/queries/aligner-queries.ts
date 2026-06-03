@@ -623,6 +623,17 @@ export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSet
       .selectFrom('aligner_sets as s')
       .leftJoin('aligner_batches as b', 's.aligner_set_id', 'b.aligner_set_id')
       .leftJoin('aligner_doctors as ad', 's.aligner_dr_id', 'ad.dr_id')
+      // Paid-to-date per set, computed ONCE here (was 4 correlated subqueries
+      // re-summing invoices inline for TotalPaid/Balance/PaymentStatus).
+      .leftJoin(
+        (eb) =>
+          eb
+            .selectFrom('invoices as i')
+            .select((e) => ['i.aligner_set_id', e.fn.sum('i.amount_paid').as('tp')])
+            .groupBy('i.aligner_set_id')
+            .as('ip'),
+        (join) => join.onRef('ip.aligner_set_id', '=', 's.aligner_set_id')
+      )
       .where('s.work_id', '=', workId)
       .groupBy([
         's.aligner_set_id',
@@ -646,6 +657,7 @@ export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSet
         's.currency',
         's.archform_id',
         'ad.doctor_name',
+        'ip.tp',
       ])
       .select((eb) => [
         's.aligner_set_id',
@@ -673,21 +685,15 @@ export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSet
         eb.fn
           .sum(sql<number>`case when "b"."delivered_to_patient_date" is not null then 1 else 0 end`)
           .as('DeliveredBatches'),
-        // vw_AlignerSetPayments inlined: TotalPaid / Balance / PaymentStatus
-        eb
-          .selectFrom('invoices as i')
-          .whereRef('i.aligner_set_id', '=', 's.aligner_set_id')
-          .select((e) => e.fn.coalesce(e.fn.sum('i.amount_paid'), sql<number>`0`).as('tp'))
-          .$castTo<number | null>()
-          .as('TotalPaid'),
-        sql<number | null>`(${eb.ref('s.set_cost')} - coalesce((select sum(i."amount_paid") from "invoices" i where i."aligner_set_id" = ${eb.ref('s.aligner_set_id')}), 0))`.as(
-          'Balance'
-        ),
+        // vw_AlignerSetPayments inlined: TotalPaid / Balance / PaymentStatus.
+        // All three derive from the single ip.tp paid-to-date join above.
+        eb.fn.coalesce(eb.ref('ip.tp'), sql<number>`0`).$castTo<number | null>().as('TotalPaid'),
+        sql<number | null>`(${eb.ref('s.set_cost')} - coalesce(${eb.ref('ip.tp')}, 0))`.as('Balance'),
         sql<string | null>`case
           when ${eb.ref('s.set_cost')} is null then 'No Cost Set'
-          when coalesce((select sum(i."amount_paid") from "invoices" i where i."aligner_set_id" = ${eb.ref('s.aligner_set_id')}), 0) = 0 then 'Unpaid'
-          when coalesce((select sum(i."amount_paid") from "invoices" i where i."aligner_set_id" = ${eb.ref('s.aligner_set_id')}), 0) < ${eb.ref('s.set_cost')} then 'Partial'
-          when coalesce((select sum(i."amount_paid") from "invoices" i where i."aligner_set_id" = ${eb.ref('s.aligner_set_id')}), 0) >= ${eb.ref('s.set_cost')} then 'Paid'
+          when coalesce(${eb.ref('ip.tp')}, 0) = 0 then 'Unpaid'
+          when coalesce(${eb.ref('ip.tp')}, 0) < ${eb.ref('s.set_cost')} then 'Partial'
+          when coalesce(${eb.ref('ip.tp')}, 0) >= ${eb.ref('s.set_cost')} then 'Paid'
           else 'Unknown' end`.as('PaymentStatus'),
         eb
           .selectFrom('aligner_notes as n')

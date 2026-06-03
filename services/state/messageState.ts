@@ -369,14 +369,15 @@ class MessageStateManager {
       }
     );
 
-    // Schedule cleanup if no viewers
+    // Schedule cleanup if no viewers. unref() so this fire-and-forget timer
+    // never keeps the process alive during graceful shutdown.
     if (result.activeViewers === 0 && !this.clientReady) {
       setTimeout(() => {
         const current = StateManager.get<QRStatus>(this.stateKeys.QR_STATUS);
         if (current && current.activeViewers === 0) {
           stateEvents.emit('qr_cleanup_required');
         }
-      }, 60000);
+      }, 60000).unref();
     }
 
     log.info(`QR viewer ${viewerId || 'unknown'} unregistered.`);
