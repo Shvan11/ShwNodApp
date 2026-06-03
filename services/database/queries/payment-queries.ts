@@ -3,23 +3,29 @@
  *
  * Migration Phase 4: translated to typed Kysely (PostgreSQL). Money columns on
  * tblInvoice (amount_paid, usd_received, iqd_received, actual_amount, change) are PG
- * `integer`, so they map straight to JS numbers (no numeric cast needed). Several
- * declared return types still say `Date` for date-only columns (date_of_payment,
- * start_date); those are PG `date`, which the centralized pg parser (kysely.ts)
- * returns as a 'YYYY-MM-DD' string. The declared types are preserved via
- * `$castTo<Date>()` (type-only); the runtime value is now a string — see FLAGS.
+ * `integer`, so they map straight to JS numbers (no numeric cast needed). The date-only
+ * columns (date_of_payment, start_date) are PG `date`, which the centralized pg parser
+ * (kysely.ts) returns as a 'YYYY-MM-DD' string; the generated `Database` type already
+ * types them `string`, so they're projected as-is and the declared return types are
+ * `string` (no `$castTo` needed).
  * The IF EXISTS…UPDATE…ELSE INSERT exchange-rate upserts became ON CONFLICT against
  * the new uq_sms_date unique index. tblsms.date is PG `date`, so date params
- * are wrapped as `sql<Date>` to satisfy the static type without changing emitted SQL.
+ * are wrapped as `sql<string>` to satisfy the static type without changing emitted SQL.
  */
 import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
 import { toDateOnly } from '../../../utils/date.js';
 
 // type definitions
-interface Payment {
+
+/**
+ * A single payment row for a patient, as projected by {@link getPayments}.
+ * `Date` is `i.date_of_payment` (PG `date`), which the centralized pg parser
+ * returns as a 'YYYY-MM-DD' string at runtime — hence the `string` type.
+ */
+export interface Payment {
   Payment: number;
-  Date: Date;
+  Date: string;
 }
 
 interface WorkForInvoice {
@@ -28,7 +34,7 @@ interface WorkForInvoice {
   total_required: number | null;
   currency: string | null;
   type_of_work: number | null;
-  start_date: Date | null;
+  start_date: string | null;
   patient_name: string;
   phone: string | null;
   TotalPaid: number;
@@ -47,7 +53,7 @@ interface PaymentRecord {
   InvoiceID: number;
   work_id: number;
   amount_paid: number;
-  date_of_payment: Date;
+  date_of_payment: string;
   actual_amount: number | null;
   actual_cur: string | null;
   change: number | null;
@@ -65,9 +71,9 @@ export function getPayments(PID: number): Promise<Payment[]> {
     .where('w.status', '=', 1)
     .where('p.person_id', '=', PID)
     // Original projected `i.*` then mapped columns[1]=amount_paid, columns[2]=date_of_payment.
-    .select((eb) => [
+    .select([
       'i.amount_paid as Payment',
-      eb.ref('i.date_of_payment').$castTo<Date>().as('Date'),
+      'i.date_of_payment as Date',
     ])
     .execute() as Promise<Payment[]>;
 }
@@ -99,7 +105,7 @@ export function getActiveWorkForInvoice(PID: number): Promise<WorkForInvoice[]> 
       'w.total_required',
       'w.currency',
       'w.type_of_work',
-      eb.ref('w.start_date').$castTo<Date>().as('start_date'),
+      'w.start_date as start_date',
       'p.patient_name',
       'p.phone',
       eb.fn.coalesce(eb.fn.sum('i.amount_paid'), sql<number>`0`).$castTo<number>().as('TotalPaid'),
@@ -115,7 +121,7 @@ export async function getCurrentExchangeRate(): Promise<number | null> {
   const db = getKysely();
   const row = await db
     .selectFrom('sms')
-    .where('date', '=', sql<Date>`${today}`)
+    .where('date', '=', sql<string>`${today}`)
     .where('exchange_rate', 'is not', null)
     .select('exchange_rate')
     .executeTakeFirst();
@@ -141,7 +147,7 @@ export async function addInvoice(invoiceData: InvoiceData): Promise<{ invoice_id
       .values({
         work_id: workid,
         amount_paid: amountPaid,
-        date_of_payment: sql<Date>`${paymentDate}`,
+        date_of_payment: sql<string>`${paymentDate}`,
         usd_received: usdReceived,
         iqd_received: iqdReceived,
         change: change,
@@ -193,7 +199,7 @@ export async function updateExchangeRate(exchangeRate: number): Promise<unknown[
   await db
     .insertInto('sms')
     .values({
-      date: sql<Date>`${today}`,
+      date: sql<string>`${today}`,
       sms_sent: false,
       email_sent: false,
       exchange_rate: exchangeRate,
@@ -211,7 +217,7 @@ export async function getExchangeRateForDate(date: string): Promise<number | nul
   const db = getKysely();
   const row = await db
     .selectFrom('sms')
-    .where('date', '=', sql<Date>`${date}`)
+    .where('date', '=', sql<string>`${date}`)
     .where('exchange_rate', 'is not', null)
     .select('exchange_rate')
     .executeTakeFirst();
@@ -229,7 +235,7 @@ export async function updateExchangeRateForDate(date: string, exchangeRate: numb
   await db
     .insertInto('sms')
     .values({
-      date: sql<Date>`${date}`,
+      date: sql<string>`${date}`,
       sms_sent: false,
       email_sent: false,
       exchange_rate: exchangeRate,
@@ -251,8 +257,8 @@ export function listExchangeRates(
   return db
     .selectFrom('sms')
     .where('exchange_rate', 'is not', null)
-    .where('date', '>=', sql<Date>`${fromDate}`)
-    .where('date', '<=', sql<Date>`${toDate}`)
+    .where('date', '>=', sql<string>`${fromDate}`)
+    .where('date', '<=', sql<string>`${toDate}`)
     .orderBy('date', 'desc')
     .select((eb) => [
       eb.ref('date').$castTo<string>().as('date'),
@@ -270,11 +276,11 @@ export function getPaymentHistoryByWorkId(workId: number): Promise<PaymentRecord
     .selectFrom('invoices')
     .where('work_id', '=', workId)
     .orderBy('date_of_payment', 'desc')
-    .select((eb) => [
+    .select([
       'invoice_id as InvoiceID',
       'work_id',
       'amount_paid',
-      eb.ref('date_of_payment').$castTo<Date>().as('date_of_payment'),
+      'date_of_payment',
       'actual_amount',
       'actual_cur',
       'change',

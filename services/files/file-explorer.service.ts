@@ -3,8 +3,11 @@
  * per-patient file browser. Every disk operation flows through `resolveSafe`
  * (pure path math + containment) and, where the target must already exist,
  * `realpathGuard` (symlink-escape defence). See the plan / CLAUDE.md
- * "Deployment & environments" for the cross-platform + SMB-volume constraints
- * this file is written against.
+ * "Deployment & environments" for the cross-platform + same-volume staging
+ * constraints this file is written against. Note: on the current deployment the
+ * patient volume is the server's LOCAL disk (`MACHINE_PATH=C:` → `C:\clinic1`),
+ * so the stat/volume notes below are portability insurance for WSL `/mnt/c`
+ * (drvfs) and a future network-mounted server — not a cost paid in prod today.
  */
 import fs from 'fs/promises';
 import path from 'path';
@@ -23,7 +26,7 @@ export interface FileEntry {
   /** Path relative to the patient root, web-style `/` separators. */
   relPath: string;
   type: FileEntryType;
-  /** Bytes — present in browse mode, omitted in flat mode (SMB stat cost). */
+  /** Bytes — present in browse mode, omitted in flat mode (per-file stat cost on remote/drvfs mounts). */
   size?: number;
   /** ISO mtime — present in browse mode, omitted in flat mode. */
   modified?: string;
@@ -61,9 +64,9 @@ const MAX_ENTRIES = 5000;
 const INFRA_DIRS = new Set(['.trash', '.thumbs', '.uploads']);
 
 const pathResolver = createPathResolver(config.fileSystem.machinePath || '');
-/** Trash root: sibling of the numeric patient folders, same SMB volume. */
+/** Trash root: sibling of the numeric patient folders, same volume. */
 const TRASH_ROOT = pathResolver('clinic1/.trash');
-/** Upload staging root: sibling of patient folders, same SMB volume, so the
+/** Upload staging root: sibling of patient folders, same volume, so the
  *  final rename into a patient folder is atomic + EXDEV-free. */
 const UPLOADS_ROOT = pathResolver('clinic1/.uploads');
 
@@ -269,8 +272,9 @@ export async function listDirectory(
 
 /**
  * Recursively flatten a subtree into a file-only list. Streams via `opendir`,
- * emits names/types straight from the Dirent (NO per-file lstat — SMB round
- * trips), skips symlinked dirs, and stops at the depth/entry caps.
+ * emits names/types straight from the Dirent (NO per-file lstat — that cost
+ * bites on remote/drvfs mounts), skips symlinked dirs, and stops at the
+ * depth/entry caps.
  */
 export async function walkFlat(
   personId: string | number,
@@ -417,7 +421,7 @@ export async function renameEntry(
 
 /**
  * Soft delete — move the entry into `clinic1/.trash/{personId}/{timestamp}/`.
- * Same SMB volume as the source, so the rename is atomic; recoverable; never
+ * Same volume as the source, so the rename is atomic; recoverable; never
  * surfaced in a listing.
  */
 export async function softDelete(personId: string | number, relPath: string): Promise<void> {
@@ -457,7 +461,7 @@ export interface BatchDeleteResult {
  * de-duped with a ` (n)` suffix so the second never clobbers the first. The
  * stamp dir is removed if nothing landed, to avoid littering empty folders.
  *
- * Moving a folder is a single rename regardless of subtree size (same SMB
+ * Moving a folder is a single rename regardless of subtree size (same
  * volume), so batch cost scales with the number of selected entries, not their
  * contents.
  */
@@ -585,7 +589,7 @@ export async function validateUploadTargetDir(
 /**
  * Staging dir for in-flight uploads: `clinic1/.uploads/{personId}` — a sibling
  * of the patient folder (so temp files never appear in a listing) but on the
- * same SMB volume (so the finalize rename into the patient folder is atomic,
+ * same volume (so the finalize rename into the patient folder is atomic,
  * never `EXDEV`). Used as multer's `destination`.
  */
 export async function getUploadStagingDir(personId: string | number): Promise<string> {

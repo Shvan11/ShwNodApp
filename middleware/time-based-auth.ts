@@ -26,7 +26,10 @@ export type OperationType = 'delete' | 'update';
 /**
  * Function type for getting record creation date
  */
-export type GetRecordDateFn = (req: Request) => Promise<Date>;
+// `date` columns (date_of_payment, expense_date) resolve to 'YYYY-MM-DD' strings at
+// runtime; `timestamp` columns (date_added, addition_date) resolve to Date. `isToday`
+// normalizes both via `new Date(...)`, so the fn type is the honest union.
+export type GetRecordDateFn = (req: Request) => Promise<Date | string>;
 
 /**
  * Options for requireRecordAge middleware
@@ -42,7 +45,7 @@ export interface RecordAgeOptions {
  * Record date result from database
  */
 interface RecordDateResult {
-  createdAt: Date;
+  createdAt: Date | string;
 }
 
 /**
@@ -135,7 +138,7 @@ export function requireRecordAge(options: RecordAgeOptions) {
  * @param req - Express request object
  * @returns Patient creation date
  */
-export async function getPatientCreationDate(req: Request): Promise<Date> {
+export async function getPatientCreationDate(req: Request): Promise<Date | string> {
   const { personId } = req.params;
 
   const { rows: result } = await sql<RecordDateResult>`
@@ -162,7 +165,7 @@ interface WorkRequestBody {
  * @param req - Express request object
  * @returns Work creation date
  */
-export async function getWorkCreationDate(req: Request): Promise<Date> {
+export async function getWorkCreationDate(req: Request): Promise<Date | string> {
   // workId can come from body (delete, update) or params
   const body = req.body as WorkRequestBody | undefined;
   const workId = body?.workId || body?.workid || req.params?.workId;
@@ -187,7 +190,7 @@ export async function getWorkCreationDate(req: Request): Promise<Date> {
  * @param req - Express request object
  * @returns Invoice creation date
  */
-export async function getInvoiceCreationDate(req: Request): Promise<Date> {
+export async function getInvoiceCreationDate(req: Request): Promise<Date | string> {
   const { invoiceId } = req.params;
 
   const { rows: result } = await sql<RecordDateResult>`
@@ -206,7 +209,7 @@ export async function getInvoiceCreationDate(req: Request): Promise<Date> {
  * @param req - Express request object
  * @returns Expense creation date
  */
-export async function getExpenseCreationDate(req: Request): Promise<Date> {
+export async function getExpenseCreationDate(req: Request): Promise<Date | string> {
   const { id } = req.params;
 
   const { rows: result } = await sql<RecordDateResult>`

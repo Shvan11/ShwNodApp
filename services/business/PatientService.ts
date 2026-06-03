@@ -17,8 +17,7 @@ import {
   getTimePoints,
   getTimePointImgs,
 } from '../database/queries/timepoint-queries.js';
-import { getPayments } from '../database/queries/payment-queries.js';
-import type { Payment } from '../../types/database.types.js';
+import { getPayments, type Payment } from '../database/queries/payment-queries.js';
 
 /**
  * Patient information returned from service
@@ -49,7 +48,7 @@ interface PatientInfoResult {
   AlertCount: number;
   // Legacy fields for backwards compatibility
   name: string | null;
-  start_date: Date | null;
+  start_date: string | null;
   estimatedCost: number | null;
   activeAlert: {
     alertId: number;

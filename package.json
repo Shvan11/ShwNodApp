@@ -37,7 +37,7 @@
     "db:migrate": "node-pg-migrate up -m migrations/pg",
     "db:migrate:down": "node-pg-migrate down -m migrations/pg",
     "db:new-migration": "node-pg-migrate create -m migrations/pg -j sql",
-    "db:codegen": "kysely-codegen --out-file types/db.d.ts"
+    "db:codegen": "kysely-codegen --date-parser string --out-file types/db.d.ts"
   },
   "author": "",
   "license": "ISC",

@@ -428,7 +428,7 @@ export async function getWhatsAppMessages(
       const candidates = await getKysely()
         .selectFrom('appointments as a')
         .innerJoin('patients as p', 'p.person_id', 'a.person_id')
-        .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
+        .where('a.app_day', '=', sql<string>`${dateStr}::date`)
         .where('a.want_wa', '=', true)
         .where((eb) => eb.or([eb('a.notified', 'is', null), eb('a.notified', '=', false)]))
         .where((eb) => eb.or([eb('a.sent_wa', 'is', null), eb('a.sent_wa', '=', false)]))
@@ -602,7 +602,7 @@ export async function getWhatsAppDeliveryStatus(
       const rows = await getKysely()
         .selectFrom('appointments as a')
         .innerJoin('patients as p', 'p.person_id', 'a.person_id')
-        .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
+        .where('a.app_day', '=', sql<string>`${dateStr}::date`)
         .where('a.sent_wa', '=', true)
         .select([
           'a.appointment_id as id',
@@ -666,7 +666,7 @@ export async function getSmsMessages(date: Date | string): Promise<SmsMessage[]>
       const rows = await getKysely()
         .selectFrom('appointments as a')
         .innerJoin('patients as p', 'p.person_id', 'a.person_id')
-        .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
+        .where('a.app_day', '=', sql<string>`${dateStr}::date`)
         .where('a.want_notify', '=', true)
         .where((eb) => eb.or([eb('a.notified', 'is', null), eb('a.notified', '=', false)]))
         .select([
@@ -737,7 +737,7 @@ export async function getSmsIds(date: Date | string): Promise<SmsIdMessage[]> {
       const dateStr = typeof date === 'string' ? date.slice(0, 10) : toDateOnly(date);
       const rows = await getKysely()
         .selectFrom('appointments')
-        .where('app_day', '=', sql<Date>`${dateStr}::date`)
+        .where('app_day', '=', sql<string>`${dateStr}::date`)
         .where('sms_sid', 'is not', null)
         .select(['appointment_id as id', 'sms_sid as sid'])
         .execute();
@@ -787,7 +787,7 @@ export async function getMessageStatusByDate(date: Date | string): Promise<Messa
       const rows = await getKysely()
         .selectFrom('appointments as a')
         .innerJoin('patients as p', 'p.person_id', 'a.person_id')
-        .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
+        .where('a.app_day', '=', sql<string>`${dateStr}::date`)
         .orderBy('a.app_time')
         .select([
           'a.appointment_id as appointmentId',
@@ -924,7 +924,7 @@ export async function resetMessagingForDate(date: string): Promise<ResetResult> 
 
     const stats = await trx
       .selectFrom('appointments')
-      .where('app_day', '=', sql<Date>`${date}::date`)
+      .where('app_day', '=', sql<string>`${date}::date`)
       .select((eb) => [
         eb.fn.countAll<number>().as('total'),
         eb.fn.sum<number>(sql`CASE WHEN "want_wa" = true THEN 1 ELSE 0 END`).as('readyWa'),

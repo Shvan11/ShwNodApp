@@ -14,6 +14,7 @@
 
 import { log } from '../../utils/logger.js';
 import { isUniqueViolation } from '../../utils/pg-errors.js';
+import { toDateOnly } from '../../utils/date.js';
 import {
   addWork,
   getActiveWork,
@@ -27,7 +28,6 @@ import {
   type TransferWorkResult,
 } from '../database/queries/work-queries.js';
 import { getPatientById } from '../database/queries/patient-queries.js';
-import type { Work, WorkWithDetails } from '../../types/database.types.js';
 
 // Re-export WORK_STATUS for convenience
 export { WORK_STATUS };
@@ -75,9 +75,38 @@ export interface ExistingWorkInfo {
   typeOfWork: number | null;
   typeName: string | null;
   doctor: string | null;
-  additionDate: Date | null;
+  additionDate: string | null;
   totalRequired: number | null;
   currency: string | null;
+}
+
+/**
+ * Build the wire-facing `ExistingWorkInfo` DTO from a work row.
+ *
+ * `addition_date` is a `timestamp` (a real `Date` at runtime), so truncate it to a
+ * local `YYYY-MM-DD` string here — `toDateOnly` uses local getters, which keeps the
+ * stored wall-clock date instead of the UTC-shifted value `res.json()` would emit by
+ * serializing the `Date` via `.toISOString()`. Both DUPLICATE_ACTIVE_WORK and
+ * ACTIVE_WORK_CONFLICT build the same shape; this is the single conversion point.
+ */
+function toExistingWorkInfo(row: {
+  work_id: number;
+  type_of_work: number | null;
+  type_name: string | null;
+  doctor_name: string | null;
+  addition_date: Date | null;
+  total_required: number | null;
+  currency: string | null;
+}): ExistingWorkInfo {
+  return {
+    workId: row.work_id,
+    typeOfWork: row.type_of_work ?? null,
+    typeName: row.type_name ?? null,
+    doctor: row.doctor_name ?? null,
+    additionDate: row.addition_date ? toDateOnly(row.addition_date) : null,
+    totalRequired: row.total_required ?? null,
+    currency: row.currency ?? null,
+  };
 }
 
 /**
@@ -145,11 +174,11 @@ export interface WorkCreateData {
   total_required?: number | string | null;
   currency?: string;
   notes?: string;
-  start_date?: string | Date;
-  debond_date?: string | Date;
-  f_photo_date?: string | Date;
-  i_photo_date?: string | Date;
-  notes_date?: string | Date;
+  start_date?: string;
+  debond_date?: string;
+  f_photo_date?: string;
+  i_photo_date?: string;
+  notes_date?: string;
   createAsFinished?: boolean;
   status?: WorkStatusType;
   estimated_duration?: number;
@@ -197,7 +226,10 @@ function normalizeDateFields(
           { field, value }
         );
       }
-      normalized[field] = date;
+      // PG `date` columns are typed/serialized as 'YYYY-MM-DD' strings (see kysely.ts
+      // parsers + db:codegen --date-parser string). Store the normalized date-only
+      // string, not a Date object, so a `date` column never gets a tz-shifted value.
+      normalized[field] = toDateOnly(date);
     }
   }
 
@@ -281,24 +313,12 @@ async function formatDuplicateActiveWorkError(
   personId: number | string
 ): Promise<WorkErrorDetails> {
   try {
-    const existingWork = (await getActiveWork(
-      parseInt(String(personId))
-    )) as WorkWithDetails | null;
+    const existingWork = await getActiveWork(parseInt(String(personId)));
     return {
       message:
         'This patient already has an active (unfinished) work record. You can finish the existing work and add the new one.',
       code: 'DUPLICATE_ACTIVE_WORK',
-      existingWork: existingWork
-        ? {
-            workId: existingWork.work_id,
-            typeOfWork: existingWork.type_of_work ?? null,
-            typeName: existingWork.type_name ?? null,
-            doctor: existingWork.doctor_name ?? null,
-            additionDate: existingWork.addition_date ?? null,
-            totalRequired: existingWork.total_required ?? null,
-            currency: existingWork.currency ?? null,
-          }
-        : null,
+      existingWork: existingWork ? toExistingWorkInfo(existingWork) : null,
     };
   } catch {
     // If we can't fetch the existing work, return basic error
@@ -318,7 +338,7 @@ async function formatDuplicateActiveWorkError(
  */
 export async function validateAndCreateWork(
   workData: WorkCreateData
-): Promise<Work> {
+): Promise<{ work_id: number }> {
   // Validate required fields
   validateWorkRequiredFields(workData);
 
@@ -345,7 +365,10 @@ export async function validateAndCreateWork(
       total_required: dataWithDates.total_required != null ? parseFloat(String(dataWithDates.total_required)) : null,
     };
     // Create work in database
-    const result = (await addWork(dbData)) as unknown as Work;
+    const result = await addWork(dbData);
+    if (!result) {
+      throw new Error('Work creation did not return an id');
+    }
     log.info(
       `Work created successfully: Work ${result.work_id} for Patient ${workData.person_id}`
     );
@@ -587,15 +610,7 @@ export async function validateAndTransferWork(
         'ACTIVE_WORK_CONFLICT',
         {
           targetPatientId,
-          existingWork: {
-            workId: targetActiveWork.work_id,
-            typeOfWork: targetActiveWork.type_of_work ?? null,
-            typeName: targetActiveWork.type_name ?? null,
-            doctor: targetActiveWork.doctor_name ?? null,
-            additionDate: targetActiveWork.addition_date ?? null,
-            totalRequired: targetActiveWork.total_required ?? null,
-            currency: targetActiveWork.currency ?? null,
-          },
+          existingWork: toExistingWorkInfo(targetActiveWork),
         }
       );
     }

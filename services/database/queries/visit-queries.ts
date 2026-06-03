@@ -20,7 +20,7 @@ interface VisitSummary {
   patient_name: string;
   work_id: number;
   id: number;
-  visit_date: Date;
+  visit_date: string;
   opg: boolean;
   i_photo: boolean;
   f_photo: boolean;
@@ -30,7 +30,7 @@ interface VisitSummary {
 }
 
 interface LatestVisitSummary {
-  visit_date: Date;
+  visit_date: string;
   Summary: string | null;
 }
 
@@ -52,7 +52,7 @@ interface LatestWireDetails {
 }
 
 interface VisitDetails {
-  visitDate: Date;
+  visitDate: string;
   upperWireID: number | null;
   lowerWireID: number | null;
   others: string | null;
@@ -62,7 +62,7 @@ interface VisitDetails {
 interface Visit {
   id: number;
   work_id: number;
-  visit_date: Date;
+  visit_date: string;
   bracket_change: string | null;
   wire_bending: string | null;
   opg: boolean;
@@ -83,7 +83,7 @@ interface Visit {
 
 interface VisitData {
   work_id: number;
-  visit_date: Date;
+  visit_date: Date | string;
   bracket_change?: string;
   wire_bending?: string;
   opg?: boolean;
@@ -253,7 +253,7 @@ export async function getVisitsSummary(PID: number): Promise<VisitSummary[]> {
     patient_name: r.patient_name,
     work_id: r.work_id,
     id: r.id,
-    visit_date: r.visit_date as unknown as Date, // PG `date` → 'YYYY-MM-DD' string at runtime
+    visit_date: r.visit_date, // PG `date` → 'YYYY-MM-DD' string
     opg: r.opg ?? false,
     i_photo: r.i_photo ?? false,
     f_photo: r.f_photo ?? false,
@@ -283,7 +283,7 @@ export async function getLatestVisitsSum(PID: number): Promise<LatestVisitSummar
     .executeTakeFirst();
 
   if (!row) return undefined;
-  return { visit_date: row.visit_date as unknown as Date, Summary: buildVisitSummary(row) };
+  return { visit_date: row.visit_date, Summary: buildVisitSummary(row) };
 }
 
 /**
@@ -292,7 +292,7 @@ export async function getLatestVisitsSum(PID: number): Promise<LatestVisitSummar
  */
 export async function addVisit(
   PID: number,
-  visitDate: Date,
+  visitDate: Date | string,
   upperWireID: number,
   lowerWireID: number,
   others: string,
@@ -325,7 +325,7 @@ export async function getVisitDetailsByID(VID: number): Promise<VisitDetails | u
     .executeTakeFirst();
   if (!row) return undefined;
   return {
-    visitDate: row.visit_date as unknown as Date,
+    visitDate: row.visit_date,
     upperWireID: row.upper_wire_id,
     lowerWireID: row.lower_wire_id,
     others: row.others,
@@ -339,7 +339,7 @@ export async function getVisitDetailsByID(VID: number): Promise<VisitDetails | u
  */
 export async function updateVisit(
   VID: number,
-  visitDate: Date,
+  visitDate: Date | string,
   upperWireID: number,
   lowerWireID: number,
   others: string,

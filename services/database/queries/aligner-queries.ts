@@ -68,7 +68,7 @@ interface AlignerSet {
   lower_aligners_count: number;
   remaining_upper_aligners: number;
   remaining_lower_aligners: number;
-  creation_date: Date;
+  creation_date: string | null;
   days: number | null;
   is_active: boolean;
   notes: string | null;
@@ -101,11 +101,11 @@ interface AlignerSetFromView {
   set_sequence: number | null;
   SetIsActive: boolean;
   batch_sequence: number | null;
-  creation_date: Date | null;
+  creation_date: string | null;
   BatchCreationDate: Date | null;
-  manufacture_date: Date | null;
-  delivered_to_patient_date: Date | null;
-  NextDueDate: Date | null;
+  manufacture_date: string | null;
+  delivered_to_patient_date: string | null;
+  NextDueDate: string | null;
   notes: string | null;
   is_last: boolean | null;
   NextBatchPresent: string | null;
@@ -174,11 +174,11 @@ interface AlignerBatch {
   lower_aligner_start_sequence: number | null;
   lower_aligner_end_sequence: number | null;
   creation_date: Date;
-  manufacture_date: Date | null;
-  delivered_to_patient_date: Date | null;
+  manufacture_date: string | null;
+  delivered_to_patient_date: string | null;
   days: number | null;
   validity_period: number | null;
-  batch_expiry_date: Date | null;
+  batch_expiry_date: string | null;
   notes: string | null;
   is_active: boolean;
   is_last: boolean;
@@ -542,10 +542,10 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
         's.set_sequence as set_sequence',
         's.is_active as SetIsActive',
         'lb.batch_sequence as batch_sequence',
-        eb.ref('s.creation_date').$castTo<Date | null>().as('creation_date'),
+        's.creation_date as creation_date',
         eb.ref('lb.creation_date').$castTo<Date | null>().as('BatchCreationDate'),
-        eb.ref('lb.manufacture_date').$castTo<Date | null>().as('manufacture_date'),
-        eb.ref('lb.delivered_to_patient_date').$castTo<Date | null>().as('delivered_to_patient_date'),
+        'lb.manufacture_date as manufacture_date',
+        'lb.delivered_to_patient_date as delivered_to_patient_date',
         // NextDueDate: batch_expiry_date of the latest DELIVERED batch
         eb
           .selectFrom('aligner_batches as b')
@@ -554,7 +554,7 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
           .orderBy('b.batch_sequence', 'desc')
           .select('b.batch_expiry_date')
           .limit(1)
-          .$castTo<Date | null>()
+          .$castTo<string | null>()
           .as('NextDueDate'),
         'lb.notes as notes',
         'lb.is_last as is_last',
@@ -656,7 +656,7 @@ export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSet
         's.lower_aligners_count',
         's.remaining_upper_aligners',
         's.remaining_lower_aligners',
-        eb.ref('s.creation_date').$castTo<Date>().as('creation_date'),
+        's.creation_date as creation_date',
         's.days',
         's.is_active',
         's.notes',
@@ -754,7 +754,7 @@ export async function getAlignerSetById(setId: number): Promise<AlignerSet | nul
         'lower_aligners_count',
         'remaining_upper_aligners',
         'remaining_lower_aligners',
-        eb.ref('creation_date').$castTo<Date>().as('creation_date'),
+        'creation_date',
         'days',
         'is_active',
         'notes',
@@ -1221,11 +1221,11 @@ export async function getBatchesBySetId(setId: number): Promise<AlignerBatch[]> 
         'lower_aligner_start_sequence',
         'lower_aligner_end_sequence',
         eb.ref('creation_date').$castTo<Date>().as('creation_date'),
-        eb.ref('manufacture_date').$castTo<Date | null>().as('manufacture_date'),
-        eb.ref('delivered_to_patient_date').$castTo<Date | null>().as('delivered_to_patient_date'),
+        'manufacture_date',
+        'delivered_to_patient_date',
         'days',
         'validity_period',
-        eb.ref('batch_expiry_date').$castTo<Date | null>().as('batch_expiry_date'),
+        'batch_expiry_date',
         'notes',
         'is_active',
         'is_last',
@@ -1968,7 +1968,7 @@ export async function markAllActivitiesAsRead(setId: number): Promise<void> {
  * Add payment for an aligner set
  *
  * FLAG (date-string): `tblInvoice.date_of_payment` is a PG `date` column; the value is
- * bound as a 'YYYY-MM-DD' string (via toDateOnly) wrapped in `sql<Date>` so PG infers the
+ * bound as a 'YYYY-MM-DD' string (via toDateOnly) wrapped in `sql<string>` so PG infers the
  * date type and the column isn't shifted by a UTC conversion (see CLAUDE.md date gotcha).
  * `amount_paid`/`actual_amount`/`change`/`usd_received`/`iqd_received` are plain integer columns.
  */
@@ -2004,7 +2004,7 @@ export async function createAlignerPayment(
       .values({
         work_id: workid,
         amount_paid: Math.round(paidAmount),
-        date_of_payment: sql<Date>`${dateStr}`,
+        date_of_payment: sql<string>`${dateStr}`,
         actual_amount: actual_amount ?? null,
         actual_cur: actual_cur || null,
         change: change ?? null,
@@ -2083,8 +2083,8 @@ export async function getBatchById(batchId: number): Promise<AlignerBatch[]> {
         'lower_aligner_start_sequence',
         'lower_aligner_end_sequence',
         eb.ref('creation_date').$castTo<Date>().as('creation_date'),
-        eb.ref('manufacture_date').$castTo<Date | null>().as('manufacture_date'),
-        eb.ref('delivered_to_patient_date').$castTo<Date | null>().as('delivered_to_patient_date'),
+        'manufacture_date',
+        'delivered_to_patient_date',
         'days',
         'notes',
         'is_active',

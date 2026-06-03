@@ -3,83 +3,21 @@
  * Re-exports all types for convenient importing
  *
  * Usage:
- *   import type { Patient, Appointment, ApiResponse } from '../types/index.js';
- *   // or
- *   import type { Patient } from '../types/database.types.js';
+ *   import type { ApiResponse, SafeUser } from '../types/index.js';
+ *
+ * Note: there is no hand-written "database entity types" module. Table-row
+ * shapes are owned by the generated `types/db.d.ts` (`Database` via
+ * `services/database/kysely.ts`) and query-result projections live alongside
+ * their query module in `services/database/queries/*`. Only app-level contract
+ * types (API, config, services) are re-exported here.
  */
-
-// Database entity types
-export type {
-  // Patient types
-  Patient,
-  PatientInfo,
-  PatientAlert,
-  XrayFile,
-  TimePoint,
-
-  // Appointment types
-  Appointment,
-  AppointmentStatus,
-  AppointmentStateField,
-  DailyAppointmentsResponse,
-  AppointmentStats,
-  DailyAppointmentsData,
-
-  // Work types
-  Work,
-  WorkWithDetails,
-  WorkStatusValue,
-
-  // Payment types
-  Invoice,
-  InvoiceCreateData,
-  Payment,
-  WorkForInvoice,
-
-  // User types
-  User,
-  SafeUser,
-  UserRole,
-
-  // Visit types
-  Visit,
-
-  // Wire types
-  wire as Wire,
-
-  // Expense types
-  Expense,
-
-  // Employee types
-  Employee,
-
-  // Lookup types
-  work_type as WorkType,
-  Keyword,
-  patient_type as PatientType,
-  AlertType,
-
-  // Aligner types
-  AlignerSet,
-  AlignerBatch,
-  AlignerPartner,
-
-  // Template types
-  Template,
-
-  // Messaging types
-  MessageRecord,
-  MessageStatus,
-
-  // Holiday types
-  Holiday,
-} from './database.types.js';
-
-// Re-export constants
-export { WORK_STATUS } from './database.types.js';
 
 // API types
 export type {
+  // User / auth domain types
+  UserRole,
+  SafeUser,
+
   // Session types
   AppSession,
 

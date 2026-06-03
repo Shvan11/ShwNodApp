@@ -18,7 +18,22 @@ import {
   getExchangeRateForDate,
 } from '../database/queries/payment-queries.js';
 import { getWorkDetails } from '../database/queries/work-queries.js';
-import type { Invoice, WorkWithDetails } from '../../types/database.types.js';
+
+/**
+ * The invoice record returned to callers after creation. This is a freshly
+ * constructed response object (not a DB row read-back): `date_of_payment` is a
+ * real JS `Date` built from the request, and `InvoiceID` is the id returned by
+ * the insert. Co-located here because it's a service-layer DTO.
+ */
+interface CreatedInvoice {
+  InvoiceID: number | undefined;
+  workid: number;
+  amount_paid: number;
+  date_of_payment: Date;
+  usd_received: number | null;
+  iqd_received: number | null;
+  change: number | null;
+}
 
 /**
  * Payment error codes
@@ -237,7 +252,7 @@ async function calculateValidatedChange(
  */
 export async function validateAndCreateInvoice(
   invoiceData: InvoiceCreateData
-): Promise<Invoice> {
+): Promise<CreatedInvoice> {
   const { workid, amountPaid, paymentDate, usdReceived, iqdReceived, change } =
     invoiceData;
 
@@ -249,7 +264,7 @@ export async function validateAndCreateInvoice(
   validateCurrencyAmounts(usd, iqd);
 
   // Get work details to determine account currency
-  const workDetails = (await getWorkDetails(workid)) as WorkWithDetails | null;
+  const workDetails = await getWorkDetails(workid);
   if (!workDetails) {
     throw new PaymentValidationError('Work record not found', 'WORK_NOT_FOUND');
   }
@@ -296,7 +311,7 @@ export async function validateAndCreateInvoice(
   );
 
   // Construct the Invoice object from input data plus returned id
-  const invoice: Invoice = {
+  const invoice: CreatedInvoice = {
     InvoiceID: result[0]?.invoice_id,
     workid,
     amount_paid: amountPaid,

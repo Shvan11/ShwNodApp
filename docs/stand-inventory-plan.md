@@ -108,12 +108,13 @@ Indexes: ItemID, MovementDate, MovementType
 
 ## Backend
 
-### Types — add to `types/database.types.ts`
-Entity types following existing patterns (nullable fields as `Type | null`, enum via `as const`):
-- `StandCategory`, `StandItem`, `StandItemWithCategory` (joined display)
-- `StandSale`, `StandSaleItem`, `StandSaleWithItems` (joined)
-- `StandStockMovement`
-- `StandItemCreateData`, `StandSaleCreateData`, `StandRestockData`, `StandAdjustData`
+### Types — co-locate with the query module (no hand-written entity file)
+Table-row shapes come from the generated `Database` (`types/db.d.ts`, via
+`services/database/kysely.ts` — use `Selectable<Database['stand_items']>` etc.).
+Query-result projections (joined display shapes) and input DTOs live alongside
+`stand-queries.ts`, exported from there. Enums via `as const`:
+- `StandItemWithCategory`, `StandSaleWithItems` (joined display projections)
+- `StandItemCreateData`, `StandSaleCreateData`, `StandRestockData`, `StandAdjustData` (input DTOs)
 - `STAND_MOVEMENT_TYPE = { INITIAL, RESTOCK, SALE, ADJUSTMENT, WASTE, RETURN, VOID } as const`
 
 ### Query module — `services/database/queries/stand-queries.ts`
@@ -339,7 +340,7 @@ Other integrations kept:
 
 **Phase 1 — Foundation (MVP)**
 1. Write `/migrations/add_stand_tables.sql`; run via `mcp__mssql__exec_sql_json`
-2. Add types to `types/database.types.ts`
+2. Define projection/DTO types in `stand-queries.ts` (rows derive from generated `Database`)
 3. Create `stand-queries.ts` (categories + items CRUD + initial movements)
 4. Create `StandService.ts` with `StandValidationError` + item validation
 5. Create `stand.routes.ts` (category + item endpoints)
@@ -375,7 +376,7 @@ Other integrations kept:
 
 ## Files to modify
 
-- `types/database.types.ts` — add entity types
+- `services/database/queries/stand-queries.ts` — define projection/DTO types (rows from generated `Database`)
 - `routes/api/index.ts` — register `standRoutes`
 - `public/js/router/routes.config.tsx` — add 5 routes
 - `public/js/routes/Dashboard.tsx` — add card entry

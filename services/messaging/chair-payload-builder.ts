@@ -19,7 +19,7 @@ export interface ChairPatientPayload {
   pid: string;
   name: string | null;
   images: Array<{ name: string }>;
-  latestVisit: { visit_date?: Date; Summary?: string | null } | null | undefined;
+  latestVisit: { visit_date?: string; Summary?: string | null } | null | undefined;
 }
 
 /**

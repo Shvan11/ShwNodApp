@@ -22,6 +22,7 @@ import { isUniqueViolation } from '../../utils/pg-errors.js';
 import { getKysely } from '../../services/database/kysely.js';
 import {
   getWorksByPatient,
+  toWorkWire,
   getWorkDetails,
   finishWork,
   discontinueWork,
@@ -193,8 +194,8 @@ interface WorkDetailBody {
   implant_manufacturer_id?: number;
   material?: string;
   lab_name?: string;
-  start_date?: Date | string;
-  completed_date?: Date | string;
+  start_date?: string;
+  completed_date?: string;
   note?: string;
 }
 
@@ -272,7 +273,7 @@ router.get(
         ErrorResponses.notFound(res, 'Work');
         return;
       }
-      res.json(work);
+      res.json(toWorkWire(work));
     } catch (error) {
       log.error('Error fetching work details:', error);
       sendError(res, 500, 'Failed to fetch work details', error as Error);
@@ -298,7 +299,7 @@ router.get(
       }
 
       const works = await getWorksByPatient(parseInt(personId));
-      res.json(works);
+      res.json(works.map(toWorkWire));
     } catch (error) {
       log.error('Error fetching works:', error);
       sendError(res, 500, 'Failed to fetch works', error as Error);

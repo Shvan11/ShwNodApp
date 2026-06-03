@@ -45,7 +45,7 @@ export async function findOrCreateNativeTimePoint(
       .selectFrom('time_points')
       .where('person_id', '=', personId)
       .where('tp_description', '=', tpName)
-      .where('tp_date_time', '=', sql<Date>`${dateStr}`)
+      .where('tp_date_time', '=', sql<string>`${dateStr}`)
       .orderBy('tp_code')
       .select(['time_point_id', 'tp_code'])
       .limit(1)
@@ -64,7 +64,7 @@ export async function findOrCreateNativeTimePoint(
 
     const inserted = await trx
       .insertInto('time_points')
-      .values({ person_id: personId, tp_code: next, tp_description: tpName, tp_date_time: sql<Date>`${dateStr}` })
+      .values({ person_id: personId, tp_code: next, tp_description: tpName, tp_date_time: sql<string>`${dateStr}` })
       .returning(['time_point_id', 'tp_code'])
       .executeTakeFirstOrThrow();
     log.info('Created native timepoint', { personId, tp_code: inserted.tp_code, tpName });
@@ -95,13 +95,13 @@ export async function upsertNativeTimePointImage(
       person_id: personId,
       image_type: imageType,
       image_file: imageFile,
-      image_date: sql<Date>`${dateStr}`,
+      image_date: sql<string>`${dateStr}`,
       title: title,
     })
     .onConflict((oc) =>
       oc.columns(['time_point_id', 'image_type']).doUpdateSet({
         image_file: imageFile,
-        image_date: sql<Date>`${dateStr}`,
+        image_date: sql<string>`${dateStr}`,
         title: title,
         person_id: personId,
       })
@@ -179,7 +179,7 @@ export async function updateNativeTimePoint(
       .where('person_id', '=', personId)
       .where('tp_code', '!=', tp_code)
       .where('tp_description', '=', tp_description)
-      .where('tp_date_time', '=', sql<Date>`${tp_date_time}`)
+      .where('tp_date_time', '=', sql<string>`${tp_date_time}`)
       .select('time_point_id')
       .limit(1)
       .executeTakeFirst();
@@ -187,7 +187,7 @@ export async function updateNativeTimePoint(
 
     await trx
       .updateTable('time_points')
-      .set({ tp_description, tp_date_time: sql<Date>`${tp_date_time}` })
+      .set({ tp_description, tp_date_time: sql<string>`${tp_date_time}` })
       .where('person_id', '=', personId)
       .where('tp_code', '=', tp_code)
       .execute();

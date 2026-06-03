@@ -45,7 +45,7 @@ interface PatientInfo {
   AlertCount: number;
   // Legacy fields for backwards compatibility
   name: string | null;
-  start_date: Date | null;
+  start_date: string | null;
   estimatedCost: number | null;
   activeAlert: ActiveAlert | null;
 }
@@ -111,7 +111,7 @@ interface PatientDetails {
   phone: string | null;
   phone2: string | null;
   email: string | null;
-  date_of_birth: Date | null;
+  date_of_birth: string | null;
   gender: number | null;
   address_id: number | null;
   referral_source_id: number | null;
@@ -266,7 +266,7 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
         DolphinId: row.DolphinId,
         date_added: row.date_added,
         AlertCount: Number(row.AlertCount ?? 0),
-        start_date: row.start_date as Date | null,
+        start_date: row.start_date,
         // Legacy fields for backwards compatibility
         name: row.patient_name,
         estimatedCost: row.estimated_cost,
@@ -524,9 +524,9 @@ export function getGenders(): Promise<LookupItem[]> {
  * Retrieves a single patient's full details by person_id.
  */
 export async function getPatientById(personId: number): Promise<PatientDetails | null> {
-  // NOTE: date_of_birth is a PG `date` so its runtime value is a 'YYYY-MM-DD' string
-  // (kysely-codegen still types it as Date — the declared PatientDetails.date_of_birth
-  // type is preserved). date_added is a `timestamp` → genuine Date. (Phase 6/7 review.)
+  // NOTE: date_of_birth is a PG `date` so its runtime value is a 'YYYY-MM-DD' string;
+  // codegen types it `string` and PatientDetails.date_of_birth matches (`string | null`).
+  // date_added is a `timestamp` → genuine Date.
   const row = await getKysely()
     .selectFrom('patients as p')
     .where('p.person_id', '=', personId)

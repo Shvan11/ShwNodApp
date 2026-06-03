@@ -7,8 +7,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { sql } from 'kysely';
 import { getKysely } from '../services/database/kysely.js';
 import { log } from '../utils/logger.js';
-import type { AuthResult, ApiErrorResponse } from '../types/index.js';
-import type { SafeUser, UserRole } from '../types/database.types.js';
+import type { AuthResult, ApiErrorResponse, SafeUser, UserRole } from '../types/index.js';
 
 /**
  * User data from database

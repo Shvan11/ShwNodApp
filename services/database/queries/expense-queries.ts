@@ -2,10 +2,10 @@
  * Expense-related database queries
  *
  * Migration Phase 4: translated to typed Kysely (PostgreSQL). `tblExpenses.amount` is
- * PG `integer` (maps straight to a JS number; no numeric cast). `expenseDate` is a PG
- * `date`, which the centralized pg parser (kysely.ts) returns as a 'YYYY-MM-DD' string;
- * the declared return types still say `Date`, preserved via `$castTo<Date>()` — the
- * runtime value is now a string (see FLAGS). `currency` is `citext`, so equality is
+ * PG `integer` (maps straight to a JS number; no numeric cast). `expense_date` is a PG
+ * `date`, which the centralized pg parser (kysely.ts) returns as a 'YYYY-MM-DD' string,
+ * and the generated `Database` type already types it `string` — so it's projected as-is
+ * and the declared return type is `string` (no `$castTo` needed). `currency` is `citext`, so equality is
  * already case-insensitive (matches the old Arabic_CI_AS column); we keep the trim
  * (`LTRIM(RTRIM(...))`) via PG `btrim()` so the grouping/filtering behavior is identical.
  */
@@ -29,7 +29,7 @@ const MAX_PAGE_SIZE = 1000;
 
 interface Expense {
   id: number;
-  expense_date: Date;
+  expense_date: string;
   amount: number;
   currency: string | null;
   note: string | null;
@@ -83,9 +83,9 @@ export async function getAllExpenses(filters: ExpenseFilters = {}): Promise<Expe
     .selectFrom('expenses as e')
     .leftJoin('expense_categories as c', 'e.category_id', 'c.category_id')
     .leftJoin('expense_subcategories as s', 'e.subcategory_id', 's.subcategory_id')
-    .select((eb) => [
+    .select([
       'e.id',
-      eb.ref('e.expense_date').$castTo<Date>().as('expense_date'),
+      'e.expense_date',
       'e.amount',
       'e.currency',
       'e.note',
@@ -96,10 +96,10 @@ export async function getAllExpenses(filters: ExpenseFilters = {}): Promise<Expe
     ]);
 
   if (filters.startDate) {
-    q = q.where('e.expense_date', '>=', sql<Date>`${filters.startDate}`);
+    q = q.where('e.expense_date', '>=', sql<string>`${filters.startDate}`);
   }
   if (filters.endDate) {
-    q = q.where('e.expense_date', '<=', sql<Date>`${filters.endDate}`);
+    q = q.where('e.expense_date', '<=', sql<string>`${filters.endDate}`);
   }
   if (filters.categoryId) {
     q = q.where('e.category_id', '=', filters.categoryId);
@@ -134,9 +134,9 @@ export async function getExpenseById(id: number): Promise<Expense | null> {
     .leftJoin('expense_categories as c', 'e.category_id', 'c.category_id')
     .leftJoin('expense_subcategories as s', 'e.subcategory_id', 's.subcategory_id')
     .where('e.id', '=', id)
-    .select((eb) => [
+    .select([
       'e.id',
-      eb.ref('e.expense_date').$castTo<Date>().as('expense_date'),
+      'e.expense_date',
       'e.amount',
       'e.currency',
       'e.note',
@@ -191,7 +191,7 @@ export async function addExpense(expenseData: ExpenseData): Promise<{ NewID: num
   const row = await db
     .insertInto('expenses')
     .values({
-      expense_date: sql<Date>`${expenseData.expense_date}`,
+      expense_date: sql<string>`${expenseData.expense_date}`,
       amount: expenseData.amount,
       currency: expenseData.currency || 'IQD',
       note: expenseData.note || null,
@@ -219,7 +219,7 @@ export async function updateExpense(
   await db
     .updateTable('expenses')
     .set({
-      expense_date: sql<Date>`${expenseData.expense_date}`,
+      expense_date: sql<string>`${expenseData.expense_date}`,
       amount: expenseData.amount,
       currency: expenseData.currency || 'IQD',
       note: expenseData.note || null,
@@ -252,8 +252,8 @@ export async function getExpenseSummary(
   return db
     .selectFrom('expenses as e')
     .leftJoin('expense_categories as c', 'e.category_id', 'c.category_id')
-    .where('e.expense_date', '>=', sql<Date>`${startDate}`)
-    .where('e.expense_date', '<=', sql<Date>`${endDate}`)
+    .where('e.expense_date', '>=', sql<string>`${startDate}`)
+    .where('e.expense_date', '<=', sql<string>`${endDate}`)
     .groupBy(['c.category_name', sql`btrim(${sql.ref('e.currency')})`])
     .orderBy('c.category_name')
     .orderBy(sql`btrim(${sql.ref('e.currency')})`)
@@ -276,8 +276,8 @@ export async function getExpenseTotalsByCurrency(
   const db = getKysely();
   return db
     .selectFrom('expenses')
-    .where('expense_date', '>=', sql<Date>`${startDate}`)
-    .where('expense_date', '<=', sql<Date>`${endDate}`)
+    .where('expense_date', '>=', sql<string>`${startDate}`)
+    .where('expense_date', '<=', sql<string>`${endDate}`)
     .groupBy(sql`btrim(${sql.ref('currency')})`)
     .orderBy(sql`btrim(${sql.ref('currency')})`)
     .select((eb) => [

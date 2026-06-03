@@ -12,8 +12,10 @@
  *  - The work-table date columns `start_date`/`debond_date`/`f_photo_date`/`i_photo_date`/
  *    `notes_date`/`discount_date` (and `tblWorkItems.start_date`/`completed_date`) are PG
  *    `date` columns, so the parser yields `'YYYY-MM-DD'` strings at runtime (mssql
- *    returned `Date`). `addition_date` is a `timestamp` and still returns a `Date`.
- *    Declared return interfaces are preserved (callers unchanged) — see FLAGS.
+ *    returned `Date`). `addition_date` is a `timestamp`, typed honestly as `Date | null`
+ *    on the `Work` interface; consumers that cross the HTTP boundary truncate it to a
+ *    local `YYYY-MM-DD` string via `toDateOnly` at the DTO (see `toExistingWorkInfo` in
+ *    WorkService) so the wire never carries a UTC-shifted ISO timestamp.
  */
 import { sql, type Kysely } from 'kysely';
 import { getKysely, withPgTransaction, type Database } from '../kysely.js';
@@ -69,20 +71,20 @@ interface Work {
   notes: string | null;
   status: number;
   addition_date: Date | null;
-  start_date: Date | null;
-  debond_date: Date | null;
-  f_photo_date: Date | null;
-  i_photo_date: Date | null;
+  start_date: string | null;
+  debond_date: string | null;
+  f_photo_date: string | null;
+  i_photo_date: string | null;
   estimated_duration: number | null;
   dr_id: number | null;
-  notes_date: Date | null;
+  notes_date: string | null;
   keyword_id_1: number | null;
   keyword_id_2: number | null;
   keyword_id_3: number | null;
   keyword_id_4: number | null;
   keyword_id_5: number | null;
   discount: number | null;
-  discount_date: Date | null;
+  discount_date: string | null;
   discount_reason: string | null;
   doctor_name: string | null;
   type_name: string | null;
@@ -100,6 +102,22 @@ interface WorkDetails extends Work {
   patient_name: string;
 }
 
+/**
+ * Truncate a work row's `addition_date` (`timestamp` → a real `Date` at runtime) to a
+ * local `YYYY-MM-DD` string for the wire. `res.json()` would otherwise serialize the
+ * `Date` via `.toISOString()` (UTC), which can shift a near-midnight value back a day.
+ * Every other field is passed through untouched; generic so it covers both `Work`
+ * (the list/`getWorksByPatient`) and `WorkDetails`/`getWorkById` callers.
+ */
+export function toWorkWire<T extends { addition_date: Date | null }>(
+  work: T
+): Omit<T, 'addition_date'> & { addition_date: string | null } {
+  return {
+    ...work,
+    addition_date: work.addition_date ? toDateOnly(work.addition_date) : null,
+  };
+}
+
 interface WorkItem {
   id: number;
   work_id: number;
@@ -114,8 +132,8 @@ interface WorkItem {
   material: string | null;
   lab_name: string | null;
   item_cost: number | null;
-  start_date: Date | null;
-  completed_date: Date | null;
+  start_date: string | null;
+  completed_date: string | null;
   note: string | null;
   Teeth: string | null;
   TeethIds: number[];
@@ -128,20 +146,20 @@ interface WorkData {
   type_of_work?: number | null;
   notes?: string | null;
   status?: WorkStatusType;
-  start_date?: Date | string | null;
-  debond_date?: Date | string | null;
-  f_photo_date?: Date | string | null;
-  i_photo_date?: Date | string | null;
+  start_date?: string | null;
+  debond_date?: string | null;
+  f_photo_date?: string | null;
+  i_photo_date?: string | null;
   estimated_duration?: number | null;
   dr_id: number;
-  notes_date?: Date | string | null;
+  notes_date?: string | null;
   keyword_id_1?: number | null;
   keyword_id_2?: number | null;
   keyword_id_3?: number | null;
   keyword_id_4?: number | null;
   keyword_id_5?: number | null;
   discount?: number | null;
-  discount_date?: Date | string | null;
+  discount_date?: string | null;
   discount_reason?: string | null;
 }
 
@@ -157,8 +175,8 @@ interface WorkItemData {
   material?: string | null;
   lab_name?: string | null;
   item_cost?: number | null;
-  start_date?: Date | string | null;
-  completed_date?: Date | string | null;
+  start_date?: string | null;
+  completed_date?: string | null;
   note?: string | null;
   TeethIds?: number[];
 }
@@ -467,8 +485,8 @@ export async function addWorkDetail(workDetailData: WorkItemData): Promise<{ id:
         material: workDetailData.material || null,
         lab_name: workDetailData.lab_name || null,
         item_cost: workDetailData.item_cost || null,
-        start_date: (workDetailData.start_date as Date | string | null) || null,
-        completed_date: (workDetailData.completed_date as Date | string | null) || null,
+        start_date: (workDetailData.start_date as string | null) || null,
+        completed_date: (workDetailData.completed_date as string | null) || null,
         note: workDetailData.note || null,
       })
       .returning('id')
@@ -508,8 +526,8 @@ export async function updateWorkDetail(
         material: workDetailData.material || null,
         lab_name: workDetailData.lab_name || null,
         item_cost: workDetailData.item_cost || null,
-        start_date: (workDetailData.start_date as Date | string | null) || null,
-        completed_date: (workDetailData.completed_date as Date | string | null) || null,
+        start_date: (workDetailData.start_date as string | null) || null,
+        completed_date: (workDetailData.completed_date as string | null) || null,
         note: workDetailData.note || null,
       })
       .where('id', '=', detailId)
@@ -562,13 +580,13 @@ export async function addWork(workData: WorkData): Promise<{ work_id: number } |
       type_of_work: numOrNull(workData.type_of_work) as number,
       notes: workData.notes || null,
       status: status,
-      start_date: (workData.start_date as Date | string | null) || null,
-      debond_date: (workData.debond_date as Date | string | null) || null,
-      f_photo_date: (workData.f_photo_date as Date | string | null) || null,
-      i_photo_date: (workData.i_photo_date as Date | string | null) || null,
+      start_date: (workData.start_date as string | null) || null,
+      debond_date: (workData.debond_date as string | null) || null,
+      f_photo_date: (workData.f_photo_date as string | null) || null,
+      i_photo_date: (workData.i_photo_date as string | null) || null,
       estimated_duration: numOrNull(workData.estimated_duration),
       dr_id: workData.dr_id,
-      notes_date: (workData.notes_date as Date | string | null) || null,
+      notes_date: (workData.notes_date as string | null) || null,
       keyword_id_1: numOrNull(workData.keyword_id_1),
       keyword_id_2: numOrNull(workData.keyword_id_2),
       keyword_id_3: numOrNull(workData.keyword_id_3),
@@ -594,20 +612,20 @@ export async function updateWork(
     type_of_work: numOrNull(workData.type_of_work),
     notes: workData.notes || null,
     status: workData.status ?? WORK_STATUS.ACTIVE,
-    start_date: (workData.start_date as Date | string | null) || null,
-    debond_date: (workData.debond_date as Date | string | null) || null,
-    f_photo_date: (workData.f_photo_date as Date | string | null) || null,
-    i_photo_date: (workData.i_photo_date as Date | string | null) || null,
+    start_date: (workData.start_date as string | null) || null,
+    debond_date: (workData.debond_date as string | null) || null,
+    f_photo_date: (workData.f_photo_date as string | null) || null,
+    i_photo_date: (workData.i_photo_date as string | null) || null,
     estimated_duration: numOrNull(workData.estimated_duration),
     dr_id: workData.dr_id,
-    notes_date: (workData.notes_date as Date | string | null) || null,
+    notes_date: (workData.notes_date as string | null) || null,
     keyword_id_1: numOrNull(workData.keyword_id_1),
     keyword_id_2: numOrNull(workData.keyword_id_2),
     keyword_id_3: numOrNull(workData.keyword_id_3),
     keyword_id_4: numOrNull(workData.keyword_id_4),
     keyword_id_5: numOrNull(workData.keyword_id_5),
     discount: numOrNull(workData.discount),
-    discount_date: (workData.discount_date as Date | string | null) || null,
+    discount_date: (workData.discount_date as string | null) || null,
     discount_reason: workData.discount_reason ?? null,
   };
 
@@ -697,13 +715,13 @@ export async function addWorkWithInvoice(
           type_of_work: numOrNull(workData.type_of_work) as number,
           notes: workData.notes || null,
           status: WORK_STATUS.FINISHED,
-          start_date: (workData.start_date as Date | string | null) || null,
-          debond_date: (workData.debond_date as Date | string | null) || null,
-          f_photo_date: (workData.f_photo_date as Date | string | null) || null,
-          i_photo_date: (workData.i_photo_date as Date | string | null) || null,
+          start_date: (workData.start_date as string | null) || null,
+          debond_date: (workData.debond_date as string | null) || null,
+          f_photo_date: (workData.f_photo_date as string | null) || null,
+          i_photo_date: (workData.i_photo_date as string | null) || null,
           estimated_duration: numOrNull(workData.estimated_duration),
           dr_id: workData.dr_id,
-          notes_date: (workData.notes_date as Date | string | null) || null,
+          notes_date: (workData.notes_date as string | null) || null,
           keyword_id_1: numOrNull(workData.keyword_id_1),
           keyword_id_2: numOrNull(workData.keyword_id_2),
           keyword_id_3: numOrNull(workData.keyword_id_3),

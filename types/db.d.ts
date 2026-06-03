@@ -62,11 +62,11 @@ export interface AlignerActivityFlags {
 export interface AlignerBatches {
   aligner_batch_id: Generated<number>;
   aligner_set_id: number;
-  batch_expiry_date: Generated<Timestamp | null>;
+  batch_expiry_date: Generated<string | null>;
   batch_sequence: number;
   creation_date: Generated<Timestamp>;
   days: number | null;
-  delivered_to_patient_date: Timestamp | null;
+  delivered_to_patient_date: string | null;
   has_lower_template: Generated<boolean>;
   has_upper_template: Generated<boolean>;
   is_active: Generated<boolean | null>;
@@ -74,7 +74,7 @@ export interface AlignerBatches {
   lower_aligner_count: number;
   lower_aligner_end_sequence: Generated<number | null>;
   lower_aligner_start_sequence: number | null;
-  manufacture_date: Timestamp | null;
+  manufacture_date: string | null;
   notes: string | null;
   upper_aligner_count: number;
   upper_aligner_end_sequence: Generated<number | null>;
@@ -104,7 +104,7 @@ export interface AlignerSets {
   aligner_dr_id: number;
   aligner_set_id: Generated<number>;
   archform_id: number | null;
-  creation_date: Timestamp | null;
+  creation_date: string | null;
   currency: Generated<string | null>;
   days: number | null;
   drive_file_id: string | null;
@@ -129,7 +129,7 @@ export interface AlignerSets {
 export interface Appointments {
   app_cost: string | null;
   app_date: Timestamp;
-  app_day: Generated<Timestamp | null>;
+  app_day: Generated<string | null>;
   app_detail: string | null;
   app_time: Generated<string | null>;
   appointment_id: Generated<number>;
@@ -162,7 +162,7 @@ export interface Calendar {
 }
 
 export interface CarriedWires {
-  addition_date: Timestamp;
+  addition_date: string;
   id: Generated<number>;
   person_id: number;
   upper_lower: string;
@@ -339,7 +339,7 @@ export interface Expenses {
   amount: number;
   category_id: number | null;
   currency: string | null;
-  expense_date: Timestamp;
+  expense_date: string;
   id: Generated<number>;
   note: string | null;
   subcategory_id: number | null;
@@ -358,7 +358,7 @@ export interface Genders {
 
 export interface Holidays {
   description: string | null;
-  holiday_date: Timestamp;
+  holiday_date: string;
   holiday_name: Generated<string>;
   id: Generated<number>;
 }
@@ -390,7 +390,7 @@ export interface Invoices {
   aligner_set_id: number | null;
   amount_paid: number;
   change: number | null;
-  date_of_payment: Timestamp;
+  date_of_payment: string;
   invoice_id: Generated<number>;
   iqd_received: Generated<number>;
   sys_start_time: Generated<Timestamp>;
@@ -446,7 +446,7 @@ export interface Patients {
   country_code: string | null;
   currency: string | null;
   date_added: Generated<Timestamp | null>;
-  date_of_birth: Timestamp | null;
+  date_of_birth: string | null;
   email: string | null;
   estimated_cost: number | null;
   first_name: string | null;
@@ -501,6 +501,7 @@ export interface Positions {
 }
 
 export interface PrivatePhotos {
+  id: Generated<Int8>;
   image_name: string;
   marked_at: Generated<Timestamp>;
   marked_by: number | null;
@@ -523,7 +524,7 @@ export interface Screws {
 }
 
 export interface Sms {
-  date: Timestamp;
+  date: string;
   email_sent: Generated<boolean>;
   exchange_rate: number | null;
   id: Generated<number>;
@@ -550,7 +551,7 @@ export interface StandItems {
   created_by: number | null;
   current_stock: Generated<number>;
   date_added: Generated<Timestamp>;
-  expiry_date: Timestamp | null;
+  expiry_date: string | null;
   is_active: Generated<boolean>;
   item_id: Generated<number>;
   item_name: string;
@@ -622,7 +623,7 @@ export interface TagOptions {
 
 export interface TimePointImages {
   dolphin_tpi_id: string | null;
-  image_date: Timestamp | null;
+  image_date: string | null;
   image_file: string | null;
   image_type: string | null;
   person_id: number;
@@ -638,7 +639,7 @@ export interface TimePoints {
   person_id: number;
   time_point_id: Generated<number>;
   tp_code: number;
-  tp_date_time: Timestamp | null;
+  tp_date_time: string | null;
   tp_description: string | null;
 }
 
@@ -699,13 +700,13 @@ export interface Visits {
   others: string | null;
   p_photo: Generated<boolean | null>;
   upper_wire_id: number | null;
-  visit_date: Timestamp;
+  visit_date: string;
   wire_bending: string | null;
   work_id: number;
 }
 
 export interface Waiting {
-  creation_date: Timestamp;
+  creation_date: string;
   id: Generated<number>;
   person_id: number;
   type_id: number | null;
@@ -723,7 +724,7 @@ export interface Wires {
 
 export interface WorkItems {
   canals_no: number | null;
-  completed_date: Timestamp | null;
+  completed_date: string | null;
   filling_depth: string | null;
   filling_type: string | null;
   id: Generated<number>;
@@ -734,7 +735,7 @@ export interface WorkItems {
   lab_name: string | null;
   material: string | null;
   note: string | null;
-  start_date: Timestamp | null;
+  start_date: string | null;
   work_id: number;
   working_length: string | null;
 }
@@ -748,23 +749,23 @@ export interface WorkItemTeeth {
 export interface Works {
   addition_date: Generated<Timestamp | null>;
   currency: string | null;
-  debond_date: Timestamp | null;
+  debond_date: string | null;
   discount: number | null;
-  discount_date: Timestamp | null;
+  discount_date: string | null;
   discount_reason: string | null;
   dr_id: number;
   estimated_duration: number | null;
-  f_photo_date: Timestamp | null;
-  i_photo_date: Timestamp | null;
+  f_photo_date: string | null;
+  i_photo_date: string | null;
   keyword_id_1: number | null;
   keyword_id_2: number | null;
   keyword_id_3: number | null;
   keyword_id_4: number | null;
   keyword_id_5: number | null;
   notes: string | null;
-  notes_date: Timestamp | null;
+  notes_date: string | null;
   person_id: number;
-  start_date: Timestamp | null;
+  start_date: string | null;
   status: Generated<number>;
   total_required: number;
   type_of_work: number;

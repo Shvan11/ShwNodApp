@@ -15,25 +15,25 @@ interface PatientForPhotoSession {
   firstName: string | null;
   lastName: string | null;
   patientName: string | null;
-  dob: Date | null;
+  dob: string | null;
   gender: number | null;
 }
 
 interface PhotoSessionAppointment {
-  date: Date;
+  date: string;
   description: string;
 }
 
 interface PhotoSessionVisit {
-  visitDate: Date;
+  visitDate: string;
   hasInitialPhoto: boolean | null;
   hasFinalPhoto: boolean | null;
   hasProgressPhoto: boolean | null;
 }
 
 interface ExistingPhotoDate {
-  iPhotoDate: Date | null;
-  fPhotoDate: Date | null;
+  iPhotoDate: string | null;
+  fPhotoDate: string | null;
 }
 
 /**
@@ -88,7 +88,7 @@ export async function getPhotoSessionAppointments(
     .orderBy('app_date', 'desc')
     .select('app_day')
     .execute();
-  return rows.map((r) => ({ date: r.app_day as unknown as Date, description: '' }));
+  return rows.map((r) => ({ date: r.app_day as string, description: '' }));
 }
 
 /**
@@ -111,7 +111,7 @@ export async function getPhotoSessionVisits(personId: string): Promise<PhotoSess
     .select(['visit_date', 'i_photo', 'f_photo', 'p_photo'])
     .execute();
   return rows.map((r) => ({
-    visitDate: r.visit_date as unknown as Date,
+    visitDate: r.visit_date,
     hasInitialPhoto: r.i_photo,
     hasFinalPhoto: r.f_photo,
     hasProgressPhoto: r.p_photo,
@@ -122,8 +122,8 @@ export async function getPhotoSessionVisits(personId: string): Promise<PhotoSess
  * Get existing i_photo_date/f_photo_date from tblwork for conflict detection.
  */
 export async function getExistingPhotoDate(personId: string): Promise<ExistingPhotoDate | null> {
-  // i_photo_date/f_photo_date are PG `date` → 'YYYY-MM-DD' strings at runtime (typed Date
-  // by codegen; declared ExistingPhotoDate types preserved). Phase 6/7 consumer review.
+  // i_photo_date/f_photo_date are PG `date` → 'YYYY-MM-DD' strings at runtime; codegen
+  // types them `string`, and ExistingPhotoDate matches (`string | null`).
   const row = await getKysely()
     .selectFrom('works')
     .where('person_id', '=', parseInt(personId, 10))

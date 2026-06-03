@@ -111,7 +111,7 @@ export async function getPresentAps(PDate: string): Promise<AppointmentsResponse
     .selectFrom('appointments as a')
     .innerJoin('patients as p', 'p.person_id', 'a.person_id')
     .leftJoin('patient_types as pt', 'pt.id', 'p.patient_type_id')
-    .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
+    .where('a.app_day', '=', sql<string>`${dateStr}::date`)
     .where('a.present', 'is not', null)
     .where('a.dismissed', 'is', null)
     .orderBy('a.present')
@@ -140,7 +140,7 @@ export async function getPresentAps(PDate: string): Promise<AppointmentsResponse
 
   const counts = await db
     .selectFrom('appointments')
-    .where('app_day', '=', sql<Date>`${dateStr}::date`)
+    .where('app_day', '=', sql<string>`${dateStr}::date`)
     .select((eb) => [
       eb.fn.countAll<number>().as('all'),
       eb.fn.sum<number>(sql`CASE WHEN "present" IS NOT NULL THEN 1 ELSE 0 END`).as('present'),
@@ -249,7 +249,7 @@ export async function getDailyAppointmentsOptimized(
     .selectFrom('appointments as a')
     .innerJoin('patients as p', 'p.person_id', 'a.person_id')
     .leftJoin('patient_types as pt', 'pt.id', 'p.patient_type_id')
-    .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
+    .where('a.app_day', '=', sql<string>`${dateStr}::date`)
     .select([
       'a.appointment_id', 'a.person_id', 'a.app_detail', 'a.present', 'a.seated', 'a.dismissed',
       'a.app_date', 'a.app_cost', 'p.patient_name', 'pt.patient_type',
@@ -403,7 +403,7 @@ export async function getAppointmentsWithPhones(date: string): Promise<Appointme
     .innerJoin('patients as p', 'p.person_id', 'a.person_id')
     .leftJoin('patient_types as pt', 'pt.id', 'p.patient_type_id')
     .leftJoin('employees as e', 'e.id', 'a.dr_id')
-    .where('a.app_day', '=', sql<Date>`${dateStr}::date`)
+    .where('a.app_day', '=', sql<string>`${dateStr}::date`)
     .where('a.present', 'is', null)
     .orderBy('a.app_date')
     .select([

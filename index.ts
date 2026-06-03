@@ -578,6 +578,16 @@ async function gracefulShutdown(signal: string): Promise<void> {
   log.info(`\n🛑 Graceful shutdown initiated by ${signal}`);
 
   try {
+    // End long-lived SSE streams FIRST. They set req/res.setTimeout(0), so they
+    // never self-terminate — leaving them open makes server.close() block until
+    // the 5 s forceExit fires on every shutdown that has a kiosk/appointments/
+    // WhatsApp viewer connected. Tearing them down here lets server.close()
+    // resolve as soon as genuine in-flight requests drain. (Teardown is
+    // idempotent; the post-DB cleanup below no longer needs to repeat it.)
+    log.info('📡 Stopping SSE broadcasters...');
+    teardownSseBroadcaster();
+    teardownWhatsappSseBroadcaster();
+
     // Stop accepting new connections; wait up to 5 s for in-flight requests.
     if (server) {
       log.info('🔌 Closing HTTP server...');
@@ -618,10 +628,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
       await messageState.cleanup();
     }
 
-    // Stop SSE broadcasters (clears keep-alive timers, ends open streams)
-    log.info('📡 Stopping SSE broadcasters...');
-    teardownSseBroadcaster();
-    teardownWhatsappSseBroadcaster();
+    // (SSE broadcasters already torn down before server.close() above.)
 
     // Close database connections
     log.info('🗄️  Closing database connections...');

@@ -40,7 +40,7 @@ export async function isDateHoliday(date: string): Promise<Holiday | null> {
     // holiday_date is a PG `date`; pass the 'YYYY-MM-DD' string as a param (PG infers the
     // date type from the comparison). kysely-codegen types `date` as timestamp(Date), so
     // the value is wrapped to satisfy the static type without changing the emitted SQL.
-    .where('holiday_date', '=', sql<Date>`${date}`)
+    .where('holiday_date', '=', sql<string>`${date}`)
     .select((eb) => [
       'id',
       eb.ref('holiday_date').$castTo<string>().as('holiday_date'),
@@ -59,8 +59,8 @@ export async function getHolidaysInRange(startDate: string, endDate: string): Pr
   const db = getKysely();
   return db
     .selectFrom('holidays')
-    .where('holiday_date', '>=', sql<Date>`${startDate}`)
-    .where('holiday_date', '<=', sql<Date>`${endDate}`)
+    .where('holiday_date', '>=', sql<string>`${startDate}`)
+    .where('holiday_date', '<=', sql<string>`${endDate}`)
     .orderBy('holiday_date')
     .select((eb) => [
       'id',

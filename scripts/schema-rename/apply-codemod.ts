@@ -186,8 +186,6 @@ const TARGET_FILES = [
   path.join(REPO_ROOT, 'services/messaging/chair-payload-builder.ts'),
   path.join(REPO_ROOT, 'services/pdf/appointment-pdf-generator.ts'),
   path.join(REPO_ROOT, 'services/templates/receipt-service.ts'),
-  // Shared types
-  path.join(REPO_ROOT, 'types/database.types.ts'),
 ].filter(fs.existsSync);
 
 // ── Run ───────────────────────────────────────────────────────────────────────────────────────────

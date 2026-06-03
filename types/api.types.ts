@@ -5,7 +5,31 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import type { Session } from 'express-session';
-import type { UserRole, SafeUser } from './database.types.js';
+
+// ===========================================
+// USER TYPES
+// ===========================================
+
+/**
+ * Application user roles.
+ *
+ * App-level domain knowledge — the `users.role` column is a free-form
+ * `citext`/string in the generated DB types, so this narrowed union lives here
+ * (the API contract), not in the database row types.
+ */
+export type UserRole = 'admin' | 'secretary' | 'doctor' | 'user';
+
+/**
+ * User without sensitive data — the sanitized shape returned to clients
+ * (camelCase DTO, never a raw DB row).
+ */
+export interface SafeUser {
+  userId: number;
+  username: string;
+  fullName: string;
+  role: UserRole;
+  isActive: boolean;
+}
 
 // ===========================================
 // SESSION TYPES
