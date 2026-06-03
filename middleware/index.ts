@@ -3,6 +3,7 @@
  * Central export for all middleware modules
  */
 import express, { type Application } from 'express';
+import helmet from 'helmet';
 
 // Re-export authentication middleware
 export {
@@ -60,6 +61,27 @@ export function setupMiddleware(app: Application): void {
   // real client IP from X-Forwarded-For while rejecting spoofed headers from
   // any non-localhost connection.
   app.set('trust proxy', 'loopback');
+
+  // Security response headers. The app serves PHI (X-rays/photos) and is reachable
+  // off-LAN via the Cloudflare tunnel, so the baseline hardening headers
+  // (nosniff, frameguard, HSTS, referrer-policy, etc.) are worth having.
+  //
+  // Deliberately disabled for now — each has a concrete break risk in this
+  // deployment, to be revisited rather than enabled blindly:
+  //  - contentSecurityPolicy: GrapesJS template editor + PhotoSwipe gallery use
+  //    inline styles/scripts; a default CSP would break them. Tighten incrementally.
+  //  - crossOriginResourcePolicy / Embedder / Opener: the SPA is served under two
+  //    origins (local.* on-LAN, remote.* via tunnel) and uses Google OAuth flows;
+  //    the default same-origin cross-origin policies can block legitimate
+  //    cross-origin resource loads and OAuth windows.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      crossOriginOpenerPolicy: false,
+      crossOriginResourcePolicy: false,
+    })
+  );
 
   // No CORS middleware — the SPA is served by the same Node process (production
   // via Caddy reverse proxy, dev via Vite proxy), so all API calls are

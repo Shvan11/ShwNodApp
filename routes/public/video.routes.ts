@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { log } from '../../utils/logger.js';
 import { getMediaMimeType } from '../../utils/video-mime.js';
+import { streamFile } from '../../utils/stream-file.js';
 import * as videoQueries from '../../services/database/queries/video-queries.js';
 
 const router = Router();
@@ -99,35 +100,10 @@ router.get('/:id/stream', async (req: Request<VideoIdParams>, res: Response): Pr
       res.status(404).json({ error: 'Video file not found' });
       return;
     }
-    const fileSize = stat.size;
-    const range = req.headers.range;
     const mimeType = getMediaMimeType(filePath);
 
-    if (range) {
-      const parts = range.replace(/bytes=/, '').split('-');
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-      const chunkSize = end - start + 1;
-
-      const fileStream = fs.createReadStream(filePath, { start, end });
-
-      res.writeHead(206, {
-        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-        'Accept-Ranges': 'bytes',
-        'Content-Length': chunkSize,
-        'Content-type': mimeType,
-      });
-
-      fileStream.pipe(res);
-    } else {
-      res.writeHead(200, {
-        'Content-Length': fileSize,
-        'Content-type': mimeType,
-        'Accept-Ranges': 'bytes',
-      });
-
-      fs.createReadStream(filePath).pipe(res);
-    }
+    // Range validation + stream error handling live in the shared helper.
+    streamFile(req, res, filePath, stat.size, mimeType);
   } catch (error) {
     log.error('[Public Video] Error streaming video:', error);
     res.status(500).json({ error: 'Failed to stream video' });
@@ -165,13 +141,8 @@ router.get('/:id/download', async (req: Request<VideoIdParams>, res: Response): 
     const fileName = `${video.description.replace(/[^a-zA-Z0-9\s-]/g, '').trim()}${path.extname(filePath)}`;
     const mimeType = getMediaMimeType(filePath);
 
-    res.writeHead(200, {
-      'Content-Length': stat.size,
-      'Content-type': mimeType,
-      'Content-Disposition': `attachment; filename="${fileName}"`,
-    });
-
-    fs.createReadStream(filePath).pipe(res);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    streamFile(req, res, filePath, stat.size, mimeType);
   } catch (error) {
     log.error('[Public Video] Error downloading video:', error);
     res.status(500).json({ error: 'Failed to download video' });

@@ -6,9 +6,10 @@
  */
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
-import fs, { promises as fsp, type Stats } from 'fs';
+import { promises as fsp, type Stats } from 'fs';
 import path from 'path';
 import { getMediaMimeType } from '../../utils/video-mime.js';
+import { streamFile } from '../../utils/stream-file.js';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
 import * as videoQueries from '../../services/database/queries/video-queries.js';
@@ -209,37 +210,10 @@ router.get('/:id/stream', async (req: Request<VideoIdParams>, res: Response): Pr
       }
       throw err;
     }
-    const fileSize = stat.size;
-    const range = req.headers.range;
     const mimeType = getMediaMimeType(filePath);
 
-    if (range) {
-      // Handle range request for video seeking
-      const parts = range.replace(/bytes=/, '').split('-');
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-      const chunkSize = end - start + 1;
-
-      const fileStream = fs.createReadStream(filePath, { start, end });
-
-      res.writeHead(206, {
-        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-        'Accept-Ranges': 'bytes',
-        'Content-Length': chunkSize,
-        'Content-type': mimeType,
-      });
-
-      fileStream.pipe(res);
-    } else {
-      // No range - send entire file
-      res.writeHead(200, {
-        'Content-Length': fileSize,
-        'Content-type': mimeType,
-        'Accept-Ranges': 'bytes',
-      });
-
-      fs.createReadStream(filePath).pipe(res);
-    }
+    // Range validation + stream error handling live in the shared helper.
+    streamFile(req, res, filePath, stat.size, mimeType);
   } catch (error) {
     log.error('[Videos] Error streaming video:', error);
     ErrorResponses.serverError(res, 'Failed to stream video', error as Error);
@@ -280,13 +254,8 @@ router.get('/:id/thumbnail', async (req: Request<VideoIdParams>, res: Response):
     }
     const mimeType = getMediaMimeType(filePath);
 
-    res.writeHead(200, {
-      'Content-Length': stat.size,
-      'Content-type': mimeType,
-      'Cache-Control': 'public, max-age=86400', // Cache for 24 hours
-    });
-
-    fs.createReadStream(filePath).pipe(res);
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+    streamFile(req, res, filePath, stat.size, mimeType);
   } catch (error) {
     log.error('[Videos] Error fetching thumbnail:', error);
     ErrorResponses.serverError(res, 'Failed to fetch thumbnail', error as Error);
@@ -375,7 +344,7 @@ router.post(
         const newThumbnailPath = path.join(uploadPath, `${fileName}.jpg`);
 
         if (thumbnailFile.path !== newThumbnailPath) {
-          fs.renameSync(thumbnailFile.path, newThumbnailPath);
+          await fsp.rename(thumbnailFile.path, newThumbnailPath);
         }
       }
 

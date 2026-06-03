@@ -59,10 +59,21 @@ router.post(
         return;
       }
 
+      // Regenerate the session id on login to prevent session fixation — a
+      // pre-auth session id must not carry over into the authenticated session.
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
+
       // Set portal session
       req.session.patientId = pid;
       req.session.patientName = result.patientName || undefined;
       req.session.cookie.maxAge = 24 * 60 * 60 * 1000; // 24h
+
+      // Persist the regenerated, populated session before responding.
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => (err ? reject(err) : resolve()));
+      });
 
       res.json({
         success: true,

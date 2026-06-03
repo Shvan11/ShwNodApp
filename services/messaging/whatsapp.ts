@@ -2,7 +2,7 @@
 import EventEmitter from 'events';
 import messageState, { type Person as StatePersonType } from '../state/messageState.js';
 import stateEvents from '../state/stateEvents.js';
-import { getWhatsAppMessages } from '../database/queries/messaging-queries.js';
+import { getWhatsAppMessages, markWhatsAppBatchSent } from '../database/queries/messaging-queries.js';
 import * as messagingQueries from '../database/queries/messaging-queries.js';
 import { InternalEmitterEvents } from './websocket-events.js';
 import { messageSessionManager, type MessageLookupResult } from './MessageSessionManager.js';
@@ -1482,6 +1482,14 @@ class WhatsAppService extends EventEmitter {
             log.error(`Error sending message to ${numbers[i]}`, error);
             results.push({ success: false, error: (error as Error).message });
           }
+        }
+
+        // Mark the date's per-day row as processed now that the batch has been
+        // dispatched (moved here from the read path so previewing never writes).
+        try {
+          await markWhatsAppBatchSent(date);
+        } catch (err) {
+          log.warn('Failed to mark WhatsApp batch as sent', { date, error: (err as Error).message });
         }
 
         await this.messageState.setFinishedSending(true);

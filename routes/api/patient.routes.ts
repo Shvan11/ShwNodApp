@@ -300,10 +300,10 @@ router.get(
  */
 router.get(
   '/patients/:personId/timepoints/:tpCode/folder',
-  async (req: Request<{ personId: string; tp_code: string }>, res: Response): Promise<void> => {
+  async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
     try {
       const personId = Number.parseInt(req.params.personId, 10);
-      const tpCode = Number.parseInt(req.params.tp_code, 10);
+      const tpCode = Number.parseInt(req.params.tpCode, 10);
       if (!Number.isInteger(personId) || !Number.isInteger(tpCode)) {
         ErrorResponses.badRequest(res, 'Invalid patient id or time point code');
         return;
@@ -342,10 +342,10 @@ function parseLocalDate(s: string): Date | null {
 router.put(
   '/patients/:personId/timepoints/:tpCode',
   authorize(['admin', 'secretary']),
-  async (req: Request<{ personId: string; tp_code: string }>, res: Response): Promise<void> => {
+  async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
     try {
       const personId = Number.parseInt(req.params.personId, 10);
-      const tpCode = Number.parseInt(req.params.tp_code, 10);
+      const tpCode = Number.parseInt(req.params.tpCode, 10);
       if (!Number.isInteger(personId) || !Number.isInteger(tpCode)) {
         ErrorResponses.badRequest(res, 'Invalid patient id or time point code');
         return;
@@ -444,10 +444,10 @@ router.put(
 router.delete(
   '/patients/:personId/timepoints/:tpCode',
   authorize(['admin', 'secretary']),
-  async (req: Request<{ personId: string; tp_code: string }>, res: Response): Promise<void> => {
+  async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
     try {
       const personId = Number.parseInt(req.params.personId, 10);
-      const tpCode = Number.parseInt(req.params.tp_code, 10);
+      const tpCode = Number.parseInt(req.params.tpCode, 10);
       if (!Number.isInteger(personId) || !Number.isInteger(tpCode)) {
         ErrorResponses.badRequest(res, 'Invalid patient id or time point code');
         return;

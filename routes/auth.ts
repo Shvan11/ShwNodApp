@@ -90,6 +90,13 @@ router.post(
         return;
       }
 
+      // Regenerate the session id on privilege escalation to prevent session
+      // fixation — a pre-auth (potentially attacker-supplied) session id must
+      // not carry over into the authenticated session.
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
+
       // Create session
       req.session.userId = result.user!.userId;
       req.session.username = result.user!.username;
@@ -103,12 +110,17 @@ router.post(
         req.session.cookie.maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days default
       }
 
+      // Persist the regenerated, populated session before responding so the new
+      // id is stored server-side before the client starts using it.
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => (err ? reject(err) : resolve()));
+      });
+
       log.info('User logged in', {
         username: result.user!.username,
         role: result.user!.role
       });
 
-      // Session is automatically saved when modified (resave: false handles this)
       res.json({
         success: true,
         message: 'Login successful',

@@ -465,8 +465,6 @@ export async function getWhatsAppMessages(
         names.push(r.patientName || '');
       }
 
-      await sql`UPDATE "sms" SET "sms_sent" = true WHERE "date" = ${dateStr}::date`.execute(getKysely());
-
       log.debug('WhatsApp messages retrieved successfully', { messageCount: ids.length, date });
       return [numbers, messages, ids, names] as [string[], string[], number[], string[]];
     }, operationName)
@@ -474,6 +472,19 @@ export async function getWhatsAppMessages(
       log.error('Failed to retrieve WhatsApp messages', { operationName, error: error.message });
       return [[], [], [], []] as [string[], string[], number[], string[]];
     });
+}
+
+/**
+ * Mark a date's per-day messaging row (`sms`) as processed.
+ *
+ * This was previously a side effect baked into `getWhatsAppMessages`, which
+ * meant merely *previewing* a date's messages (the /count and /details GET
+ * endpoints) flipped the flag. The flag belongs to the actual send flow, so it
+ * now lives here and is called only after messages are dispatched.
+ */
+export async function markWhatsAppBatchSent(date: Date | string): Promise<void> {
+  const dateStr = typeof date === 'string' ? date.slice(0, 10) : toDateOnly(date);
+  await sql`UPDATE "sms" SET "sms_sent" = true WHERE "date" = ${dateStr}::date`.execute(getKysely());
 }
 
 /**
