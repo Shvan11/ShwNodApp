@@ -25,7 +25,7 @@ interface ReceiptRow {
   app_date: Date;
   date_of_payment: Date;
   amount_paid: number;
-  workid: number;
+  work_id: number;
   total_required: number;
   currency: string;
   discount: number | null;
@@ -179,7 +179,7 @@ export async function getReceiptData(workId: number): Promise<ReceiptData> {
       app_date: data.app_date,
     },
     work: {
-      work_id: data.workid,
+      work_id: data.work_id,
       total_required: data.total_required,
       currency: data.currency,
       discount: discount,
@@ -213,6 +213,37 @@ async function getDefaultTemplatePath(): Promise<string> {
 
   if (results.length === 0 || !results[0]?.template_file_path) {
     throw new Error('Default receipt template not found');
+  }
+
+  return results[0].template_file_path;
+}
+
+/**
+ * Well-known name of the discount-variant receipt template.
+ * Selected by name (mirrors getNoWorkTemplatePath) rather than by a templating
+ * conditional inside the file — the GrapesJS editor mangles {{#if}} blocks, so
+ * the two layouts live in two flat, fully WYSIWYG templates and the app picks
+ * one at render time on work.HasDiscount.
+ */
+const DISCOUNT_TEMPLATE_NAME = 'Shwan Orthodontics Default Receipt (With Discount)';
+
+/**
+ * Get the discount-variant template file path from database.
+ * Falls back to the on-disk discount file path if the row isn't present yet,
+ * so a missing/renamed row degrades gracefully instead of throwing.
+ * @returns Template file path
+ */
+async function getDiscountTemplatePath(): Promise<string> {
+  const { rows: results } = await sql<{ template_file_path: string | null }>`
+        SELECT "template_file_path"
+        FROM "document_templates"
+        WHERE "template_name" = ${DISCOUNT_TEMPLATE_NAME}
+        AND "is_active" = true
+    `.execute(getKysely());
+
+  if (results.length === 0 || !results[0]?.template_file_path) {
+    log.warn('[RECEIPT-SERVICE] Discount template not in database, using default path');
+    return 'data/templates/shwan-orthodontics-default-receipt-discount.html';
   }
 
   return results[0].template_file_path;
@@ -398,15 +429,18 @@ function formatDate(dateValue: unknown, pattern: string): string {
  * @returns Receipt HTML
  */
 export async function generateReceiptHTML(workId: number): Promise<string> {
-  // Get template file path from database
-  const templatePath = await getDefaultTemplatePath();
+  // Get receipt data from V_Report view first — the layout (with/without the
+  // discount rows) is chosen on data, not by a templating conditional.
+  const data = await getReceiptData(workId);
+
+  // Pick the flat template variant: discount layout only when a discount applies.
+  const templatePath = data.work.HasDiscount
+    ? await getDiscountTemplatePath()
+    : await getDefaultTemplatePath();
   const fullPath = path.join(process.cwd(), templatePath);
 
   // Read template file
   const templateHTML = await fs.readFile(fullPath, 'utf-8');
-
-  // Get receipt data from V_Report view
-  const data = await getReceiptData(workId);
 
   // Render template with data
   const html = renderTemplate(templateHTML, data as unknown as TemplateData);

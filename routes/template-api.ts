@@ -15,6 +15,25 @@ import path from 'path';
 
 const router = Router();
 
+/**
+ * Inject an auto-print + auto-close script into a rendered receipt document.
+ *
+ * The print trigger lives here (added as the HTML leaves the server), NOT in the
+ * template file — the GrapesJS designer rebuilds the whole <head> on every save
+ * via generateCompleteHTML() and never preserves a <script>, so any script stored
+ * in the template is wiped on the next edit. Injecting at render time makes
+ * auto-print immune to template edits. Gated by ?autoprint=1 so callers that
+ * print the document themselves (e.g. PaymentModal) don't get a double dialog.
+ */
+function withAutoPrint(html: string): string {
+  const script =
+    '<script>window.onload=function(){window.print();' +
+    'window.onafterprint=function(){window.close();};};</script>';
+  return html.includes('</body>')
+    ? html.replace('</body>', `${script}</body>`)
+    : html + script;
+}
+
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
@@ -477,6 +496,60 @@ router.post(
   }
 );
 
+/**
+ * GET /api/templates/:templateId/html
+ * Return the raw template HTML for the visual designer to load.
+ *
+ * The template files live under ./data, which is intentionally NOT served as
+ * static (see index.ts — that dir holds runtime state). So the designer can't
+ * fetch the file directly; we read it server-side via fs.readFile (same trusted
+ * path the receipt service uses) and hand back the HTML.
+ */
+router.get(
+  '/:templateId/html',
+  async (req: Request<TemplateIdParams>, res: Response): Promise<void> => {
+    try {
+      const { templateId } = req.params;
+
+      const template = await templateQueries.getTemplateById(
+        parseInt(templateId)
+      );
+      if (!template) {
+        res.status(404).json({ status: 'error', message: 'Template not found' });
+        return;
+      }
+      if (!template.template_file_path) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Template has no saved HTML yet'
+        });
+        return;
+      }
+
+      const fullPath = path.join(process.cwd(), template.template_file_path);
+      const html = await fs.readFile(fullPath, 'utf-8');
+
+      res.setHeader('Cache-Control', 'no-store');
+      res.type('html').send(html);
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code === 'ENOENT') {
+        res.status(404).json({
+          status: 'error',
+          message: 'Template file not found on disk'
+        });
+        return;
+      }
+      log.error('Error reading template HTML', { error: err.message });
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to read template',
+        error: err.message
+      });
+    }
+  }
+);
+
 // ============================================================================
 // RECEIPT GENERATION
 // ============================================================================
@@ -490,7 +563,8 @@ router.get(
   async (req: Request<WorkIdParams>, res: Response): Promise<void> => {
     try {
       const { workId } = req.params;
-      const html = await generateReceiptHTML(parseInt(workId));
+      const rendered = await generateReceiptHTML(parseInt(workId));
+      const html = req.query.autoprint === '1' ? withAutoPrint(rendered) : rendered;
 
       // Prevent caching
       res.setHeader(
@@ -523,7 +597,8 @@ router.get(
       const { personId } = req.params;
       log.info(`Generating no-work receipt for patient ${personId}`);
 
-      const html = await generateNoWorkReceiptHTML(parseInt(personId));
+      const rendered = await generateNoWorkReceiptHTML(parseInt(personId));
+      const html = req.query.autoprint === '1' ? withAutoPrint(rendered) : rendered;
 
       // Prevent caching
       res.setHeader(

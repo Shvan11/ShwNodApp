@@ -273,7 +273,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         }
 
         // Open receipt in new window
-        const receiptUrl = `/api/templates/receipt/no-work/${personId}`;
+        const receiptUrl = `/api/templates/receipt/no-work/${personId}?autoprint=1`;
         console.log(`[WORK-COMPONENT] Opening receipt window: ${receiptUrl}`);
 
         const receiptWindow = window.open(receiptUrl, '_blank');
@@ -681,7 +681,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     };
 
     const handlePrintReceipt = (work: Work) => {
-        window.open(`/api/templates/receipt/work/${work.work_id}`, '_blank');
+        window.open(`/api/templates/receipt/work/${work.work_id}?autoprint=1`, '_blank');
     };
 
     const toggleWorkExpanded = (workId: number) => {

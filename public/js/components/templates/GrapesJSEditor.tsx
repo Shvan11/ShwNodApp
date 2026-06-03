@@ -70,8 +70,8 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
             }
             isInitializingRef.current = false;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: loadGrapesJS reads stable refs/setters and must only fire when isLoading transitions
-    }, [isLoading]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: init runs ONCE on mount. The container div is always rendered, so it's available on first run. Depending on `isLoading` here is a bug: loadGrapesJS() toggles isLoading for the spinner, which would re-fire this effect, run the cleanup, and destroy the editor it just created (leaving getHtml() to crash on a torn-down canvas frame).
+    }, []);
 
     const loadGrapesJS = async () => {
         try {
@@ -195,12 +195,16 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
     };
 
     const loadTemplateContent = async () => {
-        if (!editorRef.current || !template?.template_file_path) return;
+        if (!editorRef.current || !template?.template_id || !template?.template_file_path) return;
 
         try {
-            // Add cache-busting query parameter
+            // The template file lives under ./data which is NOT served as static,
+            // so we read it through an API endpoint that reads it server-side.
             const cacheBuster = `?t=${Date.now()}`;
-            const htmlResponse = await fetch(`/${template.template_file_path}${cacheBuster}`);
+            const htmlResponse = await fetch(`/api/templates/${template.template_id}/html${cacheBuster}`);
+            if (!htmlResponse.ok) {
+                throw new Error(`Failed to fetch template HTML (HTTP ${htmlResponse.status})`);
+            }
             const templateHtml = await htmlResponse.text();
 
             // Extract body content and CSS from HTML

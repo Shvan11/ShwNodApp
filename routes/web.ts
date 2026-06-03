@@ -59,9 +59,29 @@ function serveSingleSPA(res: Response): void {
 // React Router handles all nested routing within the unified app
 // No page reloads - all navigation is instant
 
+// Static-asset extensions that must NEVER fall through to index.html. When a
+// hashed build chunk is missing (a stale tab after a redeploy, or a transient
+// fetch failure where express.static didn't serve it), returning index.html
+// hands the browser `text/html` for a `.js`/`.css` request. The browser then
+// refuses to execute it ("Expected a JavaScript module… got text/html") and the
+// dynamic import crashes the page via the ErrorBoundary. A real 404 instead
+// lets the client's reload-on-preloadError recovery (see App.tsx) kick in.
+const ASSET_EXT =
+  /\.(?:js|mjs|cjs|css|map|json|wasm|woff2?|ttf|eot|otf|png|jpe?g|gif|svg|webp|avif|ico)$/i;
+
+function looksLikeAsset(reqPath: string): boolean {
+  return reqPath.startsWith('/assets/') || ASSET_EXT.test(reqPath);
+}
+
 // Catch-all route - serves index.html for ALL routes
 // Note: Express 5 requires named wildcard parameters (use /*splat instead of *)
-router.get('/*splat', (_req: Request, res: Response): void => {
+router.get('/*splat', (req: Request, res: Response): void => {
+  // Asset request that reached the catch-all = the file isn't on disk. Return a
+  // clean 404 rather than poisoning the browser's module loader with HTML.
+  if (looksLikeAsset(req.path)) {
+    res.status(404).type('txt').send('Not found');
+    return;
+  }
   serveSingleSPA(res);
 });
 
