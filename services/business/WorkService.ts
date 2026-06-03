@@ -19,6 +19,9 @@ import {
   addWork,
   getActiveWork,
   getWorkById,
+  getWorkDetails,
+  validateStatusChange,
+  updateWork,
   addWorkWithInvoice as dbAddWorkWithInvoice,
   deleteWork as dbDeleteWork,
   transferWork as dbTransferWork,
@@ -28,6 +31,7 @@ import {
   type TransferWorkResult,
 } from '../database/queries/work-queries.js';
 import { getPatientById } from '../database/queries/patient-queries.js';
+import { isToday } from '../../middleware/time-based-auth.js';
 
 // Re-export WORK_STATUS for convenience
 export { WORK_STATUS };
@@ -484,6 +488,208 @@ export function validateDiscount(
       { field: 'discount', value: discount, totalRequired: total, totalPaid: paid }
     );
   }
+}
+
+/**
+ * Validation-error kinds for PUT /updatework that each map to a specific HTTP
+ * status. Keeping the (financial, permission-sensitive) update rules here lets
+ * the route stay a thin status-code mapper. WorkValidationError is NOT reused for
+ * all of these because most carry no WorkErrorCode (and it would force one).
+ */
+export type WorkUpdateErrorKind = 'badRequest' | 'notFound' | 'conflict' | 'forbidden';
+
+export class WorkUpdateError extends Error {
+  public readonly kind: WorkUpdateErrorKind;
+  public readonly details?: Record<string, unknown>;
+
+  constructor(kind: WorkUpdateErrorKind, message: string, details?: Record<string, unknown>) {
+    super(message);
+    this.name = 'WorkUpdateError';
+    this.kind = kind;
+    this.details = details;
+  }
+}
+
+// PUT /updatework treats discount_date as a date too (the create path's DATE_FIELDS
+// does not include it), so this list is deliberately distinct from DATE_FIELDS.
+const UPDATE_WORK_DATE_FIELDS = [
+  'start_date',
+  'debond_date',
+  'f_photo_date',
+  'i_photo_date',
+  'notes_date',
+  'discount_date',
+] as const;
+
+/**
+ * Input for {@link validateAndUpdateWork}. `workData` is the loose rest-spread body
+ * (every field except workId); `userRole` is the authenticated caller's session role.
+ */
+export interface UpdateWorkInput {
+  workId: number;
+  userRole: string | undefined;
+  workData: Record<string, unknown>;
+}
+
+/**
+ * Validate and apply an update to an existing work.
+ *
+ * Extracted from PUT /updatework so the route is a thin mapper. Enforces, in order:
+ * date-field coercion, status-change validation, the secretary financial-field edit
+ * time window (editable only on the work's creation day), the total_required >=
+ * already-paid guard (was DB CHECK CK_MoreThanTotalW), and the admin-only discount
+ * rules. On failure throws WorkUpdateError (route → 400/403/404/409) or, from
+ * validateDiscount, WorkValidationError (→ 400 with its code).
+ */
+export async function validateAndUpdateWork(
+  input: UpdateWorkInput
+): Promise<{ rowsAffected: number }> {
+  const { workId, userRole } = input;
+  const workData: Record<string, unknown> = { ...input.workData };
+
+  // Convert provided date strings to Date objects (behaviour preserved from the route).
+  for (const field of UPDATE_WORK_DATE_FIELDS) {
+    const value = workData[field];
+    if (value && typeof value === 'string') {
+      const date = new Date(value);
+      if (isNaN(date.getTime())) {
+        log.warn('Update work invalid date format', { workId, field, value });
+        throw new WorkUpdateError('badRequest', `Invalid date format for ${field}`);
+      }
+      workData[field] = date;
+    }
+  }
+
+  // Fetch current work once if a validation below needs it.
+  const status = workData.status as WorkStatusType | undefined;
+  const financialFields = ['total_required', 'currency'];
+  const needsCurrentWork =
+    status !== undefined ||
+    (userRole !== 'admin' &&
+      financialFields.some((field) => Object.prototype.hasOwnProperty.call(workData, field)));
+
+  let currentWork: Awaited<ReturnType<typeof getWorkById>> = null;
+  if (needsCurrentWork) {
+    currentWork = await getWorkById(workId);
+    if (!currentWork) {
+      log.warn('Work not found for update', { workId });
+      throw new WorkUpdateError('notFound', 'Work not found');
+    }
+  }
+
+  // ===== STATUS CHANGE VALIDATION =====
+  if (status !== undefined && currentWork && currentWork.status !== status) {
+    const validation = await validateStatusChange(
+      workId,
+      status,
+      (workData.person_id as number | undefined) || currentWork.person_id
+    );
+    if (!validation.valid) {
+      throw new WorkUpdateError('conflict', validation.error || 'Status change conflict', {
+        existingWork: validation.existingWork,
+      });
+    }
+  }
+
+  // ===== FINANCIAL FIELDS PERMISSION CHECK =====
+  // Non-admins may only change total_required / currency on the work's creation day.
+  let isChangingFinancialFields = false;
+  if (
+    userRole !== 'admin' &&
+    currentWork &&
+    financialFields.some((field) => Object.prototype.hasOwnProperty.call(workData, field))
+  ) {
+    const totalRequiredChanged =
+      workData.total_required !== undefined &&
+      Number(workData.total_required) !== Number(currentWork.total_required);
+    const currencyChanged =
+      workData.currency !== undefined &&
+      String(workData.currency) !== String(currentWork.currency);
+    isChangingFinancialFields = totalRequiredChanged || currencyChanged;
+  }
+
+  if (isChangingFinancialFields && currentWork) {
+    // currentWork.addition_date is the creation date (was a separate getWorkCreationDate query).
+    const created = currentWork.addition_date;
+    if (!created || !isToday(created)) {
+      throw new WorkUpdateError(
+        'forbidden',
+        'Cannot edit financial fields (Total Required, currency) for work not created today. Contact admin.',
+        { restrictedFields: financialFields }
+      );
+    }
+  }
+
+  // ===== TOTAL-REQUIRED vs PAID GUARD (was DB CHECK CK_MoreThanTotalW) =====
+  // A work's total_required must never drop below what's already been paid, or the
+  // work becomes overpaid. (NULL/absent total_required = no change / no limit → skip.)
+  if (
+    Object.prototype.hasOwnProperty.call(workData, 'total_required') &&
+    workData.total_required !== null &&
+    workData.total_required !== undefined
+  ) {
+    const newTotal = Number(workData.total_required);
+    const workForTotal = await getWorkDetails(workId);
+    const alreadyPaid = Number((workForTotal as { TotalPaid?: number } | null)?.TotalPaid ?? 0);
+    if (Number.isFinite(newTotal) && newTotal < alreadyPaid) {
+      throw new WorkUpdateError(
+        'badRequest',
+        `Total required (${newTotal}) cannot be less than the amount already paid (${alreadyPaid}).`,
+        { code: 'TOTAL_BELOW_PAID' }
+      );
+    }
+  }
+
+  // ===== DISCOUNT FIELDS PERMISSION + VALIDATION =====
+  // discount and discount_date are admin-only (financial concession); discount_reason
+  // is editable by any authenticated user.
+  const discountAdminFields = ['discount', 'discount_date'] as const;
+  const hasDiscountFieldInPayload = discountAdminFields.some((field) =>
+    Object.prototype.hasOwnProperty.call(workData, field)
+  );
+
+  if (hasDiscountFieldInPayload) {
+    const workWithPaid = await getWorkDetails(workId);
+    if (!workWithPaid) {
+      throw new WorkUpdateError('notFound', 'Work not found');
+    }
+
+    const discount = workData.discount as number | null | undefined;
+    const discountDate = workData.discount_date as string | null | undefined;
+    const discountChanged =
+      discount !== undefined && Number(discount ?? 0) !== Number(workWithPaid.discount ?? 0);
+    const discountDateChanged =
+      discountDate !== undefined &&
+      String(discountDate ?? '') !== String(workWithPaid.discount_date ?? '');
+
+    if ((discountChanged || discountDateChanged) && userRole !== 'admin') {
+      throw new WorkUpdateError('forbidden', 'Only admin can add or edit discount.', {
+        restrictedFields: [...discountAdminFields],
+      });
+    }
+
+    if (discountChanged) {
+      try {
+        validateDiscount(
+          discount ?? null,
+          workWithPaid.total_required,
+          (workWithPaid as { TotalPaid?: number }).TotalPaid ?? 0
+        );
+      } catch (err) {
+        // Surface validateDiscount's WorkValidationError as a 400 carrying its code.
+        if (err instanceof WorkValidationError) {
+          throw new WorkUpdateError('badRequest', err.message, {
+            code: err.code,
+            ...(err.details ?? {}),
+          });
+        }
+        throw err;
+      }
+    }
+  }
+
+  const result = await updateWork(workId, workData as Parameters<typeof updateWork>[1]);
+  return { rowsAffected: result.rowCount };
 }
 
 /**

@@ -28,8 +28,6 @@ import {
   discontinueWork,
   reactivateWork,
   getActiveWork,
-  getWorkById,
-  validateStatusChange,
   getWorkTypes,
   getWorkKeywords,
   getWorkDetailsList,
@@ -50,8 +48,7 @@ import { authenticate, authorize } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import {
   requireRecordAge,
-  getWorkCreationDate,
-  isToday
+  getWorkCreationDate
 } from '../../middleware/time-based-auth.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
@@ -61,7 +58,8 @@ import {
   validateAndDeleteWork,
   validateAndTransferWork,
   getTransferPreview,
-  validateDiscount,
+  validateAndUpdateWork,
+  WorkUpdateError,
   WorkValidationError,
   type WorkStatusType
 } from '../../services/business/WorkService.js';
@@ -93,23 +91,6 @@ interface WorkResult {
   type_name: string | null;
   status_name: string | null;
   [key: string]: string | number | null;
-}
-
-/**
- * Work data returned from getWorkById - includes status as number for DB compatibility
- */
-interface WorkData {
-  work_id: number;
-  person_id: number;
-  total_required: number | null;
-  currency: string | null;
-  type_of_work: number | null;
-  notes: string | null;
-  status: number;
-  dr_id: number | null;
-  doctor_name: string | null;
-  type_name: string | null;
-  status_name: string | null;
 }
 
 interface AddWorkBody {
@@ -467,189 +448,40 @@ router.put(
   async (req: Request, res: Response): Promise<void> => {
     try {
       // workId + dr_id validated and coerced to positive ints by the schema;
-      // all other work fields pass through untouched (loose schema).
+      // all other work fields pass through untouched (loose schema). All update
+      // rules (dates, status, financial/discount permissions, total-vs-paid guard)
+      // live in WorkService.validateAndUpdateWork — this handler only maps outcomes.
       const { workId, ...workData } = req.body as UpdateWorkBody;
 
-      // Convert date strings to proper Date objects if provided
-      const dateFields = [
-        'start_date',
-        'debond_date',
-        'f_photo_date',
-        'i_photo_date',
-        'notes_date',
-        'discount_date'
-      ];
-      for (const field of dateFields) {
-        const value = (workData as Record<string, unknown>)[field];
-        if (value && typeof value === 'string') {
-          const date = new Date(value);
-          if (isNaN(date.getTime())) {
-            log.warn('Update work invalid date format', { workId, field, value });
-            ErrorResponses.badRequest(res, `Invalid date format for ${field}`);
-            return;
-          }
-          (workData as Record<string, unknown>)[field] = date;
-        }
-      }
+      const result = await validateAndUpdateWork({
+        workId,
+        userRole: req.session?.userRole,
+        workData
+      });
 
-      // Fetch current work once if needed for validation
-      const needsCurrentWork =
-        workData.status !== undefined ||
-        (req.session?.userRole !== 'admin' &&
-          ['total_required', 'currency'].some((field) =>
-            Object.prototype.hasOwnProperty.call(workData, field)
-          ));
-
-      let currentWork: WorkData | null = null;
-      if (needsCurrentWork) {
-        const fetchedWork = await getWorkById(parseInt(String(workId)));
-        if (!fetchedWork) {
-          log.warn('Work not found for update', { workId });
-          ErrorResponses.notFound(res, 'Work not found');
-          return;
-        }
-        currentWork = fetchedWork as WorkData;
-      }
-
-      // ===== STATUS CHANGE VALIDATION =====
-      if (workData.status !== undefined && currentWork) {
-        if (currentWork.status !== workData.status) {
-          const validation = await validateStatusChange(
-            parseInt(String(workId)),
-            workData.status,
-            (workData.person_id || currentWork.person_id) as number
-          );
-
-          if (!validation.valid) {
-            ErrorResponses.conflict(res, validation.error || 'Status change conflict', {
-              existingWork: validation.existingWork
-            });
-            return;
-          }
-        }
-      }
-      // ===== END STATUS VALIDATION =====
-
-      // ===== FINANCIAL FIELDS PERMISSION CHECK =====
-      const financialFields = ['total_required', 'currency'];
-      let isChangingFinancialFields = false;
-
-      if (
-        req.session?.userRole !== 'admin' &&
-        currentWork &&
-        financialFields.some((field) =>
-          Object.prototype.hasOwnProperty.call(workData, field)
-        )
-      ) {
-        // Check if total_required is changing
-        const totalRequiredChanged = workData.total_required !== undefined &&
-          Number(workData.total_required) !== Number(currentWork.total_required);
-
-        // Check if currency is changing
-        const currencyChanged = workData.currency !== undefined &&
-          String(workData.currency) !== String(currentWork.currency);
-
-        isChangingFinancialFields = totalRequiredChanged || currencyChanged;
-      }
-
-      if (isChangingFinancialFields) {
-        const workCreationDate = await getWorkCreationDate(req);
-        if (!isToday(workCreationDate)) {
-          ErrorResponses.forbidden(
-            res,
-            'Cannot edit financial fields (Total Required, currency) for work not created today. Contact admin.',
-            { restrictedFields: financialFields }
-          );
-          return;
-        }
-      }
-      // ===== END FINANCIAL FIELDS PERMISSION CHECK =====
-
-      // ===== TOTAL-REQUIRED vs PAID GUARD (was DB CHECK CK_MoreThanTotalW) =====
-      // A work's total_required must never drop below what's already been paid, or the
-      // work becomes overpaid. PostgreSQL can't host the old function-based CHECK, so
-      // enforce it here. (NULL/absent total_required = no change / no limit → skip.)
-      if (
-        Object.prototype.hasOwnProperty.call(workData, 'total_required') &&
-        workData.total_required !== null &&
-        workData.total_required !== undefined
-      ) {
-        const newTotal = Number(workData.total_required);
-        const workForTotal = await getWorkDetailsFromQueries(
-          parseInt(String(workId))
-        );
-        const alreadyPaid = Number(
-          (workForTotal as { TotalPaid?: number } | null)?.TotalPaid ?? 0
-        );
-        if (Number.isFinite(newTotal) && newTotal < alreadyPaid) {
-          ErrorResponses.badRequest(
-            res,
-            `Total required (${newTotal}) cannot be less than the amount already paid (${alreadyPaid}).`,
-            { code: 'TOTAL_BELOW_PAID' }
-          );
-          return;
-        }
-      }
-
-      // ===== DISCOUNT FIELDS PERMISSION + VALIDATION =====
-      // discount and discount_date are admin-only (financial concession).
-      // discount_reason is editable by any authenticated user.
-      const discountAdminFields = ['discount', 'discount_date'] as const;
-      const hasDiscountFieldInPayload = discountAdminFields.some((field) =>
-        Object.prototype.hasOwnProperty.call(workData, field)
-      );
-
-      if (hasDiscountFieldInPayload) {
-        // Fetch work with TotalPaid (needed for DISCOUNT_EXCEEDS_REMAINING check)
-        const workWithPaid = await getWorkDetailsFromQueries(parseInt(String(workId)));
-        if (!workWithPaid) {
-          ErrorResponses.notFound(res, 'Work not found');
-          return;
-        }
-
-        const discountChanged = workData.discount !== undefined &&
-          Number(workData.discount ?? 0) !== Number(workWithPaid.discount ?? 0);
-        const discountDateChanged = workData.discount_date !== undefined &&
-          String(workData.discount_date ?? '') !== String(workWithPaid.discount_date ?? '');
-
-        if ((discountChanged || discountDateChanged) && req.session?.userRole !== 'admin') {
-          ErrorResponses.forbidden(res, 'Only admin can add or edit discount.', {
-            restrictedFields: [...discountAdminFields]
-          });
-          return;
-        }
-
-        if (discountChanged) {
-          try {
-            validateDiscount(
-              workData.discount ?? null,
-              workWithPaid.total_required,
-              (workWithPaid as { TotalPaid?: number }).TotalPaid ?? 0
-            );
-          } catch (err) {
-            if (err instanceof WorkValidationError) {
-              ErrorResponses.badRequest(res, err.message, {
-                code: err.code,
-                ...(err.details ?? {})
-              });
-              return;
-            }
-            throw err;
-          }
-        }
-      }
-      // ===== END DISCOUNT FIELDS =====
-
-      const { updateWork } = await import(
-        '../../services/database/queries/work-queries.js'
-      );
-      const result = await updateWork(parseInt(String(workId)), workData);
       res.json({
         success: true,
         message: 'Work updated successfully',
-        rowsAffected: result.rowCount
+        rowsAffected: result.rowsAffected
       });
     } catch (error) {
+      if (error instanceof WorkUpdateError) {
+        const details = error.details ?? null;
+        switch (error.kind) {
+          case 'notFound':
+            ErrorResponses.notFound(res, error.message, details);
+            return;
+          case 'conflict':
+            ErrorResponses.conflict(res, error.message, details);
+            return;
+          case 'forbidden':
+            ErrorResponses.forbidden(res, error.message, details);
+            return;
+          case 'badRequest':
+            ErrorResponses.badRequest(res, error.message, details);
+            return;
+        }
+      }
       log.error('Error updating work:', error);
       sendError(res, 500, 'Failed to update work', error as Error);
     }
