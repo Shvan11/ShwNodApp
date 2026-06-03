@@ -170,10 +170,14 @@ const updateWorkBodySchema = z.looseObject({
   dr_id: z.coerce.number().int().positive(),
 });
 
-interface WorkStatusBody {
-  workId: number;
-  personId?: number;
-}
+// Boundary guard for the work-lifecycle POSTs (/finishwork, /discontinuework,
+// /reactivatework). workId required; personId optional (reactivate uses it to
+// detect a pre-existing active work). Coercion means handlers read real numbers.
+const workStatusBodySchema = z.object({
+  workId: z.coerce.number().int().positive(),
+  personId: z.coerce.number().int().positive().optional(),
+});
+type WorkStatusBody = z.infer<typeof workStatusBodySchema>;
 
 interface DeleteWorkBody {
   workId: number;
@@ -657,26 +661,14 @@ router.put(
  */
 router.post(
   '/finishwork',
+  validate({ body: workStatusBodySchema }),
   async (
     req: Request<unknown, unknown, WorkStatusBody>,
     res: Response
   ): Promise<void> => {
     try {
       const { workId } = req.body;
-
-      if (!workId) {
-        log.warn('Finish work request missing workId');
-        ErrorResponses.missingParameter(res, 'workId');
-        return;
-      }
-
-      if (isNaN(parseInt(String(workId)))) {
-        log.warn('Finish work invalid workId', { workId });
-        ErrorResponses.badRequest(res, 'workId must be a valid number');
-        return;
-      }
-
-      const result = await finishWork(parseInt(String(workId)));
+      const result = await finishWork(workId);
       res.json({
         success: true,
         message: 'Work completed successfully',
@@ -694,26 +686,14 @@ router.post(
  */
 router.post(
   '/discontinuework',
+  validate({ body: workStatusBodySchema }),
   async (
     req: Request<unknown, unknown, WorkStatusBody>,
     res: Response
   ): Promise<void> => {
     try {
       const { workId } = req.body;
-
-      if (!workId) {
-        log.warn('Discontinue work request missing workId');
-        ErrorResponses.missingParameter(res, 'workId');
-        return;
-      }
-
-      if (isNaN(parseInt(String(workId)))) {
-        log.warn('Discontinue work invalid workId', { workId });
-        ErrorResponses.badRequest(res, 'workId must be a valid number');
-        return;
-      }
-
-      const result = await discontinueWork(parseInt(String(workId)));
+      const result = await discontinueWork(workId);
       res.json({
         success: true,
         message: 'Work discontinued successfully',
@@ -731,6 +711,7 @@ router.post(
  */
 router.post(
   '/reactivatework',
+  validate({ body: workStatusBodySchema }),
   async (
     req: Request<unknown, unknown, WorkStatusBody>,
     res: Response
@@ -738,22 +719,10 @@ router.post(
     try {
       const { workId, personId } = req.body;
 
-      if (!workId) {
-        log.warn('Reactivate work request missing workId');
-        ErrorResponses.missingParameter(res, 'workId');
-        return;
-      }
-
-      if (isNaN(parseInt(String(workId)))) {
-        log.warn('Reactivate work invalid workId', { workId });
-        ErrorResponses.badRequest(res, 'workId must be a valid number');
-        return;
-      }
-
       // Check if patient already has an active work
       if (personId) {
-        const activeWork = await getActiveWork(parseInt(String(personId)));
-        if (activeWork && activeWork.work_id !== parseInt(String(workId))) {
+        const activeWork = await getActiveWork(personId);
+        if (activeWork && activeWork.work_id !== workId) {
           ErrorResponses.conflict(
             res,
             'Patient already has an active work. Please finish or discontinue it first.',
@@ -766,7 +735,7 @@ router.post(
         }
       }
 
-      const result = await reactivateWork(parseInt(String(workId)));
+      const result = await reactivateWork(workId);
       res.json({
         success: true,
         message: 'Work reactivated successfully',
