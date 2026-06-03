@@ -147,6 +147,23 @@ interface CleanupResult {
   error?: string;
 }
 
+/**
+ * Reject if `promise` doesn't settle within `ms`. Bounds a single hung
+ * WhatsApp/Puppeteer round-trip so it can't stall a whole batch (the destroy
+ * paths already use this inline `Promise.race` shape; this is the reusable form).
+ */
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Timeout after ${ms}ms: ${label}`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 // ===========================================
 // CLIENT STATE MANAGER
 // ===========================================
@@ -172,6 +189,9 @@ class ClientStateManager {
   // Constants
   public readonly MAX_RECONNECT_ATTEMPTS = 10;
   public readonly RECONNECT_BASE_DELAY = 5000;
+  // After the attempt ceiling is hit, wait this long, then reset and retry — so an
+  // unattended server self-heals from a transient outage instead of staying dead.
+  public readonly RECONNECT_COOLDOWN_MS = 300000;
   public readonly SESSION_RESTORATION_TIMEOUT = 120000;
   public readonly FRESH_AUTH_TIMEOUT = 90000;
   public readonly INITIALIZATION_TIMEOUT = 60000;
@@ -435,6 +455,14 @@ class EnhancedCircuitBreaker {
   reset(): void {
     this.transitionToClosed();
     log.info('Circuit breaker manually reset');
+  }
+
+  /**
+   * Record a failure that happened outside execute() — e.g. the reconnect loop
+   * exhausting its attempts. Public so callers don't reach into private onFailure.
+   */
+  recordExternalFailure(operationName: string, error: Error): void {
+    this.onFailure(operationName, error);
   }
 
   getStatus(): CircuitBreakerStatus {
@@ -1220,9 +1248,21 @@ class WhatsAppService extends EventEmitter {
 
     if (this.clientState.reconnectAttempts > this.clientState.MAX_RECONNECT_ATTEMPTS) {
       log.warn(
-        `Exceeded maximum reconnection attempts (${this.clientState.MAX_RECONNECT_ATTEMPTS})`
+        `Exceeded maximum reconnection attempts (${this.clientState.MAX_RECONNECT_ATTEMPTS}); entering slow-retry cooldown`
       );
-      this.circuitBreaker['onFailure']('max-reconnect-attempts', error);
+      this.circuitBreaker.recordExternalFailure('max-reconnect-attempts', error);
+
+      // Don't give up permanently on an unattended server. After a long cooldown,
+      // reset the attempt counter and try again — indefinite slow retries beat a
+      // dead client that only a manual restart() can revive.
+      this.clientState.clearReconnectTimer();
+      this.clientState.reconnectTimer = setTimeout(() => {
+        log.info('Reconnect cooldown elapsed — resetting attempts and retrying');
+        this.clientState.reconnectAttempts = 0;
+        this.initialize().catch((err) => {
+          log.error('Error during cooldown reconnection attempt', err);
+        });
+      }, this.clientState.RECONNECT_COOLDOWN_MS);
       return;
     }
 
@@ -1664,24 +1704,43 @@ class WhatsAppService extends EventEmitter {
         const messages = await messagingQueries.getWhatsAppDeliveryStatus(date);
 
         if (messages.length > 0) {
+          // Check delivery acks with bounded concurrency and a per-message timeout.
+          // Previously this was a sequential loop with no timeout, so one hung
+          // getChatById/fetchMessages could serialize-block the whole WhatsApp
+          // command path for minutes (send/report/queueOperation share one breaker).
+          const CONCURRENCY = 5;
+          const PER_MESSAGE_TIMEOUT_MS = 15000;
           const statusUpdates: Array<{ id: number; ack: number }> = [];
 
-          for (const msg of messages) {
+          const checkOne = async (msg: (typeof messages)[number]): Promise<void> => {
             try {
-              const chat = await this.clientState.client!.getChatById(msg.number);
-              const fetchedMessages = await chat.fetchMessages({ limit: 50 });
-
-              const ourMessage = fetchedMessages.find((m) => m.id.id === msg.wamid);
-              if (ourMessage) {
-                statusUpdates.push({
-                  id: msg.id,
-                  ack: ourMessage.ack || 1,
-                });
-              }
+              const update = await withTimeout(
+                (async () => {
+                  const chat = await this.clientState.client!.getChatById(msg.number);
+                  const fetchedMessages = await chat.fetchMessages({ limit: 50 });
+                  const ourMessage = fetchedMessages.find((m) => m.id.id === msg.wamid);
+                  return ourMessage ? { id: msg.id, ack: ourMessage.ack || 1 } : null;
+                })(),
+                PER_MESSAGE_TIMEOUT_MS,
+                `report check ${msg.wamid}`
+              );
+              if (update) statusUpdates.push(update);
             } catch (error) {
               log.error(`Error checking message ${msg.wamid}`, error);
             }
-          }
+          };
+
+          // Simple worker pool: CONCURRENCY workers pull from a shared cursor.
+          let cursor = 0;
+          const worker = async (): Promise<void> => {
+            while (cursor < messages.length) {
+              const idx = cursor++;
+              await checkOne(messages[idx]);
+            }
+          };
+          await Promise.all(
+            Array.from({ length: Math.min(CONCURRENCY, messages.length) }, () => worker())
+          );
 
           if (statusUpdates.length > 0) {
             await messagingQueries.updateWhatsAppDeliveryStatus(statusUpdates);

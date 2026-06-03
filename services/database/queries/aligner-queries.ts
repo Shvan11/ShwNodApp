@@ -910,30 +910,45 @@ export async function updateAlignerSet(
   const newUpperCount = upper_aligners_count ?? 0;
   const newLowerCount = lower_aligners_count ?? 0;
 
-  // First, get current set data to validate the change
-  const currentSet = await getAlignerSetById(setId);
-  if (!currentSet) {
-    throw new Error(`Aligner set ${setId} not found`);
-  }
-
-  // Calculate how many aligners are already used in batches
-  const usedUpper = currentSet.upper_aligners_count - currentSet.remaining_upper_aligners;
-  const usedLower = currentSet.lower_aligners_count - currentSet.remaining_lower_aligners;
-
-  // Validate: new total cannot be less than what's already used in batches
-  if (newUpperCount < usedUpper) {
-    throw new Error(
-      `Cannot reduce upper aligners to ${newUpperCount}. ${usedUpper} are already assigned to batches.`
-    );
-  }
-  if (newLowerCount < usedLower) {
-    throw new Error(
-      `Cannot reduce lower aligners to ${newLowerCount}. ${usedLower} are already assigned to batches.`
-    );
-  }
-
   try {
     await withPgTransaction(async (trx) => {
+      // Lock the set row and re-read its live counts INSIDE the transaction: a
+      // concurrent createBatch/updateBatch (which also FOR UPDATE the set) must not
+      // change remaining_* between this validation and the delta update below, or
+      // the invariant can be violated and remaining_* driven negative (TOCTOU).
+      const currentSet = await trx
+        .selectFrom('aligner_sets')
+        .where('aligner_set_id', '=', setId)
+        .select([
+          'upper_aligners_count',
+          'lower_aligners_count',
+          'remaining_upper_aligners',
+          'remaining_lower_aligners',
+        ])
+        .forUpdate()
+        .executeTakeFirst();
+      if (!currentSet) {
+        throw new Error(`Aligner set ${setId} not found`);
+      }
+
+      // How many aligners are already assigned to batches (total - remaining).
+      const usedUpper =
+        (currentSet.upper_aligners_count ?? 0) - (currentSet.remaining_upper_aligners ?? 0);
+      const usedLower =
+        (currentSet.lower_aligners_count ?? 0) - (currentSet.remaining_lower_aligners ?? 0);
+
+      // Validate: new total cannot be less than what's already used in batches.
+      if (newUpperCount < usedUpper) {
+        throw new Error(
+          `Cannot reduce upper aligners to ${newUpperCount}. ${usedUpper} are already assigned to batches.`
+        );
+      }
+      if (newLowerCount < usedLower) {
+        throw new Error(
+          `Cannot reduce lower aligners to ${newLowerCount}. ${usedLower} are already assigned to batches.`
+        );
+      }
+
       // aligner_dr_id is NOT NULL. Only assign it when a real doctor id is supplied;
       // otherwise omit the column so the UPDATE leaves the existing value intact,
       // rather than binding NULL/'' — which throw 23502 / 22P02 under PG. (The old
@@ -977,29 +992,20 @@ export async function updateAlignerSet(
 }
 
 /**
- * Delete batches for a set
+ * Delete an aligner set together with its batches, atomically.
+ *
+ * Batches are deleted first (FK), then the set, in ONE transaction — previously
+ * these were two separate transactions, so a failure/crash between them could
+ * leave a set's batches gone while the set itself survived (half-deleted state).
  */
-export async function deleteBatchesBySetId(setId: number): Promise<void> {
-  try {
-    await getKysely().deleteFrom('aligner_batches').where('aligner_set_id', '=', setId).execute();
-  } catch (err) {
-    log.error('Failed to delete batches by set id', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    throw err;
-  }
-}
-
-/**
- * Delete an aligner set
- */
-export async function deleteAlignerSet(setId: number): Promise<void> {
+export async function deleteSetWithBatches(setId: number): Promise<void> {
   try {
     await withPgTransaction(async (trx) => {
+      await trx.deleteFrom('aligner_batches').where('aligner_set_id', '=', setId).execute();
       await trx.deleteFrom('aligner_sets').where('aligner_set_id', '=', setId).execute();
     });
   } catch (err) {
-    log.error('Failed to delete aligner set', {
+    log.error('Failed to delete aligner set with batches', {
       error: err instanceof Error ? err.message : String(err),
     });
     throw err;

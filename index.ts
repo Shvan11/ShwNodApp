@@ -578,8 +578,27 @@ function startServer(): Promise<HTTPServer> {
 /**
  * Comprehensive graceful shutdown
  */
+let shuttingDown = false;
 async function gracefulShutdown(signal: string): Promise<void> {
+  // Re-entrancy guard: a second signal (double Ctrl-C, or SIGTERM arriving during
+  // an uncaughtException-triggered shutdown) must not re-run the whole teardown
+  // and race two process.exit() calls against already-closing resources.
+  if (shuttingDown) {
+    log.warn(`Shutdown already in progress; ignoring ${signal}`);
+    return;
+  }
+  shuttingDown = true;
+
   log.info(`\n🛑 Graceful shutdown initiated by ${signal}`);
+
+  // Overall watchdog: if any teardown step hangs (Puppeteer/WhatsApp teardown is
+  // the classic offender), force-exit so the process can never wedge forever
+  // waiting on a stuck resource. unref() so it doesn't itself keep us alive.
+  const watchdog = setTimeout(() => {
+    log.error('⏱️  Graceful shutdown timed out after 15 s; forcing exit');
+    process.exit(1);
+  }, 15000);
+  watchdog.unref();
 
   try {
     // End long-lived SSE streams FIRST. They set req/res.setTimeout(0), so they
@@ -645,10 +664,12 @@ async function gracefulShutdown(signal: string): Promise<void> {
     await ResourceManager.gracefulShutdown(signal);
 
     log.info('✅ Graceful shutdown completed successfully');
+    clearTimeout(watchdog);
     process.exit(0);
 
   } catch (error) {
     log.error('❌ Error during graceful shutdown:', { error: (error as Error).message });
+    clearTimeout(watchdog);
     process.exit(1);
   }
 }

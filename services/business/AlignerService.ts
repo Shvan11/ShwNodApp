@@ -411,11 +411,8 @@ export async function validateAndDeleteSet(
   log.info(`Deleting aligner set ${setId}`);
 
   try {
-    // Delete batches first (foreign key constraint)
-    await alignerQueries.deleteBatchesBySetId(parsedSetId);
-
-    // Then delete the set
-    await alignerQueries.deleteAlignerSet(parsedSetId);
+    // Batches + set deleted atomically in one transaction (batches first for the FK).
+    await alignerQueries.deleteSetWithBatches(parsedSetId);
 
     log.info(`Aligner set ${setId} and its batches deleted successfully`);
   } catch (error) {
