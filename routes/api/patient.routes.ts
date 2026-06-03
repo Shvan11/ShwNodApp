@@ -503,22 +503,6 @@ router.delete(
 );
 
 /**
- * Generate and get QR code for a patient
- * GET /patients/:personId/qrcode
- */
-router.get(
-  '/patients/:personId/qrcode',
-  async (
-    req: Request<{ personId: string }>,
-    res: Response
-  ): Promise<void> => {
-    const { personId } = req.params;
-    await imaging.generateQRCode(personId);
-    res.json({ OK: 'OK' });
-  }
-);
-
-/**
  * Get gallery images for a patient
  * GET /patients/:personId/gallery/:tp
  */
@@ -1539,36 +1523,6 @@ router.post(
       const msg = (error as Error).message;
       log.warn('Portal reset-pin failed', { error: msg });
       ErrorResponses.badRequest(res, msg);
-    }
-  }
-);
-
-/**
- * POST /api/patients/:personId/portal/set-pin
- * Manually set a PIN (4-6 digits).
- */
-router.post(
-  '/patients/:personId/portal/set-pin',
-  authorize(['admin', 'secretary']),
-  async (
-    req: Request<{ personId: string }, unknown, { pin: string }>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const personId = parseInt(req.params.personId, 10);
-      const { pin } = req.body;
-      if (isNaN(personId)) {
-        ErrorResponses.badRequest(res, 'Invalid patient id');
-        return;
-      }
-      if (!pin || typeof pin !== 'string') {
-        ErrorResponses.badRequest(res, 'PIN is required');
-        return;
-      }
-      await PatientPortalService.setPin(personId, pin);
-      res.json({ success: true });
-    } catch (error) {
-      ErrorResponses.badRequest(res, (error as Error).message);
     }
   }
 );

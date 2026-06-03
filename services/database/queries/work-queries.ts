@@ -464,9 +464,6 @@ export async function getWorkDetailsList(workId: number): Promise<WorkItem[]> {
   })) as WorkItem[];
 }
 
-// Alias for new naming convention
-export const getWorkItems = getWorkDetailsList;
-
 export async function addWorkDetail(workDetailData: WorkItemData): Promise<{ id: number } | null> {
   // One transaction: the item insert + its teeth write commit together, so a failed
   // teeth insert can't leave a half-written item behind.
@@ -502,9 +499,6 @@ export async function addWorkDetail(workDetailData: WorkItemData): Promise<{ id:
     return result;
   });
 }
-
-// Alias for new naming convention
-export const addWorkItem = addWorkDetail;
 
 export async function updateWorkDetail(
   detailId: number,
@@ -547,9 +541,6 @@ export async function updateWorkDetail(
   });
 }
 
-// Alias for new naming convention
-export const updateWorkItem = updateWorkDetail;
-
 export async function deleteWorkDetail(
   detailId: number
 ): Promise<{ success: boolean; rowCount: number }> {
@@ -561,9 +552,6 @@ export async function deleteWorkDetail(
 
   return { success: true, rowCount: Number(result.numDeletedRows) };
 }
-
-// Alias for new naming convention
-export const deleteWorkItem = deleteWorkDetail;
 
 export async function addWork(workData: WorkData): Promise<{ work_id: number } | null> {
   const status = workData.status || WORK_STATUS.ACTIVE;
@@ -986,23 +974,6 @@ async function replaceWorkItemTeeth(
     .execute();
 
   return { success: true, count: teethIds.length };
-}
-
-export async function getWorkItemTeeth(workItemId: number): Promise<tooth_number[]> {
-  const db = getKysely();
-  return db
-    .selectFrom('work_item_teeth as wit')
-    .innerJoin('tooth_numbers as tn', 'tn.id', 'wit.tooth_id')
-    .where('wit.work_item_id', '=', workItemId)
-    .select((eb) => [
-      'tn.id',
-      'tn.tooth_code',
-      'tn.tooth_name',
-      eb.ref('tn.quadrant').$castTo<number>().as('quadrant'),
-      'tn.is_permanent',
-    ])
-    .orderBy('tn.sort_order')
-    .execute() as Promise<tooth_number[]>;
 }
 
 export async function getImplantManufacturers(): Promise<ImplantManufacturer[]> {

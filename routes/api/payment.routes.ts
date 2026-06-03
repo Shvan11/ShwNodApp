@@ -19,10 +19,8 @@ import { log } from '../../utils/logger.js';
 import { sql } from 'kysely';
 import { getKysely } from '../../services/database/kysely.js';
 import {
-  getPayments,
   getActiveWorkForInvoice,
   getCurrentExchangeRate,
-  updateExchangeRate,
   getPaymentHistoryByWorkId,
   getExchangeRateForDate,
   updateExchangeRateForDate,
@@ -65,10 +63,6 @@ interface WorkForReceiptResult {
   discount_date: Date | null;
 }
 
-interface ExchangeRateBody {
-  exchangeRate: number;
-}
-
 interface ExchangeRateForDateBody {
   date: string;
   exchangeRate: number;
@@ -86,22 +80,6 @@ interface AddInvoiceBody {
 // ============================================================================
 // PAYMENT RETRIEVAL ROUTES
 // ============================================================================
-
-/**
- * Get all payments for a patient
- * GET /api/getpayments?code={patientId}
- */
-router.get(
-  '/getpayments',
-  async (
-    req: Request<unknown, unknown, unknown, PaymentQueryParams>,
-    res: Response
-  ): Promise<void> => {
-    const { code: pid } = req.query;
-    const payments = await getPayments(parseInt(pid as string, 10));
-    res.json(payments);
-  }
-);
 
 /**
  * Get payment history for a specific work
@@ -318,38 +296,6 @@ router.get(
       sendSuccess(res, { rates });
     } catch (error) {
       log.error('Error listing exchange rates:', error);
-      ErrorResponses.internalError(
-        res,
-        (error as Error).message,
-        error as Error
-      );
-    }
-  }
-);
-
-/**
- * Update exchange rate for today
- * POST /api/updateExchangeRate
- * Body: { exchangeRate: number }
- */
-router.post(
-  '/updateExchangeRate',
-  async (
-    req: Request<unknown, unknown, ExchangeRateBody>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { exchangeRate } = req.body;
-
-      if (!exchangeRate || exchangeRate <= 0) {
-        ErrorResponses.badRequest(res, 'Valid exchange rate is required');
-        return;
-      }
-
-      const result = await updateExchangeRate(exchangeRate);
-      sendSuccess(res, result);
-    } catch (error) {
-      log.error('Error updating exchange rate:', error);
       ErrorResponses.internalError(
         res,
         (error as Error).message,

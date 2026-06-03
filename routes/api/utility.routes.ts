@@ -2,7 +2,6 @@
  * Utility Routes Module
  *
  * This module contains miscellaneous utility endpoints for the API:
- * - /clear: Serve the clear.html page
  * - /sendtwilio: Send SMS reminders via Twilio
  * - /checktwilio: Check SMS delivery status
  * - /google: Fetch Google contacts via OAuth
@@ -39,14 +38,6 @@ interface GoogleQuery {
 interface PathQuery {
   path?: string;
 }
-
-/**
- * GET /clear
- * Serve the clear.html page
- */
-router.get('/clear', (_req: Request, res: Response): void => {
-  res.sendFile('./public/clear.html', { root: '.' });
-});
 
 /**
  * GET /sendtwilio

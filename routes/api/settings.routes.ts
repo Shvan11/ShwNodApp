@@ -14,7 +14,6 @@ import {
   getAllOptions,
   getOption,
   updateOption,
-  getOptionsByPattern,
   bulkUpdateOptions
 } from '../../services/database/queries/options-queries.js';
 import DatabaseConfigService from '../../services/config/DatabaseConfigService.js';
@@ -29,10 +28,6 @@ const router = Router();
 
 interface OptionNameParams {
   optionName: string;
-}
-
-interface PatternParams {
-  pattern: string;
 }
 
 interface BulkUpdateBody {
@@ -104,29 +99,6 @@ router.put(
       ErrorResponses.internalError(
         res,
         'Failed to bulk update options',
-        error as Error
-      );
-    }
-  }
-);
-
-/**
- * Get options matching a pattern
- * GET /api/options/pattern/:pattern
- * NOTE: This route must come BEFORE /options/:optionName to avoid matching "pattern" as optionName
- */
-router.get(
-  '/options/pattern/:pattern',
-  async (req: Request<PatternParams>, res: Response): Promise<void> => {
-    try {
-      const { pattern } = req.params;
-      const options = await getOptionsByPattern(pattern);
-      res.json({ status: 'success', options });
-    } catch (error) {
-      log.error('Error getting options by pattern:', error);
-      ErrorResponses.internalError(
-        res,
-        'Failed to retrieve options by pattern',
         error as Error
       );
     }
@@ -316,65 +288,6 @@ router.put(
 );
 
 /**
- * Get database configuration status and diagnostics
- * GET /api/config/database/status
- */
-router.get(
-  '/config/database/status',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      const result = await dbConfigService.getConfigurationStatus();
-      res.json(result);
-    } catch (error) {
-      log.error('Error getting configuration status:', error);
-      ErrorResponses.internalError(
-        res,
-        'Failed to get configuration status',
-        error as Error
-      );
-    }
-  }
-);
-
-/**
- * Create backup of current database configuration
- * POST /api/config/database/backup
- */
-router.post(
-  '/config/database/backup',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      const result = await dbConfigService.createBackup();
-
-      const statusCode = result.success ? 200 : 400;
-      res.status(statusCode).json(result);
-    } catch (error) {
-      log.error('Error creating configuration backup:', error);
-      ErrorResponses.internalError(res, 'Backup creation failed', error as Error);
-    }
-  }
-);
-
-/**
- * Restore database configuration from backup
- * POST /api/config/database/restore
- */
-router.post(
-  '/config/database/restore',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      const result = await dbConfigService.restoreFromBackup();
-
-      const statusCode = result.success ? 200 : 400;
-      res.status(statusCode).json(result);
-    } catch (error) {
-      log.error('Error restoring configuration from backup:', error);
-      ErrorResponses.internalError(res, 'Restore failed', error as Error);
-    }
-  }
-);
-
-/**
  * Export current database configuration (sanitized)
  * GET /api/config/database/export
  */
@@ -395,23 +308,6 @@ router.get(
     }
   }
 );
-
-/**
- * Get database connection presets
- * GET /api/config/database/presets
- */
-router.get('/config/database/presets', (_req: Request, res: Response): void => {
-  try {
-    const presets = dbConfigService.getConnectionPresets();
-    res.json({
-      success: true,
-      presets: presets
-    });
-  } catch (error) {
-    log.error('Error getting connection presets:', error);
-    ErrorResponses.internalError(res, 'Failed to get presets', error as Error);
-  }
-});
 
 // ===== SYSTEM MANAGEMENT ENDPOINTS =====
 

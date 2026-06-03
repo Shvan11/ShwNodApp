@@ -17,7 +17,6 @@ import qrcode from 'qrcode';
 import path from 'path';
 
 // Services
-import { getNewAppointmentMessage } from '../../services/database/queries/messaging-queries.js';
 import whatsapp from '../../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../../services/messaging/whatsapp-api.js';
 import { sendgramfile } from '../../services/messaging/telegram.js';
@@ -40,18 +39,8 @@ const upload = multer();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface SendToPatientQuery {
-  personId?: string;
-  appointmentId?: string;
-}
-
 interface SendByDateQuery {
   date?: string;
-}
-
-interface SendXrayQuery {
-  phone?: string;
-  file?: string;
 }
 
 interface SendReceiptBody {
@@ -81,137 +70,6 @@ interface SendMediaResult {
 // ============================================================================
 // WHATSAPP MESSAGE SENDING ROUTES
 // ============================================================================
-
-/**
- * Send WhatsApp message to a specific patient for an appointment
- * GET /send-to-patient (mounted at /api/wa)
- * Query params: personId, appointmentId
- */
-router.get(
-  '/send-to-patient',
-  async (
-    req: Request<unknown, unknown, unknown, SendToPatientQuery>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { personId, appointmentId } = req.query;
-
-      // Validate required parameters
-      if (!personId || !appointmentId) {
-        log.warn('Send to patient missing parameters', { personId, appointmentId });
-        ErrorResponses.badRequest(res, 'Missing required parameters', {
-          required: ['personId', 'appointmentId']
-        });
-        return;
-      }
-
-      // Validate parameters are numeric
-      if (isNaN(parseInt(personId)) || isNaN(parseInt(appointmentId))) {
-        log.warn('Send to patient invalid parameters', { personId, appointmentId });
-        ErrorResponses.badRequest(res, 'Invalid input', {
-          details: 'personId and appointmentId must be valid numbers'
-        });
-        return;
-      }
-
-      log.info(
-        `WhatsApp send to patient request - person_id: ${personId}, appointment_id: ${appointmentId}`
-      );
-
-      // Check if WhatsApp client is ready
-      if (!whatsapp.isReady()) {
-        const status = whatsapp.getStatus();
-        sendError(res, 503, 'Service unavailable', {
-          service: 'WhatsApp',
-          details:
-            'WhatsApp client is not ready. Please wait for initialization to complete.',
-          clientStatus: status as Record<string, unknown>,
-          requiresRestart: status.circuitBreakerOpen
-        });
-        return;
-      }
-
-      // Build the reminder message (was the GetNewAppointmentMessage proc).
-      const messageData = await getNewAppointmentMessage(
-        parseInt(personId),
-        parseInt(appointmentId)
-      );
-
-      if (!messageData) {
-        log.warn('WhatsApp message data not found', { personId, appointmentId });
-        ErrorResponses.notFound(res, 'Message data', {
-          details: 'No message data returned'
-        });
-        return;
-      }
-
-      // Check the message-build result code (0=ok, -1=not found, -2=invalid phone)
-      if (messageData.result !== 0) {
-        let errorMessage = 'Unknown error';
-        if (messageData.result === -1) {
-          errorMessage = 'Patient or appointment not found';
-        } else if (messageData.result === -2) {
-          errorMessage = 'Invalid phone number';
-        }
-
-        log.warn('WhatsApp message build error', { personId, appointmentId, result: messageData.result, errorMessage });
-        ErrorResponses.badRequest(res, 'Invalid input', {
-          details: errorMessage,
-          result: messageData.result
-        });
-        return;
-      }
-
-      // Format phone number for WhatsApp (needs international format with + prefix)
-      const countryCode = messageData.countryCode || '964'; // Default to Iraq
-      const phoneNumber = PhoneFormatter.forWhatsApp(
-        messageData.phone!,
-        countryCode
-      );
-
-      log.info(
-        `Sending WhatsApp message to ${phoneNumber}: ${messageData.message!.substring(0, 50)}...`
-      );
-
-      // Send single message using WhatsApp service
-      const result = await whatsapp.sendMessage(
-        phoneNumber,
-        messageData.message!,
-        `Patient ${personId}`,
-        parseInt(appointmentId)
-      );
-
-      if (result.success) {
-        res.json({
-          success: true,
-          message: 'WhatsApp message sent successfully',
-          data: {
-            personId: parseInt(personId),
-            appointmentId: parseInt(appointmentId),
-            phone: phoneNumber,
-            messageId: result.messageId,
-            messagePreview:
-              messageData.message!.substring(0, 100) +
-              (messageData.message!.length > 100 ? '...' : '')
-          }
-        });
-      } else {
-        log.warn('WhatsApp message send failed', { personId, appointmentId, error: result.error });
-        ErrorResponses.badRequest(res, 'operation failed', {
-          operation: 'send WhatsApp message',
-          details: result.error
-        });
-      }
-    } catch (error) {
-      log.error(
-        `Error sending WhatsApp message to patient: ${(error as Error).message}`
-      );
-      ErrorResponses.internalError(res, 'Internal server error while sending message', {
-        error: (error as Error).message
-      });
-    }
-  }
-);
 
 /**
  * Send WhatsApp messages in batch for a specific date
@@ -584,31 +442,6 @@ router.post(
 );
 
 /**
- * Send X-ray file via WhatsApp
- * GET /sendxrayfile
- * Query params: phone, file (file path)
- */
-router.get(
-  '/sendxrayfile',
-  async (
-    req: Request<unknown, unknown, unknown, SendXrayQuery>,
-    res: Response
-  ): Promise<void> => {
-    const { phone, file } = req.query;
-    try {
-      const state = await sendXray_(phone!, file!);
-      res.json(state);
-    } catch (error) {
-      log.warn('WhatsApp send X-ray failed', { phone, file, error: (error as Error).message });
-      ErrorResponses.badRequest(res, 'operation failed', {
-        operation: 'send X-ray file',
-        details: (error as Error).message
-      });
-    }
-  }
-);
-
-/**
  * Send multiple media files via WhatsApp or Telegram
  * POST /sendmedia2
  * Body: { file: comma-separated paths, phone: phoneNumber, prog: "WhatsApp"|"Telegram" }
@@ -778,33 +611,6 @@ router.get('/status', (_req: Request, res: Response): void => {
     });
   }
 });
-
-/**
- * Get detailed WhatsApp status including message state dump
- * GET /detailed-status (mounted at /api/wa)
- * Returns comprehensive status information for debugging
- */
-router.get(
-  '/detailed-status',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      const stateDump = messageState.dump(true); // Get detailed dump
-      const clientStatus = whatsapp.getStatus();
-
-      res.json({
-        success: true,
-        messageState: stateDump,
-        clientStatus: clientStatus,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      log.error('Error getting detailed status:', error);
-      ErrorResponses.internalError(res, 'Failed to get detailed status', {
-        error: (error as Error).message
-      });
-    }
-  }
-);
 
 /**
  * Get initial WhatsApp state (replaces the WS REQUEST_WHATSAPP_INITIAL_STATE RPC).

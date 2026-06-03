@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import { execFile, ChildProcess } from 'child_process';
 import config from '../../config/config.js';
-import { QRCodetoFile } from './qrcode.js';
 import { imageSizeFromFile } from 'image-size/fromFile';
 import { createPathResolver } from '../../utils/path-resolver.js';
 import { log } from '../../utils/logger.js';
@@ -73,15 +72,6 @@ async function getImageSizes(pid: string, tp: string): Promise<(ImageDimension |
   );
 
   return results;
-}
-
-/**
- * Generate a QR code for a patient
- * @param pid - Patient ID
- * @returns Promise that resolves when QR code is generated
- */
-async function generateQRCode(pid: string): Promise<void> {
-  return QRCodetoFile(pid);
 }
 
 /**
@@ -193,4 +183,4 @@ function constructArgs(
   return [source, '-o', destination];
 }
 
-export { getImageSizes, generateQRCode, processXrayImage };
+export { getImageSizes, processXrayImage };

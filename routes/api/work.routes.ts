@@ -34,15 +34,8 @@ import {
   addWorkDetail,
   updateWorkDetail,
   deleteWorkDetail,
-  WORK_STATUS,
-  // New aliases for tblWorkItems
-  getWorkItems,
-  addWorkItem,
-  updateWorkItem,
-  deleteWorkItem,
   // tooth number functions
-  getToothNumbers,
-  getWorkItemTeeth
+  getToothNumbers
 } from '../../services/database/queries/work-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
@@ -76,21 +69,6 @@ interface WorkQueryParams {
   workId?: string;
   permanent?: string;
   deciduous?: string;
-}
-
-interface WorkResult {
-  work_id: number;
-  person_id: number;
-  total_required: number;
-  currency: string;
-  type_of_work: number;
-  notes: string | null;
-  status: number;
-  dr_id: number;
-  doctor_name: string | null;
-  type_name: string | null;
-  status_name: string | null;
-  [key: string]: string | number | null;
 }
 
 interface AddWorkBody {
@@ -288,56 +266,6 @@ router.get(
     } catch (error) {
       log.error('Error fetching works:', error);
       sendError(res, 500, 'Failed to fetch works', error as Error);
-    }
-  }
-);
-
-/**
- * Get single work by id
- */
-router.get(
-  '/getwork/:workId',
-  async (req: Request<{ workId: string }>, res: Response): Promise<void> => {
-    try {
-      const { workId } = req.params;
-      if (!workId) {
-        log.warn('Get work request missing workId parameter');
-        ErrorResponses.missingParameter(res, 'workId');
-        return;
-      }
-
-      const { rows } = await sql<WorkResult>`
-            SELECT
-                w."work_id",
-                w."person_id",
-                w."total_required",
-                w."currency",
-                w."type_of_work",
-                w."notes",
-                w."status",
-                w."dr_id",
-                e."employee_name" as "doctor_name",
-                wt."work_type" as "type_name",
-                ws."status_name"
-            FROM "works" w
-            LEFT JOIN "employees" e ON w."dr_id" = e."id"
-            LEFT JOIN "work_types" wt ON w."type_of_work" = wt."id"
-            LEFT JOIN "work_statuses" ws ON w."status" = ws."status_id"
-            WHERE w."work_id" = ${parseInt(workId)}
-        `.execute(getKysely());
-
-      const work = rows.length > 0 ? rows[0] : null;
-
-      if (!work) {
-        log.warn('Work not found by id', { workId });
-        ErrorResponses.notFound(res, 'Work');
-        return;
-      }
-
-      res.json({ success: true, work });
-    } catch (error) {
-      log.error('Error fetching work:', error);
-      sendError(res, 500, 'Failed to fetch work', error as Error);
     }
   }
 );
@@ -591,22 +519,6 @@ router.post(
 );
 
 /**
- * Get work status constants (for frontend reference)
- */
-router.get('/workstatuses', (_req: Request, res: Response): void => {
-  res.json({
-    ACTIVE: WORK_STATUS.ACTIVE,
-    FINISHED: WORK_STATUS.FINISHED,
-    DISCONTINUED: WORK_STATUS.DISCONTINUED,
-    labels: {
-      [WORK_STATUS.ACTIVE]: 'Active',
-      [WORK_STATUS.FINISHED]: 'Finished',
-      [WORK_STATUS.DISCONTINUED]: 'Discontinued'
-    }
-  });
-});
-
-/**
  * Delete work - Protected: Secretary can only delete works created today
  */
 router.delete(
@@ -659,32 +571,6 @@ router.delete(
 
       log.error('Error deleting work:', error);
       sendError(res, 500, 'Failed to delete work', error as Error);
-    }
-  }
-);
-
-/**
- * Get active work for a patient
- */
-router.get(
-  '/getactivework',
-  async (
-    req: Request<unknown, unknown, unknown, WorkQueryParams>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { code: personId } = req.query;
-      if (!personId) {
-        log.warn('Get active work request missing person_id');
-        ErrorResponses.missingParameter(res, 'code (person_id)');
-        return;
-      }
-
-      const activeWork = await getActiveWork(parseInt(personId));
-      res.json(activeWork);
-    } catch (error) {
-      log.error('Error fetching active work:', error);
-      sendError(res, 500, 'Failed to fetch active work', error as Error);
     }
   }
 );
@@ -744,34 +630,6 @@ router.get(
     } catch (error) {
       log.error('Error fetching tooth numbers:', error);
       sendError(res, 500, 'Failed to fetch tooth numbers', error as Error);
-    }
-  }
-);
-
-/**
- * Get teeth for a specific work item
- */
-router.get(
-  '/work/item/:itemId/teeth',
-  async (req: Request<{ itemId: string }>, res: Response): Promise<void> => {
-    try {
-      const { itemId } = req.params;
-
-      if (!itemId || isNaN(parseInt(itemId))) {
-        log.warn('Get work item teeth invalid itemId', { itemId });
-        ErrorResponses.badRequest(res, 'itemId must be a valid number');
-        return;
-      }
-
-      const teeth = await getWorkItemTeeth(parseInt(itemId));
-      res.json({
-        success: true,
-        teeth,
-        count: teeth.length
-      });
-    } catch (error) {
-      log.error('Error fetching work item teeth:', error);
-      sendError(res, 500, 'Failed to fetch work item teeth', error as Error);
     }
   }
 );
@@ -983,160 +841,6 @@ router.delete(
       }
 
       const result = await deleteWorkDetail(parseInt(String(id)));
-      res.json({
-        success: true,
-        message: 'Work item deleted successfully',
-        rowsAffected: result.rowCount
-      });
-    } catch (error) {
-      log.error('Error deleting work item:', error);
-      sendError(res, 500, 'Failed to delete work item', error as Error);
-    }
-  }
-);
-
-// ============================================================================
-// WORK ITEMS API ENDPOINTS (New RESTful Routes)
-// ============================================================================
-
-/**
- * GET /api/work/:workId/items
- * Get all work items for a specific work
- */
-router.get(
-  '/work/:workId/items',
-  async (req: Request<{ workId: string }>, res: Response): Promise<void> => {
-    try {
-      const { workId } = req.params;
-
-      if (!workId || isNaN(parseInt(workId))) {
-        log.warn('Get work items invalid workId', { workId });
-        ErrorResponses.badRequest(res, 'workId must be a valid number');
-        return;
-      }
-
-      const items = await getWorkItems(parseInt(workId));
-      res.json({
-        success: true,
-        items,
-        count: items.length
-      });
-    } catch (error) {
-      log.error('Error fetching work items:', error);
-      sendError(res, 500, 'Failed to fetch work items', error as Error);
-    }
-  }
-);
-
-/**
- * POST /api/work/:workId/items
- * Add a new work item to a work
- */
-router.post(
-  '/work/:workId/items',
-  async (
-    req: Request<{ workId: string }, unknown, WorkDetailBody>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { workId } = req.params;
-      const itemData = req.body;
-
-      if (!workId || isNaN(parseInt(workId))) {
-        log.warn('Add work item invalid workId', { workId });
-        ErrorResponses.badRequest(res, 'workId must be a valid number');
-        return;
-      }
-
-      // Validate TeethIds if provided
-      if (itemData.TeethIds && !Array.isArray(itemData.TeethIds)) {
-        log.warn('Add work item invalid TeethIds', { workId, TeethIds: itemData.TeethIds });
-        ErrorResponses.badRequest(
-          res,
-          'TeethIds must be an array of tooth IDs'
-        );
-        return;
-      }
-
-      // Create item data with required work_id from url
-      const workItemData = {
-        ...itemData,
-        work_id: parseInt(workId)
-      };
-
-      const result = await addWorkItem(workItemData);
-      res.json({
-        success: true,
-        itemId: result?.id,
-        message: 'Work item added successfully'
-      });
-    } catch (error) {
-      log.error('Error adding work item:', error);
-      sendError(res, 500, 'Failed to add work item', error as Error);
-    }
-  }
-);
-
-/**
- * PUT /api/work/item/:itemId
- * Update a specific work item
- */
-router.put(
-  '/work/item/:itemId',
-  async (
-    req: Request<{ itemId: string }, unknown, WorkDetailBody>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { itemId } = req.params;
-      const itemData = req.body;
-
-      if (!itemId || isNaN(parseInt(itemId))) {
-        log.warn('Update work item invalid itemId', { itemId });
-        ErrorResponses.badRequest(res, 'itemId must be a valid number');
-        return;
-      }
-
-      // Validate TeethIds if provided
-      if (itemData.TeethIds && !Array.isArray(itemData.TeethIds)) {
-        log.warn('Update work item invalid TeethIds', { itemId, TeethIds: itemData.TeethIds });
-        ErrorResponses.badRequest(
-          res,
-          'TeethIds must be an array of tooth IDs'
-        );
-        return;
-      }
-
-      const result = await updateWorkItem(parseInt(itemId), itemData);
-      res.json({
-        success: true,
-        message: 'Work item updated successfully',
-        rowsAffected: result.rowCount
-      });
-    } catch (error) {
-      log.error('Error updating work item:', error);
-      sendError(res, 500, 'Failed to update work item', error as Error);
-    }
-  }
-);
-
-/**
- * DELETE /api/work/item/:itemId
- * Delete a specific work item
- */
-router.delete(
-  '/work/item/:itemId',
-  async (req: Request<{ itemId: string }>, res: Response): Promise<void> => {
-    try {
-      const { itemId } = req.params;
-
-      if (!itemId || isNaN(parseInt(itemId))) {
-        log.warn('Delete work item invalid itemId', { itemId });
-        ErrorResponses.badRequest(res, 'itemId must be a valid number');
-        return;
-      }
-
-      const result = await deleteWorkItem(parseInt(itemId));
       res.json({
         success: true,
         message: 'Work item deleted successfully',

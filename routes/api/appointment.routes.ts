@@ -122,34 +122,6 @@ router.get(
 );
 
 // ============================================================================
-// APPOINTMENT UPDATE NOTIFICATION
-// ============================================================================
-
-/**
- * Notify that appointments were updated
- * Triggers WebSocket event to refresh appointment views across all clients
- */
-router.get(
-  '/AppsUpdated',
-  async (
-    req: Request<unknown, unknown, unknown, AppointmentQueryParams>,
-    res: Response
-  ): Promise<void> => {
-    const { PDate } = req.query;
-    if (typeof PDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(PDate)) {
-      res.status(400).json({ success: false, error: 'PDate query parameter required (YYYY-MM-DD)' });
-      return;
-    }
-    res.sendStatus(200);
-    log.info(`AppsUpdated called with date: ${PDate}`);
-
-    if (wsEmitter) {
-      wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, PDate);
-    }
-  }
-);
-
-// ============================================================================
 // DAILY APPOINTMENTS ROUTES
 // ============================================================================
 

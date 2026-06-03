@@ -11,8 +11,6 @@
 import { Router, type Request, type Response } from 'express';
 import {
   getWires,
-  getVisitsSummary,
-  getVisitDetailsByID,
   getLatestWire,
   getVisitsByWorkId,
   getVisitById,
@@ -58,72 +56,6 @@ interface UpdateVisitByWorkBody {
 interface DeleteVisitByWorkBody {
   visitId: number;
 }
-
-// ============================================================================
-// Visit Summary Routes
-// ============================================================================
-
-/**
- * GET /visitsSummary
- * Get summary of all visits for a specific patient
- * Query params: PID (Patient id)
- */
-router.get(
-  '/visitsSummary',
-  async (
-    req: Request<unknown, unknown, unknown, VisitQueryParams>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { PID } = req.query;
-      if (!PID) {
-        ErrorResponses.missingParameter(res, 'PID');
-        return;
-      }
-
-      const visitsSummary = await getVisitsSummary(parseInt(PID, 10));
-      res.json(visitsSummary);
-    } catch (error) {
-      log.error('Error fetching visits summary:', error);
-      ErrorResponses.internalError(
-        res,
-        'Failed to fetch visits summary',
-        error as Error
-      );
-    }
-  }
-);
-
-/**
- * GET /getVisitDetailsByID
- * Get detailed information for a specific visit
- * Query params: VID (Visit id)
- */
-router.get(
-  '/getVisitDetailsByID',
-  async (
-    req: Request<unknown, unknown, unknown, VisitQueryParams>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { VID } = req.query;
-      if (!VID) {
-        ErrorResponses.missingParameter(res, 'VID');
-        return;
-      }
-
-      const visitDetails = await getVisitDetailsByID(parseInt(VID, 10));
-      res.json(visitDetails);
-    } catch (error) {
-      log.error('Error fetching visit details:', error);
-      ErrorResponses.internalError(
-        res,
-        'Failed to fetch visit details',
-        error as Error
-      );
-    }
-  }
-);
 
 // ============================================================================
 // wire Management Routes

@@ -273,72 +273,6 @@ class DatabaseConfigService {
   }
 
   /**
-   * Create backup of current configuration
-   */
-  async createBackup(): Promise<{ success: boolean; message: string; timestamp: string }> {
-    try {
-      const success = await this.envManager.createBackup();
-      return {
-        success,
-        message: success
-          ? 'Configuration backup created successfully'
-          : 'No configuration file to backup',
-        timestamp: new Date().toISOString(),
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `Failed to create backup: ${(error as Error).message}`,
-        timestamp: new Date().toISOString(),
-      };
-    }
-  }
-
-  /**
-   * Restore configuration from backup
-   */
-  async restoreFromBackup(): Promise<ConfigUpdateResult> {
-    try {
-      await this.envManager.restoreFromBackup();
-      return {
-        success: true,
-        message: 'Configuration restored from backup successfully',
-        requiresRestart: true,
-        timestamp: new Date().toISOString(),
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to restore from backup',
-        error: (error as Error).message,
-      };
-    }
-  }
-
-  /**
-   * Get configuration file status and diagnostics
-   */
-  async getConfigurationStatus(): Promise<ConfigStatus> {
-    try {
-      const fileStatus = await this.envManager.getFileStatus();
-      const validation = await this.envManager.validateEnvironment();
-
-      return {
-        success: true,
-        files: fileStatus,
-        validation,
-        timestamp: new Date().toISOString(),
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to get configuration status',
-        error: (error as Error).message,
-      };
-    }
-  }
-
-  /**
    * Export current configuration (sanitized)
    */
   async exportConfiguration(): Promise<ConfigExportResult> {
@@ -365,37 +299,6 @@ class DatabaseConfigService {
     }
   }
 
-  /**
-   * Get database connection presets/templates
-   */
-  getConnectionPresets(): ConnectionPreset[] {
-    return [
-      {
-        id: 'local_sandbox',
-        name: 'Local Sandbox (shwan_test)',
-        description: 'Local PostgreSQL sandbox database on this machine',
-        config: {
-          PG_HOST: 'localhost',
-          PG_PORT: '5432',
-          PG_DATABASE: 'shwan_test',
-          PG_USER: 'shwan_app',
-          PG_PASSWORD: '',
-        },
-      },
-      {
-        id: 'local_default',
-        name: 'Local PostgreSQL',
-        description: 'Default local PostgreSQL instance',
-        config: {
-          PG_HOST: 'localhost',
-          PG_PORT: '5432',
-          PG_DATABASE: 'postgres',
-          PG_USER: 'postgres',
-          PG_PASSWORD: '',
-        },
-      },
-    ];
-  }
 }
 
 export default DatabaseConfigService;

@@ -189,28 +189,6 @@ export async function addInvoice(invoiceData: InvoiceData): Promise<{ invoice_id
 }
 
 /**
- * Updates the exchange rate for today's date
- */
-export async function updateExchangeRate(exchangeRate: number): Promise<unknown[]> {
-  const today = toDateOnly(new Date());
-  const db = getKysely();
-
-  // IF EXISTS…UPDATE…ELSE INSERT → ON CONFLICT against the unique index uq_sms_date.
-  await db
-    .insertInto('sms')
-    .values({
-      date: sql<string>`${today}`,
-      sms_sent: false,
-      email_sent: false,
-      exchange_rate: exchangeRate,
-    })
-    .onConflict((oc) => oc.column('date').doUpdateSet({ exchange_rate: exchangeRate }))
-    .execute();
-
-  return [];
-}
-
-/**
  * Gets the exchange rate for a specific date
  */
 export async function getExchangeRateForDate(date: string): Promise<number | null> {
