@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useCategories, useSubcategories } from '../../hooks/useExpenses';
 import type { Expense, ExpenseData } from '../../hooks/useExpenses';
+import { formatISODate } from '../../core/utils';
 import { formatNumber } from '../../utils/formatters';
 import Modal from '../react/Modal';
 import styles from '../../routes/Expenses.module.css';
@@ -77,7 +78,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                 setCategoryId(expense.category_id || '');
             } else {
                 // Add mode - set default date to today
-                const today = new Date().toISOString().split('T')[0];
+                const today = formatISODate();
                 setFormData({
                     expenseDate: today,
                     amount: 0,

@@ -47,7 +47,7 @@ export interface UseWhatsAppWebSocketReturn {
   clientReady: boolean;
   sendingProgress: SendingProgress;
   messageStatusUpdate: MessageStatusUpdateData | null;
-  requestInitialState: () => void;
+  requestInitialState: (dateToRequest?: string) => void;
 }
 
 export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketReturn {
@@ -89,9 +89,11 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
 
   // Fetch initial state via REST (replaces the WS RPC). Preserves the
   // per-date dedupe so a date-change effect doesn't re-fire for the same
-  // date during quick re-renders.
-  const requestInitialState = useCallback(() => {
-    const dateToRequest = currentDateRef.current;
+  // date during quick re-renders. The date is an explicit (optional) arg:
+  // synchronous date-driven callers pass the fresh value directly, while
+  // async SSE handlers omit it and fall back to the latest-date ref.
+  const requestInitialState = useCallback((dateToRequest: string = currentDateRef.current) => {
+    if (!dateToRequest) return;
     if (lastRequestedDateRef.current === dateToRequest) {
       return;
     }
@@ -105,6 +107,11 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
       .then(applyInitialState)
       .catch((err) => {
         console.error('[useWhatsAppWebSocket] initial-state fetch failed', err);
+        // Clear the dedupe key so a later trigger can retry this date.
+        // Guarded so we don't clobber a newer in-flight request for another date.
+        if (lastRequestedDateRef.current === dateToRequest) {
+          lastRequestedDateRef.current = null;
+        }
       });
   }, [applyInitialState]);
 
@@ -193,9 +200,11 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
   }, [requestInitialState]);
 
   // Request initial state when date changes (transport stays connected).
+  // Pass `currentDate` explicitly so this doesn't depend on the ref-updater
+  // effect having run first — no ordering fragility.
   useEffect(() => {
     if (connectionStatus === UI_STATES.CONNECTED && currentDate) {
-      requestInitialState();
+      requestInitialState(currentDate);
     }
   }, [currentDate, connectionStatus, requestInitialState]);
 

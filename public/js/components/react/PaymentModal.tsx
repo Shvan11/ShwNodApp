@@ -4,6 +4,7 @@ import type { ApiResult, ExchangeRateResult } from '@/types/api.types';
 import styles from './PaymentModal.module.css';
 import Modal from './Modal';
 import { parseFormattedNumber } from '../../utils/formatters';
+import { formatISODate } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
@@ -93,7 +94,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
     // Form state - numeric values for calculations
     const [formData, setFormData] = useState<FormData>({
-        paymentDate: new Date().toISOString().substring(0, 10),
+        paymentDate: formatISODate(),
         paymentCurrency: 'IQD', // 'USD', 'IQD', 'MIXED'
         amountToRegister: '', // Amount in account currency
         actualUSD: '',

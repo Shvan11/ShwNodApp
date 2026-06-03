@@ -1377,7 +1377,7 @@ router.get(
       const { rows } = await sql`
             SELECT
                 "id",
-                "dx_date",
+                to_char("dx_date", 'YYYY-MM-DD') as "dx_date",
                 "work_id",
                 "diagnosis",
                 "treatment_plan",

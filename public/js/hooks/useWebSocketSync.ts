@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import sseAppointments, { type Freshness } from '../services/sse-appointments';
 import { clearLoaderCacheKey } from '../router/loaders';
 
@@ -59,12 +59,17 @@ export function useWebSocketSync(
   // Drives every effect below. Non-today => static view, no subscriptions.
   const isViewingToday = currentDate === getTodayDate();
 
-  // Keep a ref to the latest callback so the debounced trigger always invokes
-  // the current closure without needing to recreate the debouncer on every render.
+  // Keep refs to the latest callback + date so the debounced trigger always
+  // invokes the current closure without recreating the debouncer every render.
+  // Synced post-commit (not during render) so an aborted/discarded concurrent
+  // render can't leave a ref ahead of the committed UI. Both refs are read only
+  // from async paths (runRecovery, event handlers), so post-commit timing is safe.
   const callbackRef = useRef(onAppointmentsUpdated);
-  callbackRef.current = onAppointmentsUpdated;
   const currentDateRef = useRef(currentDate);
-  currentDateRef.current = currentDate;
+  useLayoutEffect(() => {
+    callbackRef.current = onAppointmentsUpdated;
+    currentDateRef.current = currentDate;
+  }, [onAppointmentsUpdated, currentDate]);
 
   // Debounced recovery + retry state. Held in refs so both the event-driven
   // subscriptions (reconnect/online) and the periodic safety net share the

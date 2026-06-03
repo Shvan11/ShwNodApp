@@ -396,7 +396,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                         const isClickable = !dayInfo.isPast && dayInfo.hasAvailability && !dayInfo.isHoliday;
 
                         // Build tooltip
-                        let tooltip = '';
+                        let tooltip: string;
                         if (dayInfo.isHoliday) {
                             tooltip = dayInfo.holidayName || 'Holiday';
                         } else if (dayInfo.appointmentCount > 0) {

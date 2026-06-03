@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, ChangeEvent, FormEvent, CSSProperties } from 'react';
+import { formatISODate } from '../../core/utils';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
 import Modal from './Modal';
@@ -301,7 +302,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
     };
 
     const buildExportFileName = (): string => {
-        const ts = new Date().toISOString().slice(0, 10);
+        const ts = formatISODate();
         return personId ? `comparison_${personId}_${ts}.png` : `comparison_${ts}.png`;
     };
 

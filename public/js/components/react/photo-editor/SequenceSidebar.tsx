@@ -163,7 +163,7 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
 
     // The remembered card folder is both the default picker location and the read-write grant
     // we delete under. First use picks it once; after that it's silent.
-    let cardDir: FileSystemDirectoryHandle | null = null;
+    let cardDir: FileSystemDirectoryHandle | null;
     if (importFolder.handle && (await ensurePermission(importFolder.handle, 'readwrite'))) {
       cardDir = importFolder.handle;
     } else {

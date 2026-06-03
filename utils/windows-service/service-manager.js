@@ -34,6 +34,12 @@ const serviceConfig = {
   env: [{
     name: 'NODE_ENV',
     value: 'production'
+  }, {
+    // Pin the clinic wall-clock timezone so the date layer is correct regardless of
+    // the host OS tz (a non-UTC+3 server would otherwise shift every timestamp).
+    // .env may override; defaults to the clinic zone. Reinstall the service to apply.
+    name: 'TZ',
+    value: process.env.TZ || 'Asia/Baghdad'
   }],
   stopparentfirst: false
 };

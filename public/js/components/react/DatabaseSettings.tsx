@@ -2,6 +2,7 @@ import { useState, useEffect, ChangeEvent, MouseEvent } from 'react';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import Modal from './Modal';
 import styles from './DatabaseSettings.module.css';
+import { formatISODate } from '../../core/utils';
 
 interface DatabaseConfig {
     PG_HOST: string;
@@ -210,7 +211,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `database-config-${new Date().toISOString().split('T')[0]}.json`;
+                a.download = `database-config-${formatISODate()}.json`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);

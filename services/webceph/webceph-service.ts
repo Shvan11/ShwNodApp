@@ -245,7 +245,7 @@ class WebCephService {
       };
     } catch (error) {
       log.error('[WebCeph] Error creating patient', { error: (error as Error).message });
-      throw new Error(`Failed to create patient in WebCeph: ${(error as Error).message}`);
+      throw new Error(`Failed to create patient in WebCeph: ${(error as Error).message}`, { cause: error });
     }
   }
 
@@ -281,7 +281,7 @@ class WebCephService {
       };
     } catch (error) {
       log.error('[WebCeph] Error creating record', { error: (error as Error).message });
-      throw new Error(`Failed to create record in WebCeph: ${(error as Error).message}`);
+      throw new Error(`Failed to create record in WebCeph: ${(error as Error).message}`, { cause: error });
     }
   }
 
@@ -322,7 +322,7 @@ class WebCephService {
       };
     } catch (error) {
       log.error('[WebCeph] Error uploading image', { error: (error as Error).message });
-      throw new Error(`Failed to upload image to WebCeph: ${(error as Error).message}`);
+      throw new Error(`Failed to upload image to WebCeph: ${(error as Error).message}`, { cause: error });
     }
   }
 

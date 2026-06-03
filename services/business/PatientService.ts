@@ -188,7 +188,7 @@ export async function getPatientInfo(
       throw error;
     }
     log.error(`Error fetching patient info for id ${pid}:`, { error: error instanceof Error ? error.message : String(error) });
-    throw new Error('Failed to fetch patient information');
+    throw new Error('Failed to fetch patient information', { cause: error });
   }
 }
 
@@ -211,7 +211,7 @@ export async function getPatientTimePoints(
       throw error;
     }
     log.error(`Error fetching time points for patient ${pid}:`, { error: error instanceof Error ? error.message : String(error) });
-    throw new Error('Failed to fetch patient time points');
+    throw new Error('Failed to fetch patient time points', { cause: error });
   }
 }
 
@@ -244,7 +244,7 @@ export async function getPatientTimePointImages(
       throw error;
     }
     log.error(`Error fetching time point images for patient ${pid}, tp ${timePoint}:`, { error: error instanceof Error ? error.message : String(error) });
-    throw new Error('Failed to fetch time point images');
+    throw new Error('Failed to fetch time point images', { cause: error });
   }
 }
 
@@ -267,6 +267,6 @@ export async function getPatientPayments(
       throw error;
     }
     log.error(`Error fetching payments for patient ${pid}:`, { error: error instanceof Error ? error.message : String(error) });
-    throw new Error('Failed to fetch patient payments');
+    throw new Error('Failed to fetch patient payments', { cause: error });
   }
 }

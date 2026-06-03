@@ -459,7 +459,7 @@ export class StateManager {
 
       log.info(`State imported, ${this.state.size} keys loaded`);
     } catch (error) {
-      throw new Error(`Failed to import state: ${(error as Error).message}`);
+      throw new Error(`Failed to import state: ${(error as Error).message}`, { cause: error });
     }
   }
 

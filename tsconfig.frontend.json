@@ -12,14 +12,13 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "baseUrl": "public/js",
     "paths": {
-      "@/*": ["./*"],
-      "@components/*": ["./components/*"],
-      "@services/*": ["./services/*"],
-      "@hooks/*": ["./hooks/*"],
-      "@contexts/*": ["./contexts/*"],
-      "@types/*": ["./types/*"]
+      "@/*": ["./public/js/*"],
+      "@components/*": ["./public/js/components/*"],
+      "@services/*": ["./public/js/services/*"],
+      "@hooks/*": ["./public/js/hooks/*"],
+      "@contexts/*": ["./public/js/contexts/*"],
+      "@types/*": ["./public/js/types/*"]
     },
     "types": ["vite/client"]
   },

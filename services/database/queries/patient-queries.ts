@@ -122,7 +122,7 @@ interface PatientDetails {
   estimated_cost: number | null;
   currency: string | null;
   tag_id: number | null;
-  date_added: Date | null;
+  date_added: string | null;
 }
 
 interface UpdatePatientData {
@@ -526,7 +526,8 @@ export function getGenders(): Promise<LookupItem[]> {
 export async function getPatientById(personId: number): Promise<PatientDetails | null> {
   // NOTE: date_of_birth is a PG `date` so its runtime value is a 'YYYY-MM-DD' string;
   // codegen types it `string` and PatientDetails.date_of_birth matches (`string | null`).
-  // date_added is a `timestamp` → genuine Date.
+  // date_added is a `timestamp` (Date at runtime); it's to_char'd to a date-only string
+  // in the select below so PatientDetails.date_added is honestly `string | null`.
   const row = await getKysely()
     .selectFrom('patients as p')
     .where('p.person_id', '=', personId)
@@ -549,7 +550,10 @@ export async function getPatientById(personId: number): Promise<PatientDetails |
       'p.estimated_cost',
       'p.currency',
       'p.tag_id',
-      'p.date_added',
+      // date_added is a `timestamp` → a Date at runtime. Convert to a date-only string
+      // here (matching the patient-list query) so every endpoint serves the same
+      // 'YYYY-MM-DD' shape and no raw Date hits res.json() → toISOString() (UTC).
+      sql<string | null>`to_char(p."date_added", 'YYYY-MM-DD')`.as('date_added'),
     ])
     .executeTakeFirst();
   return (row as PatientDetails | undefined) ?? null;
@@ -614,7 +618,7 @@ export async function deletePatient(personId: number): Promise<{ success: boolea
     return { success: true };
   } catch (error) {
     log.error('Error in deletePatient cascade', { error: (error as Error).message });
-    throw new Error(`Failed to delete patient and related records: ${(error as Error).message}`);
+    throw new Error(`Failed to delete patient and related records: ${(error as Error).message}`, { cause: error });
   }
 }
 

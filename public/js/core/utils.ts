@@ -10,6 +10,14 @@
 export function formatDate(date: string | Date | null | undefined): string {
   if (!date) return '';
 
+  // A bare YYYY-MM-DD has no time/zone. Rearrange the parts directly instead of going
+  // through `new Date(str)` (which parses it as UTC midnight) — that way a browser in a
+  // non-clinic timezone (negative UTC offset) can't roll the calendar date back a day.
+  if (typeof date === 'string') {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date.trim());
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  }
+
   const d = date instanceof Date ? date : new Date(date);
 
   if (isNaN(d.getTime())) return '';
@@ -22,18 +30,32 @@ export function formatDate(date: string | Date | null | undefined): string {
 }
 
 /**
- * Format a date to YYYY-MM-DD (ISO format)
- * @param date - Date to format
- * @returns Formatted date
+ * Format a date to a LOCAL-wall-clock YYYY-MM-DD string (ISO 8601 calendar date).
+ *
+ * Uses local getters, NOT `toISOString()` — the latter returns the UTC date, which in
+ * a positive-offset timezone (this clinic is UTC+3) yields YESTERDAY between local
+ * 00:00 and 03:00. Use this for "today" defaults and any date-only value.
+ *
+ * @param date - Date object, parseable string, or null/undefined (default: now)
+ * @returns `YYYY-MM-DD`, or `''` for null/invalid input
  */
-export function formatISODate(date: string | Date | null | undefined): string {
+export function formatISODate(date: string | Date | null | undefined = new Date()): string {
   if (!date) return '';
+
+  // Already a bare YYYY-MM-DD — return as-is (tz-neutral); avoids the UTC-midnight
+  // round-trip that would shift it in a non-clinic (negative-offset) browser.
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
+    return date.trim();
+  }
 
   const d = date instanceof Date ? date : new Date(date);
 
   if (isNaN(d.getTime())) return '';
 
-  return d.toISOString().split('T')[0];
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**

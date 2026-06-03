@@ -131,7 +131,7 @@ class EmailService {
       return config;
     } catch (error) {
       log.error('Failed to load email configuration', { error: (error as Error).message });
-      throw new Error('Email configuration not available');
+      throw new Error('Email configuration not available', { cause: error });
     }
   }
 

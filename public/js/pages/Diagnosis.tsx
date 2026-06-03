@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import styles from './Diagnosis.module.css';
+import { formatISODate } from '../core/utils';
 
 /**
  * Diagnosis Page
@@ -99,7 +100,7 @@ const Diagnosis = () => {
 
     const [diagnosisData, setDiagnosisData] = useState<DiagnosisData>({
         work_id: parseInt(workId || '0'),
-        dx_date: new Date().toISOString().split('T')[0],
+        dx_date: formatISODate(),
         diagnosis: '',
         treatment_plan: '',
         chief_complain: '',
@@ -181,7 +182,7 @@ const Diagnosis = () => {
                 if (diagnosis) {
                     // Format date to YYYY-MM-DD for input
                     if (diagnosis.dx_date) {
-                        diagnosis.dx_date = new Date(diagnosis.dx_date).toISOString().split('T')[0];
+                        diagnosis.dx_date = formatISODate(diagnosis.dx_date);
                     }
                     setDiagnosisData(prev => ({ ...prev, ...diagnosis }));
                     setDiagnosisExists(true);

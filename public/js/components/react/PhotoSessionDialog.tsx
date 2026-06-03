@@ -3,6 +3,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useImportFolder } from '@/hooks/useImportFolder';
 import Modal from './Modal';
 import styles from './PhotoSessionDialog.module.css';
+import { formatISODate } from '../../core/utils';
 
 interface Props {
     personId?: string;
@@ -53,7 +54,7 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [visits, setVisits] = useState<Visit[]>([]);
     const [timepointType, setTimepointType] = useState('Initial');
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+    const [selectedDate, setSelectedDate] = useState(formatISODate());
     const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
     // Set when the server reports the patient has no English name — Dolphin's patient columns are
     // Latin1 and corrupt Arabic, so we capture an English first/last before proceeding.

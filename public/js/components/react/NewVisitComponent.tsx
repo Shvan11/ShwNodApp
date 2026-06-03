@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, type FormEvent, type ChangeEvent } from 'react';
 import cn from 'classnames';
+import { formatISODate } from '../../core/utils';
 import DentalChart from './DentalChart';
 import { useToast } from '../../contexts/ToastContext';
 import styles from './NewVisitComponent.module.css';
@@ -93,7 +94,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
     // Form state
     const [formData, setFormData] = useState<VisitFormData>({
         work_id: workId ?? 0,
-        visit_date: new Date().toISOString().split('T')[0],
+        visit_date: formatISODate(),
         upper_wire_id: '',
         lower_wire_id: '',
         bracket_change: '',

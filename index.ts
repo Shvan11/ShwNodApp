@@ -3,6 +3,10 @@
 // Default to production for safety (before any other code runs)
 process.env.NODE_ENV ??= 'production';
 
+// Pin the process timezone to the clinic wall-clock before any module reads it.
+// MUST stay the first import (ESM evaluates the first import before later ones).
+import './config/timezone.js';
+
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { createServer, Server as HTTPServer } from 'http';

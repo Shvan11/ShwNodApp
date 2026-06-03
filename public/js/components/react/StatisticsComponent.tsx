@@ -250,7 +250,7 @@ const StatisticsComponent = () => {
             revenueTrendChartInstance.current.destroy();
         }
 
-        let chartData: ChartDataItem[] = [];
+        let chartData: ChartDataItem[];
         let chartTitle = 'Grand Total (USD)';
 
         // Aggregate data based on view mode

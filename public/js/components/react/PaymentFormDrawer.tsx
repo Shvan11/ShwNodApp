@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import type { PaymentSaveData } from '@/types/api.types';
 import { formatNumber } from '../../utils/formatters';
+import { formatISODate } from '../../core/utils';
 
 // Types
 interface SetInfo {
@@ -39,7 +40,7 @@ interface PaymentFormDrawerProps {
 const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }: PaymentFormDrawerProps) => {
     const [formData, setFormData] = useState<PaymentFormData>({
         amount_paid: 0,
-        date_of_payment: new Date().toISOString().split('T')[0]
+        date_of_payment: formatISODate()
     });
 
     const [displayAmount, setDisplayAmount] = useState('');
@@ -52,7 +53,7 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
             const initialAmount = set.Balance || set.set_cost || 0;
             setFormData({
                 amount_paid: initialAmount,
-                date_of_payment: new Date().toISOString().split('T')[0]
+                date_of_payment: formatISODate()
             });
             setDisplayAmount(initialAmount ? formatNumber(initialAmount) : '');
             setErrors({});

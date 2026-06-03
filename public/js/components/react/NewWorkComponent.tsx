@@ -6,6 +6,7 @@
 
 import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
+import { formatISODate } from '../../core/utils';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 import styles from './NewWorkComponent.module.css';
 
@@ -279,7 +280,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     ...formData,
                     discount: discountNum > 0 ? discountNum : null,
                     discount_date: discountNum > 0
-                        ? (formData.discount_date || new Date().toISOString().split('T')[0])
+                        ? (formData.discount_date || formatISODate())
                         : null,
                     discount_reason: discountNum > 0 ? (formData.discount_reason || null) : null
                 };

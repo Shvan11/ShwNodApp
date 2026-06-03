@@ -128,7 +128,7 @@ class DriveUploadService {
       };
     } catch (error) {
       log.error('Error uploading PDF to Google Drive', { error: (error as Error).message });
-      throw new Error(`Failed to upload PDF: ${(error as Error).message}`);
+      throw new Error(`Failed to upload PDF: ${(error as Error).message}`, { cause: error });
     }
   }
 

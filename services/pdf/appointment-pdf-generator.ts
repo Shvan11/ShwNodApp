@@ -377,7 +377,7 @@ class AppointmentPDFGenerator {
         error: (error as Error).message,
         stack: (error as Error).stack,
       });
-      throw new Error(`Failed to fetch appointments for ${date}: ${(error as Error).message}`);
+      throw new Error(`Failed to fetch appointments for ${date}: ${(error as Error).message}`, { cause: error });
     }
   }
 

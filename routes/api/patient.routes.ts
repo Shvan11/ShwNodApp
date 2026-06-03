@@ -89,7 +89,7 @@ interface PatientSearchResult {
   country_code: string | null;
   estimated_cost: number | null;
   currency: string | null;
-  date_added: Date | null;
+  date_added: string | null;
   GenderName: string | null;
   AddressName: string | null;
   ReferralSource: string | null;
@@ -821,7 +821,7 @@ router.get(
                     p."phone", p."phone2", p."email", p."date_of_birth", p."gender",
                     p."address_id", p."referral_source_id", p."patient_type_id", p."tag_id",
                     p."notes", p."language", p."country_code",
-                    p."estimated_cost", p."currency", p."date_added",
+                    p."estimated_cost", p."currency", to_char(p."date_added", 'YYYY-MM-DD') as "date_added",
                     g."gender" as "GenderName", a."zone" as "AddressName",
                     r."referral" as "ReferralSource", pt."patient_type" as "PatientTypeName",
                     tag."tag" as "TagName",

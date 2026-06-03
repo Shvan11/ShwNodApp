@@ -6,6 +6,7 @@
 import { MessageStatusValue } from '../../utils/whatsapp-send-constants';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import styles from '../../routes/WhatsAppSend.module.css';
+import { formatISODate } from '../../core/utils';
 
 export interface MessageItem {
   status: MessageStatusValue;
@@ -69,12 +70,11 @@ export default function MessageStatusTable({
   }
 
   if (!messages || messages.length === 0) {
-    const today = new Date();
-    const todayStr = today.toISOString().slice(0, 10);
+    const todayStr = formatISODate();
     const isToday = currentDate === todayStr;
     const isPast = currentDate < todayStr;
 
-    let message = '';
+    let message: string;
     if (isPast) {
       message = 'No messages were sent on this date';
     } else if (isToday) {

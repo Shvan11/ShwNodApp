@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import PhoneInput from './PhoneInput';
 import styles from './EditPatientComponent.module.css';
+import { formatISODate } from '../../core/utils';
 
 interface Props {
     personId?: number | null;  // Validated PersonID from loader (null if invalid)
@@ -118,7 +119,7 @@ const EditPatientComponent = ({ personId }: Props) => {
     const [webcephSuccess, setWebcephSuccess] = useState('');
     const [photoTypes, setPhotoTypes] = useState<PhotoType[]>([]);
     const [uploadData, setUploadData] = useState<UploadData>({
-        recordDate: new Date().toISOString().split('T')[0],
+        recordDate: formatISODate(),
         targetClass: 'ceph_photo',
         imageFile: null
     });
@@ -344,7 +345,7 @@ const EditPatientComponent = ({ personId }: Props) => {
 
             // Reset upload form
             setUploadData({
-                recordDate: new Date().toISOString().split('T')[0],
+                recordDate: formatISODate(),
                 targetClass: 'ceph_photo',
                 imageFile: null
             });

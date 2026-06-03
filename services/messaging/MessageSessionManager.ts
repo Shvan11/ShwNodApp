@@ -379,7 +379,6 @@ export class MessageSessionManager {
     const cutoffTime = now - this.maxSessionAge;
     let expiredCount = 0;
     let cleanedCount = 0;
-    let historyTrimmed = 0;
 
     // First pass: expire sessions that exceeded ACK tracking window
     for (const [, session] of this.activeSessions) {
@@ -418,7 +417,7 @@ export class MessageSessionManager {
       // Clear all history if disabled
       this.sessionHistory.clear();
     }
-    historyTrimmed = historyBefore - this.sessionHistory.size;
+    const historyTrimmed = historyBefore - this.sessionHistory.size;
 
     if (expiredCount > 0 || cleanedCount > 0 || historyTrimmed > 0) {
       log.info('Periodic cleanup completed', {

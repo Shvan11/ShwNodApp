@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, ChangeEvent, FormEvent, MouseEvent 
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import type { AlignerBatch, AlignerSetForBatch } from '../../pages/aligner/aligner.types';
+import { formatISODate } from '../../core/utils';
 
 interface BatchFormData {
     batch_sequence: number | string;
@@ -364,7 +365,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
     };
 
     const getTodayDateString = (): string => {
-        return new Date().toISOString().split('T')[0];
+        return formatISODate();
     };
 
     const formatDisplayDate = (dateStr: string | null | undefined): string => {

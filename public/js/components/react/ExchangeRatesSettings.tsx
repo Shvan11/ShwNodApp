@@ -3,17 +3,18 @@ import type { ApiResult, ExchangeRateResult, HistoryEntry, HistoryResult } from 
 import { useToast } from '../../contexts/ToastContext';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
 import styles from './ExchangeRatesSettings.module.css';
+import { formatISODate } from '../../core/utils';
 
 interface ExchangeRatesSettingsProps {
     onChangesUpdate: (hasChanges: boolean) => void;
 }
 
-const todayIso = (): string => new Date().toISOString().slice(0, 10);
+const todayIso = (): string => formatISODate();
 
 const daysAgoIso = (days: number): string => {
     const d = new Date();
     d.setDate(d.getDate() - days);
-    return d.toISOString().slice(0, 10);
+    return formatISODate(d);
 };
 
 const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) => {

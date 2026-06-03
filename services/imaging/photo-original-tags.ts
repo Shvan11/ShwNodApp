@@ -100,7 +100,7 @@ export async function tagOriginalForView(
 
   const { abs: folderAbs } = resolveSafe(personId, normFolder);
 
-  let entries: string[] = [];
+  let entries: string[];
   try {
     entries = await fs.readdir(folderAbs);
   } catch {
@@ -131,7 +131,7 @@ export async function untagOriginalForView(
   if (!isViewCode(view)) return;
   const normFolder = normalizeRel(folderRel);
   const { abs: folderAbs } = resolveSafe(personId, normFolder);
-  let entries: string[] = [];
+  let entries: string[];
   try {
     entries = await fs.readdir(folderAbs);
   } catch {

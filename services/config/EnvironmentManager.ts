@@ -73,7 +73,7 @@ class EnvironmentManager {
         log.warn('No .env file found, returning empty configuration');
         return {};
       }
-      throw new Error(`Failed to read .env file: ${(error as Error).message}`);
+      throw new Error(`Failed to read .env file: ${(error as Error).message}`, { cause: error });
     }
   }
 
@@ -187,7 +187,7 @@ class EnvironmentManager {
       return false;
     } catch (error) {
       log.error('Failed to create environment backup', { error: (error as Error).message });
-      throw new Error(`Backup creation failed: ${(error as Error).message}`);
+      throw new Error(`Backup creation failed: ${(error as Error).message}`, { cause: error });
     }
   }
 
@@ -204,7 +204,7 @@ class EnvironmentManager {
       throw new Error('No backup file found');
     } catch (error) {
       log.error('Failed to restore from backup', { error: (error as Error).message });
-      throw new Error(`Restore failed: ${(error as Error).message}`);
+      throw new Error(`Restore failed: ${(error as Error).message}`, { cause: error });
     }
   }
 
@@ -226,7 +226,7 @@ class EnvironmentManager {
       return true;
     } catch (error) {
       log.error('Failed to write environment file', { error: (error as Error).message });
-      throw new Error(`Write failed: ${(error as Error).message}`);
+      throw new Error(`Write failed: ${(error as Error).message}`, { cause: error });
     }
   }
 
@@ -250,7 +250,7 @@ class EnvironmentManager {
       return updatedEnv;
     } catch (error) {
       log.error('Failed to update environment variables', { error: (error as Error).message });
-      throw new Error(`Update failed: ${(error as Error).message}`);
+      throw new Error(`Update failed: ${(error as Error).message}`, { cause: error });
     }
   }
 
@@ -270,7 +270,7 @@ class EnvironmentManager {
       };
     } catch (error) {
       log.error('Failed to get database configuration', { error: (error as Error).message });
-      throw new Error(`Database config read failed: ${(error as Error).message}`);
+      throw new Error(`Database config read failed: ${(error as Error).message}`, { cause: error });
     }
   }
 
@@ -315,7 +315,7 @@ class EnvironmentManager {
       return this.getDatabaseConfig();
     } catch (error) {
       log.error('Failed to update database configuration', { error: (error as Error).message });
-      throw new Error(`Database config update failed: ${(error as Error).message}`);
+      throw new Error(`Database config update failed: ${(error as Error).message}`, { cause: error });
     }
   }
 

@@ -13,7 +13,6 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "baseUrl": ".",
     "paths": {
       "@config/*": ["./config/*"],
       "@services/*": ["./services/*"],
