@@ -34,7 +34,7 @@ export default function WhatsAppAuth() {
     if (!import.meta.env.DEV) return;
     if (initRequestedRef.current) return;
     initRequestedRef.current = true;
-    fetch('/api/wa/initialize', { credentials: 'include' }).catch((err) => {
+    fetch('/api/wa/initialize', { credentials: 'same-origin' }).catch((err) => {
       console.error('[WhatsAppAuth] dev auto-init request failed:', err);
     });
   }, []);

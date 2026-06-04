@@ -149,7 +149,7 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
     // Authoritative reconcile. On REST failure keep the last known state — the
     // live SSE events above remain the fallback — rather than forcing `false`.
     const reconcileFromRest = (): void => {
-      fetch('/api/wa/initial-state', { credentials: 'include' })
+      fetch('/api/wa/initial-state', { credentials: 'same-origin' })
         .then((res) => (res.ok ? res.json() : null))
         .then((data: { clientReady?: boolean } | null) => {
           if (!data) return;

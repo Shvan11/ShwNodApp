@@ -70,7 +70,7 @@ const SettingsComponent: React.FC = () => {
     useEffect(() => {
         async function fetchUserRole(): Promise<void> {
             try {
-                const response = await fetch('/api/auth/me', { credentials: 'include' });
+                const response = await fetch('/api/auth/me', { credentials: 'same-origin' });
                 const data: UserResponse = await response.json();
                 if (data.success && data.user) {
                     setUserRole(data.user.role);

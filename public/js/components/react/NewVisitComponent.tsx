@@ -147,7 +147,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
 
             setFormData({
                 work_id: visit.work_id,
-                visit_date: visit.visit_date ? new Date(visit.visit_date).toISOString().split('T')[0] : '',
+                visit_date: visit.visit_date ? formatISODate(visit.visit_date) : '',
                 upper_wire_id: visit.upper_wire_id || '',
                 lower_wire_id: visit.lower_wire_id || '',
                 bracket_change: visit.bracket_change || '',

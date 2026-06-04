@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { formatISODate } from '../../core/utils';
 
 // Types
 interface ReferenceConfig {
@@ -295,12 +296,9 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
             }
 
             case 'date': {
-                // Format date value for input (YYYY-MM-DD)
-                const dateValue = value ? (
-                    value instanceof Date
-                        ? value.toISOString().split('T')[0]
-                        : String(value).split('T')[0]
-                ) : '';
+                // Format date value for input (YYYY-MM-DD) using local getters —
+                // avoids the UTC-midnight day-shift of toISOString() in a +tz browser.
+                const dateValue = formatISODate(value as string | Date | null | undefined);
                 return (
                     <input
                         type="date"

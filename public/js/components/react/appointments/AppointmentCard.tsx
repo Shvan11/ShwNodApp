@@ -15,12 +15,12 @@ export interface DailyAppointment {
     present?: string | null;
     seated?: string | null;
     dismissed?: string | null;
-    PresentTime?: string | null;
-    SeatedTime?: string | null;
-    DismissedTime?: string | null;
+    present_time?: string | null;
+    seated_time?: string | null;
+    dismissed_time?: string | null;
     hasActiveAlert?: boolean;
-    IsOrthoVisit?: boolean;
-    HasVisit?: boolean | number | null;
+    is_ortho_visit?: boolean;
+    has_visit?: boolean | number | null;
     app_date?: Date | string | null;
     app_cost?: number | null;
 }
@@ -106,9 +106,9 @@ const AppointmentCard = ({
     };
 
     // Get state times
-    const presentTime = appointment.PresentTime ? formatTime(appointment.PresentTime) : null;
-    const seatedTime = appointment.SeatedTime ? formatTime(appointment.SeatedTime) : null;
-    const dismissedTime = appointment.DismissedTime ? formatTime(appointment.DismissedTime) : null;
+    const presentTime = appointment.present_time ? formatTime(appointment.present_time) : null;
+    const seatedTime = appointment.seated_time ? formatTime(appointment.seated_time) : null;
+    const dismissedTime = appointment.dismissed_time ? formatTime(appointment.dismissed_time) : null;
 
     // Helper to get button class based on state
     const getButtonClass = (isActive: boolean, isClickable: boolean, isWaitingState: boolean = false): string => {
@@ -145,10 +145,10 @@ const AppointmentCard = ({
             );
         } else {
             // Checked-in patients - Fixed icon workflow: Present → Seat → Dismiss
-            // Use the *Time fields because the API returns PresentTime/SeatedTime/DismissedTime
-            const isPresent = appointment.PresentTime;
-            const isSeated = appointment.SeatedTime;
-            const isDismissed = appointment.DismissedTime;
+            // Use the *_time fields because the API returns present_time/seated_time/dismissed_time
+            const isPresent = appointment.present_time;
+            const isSeated = appointment.seated_time;
+            const isDismissed = appointment.dismissed_time;
 
             // Validation rules for undo operations
             const canUndoPresent = !isSeated && !isDismissed; // Can only undo check-in if not seated/dismissed
@@ -269,13 +269,13 @@ const AppointmentCard = ({
                     )}
                 </div>
 
-                {showStatus && appointment.IsOrthoVisit && (
+                {showStatus && appointment.is_ortho_visit && (
                     <div className={styles.infoLine2}>
                         <span
-                            className={appointment.HasVisit ? styles.visitNotesRegistered : styles.visitNotesMissing}
-                            title={appointment.HasVisit ? 'Visit notes registered ✓' : 'No visit notes yet'}
+                            className={appointment.has_visit ? styles.visitNotesRegistered : styles.visitNotesMissing}
+                            title={appointment.has_visit ? 'Visit notes registered ✓' : 'No visit notes yet'}
                         >
-                            <i className={`fas fa-${appointment.HasVisit ? 'clipboard-check' : 'clipboard'}`}></i>
+                            <i className={`fas fa-${appointment.has_visit ? 'clipboard-check' : 'clipboard'}`}></i>
                         </span>
                     </div>
                 )}

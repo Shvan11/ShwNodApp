@@ -61,7 +61,7 @@ export default function AdminUserManagement() {
   const fetchUsers = async () => {
     try {
       const response = await fetch('/api/users', {
-        credentials: 'include'
+        credentials: 'same-origin'
       });
       const data = await response.json();
 
@@ -85,7 +85,7 @@ export default function AdminUserManagement() {
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        credentials: 'same-origin',
         body: JSON.stringify(formData)
       });
 
@@ -110,7 +110,7 @@ export default function AdminUserManagement() {
     try {
       const response = await fetch(`/api/users/${userId}/toggle`, {
         method: 'PUT',
-        credentials: 'include'
+        credentials: 'same-origin'
       });
 
       const data = await response.json();
@@ -145,7 +145,7 @@ export default function AdminUserManagement() {
       const response = await fetch(`/api/users/${resetTarget.userId}/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        credentials: 'same-origin',
         body: JSON.stringify({ newPassword: newPasswordInput })
       });
 
@@ -171,7 +171,7 @@ export default function AdminUserManagement() {
     try {
       const response = await fetch(`/api/users/${userId}`, {
         method: 'DELETE',
-        credentials: 'include'
+        credentials: 'same-origin'
       });
 
       const data = await response.json();

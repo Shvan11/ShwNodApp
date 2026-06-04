@@ -36,6 +36,7 @@ interface ApiErrorResponse {
     error?: string;
     code?: string;
     details?: {
+        code?: string;
         holidayName?: string;
     };
 }
@@ -222,15 +223,20 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
             if (!response.ok) {
                 const errorData: ApiErrorResponse = await response.json();
 
+                // Appointment/work conflicts route through ErrorResponses.conflict(),
+                // which nests the code under details.code; patient routes put it at
+                // the root. Read both so the friendly messages fire either way (M1).
+                const errorCode = errorData.code ?? errorData.details?.code;
+
                 // Handle holiday conflict specifically
-                if (errorData.code === 'HOLIDAY_CONFLICT') {
+                if (errorCode === 'HOLIDAY_CONFLICT') {
                     const holidayName = errorData.details?.holidayName || 'Holiday';
                     setError(`Cannot create appointment: ${holidayName} is a holiday. No appointments are allowed on this date.`);
                     return;
                 }
 
                 // Handle other conflict types
-                if (errorData.code === 'APPOINTMENT_CONFLICT') {
+                if (errorCode === 'APPOINTMENT_CONFLICT') {
                     setError('Patient already has an appointment on this date.');
                     return;
                 }

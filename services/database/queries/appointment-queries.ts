@@ -288,6 +288,7 @@ export async function getDailyAppointmentsOptimized(
       patient_name: r.patient_name,
       hasActiveAlert: r.hasActiveAlert,
       apptime: r.apptime,
+      has_visit: r.hasVisit,
     }));
 
   // Result set 2: checked-in — present IS NOT NULL, ordered by presentTime.
@@ -298,17 +299,17 @@ export async function getDailyAppointmentsOptimized(
       appointment_id: r.appointment_id,
       person_id: r.person_id,
       app_detail: r.app_detail,
-      PresentTime: r.presentTime,
-      SeatedTime: r.seatedTime,
-      DismissedTime: r.dismissedTime,
+      present_time: r.presentTime,
+      seated_time: r.seatedTime,
+      dismissed_time: r.dismissedTime,
       app_date: r.appDate,
       app_cost: r.app_cost,
       apptime: r.apptime,
       patient_type: r.patient_type,
       patient_name: r.patient_name,
       hasActiveAlert: r.hasActiveAlert,
-      HasVisit: r.hasVisit,
-      IsOrthoVisit: r.isOrthoVisit,
+      has_visit: r.hasVisit,
+      is_ortho_visit: r.isOrthoVisit,
     }));
 
   const total = enriched.length;

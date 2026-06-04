@@ -112,7 +112,11 @@ router.post('/settings/cost-presets', authenticate, authorize(['admin']), async 
  */
 router.put('/settings/cost-presets/:id', authenticate, authorize(['admin']), async (req: Request<CostPresetParams, object, CostPresetBody>, res: Response): Promise<void> => {
   try {
-    const presetId = parseInt(req.params.id);
+    const presetId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(presetId) || presetId <= 0) {
+      ErrorResponses.badRequest(res, 'Invalid cost preset ID');
+      return;
+    }
     const { amount, currency, displayOrder = 0 } = req.body;
 
     // Validation

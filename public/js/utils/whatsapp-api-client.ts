@@ -94,7 +94,7 @@ export class APIClient {
         async () => {
           const response = await fetch(url, {
             signal: abortController.signal,
-            credentials: 'include', // Include session cookies for authentication
+            credentials: 'same-origin', // Include session cookies for authentication
             headers: {
               'Content-Type': 'application/json',
               ...fetchOptions.headers,

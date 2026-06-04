@@ -96,8 +96,10 @@ router.use('/', alignerRoutes);                 // Also mount at root for /align
 
 // Employee and expense routes
 router.use('/', employeeRoutes);      // Employee management
-router.use('/expenses', expenseRoutes); // Expense tracking (some mounted at /expenses, some at root)
-router.use('/', expenseRoutes);        // Legacy expense routes at root
+// All expense endpoints define their own `/expenses` prefix internally, so they
+// mount at root → `/api/expenses*`. (A second `/expenses` mount would resolve to
+// the dead `/api/expenses/expenses`, so there is intentionally only one mount.)
+router.use('/', expenseRoutes);        // Expense tracking (routes define /expenses* prefix)
 
 // System and configuration routes
 router.use('/health', healthRoutes);   // Health monitoring (mounted at /health)

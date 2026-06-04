@@ -9,7 +9,7 @@ interface ImageEntry {
 }
 
 interface LatestVisit {
-    VisitDate?: string | Date;
+    visit_date?: string | Date;
     Summary?: string | null;
 }
 
@@ -148,7 +148,7 @@ const ChairDisplay = () => {
     }
 
     const visitSummary = patient?.latestVisit?.Summary;
-    const visitDate = patient?.latestVisit?.VisitDate;
+    const visitDate = patient?.latestVisit?.visit_date;
     const formattedVisitDate = visitDate
         ? new Date(visitDate).toLocaleDateString(undefined, {
               year: 'numeric',

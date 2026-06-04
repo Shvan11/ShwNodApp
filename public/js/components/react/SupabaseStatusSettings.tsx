@@ -77,7 +77,7 @@ const SupabaseStatusSettings = ({ onChangesUpdate }: SupabaseStatusSettingsProps
 
     const fetchStatus = useCallback(async (): Promise<void> => {
         try {
-            const res = await fetch('/api/sync/supabase-status', { credentials: 'include' });
+            const res = await fetch('/api/sync/supabase-status', { credentials: 'same-origin' });
             const data: StatusResponse = await res.json();
             if (!isMounted.current) return;
             if (data.success && data.sinks) {

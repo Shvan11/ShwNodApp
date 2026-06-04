@@ -124,7 +124,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                credentials: 'include',
+                credentials: 'same-origin',
                 body: JSON.stringify({
                     alertTypeId: parseInt(formData.alertTypeId, 10),
                     alertSeverity: parseInt(formData.alertSeverity, 10),

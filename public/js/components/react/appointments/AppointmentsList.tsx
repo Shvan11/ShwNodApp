@@ -33,7 +33,7 @@ const AppointmentsList = ({
     emptyMessage = 'No appointments found.',
     className = ''
 }: AppointmentsListProps) => {
-    // Trust database ordering - stored procedure already sorts by PresentTime
+    // Trust database ordering - the query already sorts by present_time
     const sortedAppointments = appointments;
 
     // Only show skeletons on INITIAL load (no data yet)

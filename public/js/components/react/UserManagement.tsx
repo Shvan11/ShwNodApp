@@ -34,7 +34,7 @@ export default function UserManagement() {
     async function fetchUserInfo() {
       try {
         const response = await fetch('/api/auth/me', {
-          credentials: 'include'
+          credentials: 'same-origin'
         });
         const data = await response.json();
         if (data.success) {
@@ -73,7 +73,7 @@ export default function UserManagement() {
       const response = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        credentials: 'same-origin',
         body: JSON.stringify({ currentPassword, newPassword })
       });
 
@@ -102,7 +102,7 @@ export default function UserManagement() {
     try {
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'same-origin'
       });
 
       const data = await response.json();

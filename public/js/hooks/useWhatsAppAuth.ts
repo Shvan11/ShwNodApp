@@ -125,7 +125,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   // Fetch initial state via REST (replaces the WS RPC).
   const requestInitialState = useCallback(async () => {
     try {
-      const response = await fetch('/api/wa/initial-state', { credentials: 'include' });
+      const response = await fetch('/api/wa/initial-state', { credentials: 'same-origin' });
       if (!response.ok) {
         throw new Error(`Initial state request failed: ${response.status}`);
       }
@@ -139,7 +139,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   // Fetch QR code from API (fallback method)
   const fetchQRCode = useCallback(async (): Promise<string | null> => {
     try {
-      const response = await fetch('/api/wa/qr', { credentials: 'include' });
+      const response = await fetch('/api/wa/qr', { credentials: 'same-origin' });
       if (!response.ok) {
         if (response.status === 404) return null;
         throw new Error(`Failed to fetch QR code: ${response.status}`);
@@ -257,7 +257,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     try {
       const response = await fetch('/api/wa/restart', {
         method: 'POST',
-        credentials: 'include',
+        credentials: 'same-origin',
       });
       const result = await response.json();
       if (result.success) {
@@ -283,7 +283,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     try {
       const response = await fetch('/api/wa/destroy', {
         method: 'POST',
-        credentials: 'include',
+        credentials: 'same-origin',
       });
       const result = await response.json();
       if (result.success) {
@@ -306,7 +306,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     try {
       const response = await fetch('/api/wa/logout', {
         method: 'POST',
-        credentials: 'include',
+        credentials: 'same-origin',
       });
       const result = await response.json();
       if (result.success) {
@@ -316,7 +316,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
         try {
           const restartResponse = await fetch('/api/wa/restart', {
             method: 'POST',
-            credentials: 'include',
+            credentials: 'same-origin',
           });
           const restartResult = await restartResponse.json();
           if (restartResult.success) {

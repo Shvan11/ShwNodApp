@@ -99,7 +99,7 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
     }
     lastRequestedDateRef.current = dateToRequest;
 
-    fetch('/api/wa/initial-state', { credentials: 'include' })
+    fetch('/api/wa/initial-state', { credentials: 'same-origin' })
       .then((res) => {
         if (!res.ok) throw new Error(`Initial state request failed: ${res.status}`);
         return res.json() as Promise<InitialStateResponse>;

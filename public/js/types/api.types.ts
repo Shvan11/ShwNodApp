@@ -33,6 +33,8 @@ export interface ApiResponse<T = unknown> {
     message?: string;
     code?: string;
     details?: Record<string, unknown>;
+    /** ISO timestamp emitted by the backend envelope (sendSuccess / ErrorResponses). */
+    timestamp?: string;
 }
 
 export interface ApiSuccessResponse<T = unknown> {
@@ -46,6 +48,8 @@ export interface ApiErrorResponse {
     error: string;
     message?: string;
     code?: string;
+    /** ISO timestamp emitted by ErrorResponses. */
+    timestamp?: string;
 }
 
 // =============================================================================

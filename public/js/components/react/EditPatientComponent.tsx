@@ -191,7 +191,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                 phone: data.phone || '',
                 phone2: data.phone2 || '',
                 email: data.email || '',
-                date_of_birth: data.date_of_birth ? new Date(data.date_of_birth).toISOString().split('T')[0] : '',
+                date_of_birth: data.date_of_birth ? formatISODate(data.date_of_birth) : '',
                 gender: data.gender || '',
                 address_id: data.address_id || '',
                 referral_source_id: data.referral_source_id || '',

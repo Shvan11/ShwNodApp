@@ -1023,7 +1023,11 @@ router.post(
   handleUploadError,
   async (req: Request<{ setId: string }>, res: Response): Promise<void> => {
     try {
-      const setId = parseInt(req.params.setId);
+      const setId = parseInt(req.params.setId, 10);
+      if (!Number.isInteger(setId) || setId <= 0) {
+        ErrorResponses.badRequest(res, 'Invalid aligner set ID');
+        return;
+      }
       const uploaderEmail = 'staff@shwan.local';
 
       // Validate file exists
@@ -1074,7 +1078,11 @@ router.delete(
   '/aligner/sets/:setId/pdf',
   async (req: Request<{ setId: string }>, res: Response): Promise<void> => {
     try {
-      const setId = parseInt(req.params.setId);
+      const setId = parseInt(req.params.setId, 10);
+      if (!Number.isInteger(setId) || setId <= 0) {
+        ErrorResponses.badRequest(res, 'Invalid aligner set ID');
+        return;
+      }
 
       await deletePdfFromSet(setId);
 

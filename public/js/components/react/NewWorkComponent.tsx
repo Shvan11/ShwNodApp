@@ -208,7 +208,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
             const work = works.find(w => w.work_id === workId);
 
             if (work) {
-                const discountDateISO = work.discount_date ? new Date(work.discount_date).toISOString().split('T')[0] : '';
+                const discountDateISO = work.discount_date ? formatISODate(work.discount_date) : '';
                 const discountValue = Number(work.discount ?? 0);
                 setFormData({
                     person_id: String(work.person_id),
@@ -217,13 +217,13 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     type_of_work: String(work.type_of_work || ''),
                     notes: work.notes || '',
                     status: work.status ?? 1, // Use nullish coalescing to preserve 0 if somehow status is 0
-                    start_date: work.start_date ? new Date(work.start_date).toISOString().split('T')[0] : '',
-                    debond_date: work.debond_date ? new Date(work.debond_date).toISOString().split('T')[0] : '',
-                    f_photo_date: work.f_photo_date ? new Date(work.f_photo_date).toISOString().split('T')[0] : '',
-                    i_photo_date: work.i_photo_date ? new Date(work.i_photo_date).toISOString().split('T')[0] : '',
+                    start_date: work.start_date ? formatISODate(work.start_date) : '',
+                    debond_date: work.debond_date ? formatISODate(work.debond_date) : '',
+                    f_photo_date: work.f_photo_date ? formatISODate(work.f_photo_date) : '',
+                    i_photo_date: work.i_photo_date ? formatISODate(work.i_photo_date) : '',
                     estimated_duration: String(work.estimated_duration || ''),
                     dr_id: String(work.dr_id || ''),
-                    notes_date: work.notes_date ? new Date(work.notes_date).toISOString().split('T')[0] : '',
+                    notes_date: work.notes_date ? formatISODate(work.notes_date) : '',
                     keyword_id_1: String(work.keyword_id_1 || ''),
                     keyword_id_2: String(work.keyword_id_2 || ''),
                     keyword_id_3: String(work.keyword_id_3 || ''),

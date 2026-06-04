@@ -157,7 +157,11 @@ router.get(
     res: Response
   ): Promise<void> => {
     try {
-      const categoryId = parseInt(req.params.categoryId);
+      const categoryId = parseInt(req.params.categoryId, 10);
+      if (!Number.isInteger(categoryId) || categoryId <= 0) {
+        ErrorResponses.badRequest(res, 'Invalid category ID');
+        return;
+      }
       const subcategories = await getExpenseSubcategories(categoryId);
       res.json(subcategories);
     } catch (error) {
