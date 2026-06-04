@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useToast } from '../../contexts/ToastContext';
 import LookupEditorModal from './LookupEditorModal';
 import Modal from './Modal';
+import { parseLocalDate } from '../../utils/calendarDate';
 
 interface Column {
     name: string;
@@ -341,7 +342,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
     // Format date for display
     const formatDate = (dateValue: unknown): string => {
         if (!dateValue) return '-';
-        const date = new Date(dateValue as string);
+        const date = parseLocalDate(dateValue as string);
         return date.toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',

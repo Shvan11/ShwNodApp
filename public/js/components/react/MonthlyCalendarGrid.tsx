@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef, type MouseEvent } from 'react';
 import type { CalendarDay, CalendarData, CalendarAppointment, CalendarMode } from './calendar.types';
 import { formatTime12 } from '../../utils/formatters';
+import { parseLocalDate } from '../../utils/calendarDate';
 import styles from './MonthlyCalendarGrid.module.css';
 
 interface MonthlyCalendarGridProps {
@@ -53,20 +54,20 @@ const MonthlyCalendarGrid = ({
     // Helper to check if date is today
     const isToday = (date: string): boolean => {
         const today = new Date();
-        const checkDate = new Date(date);
+        const checkDate = parseLocalDate(date);
         return today.toDateString() === checkDate.toDateString();
     };
 
     // Helper to check if day is weekend (Saturday or Sunday)
     const isWeekend = (date: string): boolean => {
-        const day = new Date(date).getDay();
+        const day = parseLocalDate(date).getDay();
         return day === 0 || day === 6; // Sunday = 0, Saturday = 6
     };
 
     // Helper to check if day is in current month
     const isCurrentMonth = (date: string): boolean => {
-        const checkDate = new Date(date);
-        const current = new Date(currentDate);
+        const checkDate = parseLocalDate(date);
+        const current = parseLocalDate(currentDate);
         return checkDate.getMonth() === current.getMonth() &&
                checkDate.getFullYear() === current.getFullYear();
     };
@@ -147,7 +148,7 @@ const MonthlyCalendarGrid = ({
                         >
                             {/* Day number */}
                             <div className={styles.monthDayNumber}>
-                                {new Date(day.date).getDate()}
+                                {parseLocalDate(day.date).getDate()}
                             </div>
 
                             {/* Holiday badge */}
@@ -168,7 +169,7 @@ const MonthlyCalendarGrid = ({
                             {isExpanded && currentMonth && !isHoliday && appointmentCount > 0 && (
                                 <div className={styles.dayExpandedPanel}>
                                     <div className={styles.expandedHeader}>
-                                        {new Date(day.date).toLocaleDateString('en-US', {
+                                        {parseLocalDate(day.date).toLocaleDateString('en-US', {
                                             weekday: 'short',
                                             month: 'short',
                                             day: 'numeric'

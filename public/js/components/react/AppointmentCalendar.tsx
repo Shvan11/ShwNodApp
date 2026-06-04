@@ -9,6 +9,7 @@ import Modal from './Modal';
 import CalendarLegend from './CalendarLegend';
 import { useToast } from '../../contexts/ToastContext';
 import { useAppointmentDoctors } from '../../hooks/useAppointmentDoctors';
+import { parseLocalDate } from '../../utils/calendarDate';
 import type {
     ViewMode,
     CalendarMode,
@@ -26,19 +27,6 @@ import type {
 interface ContextMenuState {
     position: MenuPosition;
     appointment: CalendarAppointment;
-}
-
-/**
- * Parse a `Date | 'YYYY-MM-DD'` into a local Date anchored at noon. A bare
- * `new Date('YYYY-MM-DD')` parses as UTC midnight, which shifts the calendar
- * day backward in any timezone west of UTC; anchoring at local noon keeps the
- * wall-clock day correct everywhere the week/day math reads getDate()/getDay().
- */
-function parseLocalDate(value: Date | string): Date {
-    if (value instanceof Date) return value;
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12);
-    return new Date(value);
 }
 
 interface DayContextMenuState {

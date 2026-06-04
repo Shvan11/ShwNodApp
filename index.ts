@@ -236,8 +236,6 @@ async function initializeApplication(): Promise<AppInitResult> {
     // Use path resolver for cross-platform compatibility
     const pathResolver = createPathResolver(config.fileSystem.machinePath || '');
 
-    // Public UI assets — no auth required
-    app.use('/photoswipe', express.static('./public/photoswipe/'));
     // NOTE: do NOT mount ./data as static — it holds runtime state/config (and formerly the
     // SQLite session DBs, now migrated to PostgreSQL). Templates under ./data/templates are read
     // via fs.readFile in the receipt service, never served over HTTP.

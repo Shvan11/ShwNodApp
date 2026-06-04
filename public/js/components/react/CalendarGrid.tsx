@@ -11,6 +11,7 @@
 import { useEffect } from 'react';
 import type { Dispatch, DragEvent, MouseEvent, SetStateAction } from 'react';
 import { to12Hour, formatTime12 } from '../../utils/formatters';
+import { parseLocalDate } from '../../utils/calendarDate';
 import type {
     CalendarDay,
     CalendarData,
@@ -126,7 +127,7 @@ const validOnly = (appts: CalendarAppointment[]): CalendarAppointment[] =>
 
 const isToday = (date: string): boolean => {
     const today = new Date();
-    const checkDate = new Date(date);
+    const checkDate = parseLocalDate(date);
     return today.toDateString() === checkDate.toDateString();
 };
 
@@ -416,7 +417,7 @@ const CalendarGrid = ({
                         (sum, t) => sum + getSlotAppointments(day, t).length,
                         0
                     );
-                    const dateNum = new Date(day.date).getDate();
+                    const dateNum = parseLocalDate(day.date).getDate();
                     const handleContextMenu = (event: MouseEvent<HTMLDivElement>) => {
                         event.preventDefault();
                         onDayContextMenu?.(day, event);

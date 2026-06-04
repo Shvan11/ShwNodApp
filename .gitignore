@@ -44,7 +44,6 @@ build/Release
 # Dependency directories
 node_modules/
 jspm_packages/
-photoswipe/
 .wwebjs_auth
 
 # Snowpack dependency directory (https://snowpack.dev/)
@@ -160,7 +159,6 @@ dist-server
 .pnp.*
 
 # Dependencies
-photoswipe/
 .wwebjs_auth/
 .wwebjs_cache/
 daemon/
@@ -170,7 +168,6 @@ credentials.json
 tokens/
 credentials.json
 pngwing.com.png
-public/photoswipe
 
 # MCP Configuration (may contain sensitive connection strings)
 .mcp.json

@@ -19,8 +19,7 @@
       See: /public/js/routes/*.jsx for route-specific CSS imports
     -->
 
-    <!-- PhotoSwipe CSS for image lightbox -->
-    <link rel="stylesheet" href="/photoswipe/dist/photoswipe.css">
+    <!-- PhotoSwipe CSS is bundled by Vite via `import 'photoswipe/style.css'` in GridComponent -->
 
     <!-- GrapesJS CSS (loaded globally for template designer) -->
     <link rel="stylesheet" href="https://unpkg.com/grapesjs@0.22.13/dist/css/grapes.min.css">
@@ -184,7 +183,8 @@
 
         console.log('[App] Initializing unified React application with Data Router');
 
-        // Import main App component (contains RouterProvider with createBrowserRouter)
+        // Import main App component (contains RouterProvider with createBrowserRouter).
+        // App itself renders the <StrictMode> wrapper — see App.tsx.
         import App from '/js/App.jsx';
 
         // Wait for ALL resources (including CSS) to load
@@ -201,11 +201,7 @@
             const root = ReactDOM.createRoot(document.getElementById('app-root'));
 
             try {
-                root.render(
-                    React.createElement(React.StrictMode, null,
-                        React.createElement(App)
-                    )
-                );
+                root.render(React.createElement(App));
 
                 console.log('[App] Application mounted successfully with Data Router');
             } catch (error) {

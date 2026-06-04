@@ -71,16 +71,6 @@ export default defineConfig(({ mode }) => {
               return 'vendor-charts';
             }
 
-            // Date/time utilities
-            if (id.includes('date-fns')) {
-              return 'vendor-utils';
-            }
-
-            // HTTP clients
-            if (id.includes('axios')) {
-              return 'vendor-utils';
-            }
-
             // Let Vite auto-chunk remaining modules (prevents circular dependency errors)
             // Previously: return 'vendor-other' - caused "Cannot access before initialization" errors
           }
@@ -152,8 +142,8 @@ export default defineConfig(({ mode }) => {
   },
   optimizeDeps: {
     // Pre-bundle React dependencies for faster dev server startup
-    include: ['react', 'react-dom', 'react-dom/client', 'react-router-dom', 'date-fns', 'axios'],
-    exclude: ['grapesjs', 'grapesjs-preset-newsletter']
+    include: ['react', 'react-dom', 'react-dom/client', 'react-router-dom'],
+    exclude: ['grapesjs']
   }
 };
 });

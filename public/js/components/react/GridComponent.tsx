@@ -9,6 +9,9 @@ import DeleteTimepointModal from './DeleteTimepointModal';
 import TimepointActionsMenu, { type DeleteScope, type FolderState } from './TimepointActionsMenu';
 import { encodeRelPath } from './files/fileHelpers';
 import sseAppointments from '../../services/sse-appointments';
+import PhotoSwipeLightbox from 'photoswipe/lightbox';
+import type { PhotoSwipe as PhotoSwipeInstance } from 'photoswipe/lightbox';
+import 'photoswipe/style.css';
 
 interface Props {
     personId?: number | null;
@@ -53,46 +56,6 @@ interface CachedShareBlob {
     fetchId: number;
 }
 
-interface PhotoSwipeLightbox {
-    init: () => void;
-    destroy: () => void;
-    on: (event: string, callback: () => void) => void;
-    pswp: PhotoSwipeInstance | null;
-}
-
-interface PhotoSwipeInstance {
-    currSlide: { data: { src: string } };
-    on: (event: string, callback: () => void) => void;
-    ui: {
-        registerElement: (config: PhotoSwipeUIElementConfig) => void;
-    };
-}
-
-interface PhotoSwipeUIElementConfig {
-    name: string;
-    order: number;
-    isButton: boolean;
-    tagName: string;
-    html: {
-        isCustomSVG: boolean;
-        inner: string;
-        outlineID: string;
-    };
-    onInit: (el: HTMLElement, pswp: PhotoSwipeInstance) => void;
-}
-
-declare global {
-    interface Window {
-        PhotoSwipe: unknown;
-        PhotoSwipeLightbox: new (config: {
-            gallery: string;
-            children: string;
-            pswpModule: unknown;
-            bgOpacity: number;
-            showHideOpacity: boolean;
-        }) => PhotoSwipeLightbox;
-    }
-}
 
 const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const navigate = useNavigate();
@@ -201,7 +164,11 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         if (isSharingRef.current) return;
         isSharingRef.current = true;
 
-        const imageUrl = pswp.currSlide.data.src;
+        const imageUrl = pswp.currSlide?.data?.src;
+        if (!imageUrl) {
+            isSharingRef.current = false;
+            return;
+        }
         const cached = cachedShareBlobRef.current;
 
         // Check if cached blob matches current slide
@@ -374,61 +341,27 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                         return;
                     }
 
-                    // Load PhotoSwipe UMD versions for browser compatibility (if not already loaded)
-                    if (!window.PhotoSwipe || !window.PhotoSwipeLightbox) {
-                        await new Promise<void>((resolve, reject) => {
-                            // Check if PhotoSwipe main script is already loaded
-                            if (!window.PhotoSwipe) {
-                                const script1 = document.createElement('script');
-                                script1.src = '/photoswipe/dist/umd/photoswipe.umd.min.js';
-                                script1.onload = () => {
-                                    // Load PhotoSwipeLightbox after PhotoSwipe
-                                    if (!window.PhotoSwipeLightbox) {
-                                        const script2 = document.createElement('script');
-                                        script2.src = '/photoswipe/dist/umd/photoswipe-lightbox.umd.min.js';
-                                        script2.onload = () => resolve();
-                                        script2.onerror = () => reject(new Error('Failed to load PhotoSwipeLightbox'));
-                                        document.head.appendChild(script2);
-                                    } else {
-                                        resolve();
-                                    }
-                                };
-                                script1.onerror = () => reject(new Error('Failed to load PhotoSwipe'));
-                                document.head.appendChild(script1);
-                            } else if (!window.PhotoSwipeLightbox) {
-                                // PhotoSwipe loaded but not PhotoSwipeLightbox
-                                const script2 = document.createElement('script');
-                                script2.src = '/photoswipe/dist/umd/photoswipe-lightbox.umd.min.js';
-                                script2.onload = () => resolve();
-                                script2.onerror = () => reject(new Error('Failed to load PhotoSwipeLightbox'));
-                                document.head.appendChild(script2);
-                            } else {
-                                // Both already loaded
-                                resolve();
-                            }
-                        });
-                    }
-                    if (cancelled) return;
-
-                    if (!window.PhotoSwipeLightbox) {
-                        throw new Error('PhotoSwipeLightbox not available');
-                    }
-
-                    // Initialize PhotoSwipe
-                    const lightboxInstance = new window.PhotoSwipeLightbox({
+                    // Initialize PhotoSwipe. The lightbox ships via npm and is bundled by
+                    // Vite (served from our own origin, fingerprinted — no CDN, no hand-copied
+                    // vendor files). Its heavy core is code-split behind a dynamic import() so
+                    // it only downloads when a gallery actually mounts.
+                    const lightboxInstance = new PhotoSwipeLightbox({
                         gallery: '#dolph_gallery',
                         children: 'a',
-                        pswpModule: window.PhotoSwipe,
+                        pswpModule: () => import('photoswipe'),
                         bgOpacity: 0.9,
                         showHideOpacity: true
                     });
 
                     // Add custom buttons
                     lightboxInstance.on('uiRegister', () => {
-                        if (!lightboxInstance.pswp) return;
+                        // Capture the UI registry once: narrowing on lightboxInstance.pswp
+                        // resets after each registerElement() call, so a local const keeps it stable.
+                        const pswpUi = lightboxInstance.pswp?.ui;
+                        if (!pswpUi) return;
 
                         // Add download button
-                        lightboxInstance.pswp.ui.registerElement({
+                        pswpUi.registerElement({
                             name: 'download-button',
                             order: 8,
                             isButton: true,
@@ -447,7 +380,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                 el.setAttribute('title', 'Download Image');
 
                                 pswp.on('change', () => {
-                                    const imageUrl = pswp.currSlide.data.src;
+                                    const imageUrl = pswp.currSlide?.data?.src;
+                                    if (!imageUrl) return;
                                     el.setAttribute('download', getShareFileName(imageUrl));
                                     (el as HTMLAnchorElement).href = imageUrl;
                                 });
@@ -457,7 +391,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                         // Add eye-toggle button: staff can mark individual photos as
                         // private (hidden from the patient portal). Reads current
                         // state from privateNamesRef; updates on slide change.
-                        lightboxInstance.pswp!.ui.registerElement({
+                        pswpUi.registerElement({
                             name: 'visibility-toggle-button',
                             order: 7.5,
                             isButton: true,
@@ -511,7 +445,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
 
                         // Add native share button (mobile only)
                         if ('share' in navigator && 'canShare' in navigator) {
-                            lightboxInstance.pswp!.ui.registerElement({
+                            pswpUi.registerElement({
                                 name: 'native-share-button',
                                 order: 8.5,
                                 isButton: true,
@@ -534,7 +468,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
 
                         // Add send message button (desktop only - mobile uses native share)
                         if (!navigator.share || !navigator.canShare) {
-                            lightboxInstance.pswp!.ui.registerElement({
+                            pswpUi.registerElement({
                                 name: 'send-message-button',
                                 order: 9,
                                 isButton: true,
@@ -551,7 +485,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                     el.setAttribute('aria-label', 'Send Message');
 
                                     el.addEventListener('click', async () => {
-                                        const imageSrc = pswp.currSlide.data.src;
+                                        const imageSrc = pswp.currSlide?.data?.src;
+                                        if (!imageSrc) return;
 
                                         try {
                                             let webPath = imageSrc;

@@ -26,35 +26,53 @@ interface GrapesJSEditorProps {
 const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps>(({ template, styles }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<GrapesJSEditorType | null>(null);
-    const isInitializingRef = useRef(false); // Prevent double initialization in StrictMode
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const toast = useToast();
 
     useImperativeHandle(ref, () => editorRef.current!);
 
-    // Initialize GrapesJS after container is rendered
+    // Initialize GrapesJS after container is rendered. Runs ONCE on mount.
+    //
+    // The guard is a per-run `cancelled` closure flag, NOT a shared ref. That's
+    // what makes this safe if the tree is ever wrapped in <StrictMode>, whose
+    // mount → unmount → remount would otherwise leak an orphaned editor: the
+    // dynamic import() outlives the first run's cleanup, so by the time it
+    // resolves `cancelled` is already true and that run bails instead of
+    // building a second editor over the first. A shared `isInitializingRef`
+    // can't do this — cleanup resets it before the remount, so both runs pass.
     useEffect(() => {
-        // Wait for container to be rendered (it's rendered when isLoading becomes false)
-        if (!containerRef.current) {
-            return;
-        }
+        let cancelled = false;
 
-        if (editorRef.current) {
-            return;
-        }
+        const load = async () => {
+            if (editorRef.current || !containerRef.current) return;
+            try {
+                setIsLoading(true);
+                // Dynamic import — GrapesJS only loads when this component mounts.
+                // CSS is loaded globally in index.html.
+                const grapesjs = (await import('grapesjs')).default;
+                if (!grapesjs) {
+                    throw new Error('GrapesJS module loaded but default export is undefined');
+                }
+                // Bail if we unmounted during the import, or another run already won.
+                if (cancelled || editorRef.current || !containerRef.current) return;
+                setIsLoading(false);
+                initializeEditor(grapesjs);
+            } catch (error) {
+                if (cancelled) return;
+                console.error('Failed to load GrapesJS:', error);
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error loading GrapesJS';
+                setLoadError(errorMessage);
+                setIsLoading(false);
+                toast?.error('Failed to load template designer: ' + errorMessage);
+            }
+        };
 
-        if (isInitializingRef.current) {
-            return;
-        }
-
-        isInitializingRef.current = true;
-
-        // Dynamically import GrapesJS only when component mounts
-        loadGrapesJS();
+        load();
 
         // Cleanup on unmount
         return () => {
+            cancelled = true;
             if (editorRef.current) {
                 try {
                     editorRef.current.destroy();
@@ -63,35 +81,9 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
                 }
                 editorRef.current = null;
             }
-            isInitializingRef.current = false;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: init runs ONCE on mount. The container div is always rendered, so it's available on first run. Depending on `isLoading` here is a bug: loadGrapesJS() toggles isLoading for the spinner, which would re-fire this effect, run the cleanup, and destroy the editor it just created (leaving getHtml() to crash on a torn-down canvas frame).
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: init runs ONCE on mount. The container div is always rendered, so it's available on first run. `toast` is stable from context. Depending on `isLoading` here is a bug: load() toggles isLoading for the spinner, which would re-fire this effect, run the cleanup, and destroy the editor it just created (leaving getHtml() to crash on a torn-down canvas frame).
     }, []);
-
-    const loadGrapesJS = async () => {
-        try {
-            setIsLoading(true);
-
-            // Dynamic import - GrapesJS is only loaded when this component mounts
-            // CSS is loaded globally in index.html
-            const grapesJSModule = await import('grapesjs');
-
-            const grapesjs = grapesJSModule.default;
-
-            if (!grapesjs) {
-                throw new Error('GrapesJS module loaded but default export is undefined');
-            }
-
-            setIsLoading(false);
-            initializeEditor(grapesjs);
-        } catch (error) {
-            console.error('Failed to load GrapesJS:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error loading GrapesJS';
-            setLoadError(errorMessage);
-            setIsLoading(false);
-            toast?.error('Failed to load template designer: ' + errorMessage);
-        }
-    };
 
     useEffect(() => {
         if (editorRef.current && template) {

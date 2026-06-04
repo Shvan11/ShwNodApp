@@ -34,6 +34,7 @@ import '../css/components/calendar-holidays.css';
 // END GLOBAL CSS IMPORTS
 // ===================================
 
+import { StrictMode } from 'react';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { GlobalErrorBoundary } from './components/error-boundaries/GlobalErrorBoundary';
 import routesConfig from './router/routes.config';
@@ -122,8 +123,10 @@ const router = createBrowserRouter(routesConfig, {
  */
 export default function App() {
   return (
-    <GlobalErrorBoundary>
-      <RouterProvider router={router} />
-    </GlobalErrorBoundary>
+    <StrictMode>
+      <GlobalErrorBoundary>
+        <RouterProvider router={router} />
+      </GlobalErrorBoundary>
+    </StrictMode>
   );
 }
