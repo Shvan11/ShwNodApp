@@ -1,12 +1,19 @@
 import { useState, useEffect, useCallback, useMemo, type ChangeEvent, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import cn from 'classnames';
+import { fetchJSON, httpErrorMessage } from '@/core/http';
 import styles from './SimplifiedCalendarPicker.module.css';
 
 interface Appointment {
     patientName: string;
     appDetail?: string;
     [key: string]: unknown;
+}
+
+// GET /api/options/:name success shape ({ status:'success', optionName, value }).
+interface OptionResponse {
+    status?: string;
+    value?: string | null;
 }
 
 interface TimeSlot {
@@ -77,27 +84,25 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
     useEffect(() => {
         const fetchExtendedSlotsSettings = async () => {
             try {
-                const [earlyResponse, lateResponse, defaultResponse] = await Promise.all([
-                    fetch('/api/options/CALENDAR_EARLY_SLOTS'),
-                    fetch('/api/options/CALENDAR_LATE_SLOTS'),
-                    fetch('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT')
-                ]);
-
+                // /api/options/:name 404s when an option is unset; each GET is
+                // tolerant (.catch → null) so a missing one falls back to its
+                // default without aborting its siblings (the rows are seeded
+                // today — see audit N12/N20).
                 const [earlyData, lateData, defaultData] = await Promise.all([
-                    earlyResponse.json(),
-                    lateResponse.json(),
-                    defaultResponse.json()
+                    fetchJSON<OptionResponse>('/api/options/CALENDAR_EARLY_SLOTS').catch(() => null),
+                    fetchJSON<OptionResponse>('/api/options/CALENDAR_LATE_SLOTS').catch(() => null),
+                    fetchJSON<OptionResponse>('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT').catch(() => null)
                 ]);
 
-                if (earlyData.status === 'success' && earlyData.value) {
+                if (earlyData?.status === 'success' && earlyData.value) {
                     setEarlySlotTimes(earlyData.value.split(',').filter(Boolean));
                 }
 
-                if (lateData.status === 'success' && lateData.value) {
+                if (lateData?.status === 'success' && lateData.value) {
                     setLateSlotTimes(lateData.value.split(',').filter(Boolean));
                 }
 
-                if (defaultData.status === 'success' && defaultData.value !== null) {
+                if (defaultData?.status === 'success' && defaultData.value != null) {
                     setShowExtendedSlotsDefault(defaultData.value === 'true');
                 }
             } catch (err) {
@@ -126,21 +131,18 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                 return `${year}-${month}-${day}`;
             };
 
-            const response = await fetch(
+            const data = await fetchJSON<{ success?: boolean; availability?: Record<string, DayAvailabilityInfo> }>(
                 `/api/calendar/month-availability?` +
                 `startDate=${formatLocalDate(firstDay)}&` +
                 `endDate=${formatLocalDate(lastDay)}`
             );
-
-            if (!response.ok) throw new Error('Failed to fetch availability');
-            const data = await response.json();
 
             if (data.success) {
                 setDayAvailability(data.availability || {});
             }
         } catch (err) {
             console.error('Error fetching month availability:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
         } finally {
             setLoading(false);
         }
@@ -155,10 +157,9 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
             const dateStr = `${year}-${month}-${day}`;
-            const response = await fetch(`/api/calendar/available-slots?date=${dateStr}`);
-
-            if (!response.ok) throw new Error('Failed to fetch slots');
-            const data = await response.json();
+            const data = await fetchJSON<{ success?: boolean; slots?: TimeSlot[] }>(
+                `/api/calendar/available-slots?date=${dateStr}`
+            );
 
             if (data.success) {
                 const slots: TimeSlot[] = data.slots || [];
@@ -176,7 +177,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
             }
         } catch (err) {
             console.error('Error fetching slots:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
             setAvailableSlots([]);
         } finally {
             setLoading(false);

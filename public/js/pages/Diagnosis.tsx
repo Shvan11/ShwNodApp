@@ -4,6 +4,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import styles from './Diagnosis.module.css';
 import { formatISODate } from '../core/utils';
+import { fetchJSON, postJSON, deleteJSON } from '@/core/http';
 
 /**
  * Diagnosis Page
@@ -159,34 +160,34 @@ const Diagnosis = () => {
         try {
             setLoading(true);
 
-            // Load patient info, work info, and diagnosis data in parallel
-            const [patientResponse, worksResponse, diagnosisResponse] = await Promise.all([
-                fetch(`/api/patients/${personId}/info`),
-                fetch(`/api/getworks?code=${personId}`),
-                fetch(`/api/diagnosis/${workId}`)
+            // Load patient info, work info, and diagnosis data in parallel. Each GET is
+            // independent — a failure of one shouldn't blank the others — so each is
+            // wrapped in .catch(() => null) (the N14 tolerant-Promise.all mechanic),
+            // replacing the old per-res.ok guards. /api/diagnosis/:workId returns HTTP 200
+            // with a null body when no diagnosis exists yet (NOT a non-2xx — see audit
+            // N18), so the `if (diagnosis)` null-check still means "new diagnosis".
+            const [patient, works, diagnosis] = await Promise.all([
+                fetchJSON<PatientInfo>(`/api/patients/${personId}/info`).catch(() => null),
+                fetchJSON<WorkInfo[]>(`/api/getworks?code=${personId}`).catch(() => null),
+                fetchJSON<Partial<DiagnosisData> | null>(`/api/diagnosis/${workId}`).catch(() => null)
             ]);
 
-            if (patientResponse.ok) {
-                const patient: PatientInfo = await patientResponse.json();
+            if (patient) {
                 setPatientInfo(patient);
             }
 
-            if (worksResponse.ok) {
-                const works: WorkInfo[] = await worksResponse.json();
+            if (works) {
                 const work = works.find(w => w.work_id === parseInt(workId || '0'));
                 setWorkInfo(work || null);
             }
 
-            if (diagnosisResponse.ok) {
-                const diagnosis: Partial<DiagnosisData> = await diagnosisResponse.json();
-                if (diagnosis) {
-                    // Format date to YYYY-MM-DD for input
-                    if (diagnosis.dx_date) {
-                        diagnosis.dx_date = formatISODate(diagnosis.dx_date);
-                    }
-                    setDiagnosisData(prev => ({ ...prev, ...diagnosis }));
-                    setDiagnosisExists(true);
+            if (diagnosis) {
+                // Format date to YYYY-MM-DD for input
+                if (diagnosis.dx_date) {
+                    diagnosis.dx_date = formatISODate(diagnosis.dx_date);
                 }
+                setDiagnosisData(prev => ({ ...prev, ...diagnosis }));
+                setDiagnosisExists(true);
             }
         } catch (err) {
             console.error('Error loading data:', err);
@@ -215,13 +216,7 @@ const Diagnosis = () => {
 
         try {
             setSaving(true);
-            const response = await fetch('/api/diagnosis', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(diagnosisData)
-            });
-
-            if (!response.ok) throw new Error('Failed to save diagnosis');
+            await postJSON('/api/diagnosis', diagnosisData);
 
             toast.success('Diagnosis saved successfully');
             setDiagnosisExists(true);
@@ -250,11 +245,7 @@ const Diagnosis = () => {
 
         try {
             setDeleting(true);
-            const response = await fetch(`/api/diagnosis/${workId}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) throw new Error('Failed to delete diagnosis');
+            await deleteJSON(`/api/diagnosis/${workId}`);
 
             toast.success('Diagnosis deleted successfully');
 

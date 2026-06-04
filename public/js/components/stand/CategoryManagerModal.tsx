@@ -11,6 +11,7 @@ import {
 } from '../../hooks/useStand';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { httpErrorMessage } from '@/core/http';
 import Modal from '../react/Modal';
 import styles from './CategoryManagerModal.module.css';
 
@@ -39,7 +40,7 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
       setNewName('');
       toast.success(`Added "${name}"`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to add category');
+      toast.error(httpErrorMessage(err, 'Failed to add category'));
     }
   };
 
@@ -61,7 +62,7 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
       cancelEdit();
       toast.success('Renamed');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to rename category');
+      toast.error(httpErrorMessage(err, 'Failed to rename category'));
     }
   };
 
@@ -73,7 +74,7 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
       await deleteCategory(cat.category_id);
       toast.success(`Deactivated "${cat.category_name}"`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to deactivate category');
+      toast.error(httpErrorMessage(err, 'Failed to deactivate category'));
     }
   };
 

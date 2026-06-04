@@ -849,6 +849,10 @@ router.patch(
           batchId: result.batchId,
           batchSequence: result.batchSequence,
           action: result.action,
+          // Structured idempotency flag (symmetric with /deliver's wasAlreadyDelivered)
+          // so funneled callers don't have to string-match the envelope message, which
+          // core/http.ts's unwrapEnvelope strips. See audit N19.
+          wasAlreadyManufactured: result.wasAlreadyManufactured,
         }
       });
     } catch (error) {

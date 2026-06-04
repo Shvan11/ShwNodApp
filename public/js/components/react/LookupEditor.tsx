@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useToast } from '../../contexts/ToastContext';
+import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import LookupEditorModal from './LookupEditorModal';
 
 // Types
@@ -152,16 +153,10 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
     const loadItems = useCallback(async (): Promise<void> => {
         try {
             setLoading(true);
-            const response = await fetch(`/api/admin/lookups/${tableKey}`);
-            if (response.ok) {
-                const data: LookupItem[] = await response.json();
-                setItems(data);
-            } else {
-                const error = await response.json();
-                toast.error(error.error || `Failed to load ${tableName}`);
-            }
-        } catch {
-            toast.error(`Error loading ${tableName}`);
+            const data = await fetchJSON<LookupItem[]>(`/api/admin/lookups/${tableKey}`);
+            setItems(data);
+        } catch (err) {
+            toast.error(httpErrorMessage(err, `Failed to load ${tableName}`));
         } finally {
             setLoading(false);
         }
@@ -204,19 +199,11 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
         const itemId = deleteConfirm[idColumn];
 
         try {
-            const response = await fetch(`/api/admin/lookups/${tableKey}/${itemId}`, {
-                method: 'DELETE'
-            });
-
-            if (response.ok) {
-                toast.success('Item deleted successfully');
-                loadItems();
-            } else {
-                const error = await response.json();
-                toast.error(error.error || 'Failed to delete item');
-            }
-        } catch {
-            toast.error('Error deleting item');
+            await deleteJSON(`/api/admin/lookups/${tableKey}/${itemId}`);
+            toast.success('Item deleted successfully');
+            loadItems();
+        } catch (err) {
+            toast.error(httpErrorMessage(err, 'Failed to delete item'));
         } finally {
             setDeleteConfirm(null);
             setDeleteAnchorEl(null);
@@ -226,29 +213,19 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
     const handleSave = async (data: Record<string, any>): Promise<void> => {
         try {
             const isEdit = !!editingItem;
-            const method = isEdit ? 'PUT' : 'POST';
             const itemId = isEdit ? editingItem[idColumn] : null;
             const url = isEdit
                 ? `/api/admin/lookups/${tableKey}/${itemId}`
                 : `/api/admin/lookups/${tableKey}`;
 
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
+            await (isEdit ? putJSON(url, data) : postJSON(url, data));
 
-            if (response.ok) {
-                toast.success(isEdit ? 'Item updated successfully' : 'Item created successfully');
-                setModalOpen(false);
-                setAnchorEl(null);
-                loadItems();
-            } else {
-                const error = await response.json();
-                toast.error(error.error || 'Failed to save item');
-            }
-        } catch {
-            toast.error('Error saving item');
+            toast.success(isEdit ? 'Item updated successfully' : 'Item created successfully');
+            setModalOpen(false);
+            setAnchorEl(null);
+            loadItems();
+        } catch (err) {
+            toast.error(httpErrorMessage(err, 'Failed to save item'));
         }
     };
 

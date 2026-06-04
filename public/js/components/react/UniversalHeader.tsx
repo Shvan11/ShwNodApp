@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { useGlobalState, type UserData } from '../../contexts/GlobalStateContext';
+import { fetchJSON } from '@/core/http';
 
 interface Patient {
     code: string | number;
@@ -65,8 +66,7 @@ const UniversalHeader = () => {
         const patientCode = extractPatientCodeFromURL();
 
         if (patientCode) {
-            fetch(`/api/patients/${patientCode}/info`, { signal })
-                .then(response => response.json())
+            fetchJSON<{ person_id?: number; patient_name?: string; name?: string; [key: string]: unknown }>(`/api/patients/${patientCode}/info`, { signal })
                 .then(data => {
                     // `/info` returns a single patient object (not an array). Map
                     // it onto the header's {code,name} shape; person_id is the code.
@@ -89,11 +89,7 @@ const UniversalHeader = () => {
     };
 
     const loadCurrentUser = (signal: AbortSignal) => {
-        fetch('/api/auth/me', { signal })
-            .then(response => {
-                if (!response.ok) return null;
-                return response.json();
-            })
+        fetchJSON<{ success?: boolean; user?: User & UserData }>('/api/auth/me', { signal })
             .then(data => {
                 if (data && data.success && data.user) {
                     setCurrentUser(data.user);

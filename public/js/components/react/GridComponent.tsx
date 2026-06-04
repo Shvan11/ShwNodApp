@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, MouseEvent as ReactMouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
-import { putJSON, deleteJSON } from '@/core/http';
+import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import tpStyles from './TimePointsSelector.module.css';
 import styles from './GridComponent.module.css';
 import EditTimepointModal from './EditTimepointModal';
@@ -138,6 +138,9 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         cachedShareBlobRef.current.blob = null;
 
         try {
+            // Raw image fetch read as a Blob for the native share sheet — not a
+            // JSON API call, so it stays on bare fetch().
+            // eslint-disable-next-line no-restricted-syntax
             const response = await fetch(imageUrl);
             if (!response.ok) return;
 
@@ -201,13 +204,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
 
         try {
             setLoadingTimepoints(true);
-            const response = await fetch(`/api/patients/${personId}/timepoints`);
-
-            if (!response.ok) {
-                throw new Error('Failed to load timepoints');
-            }
-
-            const data: Timepoint[] = await response.json();
+            const data = await fetchJSON<Timepoint[]>(`/api/patients/${personId}/timepoints`);
             setTimepoints(data);
             return data;
         } catch (err) {
@@ -228,23 +225,20 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         try {
             setLoading(true);
 
-            const [galleryRes, visibilityRes] = await Promise.all([
-                fetch(`/api/patients/${personId}/gallery/${tpCode}`),
-                fetch(`/api/patients/${personId}/photos/visibility`),
-            ]);
-
-            if (!galleryRes.ok) {
-                throw new Error(`HTTP ${galleryRes.status}: ${galleryRes.statusText}`);
-            }
-
-            const galleryImages: GalleryImage[] = await galleryRes.json();
-            setImages(galleryImages);
-
-            if (visibilityRes.ok) {
-                const visData = (await visibilityRes.json()) as {
+            // Gallery is required (its failure throws → caught below); visibility is
+            // best-effort (per-promise .catch → null → no private flags), mirroring
+            // the old `if (visibilityRes.ok)` tolerance.
+            const [galleryImages, visData] = await Promise.all([
+                fetchJSON<GalleryImage[]>(`/api/patients/${personId}/gallery/${tpCode}`),
+                fetchJSON<{
                     success: boolean;
                     privateImages?: Array<{ tp: string; name: string }>;
-                };
+                }>(`/api/patients/${personId}/photos/visibility`).catch(() => null),
+            ]);
+
+            setImages(galleryImages);
+
+            if (visData) {
                 const names = new Set<string>(
                     (visData.privateImages ?? [])
                         .filter((r) => r.tp === tpCode)
@@ -256,7 +250,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             }
         } catch (err) {
             console.error('Error loading grid:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
         } finally {
             setLoading(false);
         }
@@ -270,15 +264,11 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         const wasPrivate = privateNamesRef.current.has(lower);
         const nextPrivate = !wasPrivate;
         try {
-            const res = await fetch(`/api/patients/${personId}/photos/visibility`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tp: tpCode, name: fileName, isPrivate: nextPrivate }),
+            await postJSON(`/api/patients/${personId}/photos/visibility`, {
+                tp: tpCode,
+                name: fileName,
+                isPrivate: nextPrivate,
             });
-            const data = (await res.json()) as { success: boolean; error?: string };
-            if (!res.ok || !data.success) {
-                throw new Error(data.error || 'Failed to update');
-            }
             setPrivateNames((prev) => {
                 const next = new Set(prev);
                 if (nextPrivate) next.add(lower);
@@ -287,7 +277,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             });
             toast.success(nextPrivate ? 'Photo hidden from patient' : 'Photo visible to patient');
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to update visibility');
+            toast.error(httpErrorMessage(err, 'Failed to update visibility'));
         }
     };
 
@@ -495,13 +485,9 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                                 webPath = url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
                                             }
 
-                                            const response = await fetch(`/api/convert-path?path=${encodeURIComponent(webPath)}`);
-
-                                            if (!response.ok) {
-                                                throw new Error(`Failed to convert path: ${response.statusText}`);
-                                            }
-
-                                            const { fullPath } = await response.json();
+                                            const { fullPath } = await fetchJSON<{ fullPath: string }>(
+                                                `/api/convert-path?path=${encodeURIComponent(webPath)}`
+                                            );
 
                                             // Use actual file path - backend will handle filename conversion
                                             const convertedPath = fullPath;
@@ -660,9 +646,10 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         setMenuFolder(null);
         menuTpRef.current = tp.tp_code;
         if (personId) {
-            fetch(`/api/patients/${personId}/timepoints/${tp.tp_code}/folder`)
-                .then((r) => (r.ok ? r.json() : null))
-                .then((data: { folder: string | null; exists: boolean } | null) => {
+            fetchJSON<{ folder: string | null; exists: boolean }>(
+                `/api/patients/${personId}/timepoints/${tp.tp_code}/folder`
+            )
+                .then((data) => {
                     // Ignore a stale resolve if another tab's menu was opened meanwhile.
                     if (menuTpRef.current === tp.tp_code) {
                         setMenuFolder(data ?? { folder: null, exists: false });

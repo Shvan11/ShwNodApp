@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
 import Modal from './Modal';
 
 interface EmailConfig {
@@ -35,17 +36,16 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
     const loadEmailConfig = useCallback(async () => {
         setIsLoading(true);
         try {
-            const response = await fetch('/api/email/config');
-            const data = await response.json();
+            const data = await fetchJSON<{ success?: boolean; config?: EmailConfig; error?: string }>('/api/email/config');
 
             if (data.success) {
-                setConfig(data.config);
+                setConfig(data.config ?? {});
             } else {
                 throw new Error(data.error || 'Failed to load email configuration');
             }
         } catch (error) {
             console.error('Error loading email configuration:', error);
-            showModal('Error', 'Failed to load email settings: ' + (error as Error).message, 'error');
+            showModal('Error', 'Failed to load email settings: ' + httpErrorMessage(error, 'Unknown error'), 'error');
         } finally {
             setIsLoading(false);
         }
@@ -97,15 +97,7 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
 
         setIsLoading(true);
         try {
-            const response = await fetch('/api/email/config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(pendingChanges)
-            });
-
-            const data = await response.json();
+            const data = await postJSON<{ success?: boolean; error?: string }>('/api/email/config', pendingChanges);
 
             if (data.success) {
                 // Reload configuration
@@ -117,7 +109,7 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
             }
         } catch (error) {
             console.error('Error saving email configuration:', error);
-            showModal('Error', 'Failed to save email configuration: ' + (error as Error).message, 'error');
+            showModal('Error', 'Failed to save email configuration: ' + httpErrorMessage(error, 'Unknown error'), 'error');
         } finally {
             setIsLoading(false);
         }
@@ -126,8 +118,7 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
     const testConnection = async () => {
         setIsTesting(true);
         try {
-            const response = await fetch('/api/email/test');
-            const data = await response.json();
+            const data = await fetchJSON<{ success?: boolean; message?: string; error?: string }>('/api/email/test');
 
             if (data.success) {
                 showModal('Success', 'Email connection test successful! Configuration is valid.', 'success');
@@ -136,7 +127,7 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
             }
         } catch (error) {
             console.error('Error testing email connection:', error);
-            showModal('Error', 'Connection test failed: ' + (error as Error).message, 'error');
+            showModal('Error', 'Connection test failed: ' + httpErrorMessage(error, 'Unknown error'), 'error');
         } finally {
             setIsTesting(false);
         }
@@ -145,15 +136,7 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
     const sendTestEmail = async () => {
         setIsSending(true);
         try {
-            const response = await fetch('/api/email/test-send', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({})
-            });
-
-            const data = await response.json();
+            const data = await postJSON<{ success?: boolean; to?: string; error?: string }>('/api/email/test-send', {});
 
             if (data.success) {
                 showModal('Success', `Test email sent successfully to ${data.to}!`, 'success');
@@ -162,7 +145,7 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
             }
         } catch (error) {
             console.error('Error sending test email:', error);
-            showModal('Error', 'Failed to send test email: ' + (error as Error).message, 'error');
+            showModal('Error', 'Failed to send test email: ' + httpErrorMessage(error, 'Unknown error'), 'error');
         } finally {
             setIsSending(false);
         }

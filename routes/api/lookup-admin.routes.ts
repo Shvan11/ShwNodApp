@@ -17,7 +17,7 @@ import {
   getTableConfig,
   ReferentialError
 } from '../../services/database/queries/lookup-admin-queries.js';
-import { ErrorResponses } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
 
 const router = Router();
 
@@ -47,7 +47,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const tables = getLookupTableConfigs();
-      res.json(tables);
+      sendSuccess(res, tables);
     } catch (error) {
       log.error('Error fetching lookup table configs:', {
         error: (error as Error).message
@@ -77,7 +77,7 @@ router.get(
       }
 
       const items = await getLookupItems(tableName);
-      res.json(items);
+      sendSuccess(res, items);
     } catch (error) {
       log.error('Error fetching lookup items:', {
         table: req.params.tableName,
@@ -132,11 +132,7 @@ router.post(
         id: newId
       });
 
-      res.json({
-        success: true,
-        id: newId,
-        message: 'Item created successfully'
-      });
+      sendSuccess(res, { id: newId }, 'Item created successfully');
     } catch (error) {
       log.error('Error creating lookup item:', {
         table: req.params.tableName,
@@ -192,10 +188,7 @@ router.put(
         id
       });
 
-      res.json({
-        success: true,
-        message: 'Item updated successfully'
-      });
+      sendSuccess(res, null, 'Item updated successfully');
     } catch (error) {
       log.error('Error updating lookup item:', {
         table: req.params.tableName,
@@ -234,20 +227,14 @@ router.delete(
         id
       });
 
-      res.json({
-        success: true,
-        message: 'Item deleted successfully'
-      });
+      sendSuccess(res, null, 'Item deleted successfully');
     } catch (error) {
       if (error instanceof ReferentialError) {
         log.info('Refused to delete lookup item: still referenced', {
           table: req.params.tableName,
           id: req.params.id
         });
-        res.status(409).json({
-          success: false,
-          error: error.message
-        });
+        ErrorResponses.conflict(res, error.message);
         return;
       }
       log.error('Error deleting lookup item:', {

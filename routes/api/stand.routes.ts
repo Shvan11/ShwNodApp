@@ -36,7 +36,7 @@ import {
 } from '../../services/business/StandService.js';
 import { GoogleGenAI, Type } from '@google/genai';
 import { authenticate, authorize } from '../../middleware/auth.js';
-import { ErrorResponses } from '../../utils/error-response.js';
+import { ErrorResponses, sendError, sendSuccess } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
@@ -57,13 +57,7 @@ function getGeminiClient(): GoogleGenAI | null {
 
 function handleStandError(res: Response, error: unknown, fallbackMessage: string): void {
   if (error instanceof StandValidationError) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-      code: error.code,
-      details: error.details,
-      timestamp: new Date().toISOString(),
-    });
+    ErrorResponses.badRequest(res, error.message, { code: error.code, ...error.details });
     return;
   }
   log.error(fallbackMessage, error);
@@ -77,7 +71,7 @@ function handleStandError(res: Response, error: unknown, fallbackMessage: string
 router.get('/stand/dashboard', async (_req: Request, res: Response): Promise<void> => {
   try {
     const kpis = await getStandDashboardKPIs();
-    res.json(kpis);
+    sendSuccess(res, kpis);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch stand dashboard KPIs');
   }
@@ -90,7 +84,7 @@ router.get('/stand/dashboard', async (_req: Request, res: Response): Promise<voi
 router.get('/stand/categories', async (_req: Request, res: Response): Promise<void> => {
   try {
     const categories = await getStandCategories();
-    res.json(categories);
+    sendSuccess(res, categories);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch stand categories');
   }
@@ -108,7 +102,7 @@ router.post(
         return;
       }
       const result = await addStandCategory(name.trim());
-      res.status(201).json({ success: true, data: result });
+      sendSuccess(res, result, null, 201);
     } catch (error) {
       handleStandError(res, error, 'Failed to create stand category');
     }
@@ -124,7 +118,7 @@ router.put(
       const id = parseInt(req.params.id);
       if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid category id'); return; }
       await updateStandCategory(id, req.body);
-      res.json({ success: true });
+      sendSuccess(res, null);
     } catch (error) {
       handleStandError(res, error, 'Failed to update stand category');
     }
@@ -140,7 +134,7 @@ router.delete(
       const id = parseInt(req.params.id);
       if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid category id'); return; }
       await deactivateStandCategory(id);
-      res.json({ success: true });
+      sendSuccess(res, null);
     } catch (error) {
       handleStandError(res, error, 'Failed to delete stand category');
     }
@@ -154,7 +148,7 @@ router.delete(
 router.get('/stand/items/low-stock', async (_req: Request, res: Response): Promise<void> => {
   try {
     const items = await getLowStockItems();
-    res.json(items);
+    sendSuccess(res, items);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch low stock items');
   }
@@ -164,7 +158,7 @@ router.get('/stand/items/expiring', async (req: Request, res: Response): Promise
   try {
     const days = parseInt(req.query.days as string) || 30;
     const items = await getExpiringItems(days);
-    res.json(items);
+    sendSuccess(res, items);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch expiring items');
   }
@@ -265,23 +259,17 @@ For item_name, combine the brand name and product name as shown on packaging.`;
       const parsed = JSON.parse(result.text ?? '{}');
 
       log.info('Vision scan completed', { itemName: parsed.item_name });
-      res.json({ success: true, data: parsed });
+      sendSuccess(res, parsed);
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
       if (errMsg.includes('429') || errMsg.includes('quota')) {
         log.warn('Gemini API rate limit hit', { error: errMsg });
-        res.status(429).json({
-          success: false,
-          error: 'AI service is temporarily busy. Please try again in a moment.',
-        });
+        sendError(res, 429, 'AI service is temporarily busy. Please try again in a moment.');
         return;
       }
       if (errMsg.includes('503') || errMsg.includes('UNAVAILABLE') || errMsg.includes('overloaded')) {
         log.warn('Gemini API overloaded after retries', { error: errMsg });
-        res.status(503).json({
-          success: false,
-          error: 'AI service is experiencing high demand. Please try again in a minute.',
-        });
+        sendError(res, 503, 'AI service is experiencing high demand. Please try again in a minute.');
         return;
       }
       handleStandError(res, error, 'Failed to scan product with AI vision');
@@ -293,7 +281,7 @@ router.get('/stand/items/barcode/:barcode', async (req: Request<{ barcode: strin
   try {
     const item = await getStandItemByBarcode(req.params.barcode);
     if (!item) { ErrorResponses.notFound(res, 'Item'); return; }
-    res.json(item);
+    sendSuccess(res, item);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch item by barcode');
   }
@@ -312,7 +300,7 @@ router.get(
         stockStatus: req.query.stockStatus as 'in-stock' | 'low-stock' | 'out-of-stock' | undefined,
         includeInactive: req.query.includeInactive === 'true',
       });
-      res.json(items);
+      sendSuccess(res, items);
     } catch (error) {
       handleStandError(res, error, 'Failed to fetch stand items');
     }
@@ -325,7 +313,7 @@ router.get('/stand/items/:id', async (req: Request<{ id: string }>, res: Respons
     if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
     const item = await getStandItemById(id);
     if (!item) { ErrorResponses.notFound(res, 'Item'); return; }
-    res.json(item);
+    sendSuccess(res, item);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch stand item');
   }
@@ -344,7 +332,7 @@ router.post(
       }
       const userId = req.session?.userId ?? null;
       const result = await addStandItem({ ...req.body, createdBy: userId });
-      res.status(201).json({ success: true, data: result });
+      sendSuccess(res, result, null, 201);
     } catch (error) {
       handleStandError(res, error, 'Failed to create stand item');
     }
@@ -360,7 +348,7 @@ router.put(
       const id = parseInt(req.params.id);
       if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
       await updateStandItem(id, req.body);
-      res.json({ success: true });
+      sendSuccess(res, null);
     } catch (error) {
       handleStandError(res, error, 'Failed to update stand item');
     }
@@ -376,7 +364,7 @@ router.delete(
       const id = parseInt(req.params.id);
       if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
       await softDeleteStandItem(id);
-      res.json({ success: true });
+      sendSuccess(res, null);
     } catch (error) {
       handleStandError(res, error, 'Failed to delete stand item');
     }
@@ -398,7 +386,7 @@ router.post(
       }
       const userId = req.session?.userId ?? null;
       await validateAndRestockItem(id, parseInt(String(quantity)), parseInt(String(unitCost)), userId);
-      res.json({ success: true });
+      sendSuccess(res, null);
     } catch (error) {
       handleStandError(res, error, 'Failed to restock item');
     }
@@ -420,7 +408,7 @@ router.post(
       }
       const userId = req.session?.userId ?? null;
       await validateAndAdjustStock(id, parseInt(String(delta)), reason, userId);
-      res.json({ success: true });
+      sendSuccess(res, null);
     } catch (error) {
       handleStandError(res, error, 'Failed to adjust stock');
     }
@@ -436,7 +424,7 @@ router.get('/stand/items/:id/movements', async (req: Request<{ id: string }>, re
       endDate: req.query.endDate as string | undefined,
       movementType: req.query.movementType as string | undefined,
     });
-    res.json(movements);
+    sendSuccess(res, movements);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch stock movements');
   }
@@ -454,7 +442,7 @@ router.post(
     try {
       const cashierId = req.session?.userId ?? null;
       const result = await validateAndCreateSale({ ...req.body, cashierId });
-      res.status(201).json({ success: true, data: result });
+      sendSuccess(res, result, null, 201);
     } catch (error) {
       handleStandError(res, error, 'Failed to create sale');
     }
@@ -476,7 +464,7 @@ router.get(
         limit: req.query.limit ? parseInt(req.query.limit) : undefined,
         offset: req.query.offset ? parseInt(req.query.offset) : undefined,
       });
-      res.json(sales);
+      sendSuccess(res, sales);
     } catch (error) {
       handleStandError(res, error, 'Failed to fetch sales');
     }
@@ -489,7 +477,7 @@ router.get('/stand/sales/:id', async (req: Request<{ id: string }>, res: Respons
     if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid sale id'); return; }
     const sale = await getStandSaleById(id);
     if (!sale) { ErrorResponses.notFound(res, 'Sale'); return; }
-    res.json(sale);
+    sendSuccess(res, sale);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch sale');
   }
@@ -510,7 +498,7 @@ router.post(
       }
       const userId = req.session?.userId ?? null;
       await validateAndVoidSale(id, reason, userId);
-      res.json({ success: true });
+      sendSuccess(res, null);
     } catch (error) {
       handleStandError(res, error, 'Failed to void sale');
     }
@@ -537,7 +525,7 @@ router.get(
         getStandSalesSummary(startDate, endDate),
         getStandPurchasesSummary(startDate, endDate),
       ]);
-      res.json({ salesSummary, purchases });
+      sendSuccess(res, { salesSummary, purchases });
     } catch (error) {
       handleStandError(res, error, 'Failed to fetch stand report summary');
     }
@@ -558,7 +546,7 @@ router.get(
       }
       const limit = parseInt(req.query.limit || '10');
       const topItems = await getTopSellingItems(startDate, endDate, limit);
-      res.json(topItems);
+      sendSuccess(res, topItems);
     } catch (error) {
       handleStandError(res, error, 'Failed to fetch top selling items');
     }

@@ -4,6 +4,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { formatNumber } from '../../utils/formatters';
 import type { AlignerDoctorMinimal, AlignerSet } from '../../pages/aligner/aligner.types';
+import { postJSON, putJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
 
 interface SetFormData {
     set_sequence: number | string;
@@ -212,31 +213,22 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                 ? `/api/aligner/sets/${set.aligner_set_id}`
                 : '/api/aligner/sets';
 
-            const method = set ? 'PUT' : 'POST';
+            const result = set
+                ? await putJSON<{ setId?: number }>(url, dataToSend)
+                : await postJSON<{ setId?: number }>(url, dataToSend);
 
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(dataToSend)
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                // If there's a PDF file to upload, do it after saving
-                if (pdfFile && (result.setId || set?.aligner_set_id)) {
-                    const setIdToUse = result.setId || set?.aligner_set_id;
-                    await handlePdfUpload(setIdToUse);
-                }
-
-                onSave();
-                onClose();
-            } else {
-                toast.error('Error: ' + (result.error || 'Failed to save set'));
+            // If there's a PDF file to upload, do it after saving (success — a
+            // non-2xx would have thrown).
+            const setIdToUse = result.setId || set?.aligner_set_id;
+            if (pdfFile && setIdToUse) {
+                await handlePdfUpload(setIdToUse);
             }
+
+            onSave();
+            onClose();
         } catch (error) {
             console.error('Error saving set:', error);
-            toast.error('Error saving set: ' + (error as Error).message);
+            toast.error(httpErrorMessage(error, 'Failed to save set'));
         } finally {
             setSaving(false);
         }
@@ -259,20 +251,12 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
             const formDataUpload = new FormData();
             formDataUpload.append('pdf', pdfFile);
 
-            const response = await fetch(`/api/aligner/sets/${setId}/upload-pdf`, {
-                method: 'POST',
-                body: formDataUpload
-            });
-
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to upload PDF');
-            }
-
+            // upload-pdf is sendSuccess-enveloped; fetchJSON unwraps to the inner
+            // data (ignored here). A non-2xx throws → caught below.
+            await postFormData(`/api/aligner/sets/${setId}/upload-pdf`, formDataUpload);
         } catch (error) {
             console.error('Error uploading PDF:', error);
-            toast.error('Failed to upload PDF: ' + (error as Error).message);
+            toast.error(httpErrorMessage(error, 'Failed to upload PDF'));
         }
     };
 
@@ -286,23 +270,14 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
         try {
             setDeletingPdf(true);
 
-            const response = await fetch(`/api/aligner/sets/${set.aligner_set_id}/pdf`, {
-                method: 'DELETE'
-            });
-
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to delete PDF');
-            }
+            await deleteJSON(`/api/aligner/sets/${set.aligner_set_id}/pdf`);
 
             // Update form data to reflect deletion
             setFormData(prev => ({ ...prev, set_pdf_url: '' }));
             toast.success('PDF deleted successfully');
-
         } catch (error) {
             console.error('Error deleting PDF:', error);
-            toast.error('Failed to delete PDF: ' + (error as Error).message);
+            toast.error(httpErrorMessage(error, 'Failed to delete PDF'));
         } finally {
             setDeletingPdf(false);
         }

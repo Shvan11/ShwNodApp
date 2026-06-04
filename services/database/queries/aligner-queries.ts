@@ -275,6 +275,7 @@ export interface UpdateBatchStatusResult {
   message: string;
   wasActivated: boolean;
   wasAlreadyActive: boolean;
+  wasAlreadyManufactured: boolean;
   wasAlreadyDelivered: boolean;
   previouslyActiveBatchSequence: number | null;
 }
@@ -1572,12 +1573,13 @@ export async function updateBatchStatus(
     const base = {
       batchId, batchSequence, setId, action,
       success: true, wasActivated: false, wasAlreadyActive: isCurrentlyActive,
-      wasAlreadyDelivered: false, previouslyActiveBatchSequence: null as number | null,
+      wasAlreadyManufactured: false, wasAlreadyDelivered: false,
+      previouslyActiveBatchSequence: null as number | null,
     };
 
     if (action === 'MANUFACTURE') {
       if (manufactured && target === null) {
-        return { ...base, message: 'Batch already manufactured' };
+        return { ...base, wasAlreadyManufactured: true, message: 'Batch already manufactured' };
       }
       await trx.updateTable('aligner_batches').set({ manufacture_date: target ?? today }).where('aligner_batch_id', '=', batchId).execute();      return { ...base, message: manufactured ? 'Manufacture date updated' : 'Batch marked as manufactured' };
     }

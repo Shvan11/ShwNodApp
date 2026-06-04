@@ -22,6 +22,7 @@ const notifyChairDisplay = (path: '/api/chair-display/patient-loaded' | '/api/ch
             return;
         }
         // Fallback: still non-blocking (no await), keepalive survives unload
+        // eslint-disable-next-line no-restricted-syntax -- beacon fallback: fire-and-forget keepalive POST on unload, no response read
         void fetch(path, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

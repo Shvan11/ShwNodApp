@@ -8,6 +8,7 @@ import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { fetchJSON, postJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import Modal from './Modal';
 import styles from './NewWorkComponent.module.css';
 
@@ -35,6 +36,13 @@ interface ExistingWorkData {
     currency?: string;
     additionDate?: string;
 }
+
+/**
+ * Shape of the conflicting work carried on a DUPLICATE_ACTIVE_WORK / 409 error
+ * body. The dialog reads the `ExistingWorkData` fields; the 409 message reads the
+ * alternate `type`/`work_id` aliases — both kept optional so either payload fits.
+ */
+type WorkConflictExisting = ExistingWorkData & { type?: string; work_id?: number };
 
 interface WorkFormData {
     person_id: string;
@@ -171,24 +179,17 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
 
     const loadDropdownData = async () => {
         try {
-            const [typesRes, keywordsRes, employeesRes] = await Promise.all([
-                fetch('/api/getworktypes'),
-                fetch('/api/getworkkeywords'),
-                fetch('/api/employees?percentage=true')
+            // Independent dropdowns — each tolerates its own failure so one bad
+            // lookup doesn't blank the rest, matching the old per-`res.ok` guards.
+            const [types, kw, employeesData] = await Promise.all([
+                fetchJSON<WorkType[]>('/api/getworktypes').catch(() => null),
+                fetchJSON<Keyword[]>('/api/getworkkeywords').catch(() => null),
+                fetchJSON<{ employees?: Doctor[] }>('/api/employees?percentage=true').catch(() => null)
             ]);
 
-            if (typesRes.ok) {
-                const types: WorkType[] = await typesRes.json();
-                setWorkTypes(types);
-            }
-            if (keywordsRes.ok) {
-                const kw: Keyword[] = await keywordsRes.json();
-                setKeywords(kw);
-            }
-            if (employeesRes.ok) {
-                const data = await employeesRes.json();
-                setDoctors(data?.employees || []);
-            }
+            if (types) setWorkTypes(types);
+            if (kw) setKeywords(kw);
+            if (employeesData) setDoctors(employeesData.employees || []);
         } catch (err) {
             console.error('Error loading dropdown data:', err);
         }
@@ -202,9 +203,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
 
         try {
             setLoading(true);
-            const response = await fetch(`/api/getworks?code=${personId}`);
-            if (!response.ok) throw new Error('Failed to fetch work data');
-            const works: WorkResponse[] = await response.json();
+            const works = await fetchJSON<WorkResponse[]>(`/api/getworks?code=${personId}`);
             const work = works.find(w => w.work_id === workId);
 
             if (work) {
@@ -237,7 +236,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 setExistingTotalPaid(Number(work.TotalPaid ?? 0));
             }
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            setError(httpErrorMessage(err, 'Failed to fetch work data'));
         } finally {
             setLoading(false);
         }
@@ -269,8 +268,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
     const performSubmit = async () => {
         try {
             setLoading(true);
-            let response: Response;
 
+            // Both endpoints return the raw WorkResponse (no envelope) → fetchData passthrough.
+            let result: WorkResponse;
             if (workId) {
                 // Update existing work
                 // Send all fields - backend middleware handles authorization
@@ -290,65 +290,56 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     delete updatePayload.discount;
                     delete updatePayload.discount_date;
                 }
-                response = await fetch('/api/updatework', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updatePayload)
-                });
+                result = await putJSON<WorkResponse>('/api/updatework', updatePayload);
             } else {
                 // Add new work - use special endpoint if createAsFinished is true
                 // Strip discount fields from creation payload (not supported at creation)
                 const { discount: _d, discount_date: _dd, discount_reason: _dr, ...creationData } = formData;
                 void _d; void _dd; void _dr;
                 const endpoint = formData.createAsFinished ? '/api/addWorkWithInvoice' : '/api/addwork';
-                response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(creationData)
-                });
+                result = await postJSON<WorkResponse>(endpoint, creationData);
             }
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                // Handle specific error cases with detailed messages
-                // Check for DUPLICATE_ACTIVE_WORK in details.code or top-level code
-                const errorCode = errorData.details?.code || errorData.code;
-                if (errorCode === 'DUPLICATE_ACTIVE_WORK') {
-                    // Show confirmation dialog instead of error
-                    setExistingWorkData(errorData.details?.existingWork || errorData.existingWork);
-                    setPendingFormData(formData);
-                    setShowConfirmDialog(true);
-                    setLoading(false);
-                    return;
-                }
-
-                // Handle 409 Conflict - Status change conflict (Active work already exists).
-                // existingWork now arrives under `details` (standard error envelope); keep the
-                // top-level fallback for any older shape.
-                const conflictWork = errorData.details?.existingWork || errorData.existingWork;
-                if (response.status === 409 && conflictWork) {
-                    const existingWork = conflictWork;
-                    const errorMessage = `Cannot activate this work: Patient already has an active work:\n\n` +
-                        `Work Type: ${existingWork.type || 'N/A'}\n` +
-                        `Doctor: ${existingWork.doctor || 'N/A'}\n` +
-                        `Work ID: ${existingWork.work_id}\n\n` +
-                        `Please finish or discontinue the existing work first.`;
-                    throw new Error(errorMessage);
-                }
-
-                // Extract error message properly (details.message > message > error).
-                // Note: errorData.details is an object in the standard envelope, so it is NOT a
-                // message fallback (that previously surfaced "[object Object]").
-                const errorMessage = errorData.details?.message || errorData.message || errorData.error || 'Failed to save work';
-                throw new Error(errorMessage);
-            }
-
-            const result: WorkResponse = await response.json();
             if (onSave) {
                 onSave(result);
             }
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            // Conflict context travels on the thrown HttpError's parsed body. The standard
+            // envelope nests code/existingWork under `details`; the top-level keys are kept
+            // as a fallback for any older shape.
+            const httpErr = err as HttpError;
+            const errorData = httpErr.data as {
+                code?: string;
+                message?: string;
+                error?: string;
+                existingWork?: WorkConflictExisting;
+                details?: { code?: string; message?: string; existingWork?: WorkConflictExisting };
+            } | undefined;
+
+            const errorCode = errorData?.details?.code || errorData?.code;
+            if (errorCode === 'DUPLICATE_ACTIVE_WORK') {
+                // Show confirmation dialog instead of error
+                setExistingWorkData(errorData?.details?.existingWork || errorData?.existingWork || null);
+                setPendingFormData(formData);
+                setShowConfirmDialog(true);
+                return;
+            }
+
+            // Handle 409 Conflict - Status change conflict (Active work already exists).
+            const conflictWork = errorData?.details?.existingWork || errorData?.existingWork;
+            if (httpErr.status === 409 && conflictWork) {
+                setError(
+                    `Cannot activate this work: Patient already has an active work:\n\n` +
+                    `Work Type: ${conflictWork.type || 'N/A'}\n` +
+                    `Doctor: ${conflictWork.doctor || 'N/A'}\n` +
+                    `Work ID: ${conflictWork.work_id}\n\n` +
+                    `Please finish or discontinue the existing work first.`
+                );
+                return;
+            }
+
+            // Extract error message properly (details.message > server error/message > fallback).
+            setError(errorData?.details?.message || httpErrorMessage(err, 'Failed to save work'));
         } finally {
             setLoading(false);
         }
@@ -359,16 +350,11 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
             setLoading(true);
             setShowConfirmDialog(false);
 
-            // First, finish the existing work
-            const finishResponse = await fetch('/api/finishwork', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ workId: existingWorkData?.workId })
-            });
-
-            if (!finishResponse.ok) {
-                throw new Error('Failed to finish existing work');
-            }
+            // First, finish the existing work (re-wrap any failure with its own message).
+            await postJSON('/api/finishwork', { workId: existingWorkData?.workId })
+                .catch((finishErr) => {
+                    throw new Error(httpErrorMessage(finishErr, 'Failed to finish existing work'));
+                });
 
             // Now add the new work
             const pendingCreation = pendingFormData
@@ -378,18 +364,10 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                       return rest;
                   })()
                 : pendingFormData;
-            const addResponse = await fetch('/api/addwork', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(pendingCreation)
-            });
-
-            if (!addResponse.ok) {
-                const errorData = await addResponse.json();
-                throw new Error(errorData.details || errorData.error || 'Failed to add new work');
-            }
-
-            const result: WorkResponse = await addResponse.json();
+            const result = await postJSON<WorkResponse>('/api/addwork', pendingCreation)
+                .catch((addErr) => {
+                    throw new Error(httpErrorMessage(addErr, 'Failed to add new work'));
+                });
             if (onSave) {
                 onSave(result);
             }

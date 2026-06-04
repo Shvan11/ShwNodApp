@@ -3,6 +3,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import Modal from './Modal';
 import styles from './DatabaseSettings.module.css';
 import { formatISODate } from '../../core/utils';
+import { fetchJSON, postJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
 
 interface DatabaseConfig {
     PG_HOST: string;
@@ -66,17 +67,18 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
     const loadCurrentConfig = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch('/api/config/database');
-            const data = await response.json();
+            const data = await fetchJSON<{ success: boolean; config?: DatabaseConfig; message?: string }>(
+                '/api/config/database'
+            );
 
-            if (data.success) {
+            if (data.success && data.config) {
                 setConfig(data.config);
             } else {
                 throw new Error(data.message || 'Failed to load database configuration');
             }
         } catch (error) {
             console.error('Error loading database config:', error);
-            showModal('Error', 'Failed to load database configuration: ' + (error as Error).message);
+            showModal('Error', 'Failed to load database configuration: ' + httpErrorMessage(error, 'Unknown error'));
         } finally {
             setIsLoading(false);
         }
@@ -126,13 +128,10 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                 return;
             }
 
-            const response = await fetch('/api/config/database/test', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(testConfig)
-            });
-
-            const data = await response.json();
+            const data = await postJSON<{ success: boolean; message: string; details?: string }>(
+                '/api/config/database/test',
+                testConfig
+            );
 
             setConnectionStatus({
                 success: data.success,
@@ -141,10 +140,15 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
             });
 
         } catch (error) {
+            // A failed test is returned as HTTP 400 with { success:false, message, details },
+            // so it lands here — surface the server's reason rather than a generic message.
+            const body = (error as HttpError).data as
+                | { message?: string; details?: string }
+                | undefined;
             setConnectionStatus({
                 success: false,
-                message: 'Connection test failed',
-                details: (error as Error).message
+                message: body?.message || 'Connection test failed',
+                details: body?.details || (error as Error).message
             });
         } finally {
             setIsTestingConnection(false);
@@ -161,13 +165,10 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
             // Get complete configuration (current + pending changes)
             const completeConfig = { ...config, ...pendingChanges };
 
-            const response = await fetch('/api/config/database', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(completeConfig)
-            });
-
-            const data = await response.json();
+            const data = await putJSON<{ success: boolean; message?: string; requiresRestart?: boolean }>(
+                '/api/config/database',
+                completeConfig
+            );
 
             if (data.success) {
                 // Update local state
@@ -186,7 +187,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                         showModal('Success', data.message + '\n\nRemember to restart the application for changes to take effect.');
                     }
                 } else {
-                    showModal('Success', data.message);
+                    showModal('Success', data.message || 'Configuration saved successfully.');
                 }
             } else {
                 throw new Error(data.message || 'Failed to save configuration');
@@ -194,14 +195,15 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
         } catch (error) {
             console.error('Error saving database config:', error);
-            showModal('Error', 'Failed to save database configuration: ' + (error as Error).message);
+            showModal('Error', 'Failed to save database configuration: ' + httpErrorMessage(error, 'Unknown error'));
         }
     };
 
     const exportConfiguration = async () => {
         try {
-            const response = await fetch('/api/config/database/export');
-            const data = await response.json();
+            const data = await fetchJSON<{ success: boolean; config?: unknown; message?: string }>(
+                '/api/config/database/export'
+            );
 
             if (data.success) {
                 // Create downloadable file
@@ -223,19 +225,16 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
             }
         } catch (error) {
             console.error('Error exporting configuration:', error);
-            showModal('Error', 'Failed to export configuration: ' + (error as Error).message);
+            showModal('Error', 'Failed to export configuration: ' + httpErrorMessage(error, 'Unknown error'));
         }
     };
 
     const restartApplication = async () => {
         try {
-            const response = await fetch('/api/system/restart', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason: 'Database configuration update' })
-            });
-
-            const data = await response.json();
+            const data = await postJSON<{ success: boolean; message?: string }>(
+                '/api/system/restart',
+                { reason: 'Database configuration update' }
+            );
 
             if (data.success) {
                 showModal('Restarting', 'Application is restarting. Please wait...');
@@ -249,7 +248,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
             }
         } catch (error) {
             console.error('Error restarting application:', error);
-            showModal('Error', 'Failed to restart application: ' + (error as Error).message);
+            showModal('Error', 'Failed to restart application: ' + httpErrorMessage(error, 'Unknown error'));
         }
     };
 

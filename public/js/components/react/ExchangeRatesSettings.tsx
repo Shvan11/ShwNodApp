@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import type { ApiResponse, ExchangeRateResult, HistoryEntry, HistoryResult } from '@/types/api.types';
+import type { HistoryEntry } from '@/types/api.types';
+import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { useToast } from '../../contexts/ToastContext';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
 import styles from './ExchangeRatesSettings.module.css';
@@ -35,20 +36,14 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
     const loadTodayRate = useCallback(async () => {
         try {
             setTodayLoading(true);
-            const response = await fetch('/api/getCurrentExchangeRate');
-            if (response.status === 404) {
-                setTodayRate(null);
-                return;
-            }
-            const result: ExchangeRateResult = await response.json();
-            if (result.success && result.data?.exchangeRate) {
-                setTodayRate(result.data.exchangeRate);
-            } else {
-                setTodayRate(null);
-            }
+            const data = await fetchJSON<{ exchangeRate?: number }>('/api/getCurrentExchangeRate');
+            setTodayRate(data?.exchangeRate || null);
         } catch (error) {
-            console.error('Error loading today rate:', error);
-            toast.error('Failed to load today\'s exchange rate');
+            // 404 = no rate recorded for today — a normal empty state, not an error.
+            if ((error as HttpError).status !== 404) {
+                console.error('Error loading today rate:', error);
+                toast.error('Failed to load today\'s exchange rate');
+            }
             setTodayRate(null);
         } finally {
             setTodayLoading(false);
@@ -58,17 +53,11 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
     const loadHistory = useCallback(async (from: string, to: string) => {
         try {
             setHistoryLoading(true);
-            const response = await fetch(`/api/exchange-rates?from=${from}&to=${to}`);
-            const result: HistoryResult = await response.json();
-            if (result.success && result.data?.rates) {
-                setHistory(result.data.rates);
-            } else {
-                setHistory([]);
-                toast.error(result.message || 'Failed to load rate history');
-            }
+            const data = await fetchJSON<{ rates?: HistoryEntry[] }>(`/api/exchange-rates?from=${from}&to=${to}`);
+            setHistory(data?.rates ?? []);
         } catch (error) {
             console.error('Error loading history:', error);
-            toast.error('Failed to load exchange rate history');
+            toast.error(httpErrorMessage(error, 'Failed to load exchange rate history'));
             setHistory([]);
         } finally {
             setHistoryLoading(false);
@@ -111,26 +100,17 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
         }
         try {
             setSaving(true);
-            const response = await fetch('/api/updateExchangeRateForDate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ date: today, exchangeRate: Math.round(rate) }),
-            });
-            const result: ApiResponse = await response.json();
-            if (result.success) {
-                toast.success("Today's exchange rate updated");
-                setTodayRate(Math.round(rate));
-                setEditing(false);
-                setDraftValue('');
-                if (toDate >= today && fromDate <= today) {
-                    loadHistory(fromDate, toDate);
-                }
-            } else {
-                toast.error(result.message || 'Failed to update exchange rate');
+            await postJSON('/api/updateExchangeRateForDate', { date: today, exchangeRate: Math.round(rate) });
+            toast.success("Today's exchange rate updated");
+            setTodayRate(Math.round(rate));
+            setEditing(false);
+            setDraftValue('');
+            if (toDate >= today && fromDate <= today) {
+                loadHistory(fromDate, toDate);
             }
         } catch (error) {
             console.error('Error saving rate:', error);
-            toast.error('Failed to update exchange rate');
+            toast.error(httpErrorMessage(error, 'Failed to update exchange rate'));
         } finally {
             setSaving(false);
         }

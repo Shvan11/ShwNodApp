@@ -9,7 +9,7 @@
 
 import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
-import { ErrorResponses } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
 import {
   getAppointmentsOnDate
 } from '../../services/database/queries/holiday-queries.js';
@@ -37,8 +37,7 @@ router.get('/appointments-on-date', async (req: Request<object, object, object, 
     }
 
     const appointments = await getAppointmentsOnDate(date);
-    res.json({
-      success: true,
+    sendSuccess(res, {
       appointments,
       count: appointments.length
     });

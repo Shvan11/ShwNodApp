@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Editor as GrapesJSEditorType } from 'grapesjs';
-import type { ApiStatusResponse } from '@/types/api.types';
+import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
 
 import styles from './TemplateDesigner.module.css';
 import GrapesJSEditor from './GrapesJSEditor';
@@ -50,26 +50,12 @@ function TemplateDesigner() {
     const loadTemplate = async (id: string) => {
         try {
             setIsLoading(true);
-            const response = await fetch(`/api/templates/${id}`);
-
-            // Check if response is ok (status 200-299)
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('API error response:', response.status, errorText);
-                throw new Error(`Failed to load template (HTTP ${response.status}): ${errorText}`);
-            }
-
-            const result: ApiStatusResponse<Template> = await response.json();
-
-            if (result.success) {
-                setTemplate(result.data);
-                setError(null);
-            } else {
-                throw new Error(result.message || 'Failed to load template');
-            }
+            const template = await fetchJSON<Template>(`/api/templates/${id}`);
+            setTemplate(template);
+            setError(null);
         } catch (err) {
             console.error('Error loading template:', err);
-            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            const errorMessage = httpErrorMessage(err, 'Unknown error');
             setError('Failed to load template: ' + errorMessage);
             toast?.error('Failed to load template: ' + errorMessage);
         } finally {
@@ -99,23 +85,11 @@ function TemplateDesigner() {
             const completeHtml = generateCompleteHTML(html, css, pageWidth, pageHeight);
 
             // Send to backend
-            const response = await fetch(`/api/templates/${templateId}/save-html`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ html: completeHtml })
-            });
-
-            const result: ApiStatusResponse<unknown> = await response.json();
-
-            if (result.success) {
-                toast.success('Template saved successfully!');
-            } else {
-                throw new Error(result.message || 'Failed to save template');
-            }
+            await postJSON(`/api/templates/${templateId}/save-html`, { html: completeHtml });
+            toast.success('Template saved successfully!');
         } catch (err) {
             console.error('Error saving template:', err);
-            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-            toast.error('Failed to save template: ' + errorMessage);
+            toast.error('Failed to save template: ' + httpErrorMessage(err, 'Unknown error'));
         } finally {
             setIsSaving(false);
         }

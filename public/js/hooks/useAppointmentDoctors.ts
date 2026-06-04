@@ -7,7 +7,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { buildDoctorColors, type DoctorColorResult } from '../components/react/doctorColors';
+import { fetchJSON } from '@/core/http';
+import { buildDoctorColors, type DoctorColorResult, type DoctorColorSource } from '../components/react/doctorColors';
 
 const EMPTY: DoctorColorResult = { byId: new Map(), legend: [] };
 
@@ -19,9 +20,7 @@ export function useAppointmentDoctors(): DoctorColorResult & { loading: boolean 
         let cancelled = false;
         (async () => {
             try {
-                const res = await fetch('/api/employees?getAppointments=true');
-                if (!res.ok) throw new Error(`Failed to load doctors: ${res.status}`);
-                const data = await res.json();
+                const data = await fetchJSON<{ employees?: DoctorColorSource[] }>('/api/employees?getAppointments=true');
                 const employees = Array.isArray(data?.employees) ? data.employees : [];
                 if (!cancelled) setResult(buildDoctorColors(employees));
             } catch (err) {

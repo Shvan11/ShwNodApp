@@ -177,6 +177,10 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
             // The template file lives under ./data which is NOT served as static,
             // so we read it through an API endpoint that reads it server-side.
             const cacheBuster = `?t=${Date.now()}`;
+            // This endpoint returns raw HTML text (res.type('html').send), not a JSON envelope,
+            // so it stays on raw fetch() — core/http.ts is JSON-oriented. (Audit H1/N11: res.text()
+            // bodies are a legitimate raw-fetch exception, like blob downloads.)
+            // eslint-disable-next-line no-restricted-syntax -- HTML-text endpoint, not JSON
             const htmlResponse = await fetch(`/api/templates/${template.template_id}/html${cacheBuster}`);
             if (!htmlResponse.ok) {
                 throw new Error(`Failed to fetch template HTML (HTTP ${htmlResponse.status})`);

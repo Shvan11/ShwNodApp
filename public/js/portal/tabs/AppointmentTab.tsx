@@ -24,6 +24,7 @@ const AppointmentTab = () => {
     let cancelled = false;
     (async () => {
       try {
+        // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (CLAUDE.md / audit N17): validates the raw body itself and reads res.ok/error.
         const res = await fetch('/api/portal/appointments/next', { credentials: 'same-origin' });
         const parsed = portalNextAppointmentResponseSchema.safeParse(await res.json());
         if (cancelled) return;

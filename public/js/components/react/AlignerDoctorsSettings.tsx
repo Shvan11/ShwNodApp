@@ -1,6 +1,7 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import styles from './AlignerDoctorsSettings.module.css';
 import type { AlignerDoctor } from '../../pages/aligner/aligner.types';
 
@@ -37,17 +38,11 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
         try {
             setLoading(true);
             setError(null);
-            const response = await fetch('/api/aligner-doctors');
-
-            if (!response.ok) {
-                throw new Error('Failed to load doctors');
-            }
-
-            const data = await response.json();
+            const data = await fetchJSON<{ doctors?: AlignerDoctor[] }>('/api/aligner-doctors');
             setDoctors(data.doctors || []);
         } catch (err) {
             console.error('Error loading doctors:', err);
-            setError((err as Error).message);
+            setError(httpErrorMessage(err, 'Failed to load doctors'));
         } finally {
             setLoading(false);
         }
@@ -83,20 +78,7 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
                 ? `/api/aligner-doctors/${editingId}`
                 : '/api/aligner-doctors';
 
-            const method = editingId ? 'PUT' : 'POST';
-
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to save doctor');
-            }
+            await (editingId ? putJSON(url, formData) : postJSON(url, formData));
 
             await loadDoctors();
             handleCancel();
@@ -105,7 +87,7 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
             toast.success(editingId ? 'Doctor updated successfully!' : 'Doctor added successfully!');
         } catch (err) {
             console.error('Error saving doctor:', err);
-            toast.error((err as Error).message);
+            toast.error(httpErrorMessage(err, 'Failed to save doctor'));
         }
     };
 
@@ -115,20 +97,13 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
         }
 
         try {
-            const response = await fetch(`/api/aligner-doctors/${drID}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to delete doctor');
-            }
+            await deleteJSON(`/api/aligner-doctors/${drID}`);
 
             await loadDoctors();
             toast.success('Doctor deleted successfully!');
         } catch (err) {
             console.error('Error deleting doctor:', err);
-            toast.error((err as Error).message);
+            toast.error(httpErrorMessage(err, 'Failed to delete doctor'));
         }
     };
 

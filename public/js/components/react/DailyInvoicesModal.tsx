@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { fetchJSON, httpErrorMessage } from '@/core/http';
 import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters';
 import Modal from './Modal';
 import styles from './StatisticsComponent.module.css';
@@ -60,16 +61,10 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
         setError(null);
 
         try {
-            const response = await fetch(`/api/daily-invoices?date=${dateValue}`);
-            const data = await response.json();
-
-            if (!response.ok || !data.success) {
-                throw new Error(data.error || 'Failed to fetch daily invoices');
-            }
-
+            const data = await fetchJSON<{ invoices?: Invoice[] }>(`/api/daily-invoices?date=${dateValue}`);
             setInvoices(data.invoices ?? []);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Failed to fetch daily invoices'));
             console.error('Error fetching daily invoices:', err);
         } finally {
             setLoading(false);

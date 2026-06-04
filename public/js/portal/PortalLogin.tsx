@@ -36,6 +36,7 @@ const PortalLogin = ({ onLogin }: Props) => {
     }
     setBusy(true);
     try {
+      // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (CLAUDE.md / audit N17): validates the raw body and reads error/lockedUntil on non-2xx; the throwing staff client would obscure that.
       const res = await fetch('/api/portal/login', {
         method: 'POST',
         credentials: 'same-origin',

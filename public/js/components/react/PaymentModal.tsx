@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent, FocusEvent } from 'react';
-import type { ApiResponse, ExchangeRateResult } from '@/types/api.types';
+import type { ApiResponse } from '@/types/api.types';
 import styles from './PaymentModal.module.css';
 import Modal from './Modal';
 import { parseFormattedNumber } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 
 // Types
 interface WorkData {
@@ -131,11 +132,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         const fetchCompleteWorkData = async () => {
             if (workData && workData.work_id) {
                 try {
-                    const response = await fetch(`/api/getworkforreceipt/${workData.work_id}`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        setCompleteWorkData(data);
-                    }
+                    // Raw object (not enveloped) → fetchJSON passthrough.
+                    const data = await fetchJSON<WorkData>(`/api/getworkforreceipt/${workData.work_id}`);
+                    setCompleteWorkData(data);
                 } catch (error) {
                     console.error('Error fetching complete work data:', error);
                 }
@@ -196,20 +195,26 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
     const loadExchangeRate = async (date: string) => {
         try {
-            const response = await fetch(`/api/getExchangeRateForDate?date=${date}`);
-            const result: ExchangeRateResult = await response.json();
+            // Enveloped (sendSuccess) → fetchJSON unwraps to the inner { exchangeRate, date }.
+            const result = await fetchJSON<{ exchangeRate?: number; date?: string }>(
+                `/api/getExchangeRateForDate?date=${date}`
+            );
 
-            if (result.success && result.data?.exchangeRate) {
-                setExchangeRate(result.data.exchangeRate);
+            if (result?.exchangeRate) {
+                setExchangeRate(result.exchangeRate);
                 setExchangeRateError(false);
             } else {
                 setExchangeRate(null);
                 setExchangeRateError(true);
             }
         } catch (error) {
-            console.error('Error loading exchange rate:', error);
+            // 404 = no rate set for this date — a normal, expected state that drives the
+            // inline "Set Rate" prompt; only log genuine failures.
             setExchangeRate(null);
             setExchangeRateError(true);
+            if ((error as HttpError).status !== 404) {
+                console.error('Error loading exchange rate:', error);
+            }
         }
     };
 
@@ -222,28 +227,19 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
         try {
             setLoading(true);
-            const response = await fetch('/api/updateExchangeRateForDate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    date: formData.paymentDate,
-                    exchangeRate: Math.round(rate)
-                })
+            // Enveloped (sendSuccess); a non-2xx now throws and is handled below.
+            await postJSON('/api/updateExchangeRateForDate', {
+                date: formData.paymentDate,
+                exchangeRate: Math.round(rate)
             });
 
-            const result: ApiResponse = await response.json();
-
-            if (result.success) {
-                setExchangeRate(Math.round(rate));
-                setExchangeRateError(false);
-                setShowRateInput(false);
-                setNewRateValue('');
-            } else {
-                toast.error('Error setting exchange rate: ' + result.message);
-            }
+            setExchangeRate(Math.round(rate));
+            setExchangeRateError(false);
+            setShowRateInput(false);
+            setNewRateValue('');
         } catch (error) {
             console.error('Error setting exchange rate:', error);
-            toast.error('Error setting exchange rate: ' + (error as Error).message);
+            toast.error('Error setting exchange rate: ' + httpErrorMessage(error, 'unknown error'));
         } finally {
             setLoading(false);
         }
@@ -729,58 +725,46 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                 change: changeToSubmit  // NULL for same-currency, number for cross-currency
             };
 
-            const response = await fetch('/api/addInvoice', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(invoiceData)
+            // Enveloped (sendSuccess) → postJSON unwraps to the inner result; a non-2xx
+            // (validation/insufficient-balance) now throws and is handled in the catch.
+            const result = await postJSON<Record<string, unknown>>('/api/addInvoice', invoiceData);
+
+            // Set success state and prepare receipt data with complete work data
+            setPaymentSuccess(true);
+            setReceiptData({
+                ...workData!,
+                // Override with complete data from V_Report if available
+                ...(completeWorkData || {}),
+                amountPaidToday: amountPaid,
+                paymentDate: formData.paymentDate,
+                paymentDateTime: new Date().toISOString(),
+                usdReceived: actualUSD,
+                iqdReceived: actualIQD,
+                change: parseInt(String(formData.change)) || 0,
+                newBalance: ((workData!.total_required || 0) - Number(workData!.discount ?? 0) - (workData!.TotalPaid || 0) - amountPaid)
             });
 
-            const result: ApiResponse = await response.json();
-
-            if (result.success) {
-                // Set success state and prepare receipt data with complete work data
-                setPaymentSuccess(true);
-                setReceiptData({
-                    ...workData!,
-                    // Override with complete data from V_Report if available
-                    ...(completeWorkData || {}),
-                    amountPaidToday: amountPaid,
-                    paymentDate: formData.paymentDate,
-                    paymentDateTime: new Date().toISOString(),
-                    usdReceived: actualUSD,
-                    iqdReceived: actualIQD,
-                    change: parseInt(String(formData.change)) || 0,
-                    newBalance: ((workData!.total_required || 0) - Number(workData!.discount ?? 0) - (workData!.TotalPaid || 0) - amountPaid)
+            // Flat { success, messageId } / { success:false, message } at HTTP 200 → passthrough.
+            postJSON<{ success: boolean; message?: string }>('/api/wa/send-receipt', { workId: workData!.work_id })
+                .then((waResult) => {
+                    if (waResult.success) {
+                        toast.success('Receipt sent via WhatsApp!');
+                    } else {
+                        toast.warning(waResult.message || 'Failed to send WhatsApp');
+                    }
+                })
+                .catch(err => {
+                    toast.error('WhatsApp error: ' + httpErrorMessage(err, 'unknown error'));
                 });
 
-                fetch('/api/wa/send-receipt', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ workId: workData!.work_id })
-                })
-                    .then(res => res.json())
-                    .then((waResult: { success: boolean; message?: string }) => {
-                        if (waResult.success) {
-                            toast.success('Receipt sent via WhatsApp!');
-                        } else {
-                            toast.warning(waResult.message || 'Failed to send WhatsApp');
-                        }
-                    })
-                    .catch(err => {
-                        toast.error('WhatsApp error: ' + err.message);
-                    });
-
-                if (onSuccess) {
-                    onSuccess(result);
-                }
-            } else {
-                toast.error('Error adding payment: ' + result.message);
+            if (onSuccess) {
+                // postJSON unwrapped the envelope; reconstruct an ApiResponse for the
+                // (arg-ignoring) consumer so the prop type is honoured.
+                onSuccess({ success: true, data: result });
             }
         } catch (error) {
             console.error('Error adding payment:', error);
-            toast.error('Error adding payment: ' + (error as Error).message);
+            toast.error('Error adding payment: ' + httpErrorMessage(error, 'unknown error'));
         } finally {
             setLoading(false);
         }
@@ -788,7 +772,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
     const handlePrint = async () => {
         try {
-            // Fetch receipt HTML from template-based system using work ID
+            // Fetch receipt HTML from template-based system using work ID.
+            // eslint-disable-next-line no-restricted-syntax -- returns raw HTML text (res.type('html').send), not JSON; the envelope-unwrapping client doesn't apply (cf. GrapesJSEditor /html).
             const response = await fetch(`/api/templates/receipt/work/${workData!.work_id}`);
             if (!response.ok) throw new Error('Failed to generate receipt');
 

@@ -149,7 +149,7 @@ router.get(
       res.json({
         success: true,
         data: messageCount,
-        timestamp: Date.now()
+        timestamp: new Date().toISOString()
       });
     } catch (error) {
       log.error('Error getting message count:', error);
@@ -177,7 +177,7 @@ router.post(
         success: true,
         message: `Messaging reset completed for ${date}`,
         data: result,
-        timestamp: Date.now()
+        timestamp: new Date().toISOString()
       });
     } catch (error) {
       log.error('Error resetting messaging:', error);

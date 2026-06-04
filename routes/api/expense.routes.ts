@@ -29,7 +29,7 @@ import {
   requireRecordAge,
   getExpenseCreationDate
 } from '../../middleware/time-based-auth.js';
-import { ErrorResponses } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
@@ -115,7 +115,7 @@ router.get(
       });
 
       const expenses = await getAllExpenses(cleanFilters);
-      res.json(expenses);
+      sendSuccess(res, expenses);
     } catch (error) {
       log.error('Error fetching expenses:', error);
       ErrorResponses.internalError(
@@ -135,7 +135,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const categories = await getExpenseCategories();
-      res.json(categories);
+      sendSuccess(res, categories);
     } catch (error) {
       log.error('Error fetching expense categories:', error);
       ErrorResponses.internalError(
@@ -163,7 +163,7 @@ router.get(
         return;
       }
       const subcategories = await getExpenseSubcategories(categoryId);
-      res.json(subcategories);
+      sendSuccess(res, subcategories);
     } catch (error) {
       log.error('Error fetching expense subcategories:', error);
       ErrorResponses.internalError(
@@ -252,7 +252,7 @@ router.get(
       const summary = await getExpenseSummary(startDate, endDate);
       const totals = await getExpenseTotalsByCurrency(startDate, endDate);
 
-      res.json({
+      sendSuccess(res, {
         summary,
         totals
       });
@@ -292,7 +292,7 @@ router.get(
         return;
       }
 
-      res.json(expense);
+      sendSuccess(res, expense);
     } catch (error) {
       log.error('Error fetching expense:', error);
       ErrorResponses.internalError(

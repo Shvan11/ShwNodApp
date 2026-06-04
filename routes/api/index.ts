@@ -90,9 +90,12 @@ router.use('/', visitRoutes);         // Visit tracking
 router.use('/wa', whatsappRoutes);              // WhatsApp (mounted at /wa)
 router.use('/messaging', messagingRoutes);      // Messaging system (mounted at /messaging)
 
-// Aligner routes (prefixed)
-router.use('/aligner', alignerRoutes);          // Aligner management (mounted at /aligner)
-router.use('/', alignerRoutes);                 // Also mount at root for /aligner-doctors routes
+// Aligner routes. Every route in alignerRoutes self-prefixes its full path
+// (`/aligner/*` or `/aligner-doctors*`), so a SINGLE root mount yields the
+// canonical `/api/aligner/*` + `/api/aligner-doctors*` the FE actually calls.
+// (A second `/aligner` mount would only produce dead `/api/aligner/aligner/*`
+// paths nothing calls — same self-prefix trap as the expense mount above.)
+router.use('/', alignerRoutes);
 
 // Employee and expense routes
 router.use('/', employeeRoutes);      // Employee management

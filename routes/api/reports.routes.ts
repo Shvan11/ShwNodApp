@@ -4,7 +4,7 @@
  */
 import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
-import { ErrorResponses } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
 import {
   calculateMonthlyStatistics,
   enrichInvoicesWithDetails,
@@ -110,8 +110,7 @@ router.get('/statistics', async (req: Request<object, object, object, Statistics
     // Delegate calculation to service layer
     const summary = calculateMonthlyStatistics(dailyData, exRate);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       month: monthNum,
       year: yearNum,
       exchangeRate: exRate,
@@ -176,8 +175,7 @@ router.get('/statistics/yearly', async (req: Request<object, object, object, Yea
       grandTotal: 0
     });
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       startMonth: monthNum,
       startYear: yearNum,
       exchangeRate: exRate,
@@ -295,8 +293,7 @@ router.get('/statistics/multi-year', async (req: Request<object, object, object,
       grandTotal: 0
     });
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       startYear: startYearNum,
       endYear: endYearNum,
       exchangeRate: exRate,
@@ -334,8 +331,7 @@ router.get('/daily-invoices', async (req: Request<object, object, object, DailyI
     // Delegate enrichment to service layer
     const enrichedInvoices = await enrichInvoicesWithDetails(baseInvoices);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       date: date,
       count: enrichedInvoices.length,
       invoices: enrichedInvoices

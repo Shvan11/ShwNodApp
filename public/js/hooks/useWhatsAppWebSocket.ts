@@ -3,6 +3,7 @@
  * Subscribes to the shared SSE singleton and primes initial state via REST.
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { fetchJSON } from '@/core/http';
 import { useGlobalState } from '../contexts/GlobalStateContext';
 import { UI_STATES, type UIState } from '../utils/whatsapp-send-constants';
 import sseWhatsapp from '../services/sse-whatsapp';
@@ -99,11 +100,7 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
     }
     lastRequestedDateRef.current = dateToRequest;
 
-    fetch('/api/wa/initial-state', { credentials: 'same-origin' })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Initial state request failed: ${res.status}`);
-        return res.json() as Promise<InitialStateResponse>;
-      })
+    fetchJSON<InitialStateResponse>('/api/wa/initial-state')
       .then(applyInitialState)
       .catch((err) => {
         console.error('[useWhatsAppWebSocket] initial-state fetch failed', err);

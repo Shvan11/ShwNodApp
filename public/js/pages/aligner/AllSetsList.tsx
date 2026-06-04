@@ -2,6 +2,7 @@
 import React, { useState, useEffect, type ChangeEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
+import { fetchJSON, httpErrorMessage } from '@/core/http';
 import styles from './AllSetsList.module.css';
 
 interface AlignerSetView {
@@ -48,8 +49,9 @@ const AllSetsList: React.FC = () => {
     const loadAllSets = async (): Promise<void> => {
         try {
             setLoading(true);
-            const response = await fetch('/api/aligner/all-sets');
-            const data = await response.json();
+            const data = await fetchJSON<{ success: boolean; sets?: AlignerSetView[]; error?: string }>(
+                '/api/aligner/all-sets'
+            );
 
             if (data.success) {
                 setSets(data.sets || []);
@@ -58,7 +60,7 @@ const AllSetsList: React.FC = () => {
             }
         } catch (error) {
             console.error('Error loading aligner sets:', error);
-            toast.error('Failed to load aligner sets');
+            toast.error(httpErrorMessage(error, 'Failed to load aligner sets'));
         } finally {
             setLoading(false);
         }

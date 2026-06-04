@@ -3,6 +3,7 @@ import type { MouseEvent } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import PhotoSessionDialog from './PhotoSessionDialog';
+import { fetchJSON, httpErrorMessage } from '@/core/http';
 
 interface Timepoint {
     tp_code: string;
@@ -81,12 +82,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         try {
             setLoading(true);
 
-            const response = await fetch(`/api/patients/${personIdParam}/timepoints`);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
+            const data = await fetchJSON<Timepoint[]>(`/api/patients/${personIdParam}/timepoints`);
 
             // Update cache
             cacheRef.current.set(cacheKey, {
@@ -98,7 +94,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
             setError(null);
         } catch (err) {
             console.error('Failed to load timepoints:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
             setTimepoints([]);
         } finally {
             setLoading(false);
@@ -124,11 +120,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
             }
 
             // If not in cache, fetch from API
-            const response = await fetch('/api/settings/patients-folder');
-            if (!response.ok) {
-                throw new Error('Failed to fetch patients folder setting');
-            }
-            const data = await response.json();
+            const data = await fetchJSON<{ patientsFolder?: string }>('/api/settings/patients-folder');
             const folderPath = data.patientsFolder || '';
 
             // Store in localStorage for future use
@@ -146,11 +138,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         if (!personIdParam || personIdParam === 'new') return;
 
         try {
-            const response = await fetch(`/api/patients/${personIdParam}/info`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch patient info');
-            }
-            const data = await response.json();
+            const data = await fetchJSON<PatientInfo>(`/api/patients/${personIdParam}/info`);
             setPatientInfo(data);
         } catch (err) {
             console.error('Error loading patient info:', err);

@@ -101,7 +101,32 @@ export default [
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn'
+      'react-hooks/exhaustive-deps': 'warn',
+      // Funnel migration (audit H1): all HTTP must go through core/http.ts so
+      // credentials, error-throwing, and success-envelope unwrapping are uniform.
+      // ERROR: the H1 funnel is complete (all ~310 sites migrated), so a new bare
+      // fetch() now fails CI. The few legitimate raw uses (blob/stream downloads,
+      // the Zod portal boundary, sendBeacon) take an inline
+      // // eslint-disable-next-line no-restricted-syntax with a reason.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.name='fetch']",
+          message:
+            'Use the helpers in core/http.ts (fetchJSON/postJSON/putJSON/deleteJSON/postFormData) instead of bare fetch() — they add credentials, throw on !ok, and unwrap the success envelope. (Audit H1 funnel.)'
+        },
+        {
+          selector: "CallExpression[callee.object.name='window'][callee.property.name='fetch']",
+          message: 'Use the helpers in core/http.ts instead of window.fetch(). (Audit H1 funnel.)'
+        }
+      ]
+    }
+  },
+  // core/http.ts is the one place that legitimately calls fetch() — it IS the wrapper.
+  {
+    files: ['public/js/core/http.ts'],
+    rules: {
+      'no-restricted-syntax': 'off'
     }
   },
   // JavaScript config/utility files

@@ -3,6 +3,7 @@ import type { FormEvent, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Select, { SingleValue, StylesConfig } from 'react-select';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { fetchJSON, postFormData, httpErrorMessage } from '@/core/http';
 
 interface ContactData {
     id?: string | number;
@@ -62,32 +63,24 @@ const SendMessage = () => {
     // Load contacts based on source
     const loadContacts = async (source: string) => {
         try {
-            let response;
-            if (source === 'pat') {
-                response = await fetch('/api/patients/phones');
-            } else {
-                response = await fetch(`/api/google?source=${encodeURIComponent(source)}`);
-            }
+            const data = source === 'pat'
+                ? await fetchJSON('/api/patients/phones')
+                : await fetchJSON(`/api/google?source=${encodeURIComponent(source)}`);
 
-            if (response.ok) {
-                const data = await response.json();
-                const contactsArray: ContactData[] = Array.isArray(data) ? data : [];
+            const contactsArray: ContactData[] = Array.isArray(data) ? data : [];
 
-                // Convert to React-Select format
-                const options: ContactOption[] = contactsArray.map(contact => ({
-                    value: contact.id || contact.phone,
-                    label: `${contact.name || contact.text} - ${contact.phone}`,
-                    phone: contact.phone,
-                    name: contact.name || contact.text || '',
-                    contactData: contact
-                }));
-                setContactOptions(options);
-            } else {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
+            // Convert to React-Select format
+            const options: ContactOption[] = contactsArray.map(contact => ({
+                value: contact.id || contact.phone,
+                label: `${contact.name || contact.text} - ${contact.phone}`,
+                phone: contact.phone,
+                name: contact.name || contact.text || '',
+                contactData: contact
+            }));
+            setContactOptions(options);
         } catch (error) {
             console.error('Error loading contacts:', error);
-            showMessage(`Failed to load contacts: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+            showMessage(`Failed to load contacts: ${httpErrorMessage(error, 'Unknown error')}`, 'error');
             setContactOptions([]);
         }
     };
@@ -149,16 +142,7 @@ const SendMessage = () => {
         formData.append('file', filePath);
 
         try {
-            const response = await fetch('/api/wa/sendmedia2', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
+            const data = await postFormData<{ result?: string; sentMessages?: number; error?: string }>('/api/wa/sendmedia2', formData);
 
             if (data.result === 'OK') {
                 const fileCount = pathsArray.length;
@@ -170,7 +154,7 @@ const SendMessage = () => {
             }
         } catch (error) {
             console.error('Error sending message:', error);
-            showMessage(`Failed to send ${program} message: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+            showMessage(`Failed to send ${program} message: ${httpErrorMessage(error, 'Unknown error')}`, 'error');
         }
     };
 

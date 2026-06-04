@@ -92,6 +92,7 @@ export class APIClient {
     try {
       return await RetryManager.withRetry<T>(
         async () => {
+          // eslint-disable-next-line no-restricted-syntax -- bespoke WhatsApp-send API client (parallel to core/http.ts): adds retry w/ exponential backoff (RetryManager), per-request AbortController cancellation, and validateApiResponse. Reconcile with core/http.ts once it gains retry (M8) + abort (M7).
           const response = await fetch(url, {
             signal: abortController.signal,
             credentials: 'same-origin', // Include session cookies for authentication

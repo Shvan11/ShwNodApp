@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import { postJSON, putJSON, httpErrorMessage } from '@/core/http';
 import Modal from './Modal';
 
 interface AlertType {
@@ -119,23 +120,12 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                 ? `/api/alerts/${editAlert!.alert_id}`
                 : `/api/patients/${personId}/alerts`;
 
-            const response = await fetch(url, {
-                method: isEditMode ? 'PUT' : 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify({
-                    alertTypeId: parseInt(formData.alertTypeId, 10),
-                    alertSeverity: parseInt(formData.alertSeverity, 10),
-                    alertDetails: formData.alertDetails.trim()
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `Failed to ${isEditMode ? 'update' : 'create'} alert`);
-            }
+            const body = {
+                alertTypeId: parseInt(formData.alertTypeId, 10),
+                alertSeverity: parseInt(formData.alertSeverity, 10),
+                alertDetails: formData.alertDetails.trim()
+            };
+            await (isEditMode ? putJSON(url, body) : postJSON(url, body));
 
             toast.success(`Alert ${isEditMode ? 'updated' : 'created'} successfully`);
 
@@ -156,7 +146,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
             onClose();
         } catch (error) {
             console.error(`Error ${isEditMode ? 'updating' : 'creating'} alert:`, error);
-            toast.error(error instanceof Error ? error.message : `Failed to ${isEditMode ? 'update' : 'create'} alert`);
+            toast.error(httpErrorMessage(error, `Failed to ${isEditMode ? 'update' : 'create'} alert`));
         } finally {
             setLoading(false);
         }

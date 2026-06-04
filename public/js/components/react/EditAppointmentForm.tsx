@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import cn from 'classnames';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
 import { useToast } from '../../contexts/ToastContext';
+import { fetchJSON, postJSON, putJSON, httpErrorMessage } from '@/core/http';
 import styles from './AppointmentForm.module.css';
 
 interface AppointmentFormData {
@@ -99,9 +100,9 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     const loadAppointmentData = async (id: number | string): Promise<void> => {
         try {
             setLoadingData(true);
-            const response = await fetch(`/api/appointments/${id}`);
-            if (!response.ok) throw new Error('Failed to load appointment');
-            const data = await response.json();
+            const data = await fetchJSON<{ success?: boolean; appointment?: ExistingAppointment }>(
+                `/api/appointments/${id}`
+            );
             if (data.success && data.appointment) {
                 prefillFormData(data.appointment);
             } else {
@@ -109,7 +110,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
             }
         } catch (err) {
             console.error('Error loading appointment:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
         } finally {
             setLoadingData(false);
         }
@@ -137,9 +138,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     const loadDoctors = async (): Promise<void> => {
         try {
             // Fetch all employees who can receive appointments (doctors, hygienists, etc.)
-            const response = await fetch('/api/employees?getAppointments=true');
-            if (!response.ok) throw new Error('Failed to load employees');
-            const data = await response.json();
+            const data = await fetchJSON<{ employees?: Doctor[] }>('/api/employees?getAppointments=true');
             const employees: Doctor[] = data?.employees || [];
             // "Clinic" is the most common assignment, so float it to the top of the
             // dropdown; everyone else keeps the server's SortOrder (Array.sort is stable).
@@ -151,19 +150,17 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
             setDoctors(employees);
         } catch (err) {
             console.error('Error loading employees:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
         }
     };
 
     const loadDetails = async (): Promise<void> => {
         try {
-            const response = await fetch('/api/appointment-details');
-            if (!response.ok) throw new Error('Failed to load appointment details');
-            const data = await response.json();
+            const data = await fetchJSON<AppointmentDetail[]>('/api/appointment-details');
             setDetails(data || []);
         } catch (err) {
             console.error('Error loading appointment details:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
         }
     };
 
@@ -250,35 +247,25 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
         try {
             const appointmentDateTime = `${formData.AppDate}T${formData.AppTime}:00`;
-            const response = await fetch(`/api/appointments/${appointmentId || existingAppointment?.appointment_id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const result = await putJSON<{ success?: boolean; error?: string }>(
+                `/api/appointments/${appointmentId || existingAppointment?.appointment_id}`,
+                {
                     person_id: parseInt(String(formData.PersonID)),
                     app_date: appointmentDateTime,
                     app_detail: formData.AppDetail,
                     dr_id: parseInt(formData.DrID)
-                })
-            });
+                }
+            );
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to update appointment');
-            }
-
-            const result = await response.json();
             if (result.success) {
                 const dateChanged = formData.AppDate !== originalDate;
                 const apptId = appointmentId || existingAppointment?.appointment_id;
 
                 if (dateChanged && apptId) {
-                    fetch('/api/wa/send-appointment', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ appointmentId: apptId })
+                    postJSON<{ success: boolean; message?: string }>('/api/wa/send-appointment', {
+                        appointmentId: apptId
                     })
-                        .then(res => res.json())
-                        .then((waResult: { success: boolean; message?: string }) => {
+                        .then((waResult) => {
                             if (waResult.success) {
                                 toast.success('Appointment confirmation sent via WhatsApp!');
                             } else {
@@ -286,7 +273,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                             }
                         })
                         .catch(err => {
-                            toast.error('WhatsApp error: ' + err.message);
+                            toast.error('WhatsApp error: ' + httpErrorMessage(err, 'send failed'));
                         });
                 }
 
@@ -296,8 +283,10 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                 throw new Error(result.error || 'Failed to update appointment');
             }
         } catch (err) {
+            // putJSON throws on non-2xx; httpErrorMessage surfaces the server's
+            // error message (this form has no conflict-code branching — M1).
             console.error('Error updating appointment:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
         } finally {
             setLoading(false);
         }

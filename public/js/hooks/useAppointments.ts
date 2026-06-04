@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 
 /**
  * Appointment statistics from API
@@ -111,13 +112,11 @@ export function useAppointments(
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/getDailyAppointments?AppsDate=${date}`);
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch appointments');
-        }
-
-        const data = await response.json();
+        const data = await fetchJSON<{
+          allAppointments?: Appointment[];
+          checkedInAppointments?: Appointment[];
+          stats?: AppointmentStats;
+        }>(`/api/getDailyAppointments?AppsDate=${date}`);
 
         setAllAppointments(data.allAppointments || []);
         setCheckedInAppointments(data.checkedInAppointments || []);
@@ -125,7 +124,7 @@ export function useAppointments(
         return true;
       } catch (err) {
         console.error('Error loading appointments:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load appointments');
+        setError(httpErrorMessage(err, 'Failed to load appointments'));
         return false;
       } finally {
         setLoading(false);
@@ -140,12 +139,13 @@ export function useAppointments(
   // The server rejects forward state transitions when the caller's view of the
   // appointment is stale (typically a missed WebSocket DATA_UPDATED). When that
   // happens we don't want to surface a hard error — the right recovery is a
-  // silent reload of the truth. Returns true if the response was a conflict and
-  // a reload was issued.
+  // silent reload of the truth. Reads the conflict off the thrown HttpError's
+  // parsed body. Returns true if the error was a conflict and a reload was issued.
   const recoverFromConflict = useCallback(
-    async (response: Response, currentDate: string): Promise<boolean> => {
-      if (response.status !== 400) return false;
-      const errorData = await response.clone().json().catch(() => null);
+    async (err: unknown, currentDate: string): Promise<boolean> => {
+      const httpErr = err as HttpError;
+      if (httpErr.status !== 400) return false;
+      const errorData = httpErr.data as { details?: { code?: string } } | undefined;
       if (errorData?.details?.code === 'INVALID_STATE_TRANSITION') {
         window.toast?.warning('Patient state changed — refreshing');
         await loadAppointments(currentDate);
@@ -167,33 +167,23 @@ export function useAppointments(
       try {
         setLoading(true);
 
-        const response = await fetch('/api/updateAppointmentState', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            appointment_id: appointmentId,
-            state: 'present',
-            time: currentTime,
-          }),
+        await postJSON('/api/updateAppointmentState', {
+          appointment_id: appointmentId,
+          state: 'present',
+          time: currentTime,
         });
-
-        if (await recoverFromConflict(response, currentDate)) {
-          return { success: false };
-        }
-
-        if (!response.ok) {
-          throw new Error('Failed to check in patient');
-        }
-
-        await response.json();
 
         // Reload appointments to get fresh data
         await loadAppointments(currentDate);
 
         return { success: true };
       } catch (err) {
+        // A stale-view 400 (INVALID_STATE_TRANSITION) isn't a hard error — reload silently.
+        if (await recoverFromConflict(err, currentDate)) {
+          return { success: false };
+        }
         console.error('Check-in failed:', err);
-        setError(err instanceof Error ? err.message : 'Check-in failed');
+        setError(httpErrorMessage(err, 'Failed to check in patient'));
         throw err;
       } finally {
         setLoading(false);
@@ -213,33 +203,23 @@ export function useAppointments(
       try {
         setLoading(true);
 
-        const response = await fetch('/api/updateAppointmentState', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            appointment_id: appointmentId,
-            state: 'seated',
-            time: currentTime,
-          }),
+        await postJSON('/api/updateAppointmentState', {
+          appointment_id: appointmentId,
+          state: 'seated',
+          time: currentTime,
         });
-
-        if (await recoverFromConflict(response, currentDate)) {
-          return { success: false };
-        }
-
-        if (!response.ok) {
-          throw new Error('Failed to seat patient');
-        }
-
-        await response.json();
 
         // Reload appointments to get fresh data
         await loadAppointments(currentDate);
 
         return { success: true };
       } catch (err) {
+        // A stale-view 400 (INVALID_STATE_TRANSITION) isn't a hard error — reload silently.
+        if (await recoverFromConflict(err, currentDate)) {
+          return { success: false };
+        }
         console.error('Seat failed:', err);
-        setError(err instanceof Error ? err.message : 'Seat failed');
+        setError(httpErrorMessage(err, 'Failed to seat patient'));
         throw err;
       } finally {
         setLoading(false);
@@ -259,33 +239,23 @@ export function useAppointments(
       try {
         setLoading(true);
 
-        const response = await fetch('/api/updateAppointmentState', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            appointment_id: appointmentId,
-            state: 'dismissed',
-            time: currentTime,
-          }),
+        await postJSON('/api/updateAppointmentState', {
+          appointment_id: appointmentId,
+          state: 'dismissed',
+          time: currentTime,
         });
-
-        if (await recoverFromConflict(response, currentDate)) {
-          return { success: false };
-        }
-
-        if (!response.ok) {
-          throw new Error('Failed to complete visit');
-        }
-
-        await response.json();
 
         // Reload appointments to get fresh data
         await loadAppointments(currentDate);
 
         return { success: true };
       } catch (err) {
+        // A stale-view 400 (INVALID_STATE_TRANSITION) isn't a hard error — reload silently.
+        if (await recoverFromConflict(err, currentDate)) {
+          return { success: false };
+        }
         console.error('Dismiss failed:', err);
-        setError(err instanceof Error ? err.message : 'Dismiss failed');
+        setError(httpErrorMessage(err, 'Failed to complete visit'));
         throw err;
       } finally {
         setLoading(false);
@@ -308,36 +278,22 @@ export function useAppointments(
       try {
         setLoading(true);
 
-        const response = await fetch('/api/undoAppointmentState', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            appointment_id: appointmentId,
-            state: stateToUndo,
-          }),
+        await postJSON('/api/undoAppointmentState', {
+          appointment_id: appointmentId,
+          state: stateToUndo,
         });
-
-        if (await recoverFromConflict(response, currentDate)) {
-          return { success: false };
-        }
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          if (errorData && errorData.error) {
-            throw new Error(errorData.error);
-          }
-          throw new Error(`Failed to undo ${stateToUndo}`);
-        }
-
-        await response.json();
 
         // Reload appointments to get fresh data
         await loadAppointments(currentDate);
 
         return { success: true };
       } catch (err) {
+        // A stale-view 400 (INVALID_STATE_TRANSITION) isn't a hard error — reload silently.
+        if (await recoverFromConflict(err, currentDate)) {
+          return { success: false };
+        }
         console.error(`Undo ${stateToUndo} failed:`, err);
-        setError(err instanceof Error ? err.message : `Undo ${stateToUndo} failed`);
+        setError(httpErrorMessage(err, `Failed to undo ${stateToUndo}`));
         throw err;
       } finally {
         setLoading(false);

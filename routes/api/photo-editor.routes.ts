@@ -124,8 +124,13 @@ function toDateOnly(d: Date | string): string {
 /**
  * POST /:personId/prepare
  * Find/create a timepoint in the LOCAL clone tables, with tblwork Initial/Final
- * date conflict detection. Returns success/conflict/tpCode at the top level so
- * PhotoSessionDialog's conflict/override UI can consume it directly.
+ * date conflict detection. All three normal outcomes ride the `sendSuccess`
+ * envelope as a discriminated `PhotoPrepareResult` — `{ tp_code }` (prepared),
+ * `{ conflict: true, … }` (override needed), or `{ needsName: true, … }` (English
+ * name required). They are valid results, not errors, so they are HTTP 200 with
+ * `success:true`; genuine failures (bad input, patient not found, server error)
+ * go through `ErrorResponses.*` (non-2xx). PhotoSessionDialog funnels this through
+ * `core/http.ts`, which unwraps the envelope and branches on the discriminant.
  */
 router.post(
   '/:personId/prepare',
@@ -171,8 +176,7 @@ router.post(
         }
 
         if (!newFirst || !newLast) {
-          res.json({
-            success: false,
+          sendSuccess(res, {
             needsName: true,
             message:
               'This patient has no English name. Enter an English (Latin) first and last name to add photos — Dolphin Imaging cannot store Arabic names.',
@@ -203,8 +207,7 @@ router.post(
           const existingDateOnly = toDateOnly(existingDate);
           if (existingDateOnly !== tpDate) {
             if (!overrideDate) {
-              res.json({
-                success: false,
+              sendSuccess(res, {
                 conflict: true,
                 conflictType: tpDescription,
                 conflictSource: 'shwan',
@@ -231,7 +234,7 @@ router.post(
 
       const { tp_code } = await findOrCreateNativeTimePoint(Number(personId), tpDescription, parsedDate);
       log.info('[PhotoEditor] prepared timepoint', { personId, tpDescription, tpDate, tp_code });
-      res.json({ success: true, tp_code });
+      sendSuccess(res, { tp_code });
     } catch (err) {
       log.error('[PhotoEditor] prepare failed', { error: (err as Error).message });
       ErrorResponses.internalError(res, 'Failed to prepare timepoint', err as Error);

@@ -7,6 +7,7 @@ import POSCart from '../components/stand/POSCart';
 import POSCheckout from '../components/stand/POSCheckout';
 import Modal from '../components/react/Modal';
 import { useToast } from '../contexts/ToastContext';
+import { httpErrorMessage } from '@/core/http';
 import { formatNumber } from '../utils/formatters';
 import styles from './StandPOS.module.css';
 
@@ -56,7 +57,7 @@ export default function StandPOS() {
         toast.error(`No item found for barcode: ${barcode}`);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Barcode lookup failed');
+      toast.error(httpErrorMessage(err, 'Barcode lookup failed'));
     }
   };
 
@@ -100,7 +101,7 @@ export default function StandPOS() {
       setCart([]);
       toast.success('Sale completed!');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to complete sale');
+      toast.error(httpErrorMessage(err, 'Failed to complete sale'));
     }
   };
 

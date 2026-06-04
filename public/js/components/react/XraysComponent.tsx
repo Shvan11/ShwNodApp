@@ -1,4 +1,5 @@
 import React, { useState, useEffect, SyntheticEvent } from 'react';
+import { fetchJSON, httpErrorMessage } from '@/core/http';
 import styles from './XraysComponent.module.css';
 
 interface Props {
@@ -32,16 +33,11 @@ const XraysComponent = ({ personId }: Props) => {
         try {
             setLoading(true);
 
-            const response = await fetch(`/api/patients/${personId}/info`);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const patientData = await response.json();
+            const patientData = await fetchJSON<PatientInfo>(`/api/patients/${personId}/info`);
             setPatientInfo(patientData);
         } catch (err) {
             console.error('Error loading X-rays:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
         } finally {
             setLoading(false);
         }

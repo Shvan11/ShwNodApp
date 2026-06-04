@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, ComponentType } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { UserResponse } from '@/types/api.types';
+import { fetchJSON } from '@/core/http';
 
 // CSS Modules
 import styles from './SettingsContainer.module.css';
@@ -70,8 +71,7 @@ const SettingsComponent: React.FC = () => {
     useEffect(() => {
         async function fetchUserRole(): Promise<void> {
             try {
-                const response = await fetch('/api/auth/me', { credentials: 'same-origin' });
-                const data: UserResponse = await response.json();
+                const data = await fetchJSON<UserResponse>('/api/auth/me');
                 if (data.success && data.user) {
                     setUserRole(data.user.role);
                 }

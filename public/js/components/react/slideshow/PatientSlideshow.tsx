@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useToast } from '../../../contexts/ToastContext';
 import { generateId } from '../../../core/utils';
+import { fetchJSON } from '@/core/http';
 import SlideshowBuilder from './SlideshowBuilder';
 import SlideshowPlayer from './SlideshowPlayer';
 import { labelForImageName, isLogoImage } from './photoTypes';
@@ -101,12 +102,8 @@ const PatientSlideshow = ({ personId }: Props) => {
     }
     const ctrl = new AbortController();
     setLoadingTimepoints(true);
-    fetch(`/api/patients/${personId}/timepoints`, { signal: ctrl.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((data: TimepointApiRow[]) =>
+    fetchJSON<TimepointApiRow[]>(`/api/patients/${personId}/timepoints`, { signal: ctrl.signal })
+      .then((data) =>
         setTimepoints(
           Array.isArray(data)
             ? data.map((r) => ({
@@ -144,9 +141,7 @@ const PatientSlideshow = ({ personId }: Props) => {
   const loadGallery = async (tp: Timepoint): Promise<SlidePhoto[]> => {
     if (galleries[tp.tpCode]) return galleries[tp.tpCode];
     if (!personId) return [];
-    const res = await fetch(`/api/patients/${personId}/gallery/${tp.tpCode}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const raw = (await res.json()) as (GalleryEntry | null)[];
+    const raw = await fetchJSON<(GalleryEntry | null)[]>(`/api/patients/${personId}/gallery/${tp.tpCode}`);
     const items: SlidePhoto[] = raw
       .filter((e): e is GalleryEntry => !!e && !isLogoImage(e.name))
       .map((e) => ({

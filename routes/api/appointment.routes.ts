@@ -23,7 +23,7 @@ import {
   undoAppointmentState
 } from '../../services/database/queries/appointment-queries.js';
 import { InternalEmitterEvents } from '../../services/messaging/websocket-events.js';
-import { ErrorResponses } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 import {
   validateAndCreateAppointment,
@@ -109,7 +109,7 @@ router.get(
       const { rows } = await sql<AppointmentDetail>`
         SELECT "id", "detail" FROM "details" ORDER BY "detail"
       `.execute(db);
-      res.json(rows);
+      sendSuccess(res, rows);
     } catch (error) {
       log.error('Error fetching appointment details:', error);
       ErrorResponses.internalError(

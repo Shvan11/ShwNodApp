@@ -1,6 +1,7 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import styles from './CostPresetsSettings.module.css';
 
 type Currency = 'IQD' | 'USD' | 'EUR';
@@ -36,16 +37,11 @@ const CostPresetsSettings = () => {
     const loadPresets = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/settings/cost-presets');
-            if (response.ok) {
-                const data = await response.json();
-                setPresets(data);
-            } else {
-                toast.error('Failed to load cost presets');
-            }
+            const data = await fetchJSON<CostPreset[]>('/api/settings/cost-presets');
+            setPresets(data);
         } catch (error) {
             console.error('Error loading presets:', error);
-            toast.error('Error loading cost presets');
+            toast.error(httpErrorMessage(error, 'Failed to load cost presets'));
         } finally {
             setLoading(false);
         }
@@ -75,28 +71,19 @@ const CostPresetsSettings = () => {
         }
 
         try {
-            const response = await fetch('/api/settings/cost-presets', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    amount: parseFloat(formData.amount),
-                    currency: formData.currency,
-                    displayOrder: parseInt(String(formData.displayOrder)) || 0
-                })
+            await postJSON('/api/settings/cost-presets', {
+                amount: parseFloat(formData.amount),
+                currency: formData.currency,
+                displayOrder: parseInt(String(formData.displayOrder)) || 0
             });
 
-            if (response.ok) {
-                toast.success('Preset created successfully');
-                setFormData({ amount: '', currency: activeCurrency, displayOrder: 0 });
-                setDisplayAmount('');
-                loadPresets();
-            } else {
-                const error = await response.json();
-                toast.error(error.error || 'Failed to create preset');
-            }
+            toast.success('Preset created successfully');
+            setFormData({ amount: '', currency: activeCurrency, displayOrder: 0 });
+            setDisplayAmount('');
+            loadPresets();
         } catch (error) {
             console.error('Error creating preset:', error);
-            toast.error('Error creating preset');
+            toast.error(httpErrorMessage(error, 'Failed to create preset'));
         }
     };
 
@@ -123,29 +110,20 @@ const CostPresetsSettings = () => {
         if (!editingPreset) return;
 
         try {
-            const response = await fetch(`/api/settings/cost-presets/${editingPreset.preset_id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    amount: parseFloat(formData.amount),
-                    currency: formData.currency,
-                    displayOrder: parseInt(String(formData.displayOrder)) || 0
-                })
+            await putJSON(`/api/settings/cost-presets/${editingPreset.preset_id}`, {
+                amount: parseFloat(formData.amount),
+                currency: formData.currency,
+                displayOrder: parseInt(String(formData.displayOrder)) || 0
             });
 
-            if (response.ok) {
-                toast.success('Preset updated successfully');
-                setEditingPreset(null);
-                setFormData({ amount: '', currency: activeCurrency, displayOrder: 0 });
-                setDisplayAmount('');
-                loadPresets();
-            } else {
-                const error = await response.json();
-                toast.error(error.error || 'Failed to update preset');
-            }
+            toast.success('Preset updated successfully');
+            setEditingPreset(null);
+            setFormData({ amount: '', currency: activeCurrency, displayOrder: 0 });
+            setDisplayAmount('');
+            loadPresets();
         } catch (error) {
             console.error('Error updating preset:', error);
-            toast.error('Error updating preset');
+            toast.error(httpErrorMessage(error, 'Failed to update preset'));
         }
     };
 
@@ -156,20 +134,13 @@ const CostPresetsSettings = () => {
         }
 
         try {
-            const response = await fetch(`/api/settings/cost-presets/${preset_id}`, {
-                method: 'DELETE'
-            });
+            await deleteJSON(`/api/settings/cost-presets/${preset_id}`);
 
-            if (response.ok) {
-                toast.success('Preset deleted successfully');
-                loadPresets();
-            } else {
-                const error = await response.json();
-                toast.error(error.error || 'Failed to delete preset');
-            }
+            toast.success('Preset deleted successfully');
+            loadPresets();
         } catch (error) {
             console.error('Error deleting preset:', error);
-            toast.error('Error deleting preset');
+            toast.error(httpErrorMessage(error, 'Failed to delete preset'));
         }
     };
 

@@ -24,6 +24,7 @@ import {
   type SlotRenderSpec,
 } from './photoEditorTypes';
 import { useToast } from '../../../contexts/ToastContext';
+import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '../../../core/http';
 
 interface Props {
   personId?: number | null;
@@ -94,17 +95,22 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
     const folder = folderName(tpName, tpDate);
     (async () => {
       try {
+        // Independent best-effort probes: a per-promise .catch keeps one failing
+        // without blanking the other (the files route is the sendSuccess envelope,
+        // so fetchJSON unwraps it to { entries }).
         const [gallery, files] = await Promise.all([
-          fetch(`/api/patients/${personId}/gallery/${tpCode}`).then((r) => (r.ok ? r.json() : [])),
-          fetch(`/api/patients/${personId}/files?path=${encodeURIComponent(folder)}`).then((r) =>
-            r.ok ? r.json() : null,
-          ),
+          fetchJSON<Array<{ name?: string } | null>>(
+            `/api/patients/${personId}/gallery/${tpCode}`,
+          ).catch(() => [] as Array<{ name?: string } | null>),
+          fetchJSON<{ entries?: Array<{ name: string; relPath: string; type: string }> }>(
+            `/api/patients/${personId}/files?path=${encodeURIComponent(folder)}`,
+          ).catch(() => null),
         ]);
         if (cancelled) return;
         const views: Partial<Record<PhotoViewCode, SlotHydration>> = {};
         // Cropped images present in working/ → read-only display.
         if (Array.isArray(gallery)) {
-          for (const img of gallery as Array<{ name?: string } | null>) {
+          for (const img of gallery) {
             const name = img?.name;
             const m = name ? /\.(i10|i12|i13|i20|i21|i22|i23|i24)$/.exec(name) : null;
             if (!name || !m) continue;
@@ -117,7 +123,7 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
           }
         }
         // Tagged originals → enable "Restore original" for their view.
-        const entries = (files?.data?.entries ?? []) as Array<{ name: string; relPath: string; type: string }>;
+        const entries = files?.entries ?? [];
         for (const e of entries) {
           if (e.type !== 'file') continue;
           const tag = parseOriginalViewTag(e.name);
@@ -235,19 +241,11 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
       // background — so this resolves in well under a second regardless of slot count.
       // We navigate straight to the photos grid, which fills in over SSE as the render
       // completes (see GridComponent's photos_rendered handler).
-      const res = await fetch(`/api/photo-editor/${personId}/render`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tpName, tpDate, slots }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.success) {
-        throw new Error(json?.error || 'Render failed');
-      }
+      await postJSON(`/api/photo-editor/${personId}/render`, { tpName, tpDate, slots });
       toast.info(`Saving ${slots.length} photo(s) in the background…`);
       navigate(`/patient/${personId}/photos/tp${tpCode}`);
     } catch (err) {
-      toast.error(`Save failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+      toast.error(`Save failed: ${httpErrorMessage(err, 'unknown error')}`);
     } finally {
       setSaving(false);
     }
@@ -260,21 +258,15 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
     if (!removeTarget) return;
     setRemoving(true);
     try {
-      const res = await fetch(`/api/photo-editor/${personId}/view`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+      await deleteJSON(`/api/photo-editor/${personId}/view`, {
         body: JSON.stringify({ tpCode, tpName, tpDate, view: removeTarget }),
       });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || json?.success === false) {
-        throw new Error(json?.error || 'Remove failed');
-      }
       editor.clear(removeTarget); // empty the slot in the editor
       setSidebarRefresh((n) => n + 1); // re-list the folder (original is back, untagged)
       toast.success('Photo removed.');
       setRemoveTarget(null);
     } catch (err) {
-      toast.error(`Remove failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+      toast.error(`Remove failed: ${httpErrorMessage(err, 'unknown error')}`);
     } finally {
       setRemoving(false);
     }

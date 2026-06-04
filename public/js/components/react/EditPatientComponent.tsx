@@ -4,6 +4,7 @@ import { useToast } from '../../contexts/ToastContext';
 import PhoneInput from './PhoneInput';
 import styles from './EditPatientComponent.module.css';
 import { formatISODate } from '../../core/utils';
+import { fetchJSON, postJSON, putJSON, postFormData, httpErrorMessage, type HttpError } from '@/core/http';
 
 interface Props {
     personId?: number | null;  // Validated PersonID from loader (null if invalid)
@@ -148,19 +149,22 @@ const EditPatientComponent = ({ personId }: Props) => {
 
     const loadDropdownData = useCallback(async () => {
         try {
-            const [gendersRes, addressesRes, referralsRes, typesRes, tagsRes] = await Promise.all([
-                fetch('/api/genders'),
-                fetch('/api/addresses'),
-                fetch('/api/referral-sources'),
-                fetch('/api/patient-types'),
-                fetch('/api/patients/tag-options')
+            // Independent dropdowns — each tolerates its own failure (per-promise
+            // .catch) so one bad lookup doesn't blank the rest, matching the old
+            // per-`res.ok` guards.
+            const [gendersData, addressesData, referralsData, typesData, tagsData] = await Promise.all([
+                fetchJSON<Gender[]>('/api/genders').catch(() => null),
+                fetchJSON<Address[]>('/api/addresses').catch(() => null),
+                fetchJSON<ReferralSource[]>('/api/referral-sources').catch(() => null),
+                fetchJSON<PatientType[]>('/api/patient-types').catch(() => null),
+                fetchJSON<Tag[]>('/api/patients/tag-options').catch(() => null)
             ]);
 
-            if (gendersRes.ok) setGenders(await gendersRes.json());
-            if (addressesRes.ok) setAddresses(await addressesRes.json());
-            if (referralsRes.ok) setReferralSources(await referralsRes.json());
-            if (typesRes.ok) setPatientTypes(await typesRes.json());
-            if (tagsRes.ok) setTags(await tagsRes.json());
+            if (gendersData) setGenders(gendersData);
+            if (addressesData) setAddresses(addressesData);
+            if (referralsData) setReferralSources(referralsData);
+            if (typesData) setPatientTypes(typesData);
+            if (tagsData) setTags(tagsData);
         } catch (err) {
             console.error('Error loading dropdown data:', err);
         }
@@ -175,11 +179,7 @@ const EditPatientComponent = ({ personId }: Props) => {
 
         try {
             setLoading(true);
-            const response = await fetch(`/api/patients/${personId}`);
-
-            if (!response.ok) throw new Error('Failed to load patient data');
-
-            const data: PatientData = await response.json();
+            const data = await fetchJSON<PatientData>(`/api/patients/${personId}`);
             setPatientData(data);
 
             // Populate form
@@ -205,7 +205,7 @@ const EditPatientComponent = ({ personId }: Props) => {
             });
         } catch (err) {
             console.error('Error loading patient data:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Failed to load patient data'));
         } finally {
             setLoading(false);
         }
@@ -224,11 +224,13 @@ const EditPatientComponent = ({ personId }: Props) => {
         if (!personId) return;
 
         try {
-            const response = await fetch(`/api/webceph/patient-link/${personId}`);
-            const data = await response.json();
-
-            if (data.success && data.data) {
-                setWebcephData(data.data);
+            // A hit is `{success:true, data}` → unwrapped to the link object; "no link"
+            // is `{success:false, data:null}` (HTTP 200) → passed through untouched.
+            const link = await fetchJSON<WebcephData | { success: false }>(
+                `/api/webceph/patient-link/${personId}`
+            );
+            if (link && !('success' in link)) {
+                setWebcephData(link);
             }
         } catch (err) {
             console.error('Error loading WebCeph data:', err);
@@ -238,12 +240,8 @@ const EditPatientComponent = ({ personId }: Props) => {
     // Load available photo types
     const loadPhotoTypes = async () => {
         try {
-            const response = await fetch('/api/webceph/photo-types');
-            const data = await response.json();
-
-            if (data.success) {
-                setPhotoTypes(data.data);
-            }
+            const photoTypes = await fetchJSON<PhotoType[]>('/api/webceph/photo-types');
+            setPhotoTypes(photoTypes);
         } catch (err) {
             console.error('Error loading photo types:', err);
         }
@@ -279,26 +277,17 @@ const EditPatientComponent = ({ personId }: Props) => {
                 race: 'Asian' // Default value
             };
 
-            const response = await fetch('/api/webceph/create-patient', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+            const result = await postJSON<{ webcephPatientId: string; link: string; linkId?: string }>(
+                '/api/webceph/create-patient',
+                {
                     personId: patientData.person_id,
                     patientData: webcephPatientData
-                })
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || data.details || 'Failed to create patient in WebCeph');
-            }
+                }
+            );
 
             setWebcephData({
-                webcephPatientId: data.data.webcephPatientId,
-                link: data.data.link,
+                webcephPatientId: result.webcephPatientId,
+                link: result.link,
                 createdAt: new Date().toISOString()
             });
 
@@ -306,7 +295,7 @@ const EditPatientComponent = ({ personId }: Props) => {
             setTimeout(() => setWebcephSuccess(''), 5000);
         } catch (err) {
             console.error('Error creating WebCeph patient:', err);
-            setWebcephError(err instanceof Error ? err.message : 'Unknown error');
+            setWebcephError(httpErrorMessage(err, 'Failed to create patient in WebCeph'));
         } finally {
             setWebcephLoading(false);
         }
@@ -329,18 +318,12 @@ const EditPatientComponent = ({ personId }: Props) => {
             formDataObj.append('recordDate', uploadData.recordDate);
             formDataObj.append('targetClass', uploadData.targetClass);
 
-            const response = await fetch('/api/webceph/upload-image', {
-                method: 'POST',
-                body: formDataObj
-            });
+            const result = await postFormData<{ big?: string; thumbnail?: string; link: string }>(
+                '/api/webceph/upload-image',
+                formDataObj
+            );
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || data.details || 'Failed to upload image');
-            }
-
-            setWebcephSuccess(`Image uploaded successfully! View at: ${data.data.link}`);
+            setWebcephSuccess(`Image uploaded successfully! View at: ${result.link}`);
             setTimeout(() => setWebcephSuccess(''), 10000);
 
             // Reset upload form
@@ -355,7 +338,7 @@ const EditPatientComponent = ({ personId }: Props) => {
             if (fileInput) fileInput.value = '';
         } catch (err) {
             console.error('Error uploading image:', err);
-            setWebcephError(err instanceof Error ? err.message : 'Unknown error');
+            setWebcephError(httpErrorMessage(err, 'Failed to upload image'));
         } finally {
             setWebcephLoading(false);
         }
@@ -382,27 +365,7 @@ const EditPatientComponent = ({ personId }: Props) => {
             setSaving(true);
             setError(null);
 
-            const response = await fetch(`/api/patients/${pid}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-
-                // Handle duplicate patient name specifically
-                if (errorData.code === 'DUPLICATE_PATIENT_NAME') {
-                    const duplicateName = errorData.duplicateName || formData.patient_name;
-                    toast.error(`A patient with the name "${duplicateName}" already exists`);
-                    setError(`A patient with the name "${duplicateName}" already exists. Please use a different name.`);
-                    return;
-                }
-
-                throw new Error(errorData.error || 'Failed to update patient');
-            }
+            await putJSON(`/api/patients/${pid}`, formData);
 
             setSuccessMessage('Patient updated successfully!');
             toast.success('Patient updated successfully!');
@@ -413,7 +376,20 @@ const EditPatientComponent = ({ personId }: Props) => {
             // Reload patient data to get fresh values
             await loadPatientData();
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            // Duplicate patient name → 409 with code/context in `details` (root kept as a fallback).
+            const errorData = (err as HttpError).data as {
+                code?: string;
+                duplicateName?: string;
+                details?: { code?: string; duplicateName?: string };
+            } | undefined;
+            if ((errorData?.details?.code ?? errorData?.code) === 'DUPLICATE_PATIENT_NAME') {
+                const duplicateName = errorData?.details?.duplicateName || errorData?.duplicateName || formData.patient_name;
+                toast.error(`A patient with the name "${duplicateName}" already exists`);
+                setError(`A patient with the name "${duplicateName}" already exists. Please use a different name.`);
+                return;
+            }
+
+            const errorMessage = httpErrorMessage(err, 'Failed to update patient');
             setError(errorMessage);
             toast.error(errorMessage);
         } finally {

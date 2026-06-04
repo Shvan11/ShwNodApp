@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
 import styles from './UserManagement.module.css';
 
 interface UserInfo {
@@ -33,11 +34,8 @@ export default function UserManagement() {
   useEffect(() => {
     async function fetchUserInfo() {
       try {
-        const response = await fetch('/api/auth/me', {
-          credentials: 'same-origin'
-        });
-        const data = await response.json();
-        if (data.success) {
+        const data = await fetchJSON<{ success: boolean; user?: UserInfo }>('/api/auth/me');
+        if (data.success && data.user) {
           setUserInfo(data.user);
         }
       } catch (error) {
@@ -70,25 +68,13 @@ export default function UserManagement() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ currentPassword, newPassword })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setMessage({ type: 'success', text: 'Password changed successfully!' });
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Failed to change password' });
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Network error. Please try again.' });
+      await postJSON('/api/auth/change-password', { currentPassword, newPassword });
+      setMessage({ type: 'success', text: 'Password changed successfully!' });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error. Please try again.') });
     } finally {
       setLoading(false);
     }
@@ -100,22 +86,12 @@ export default function UserManagement() {
     }
 
     try {
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'same-origin'
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        // Logout successful - redirect to login
-        window.location.href = '/login.html';
-      } else {
-        toast.error('Logout failed: ' + (data.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Logout failed:', error);
-      toast.error('Logout failed. Please try again.');
+      await postJSON('/api/auth/logout', {});
+      // Logout successful - redirect to login (security-logout exception to React Router nav)
+      window.location.href = '/login.html';
+    } catch (err) {
+      console.error('Logout failed:', err);
+      toast.error('Logout failed: ' + httpErrorMessage(err, 'Please try again.'));
     }
   };
 

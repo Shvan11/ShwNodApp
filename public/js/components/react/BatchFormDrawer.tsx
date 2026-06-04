@@ -3,6 +3,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import type { AlignerBatch, AlignerSetForBatch } from '../../pages/aligner/aligner.types';
 import { formatISODate } from '../../core/utils';
+import { postJSON, putJSON, patchJSON, httpErrorMessage, type HttpError } from '@/core/http';
 
 interface BatchFormData {
     batch_sequence: number | string;
@@ -324,41 +325,31 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                 ? `/api/aligner/batches/${batch.aligner_batch_id}`
                 : '/api/aligner/batches';
 
-            const method = batch ? 'PUT' : 'POST';
+            // Flat { success, …, deactivatedBatch? } (no `data` key) → passthrough; a
+            // non-2xx (400/500) now throws and is handled in the catch.
+            const result = batch
+                ? await putJSON<{ deactivatedBatch?: { batchSequence: number } }>(url, dataToSend)
+                : await postJSON<{ deactivatedBatch?: { batchSequence: number } }>(url, dataToSend);
 
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(dataToSend)
-            });
+            // Show success message
+            toast.success(batch ? 'Batch updated successfully!' : 'Batch created successfully!');
 
-            const result = await response.json();
-
-            // Check for HTTP errors (400, 500, etc.)
-            if (!response.ok) {
-                // Get the most specific error message available
-                const errorMessage = result.details?.message || result.error || result.message || 'Failed to save batch';
-                toast.error(errorMessage);
-                return;
+            // If a batch was automatically deactivated, inform the user
+            if (result.deactivatedBatch && formData.is_active) {
+                toast.info(`Batch #${result.deactivatedBatch.batchSequence} was automatically deactivated (only one batch can be active at a time)`);
             }
 
-            if (result.success) {
-                // Show success message
-                toast.success(batch ? 'Batch updated successfully!' : 'Batch created successfully!');
-
-                // If a batch was automatically deactivated, inform the user
-                if (result.deactivatedBatch && formData.is_active) {
-                    toast.info(`Batch #${result.deactivatedBatch.batchSequence} was automatically deactivated (only one batch can be active at a time)`);
-                }
-
-                await onSave();
-                onClose();
-            } else {
-                toast.error('Error: ' + (result.error || 'Failed to save batch'));
-            }
+            await onSave();
+            onClose();
         } catch (error) {
             console.error('Error saving batch:', error);
-            toast.error('Error saving batch: ' + (error as Error).message);
+            // Preserve the old precedence: details.message → error → message → fallback,
+            // now read off the thrown HttpError's parsed body.
+            const data = (error as HttpError).data as
+                | { error?: string; message?: string; details?: { message?: string } }
+                | undefined;
+            const errorMessage = data?.details?.message || data?.error || data?.message || 'Failed to save batch';
+            toast.error(errorMessage);
         } finally {
             setSaving(false);
         }
@@ -380,22 +371,15 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         if (!batch) return;
         setSavingDate(true);
         try {
-            const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}/manufacture`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ targetDate: dateStr })
-            });
-            const result = await response.json();
-            if (!response.ok) {
-                toast.error(result.error || result.message || 'Failed to update manufacture date');
-                return;
-            }
-            toast.success(result.message || 'Manufacture date updated');
+            // Route returns { success, message, data } — fetchJSON unwraps to `data`, so the
+            // envelope message isn't available; the static success text covers it.
+            await patchJSON(`/api/aligner/batches/${batch.aligner_batch_id}/manufacture`, { targetDate: dateStr });
+            toast.success('Manufacture date updated');
             setEditingManufactureDate(false);
             setTempManufactureDate('');
             await onSave(); // Refresh data
         } catch (error) {
-            toast.error('Error updating manufacture date: ' + (error as Error).message);
+            toast.error(httpErrorMessage(error, 'Failed to update manufacture date'));
         } finally {
             setSavingDate(false);
         }
@@ -405,22 +389,15 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         if (!batch) return;
         setSavingDate(true);
         try {
-            const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}/deliver`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ targetDate: dateStr })
-            });
-            const result = await response.json();
-            if (!response.ok) {
-                toast.error(result.error || result.message || 'Failed to update delivery date');
-                return;
-            }
-            toast.success(result.message || 'Delivery date updated');
+            // Route returns { success, message, data } — fetchJSON unwraps to `data`, so the
+            // envelope message isn't available; the static success text covers it.
+            await patchJSON(`/api/aligner/batches/${batch.aligner_batch_id}/deliver`, { targetDate: dateStr });
+            toast.success('Delivery date updated');
             setEditingDeliveryDate(false);
             setTempDeliveryDate('');
             await onSave(); // Refresh data
         } catch (error) {
-            toast.error('Error updating delivery date: ' + (error as Error).message);
+            toast.error(httpErrorMessage(error, 'Failed to update delivery date'));
         } finally {
             setSavingDate(false);
         }

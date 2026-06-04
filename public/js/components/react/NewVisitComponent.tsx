@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useRef, useCallback, type FormEvent, type ChangeEvent } from 'react';
 import cn from 'classnames';
 import { formatISODate } from '../../core/utils';
+import { fetchJSON, putJSON, postJSON, httpErrorMessage } from '@/core/http';
 import DentalChart from './DentalChart';
 import { useToast } from '../../contexts/ToastContext';
 import styles from './NewVisitComponent.module.css';
@@ -114,24 +115,18 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
     // Memoized function to load dropdown data
     const loadDropdownData = useCallback(async () => {
         try {
-            const [wiresRes, operatorsRes, latestWiresRes] = await Promise.all([
-                fetch('/api/getWires'),
-                fetch('/api/operators'),
-                fetch(`/api/getlatestwires?workId=${workId}`)
+            // Each request is independent (a failed one must not blank the others),
+            // so per-promise .catch keeps Promise.all from rejecting wholesale —
+            // mirrors the old per-response `if (res.ok)` guards.
+            const [wiresData, operatorsData, latestWiresData] = await Promise.all([
+                fetchJSON<Wire[]>('/api/getWires').catch(() => null),
+                fetchJSON<Operator[]>('/api/operators').catch(() => null),
+                fetchJSON<LatestWires>(`/api/getlatestwires?workId=${workId}`).catch(() => null)
             ]);
 
-            if (wiresRes.ok) {
-                const wiresData: Wire[] = await wiresRes.json();
-                setWires(wiresData);
-            }
-            if (operatorsRes.ok) {
-                const operatorsData: Operator[] = await operatorsRes.json();
-                setOperators(operatorsData);
-            }
-            if (latestWiresRes.ok) {
-                const latestWiresData: LatestWires = await latestWiresRes.json();
-                setLatestWires(latestWiresData);
-            }
+            if (wiresData) setWires(wiresData);
+            if (operatorsData) setOperators(operatorsData);
+            if (latestWiresData) setLatestWires(latestWiresData);
         } catch (err) {
             console.error('Error loading dropdown data:', err);
         }
@@ -141,9 +136,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
     const loadVisitData = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await fetch(`/api/getvisitbyid?visitId=${visitId}`);
-            if (!response.ok) throw new Error('Failed to fetch visit data');
-            const visit: VisitResponse = await response.json();
+            const visit = await fetchJSON<VisitResponse>(`/api/getvisitbyid?visitId=${visitId}`);
 
             setFormData({
                 work_id: visit.work_id,
@@ -163,7 +156,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 operator_id: visit.operator_id || ''
             });
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            setError(httpErrorMessage(err, 'Failed to fetch visit data'));
         } finally {
             setLoading(false);
         }
@@ -184,30 +177,10 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
 
         try {
             setLoading(true);
-            let response: Response;
 
-            if (visitId) {
-                // Update existing visit
-                response = await fetch('/api/updatevisitbywork', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ visitId, ...formData })
-                });
-            } else {
-                // Add new visit
-                response = await fetch('/api/addvisitbywork', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
-                });
-            }
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to save visit');
-            }
-
-            const result: VisitResponse = await response.json();
+            const result = visitId
+                ? await putJSON<VisitResponse>('/api/updatevisitbywork', { visitId, ...formData })
+                : await postJSON<VisitResponse>('/api/addvisitbywork', formData);
 
             // Show success toast notification
             if (visitId) {
@@ -220,7 +193,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 onSave(result);
             }
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+            const errorMessage = httpErrorMessage(err, 'Failed to save visit');
             setError(errorMessage);
             toast.error(`Failed to save visit: ${errorMessage}`);
         } finally {

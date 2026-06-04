@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
 import Modal from './Modal';
+import { fetchJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import styles from './PatientAppointments.module.css';
 
 interface PatientAppointment {
@@ -37,17 +38,11 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
         try {
             setLoading(true);
             setError(null);
-            const response = await fetch(`/api/patient-appointments/${personId}`);
-
-            if (!response.ok) {
-                throw new Error('Failed to load appointments');
-            }
-
-            const data = await response.json();
+            const data = await fetchJSON<{ appointments?: PatientAppointment[] }>(`/api/patient-appointments/${personId}`);
             setAppointments(data.appointments || []);
         } catch (err) {
             console.error('Error loading appointments:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
         } finally {
             setLoading(false);
         }
@@ -62,20 +57,14 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
 
     const handleDelete = async (appointmentId: number): Promise<void> => {
         try {
-            const response = await fetch(`/api/appointments/${appointmentId}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to delete appointment');
-            }
+            await deleteJSON(`/api/appointments/${appointmentId}`);
 
             // Reload appointments after deletion
             await loadAppointments();
             setDeleteConfirm(null);
         } catch (err) {
             console.error('Error deleting appointment:', err);
-            toast.error('Failed to delete appointment: ' + (err instanceof Error ? err.message : 'Unknown error'));
+            toast.error(httpErrorMessage(err, 'Failed to delete appointment'));
         }
     };
 

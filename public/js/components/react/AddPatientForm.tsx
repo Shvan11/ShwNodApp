@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import PhoneInput from './PhoneInput';
 import styles from './AddPatientForm.module.css';
 
@@ -110,10 +111,10 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         const loadDropdownData = async () => {
             try {
                 const [referralSources, patientTypes, addresses, genders] = await Promise.all([
-                    fetch('/api/referral-sources').then(res => res.json()),
-                    fetch('/api/patient-types').then(res => res.json()),
-                    fetch('/api/addresses').then(res => res.json()),
-                    fetch('/api/genders').then(res => res.json())
+                    fetchJSON<DropdownItem[]>('/api/referral-sources'),
+                    fetchJSON<DropdownItem[]>('/api/patient-types'),
+                    fetchJSON<DropdownItem[]>('/api/addresses'),
+                    fetchJSON<DropdownItem[]>('/api/genders')
                 ]);
 
                 setDropdownData({
@@ -173,37 +174,32 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
         let succeeded = false;
         try {
-            const response = await fetch('/api/patients', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData)
-            });
+            // Success body is the flat `{ success, personId, message }` (no `data`
+            // key), so the envelope unwrap is a passthrough — `personId` is read off it.
+            const result = await postJSON<{ personId: number }>('/api/patients', formData);
 
-            const result = await response.json();
-
-            if (response.ok) {
-                const personId = result.personId;
-                succeeded = true;
-                showAlert(
-                    `Patient "${formData.patientName}" has been successfully added. Redirecting to works page...`,
-                    'success',
-                    personId
-                );
-            } else {
-                if (response.status === 409 && result.code === 'DUPLICATE_PATIENT_NAME') {
-                    showAlert(
-                        `A patient with the name "${formData.patientName}" already exists. Please use a different name or check existing patients.`,
-                        'danger'
-                    );
-                } else {
-                    showAlert(result.error || 'Failed to add patient. Please try again.');
-                }
-            }
+            succeeded = true;
+            showAlert(
+                `Patient "${formData.patientName}" has been successfully added. Redirecting to works page...`,
+                'success',
+                result.personId
+            );
         } catch (error) {
-            console.error('Error adding patient:', error);
-            showAlert('Network error. Please check your connection and try again.');
+            const httpErr = error as HttpError;
+            const code = (httpErr.data as { details?: { code?: string } } | undefined)?.details?.code;
+            if (httpErr.status === 409 && code === 'DUPLICATE_PATIENT_NAME') {
+                showAlert(
+                    `A patient with the name "${formData.patientName}" already exists. Please use a different name or check existing patients.`,
+                    'danger'
+                );
+            } else if (httpErr.status) {
+                // Server responded with a non-2xx — surface its message.
+                showAlert(httpErrorMessage(error, 'Failed to add patient. Please try again.'));
+            } else {
+                // Transport/parse failure (no HTTP status).
+                console.error('Error adding patient:', error);
+                showAlert('Network error. Please check your connection and try again.');
+            }
         } finally {
             // On success the button stays disabled through the 1.5s redirect
             // window so a second click can't create a duplicate patient.

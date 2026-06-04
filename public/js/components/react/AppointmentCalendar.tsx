@@ -10,6 +10,7 @@ import CalendarLegend from './CalendarLegend';
 import { useToast } from '../../contexts/ToastContext';
 import { useAppointmentDoctors } from '../../hooks/useAppointmentDoctors';
 import { parseLocalDate } from '../../utils/calendarDate';
+import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import type {
     ViewMode,
     CalendarMode,
@@ -248,22 +249,15 @@ const AppointmentCalendar = ({
                 ? `/api/calendar/month?${calendarParams}`
                 : `/api/calendar/week?${calendarParams}`;
 
-            // Fetch both calendar data and stats in parallel
-            const [calendarResponse, statsResponse] = await Promise.all([
-                fetch(endpoint),
-                fetch(`/api/calendar/stats?date=${targetDate}`)
+            // Fetch both calendar data and stats in parallel. Both are required,
+            // so a bare fetchJSON in Promise.all (rejects on the first non-2xx)
+            // matches the old per-response !ok throw.
+            const [calendarResult, statsResult] = await Promise.all([
+                fetchJSON<Partial<CalendarData> & { success?: boolean; error?: string }>(endpoint),
+                fetchJSON<{ success?: boolean; error?: string; stats?: CalendarStats }>(
+                    `/api/calendar/stats?date=${targetDate}`
+                )
             ]);
-
-            if (!calendarResponse.ok) {
-                throw new Error(`Calendar API error: ${calendarResponse.status}`);
-            }
-
-            if (!statsResponse.ok) {
-                throw new Error(`Stats API error: ${statsResponse.status}`);
-            }
-
-            const calendarResult = await calendarResponse.json();
-            const statsResult = await statsResponse.json();
 
             if (!calendarResult.success) {
                 throw new Error(calendarResult.error || 'Failed to fetch calendar data');
@@ -276,11 +270,11 @@ const AppointmentCalendar = ({
             // Validate and set calendar data
             const validatedCalendarData = validateCalendarData(calendarResult);
             setCalendarData(validatedCalendarData);
-            setCalendarStats(statsResult.stats);
+            setCalendarStats(statsResult.stats ?? null);
 
         } catch (err) {
             console.error('❌ Calendar fetch error:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
             setCalendarData(null);
             setCalendarStats(null);
         } finally {
@@ -340,28 +334,17 @@ const AppointmentCalendar = ({
             }
 
             try {
-                const response = await fetch(`/api/appointments/${appointmentID}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        person_id: personID,
-                        dr_id: appt.drID,
-                        app_detail: appt.appDetail,
-                        app_date: `${newDate}T${newTime}:00`
-                    })
+                await putJSON(`/api/appointments/${appointmentID}`, {
+                    person_id: personID,
+                    dr_id: appt.drID,
+                    app_detail: appt.appDetail,
+                    app_date: `${newDate}T${newTime}:00`
                 });
-
-                if (!response.ok) {
-                    const data = await response.json().catch(() => null);
-                    throw new Error(data?.error || 'Failed to reschedule appointment');
-                }
 
                 toast.success('Appointment rescheduled');
                 await fetchCalendarData(currentDate, selectedDoctorId);
             } catch (error) {
-                toast.error(
-                    error instanceof Error ? error.message : 'Failed to reschedule appointment'
-                );
+                toast.error(httpErrorMessage(error, 'Failed to reschedule appointment'));
             }
         },
         [currentDate, selectedDoctorId, fetchCalendarData, toast]
@@ -439,13 +422,14 @@ const AppointmentCalendar = ({
     const handleAddHoliday = useCallback(async (day: CalendarDay) => {
         // Check for existing appointments on this date
         try {
-            const response = await fetch(`/api/holidays/appointments-on-date?date=${day.date}`);
-            const data = await response.json();
+            const data = await fetchJSON<AppointmentWarning>(
+                `/api/holidays/appointments-on-date?date=${day.date}`
+            );
 
             setHolidayModal({
                 date: day.date,
                 existingHoliday: null,
-                appointmentWarning: data.success && data.count > 0 ? data : null
+                appointmentWarning: data.count > 0 ? data : null
             });
         } catch {
             // If check fails, still allow adding holiday
@@ -484,23 +468,16 @@ const AppointmentCalendar = ({
     const handleSaveHoliday = useCallback(async ({ date, holidayName, description, existingId }: SaveHolidayData) => {
         try {
             const isEdit = !!existingId;
-            const url = isEdit
-                ? `/api/admin/lookups/tblHolidays/${existingId}`
-                : '/api/admin/lookups/tblHolidays';
+            const body = {
+                holiday_date: date,
+                holiday_name: holidayName,
+                description: description
+            };
 
-            const response = await fetch(url, {
-                method: isEdit ? 'PUT' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    holiday_date: date,
-                    holiday_name: holidayName,
-                    description: description
-                })
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Failed to save holiday');
+            if (isEdit) {
+                await putJSON(`/api/admin/lookups/tblHolidays/${existingId}`, body);
+            } else {
+                await postJSON('/api/admin/lookups/tblHolidays', body);
             }
 
             toast.success(isEdit ? 'Holiday updated' : 'Holiday added');
@@ -509,7 +486,7 @@ const AppointmentCalendar = ({
             // Refresh calendar to show updated holidays
             await fetchCalendarData(currentDate, selectedDoctorId);
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to save holiday');
+            toast.error(httpErrorMessage(error, 'Failed to save holiday'));
         }
     }, [currentDate, selectedDoctorId, fetchCalendarData, toast]);
 
@@ -518,13 +495,7 @@ const AppointmentCalendar = ({
         if (!deleteHolidayConfirm?.holidayId) return;
 
         try {
-            const response = await fetch(`/api/admin/lookups/tblHolidays/${deleteHolidayConfirm.holidayId}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to remove holiday');
-            }
+            await deleteJSON(`/api/admin/lookups/tblHolidays/${deleteHolidayConfirm.holidayId}`);
 
             toast.success('Holiday removed');
             setDeleteHolidayConfirm(null);
@@ -532,7 +503,7 @@ const AppointmentCalendar = ({
             // Refresh calendar
             await fetchCalendarData(currentDate, selectedDoctorId);
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to remove holiday');
+            toast.error(httpErrorMessage(error, 'Failed to remove holiday'));
         }
     }, [deleteHolidayConfirm, currentDate, selectedDoctorId, fetchCalendarData, toast]);
 
@@ -546,13 +517,7 @@ const AppointmentCalendar = ({
         if (!deleteConfirmation?.appointment_id) return;
 
         try {
-            const response = await fetch(`/api/appointments/${deleteConfirmation.appointment_id}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to delete appointment');
-            }
+            await deleteJSON(`/api/appointments/${deleteConfirmation.appointment_id}`);
 
             // Refresh calendar data after successful delete
             await fetchCalendarData(currentDate, selectedDoctorId);
@@ -561,7 +526,7 @@ const AppointmentCalendar = ({
             setDeleteConfirmation(null);
         } catch (error) {
             console.error('Error deleting appointment:', error);
-            toast.error('Failed to delete appointment: ' + (error instanceof Error ? error.message : 'Unknown error'));
+            toast.error('Failed to delete appointment: ' + httpErrorMessage(error, 'Unknown error'));
         }
     }, [deleteConfirmation, currentDate, selectedDoctorId, fetchCalendarData, toast]);
 

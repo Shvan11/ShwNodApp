@@ -36,7 +36,7 @@ import {
   getPatientCreationDate
 } from '../../middleware/time-based-auth.js';
 import { getOption } from '../../services/database/queries/options-queries.js';
-import { ErrorResponses } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
 import * as PatientService from '../../services/business/PatientService.js';
 import { PatientValidationError } from '../../services/business/PatientService.js';
 import { transliterateNameToEnglish } from '../../services/business/name-transliteration.js';
@@ -184,18 +184,18 @@ router.get(
       res.json(info);
     } catch (error) {
       if (error instanceof PatientValidationError) {
-        res.status(400).json({
-          error: error.message,
+        ErrorResponses.badRequest(res, error.message, {
           code: error.code,
-          details: error.details
+          ...(error.details ?? {})
         });
         return;
       }
       log.error('Error fetching patient info:', error);
-      res.status(500).json({
-        error: 'Failed to fetch patient information',
-        message: (error as Error).message
-      });
+      ErrorResponses.internalError(
+        res,
+        'Failed to fetch patient information',
+        error as Error
+      );
     }
   }
 );
@@ -209,7 +209,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const patientsFolder = await getOption('PatientsFolder');
-      res.json({ patientsFolder: patientsFolder || '' });
+      sendSuccess(res, { patientsFolder: patientsFolder || '' });
     } catch (error) {
       log.error('Error fetching PatientsFolder setting:', error);
       ErrorResponses.internalError(
@@ -238,21 +238,21 @@ router.get(
     try {
       const { personId } = req.params;
       const timepoints = await PatientService.getPatientTimePoints(personId);
-      res.json(timepoints);
+      sendSuccess(res, timepoints);
     } catch (error) {
       if (error instanceof PatientValidationError) {
-        res.status(400).json({
-          error: error.message,
+        ErrorResponses.badRequest(res, error.message, {
           code: error.code,
-          details: error.details
+          ...(error.details ?? {})
         });
         return;
       }
       log.error('Error fetching time points:', error);
-      res.status(500).json({
-        error: 'Failed to fetch time points',
-        message: (error as Error).message
-      });
+      ErrorResponses.internalError(
+        res,
+        'Failed to fetch time points',
+        error as Error
+      );
     }
   }
 );
@@ -273,21 +273,21 @@ router.get(
         personId,
         tp
       );
-      res.json(timepointimgs);
+      sendSuccess(res, timepointimgs);
     } catch (error) {
       if (error instanceof PatientValidationError) {
-        res.status(400).json({
-          error: error.message,
+        ErrorResponses.badRequest(res, error.message, {
           code: error.code,
-          details: error.details
+          ...(error.details ?? {})
         });
         return;
       }
       log.error('Error fetching time point images:', error);
-      res.status(500).json({
-        error: 'Failed to fetch time point images',
-        message: (error as Error).message
-      });
+      ErrorResponses.internalError(
+        res,
+        'Failed to fetch time point images',
+        error as Error
+      );
     }
   }
 );
@@ -315,7 +315,7 @@ router.get(
       }
       const folder = timepointFolderName(existing.tp_description ?? '', existing.tp_date_time);
       const exists = folder ? await entryExists(personId, folder) : false;
-      res.json({ folder, exists });
+      sendSuccess(res, { folder, exists });
     } catch (error) {
       log.error('Error checking time point folder:', error);
       ErrorResponses.internalError(res, 'Failed to check time point folder', error as Error);
@@ -831,7 +831,7 @@ router.get(
 
       const hasMore = offset + patients.length < totalCount;
 
-      res.json({
+      sendSuccess(res, {
         patients,
         totalCount,
         hasMore
@@ -1053,9 +1053,9 @@ router.post(
       };
       if (err.code === 'DUPLICATE_PATIENT_NAME') {
         log.warn(`Duplicate patient name attempted: ${patientData.patientName}`);
-        res.status(409).json({
-          success: false,
-          error: err.message,
+        // Conflict code/context travel in `details` (unified error envelope — every
+        // other conflict route nests `code` there; FE reads `errorData.details?.code`).
+        ErrorResponses.conflict(res, err.message, {
           code: 'DUPLICATE_PATIENT_NAME',
           existingPatientId: err.existingPatientId
         });
@@ -1110,9 +1110,8 @@ router.put(
         log.warn(
           `Duplicate patient name attempted during update: ${patientData.patient_name}`
         );
-        res.status(409).json({
-          success: false,
-          error: 'A patient with this name already exists',
+        // Conflict code/context travel in `details` (unified error envelope).
+        ErrorResponses.conflict(res, 'A patient with this name already exists', {
           code: 'DUPLICATE_PATIENT_NAME',
           duplicateName: patientData.patient_name
         });

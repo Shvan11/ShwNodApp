@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from 'r
 import cn from 'classnames';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
 import { useToast } from '../../contexts/ToastContext';
+import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import styles from './AppointmentForm.module.css';
 
 interface AppointmentFormData {
@@ -84,9 +85,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
     const loadDoctors = async (): Promise<void> => {
         try {
             // Fetch all employees who can receive appointments (doctors, hygienists, etc.)
-            const response = await fetch('/api/employees?getAppointments=true');
-            if (!response.ok) throw new Error('Failed to load employees');
-            const data = await response.json();
+            const data = await fetchJSON<{ employees?: Doctor[] }>('/api/employees?getAppointments=true');
             const employees: Doctor[] = data?.employees || [];
             // "Clinic" is the most common assignment, so float it to the top of the
             // dropdown; everyone else keeps the server's SortOrder (Array.sort is stable).
@@ -98,19 +97,17 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
             setDoctors(employees);
         } catch (err) {
             console.error('Error loading employees:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
         }
     };
 
     const loadDetails = async (): Promise<void> => {
         try {
-            const response = await fetch('/api/appointment-details');
-            if (!response.ok) throw new Error('Failed to load appointment details');
-            const data = await response.json();
+            const data = await fetchJSON<AppointmentDetail[]>('/api/appointment-details');
             setDetails(data || []);
         } catch (err) {
             console.error('Error loading appointment details:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
         }
     };
 
@@ -209,50 +206,21 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
 
         try {
             const appointmentDateTime = `${formData.AppDate}T${formData.AppTime}:00`;
-            const response = await fetch('/api/appointments', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const result = await postJSON<{ success?: boolean; appointment_id?: number; error?: string }>(
+                '/api/appointments',
+                {
                     person_id: parseInt(String(formData.PersonID)),
                     app_date: appointmentDateTime,
                     app_detail: formData.AppDetail,
                     dr_id: parseInt(formData.DrID)
-                })
-            });
-
-            if (!response.ok) {
-                const errorData: ApiErrorResponse = await response.json();
-
-                // Appointment/work conflicts route through ErrorResponses.conflict(),
-                // which nests the code under details.code; patient routes put it at
-                // the root. Read both so the friendly messages fire either way (M1).
-                const errorCode = errorData.code ?? errorData.details?.code;
-
-                // Handle holiday conflict specifically
-                if (errorCode === 'HOLIDAY_CONFLICT') {
-                    const holidayName = errorData.details?.holidayName || 'Holiday';
-                    setError(`Cannot create appointment: ${holidayName} is a holiday. No appointments are allowed on this date.`);
-                    return;
                 }
+            );
 
-                // Handle other conflict types
-                if (errorCode === 'APPOINTMENT_CONFLICT') {
-                    setError('Patient already has an appointment on this date.');
-                    return;
-                }
-
-                throw new Error(errorData.error || 'Failed to create appointment');
-            }
-
-            const result = await response.json();
             if (result.success) {
-                fetch('/api/wa/send-appointment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ appointmentId: result.appointment_id })
+                postJSON<{ success: boolean; message?: string }>('/api/wa/send-appointment', {
+                    appointmentId: result.appointment_id
                 })
-                    .then(res => res.json())
-                    .then((waResult: { success: boolean; message?: string }) => {
+                    .then((waResult) => {
                         if (waResult.success) {
                             toast.success('Appointment confirmation sent via WhatsApp!');
                         } else {
@@ -260,7 +228,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                         }
                     })
                     .catch(err => {
-                        toast.error('WhatsApp error: ' + err.message);
+                        toast.error('WhatsApp error: ' + httpErrorMessage(err, 'send failed'));
                     });
 
                 // Only call onSuccess, it will handle navigation
@@ -274,8 +242,22 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                 throw new Error(result.error || 'Failed to create appointment');
             }
         } catch (err) {
-            console.error('Error creating appointment:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            // postJSON throws on non-2xx; the conflict codes ride the thrown
+            // HttpError's parsed body. Appointment/work conflicts route through
+            // ErrorResponses.conflict() (nested details.code); patient routes put
+            // it at the root — read both so the friendly messages fire either way (M1).
+            const errorData = (err as HttpError).data as ApiErrorResponse | undefined;
+            const errorCode = errorData?.code ?? errorData?.details?.code;
+
+            if (errorCode === 'HOLIDAY_CONFLICT') {
+                const holidayName = errorData?.details?.holidayName || 'Holiday';
+                setError(`Cannot create appointment: ${holidayName} is a holiday. No appointments are allowed on this date.`);
+            } else if (errorCode === 'APPOINTMENT_CONFLICT') {
+                setError('Patient already has an appointment on this date.');
+            } else {
+                console.error('Error creating appointment:', err);
+                setError(httpErrorMessage(err, 'Unknown error'));
+            }
         } finally {
             setLoading(false);
         }

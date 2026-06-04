@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { formatISODate } from '../../core/utils';
+import { fetchJSON } from '@/core/http';
 
 // Types
 interface ReferenceConfig {
@@ -78,9 +79,7 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
             await Promise.all(needed.map(async (table) => {
                 const refCol = refColumns.find(c => c.reference!.table === table)!.reference!;
                 try {
-                    const res = await fetch(`/api/admin/lookups/${table}`);
-                    if (!res.ok) return;
-                    const rows = await res.json() as LookupItem[];
+                    const rows = await fetchJSON<LookupItem[]>(`/api/admin/lookups/${table}`);
                     fetched[table] = rows.map(r => ({
                         id: r[refCol.idColumn],
                         label: String(r[refCol.displayColumn] ?? ''),

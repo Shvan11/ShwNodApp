@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
+import { fetchJSON, httpErrorMessage } from '@/core/http';
 import styles from './DoctorsList.module.css';
 
 interface Doctor {
@@ -23,8 +24,9 @@ const DoctorsList: React.FC = () => {
 
     const loadDoctors = async (): Promise<void> => {
         try {
-            const response = await fetch('/api/aligner/doctors');
-            const data = await response.json();
+            const data = await fetchJSON<{ success: boolean; doctors?: Doctor[]; error?: string }>(
+                '/api/aligner/doctors'
+            );
 
             if (data.success) {
                 setDoctors(data.doctors || []);
@@ -33,7 +35,7 @@ const DoctorsList: React.FC = () => {
             }
         } catch (error) {
             console.error('Error loading doctors:', error);
-            toast.error('Failed to load doctors');
+            toast.error(httpErrorMessage(error, 'Failed to load doctors'));
         } finally {
             setLoading(false);
         }

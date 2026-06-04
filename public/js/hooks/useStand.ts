@@ -3,6 +3,7 @@
  * Handles all stand-related API calls with proper state management
  */
 import { useState, useEffect, useCallback } from 'react';
+import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 
 // ============================================================================
 // TYPES
@@ -155,19 +156,6 @@ export interface StandSaleResult {
 }
 
 // ============================================================================
-// HELPER: parse API error
-// ============================================================================
-
-async function parseApiError(response: Response, fallback: string): Promise<string> {
-  try {
-    const data = await response.json();
-    return data?.error || data?.message || fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-// ============================================================================
 // ITEMS
 // ============================================================================
 
@@ -192,13 +180,10 @@ export function useStandItems(filters: StandItemFilters = {}): {
       if (filters.stockStatus) params.append('stockStatus', filters.stockStatus);
       if (filters.includeInactive) params.append('includeInactive', 'true');
 
-      const response = await fetch(`/api/stand/items?${params}`);
-      if (!response.ok) throw new Error(await parseApiError(response, 'Failed to fetch items'));
-
-      const data = await response.json();
+      const data = await fetchJSON<StandItem[]>(`/api/stand/items?${params}`);
       setItems(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch items');
+      setError(httpErrorMessage(err, 'Failed to fetch items'));
     } finally {
       setLoading(false);
     }
@@ -221,15 +206,13 @@ export function useStandItemByBarcode(): {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/stand/items/barcode/${encodeURIComponent(barcode)}`);
-      // 404 is a genuine "no such barcode", not an error — keep returning null.
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error('Lookup failed');
-      return await response.json();
+      return await fetchJSON<StandItem>(`/api/stand/items/barcode/${encodeURIComponent(barcode)}`);
     } catch (err) {
+      // 404 is a genuine "no such barcode", not an error — keep returning null.
+      if ((err as HttpError).status === 404) return null;
       // Surface real failures (network/5xx) to the caller instead of masking
       // them as "not found" — only a 404 above means a genuinely unknown barcode.
-      setError(err instanceof Error ? err.message : 'Barcode lookup failed');
+      setError(httpErrorMessage(err, 'Barcode lookup failed'));
       throw err;
     } finally {
       setLoading(false);
@@ -257,12 +240,10 @@ export function useStandCategories(): {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('/api/stand/categories');
-      if (!response.ok) throw new Error('Failed to fetch categories');
-      const data = await response.json();
+      const data = await fetchJSON<StandCategory[]>('/api/stand/categories');
       setCategories(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch categories');
+      setError(httpErrorMessage(err, 'Failed to fetch categories'));
     } finally {
       setLoading(false);
     }
@@ -291,12 +272,10 @@ export function useStandDashboardKPIs(): {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('/api/stand/dashboard');
-      if (!response.ok) throw new Error('Failed to fetch KPIs');
-      const data = await response.json();
+      const data = await fetchJSON<StandDashboardKPIs>('/api/stand/dashboard');
       setKpis(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch KPIs');
+      setError(httpErrorMessage(err, 'Failed to fetch KPIs'));
     } finally {
       setLoading(false);
     }
@@ -332,13 +311,10 @@ export function useStandSales(filters: StandSaleFilters = {}): {
       if (filters.cashierId) params.append('cashierId', String(filters.cashierId));
       if (filters.personId) params.append('personId', String(filters.personId));
 
-      const response = await fetch(`/api/stand/sales?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch sales');
-
-      const data = await response.json();
+      const data = await fetchJSON<StandSale[]>(`/api/stand/sales?${params}`);
       setSales(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch sales');
+      setError(httpErrorMessage(err, 'Failed to fetch sales'));
     } finally {
       setLoading(false);
     }
@@ -365,12 +341,10 @@ export function useStandSale(id: number | null): {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(`/api/stand/sales/${id}`);
-        if (!response.ok) throw new Error('Failed to fetch sale');
-        const data = await response.json();
+        const data = await fetchJSON<StandSaleWithItems>(`/api/stand/sales/${id}`);
         setSale(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch sale');
+        setError(httpErrorMessage(err, 'Failed to fetch sale'));
       } finally {
         setLoading(false);
       }
@@ -400,11 +374,9 @@ export function useLowStockItems(): {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('/api/stand/items/low-stock');
-      if (!response.ok) throw new Error('Failed to fetch low-stock items');
-      setItems(await response.json());
+      setItems(await fetchJSON<StandItem[]>('/api/stand/items/low-stock'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch low-stock items');
+      setError(httpErrorMessage(err, 'Failed to fetch low-stock items'));
     } finally {
       setLoading(false);
     }
@@ -429,11 +401,9 @@ export function useExpiringItems(daysAhead: number = 30): {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/stand/items/expiring?days=${daysAhead}`);
-      if (!response.ok) throw new Error('Failed to fetch expiring items');
-      setItems(await response.json());
+      setItems(await fetchJSON<StandItem[]>(`/api/stand/items/expiring?days=${daysAhead}`));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch expiring items');
+      setError(httpErrorMessage(err, 'Failed to fetch expiring items'));
     } finally {
       setLoading(false);
     }
@@ -463,11 +433,9 @@ export function useStockMovements(itemId: number | null): {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/stand/items/${itemId}/movements`);
-      if (!response.ok) throw new Error('Failed to fetch stock movements');
-      setMovements(await response.json());
+      setMovements(await fetchJSON<StandStockMovement[]>(`/api/stand/items/${itemId}/movements`));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch stock movements');
+      setError(httpErrorMessage(err, 'Failed to fetch stock movements'));
     } finally {
       setLoading(false);
     }
@@ -497,78 +465,51 @@ export function useStandItemMutations(onSuccess?: () => void): {
   const createItem = useCallback(async (data: StandItemCreateData): Promise<{ item_id: number }> => {
     try {
       setLoading(true); setError(null);
-      const response = await fetch('/api/stand/items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error(await parseApiError(response, 'Failed to create item'));
-      const result = await response.json();
+      const result = await postJSON<{ item_id: number }>('/api/stand/items', data);
       onSuccess?.();
-      return result.data;
+      return result;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to create item';
-      setError(msg); throw err;
+      setError(httpErrorMessage(err, 'Failed to create item')); throw err;
     } finally { setLoading(false); }
   }, [onSuccess]);
 
   const updateItem = useCallback(async (id: number, data: Partial<StandItemCreateData>): Promise<void> => {
     try {
       setLoading(true); setError(null);
-      const response = await fetch(`/api/stand/items/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error(await parseApiError(response, 'Failed to update item'));
+      await putJSON(`/api/stand/items/${id}`, data);
       onSuccess?.();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to update item';
-      setError(msg); throw err;
+      setError(httpErrorMessage(err, 'Failed to update item')); throw err;
     } finally { setLoading(false); }
   }, [onSuccess]);
 
   const deleteItem = useCallback(async (id: number): Promise<void> => {
     try {
       setLoading(true); setError(null);
-      const response = await fetch(`/api/stand/items/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error(await parseApiError(response, 'Failed to delete item'));
+      await deleteJSON(`/api/stand/items/${id}`);
       onSuccess?.();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to delete item';
-      setError(msg); throw err;
+      setError(httpErrorMessage(err, 'Failed to delete item')); throw err;
     } finally { setLoading(false); }
   }, [onSuccess]);
 
   const restockItem = useCallback(async (id: number, quantity: number, unitCost: number): Promise<void> => {
     try {
       setLoading(true); setError(null);
-      const response = await fetch(`/api/stand/items/${id}/restock`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quantity, unitCost }),
-      });
-      if (!response.ok) throw new Error(await parseApiError(response, 'Failed to restock'));
+      await postJSON(`/api/stand/items/${id}/restock`, { quantity, unitCost });
       onSuccess?.();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to restock';
-      setError(msg); throw err;
+      setError(httpErrorMessage(err, 'Failed to restock')); throw err;
     } finally { setLoading(false); }
   }, [onSuccess]);
 
   const adjustStock = useCallback(async (id: number, delta: number, reason: string): Promise<void> => {
     try {
       setLoading(true); setError(null);
-      const response = await fetch(`/api/stand/items/${id}/adjust`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ delta, reason }),
-      });
-      if (!response.ok) throw new Error(await parseApiError(response, 'Failed to adjust stock'));
+      await postJSON(`/api/stand/items/${id}/adjust`, { delta, reason });
       onSuccess?.();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to adjust stock';
-      setError(msg); throw err;
+      setError(httpErrorMessage(err, 'Failed to adjust stock')); throw err;
     } finally { setLoading(false); }
   }, [onSuccess]);
 
@@ -591,34 +532,21 @@ export function useStandSaleMutations(onSuccess?: () => void): {
   const createSale = useCallback(async (data: SaleCreateData) => {
     try {
       setLoading(true); setError(null);
-      const response = await fetch('/api/stand/sales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error(await parseApiError(response, 'Failed to create sale'));
-      const result = await response.json();
+      const result = await postJSON<StandSaleResult>('/api/stand/sales', data);
       onSuccess?.();
-      return result.data;
+      return result;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to create sale';
-      setError(msg); throw err;
+      setError(httpErrorMessage(err, 'Failed to create sale')); throw err;
     } finally { setLoading(false); }
   }, [onSuccess]);
 
   const voidSale = useCallback(async (id: number, reason: string): Promise<void> => {
     try {
       setLoading(true); setError(null);
-      const response = await fetch(`/api/stand/sales/${id}/void`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason }),
-      });
-      if (!response.ok) throw new Error(await parseApiError(response, 'Failed to void sale'));
+      await postJSON(`/api/stand/sales/${id}/void`, { reason });
       onSuccess?.();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to void sale';
-      setError(msg); throw err;
+      setError(httpErrorMessage(err, 'Failed to void sale')); throw err;
     } finally { setLoading(false); }
   }, [onSuccess]);
 
@@ -647,12 +575,10 @@ export function useStandReportSummary(startDate: string | null, endDate: string 
         setLoading(true);
         setError(null);
         const params = new URLSearchParams({ startDate, endDate });
-        const response = await fetch(`/api/stand/reports/summary?${params}`);
-        if (!response.ok) throw new Error('Failed to fetch report');
-        const json = await response.json();
+        const json = await fetchJSON<StandReportData>(`/api/stand/reports/summary?${params}`);
         if (!cancelled) setData(json);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to fetch report');
+        if (!cancelled) setError(httpErrorMessage(err, 'Failed to fetch report'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -683,12 +609,10 @@ export function useTopSellingItems(startDate: string | null, endDate: string | n
         setLoading(true);
         setError(null);
         const params = new URLSearchParams({ startDate, endDate, limit: String(limit) });
-        const response = await fetch(`/api/stand/reports/top-items?${params}`);
-        if (!response.ok) throw new Error('Failed to fetch top-selling items');
-        const json = await response.json();
+        const json = await fetchJSON<TopItemRow[]>(`/api/stand/reports/top-items?${params}`);
         if (!cancelled) setItems(json);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to fetch top-selling items');
+        if (!cancelled) setError(httpErrorMessage(err, 'Failed to fetch top-selling items'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -716,12 +640,7 @@ export function useStandCategoryMutations(onSuccess?: () => void): {
   const createCategory = useCallback(async (name: string) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/stand/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      if (!response.ok) throw new Error(await parseApiError(response, 'Failed to create category'));
+      await postJSON('/api/stand/categories', { name });
       onSuccess?.();
     } finally { setLoading(false); }
   }, [onSuccess]);
@@ -729,12 +648,7 @@ export function useStandCategoryMutations(onSuccess?: () => void): {
   const updateCategory = useCallback(async (id: number, data: { categoryName?: string }) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/stand/categories/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error(await parseApiError(response, 'Failed to update category'));
+      await putJSON(`/api/stand/categories/${id}`, data);
       onSuccess?.();
     } finally { setLoading(false); }
   }, [onSuccess]);
@@ -742,8 +656,7 @@ export function useStandCategoryMutations(onSuccess?: () => void): {
   const deleteCategory = useCallback(async (id: number) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/stand/categories/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error(await parseApiError(response, 'Failed to delete category'));
+      await deleteJSON(`/api/stand/categories/${id}`);
       onSuccess?.();
     } finally { setLoading(false); }
   }, [onSuccess]);

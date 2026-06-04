@@ -4,6 +4,7 @@ import { useToast } from '../../contexts/ToastContext';
 import LookupEditorModal from './LookupEditorModal';
 import Modal from './Modal';
 import { parseLocalDate } from '../../utils/calendarDate';
+import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 
 interface Column {
     name: string;
@@ -165,16 +166,10 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
     const loadItems = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await fetch(`/api/admin/lookups/${tableKey}`);
-            if (response.ok) {
-                const data = await response.json();
-                setItems(data);
-            } else {
-                const error = await response.json();
-                toast.error(error.error || `Failed to load ${tableName}`);
-            }
-        } catch {
-            toast.error(`Error loading ${tableName}`);
+            const data = await fetchJSON<HolidayItem[]>(`/api/admin/lookups/${tableKey}`);
+            setItems(data);
+        } catch (err) {
+            toast.error(httpErrorMessage(err, `Failed to load ${tableName}`));
         } finally {
             setLoading(false);
         }
@@ -217,19 +212,11 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
         const itemId = deleteConfirm[idColumn];
 
         try {
-            const response = await fetch(`/api/admin/lookups/${tableKey}/${itemId}`, {
-                method: 'DELETE'
-            });
-
-            if (response.ok) {
-                toast.success('Holiday deleted successfully');
-                loadItems();
-            } else {
-                const error = await response.json();
-                toast.error(error.error || 'Failed to delete holiday');
-            }
-        } catch {
-            toast.error('Error deleting holiday');
+            await deleteJSON(`/api/admin/lookups/${tableKey}/${itemId}`);
+            toast.success('Holiday deleted successfully');
+            loadItems();
+        } catch (err) {
+            toast.error(httpErrorMessage(err, 'Failed to delete holiday'));
         } finally {
             setDeleteConfirm(null);
             setDeleteAnchorEl(null);
@@ -240,13 +227,14 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
     const checkAppointmentsOnDate = async (date: string): Promise<AppointmentWarning | null> => {
         try {
             setCheckingAppointments(true);
-            const response = await fetch(`/api/holidays/appointments-on-date?date=${date}`);
-            const data = await response.json();
+            const data = await fetchJSON<{ appointments?: AppointmentWarning['appointments']; count?: number }>(
+                `/api/holidays/appointments-on-date?date=${date}`
+            );
 
-            if (data.success && data.count > 0) {
+            if (data.count && data.count > 0) {
                 return {
                     date,
-                    appointments: data.appointments,
+                    appointments: data.appointments ?? [],
                     count: data.count
                 };
             }
@@ -287,31 +275,21 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
     const saveHoliday = async (data: Record<string, unknown>) => {
         try {
             const isEdit = !!editingItem;
-            const method = isEdit ? 'PUT' : 'POST';
             const itemId = isEdit ? editingItem[idColumn] : null;
             const url = isEdit
                 ? `/api/admin/lookups/${tableKey}/${itemId}`
                 : `/api/admin/lookups/${tableKey}`;
 
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
+            await (isEdit ? putJSON(url, data) : postJSON(url, data));
 
-            if (response.ok) {
-                toast.success(isEdit ? 'Holiday updated successfully' : 'Holiday created successfully');
-                setModalOpen(false);
-                setAnchorEl(null);
-                setAppointmentWarning(null);
-                setPendingHolidayData(null);
-                loadItems();
-            } else {
-                const error = await response.json();
-                toast.error(error.error || 'Failed to save holiday');
-            }
-        } catch {
-            toast.error('Error saving holiday');
+            toast.success(isEdit ? 'Holiday updated successfully' : 'Holiday created successfully');
+            setModalOpen(false);
+            setAnchorEl(null);
+            setAppointmentWarning(null);
+            setPendingHolidayData(null);
+            loadItems();
+        } catch (err) {
+            toast.error(httpErrorMessage(err, 'Failed to save holiday'));
         }
     };
 

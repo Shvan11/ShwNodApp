@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import Modal from './Modal';
 import styles from './AdminUserManagement.module.css';
 
@@ -60,18 +61,10 @@ export default function AdminUserManagement() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/users', {
-        credentials: 'same-origin'
-      });
-      const data = await response.json();
-
-      if (data.success) {
-        setUsers(data.users ?? []);
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Failed to load users' });
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Network error loading users' });
+      const data = await fetchJSON<{ success: boolean; users?: User[] }>('/api/users');
+      setUsers(data.users ?? []);
+    } catch (err) {
+      setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error loading users') });
     } finally {
       setLoading(false);
     }
@@ -82,25 +75,13 @@ export default function AdminUserManagement() {
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(formData)
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setMessage({ type: 'success', text: 'User created successfully!' });
-        setFormData({ username: '', password: '', fullName: '', role: 'secretary' });
-        setShowCreateForm(false);
-        fetchUsers(); // Reload list
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Failed to create user' });
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Network error creating user' });
+      await postJSON('/api/users', formData);
+      setMessage({ type: 'success', text: 'User created successfully!' });
+      setFormData({ username: '', password: '', fullName: '', role: 'secretary' });
+      setShowCreateForm(false);
+      fetchUsers(); // Reload list
+    } catch (err) {
+      setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error creating user') });
     }
   };
 
@@ -108,21 +89,11 @@ export default function AdminUserManagement() {
     if (!await confirm('Toggle user active status?', { title: 'Toggle Status' })) return;
 
     try {
-      const response = await fetch(`/api/users/${userId}/toggle`, {
-        method: 'PUT',
-        credentials: 'same-origin'
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setMessage({ type: 'success', text: 'User status updated' });
-        fetchUsers();
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Failed to update status' });
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Network error' });
+      await putJSON(`/api/users/${userId}/toggle`, {});
+      setMessage({ type: 'success', text: 'User status updated' });
+      fetchUsers();
+    } catch (err) {
+      setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error') });
     }
   };
 
@@ -142,24 +113,12 @@ export default function AdminUserManagement() {
 
     setResetting(true);
     try {
-      const response = await fetch(`/api/users/${resetTarget.userId}/password`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ newPassword: newPasswordInput })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setMessage({ type: 'success', text: `Password reset for ${resetTarget.username}` });
-        setResetTarget(null);
-        setNewPasswordInput('');
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Failed to reset password' });
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Network error' });
+      await putJSON(`/api/users/${resetTarget.userId}/password`, { newPassword: newPasswordInput });
+      setMessage({ type: 'success', text: `Password reset for ${resetTarget.username}` });
+      setResetTarget(null);
+      setNewPasswordInput('');
+    } catch (err) {
+      setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error') });
     } finally {
       setResetting(false);
     }
@@ -169,21 +128,11 @@ export default function AdminUserManagement() {
     if (!await confirm(`Are you sure you want to delete user "${username}"? This cannot be undone.`, { title: 'Delete User', danger: true, confirmText: 'Delete' })) return;
 
     try {
-      const response = await fetch(`/api/users/${userId}`, {
-        method: 'DELETE',
-        credentials: 'same-origin'
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setMessage({ type: 'success', text: `User ${username} deleted` });
-        fetchUsers();
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Failed to delete user' });
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Network error' });
+      await deleteJSON(`/api/users/${userId}`);
+      setMessage({ type: 'success', text: `User ${username} deleted` });
+      fetchUsers();
+    } catch (err) {
+      setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error') });
     }
   };
 

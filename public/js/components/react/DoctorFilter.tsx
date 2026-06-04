@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
+import { fetchJSON, httpErrorMessage } from '@/core/http';
 
 interface Doctor {
     id: number;
@@ -33,13 +34,7 @@ const DoctorFilter = ({ selectedDoctorId, onDoctorChange, className = '' }: Doct
             setLoading(true);
             setError(null);
 
-            const response = await fetch('/api/doctors');
-
-            if (!response.ok) {
-                throw new Error(`Failed to fetch doctors: ${response.statusText}`);
-            }
-
-            const data = await response.json();
+            const data = await fetchJSON<Doctor[]>('/api/doctors');
 
             // Validate data structure
             if (Array.isArray(data)) {
@@ -50,7 +45,7 @@ const DoctorFilter = ({ selectedDoctorId, onDoctorChange, className = '' }: Doct
             }
         } catch (err) {
             console.error('Error fetching doctors:', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
         } finally {
             setLoading(false);
         }

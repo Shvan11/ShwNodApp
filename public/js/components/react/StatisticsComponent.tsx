@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import Chart from 'chart.js/auto';
 import DailyInvoicesModal from './DailyInvoicesModal';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
+import { fetchJSON, httpErrorMessage } from '@/core/http';
 import styles from './StatisticsComponent.module.css';
 
 // Types
@@ -121,17 +122,11 @@ const StatisticsComponent = () => {
         setError(null);
 
         try {
-            const response = await fetch(`/api/statistics?month=${month}&year=${year}&exchangeRate=${exchangeRate}`);
-            const data: StatisticsData = await response.json();
-
-            if (!response.ok || !data.success) {
-                throw new Error(data.error || 'Failed to fetch statistics');
-            }
-
+            const data = await fetchJSON<StatisticsData>(`/api/statistics?month=${month}&year=${year}&exchangeRate=${exchangeRate}`);
             setStatistics(data);
             setSearchParams({ month: month.toString(), year: year.toString() });
         } catch (err) {
-            setError((err as Error).message);
+            setError(httpErrorMessage(err, 'Failed to fetch statistics'));
             console.error('Error fetching statistics:', err);
         } finally {
             setLoading(false);
@@ -142,13 +137,7 @@ const StatisticsComponent = () => {
     const fetchYearlyData = useCallback(async () => {
         setLoadingYearly(true);
         try {
-            const response = await fetch(`/api/statistics/yearly?startMonth=${periodStartMonth}&startYear=${periodStartYear}&exchangeRate=${exchangeRate}`);
-            const data: YearlyData = await response.json();
-
-            if (!response.ok || !data.success) {
-                throw new Error(data.error || 'Failed to fetch yearly statistics');
-            }
-
+            const data = await fetchJSON<YearlyData>(`/api/statistics/yearly?startMonth=${periodStartMonth}&startYear=${periodStartYear}&exchangeRate=${exchangeRate}`);
             setYearlyData(data);
         } catch (err) {
             console.error('[Statistics] Error fetching yearly statistics:', err);
@@ -162,13 +151,7 @@ const StatisticsComponent = () => {
     const fetchMultiYearData = useCallback(async () => {
         setLoadingMultiYear(true);
         try {
-            const response = await fetch(`/api/statistics/multi-year?startYear=${yearRangeStart}&endYear=${yearRangeEnd}&exchangeRate=${exchangeRate}`);
-            const data: MultiYearData = await response.json();
-
-            if (!response.ok || !data.success) {
-                throw new Error(data.error || 'Failed to fetch multi-year statistics');
-            }
-
+            const data = await fetchJSON<MultiYearData>(`/api/statistics/multi-year?startYear=${yearRangeStart}&endYear=${yearRangeEnd}&exchangeRate=${exchangeRate}`);
             setMultiYearData(data);
         } catch (err) {
             console.error('[Statistics] Error fetching multi-year statistics:', err);

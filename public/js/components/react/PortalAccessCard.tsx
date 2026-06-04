@@ -6,6 +6,7 @@ import type {
 } from '@/types/api.types';
 import Modal from './Modal';
 import { useToast } from '../../contexts/ToastContext';
+import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
 import viewStyles from './ViewPatientInfo.module.css';
 import styles from './PortalAccessCard.module.css';
 
@@ -40,13 +41,7 @@ const PortalAccessCard = ({ personId }: Props) => {
   const loadStatus = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch(`/api/patients/${personId}/portal`, {
-        credentials: 'same-origin',
-      });
-      const data = (await res.json()) as PortalStatusResponse;
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to load portal status');
-      }
+      const data = await fetchJSON<PortalStatusResponse>(`/api/patients/${personId}/portal`);
       setStatus({
         enabled: data.enabled ?? false,
         hasPin: data.hasPin ?? false,
@@ -57,7 +52,7 @@ const PortalAccessCard = ({ personId }: Props) => {
         portalUrl: data.portalUrl ?? '',
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      setError(httpErrorMessage(err, 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -72,20 +67,11 @@ const PortalAccessCard = ({ personId }: Props) => {
     const next = !status.enabled;
     setBusyAction('enable');
     try {
-      const res = await fetch(`/api/patients/${personId}/portal/enable`, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: next }),
-      });
-      const data = (await res.json()) as { success: boolean; error?: string };
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to update');
-      }
+      await postJSON(`/api/patients/${personId}/portal/enable`, { enabled: next });
       setStatus({ ...status, enabled: next });
       toast.success(next ? 'Portal access enabled' : 'Portal access disabled');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update');
+      toast.error(httpErrorMessage(err, 'Failed to update'));
     } finally {
       setBusyAction(null);
     }
@@ -95,19 +81,15 @@ const PortalAccessCard = ({ personId }: Props) => {
     if (busyAction) return;
     setBusyAction('reset');
     try {
-      const res = await fetch(`/api/patients/${personId}/portal/reset-pin`, {
-        method: 'POST',
-        credentials: 'same-origin',
-      });
-      const data = (await res.json()) as PortalPinResetResponse;
-      if (!res.ok || !data.success || !data.pin) {
+      const data = await postJSON<PortalPinResetResponse>(`/api/patients/${personId}/portal/reset-pin`, {});
+      if (!data.pin) {
         throw new Error(data.error || 'Failed to reset PIN');
       }
       setNewPin(data.pin);
       setCopyState('idle');
       await loadStatus();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to reset PIN');
+      toast.error(httpErrorMessage(err, 'Failed to reset PIN'));
     } finally {
       setBusyAction(null);
     }
@@ -117,18 +99,11 @@ const PortalAccessCard = ({ personId }: Props) => {
     if (busyAction) return;
     setBusyAction('unlock');
     try {
-      const res = await fetch(`/api/patients/${personId}/portal/unlock`, {
-        method: 'POST',
-        credentials: 'same-origin',
-      });
-      const data = (await res.json()) as { success: boolean; error?: string };
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to unlock');
-      }
+      await postJSON(`/api/patients/${personId}/portal/unlock`, {});
       toast.success('Portal access unlocked');
       await loadStatus();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to unlock');
+      toast.error(httpErrorMessage(err, 'Failed to unlock'));
     } finally {
       setBusyAction(null);
     }

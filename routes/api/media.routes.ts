@@ -15,7 +15,7 @@ import { getKysely } from '../../services/database/kysely.js';
 import { log } from '../../utils/logger.js';
 import multer from 'multer';
 import webcephService from '../../services/webceph/webceph-service.js';
-import { ErrorResponses } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
 
 const router = Router();
 
@@ -145,15 +145,11 @@ router.post('/webceph/create-patient', async (req: Request<object, object, Creat
 
     log.info(`[WebCeph] Patient created successfully for person_id: ${personId}`);
 
-    res.json({
-      success: true,
-      message: 'Patient created in WebCeph successfully',
-      data: {
-        webcephPatientId: result.webcephPatientId,
-        link: result.link,
-        linkId: result.linkId
-      }
-    });
+    sendSuccess(res, {
+      webcephPatientId: result.webcephPatientId,
+      link: result.link,
+      linkId: result.linkId
+    }, 'Patient created in WebCeph successfully');
   } catch (error) {
     log.error('[WebCeph] Error creating patient:', error);
     ErrorResponses.serverError(res, 'Failed to create patient in WebCeph', error as Error);
@@ -210,15 +206,11 @@ router.post('/webceph/upload-image', uploadImage, async (req: FileRequest, res: 
 
     log.info(`[WebCeph] Image uploaded successfully for patient: ${patient_id}`);
 
-    res.json({
-      success: true,
-      message: 'Image uploaded to WebCeph successfully',
-      data: {
-        big: result.big,
-        thumbnail: result.thumbnail,
-        link: result.link
-      }
-    });
+    sendSuccess(res, {
+      big: result.big,
+      thumbnail: result.thumbnail,
+      link: result.link
+    }, 'Image uploaded to WebCeph successfully');
   } catch (error) {
     log.error('[WebCeph] Error uploading image:', error);
     ErrorResponses.serverError(res, 'Failed to upload image to WebCeph', error as Error);
@@ -254,10 +246,7 @@ router.get('/webceph/patient-link/:personId', async (req: Request<PersonIdParams
       return;
     }
 
-    res.json({
-      success: true,
-      data: result[0]
-    });
+    sendSuccess(res, result[0]);
   } catch (error) {
     log.error('[WebCeph] Error fetching patient link:', error);
     ErrorResponses.serverError(res, 'Failed to fetch WebCeph patient link', error as Error);
@@ -271,10 +260,7 @@ router.get('/webceph/patient-link/:personId', async (req: Request<PersonIdParams
 router.get('/webceph/photo-types', async (_req: Request, res: Response): Promise<void> => {
   try {
     const photoTypes = webcephService.getPhotoTypes();
-    res.json({
-      success: true,
-      data: photoTypes
-    });
+    sendSuccess(res, photoTypes);
   } catch (error) {
     log.error('[WebCeph] Error fetching photo types:', error);
     ErrorResponses.serverError(res, 'Failed to fetch photo types', error as Error);

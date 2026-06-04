@@ -6,6 +6,7 @@ import { useToast } from '../../contexts/ToastContext';
 import PatientQuickSearch, { type SelectedPatient, type PatientOption } from './PatientQuickSearch';
 import PhoneDisplay from './PhoneDisplay';
 import Modal from './Modal';
+import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import styles from './PatientManagement.module.css';
 
 interface Patient {
@@ -243,13 +244,10 @@ const PatientManagement = () => {
             params.append('offset', offset.toString());
             params.append('limit', '100');
 
-            const response = await fetch(`/api/patients/search?${params.toString()}`, {
-                signal: abortController.signal
-            });
-
-            if (!response.ok) throw new Error('Failed to search patients');
-
-            const data = await response.json();
+            const data = await fetchJSON<Patient[] | { patients?: Patient[]; totalCount?: number; hasMore?: boolean }>(
+                `/api/patients/search?${params.toString()}`,
+                { signal: abortController.signal }
+            );
 
             // Handle both new format {patients, totalCount, hasMore} and legacy array format
             const patientsArray: Patient[] = Array.isArray(data) ? data : (data.patients || []);
@@ -270,7 +268,7 @@ const PatientManagement = () => {
             setHasSearched(true);
         } catch (err) {
             if (err instanceof Error && err.name !== 'AbortError') {
-                toast.error(err.message || 'Failed to search patients');
+                toast.error(httpErrorMessage(err, 'Failed to search patients'));
             }
         } finally {
             if (!abortController.signal.aborted) {
@@ -343,8 +341,7 @@ const PatientManagement = () => {
         setLastAppointmentFilter(''); setLastAppointmentCustomDate(''); setHasFinalPhotos(false);
         setCurrentOffset(0);
         setLoading(true);
-        fetch(`/api/patients/search?q=&sortBy=name&order=asc&limit=100&offset=0`)
-            .then(res => res.json())
+        fetchJSON<Patient[] | { patients?: Patient[]; totalCount?: number; hasMore?: boolean }>(`/api/patients/search?q=&sortBy=name&order=asc&limit=100&offset=0`)
             .then(data => {
                 // Handle both new format {patients, totalCount, hasMore} and legacy array format
                 const patientsArray: Patient[] = Array.isArray(data) ? data : (data.patients || []);
@@ -368,16 +365,10 @@ const PatientManagement = () => {
         e.preventDefault(); e.stopPropagation();
         try {
             setLoading(true);
-            const res = await fetch('/api/appointments/quick-checkin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ person_id: patient.person_id })
-            });
-            if(!res.ok) throw new Error((await res.json()).error);
-            const data = await res.json();
+            const data = await postJSON<{ alreadyCheckedIn?: boolean }>('/api/appointments/quick-checkin', { person_id: patient.person_id });
             toast.success(data.alreadyCheckedIn ? 'Already checked in' : 'Checked in successfully');
         } catch(err) {
-            toast.error(err instanceof Error ? err.message : 'Check-in failed');
+            toast.error(httpErrorMessage(err, 'Check-in failed'));
         }
         finally { setLoading(false); }
     };
@@ -388,9 +379,7 @@ const PatientManagement = () => {
         if (!selectedPatient || deleting) return;
         setDeleting(true);
         try {
-            const res = await fetch(`/api/patients/${selectedPatient.person_id}`, { method: 'DELETE' });
-            if(!res.ok) throw new Error('Delete failed');
-            const data = await res.json().catch(() => ({}));
+            const data = await deleteJSON<{ folderRemoved?: boolean; message?: string }>(`/api/patients/${selectedPatient.person_id}`);
             executeSearch();
             setShowDeleteConfirm(false);
             if (data.folderRemoved === false) {
@@ -399,7 +388,7 @@ const PatientManagement = () => {
                 toast.success('Patient and photo folder deleted');
             }
         } catch(err) {
-            toast.error(err instanceof Error ? err.message : 'Delete failed');
+            toast.error(httpErrorMessage(err, 'Delete failed'));
         } finally {
             setDeleting(false);
         }

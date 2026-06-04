@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchJSON } from '@/core/http';
-import type { ApiResponse, FileEntry, FileListing } from '@/types/api.types';
+import type { FileEntry, FileListing } from '@/types/api.types';
 import { buildWorkingContentUrl, errorMessage } from './fileHelpers';
 import FileEntryTile from './FileEntryTile';
 import FilePreviewModal from './FilePreviewModal';
@@ -34,13 +34,12 @@ const WorkingFilesView = ({ personId }: Props) => {
     const ac = new AbortController();
     setLoading(true);
     setError(null);
-    fetchJSON<ApiResponse<FileListing>>(`/api/patients/${personId}/working-files`, {
+    fetchJSON<FileListing>(`/api/patients/${personId}/working-files`, {
       signal: ac.signal,
     })
-      .then((res) => {
+      .then((listing) => {
         if (ac.signal.aborted) return;
-        if (res.success && res.data) setEntries(res.data.entries);
-        else throw new Error(res.error || 'Failed to load working files');
+        setEntries(listing.entries);
       })
       .catch((err: unknown) => {
         if (!ac.signal.aborted && (err as Error)?.name !== 'AbortError') {

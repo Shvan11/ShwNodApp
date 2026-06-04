@@ -8,6 +8,16 @@
  */
 
 // =============================================================================
+// PRIMITIVE STRING ALIASES (documentation-only — structurally just `string`)
+// =============================================================================
+
+/** A calendar date with no time or zone, formatted `YYYY-MM-DD` (matches PG `date` columns). */
+export type DateOnly = string;
+
+/** An ISO-8601 timestamp, e.g. `2026-06-04T12:00:00.000Z` (PG `timestamp` columns / envelope `timestamp`). */
+export type IsoTimestamp = string;
+
+// =============================================================================
 // GENERIC RESPONSE WRAPPERS
 // =============================================================================
 
@@ -31,10 +41,16 @@ export interface ApiResponse<T = unknown> {
     data?: T;
     error?: string;
     message?: string;
+    /**
+     * Legacy/fallback location for a machine-readable error code. The canonical
+     * place is `details.code` — every conflict route nests it there — so read
+     * defensively as `details?.code ?? code`.
+     */
     code?: string;
-    details?: Record<string, unknown>;
+    /** Structured error context; conflict routes carry the error code here as `details.code`. */
+    details?: { code?: string } & Record<string, unknown>;
     /** ISO timestamp emitted by the backend envelope (sendSuccess / ErrorResponses). */
-    timestamp?: string;
+    timestamp?: IsoTimestamp;
 }
 
 export interface ApiSuccessResponse<T = unknown> {
@@ -47,9 +63,12 @@ export interface ApiErrorResponse {
     success: false;
     error: string;
     message?: string;
+    /** Legacy/fallback location — canonical error code is `details.code`. Read as `details?.code ?? code`. */
     code?: string;
+    /** Structured error context; conflict routes nest the error code here as `details.code`. */
+    details?: { code?: string } & Record<string, unknown>;
     /** ISO timestamp emitted by ErrorResponses. */
-    timestamp?: string;
+    timestamp?: IsoTimestamp;
 }
 
 // =============================================================================
@@ -57,10 +76,10 @@ export interface ApiErrorResponse {
 // =============================================================================
 
 /** GET /api/getCurrentExchangeRate, GET /api/getExchangeRateForDate. */
-export type ExchangeRateResult = ApiResponse<{ exchangeRate?: number; date?: string }>;
+export type ExchangeRateResult = ApiResponse<{ exchangeRate?: number; date?: DateOnly }>;
 
 export interface HistoryEntry {
-    date: string;
+    date: DateOnly;
     exchangeRate: number;
 }
 
@@ -125,17 +144,34 @@ export interface SlotRenderSpec {
 /** POST /api/photo-editor/:personId/prepare request body. */
 export interface PhotoPrepareRequest {
     tpDescription: string;
-    tpDate: string;
+    tpDate: DateOnly;
+    /** Confirm overriding an existing Initial/Final tblwork photo date. */
+    overrideDate?: boolean;
+    /** Supplied on resubmit when the patient has no English name (Dolphin can't store Arabic). */
+    firstName?: string;
+    lastName?: string;
 }
 
-/** POST /api/photo-editor/:personId/prepare response data (success or shwan-date conflict). */
-export interface PhotoPrepareResult {
-    tp_code?: number;
-    conflict?: boolean;
-    conflictSource?: 'shwan';
-    existingDate?: string;
-    requestedDate?: string;
-}
+/**
+ * POST /api/photo-editor/:personId/prepare response payload — the inner `data` of
+ * the `sendSuccess` envelope (unwrapped by `core/http.ts`). A discriminated union
+ * of the three normal outcomes, so a new outcome is a compile error until handled:
+ *  - `{ tp_code }`          — timepoint prepared, hand off to the editor;
+ *  - `{ conflict: true }`   — an Initial/Final date already exists; confirm override;
+ *  - `{ needsName: true }`  — patient has no English name (Dolphin can't store Arabic).
+ * Genuine failures are non-2xx (thrown as `HttpError`), never this shape.
+ */
+export type PhotoPrepareResult =
+    | { tp_code: number }
+    | {
+          conflict: true;
+          conflictType: string;
+          conflictSource: 'shwan';
+          existingDate: DateOnly;
+          requestedDate: DateOnly;
+          message: string;
+      }
+    | { needsName: true; message: string };
 
 /** POST /api/photo-editor/:personId/render request body. */
 export interface PhotoRenderRequest {
@@ -233,8 +269,8 @@ export interface FileEntry {
     relPath: string;
     type: 'file' | 'dir' | 'symlink';
     size?: number;
-    /** ISO timestamp. */
-    modified?: string;
+    /** ISO-8601 timestamp. */
+    modified?: IsoTimestamp;
     ext: string;
     category: FileCategory;
 }

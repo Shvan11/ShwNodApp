@@ -18,7 +18,7 @@ import {
   deleteVisitByWorkId,
   getLatestWiresByWorkId
 } from '../../services/database/queries/visit-queries.js';
-import { ErrorResponses } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
@@ -69,7 +69,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const wires = await getWires();
-      res.json(wires);
+      sendSuccess(res, wires);
     } catch (error) {
       log.error('Error fetching wires:', error);
       ErrorResponses.internalError(res, 'Failed to fetch wires', error as Error);
@@ -95,7 +95,7 @@ router.get(
         return;
       }
       const latestWires = await getLatestWiresByWorkId(parseInt(workId));
-      res.json(latestWires);
+      sendSuccess(res, latestWires);
     } catch (error) {
       log.error('Error fetching latest wires:', error);
       ErrorResponses.internalError(
@@ -129,7 +129,7 @@ router.get(
         return;
       }
       const visits = await getVisitsByWorkId(parseInt(workId));
-      res.json(visits);
+      sendSuccess(res, visits);
     } catch (error) {
       log.error('Error fetching visits by work:', error);
       ErrorResponses.internalError(
@@ -163,7 +163,7 @@ router.get(
         ErrorResponses.notFound(res, 'Visit');
         return;
       }
-      res.json(visit);
+      sendSuccess(res, visit);
     } catch (error) {
       log.error('Error fetching visit by id:', error);
       ErrorResponses.internalError(

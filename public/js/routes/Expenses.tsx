@@ -7,6 +7,7 @@ import ExpenseSummary from '../components/expenses/ExpenseSummary';
 import ExpenseModal from '../components/expenses/ExpenseModal';
 import DeleteConfirmModal from '../components/expenses/DeleteConfirmModal';
 import { useToast } from '../contexts/ToastContext';
+import { fetchJSON, httpErrorMessage } from '@/core/http';
 import styles from './Expenses.module.css';
 
 /**
@@ -109,15 +110,12 @@ export default function Expenses() {
   // Open edit expense modal
   const handleEditExpense = async (id: number) => {
     try {
-      const response = await fetch(`/api/expenses/${id}`);
-      if (!response.ok) throw new Error('Failed to fetch expense');
-
-      const expense: Expense = await response.json();
+      const expense = await fetchJSON<Expense>(`/api/expenses/${id}`);
       setCurrentExpense(expense);
       setIsExpenseModalOpen(true);
     } catch (err) {
       console.error('Error loading expense:', err);
-      toast.error('Failed to load expense data');
+      toast.error(httpErrorMessage(err, 'Failed to load expense data'));
     }
   };
 

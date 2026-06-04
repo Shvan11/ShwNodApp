@@ -112,6 +112,7 @@ const PreviewBody = ({ entry, src, downloadUrl }: BodyProps) => {
   useEffect(() => {
     if (entry.category !== 'text') return;
     let cancelled = false;
+    // eslint-disable-next-line no-restricted-syntax -- raw file-content fetch (reads res.text() of a download URL, not a JSON API)
     fetch(src, { credentials: 'same-origin' })
       .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
       .then((t) => {

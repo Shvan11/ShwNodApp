@@ -3,6 +3,7 @@
  * Handles all expense-related API calls with proper state management
  */
 import { useState, useEffect, useCallback } from 'react';
+import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 
 /**
  * Expense filters
@@ -104,13 +105,10 @@ export function useExpenses(filters: ExpenseFilters = {}): {
       if (filters.subcategoryId) queryParams.append('subcategoryId', String(filters.subcategoryId));
       if (filters.currency) queryParams.append('currency', filters.currency);
 
-      const response = await fetch(`/api/expenses?${queryParams}`);
-      if (!response.ok) throw new Error('Failed to fetch expenses');
-
-      const data = await response.json();
+      const data = await fetchJSON<Expense[]>(`/api/expenses?${queryParams}`);
       setExpenses(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch expenses');
+      setError(httpErrorMessage(err, 'Failed to fetch expenses'));
       console.error('Error fetching expenses:', err);
     } finally {
       setLoading(false);
@@ -146,12 +144,10 @@ export function useCategories(): {
     const fetchCategories = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/expenses/categories');
-        if (!response.ok) throw new Error('Failed to fetch categories');
-        const data = await response.json();
+        const data = await fetchJSON<Category[]>('/api/expenses/categories');
         setCategories(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch categories');
+        setError(httpErrorMessage(err, 'Failed to fetch categories'));
         console.error('Error fetching categories:', err);
       } finally {
         setLoading(false);
@@ -187,12 +183,10 @@ export function useSubcategories(categoryId: number | string | null | undefined)
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(`/api/expenses/subcategories/${categoryId}`);
-        if (!response.ok) throw new Error('Failed to fetch subcategories');
-        const data = await response.json();
+        const data = await fetchJSON<Subcategory[]>(`/api/expenses/subcategories/${categoryId}`);
         setSubcategories(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch subcategories');
+        setError(httpErrorMessage(err, 'Failed to fetch subcategories'));
         console.error('Error fetching subcategories:', err);
       } finally {
         setLoading(false);
@@ -224,23 +218,11 @@ export function useExpenseMutations(onSuccess?: () => void): {
         setLoading(true);
         setError(null);
 
-        const response = await fetch('/api/expenses', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(expenseData),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          const errorMessage = errorData?.error || `Failed to create expense (${response.status})`;
-          throw new Error(errorMessage);
-        }
-
-        const data = await response.json();
+        const data = await postJSON<Expense>('/api/expenses', expenseData);
         if (onSuccess) onSuccess();
         return data;
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to create expense';
+        const message = httpErrorMessage(err, 'Failed to create expense');
         setError(message);
         console.error('Error creating expense:', err);
         throw err;
@@ -257,23 +239,11 @@ export function useExpenseMutations(onSuccess?: () => void): {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/expenses/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(expenseData),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          const errorMessage = errorData?.error || `Failed to update expense (${response.status})`;
-          throw new Error(errorMessage);
-        }
-
-        const data = await response.json();
+        const data = await putJSON<Expense>(`/api/expenses/${id}`, expenseData);
         if (onSuccess) onSuccess();
         return data;
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to update expense';
+        const message = httpErrorMessage(err, 'Failed to update expense');
         setError(message);
         console.error('Error updating expense:', err);
         throw err;
@@ -290,19 +260,10 @@ export function useExpenseMutations(onSuccess?: () => void): {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/expenses/${id}`, {
-          method: 'DELETE',
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          const errorMessage = errorData?.error || `Failed to delete expense (${response.status})`;
-          throw new Error(errorMessage);
-        }
-
+        await deleteJSON(`/api/expenses/${id}`);
         if (onSuccess) onSuccess();
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to delete expense';
+        const message = httpErrorMessage(err, 'Failed to delete expense');
         setError(message);
         console.error('Error deleting expense:', err);
         throw err;
@@ -353,14 +314,11 @@ export function useExpenseSummary(
         queryParams.append('startDate', startDate);
         queryParams.append('endDate', endDate);
 
-        const response = await fetch(`/api/expenses/summary?${queryParams}`);
-        if (!response.ok) throw new Error('Failed to fetch summary');
-
-        const data = await response.json();
+        const data = await fetchJSON<ExpenseSummary>(`/api/expenses/summary?${queryParams}`);
         setSummary(data);
         setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch summary');
+        setError(httpErrorMessage(err, 'Failed to fetch summary'));
         console.error('Error fetching summary:', err);
       } finally {
         setLoading(false);

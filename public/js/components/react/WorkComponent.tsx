@@ -15,6 +15,7 @@ import {
     FILLING_TYPE_OPTIONS,
     FILLING_DEPTH_OPTIONS
 } from '../../config/workTypeConfig';
+import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import styles from './WorkComponent.module.css';
 
 interface PatientInfo {
@@ -94,6 +95,17 @@ interface Payment {
     actual_amount?: number;
     actual_cur?: string;
     change?: number;
+}
+
+/** Blocking-record counts carried on a work-delete 409 (`details.dependencies`). */
+interface WorkDeleteDependencies {
+    InvoiceCount?: number;
+    VisitCount?: number;
+    ItemCount?: number;
+    DiagnosisCount?: number;
+    ImplantCount?: number;
+    ScrewCount?: number;
+    AlignerSetCount?: number;
 }
 
 interface WorkComponentProps {
@@ -206,9 +218,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     const loadTeethOptions = async () => {
         try {
-            const response = await fetch('/api/teeth');
-            if (!response.ok) throw new Error('Failed to fetch teeth options');
-            const data = await response.json();
+            const data = await fetchJSON<{ teeth?: ToothOption[] }>('/api/teeth');
             setTeethOptions(data.teeth || []);
         } catch (err) {
             console.error('Error loading teeth options:', err);
@@ -217,9 +227,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     const loadImplantManufacturers = async () => {
         try {
-            const response = await fetch('/api/implant-manufacturers');
-            if (!response.ok) throw new Error('Failed to fetch implant manufacturers');
-            const data: ImplantManufacturer[] = await response.json();
+            const data = await fetchJSON<ImplantManufacturer[]>('/api/implant-manufacturers');
             setImplantManufacturers(data || []);
         } catch (err) {
             console.error('Error loading implant manufacturers:', err);
@@ -238,9 +246,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     const loadPatientInfo = async () => {
         try {
-            const response = await fetch(`/api/patients/${personId}/info`);
-            if (!response.ok) throw new Error('Failed to fetch patient info');
-            const data: PatientInfo = await response.json();
+            const data = await fetchJSON<PatientInfo>(`/api/patients/${personId}/info`);
             setPatientInfo(data);
         } catch (err) {
             console.error('Error loading patient info:', err);
@@ -250,9 +256,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const checkAppointmentStatus = async () => {
         try {
             setLoadingAppointment(true);
-            const response = await fetch(`/api/patients/${personId}/has-appointment`);
-            if (!response.ok) throw new Error('Failed to check appointment status');
-            const data = await response.json();
+            const data = await fetchJSON<{ hasAppointment: boolean }>(`/api/patients/${personId}/has-appointment`);
             setHasNextAppointment(data.hasAppointment);
         } catch (err) {
             console.error('[WORK-COMPONENT] Error checking appointment status:', err);
@@ -283,12 +287,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const loadWorks = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`/api/getworks?code=${personId}`);
-            if (!response.ok) throw new Error('Failed to fetch works');
-            const data: Work[] = await response.json();
+            const data = await fetchJSON<Work[]>(`/api/getworks?code=${personId}`);
             setWorks(data);
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
+            toast.error(httpErrorMessage(err, 'Failed to fetch works'), 5000);
         } finally {
             setLoading(false);
         }
@@ -348,21 +350,12 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     break;
             }
 
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || errorData.error || `Failed to ${type} work`);
-            }
+            await postJSON(endpoint, body);
 
             toast.success(successMessage);
             await loadWorks();
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
+            toast.error(httpErrorMessage(err, `Failed to ${type} work`), 5000);
         }
     };
 
@@ -416,42 +409,34 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
         try {
             const work = workToDelete;
-            const response = await fetch('/api/deletework', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ workId: work.work_id })
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                // Handle dependency error with detailed message
-                if (response.status === 409 && result.details?.dependencies) {
-                    const deps = result.details.dependencies;
-                    let detailMessage = '⚠️ CANNOT DELETE WORK - EXISTING RECORDS FOUND ⚠️\n\n';
-                    detailMessage += 'This work has the following records that must be deleted first:\n\n';
-
-                    if (deps.InvoiceCount > 0) detailMessage += `• ${deps.InvoiceCount} payment(s)\n`;
-                    if (deps.VisitCount > 0) detailMessage += `• ${deps.VisitCount} visit(s)\n`;
-                    if (deps.ItemCount > 0) detailMessage += `• ${deps.ItemCount} treatment detail(s)\n`;
-                    if (deps.DiagnosisCount > 0) detailMessage += `• ${deps.DiagnosisCount} diagnosis(es)\n`;
-                    if (deps.ImplantCount > 0) detailMessage += `• ${deps.ImplantCount} implant(s)\n`;
-                    if (deps.ScrewCount > 0) detailMessage += `• ${deps.ScrewCount} screw(s)\n`;
-                    if (deps.AlignerSetCount > 0) detailMessage += `• ${deps.AlignerSetCount} aligner set(s)\n`;
-
-                    detailMessage += '\n⚠️ Delete these records first, then try again.';
-
-                    toast.error(detailMessage, 10000);
-                    return;
-                }
-
-                throw new Error(result.error || 'Failed to delete work');
-            }
+            await deleteJSON('/api/deletework', { body: JSON.stringify({ workId: work.work_id }) });
 
             toast.success('Work deleted successfully!');
             await loadWorks();
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
+            // A 409 carries a `details.dependencies` breakdown of the blocking records.
+            const httpErr = err as HttpError;
+            const deps = (httpErr.data as { details?: { dependencies?: WorkDeleteDependencies } } | undefined)
+                ?.details?.dependencies;
+            if (httpErr.status === 409 && deps) {
+                let detailMessage = '⚠️ CANNOT DELETE WORK - EXISTING RECORDS FOUND ⚠️\n\n';
+                detailMessage += 'This work has the following records that must be deleted first:\n\n';
+
+                if (deps.InvoiceCount && deps.InvoiceCount > 0) detailMessage += `• ${deps.InvoiceCount} payment(s)\n`;
+                if (deps.VisitCount && deps.VisitCount > 0) detailMessage += `• ${deps.VisitCount} visit(s)\n`;
+                if (deps.ItemCount && deps.ItemCount > 0) detailMessage += `• ${deps.ItemCount} treatment detail(s)\n`;
+                if (deps.DiagnosisCount && deps.DiagnosisCount > 0) detailMessage += `• ${deps.DiagnosisCount} diagnosis(es)\n`;
+                if (deps.ImplantCount && deps.ImplantCount > 0) detailMessage += `• ${deps.ImplantCount} implant(s)\n`;
+                if (deps.ScrewCount && deps.ScrewCount > 0) detailMessage += `• ${deps.ScrewCount} screw(s)\n`;
+                if (deps.AlignerSetCount && deps.AlignerSetCount > 0) detailMessage += `• ${deps.AlignerSetCount} aligner set(s)\n`;
+
+                detailMessage += '\n⚠️ Delete these records first, then try again.';
+
+                toast.error(detailMessage, 10000);
+                return;
+            }
+
+            toast.error(httpErrorMessage(err, 'Failed to delete work'), 5000);
         } finally {
             setWorkToDelete(null);
         }
@@ -484,12 +469,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     const loadWorkDetails = async (workId: number) => {
         try {
-            const response = await fetch(`/api/getworkdetailslist?workId=${workId}`);
-            if (!response.ok) throw new Error('Failed to fetch work details');
-            const data: WorkDetail[] = await response.json();
+            const data = await fetchJSON<WorkDetail[]>(`/api/getworkdetailslist?workId=${workId}`);
             setWorkDetails(data);
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
+            toast.error(httpErrorMessage(err, 'Failed to fetch work details'), 5000);
         }
     };
 
@@ -544,25 +527,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         e.preventDefault();
 
         try {
-            let response: Response;
-
             if (editingDetail) {
-                response = await fetch('/api/updateworkdetail', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ detailId: editingDetail.id, ...detailFormData })
-                });
+                await putJSON('/api/updateworkdetail', { detailId: editingDetail.id, ...detailFormData });
             } else {
-                response = await fetch('/api/addworkdetail', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(detailFormData)
-                });
-            }
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to save work detail');
+                await postJSON('/api/addworkdetail', detailFormData);
             }
 
             if (selectedWork) {
@@ -570,7 +538,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             }
             setShowDetailForm(false);
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
+            toast.error(httpErrorMessage(err, 'Failed to save work detail'), 5000);
         }
     };
 
@@ -578,22 +546,13 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         if (!await confirm('Are you sure you want to delete this work detail?', { title: 'Delete Work Detail', danger: true, confirmText: 'Delete' })) return;
 
         try {
-            const response = await fetch('/api/deleteworkdetail', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ detailId })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to delete work detail');
-            }
+            await deleteJSON('/api/deleteworkdetail', { body: JSON.stringify({ detailId }) });
 
             if (selectedWork) {
                 await loadWorkDetails(selectedWork.work_id);
             }
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
+            toast.error(httpErrorMessage(err, 'Failed to delete work detail'), 5000);
         }
     };
 
@@ -673,12 +632,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const loadPaymentHistory = async (workId: number) => {
         try {
             setLoadingPayments(true);
-            const response = await fetch(`/api/getpaymenthistory?workId=${workId}`);
-            if (!response.ok) throw new Error('Failed to fetch payment history');
-            const data: Payment[] = await response.json();
+            const data = await fetchJSON<Payment[]>(`/api/getpaymenthistory?workId=${workId}`);
             setPaymentHistory(data);
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
+            toast.error(httpErrorMessage(err, 'Failed to fetch payment history'), 5000);
             setPaymentHistory([]);
         } finally {
             setLoadingPayments(false);
@@ -704,20 +661,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const handleQuickCheckin = async () => {
         try {
             setCheckingIn(true);
-            const response = await fetch('/api/appointments/quick-checkin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    person_id: personId
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to check in patient');
-            }
-
-            const result = await response.json();
+            const result = await postJSON<{ alreadyCheckedIn?: boolean; created?: boolean }>(
+                '/api/appointments/quick-checkin',
+                { person_id: personId }
+            );
 
             if (result.alreadyCheckedIn) {
                 toast.success(`${patientInfo?.name || 'Patient'} is already checked in today!`);
@@ -730,7 +677,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 setCheckedIn(true);
             }
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
+            toast.error(httpErrorMessage(err, 'Failed to check in patient'), 5000);
         } finally {
             setCheckingIn(false);
         }
@@ -1328,20 +1275,14 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                                 onClick={async () => {
                                                                     if (await confirm(`Are you sure you want to delete this payment?\n\nAmount: ${formatCurrency(payment.amount_paid, selectedWorkForPayment.currency)}\nDate: ${formatDate(payment.date_of_payment)}\n\nThis action cannot be undone.`, { title: 'Delete Payment', danger: true, confirmText: 'Delete' })) {
                                                                         try {
-                                                                            const response = await fetch(`/api/deleteInvoice/${payment.InvoiceID}`, {
-                                                                                method: 'DELETE'
-                                                                            });
-                                                                            const result = await response.json();
-                                                                            if (result.success) {
-                                                                                toast.success('Payment deleted successfully!');
-                                                                                loadPaymentHistory(selectedWorkForPayment.work_id);
-                                                                                loadWorks();
-                                                                            } else {
-                                                                                throw new Error(result.message || 'Failed to delete payment');
-                                                                            }
+                                                                            // Route is sendSuccess-enveloped → fetchData unwraps + throws on non-2xx.
+                                                                            await deleteJSON(`/api/deleteInvoice/${payment.InvoiceID}`);
+                                                                            toast.success('Payment deleted successfully!');
+                                                                            loadPaymentHistory(selectedWorkForPayment.work_id);
+                                                                            loadWorks();
                                                                         } catch (error) {
                                                                             console.error('Error deleting payment:', error);
-                                                                            toast.error(`Error deleting payment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                                                                            toast.error(`Error deleting payment: ${httpErrorMessage(error, 'Unknown error')}`);
                                                                         }
                                                                     }
                                                                 }}

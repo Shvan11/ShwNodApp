@@ -9,6 +9,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalState } from '../contexts/GlobalStateContext';
 import { useToast } from '../contexts/ToastContext';
 import sseWhatsapp from '../services/sse-whatsapp';
+import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 
 // Authentication States
 export const AUTH_STATES = {
@@ -125,11 +126,8 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   // Fetch initial state via REST (replaces the WS RPC).
   const requestInitialState = useCallback(async () => {
     try {
-      const response = await fetch('/api/wa/initial-state', { credentials: 'same-origin' });
-      if (!response.ok) {
-        throw new Error(`Initial state request failed: ${response.status}`);
-      }
-      const data = (await response.json()) as InitialStateResponse;
+      // Flat `{ success, qr, clientReady, … }` (no `data` key) → fetchJSON passthrough.
+      const data = await fetchJSON<InitialStateResponse>('/api/wa/initial-state');
       handleInitialState(data);
     } catch (err) {
       console.error('[useWhatsAppAuth] initial-state fetch failed', err);
@@ -139,14 +137,12 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   // Fetch QR code from API (fallback method)
   const fetchQRCode = useCallback(async (): Promise<string | null> => {
     try {
-      const response = await fetch('/api/wa/qr', { credentials: 'same-origin' });
-      if (!response.ok) {
-        if (response.status === 404) return null;
-        throw new Error(`Failed to fetch QR code: ${response.status}`);
-      }
-      const qrResponse = await response.json();
+      // Flat `{ qr, status, … }` (no `data` key) → fetchJSON passthrough.
+      const qrResponse = await fetchJSON<{ qr?: string }>('/api/wa/qr');
       return qrResponse.qr || null;
     } catch (err) {
+      // 404 = QR not available yet (a normal signal, not an error).
+      if ((err as HttpError).status === 404) return null;
       console.error('Failed to fetch QR code:', err);
       return null;
     }
@@ -255,24 +251,17 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   const handleRestart = useCallback(async () => {
     toast.info('Restarting WhatsApp client…');
     try {
-      const response = await fetch('/api/wa/restart', {
-        method: 'POST',
-        credentials: 'same-origin',
-      });
-      const result = await response.json();
-      if (result.success) {
-        setAuthState(AUTH_STATES.INITIALIZING);
-        toast.success('WhatsApp client restart initiated');
-        setTimeout(() => {
-          void requestInitialState();
-        }, CONFIG.CLIENT_RESTART_DELAY_MS);
-      } else {
-        throw new Error(result.error || 'Restart failed');
-      }
+      // Non-2xx now throws (route 500s on failure); the success body is success:true.
+      await postJSON('/api/wa/restart', {});
+      setAuthState(AUTH_STATES.INITIALIZING);
+      toast.success('WhatsApp client restart initiated');
+      setTimeout(() => {
+        void requestInitialState();
+      }, CONFIG.CLIENT_RESTART_DELAY_MS);
     } catch (err) {
       console.error('Restart failed:', err);
       setAuthState(AUTH_STATES.ERROR);
-      const message = err instanceof Error ? err.message : 'Restart failed';
+      const message = httpErrorMessage(err, 'Restart failed');
       setError(message);
       toast.error(`Restart failed: ${message}`);
     }
@@ -281,21 +270,14 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   const handleDestroy = useCallback(async () => {
     toast.info('Closing WhatsApp browser…');
     try {
-      const response = await fetch('/api/wa/destroy', {
-        method: 'POST',
-        credentials: 'same-origin',
-      });
-      const result = await response.json();
-      if (result.success) {
-        setAuthState(AUTH_STATES.INITIALIZING);
-        toast.success('WhatsApp browser closed');
-      } else {
-        throw new Error(result.error || 'Destroy failed');
-      }
+      // Non-2xx now throws (route 400/500s on failure); the success body is success:true.
+      await postJSON('/api/wa/destroy', {});
+      setAuthState(AUTH_STATES.INITIALIZING);
+      toast.success('WhatsApp browser closed');
     } catch (err) {
       console.error('Destroy failed:', err);
       setAuthState(AUTH_STATES.ERROR);
-      const message = err instanceof Error ? err.message : 'Destroy failed';
+      const message = httpErrorMessage(err, 'Destroy failed');
       setError(message);
       toast.error(`Failed to close browser: ${message}`);
     }
@@ -304,39 +286,26 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   const handleLogout = useCallback(async () => {
     toast.info('Logging out of WhatsApp…');
     try {
-      const response = await fetch('/api/wa/logout', {
-        method: 'POST',
-        credentials: 'same-origin',
-      });
-      const result = await response.json();
-      if (result.success) {
-        setAuthState(AUTH_STATES.INITIALIZING);
-        toast.success('Logged out — restarting client');
+      // Non-2xx now throws (route 400/500s on failure); the success body is success:true.
+      await postJSON('/api/wa/logout', {});
+      setAuthState(AUTH_STATES.INITIALIZING);
+      toast.success('Logged out — restarting client');
 
-        try {
-          const restartResponse = await fetch('/api/wa/restart', {
-            method: 'POST',
-            credentials: 'same-origin',
-          });
-          const restartResult = await restartResponse.json();
-          if (restartResult.success) {
-            setTimeout(() => {
-              void requestInitialState();
-            }, CONFIG.LOGOUT_DELAY_MS);
-          }
-        } catch (restartError) {
-          console.warn('Restart failed:', restartError);
-          setTimeout(() => {
-            void requestInitialState();
-          }, CONFIG.LOGOUT_DELAY_MS);
-        }
-      } else {
-        throw new Error(result.error || 'Logout failed');
+      // Re-prime initial state whether or not the follow-up restart succeeds
+      // (both branches re-prime; the catch covers a non-2xx restart too).
+      try {
+        await postJSON('/api/wa/restart', {});
+      } catch (restartError) {
+        console.warn('Restart failed:', restartError);
+      } finally {
+        setTimeout(() => {
+          void requestInitialState();
+        }, CONFIG.LOGOUT_DELAY_MS);
       }
     } catch (err) {
       console.error('Logout failed:', err);
       setAuthState(AUTH_STATES.ERROR);
-      const message = err instanceof Error ? err.message : 'Logout failed';
+      const message = httpErrorMessage(err, 'Logout failed');
       setError(message);
       toast.error(`Logout failed: ${message}`);
     }

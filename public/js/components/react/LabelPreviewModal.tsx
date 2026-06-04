@@ -465,6 +465,7 @@ const LabelPreviewModal = ({
         try {
             const richLabels = buildRichLabels();
 
+            // eslint-disable-next-line no-restricted-syntax -- returns a PDF blob (res.blob()) + reads X-Total-* response headers; needs the raw Response
             const response = await fetch('/api/aligner/labels/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

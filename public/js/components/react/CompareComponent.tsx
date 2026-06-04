@@ -9,6 +9,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef, ChangeEvent, 
 import { formatISODate } from '../../core/utils';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
+import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
 import Modal from './Modal';
 import styles from './CompareComponent.module.css';
 
@@ -419,9 +420,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
     // Empty array on failure — callers use it to disable photo types whose image is missing.
     const fetchTimepointImages = useCallback(async (tpCode: number): Promise<string[]> => {
         try {
-            const response = await fetch(`/api/patients/${personId}/timepoints/${tpCode}/images`);
-            if (!response.ok) return [];
-            return await response.json() as string[];
+            return await fetchJSON<string[]>(`/api/patients/${personId}/timepoints/${tpCode}/images`);
         } catch {
             return [];
         }
@@ -435,10 +434,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
 
         try {
             setLoading(true);
-            const response = await fetch(`/api/patients/${personId}/timepoints`);
-            if (!response.ok) throw new Error('Failed to load timepoints');
-
-            const data: Timepoint[] = await response.json();
+            const data = await fetchJSON<Timepoint[]>(`/api/patients/${personId}/timepoints`);
             setTimepoints(data);
 
             // Auto-select first and last timepoints (skip tp_code 0)
@@ -466,7 +462,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
             }
         } catch (err) {
             console.error('Error loading timepoints:', err);
-            toast.error('Failed to load timepoints: ' + (err instanceof Error ? err.message : 'Unknown error'));
+            toast.error(httpErrorMessage(err, 'Failed to load timepoints'));
         } finally {
             setLoading(false);
         }
@@ -1102,21 +1098,12 @@ const CompareComponent = ({ personId, phone }: Props) => {
 
             const imageData = comparison.toDataURL();
 
-            const response = await fetch('/api/wa/sendmedia', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: phoneNumber, file: imageData })
-            });
-
-            if (response.ok) {
-                toast.success('Image sent successfully!');
-                setShowWhatsAppModal(false);
-            } else {
-                throw new Error('Failed to send image');
-            }
+            await postJSON('/api/wa/sendmedia', { phone: phoneNumber, file: imageData });
+            toast.success('Image sent successfully!');
+            setShowWhatsAppModal(false);
         } catch (err) {
             console.error('Error sending WhatsApp message:', err);
-            toast.error('Failed to send image: ' + (err instanceof Error ? err.message : 'Unknown error'));
+            toast.error(httpErrorMessage(err, 'Failed to send image'));
         } finally {
             setSendingMessage(false);
         }

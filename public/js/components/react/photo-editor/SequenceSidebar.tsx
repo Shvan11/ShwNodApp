@@ -16,7 +16,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import styles from './SequenceSidebar.module.css';
 import { useToast } from '../../../contexts/ToastContext';
-import { postFormData, postJSON, type HttpError } from '@/core/http';
+import { fetchJSON, postFormData, postJSON, type HttpError } from '@/core/http';
 import { ensurePermission, showFilePicker } from '@/core/fileSystemAccess';
 import { useImportFolder } from '@/hooks/useImportFolder';
 import RenameFolderModal from './RenameFolderModal';
@@ -64,11 +64,10 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
   // Top-level folders for the picker.
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/patients/${personId}/files?path=`)
-      .then((r) => (r.ok ? r.json() : null))
+    fetchJSON<{ entries?: FileEntryLite[] }>(`/api/patients/${personId}/files?path=`)
       .then((res) => {
-        if (cancelled || !res?.data?.entries) return;
-        const dirs = (res.data.entries as FileEntryLite[])
+        if (cancelled || !res?.entries) return;
+        const dirs = res.entries
           .filter((e) => e.type === 'dir')
           .map((e) => e.name);
         setFolders(dirs);
@@ -85,25 +84,28 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/patients/${personId}/files?path=${encodeURIComponent(folder)}`)
-      .then((r) => {
-        if (!cancelled) setFolderExists(r.status !== 404); // 404 = folder doesn't exist yet
-        return r.ok ? r.json() : null;
-      })
-      .then((res) => {
+    (async () => {
+      try {
+        const res = await fetchJSON<{ entries?: FileEntryLite[] }>(
+          `/api/patients/${personId}/files?path=${encodeURIComponent(folder)}`
+        );
         if (cancelled) return;
-        const entries = (res?.data?.entries as FileEntryLite[] | undefined) || [];
+        setFolderExists(true);
+        const entries = res?.entries || [];
         setFiles(entries.filter((e) => e.type === 'file' && e.category === 'image'));
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setFiles([]);
-          toast.error('Failed to load folder');
-        }
-      })
-      .finally(() => {
+      } catch (err) {
+        if (cancelled) return;
+        // 404 = folder doesn't exist yet; other HTTP statuses still count as "exists".
+        // Only a transport/parse failure (no .status) surfaces a toast — matching the
+        // previous chain, which swallowed non-2xx responses via a null body.
+        const status = (err as HttpError).status;
+        setFolderExists(status !== 404);
+        setFiles([]);
+        if (status === undefined) toast.error('Failed to load folder');
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };

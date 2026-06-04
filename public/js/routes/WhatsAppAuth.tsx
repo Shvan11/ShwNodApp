@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { fetchJSON } from '@/core/http';
 import { useWhatsAppAuth, AUTH_STATES } from '../hooks/useWhatsAppAuth';
 import { StatusDisplay } from '../components/whatsapp-auth/StatusDisplay';
 import { QRCodeDisplay } from '../components/whatsapp-auth/QRCodeDisplay';
@@ -34,7 +35,8 @@ export default function WhatsAppAuth() {
     if (!import.meta.env.DEV) return;
     if (initRequestedRef.current) return;
     initRequestedRef.current = true;
-    fetch('/api/wa/initialize', { credentials: 'same-origin' }).catch((err) => {
+    // Fire-and-forget: response ignored, so a non-2xx (now thrown by fetchJSON) just logs.
+    fetchJSON('/api/wa/initialize').catch((err) => {
       console.error('[WhatsAppAuth] dev auto-init request failed:', err);
     });
   }, []);

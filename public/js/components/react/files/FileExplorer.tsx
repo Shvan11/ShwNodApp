@@ -22,7 +22,7 @@ import { fetchJSON, postJSON, postFormData, deleteJSON } from '@/core/http';
 import { useToast } from '@/contexts/ToastContext';
 import { useConfirm } from '@/contexts/ConfirmContext';
 import Modal from '@/components/react/Modal';
-import type { ApiResponse, FileEntry, FileListing, FileBatchDeleteResult } from '@/types/api.types';
+import type { FileEntry, FileListing, FileBatchDeleteResult } from '@/types/api.types';
 import { encodeRelPath, errorMessage } from './fileHelpers';
 import FileEntryTile from './FileEntryTile';
 import FilePreviewModal from './FilePreviewModal';
@@ -96,13 +96,12 @@ const FileExplorer = ({ personId, subPath }: Props) => {
     setLoading(true);
     setError(null);
     const qs = new URLSearchParams({ path: currentPath, flat: flat ? '1' : '0' });
-    fetchJSON<ApiResponse<FileListing>>(`/api/patients/${personId}/files?${qs}`, {
+    fetchJSON<FileListing>(`/api/patients/${personId}/files?${qs}`, {
       signal: ac.signal,
     })
-      .then((res) => {
+      .then((listing) => {
         if (ac.signal.aborted) return;
-        if (res.success && res.data) setListing(res.data);
-        else throw new Error(res.error || 'Failed to load files');
+        setListing(listing);
       })
       .catch((err: unknown) => {
         if (!ac.signal.aborted && (err as Error)?.name !== 'AbortError') {
@@ -296,12 +295,11 @@ const FileExplorer = ({ personId, subPath }: Props) => {
 
     setBusy(true);
     try {
-      const res = await postJSON<ApiResponse<FileBatchDeleteResult>>(
+      const result = await postJSON<FileBatchDeleteResult>(
         `/api/patients/${personId}/files/delete-batch`,
         { paths: sel.map((e) => e.relPath) }
       );
-      if (!res.success || !res.data) throw new Error(res.error || 'Delete failed');
-      const { succeeded, failed } = res.data;
+      const { succeeded, failed } = result;
       if (failed === 0) toast.success(`Moved ${succeeded} item(s) to trash`);
       else if (succeeded === 0) toast.error(`Failed to delete ${failed} item(s)`);
       else toast.warning(`Moved ${succeeded} to trash, ${failed} failed`);

@@ -25,6 +25,7 @@ const PhotosTab = () => {
     let cancelled = false;
     (async () => {
       try {
+        // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (CLAUDE.md / audit N17): validates the raw body itself and reads res.ok/error.
         const res = await fetch('/api/portal/timepoints', { credentials: 'same-origin' });
         const parsed = portalTimepointsResponseSchema.safeParse(await res.json());
         if (cancelled) return;
@@ -54,6 +55,7 @@ const PhotosTab = () => {
     setPhotosError(null);
     (async () => {
       try {
+        // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (CLAUDE.md / audit N17): validates the raw body itself and reads res.ok/error.
         const res = await fetch(`/api/portal/photos/${encodeURIComponent(selectedTp)}`, {
           credentials: 'same-origin',
         });

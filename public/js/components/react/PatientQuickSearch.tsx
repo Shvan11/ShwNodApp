@@ -3,6 +3,7 @@ import AsyncSelect from 'react-select/async';
 import type { StylesConfig } from 'react-select';
 import cn from 'classnames';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
+import { fetchJSON, httpErrorMessage } from '@/core/http';
 import styles from './PatientQuickSearch.module.css';
 
 /**
@@ -85,16 +86,12 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
         const fetchPatients = async () => {
             try {
                 setLoading(true);
-                const response = await fetch('/api/patients/phones');
-                if (!response.ok) {
-                    throw new Error('Failed to load patients');
-                }
-                const data = await response.json() as PatientOption[];
+                const data = await fetchJSON<PatientOption[]>('/api/patients/phones');
                 setPatients(data);
                 setError(null);
             } catch (err) {
                 console.error('Failed to fetch patients:', err);
-                setError(err instanceof Error ? err.message : 'Failed to load patients');
+                setError(httpErrorMessage(err, 'Failed to load patients'));
             } finally {
                 setLoading(false);
             }

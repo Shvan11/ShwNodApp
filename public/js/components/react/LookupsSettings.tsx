@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import { fetchJSON } from '@/core/http';
 import LookupEditor from './LookupEditor';
 import HolidayEditor from './HolidayEditor';
 import CostPresetsSettings from './CostPresetsSettings';
@@ -64,22 +65,17 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
     const loadTableConfigs = async (): Promise<void> => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/lookups/tables');
-            if (response.ok) {
-                const data: TableConfig[] = await response.json();
-                const costPresetsEntry: TableConfig = {
-                    key: COST_PRESETS_TABLE_KEY,
-                    displayName: 'Cost Presets',
-                    icon: 'fas fa-dollar-sign',
-                    idColumn: 'PresetID',
-                    columns: [],
-                };
-                setTables([...data, costPresetsEntry]);
-            } else {
-                toast.error('Failed to load lookup tables configuration');
-            }
+            const data = await fetchJSON<TableConfig[]>('/api/admin/lookups/tables');
+            const costPresetsEntry: TableConfig = {
+                key: COST_PRESETS_TABLE_KEY,
+                displayName: 'Cost Presets',
+                icon: 'fas fa-dollar-sign',
+                idColumn: 'PresetID',
+                columns: [],
+            };
+            setTables([...data, costPresetsEntry]);
         } catch {
-            toast.error('Error loading lookup tables');
+            toast.error('Failed to load lookup tables configuration');
         } finally {
             setLoading(false);
         }

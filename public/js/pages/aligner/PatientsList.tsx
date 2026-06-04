@@ -1,6 +1,7 @@
 // PatientsList.tsx - Show patients for a selected doctor
 import React, { useState, useEffect, ChangeEvent, SyntheticEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { fetchJSON } from '@/core/http';
 import styles from './PatientsList.module.css';
 
 interface Doctor {
@@ -39,14 +40,19 @@ const PatientsList: React.FC = () => {
         try {
             setLoading(true);
 
-            // Load doctor info (unless it's "all")
+            // Load doctor info (unless it's "all"). Best-effort: a doctor-lookup
+            // failure must not block the patient list, so it has its own try/catch.
             if (doctorId !== 'all') {
-                const doctorResponse = await fetch('/api/aligner/doctors');
-                const doctorData = await doctorResponse.json();
-
-                if (doctorData.success) {
-                    const foundDoctor = doctorData.doctors.find((d: Doctor) => d.dr_id === parseInt(doctorId || ''));
-                    setDoctor(foundDoctor || { dr_id: 0, doctor_name: 'Unknown Doctor' });
+                try {
+                    const doctorData = await fetchJSON<{ success: boolean; doctors?: Doctor[] }>(
+                        '/api/aligner/doctors'
+                    );
+                    if (doctorData.success) {
+                        const foundDoctor = doctorData.doctors?.find((d: Doctor) => d.dr_id === parseInt(doctorId || ''));
+                        setDoctor(foundDoctor || { dr_id: 0, doctor_name: 'Unknown Doctor' });
+                    }
+                } catch (e) {
+                    console.error('Error loading doctor info:', e);
                 }
             } else {
                 setDoctor({ dr_id: 'all', doctor_name: 'All Doctors' });
@@ -57,8 +63,7 @@ const PatientsList: React.FC = () => {
                 ? '/api/aligner/patients/all'
                 : `/api/aligner/patients/by-doctor/${doctorId}`;
 
-            const response = await fetch(url);
-            const data = await response.json();
+            const data = await fetchJSON<{ success: boolean; patients?: Patient[] }>(url);
 
             if (data.success) {
                 setPatients(data.patients || []);

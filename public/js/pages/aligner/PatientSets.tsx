@@ -33,6 +33,7 @@ import type {
     AlignerNote,
 } from './aligner.types';
 import type { PaymentSaveData } from '@/types/api.types';
+import { fetchJSON, postJSON, putJSON, patchJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
 import styles from './PatientSets.module.css';
 
 // Page-specific types
@@ -53,30 +54,24 @@ interface ConfirmDialogState {
     onConfirm: (() => void) | null;
 }
 
-interface MarkDeliveredResponse {
-    success: boolean;
-    message?: string;
-    data?: {
-        batchId: number;
-        batchSequence: number;
-        setId: number;
-        wasActivated: boolean;
-        wasAlreadyActive: boolean;
-        wasAlreadyDelivered: boolean;
-        previouslyActiveBatchSequence: number | null;
-    };
-    error?: string;
+// These are the UNWRAPPED payloads: the batch-status routes return
+// { success, message, data:{…} }, and core/http.ts's fetchJSON/patchJSON unwrap
+// to the inner `data` object (audit H1). So a handler receives this shape directly.
+interface MarkDeliveredResult {
+    batchId: number;
+    batchSequence: number;
+    setId: number;
+    wasActivated: boolean;
+    wasAlreadyActive: boolean;
+    wasAlreadyDelivered: boolean;
+    previouslyActiveBatchSequence: number | null;
 }
 
-interface BatchStatusResponse {
-    success: boolean;
-    message?: string;
-    data?: {
-        batchId: number;
-        batchSequence: number;
-        action?: string;
-    };
-    error?: string;
+interface BatchStatusResult {
+    batchId: number;
+    batchSequence: number;
+    action?: string;
+    wasAlreadyManufactured?: boolean;
 }
 
 const PatientSets: React.FC = () => {
@@ -197,12 +192,9 @@ const PatientSets: React.FC = () => {
 
     const loadDoctors = async (): Promise<void> => {
         try {
-            const response = await fetch('/api/aligner/doctors');
-            const data = await response.json();
-
-            if (data.success) {
-                setDoctors(data.doctors || []);
-            }
+            // Flat { success, doctors } (no `data` key) → fetchJSON passthrough.
+            const data = await fetchJSON<{ doctors?: AlignerDoctorWithAliases[] }>('/api/aligner/doctors');
+            setDoctors(data.doctors || []);
         } catch (error) {
             console.error('Error loading doctors:', error);
         }
@@ -223,12 +215,8 @@ const PatientSets: React.FC = () => {
 
     const loadAlignerSets = async (workIdParam: number): Promise<void> => {
         try {
-            const response = await fetch(`/api/aligner/sets/${workIdParam}`);
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to load aligner sets');
-            }
+            // Flat { success, sets, count } (no `data` key) → fetchJSON passthrough.
+            const data = await fetchJSON<{ sets?: AlignerSet[] }>(`/api/aligner/sets/${workIdParam}`);
 
             const sets: AlignerSet[] = data.sets || [];
             setAlignerSets(sets);
@@ -248,19 +236,14 @@ const PatientSets: React.FC = () => {
             }
         } catch (error) {
             console.error('Error loading aligner sets:', error);
-            toast.error('Failed to load aligner sets: ' + (error as Error).message);
+            toast.error('Failed to load aligner sets: ' + httpErrorMessage(error, 'unknown error'));
         }
     };
 
     const loadBatches = async (setId: number): Promise<void> => {
         try {
-            const response = await fetch(`/api/aligner/batches/${setId}`);
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to load batches');
-            }
-
+            // Flat { success, batches } (no `data` key) → fetchJSON passthrough.
+            const data = await fetchJSON<{ batches?: AlignerBatch[] }>(`/api/aligner/batches/${setId}`);
             setBatchesData(prev => ({ ...prev, [setId]: data.batches || [] }));
         } catch (error) {
             console.error('Error loading batches:', error);
@@ -270,12 +253,8 @@ const PatientSets: React.FC = () => {
 
     const loadNotes = async (setId: number, workIdParam: number, autoMarkRead: boolean = true): Promise<void> => {
         try {
-            const response = await fetch(`/api/aligner/notes/${setId}`);
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to load notes');
-            }
+            // Flat { success, notes } (no `data` key) → fetchJSON passthrough.
+            const data = await fetchJSON<{ notes?: AlignerNote[] }>(`/api/aligner/notes/${setId}`);
 
             setNotesData(prev => ({ ...prev, [setId]: data.notes || [] }));
 
@@ -303,9 +282,7 @@ const PatientSets: React.FC = () => {
         // the just-loaded notes payload), so toggling to read directly is safe — no
         // need for a per-note /status round-trip first.
         try {
-            await fetch(`/api/aligner/notes/${noteId}/toggle-read`, {
-                method: 'PATCH'
-            });
+            await patchJSON(`/api/aligner/notes/${noteId}/toggle-read`, {});
         } catch (error) {
             console.error('Error marking note as read:', error);
         }
@@ -420,10 +397,8 @@ const PatientSets: React.FC = () => {
     const handlePaymentSaved = async (paymentData: PaymentSaveData): Promise<void> => {
         if (!patient || !currentSetForPayment) return;
 
-        const response = await fetch('/api/aligner/payments', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        try {
+            await postJSON('/api/aligner/payments', {
                 workid: patient.workid,
                 aligner_set_id: currentSetForPayment.aligner_set_id,
                 amount_paid: paymentData.amount_paid,
@@ -432,13 +407,11 @@ const PatientSets: React.FC = () => {
                 actual_amount: paymentData.actual_amount,
                 actual_cur: paymentData.actual_cur,
                 change: paymentData.change
-            })
-        });
-
-        const data = await response.json();
-
-        if (!data.success) {
-            throw new Error(data.error || 'Failed to save payment');
+            });
+        } catch (err) {
+            // PaymentFormDrawer surfaces the thrown error's .message — preserve the
+            // server's detail (HttpError.message would just be "HTTP Error: 400 …").
+            throw new Error(httpErrorMessage(err, 'Failed to save payment'), { cause: err });
         }
 
         toast.success('Payment saved successfully');
@@ -455,14 +428,7 @@ const PatientSets: React.FC = () => {
             message: `Are you sure you want to delete Set #${set.set_sequence}? This will also delete all associated batches and notes. This action cannot be undone.`,
             onConfirm: async () => {
                 try {
-                    const response = await fetch(`/api/aligner/sets/${set.aligner_set_id}`, {
-                        method: 'DELETE'
-                    });
-                    const data = await response.json();
-
-                    if (!data.success) {
-                        throw new Error(data.error || 'Failed to delete set');
-                    }
+                    await deleteJSON(`/api/aligner/sets/${set.aligner_set_id}`);
 
                     toast.success('Set deleted successfully');
                     if (patient) {
@@ -470,7 +436,7 @@ const PatientSets: React.FC = () => {
                     }
                 } catch (error) {
                     console.error('Error deleting set:', error);
-                    toast.error('Failed to delete set: ' + (error as Error).message);
+                    toast.error('Failed to delete set: ' + httpErrorMessage(error, 'unknown error'));
                 }
                 setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }
@@ -485,22 +451,16 @@ const PatientSets: React.FC = () => {
             message: `Mark Batch #${batch.batch_sequence} as delivered? This will set the delivery date to today.`,
             onConfirm: async () => {
                 try {
-                    const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}/deliver`, {
-                        method: 'PATCH'
-                    });
-                    const data: MarkDeliveredResponse = await response.json();
-
-                    if (!data.success) {
-                        throw new Error(data.error || 'Failed to mark as delivered');
-                    }
+                    // fetchJSON unwraps { success, message, data } → the inner data object.
+                    const result = await patchJSON<MarkDeliveredResult>(`/api/aligner/batches/${batch.aligner_batch_id}/deliver`, {});
 
                     // Show appropriate toast based on what happened
-                    if (data.data?.wasAlreadyDelivered) {
+                    if (result.wasAlreadyDelivered) {
                         toast.info('Batch was already delivered');
-                    } else if (data.data?.wasActivated) {
-                        toast.success(`Batch #${data.data.batchSequence} delivered and activated (latest batch)`);
-                    } else if (data.data?.wasAlreadyActive) {
-                        toast.success(`Batch #${data.data.batchSequence} delivered (already active)`);
+                    } else if (result.wasActivated) {
+                        toast.success(`Batch #${result.batchSequence} delivered and activated (latest batch)`);
+                    } else if (result.wasAlreadyActive) {
+                        toast.success(`Batch #${result.batchSequence} delivered (already active)`);
                     } else {
                         toast.success('Batch marked as delivered');
                     }
@@ -511,7 +471,7 @@ const PatientSets: React.FC = () => {
                     }
                 } catch (error) {
                     console.error('Error marking as delivered:', error);
-                    toast.error('Failed to mark as delivered: ' + (error as Error).message);
+                    toast.error('Failed to mark as delivered: ' + httpErrorMessage(error, 'unknown error'));
                 }
                 setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }
@@ -526,17 +486,13 @@ const PatientSets: React.FC = () => {
             message: `Mark Batch #${batch.batch_sequence} as manufactured? This will set the manufacture date to today.`,
             onConfirm: async () => {
                 try {
-                    const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}/manufacture`, {
-                        method: 'PATCH'
-                    });
-                    const data: BatchStatusResponse = await response.json();
-
-                    if (!data.success) {
-                        throw new Error(data.error || 'Failed to mark as manufactured');
-                    }
+                    // fetchJSON unwraps to the inner data; the idempotency signal is now
+                    // the structured wasAlreadyManufactured flag (was the envelope message,
+                    // which unwrapEnvelope strips — see audit N19).
+                    const result = await patchJSON<BatchStatusResult>(`/api/aligner/batches/${batch.aligner_batch_id}/manufacture`, {});
 
                     // Handle idempotent case where batch was already manufactured
-                    if (data.message?.includes('already manufactured')) {
+                    if (result.wasAlreadyManufactured) {
                         toast.info('Batch was already manufactured');
                     } else {
                         toast.success('Batch marked as manufactured');
@@ -548,7 +504,7 @@ const PatientSets: React.FC = () => {
                     }
                 } catch (error) {
                     console.error('Error marking as manufactured:', error);
-                    toast.error('Failed to mark as manufactured: ' + (error as Error).message);
+                    toast.error('Failed to mark as manufactured: ' + httpErrorMessage(error, 'unknown error'));
                 }
                 setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }
@@ -571,14 +527,7 @@ const PatientSets: React.FC = () => {
             message: `Undo manufacture for Batch #${batch.batch_sequence}?`,
             onConfirm: async () => {
                 try {
-                    const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}/undo-manufacture`, {
-                        method: 'PATCH'
-                    });
-                    const data: BatchStatusResponse = await response.json();
-
-                    if (!data.success) {
-                        throw new Error(data.error || 'Failed to undo manufacture');
-                    }
+                    await patchJSON(`/api/aligner/batches/${batch.aligner_batch_id}/undo-manufacture`, {});
 
                     toast.success('Manufacture undone');
                     await loadBatches(batch.aligner_set_id);
@@ -587,8 +536,8 @@ const PatientSets: React.FC = () => {
                     }
                 } catch (error) {
                     console.error('Error undoing manufacture:', error);
-                    // Handle specific validation error from SP
-                    const errorMessage = (error as Error).message;
+                    // Handle specific validation error (now carried on HttpError.data.error)
+                    const errorMessage = httpErrorMessage(error, 'Failed to undo manufacture');
                     if (errorMessage.includes('already delivered')) {
                         toast.error('Cannot undo manufacture: batch is already delivered. Undo delivery first.');
                     } else {
@@ -608,14 +557,7 @@ const PatientSets: React.FC = () => {
             message: `Undo delivery for Batch #${batch.batch_sequence}? This will also clear the batch expiry date.`,
             onConfirm: async () => {
                 try {
-                    const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}/undo-deliver`, {
-                        method: 'PATCH'
-                    });
-                    const data: BatchStatusResponse = await response.json();
-
-                    if (!data.success) {
-                        throw new Error(data.error || 'Failed to undo delivery');
-                    }
+                    await patchJSON(`/api/aligner/batches/${batch.aligner_batch_id}/undo-deliver`, {});
 
                     toast.success('Delivery undone');
                     await loadBatches(batch.aligner_set_id);
@@ -624,7 +566,7 @@ const PatientSets: React.FC = () => {
                     }
                 } catch (error) {
                     console.error('Error undoing delivery:', error);
-                    toast.error('Failed to undo delivery: ' + (error as Error).message);
+                    toast.error('Failed to undo delivery: ' + httpErrorMessage(error, 'unknown error'));
                 }
                 setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }
@@ -639,14 +581,7 @@ const PatientSets: React.FC = () => {
             message: `Are you sure you want to delete Batch #${batch.batch_sequence}? This action cannot be undone.`,
             onConfirm: async () => {
                 try {
-                    const response = await fetch(`/api/aligner/batches/${batch.aligner_batch_id}`, {
-                        method: 'DELETE'
-                    });
-                    const data = await response.json();
-
-                    if (!data.success) {
-                        throw new Error(data.error || 'Failed to delete batch');
-                    }
+                    await deleteJSON(`/api/aligner/batches/${batch.aligner_batch_id}`);
 
                     toast.success('Batch deleted successfully');
                     await loadBatches(batch.aligner_set_id);
@@ -655,7 +590,7 @@ const PatientSets: React.FC = () => {
                     }
                 } catch (error) {
                     console.error('Error deleting batch:', error);
-                    toast.error('Failed to delete batch: ' + (error as Error).message);
+                    toast.error('Failed to delete batch: ' + httpErrorMessage(error, 'unknown error'));
                 }
                 setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }
@@ -739,20 +674,10 @@ const PatientSets: React.FC = () => {
             }
 
             // Update the set with new URL
-            const response = await fetch(`/api/aligner/sets/${setId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...currentSet,
-                    set_url: quickUrlValue.trim() || null
-                })
+            await putJSON(`/api/aligner/sets/${setId}`, {
+                ...currentSet,
+                set_url: quickUrlValue.trim() || null
             });
-
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to update URL');
-            }
 
             if (patient) {
                 await loadAlignerSets(patient.workid);
@@ -762,7 +687,7 @@ const PatientSets: React.FC = () => {
 
         } catch (error) {
             console.error('Error saving URL:', error);
-            toast.error('Failed to save URL: ' + (error as Error).message);
+            toast.error('Failed to save URL: ' + httpErrorMessage(error, 'unknown error'));
         } finally {
             setSavingUrl(false);
         }
@@ -999,16 +924,9 @@ const PatientSets: React.FC = () => {
             const formData = new FormData();
             formData.append('pdf', file);
 
-            const response = await fetch(`/api/aligner/sets/${setId}/upload-pdf`, {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to upload PDF');
-            }
+            // Route returns { success, message, data } but the FE just reloads sets to
+            // pick up the new URL; non-2xx throws.
+            await postFormData(`/api/aligner/sets/${setId}/upload-pdf`, formData);
 
             // Show success message
             toast.success('PDF uploaded successfully!');
@@ -1020,7 +938,7 @@ const PatientSets: React.FC = () => {
 
         } catch (error) {
             console.error('Error uploading PDF:', error);
-            toast.error('Failed to upload PDF: ' + (error as Error).message);
+            toast.error('Failed to upload PDF: ' + httpErrorMessage(error, 'unknown error'));
         } finally {
             setUploadingPdf(false);
         }
@@ -1042,20 +960,10 @@ const PatientSets: React.FC = () => {
             }
 
             // Update the set with new PDF URL
-            const response = await fetch(`/api/aligner/sets/${setId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...currentSet,
-                    set_pdf_url: quickPdfUrlValue.trim() || null
-                })
+            await putJSON(`/api/aligner/sets/${setId}`, {
+                ...currentSet,
+                set_pdf_url: quickPdfUrlValue.trim() || null
             });
-
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to update PDF URL');
-            }
 
             if (patient) {
                 await loadAlignerSets(patient.workid);
@@ -1065,7 +973,7 @@ const PatientSets: React.FC = () => {
 
         } catch (error) {
             console.error('Error saving PDF URL:', error);
-            toast.error('Failed to save PDF URL: ' + (error as Error).message);
+            toast.error('Failed to save PDF URL: ' + httpErrorMessage(error, 'unknown error'));
         } finally {
             setSavingPdfUrl(false);
         }
@@ -1108,20 +1016,10 @@ const PatientSets: React.FC = () => {
                 throw new Error('Set not found');
             }
 
-            const response = await fetch(`/api/aligner/sets/${setId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...currentSet,
-                    set_video: quickVideoValue.trim() || null
-                })
+            await putJSON(`/api/aligner/sets/${setId}`, {
+                ...currentSet,
+                set_video: quickVideoValue.trim() || null
             });
-
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to update video URL');
-            }
 
             if (patient) {
                 await loadAlignerSets(patient.workid);
@@ -1131,7 +1029,7 @@ const PatientSets: React.FC = () => {
 
         } catch (error) {
             console.error('Error saving video URL:', error);
-            toast.error('Failed to save video URL: ' + (error as Error).message);
+            toast.error('Failed to save video URL: ' + httpErrorMessage(error, 'unknown error'));
         } finally {
             setSavingVideo(false);
         }
@@ -1145,20 +1043,10 @@ const PatientSets: React.FC = () => {
         }
 
         try {
-            const response = await fetch('/api/aligner/notes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    aligner_set_id: setId,
-                    note_text: labNoteText.trim()
-                })
+            await postJSON('/api/aligner/notes', {
+                aligner_set_id: setId,
+                note_text: labNoteText.trim()
             });
-
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to add note');
-            }
 
             setLabNoteText('');
             setShowAddLabNote(prev => ({ ...prev, [setId]: false }));
@@ -1166,7 +1054,7 @@ const PatientSets: React.FC = () => {
 
         } catch (error) {
             console.error('Error adding note:', error);
-            toast.error('Failed to add note: ' + (error as Error).message);
+            toast.error('Failed to add note: ' + httpErrorMessage(error, 'unknown error'));
         }
     };
 
@@ -1187,19 +1075,9 @@ const PatientSets: React.FC = () => {
         }
 
         try {
-            const response = await fetch(`/api/aligner/notes/${noteId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    note_text: editNoteText.trim()
-                })
+            await putJSON(`/api/aligner/notes/${noteId}`, {
+                note_text: editNoteText.trim()
             });
-
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to update note');
-            }
 
             setEditingNoteId(null);
             setEditNoteText('');
@@ -1207,20 +1085,13 @@ const PatientSets: React.FC = () => {
 
         } catch (error) {
             console.error('Error updating note:', error);
-            toast.error('Failed to update note: ' + (error as Error).message);
+            toast.error('Failed to update note: ' + httpErrorMessage(error, 'unknown error'));
         }
     };
 
     const handleToggleNoteRead = async (noteId: number, setId: number): Promise<void> => {
         try {
-            const response = await fetch(`/api/aligner/notes/${noteId}/toggle-read`, {
-                method: 'PATCH'
-            });
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to toggle note read status');
-            }
+            await patchJSON(`/api/aligner/notes/${noteId}/toggle-read`, {});
 
             await loadNotes(setId, patient?.workid || 0, false);
         } catch (error) {
@@ -1235,20 +1106,13 @@ const PatientSets: React.FC = () => {
             message: 'Are you sure you want to delete this note? This action cannot be undone.',
             onConfirm: async () => {
                 try {
-                    const response = await fetch(`/api/aligner/notes/${noteId}`, {
-                        method: 'DELETE'
-                    });
-                    const data = await response.json();
-
-                    if (!data.success) {
-                        throw new Error(data.error || 'Failed to delete note');
-                    }
+                    await deleteJSON(`/api/aligner/notes/${noteId}`);
 
                     await loadNotes(setId, patient?.workid || 0, false);
 
                 } catch (error) {
                     console.error('Error deleting note:', error);
-                    toast.error('Failed to delete note: ' + (error as Error).message);
+                    toast.error('Failed to delete note: ' + httpErrorMessage(error, 'unknown error'));
                 }
                 setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null });
             }

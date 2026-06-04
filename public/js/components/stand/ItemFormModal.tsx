@@ -8,6 +8,7 @@ import type { StandItem, StandItemCreateData } from '../../hooks/useStand';
 import { useStandCategories } from '../../hooks/useStand';
 import { useToast } from '../../contexts/ToastContext';
 import { formatNumber } from '../../utils/formatters';
+import { postJSON, httpErrorMessage } from '@/core/http';
 import Modal from '../react/Modal';
 import styles from './ItemFormModal.module.css';
 
@@ -91,6 +92,7 @@ async function detectBarcode(files: File[]): Promise<string | null> {
 }
 
 async function dataUrlToFile(dataUrl: string, name: string): Promise<File> {
+  // eslint-disable-next-line no-restricted-syntax -- converts a data: URL to a Blob/File, not an API call
   const res = await fetch(dataUrl);
   const blob = await res.blob();
   return new File([blob], name, { type: blob.type || 'image/jpeg' });
@@ -311,26 +313,12 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
         scanImages.map((file) => compressImage(file, 1024))
       );
 
-      // Run barcode detection (local, instant) in parallel with Gemini API call
-      const [localBarcode, response] = await Promise.all([
+      // Run barcode detection (local, instant) in parallel with Gemini API call.
+      // scan-vision is sendSuccess-enveloped → fetchJSON unwraps to VisionScanResult.
+      const [localBarcode, scan] = await Promise.all([
         detectBarcode(scanImages),
-        fetch('/api/stand/items/scan-vision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ images: base64Images }),
-        }),
+        postJSON<VisionScanResult>('/api/stand/items/scan-vision', { images: base64Images }),
       ]);
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => null);
-        throw new Error(
-          (errData as { error?: string } | null)?.error || 'Failed to scan product'
-        );
-      }
-
-      const result = (await response.json()) as { success: boolean; data: VisionScanResult };
-      const scan = result.data;
 
       // Prefer local BarcodeDetector result over Gemini's AI-read barcode
       const barcode = localBarcode || scan.barcode;
@@ -347,7 +335,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
 
       toast.success('Item details extracted successfully! Please verify the fields.');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to scan product');
+      toast.error(httpErrorMessage(err, 'Failed to scan product'));
     } finally {
       setScanning(false);
     }

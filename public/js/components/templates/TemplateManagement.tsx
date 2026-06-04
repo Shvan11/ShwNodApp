@@ -14,7 +14,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import type { Template } from './TemplateCard';
 import type { DocumentType, TemplateSubmissionData } from './CreateTemplateModal';
 import type { TemplateStatsData } from './TemplateStats';
-import type { ApiStatusResponse } from '@/types/api.types';
+import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 
 function TemplateManagement() {
     const navigate = useNavigate();
@@ -55,14 +55,8 @@ function TemplateManagement() {
 
     const loadDocumentTypes = async () => {
         try {
-            const response = await fetch('/api/templates/document-types');
-            const result: ApiStatusResponse<DocumentType[]> = await response.json();
-
-            if (result.success) {
-                setDocumentTypes(result.data ?? []);
-            } else {
-                throw new Error(result.message || 'Failed to load document types');
-            }
+            const data = await fetchJSON<DocumentType[]>('/api/templates/document-types');
+            setDocumentTypes(data ?? []);
         } catch (err) {
             console.error('Error loading document types:', err);
             setError('Failed to load document types');
@@ -72,15 +66,9 @@ function TemplateManagement() {
     const loadAllTemplates = async () => {
         try {
             setIsLoading(true);
-            const response = await fetch('/api/templates');
-            const result: ApiStatusResponse<Template[]> = await response.json();
-
-            if (result.success) {
-                setAllTemplates(result.data ?? []);
-                setError(null);
-            } else {
-                throw new Error(result.message || 'Failed to load templates');
-            }
+            const data = await fetchJSON<Template[]>('/api/templates');
+            setAllTemplates(data ?? []);
+            setError(null);
         } catch (err) {
             console.error('Error loading templates:', err);
             setError('Failed to load templates');
@@ -105,25 +93,13 @@ function TemplateManagement() {
 
     const handleCreateTemplate = async (templateData: TemplateSubmissionData) => {
         try {
-            const response = await fetch('/api/templates', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(templateData)
-            });
-
-            const result: ApiStatusResponse<{ template_id: number }> = await response.json();
-
-            if (result.success) {
-                setIsCreateModalOpen(false);
-                // Navigate to designer
-                navigate(`/templates/designer/${result.data.template_id}`);
-            } else {
-                throw new Error(result.message || 'Failed to create template');
-            }
+            const data = await postJSON<{ template_id: number }>('/api/templates', templateData);
+            setIsCreateModalOpen(false);
+            // Navigate to designer
+            navigate(`/templates/designer/${data.template_id}`);
         } catch (err) {
             console.error('Error creating template:', err);
-            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-            toast.error(errorMessage);
+            toast.error(httpErrorMessage(err, 'Failed to create template'));
         }
     };
 
@@ -137,27 +113,12 @@ function TemplateManagement() {
         }
 
         try {
-            const response = await fetch(`/api/templates/${templateId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    is_default: true,
-                    modified_by: 'user'
-                })
-            });
-
-            const result: ApiStatusResponse<unknown> = await response.json();
-
-            if (result.success) {
-                await loadAllTemplates();
-                toast.success('Template set as default!');
-            } else {
-                throw new Error(result.message || 'Failed to set as default');
-            }
+            await putJSON(`/api/templates/${templateId}`, { is_default: true, modified_by: 'user' });
+            await loadAllTemplates();
+            toast.success('Template set as default!');
         } catch (err) {
             console.error('Error setting default:', err);
-            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-            toast.error(errorMessage);
+            toast.error(httpErrorMessage(err, 'Failed to set as default'));
         }
     };
 
@@ -167,22 +128,12 @@ function TemplateManagement() {
         }
 
         try {
-            const response = await fetch(`/api/templates/${templateId}`, {
-                method: 'DELETE'
-            });
-
-            const result: ApiStatusResponse<unknown> = await response.json();
-
-            if (result.success) {
-                await loadAllTemplates();
-                toast.success('Template deleted successfully!');
-            } else {
-                throw new Error(result.message || 'Failed to delete template');
-            }
+            await deleteJSON(`/api/templates/${templateId}`);
+            await loadAllTemplates();
+            toast.success('Template deleted successfully!');
         } catch (err) {
             console.error('Error deleting template:', err);
-            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-            toast.error(errorMessage);
+            toast.error(httpErrorMessage(err, 'Failed to delete template'));
         }
     };
 

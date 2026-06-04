@@ -26,6 +26,7 @@ const PortalApp = () => {
 
   const refreshSession = useCallback(async (): Promise<PortalPatient | null> => {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (CLAUDE.md / audit N17): validates the raw body itself and inspects res.ok; the envelope-unwrapping/throwing staff client would obscure that.
       const res = await fetch('/api/portal/me', { credentials: 'same-origin' });
       if (!res.ok) return null;
       const parsed = portalMeResponseSchema.safeParse(await res.json());
@@ -58,6 +59,7 @@ const PortalApp = () => {
 
   const handleLogout = useCallback(async () => {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (CLAUDE.md / audit N17): part of the portal's self-contained session lifecycle.
       await fetch('/api/portal/logout', {
         method: 'POST',
         credentials: 'same-origin',

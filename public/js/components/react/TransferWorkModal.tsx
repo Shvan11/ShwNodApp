@@ -3,6 +3,7 @@ import styles from './TransferWorkModal.module.css';
 import Modal from './Modal';
 import { useToast } from '../../contexts/ToastContext';
 import PatientQuickSearch, { type SelectedPatient } from './PatientQuickSearch';
+import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 
 /**
  * Work data for transfer
@@ -77,16 +78,11 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
   const loadPreview = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/work/${work.work_id}/transfer-preview`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to load preview');
-      }
-      const data = await response.json() as TransferPreview;
+      const data = await fetchJSON<TransferPreview>(`/api/work/${work.work_id}/transfer-preview`);
       setPreview(data);
       setStep('confirm');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to load transfer preview');
+      toast.error(httpErrorMessage(error, 'Failed to load transfer preview'));
     } finally {
       setLoading(false);
     }
@@ -104,24 +100,7 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
 
     setTransferring(true);
     try {
-      const response = await fetch(`/api/work/${work.work_id}/transfer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetPatientId: selectedPatient.person_id })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 409) {
-          toast.error(result.message || 'Target patient already has an active work');
-        } else if (response.status === 404) {
-          toast.error(result.message || 'Work or patient not found');
-        } else {
-          throw new Error(result.error || result.message || 'Transfer failed');
-        }
-        return;
-      }
+      await postJSON(`/api/work/${work.work_id}/transfer`, { targetPatientId: selectedPatient.person_id });
 
       toast.success(`Work transferred to ${selectedPatient.patient_name}`);
       onSuccess({
@@ -129,7 +108,17 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
         targetPatientId: selectedPatient.person_id
       });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Transfer failed');
+      // Preserve the status-specific messaging the route returns (409/404), reading
+      // off the thrown HttpError instead of the raw Response.
+      const status = (error as HttpError).status;
+      const data = (error as HttpError).data as { message?: string } | undefined;
+      if (status === 409) {
+        toast.error(data?.message || 'Target patient already has an active work');
+      } else if (status === 404) {
+        toast.error(data?.message || 'Work or patient not found');
+      } else {
+        toast.error(httpErrorMessage(error, 'Transfer failed'));
+      }
     } finally {
       setTransferring(false);
     }

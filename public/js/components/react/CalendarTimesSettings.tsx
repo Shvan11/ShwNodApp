@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import styles from './CalendarTimesSettings.module.css';
 import sectionStyles from './SettingsSection.module.css';
 
@@ -17,6 +18,12 @@ interface CategorizedSlots {
     early: string[];
     main: string[];
     late: string[];
+}
+
+// GET /api/options/:name success shape ({ status:'success', optionName, value }).
+interface OptionResponse {
+    status?: string;
+    value?: string | null;
 }
 
 // Helper to parse time from database format (1970-01-01T14:00:00 or HH:MM)
@@ -94,35 +101,32 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
 
         try {
             // Fetch time slots from database
-            const timesResponse = await fetch('/api/admin/lookups/tbltimes');
-            if (!timesResponse.ok) {
-                throw new Error('Failed to fetch time slots');
-            }
-            const timesData: TimeSlot[] = await timesResponse.json();
+            const timesData = await fetchJSON<TimeSlot[]>('/api/admin/lookups/tbltimes');
             setAllTimeSlots(timesData);
 
+            // /api/options/:name 404s when an option is unset; each GET is tolerant
+            // (.catch → null) so a missing one falls back to its default without
+            // failing the whole settings load. The rows are seeded today (verified —
+            // audit N12/N20), so the 404 path is defensive, not the norm.
             // Fetch early slots option
-            const earlyResponse = await fetch('/api/options/CALENDAR_EARLY_SLOTS');
-            const earlyData = await earlyResponse.json();
-            const earlySlotsArr = earlyData.status === 'success' && earlyData.value
+            const earlyData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_EARLY_SLOTS').catch(() => null);
+            const earlySlotsArr = earlyData?.status === 'success' && earlyData.value
                 ? earlyData.value.split(',').filter(Boolean)
                 : ['12:00', '12:30', '13:00', '13:30']; // Default
             setEarlySlots(earlySlotsArr);
             setOriginalEarlySlots(earlySlotsArr);
 
             // Fetch late slots option
-            const lateResponse = await fetch('/api/options/CALENDAR_LATE_SLOTS');
-            const lateData = await lateResponse.json();
-            const lateSlotsArr = lateData.status === 'success' && lateData.value
+            const lateData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_LATE_SLOTS').catch(() => null);
+            const lateSlotsArr = lateData?.status === 'success' && lateData.value
                 ? lateData.value.split(',').filter(Boolean)
                 : ['21:00', '21:30', '22:00', '22:30']; // Default
             setLateSlots(lateSlotsArr);
             setOriginalLateSlots(lateSlotsArr);
 
             // Fetch default toggle setting
-            const toggleResponse = await fetch('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT');
-            const toggleData = await toggleResponse.json();
-            const toggleValue = toggleData.status === 'success' && toggleData.value === 'true';
+            const toggleData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT').catch(() => null);
+            const toggleValue = toggleData?.status === 'success' && toggleData.value === 'true';
             setShowExtendedSlotsDefault(toggleValue);
             setOriginalShowExtendedDefault(toggleValue);
 
@@ -198,15 +202,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
         try {
             // Create the time slot in database
             // Format as 1970-01-01THH:MM:00 to match existing format
-            const response = await fetch('/api/admin/lookups/tbltimes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ my_time: `1970-01-01T${timeStr}:00` })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to create time slot');
-            }
+            await postJSON('/api/admin/lookups/tbltimes', { my_time: `1970-01-01T${timeStr}:00` });
 
             // Add to appropriate category
             if (newTimeCategory === 'early') {
@@ -244,13 +240,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
         setError(null);
 
         try {
-            const response = await fetch(`/api/admin/lookups/tbltimes/${slot.time_id}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to delete time slot');
-            }
+            await deleteJSON(`/api/admin/lookups/tbltimes/${slot.time_id}`);
 
             // Remove from categories
             setEarlySlots(prev => prev.filter(t => t !== timeStr));
@@ -278,26 +268,13 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
         setSuccessMessage(null);
 
         try {
-            // Save early slots
-            await fetch('/api/options/CALENDAR_EARLY_SLOTS', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ value: sortTimes(earlySlots).join(',') })
-            });
-
-            // Save late slots
-            await fetch('/api/options/CALENDAR_LATE_SLOTS', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ value: sortTimes(lateSlots).join(',') })
-            });
-
-            // Save toggle default
-            await fetch('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ value: showExtendedSlotsDefault.toString() })
-            });
+            // PUT /api/options/:name is update-only (404s if the row is missing).
+            // These three are seeded (verified — audit N12/N20), so a non-2xx is a
+            // genuine failure that putJSON now throws → the catch surfaces it,
+            // instead of the old fire-and-forget that always reported success.
+            await putJSON('/api/options/CALENDAR_EARLY_SLOTS', { value: sortTimes(earlySlots).join(',') });
+            await putJSON('/api/options/CALENDAR_LATE_SLOTS', { value: sortTimes(lateSlots).join(',') });
+            await putJSON('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT', { value: showExtendedSlotsDefault.toString() });
 
             // Update original values
             setOriginalEarlySlots([...earlySlots]);
@@ -331,22 +308,16 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
         setSuccessMessage(null);
 
         try {
-            const response = await fetch('/api/calendar/regenerate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to regenerate calendar');
-            }
+            const data = await postJSON<{ entriesAdded?: number; message?: string }>(
+                '/api/calendar/regenerate',
+                {}
+            );
 
             setSuccessMessage(data.message || `Added ${data.entriesAdded} calendar entries`);
             setTimeout(() => setSuccessMessage(null), 5000);
         } catch (err) {
             console.error('Error regenerating calendar:', err);
-            setError(err instanceof Error ? err.message : 'Failed to regenerate calendar');
+            setError(httpErrorMessage(err, 'Failed to regenerate calendar'));
         } finally {
             setIsRegenerating(false);
         }

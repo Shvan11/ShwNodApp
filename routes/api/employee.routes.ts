@@ -16,7 +16,7 @@ import {
   deleteEmployee,
   employeeEmailExists,
 } from '../../services/database/queries/employee-queries.js';
-import { ErrorResponses } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
@@ -131,8 +131,7 @@ router.get('/employees', async (req: Request<object, object, object, EmployeeQue
       ORDER BY e."sort_order", e."employee_name"
     `.execute(db);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       employees: employees || []
     });
 
@@ -155,8 +154,7 @@ router.get('/positions', async (_req: Request, res: Response): Promise<void> => 
       ORDER BY "position_name"
     `.execute(db);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       positions: positions || []
     });
 
@@ -204,11 +202,7 @@ router.post('/employees', async (req: Request<object, object, EmployeeBody>, res
       appointment_color: appointment_color && appointment_color.trim() !== '' ? appointment_color.trim() : null,
     });
 
-    res.json({
-      success: true,
-      message: 'Employee added successfully',
-      employeeID: newID
-    });
+    sendSuccess(res, { employeeID: newID }, 'Employee added successfully');
 
   } catch (error) {
     log.error('Error adding employee:', error);
@@ -255,10 +249,7 @@ router.put('/employees/:id', async (req: Request<EmployeeParams, object, Employe
       appointment_color: appointment_color && appointment_color.trim() !== '' ? appointment_color.trim() : null,
     });
 
-    res.json({
-      success: true,
-      message: 'Employee updated successfully'
-    });
+    sendSuccess(res, null, 'Employee updated successfully');
 
   } catch (error) {
     log.error('Error updating employee:', error);
@@ -276,10 +267,7 @@ router.delete('/employees/:id', async (req: Request<EmployeeParams>, res: Respon
 
     await deleteEmployee(parseInt(id));
 
-    res.json({
-      success: true,
-      message: 'Employee deleted successfully'
-    });
+    sendSuccess(res, null, 'Employee deleted successfully');
 
   } catch (error) {
     log.error('Error deleting employee:', error);

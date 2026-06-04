@@ -2,6 +2,7 @@ import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import Modal from './Modal';
 import { resolveDoctorColor, DEFAULT_PICKER_HEX, NEUTRAL_PICKER_HEX } from './doctorColors';
 import styles from './EmployeeSettings.module.css';
@@ -71,17 +72,11 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         try {
             setLoading(true);
             setError(null);
-            const response = await fetch('/api/employees');
-
-            if (!response.ok) {
-                throw new Error('Failed to load employees');
-            }
-
-            const data = await response.json();
+            const data = await fetchJSON<{ employees?: Employee[] }>('/api/employees');
             setEmployees(data.employees || []);
         } catch (err) {
             console.error('Error loading employees:', err);
-            setError((err as Error).message);
+            setError(httpErrorMessage(err, 'Failed to load employees'));
         } finally {
             setLoading(false);
         }
@@ -89,11 +84,8 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
 
     const loadPositions = async () => {
         try {
-            const response = await fetch('/api/positions');
-            if (response.ok) {
-                const data = await response.json();
-                setPositions(data.positions || []);
-            }
+            const data = await fetchJSON<{ positions?: Position[] }>('/api/positions');
+            setPositions(data.positions || []);
         } catch (err) {
             console.error('Error loading positions:', err);
         }
@@ -154,20 +146,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                 ? `/api/employees/${editingId}`
                 : '/api/employees';
 
-            const method = editingId ? 'PUT' : 'POST';
-
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to save employee');
-            }
+            await (editingId ? putJSON(url, formData) : postJSON(url, formData));
 
             await loadEmployees();
             handleCancel();
@@ -175,7 +154,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             toast.success(editingId ? 'Employee updated successfully!' : 'Employee added successfully!');
         } catch (err) {
             console.error('Error saving employee:', err);
-            toast.error((err as Error).message);
+            toast.error(httpErrorMessage(err, 'Failed to save employee'));
         }
     };
 
@@ -185,20 +164,13 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         }
 
         try {
-            const response = await fetch(`/api/employees/${employeeId}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to delete employee');
-            }
+            await deleteJSON(`/api/employees/${employeeId}`);
 
             await loadEmployees();
             toast.success('Employee deleted successfully!');
         } catch (err) {
             console.error('Error deleting employee:', err);
-            toast.error((err as Error).message);
+            toast.error(httpErrorMessage(err, 'Failed to delete employee'));
         }
     };
 

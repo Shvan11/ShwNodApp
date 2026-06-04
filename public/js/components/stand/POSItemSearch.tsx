@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { StandItem } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
+import { fetchJSON } from '@/core/http';
 import styles from './POSItemSearch.module.css';
 
 interface POSItemSearchProps {
@@ -50,13 +51,9 @@ const POSItemSearch: React.FC<POSItemSearchProps> = ({ onSelect }) => {
     const seq = ++requestSeqRef.current;
     setLoading(true);
     try {
-      const response = await fetch(
+      const data = await fetchJSON<StandItem[]>(
         `/api/stand/items?search=${encodeURIComponent(query)}`
       );
-      if (!response.ok) {
-        throw new Error('Search failed');
-      }
-      const data = (await response.json()) as StandItem[];
       if (seq !== requestSeqRef.current) return; // a newer query superseded this one
       setResults(data);
       setShowDropdown(data.length > 0);

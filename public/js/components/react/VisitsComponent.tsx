@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { fetchJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import styles from './VisitsComponent.module.css';
 
 interface Visit {
@@ -91,15 +92,13 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
         const reqId = ++loadReqIdRef.current;
         try {
             setLoading(true);
-            const response = await fetch(`/api/getvisitsbywork?workId=${workId}`);
-            if (!response.ok) throw new Error('Failed to fetch visits');
-            const data: Visit[] = await response.json();
+            const data = await fetchJSON<Visit[]>(`/api/getvisitsbywork?workId=${workId}`);
             // Sort by visit date descending (most recent first) on a copy, leaving
             // the fetched array untouched.
             const sortedData = [...data].sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime());
             if (reqId === loadReqIdRef.current) setVisits(sortedData);
         } catch (err) {
-            if (reqId === loadReqIdRef.current) setError(err instanceof Error ? err.message : 'An error occurred');
+            if (reqId === loadReqIdRef.current) setError(httpErrorMessage(err, 'An error occurred'));
         } finally {
             if (reqId === loadReqIdRef.current) setLoading(false);
         }
@@ -117,20 +116,10 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
         if (!await confirm('Are you sure you want to delete this visit? This action cannot be undone.', { title: 'Delete Visit', danger: true, confirmText: 'Delete' })) return;
 
         try {
-            const response = await fetch('/api/deletevisitbywork', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ visitId })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to delete visit');
-            }
-
+            await deleteJSON('/api/deletevisitbywork', { body: JSON.stringify({ visitId }) });
             await loadVisits();
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            setError(httpErrorMessage(err, 'Failed to delete visit'));
         }
     };
 

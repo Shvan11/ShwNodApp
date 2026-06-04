@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PhoneDisplay from '../../components/react/PhoneDisplay';
+import { fetchJSON } from '@/core/http';
 import styles from './SearchPatient.module.css';
 
 interface AlignerPatient {
@@ -50,8 +51,9 @@ const SearchPatient: React.FC = () => {
     const searchPatients = async (query: string): Promise<void> => {
         try {
             setLoading(true);
-            const response = await fetch(`/api/aligner/patients?search=${encodeURIComponent(query)}`);
-            const data = await response.json();
+            const data = await fetchJSON<{ success: boolean; patients?: AlignerPatient[]; error?: string }>(
+                `/api/aligner/patients?search=${encodeURIComponent(query)}`
+            );
 
             if (!data.success) {
                 throw new Error(data.error || 'Failed to search patients');

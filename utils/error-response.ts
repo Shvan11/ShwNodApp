@@ -75,11 +75,13 @@ export function sendError(
  * @param res - Express response object
  * @param data - Response data
  * @param message - Optional success message
+ * @param statusCode - HTTP status code (defaults to 200; pass 201 for resource creation)
  */
 export function sendSuccess<T>(
   res: Response,
   data: T,
-  message: string | null = null
+  message: string | null = null,
+  statusCode: number = 200
 ): Response {
   const response: SuccessResponseBody<T> = {
     success: true,
@@ -88,7 +90,7 @@ export function sendSuccess<T>(
     timestamp: new Date().toISOString()
   };
 
-  return res.status(200).json(response);
+  return res.status(statusCode).json(response);
 }
 
 /**

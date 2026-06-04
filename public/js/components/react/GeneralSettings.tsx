@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import cn from 'classnames';
 import Modal from './Modal';
 import storage from '../../core/storage';
+import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
 import styles from './SettingsSection.module.css';
 
 interface OptionsMap {
@@ -29,12 +30,15 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     const loadSettings = useCallback(async () => {
         setIsLoading(true);
         try {
-            const response = await fetch('/api/options');
-            const data = await response.json();
+            const data = await fetchJSON<{
+                status?: string;
+                options?: Array<{ option_name: string; option_value: string }>;
+                message?: string;
+            }>('/api/options');
 
-            if (data.status === 'success') {
+            if (data.status === 'success' && data.options) {
                 const optionsMap: OptionsMap = {};
-                data.options.forEach((option: { option_name: string; option_value: string }) => {
+                data.options.forEach((option) => {
                     optionsMap[option.option_name] = option.option_value;
                 });
                 setOptions(optionsMap);
@@ -43,7 +47,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
             }
         } catch (error) {
             console.error('Error loading settings:', error);
-            showModal('Error', 'Failed to load settings: ' + (error as Error).message);
+            showModal('Error', 'Failed to load settings: ' + httpErrorMessage(error, 'Unknown error'));
         } finally {
             setIsLoading(false);
         }
@@ -99,15 +103,12 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                 value: value.toString()
             }));
 
-            const response = await fetch('/api/options/bulk', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ options: optionsArray })
-            });
-
-            const data = await response.json();
+            const data = await putJSON<{
+                status?: string;
+                updated?: number;
+                failed?: string[];
+                message?: string;
+            }>('/api/options/bulk', { options: optionsArray });
 
             if (data.status === 'success') {
                 // Update local options
@@ -124,7 +125,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
             }
         } catch (error) {
             console.error('Error saving settings:', error);
-            showModal('Error', 'Failed to save settings: ' + (error as Error).message);
+            showModal('Error', 'Failed to save settings: ' + httpErrorMessage(error, 'Unknown error'));
         }
     };
 

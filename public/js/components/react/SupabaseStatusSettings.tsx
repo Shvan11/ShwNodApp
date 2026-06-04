@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { fetchJSON, httpErrorMessage } from '@/core/http';
 import styles from './SupabaseStatusSettings.module.css';
 
 /**
@@ -77,8 +78,7 @@ const SupabaseStatusSettings = ({ onChangesUpdate }: SupabaseStatusSettingsProps
 
     const fetchStatus = useCallback(async (): Promise<void> => {
         try {
-            const res = await fetch('/api/sync/supabase-status', { credentials: 'same-origin' });
-            const data: StatusResponse = await res.json();
+            const data = await fetchJSON<StatusResponse>('/api/sync/supabase-status');
             if (!isMounted.current) return;
             if (data.success && data.sinks) {
                 setSinks(data.sinks);
@@ -88,7 +88,7 @@ const SupabaseStatusSettings = ({ onChangesUpdate }: SupabaseStatusSettingsProps
                 setError(data.error || 'Failed to load Supabase status');
             }
         } catch (err) {
-            if (isMounted.current) setError((err as Error).message);
+            if (isMounted.current) setError(httpErrorMessage(err, 'Failed to load Supabase status'));
         } finally {
             if (isMounted.current) setIsLoading(false);
         }

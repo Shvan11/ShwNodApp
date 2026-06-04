@@ -9,6 +9,7 @@
  */
 
 import type { LoaderFunctionArgs } from 'react-router-dom';
+import { fetchData, fetchJSON, httpErrorMessage, type HttpError } from '@/core/http';
 
 /**
  * Cached data structure
@@ -16,6 +17,18 @@ import type { LoaderFunctionArgs } from 'react-router-dom';
 interface CachedData<T> {
   data: T;
   timestamp: number;
+}
+
+/**
+ * Tolerate a per-endpoint non-2xx (return an empty array, as the old
+ * `res.ok ? json : []` guards did) while letting a network/abort error reject —
+ * so a genuine transport failure still propagates to the loader's outer catch.
+ */
+function emptyOnHttpError<U>(p: Promise<U[]>): Promise<U[]> {
+  return p.catch((err: unknown) => {
+    if (typeof (err as HttpError).status === 'number') return [];
+    throw err;
+  });
 }
 
 /** sessionStorage key prefix + TTL for loader response caching. */
@@ -126,22 +139,31 @@ export function withAuth<T>(
       }
 
       // Auth-only check: verify session with lightweight endpoint
-      const response = await fetch('/api/auth/verify', {
-        signal: args.request?.signal,
-      });
+      await fetchJSON('/api/auth/verify', { signal: args.request?.signal });
+      return null; // No data to return for auth-only loaders
+    } catch (error) {
+      // A nested loader already mapped its failure to a Response (incl. its own
+      // 401 redirect) — propagate it untouched.
+      if (error instanceof Response) {
+        throw error;
+      }
 
-      if (response.status === 401) {
+      const httpErr = error as HttpError;
+
+      // Auth-only verify path: 401 → redirect to login.
+      if (httpErr.status === 401) {
         console.warn('[withAuth] 401 Unauthorized - redirecting to login');
         window.location.href = '/login.html';
         throw new Response('Unauthorized', { status: 401 });
       }
 
-      return null; // No data to return for auth-only loaders
-    } catch (error) {
-      // Re-throw for route error boundary to handle
-      if (error instanceof Response) {
-        throw error;
+      // Any other non-2xx from the verify check was previously treated as
+      // "session OK" (the code only redirected on 401) — preserve that.
+      if (typeof httpErr.status === 'number') {
+        return null;
       }
+
+      // Network/abort error — propagate to the route error boundary.
       throw error;
     }
   };
@@ -180,23 +202,10 @@ export async function apiLoader<T = unknown>(
   }
 
   try {
-    const response = await fetch(url, { signal });
-
-    // Handle 401 Unauthorized (preserve existing auth pattern)
-    // Note: Global fetch interceptor in index.html also handles this
-    if (response.status === 401) {
-      console.warn('[Loader] 401 Unauthorized - redirecting to login');
-      window.location.href = '/login.html';
-      throw new Response('Unauthorized', { status: 401 });
-    }
-
-    if (!response.ok) {
-      throw new Response(`API Error: ${response.statusText}`, {
-        status: response.status,
-      });
-    }
-
-    const data = (await response.json()) as T;
+    // fetchData unwraps the success envelope (so flipping a route onto sendSuccess
+    // — audit H4 — is transparent here) and throws an HttpError on non-2xx, which
+    // we re-map below to the Response/401 contract loaders rely on.
+    const data = await fetchData<T>(url, { signal });
 
     // Cache response if enabled (best-effort — a large payload can throw
     // QuotaExceededError, which must not fail the route loader).
@@ -227,6 +236,23 @@ export async function apiLoader<T = unknown>(
     // Re-throw Response errors (will be handled by errorElement)
     if (error instanceof Response) {
       throw error;
+    }
+
+    const httpErr = error as HttpError;
+
+    // Handle 401 Unauthorized (preserve existing auth pattern)
+    // Note: Global fetch interceptor in index.html also handles this
+    if (httpErr.status === 401) {
+      console.warn('[Loader] 401 Unauthorized - redirecting to login');
+      window.location.href = '/login.html';
+      throw new Response('Unauthorized', { status: 401 });
+    }
+
+    // Other HTTP error → Response carrying the status (handled by errorElement)
+    if (typeof httpErr.status === 'number') {
+      throw new Response(`API Error: ${httpErr.response?.statusText || httpErr.status}`, {
+        status: httpErr.status,
+      });
     }
 
     // Wrap other errors
@@ -602,27 +628,16 @@ export async function patientManagementLoader({
   if (import.meta.env.DEV) console.log('[Loader] Pre-fetching patient management filter data');
 
   try {
-    // Fetch all filter data in parallel
-    const [allPatientsRes, workTypesRes, keywordsRes, tagsRes, patientTypesRes] = await Promise.all([
-      fetch('/api/patients/phones', { signal }),
-      fetch('/api/getworktypes', { signal }),
-      fetch('/api/getworkkeywords', { signal }),
-      fetch('/api/patients/tag-options', { signal }),
-      fetch('/api/patients/type-options', { signal }),
+    // Fetch all filter data in parallel. Each lookup returns a raw array
+    // (fetchJSON passthrough) and tolerates its own non-2xx (→ empty) so one bad
+    // lookup doesn't blank the rest; a network/abort error still rejects → outer catch.
+    const [allPatients, workTypesData, keywordsData, tagsData, patientTypesData] = await Promise.all([
+      emptyOnHttpError(fetchJSON<PatientData[]>('/api/patients/phones', { signal })),
+      emptyOnHttpError(fetchJSON<Array<{ id: number; work_type: string }>>('/api/getworktypes', { signal })),
+      emptyOnHttpError(fetchJSON<Array<{ id: number; key_word: string }>>('/api/getworkkeywords', { signal })),
+      emptyOnHttpError(fetchJSON<Array<{ id: number; tag: string }>>('/api/patients/tag-options', { signal })),
+      emptyOnHttpError(fetchJSON<Array<{ id: number; type: string }>>('/api/patients/type-options', { signal })),
     ]);
-
-    // Parse responses
-    const allPatients: PatientData[] = allPatientsRes.ok ? await allPatientsRes.json() : [];
-    const workTypesData: Array<{ id: number; work_type: string }> = workTypesRes.ok
-      ? await workTypesRes.json()
-      : [];
-    const keywordsData: Array<{ id: number; key_word: string }> = keywordsRes.ok
-      ? await keywordsRes.json()
-      : [];
-    const tagsData: Array<{ id: number; tag: string }> = tagsRes.ok ? await tagsRes.json() : [];
-    const patientTypesData: Array<{ id: number; type: string }> = patientTypesRes.ok
-      ? await patientTypesRes.json()
-      : [];
 
     // Transform to react-select format
     const workTypes: SelectOption[] = workTypesData.map((wt) => ({
@@ -678,14 +693,16 @@ export async function patientManagementLoader({
         if (value) searchParams.set(param, value);
       });
 
-      const searchRes = await fetch(`/api/patients/search?${searchParams.toString()}`, { signal });
-      if (searchRes.ok) {
-        const data = await searchRes.json();
-        // Handle new paginated response format
-        searchResults = data.patients || data;
-      } else {
-        searchResults = [];
-      }
+      // Non-2xx → empty results (old behavior); a network/abort error rejects → outer catch.
+      const data = await fetchJSON<{ patients?: PatientData[] } | PatientData[]>(
+        `/api/patients/search?${searchParams.toString()}`,
+        { signal }
+      ).catch((err: unknown) => {
+        if (typeof (err as HttpError).status === 'number') return [] as PatientData[];
+        throw err;
+      });
+      // Handle new paginated response format
+      searchResults = Array.isArray(data) ? data : data.patients || [];
     }
 
     return {
@@ -762,15 +779,13 @@ export async function dailyAppointmentsLoader({
   if (import.meta.env.DEV) console.log(`[Loader] Pre-fetching appointments for: ${targetDate}`);
 
   try {
-    const response = await fetch(`/api/getDailyAppointments?AppsDate=${targetDate}`, {
+    const data = await fetchJSON<{
+      allAppointments?: AppointmentData[];
+      checkedInAppointments?: AppointmentData[];
+      stats?: AppointmentStats;
+    }>(`/api/getDailyAppointments?AppsDate=${targetDate}`, {
       signal: request.signal, // Abort on navigation
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
 
     return {
       allAppointments: data.allAppointments || [],
@@ -787,7 +802,7 @@ export async function dailyAppointmentsLoader({
       checkedInAppointments: [],
       stats: { total: 0, checkedIn: 0, absent: 0, waiting: 0 },
       loadedDate: targetDate,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: httpErrorMessage(error, 'Unknown error'),
       _loaderTimestamp: Date.now(),
     };
   }

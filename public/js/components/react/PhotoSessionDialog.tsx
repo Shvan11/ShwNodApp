@@ -4,6 +4,8 @@ import { useImportFolder } from '@/hooks/useImportFolder';
 import Modal from './Modal';
 import styles from './PhotoSessionDialog.module.css';
 import { formatISODate } from '../../core/utils';
+import { fetchJSON, postJSON, httpErrorMessage } from '../../core/http';
+import type { PhotoPrepareResult } from '../../types/api.types';
 
 interface Props {
     personId?: string;
@@ -70,10 +72,9 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
     const loadPhotoDates = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`/api/photo-editor/${personId}/photo-dates`);
-            if (!response.ok) throw new Error('Failed to load dates');
-
-            const data = await response.json();
+            const data = await fetchJSON<{ appointments?: Appointment[]; visits?: Visit[] }>(
+                `/api/photo-editor/${personId}/photo-dates`
+            );
             setAppointments(data.appointments || []);
             setVisits(data.visits || []);
         } catch (error) {
@@ -125,50 +126,39 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
             setSubmitting(true);
             setConflictInfo(null);
 
-            const response = await fetch(`/api/photo-editor/${personId}/prepare`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    tpDescription: timepointType,
-                    tpDate: selectedDate,
-                    overrideDate,
-                    ...(needsName ? { firstName: firstName.trim(), lastName: lastName.trim() } : {})
-                })
+            const result = await postJSON<PhotoPrepareResult>(`/api/photo-editor/${personId}/prepare`, {
+                tpDescription: timepointType,
+                tpDate: selectedDate,
+                overrideDate,
+                ...(needsName ? { firstName: firstName.trim(), lastName: lastName.trim() } : {})
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || errorData.message || 'Failed to prepare photo session');
-            }
-
-            const data = await response.json();
-
             // Patient has no English name — Dolphin can't store Arabic, so capture one and resubmit.
-            if (data.needsName) {
+            if ('needsName' in result) {
                 setNeedsName(true);
-                toast.error(data.message || 'An English first and last name is required');
+                toast.error(result.message || 'An English first and last name is required');
                 setSubmitting(false);
                 return;
             }
 
             // tblwork date conflict — offer to override the existing Initial/Final date.
-            if (data.conflict) {
+            if ('conflict' in result) {
                 setConflictInfo({
-                    conflictType: data.conflictType,
-                    existingDate: data.existingDate,
-                    requestedDate: data.requestedDate,
-                    message: data.message
+                    conflictType: result.conflictType,
+                    existingDate: result.existingDate,
+                    requestedDate: result.requestedDate,
+                    message: result.message
                 });
                 setSubmitting(false);
                 return;
             }
 
             // Hand off to the in-app editor.
-            onPrepared?.({ tpCode: data.tp_code, tpName: timepointType, tpDate: selectedDate });
+            onPrepared?.({ tpCode: result.tp_code, tpName: timepointType, tpDate: selectedDate });
             onClose();
         } catch (error) {
             console.error('Error preparing photo session:', error);
-            toast.error(error instanceof Error ? error.message : 'Failed to prepare photo session');
+            toast.error(httpErrorMessage(error, 'Failed to prepare photo session'));
         } finally {
             setSubmitting(false);
         }

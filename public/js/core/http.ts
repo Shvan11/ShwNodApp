@@ -1,5 +1,11 @@
 /**
- * HTTP utility functions for making API requests
+ * HTTP utility functions for making API requests.
+ *
+ * These helpers transparently unwrap the backend success envelope (see
+ * `unwrapEnvelope`), so a caller receives the inner payload — not the
+ * `{ success, data, timestamp }` wrapper. This is what makes flipping a route
+ * onto `sendSuccess()` (audit item H4) invisible to everything funneled
+ * through here.
  */
 
 export interface HttpError extends Error {
@@ -23,6 +29,37 @@ const defaultOptions: FetchOptions = {
   },
   credentials: 'same-origin',
 };
+
+/**
+ * Unwrap the backend success envelope.
+ *
+ * `sendSuccess()` (utils/error-response.ts) wraps every payload as
+ * `{ success: true, data, timestamp, message? }`. We return `body.data` for
+ * exactly that shape and pass every other body through untouched, so callers
+ * consume the inner payload directly and a route adopting the envelope (H4)
+ * stays transparent to all funneled callers.
+ *
+ * Deliberately conservative — we unwrap only when `success === true` AND a
+ * `data` key is present. That leaves alone:
+ *  - bare arrays / plain objects (no `success`);
+ *  - non-enveloped `{ success: true, ... }` custom shapes that carry their
+ *    payload at the top level (e.g. photo-editor `{ success, tp_code }`,
+ *    `/auth/me` `{ success, user }`) — unwrapping these would drop their data.
+ * Error envelopes never reach here: a non-2xx response is thrown as an
+ * HttpError below, before any unwrapping.
+ */
+function unwrapEnvelope(body: unknown): unknown {
+  if (
+    body !== null &&
+    typeof body === 'object' &&
+    !Array.isArray(body) &&
+    (body as { success?: unknown }).success === true &&
+    'data' in body
+  ) {
+    return (body as { data: unknown }).data;
+  }
+  return body;
+}
 
 /**
  * Handle fetch response
@@ -49,10 +86,25 @@ async function handleResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get('content-type');
 
   if (contentType?.includes('application/json')) {
-    return response.json() as Promise<T>;
+    const body = await response.json();
+    return unwrapEnvelope(body) as T;
   }
 
   return response.text() as unknown as T;
+}
+
+/**
+ * Extract a human-readable message from a thrown error.
+ *
+ * Prefers the server's `{ error }` / `{ message }` carried on an `HttpError`'s
+ * parsed body (`error.data`), then the Error's own message, then the fallback.
+ * Use this in `catch` blocks of funneled callers so the backend's friendly
+ * message still surfaces (a bare `err.message` would only show
+ * `"HTTP Error: 400 …"`).
+ */
+export function httpErrorMessage(err: unknown, fallback: string): string {
+  const data = (err as { data?: { error?: string; message?: string } })?.data;
+  return data?.error || data?.message || (err as Error)?.message || fallback;
 }
 
 /**
@@ -143,6 +195,25 @@ export function putJSON<T = unknown, D = unknown>(
 }
 
 /**
+ * Make a PATCH request
+ * @param url - Request URL
+ * @param data - Request data
+ * @param options - Fetch options
+ * @returns Response data
+ */
+export function patchJSON<T = unknown, D = unknown>(
+  url: string,
+  data: D,
+  options: FetchOptions = {}
+): Promise<T> {
+  return fetchData<T>(url, {
+    ...options,
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
  * Make a DELETE request
  * @param url - Request URL
  * @param options - Fetch options
@@ -180,6 +251,8 @@ export default {
   fetchJSON,
   postJSON,
   putJSON,
+  patchJSON,
   deleteJSON,
   postFormData,
+  httpErrorMessage,
 };

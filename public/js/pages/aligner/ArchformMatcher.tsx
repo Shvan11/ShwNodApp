@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Select, { type SingleValue, type StylesConfig } from 'react-select';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmDialog from '../../components/react/ConfirmDialog';
+import { fetchJSON, putJSON, patchJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import type { ArchformPatient, AlignerSetForMatch } from './aligner.types';
 import styles from './ArchformMatcher.module.css';
 
@@ -82,32 +83,29 @@ const ArchformMatcher: React.FC = () => {
             setError(null);
             setUnavailable(false);
 
-            const [patientsRes, matchesRes] = await Promise.all([
-                fetch('/api/aligner/archform/patients'),
-                fetch('/api/aligner/archform/matches'),
+            // /archform/matches reads Postgres, so only /archform/patients can return
+            // 503 { unavailable: true } when the Archform SQLite DB is offline. That
+            // rejection is now caught below (the detection moved from a body-read to the
+            // catch — see audit N18). Both bodies are flat { success, patients|sets }
+            // with no `data` key, so fetchJSON is a passthrough.
+            const [patientsData, matchesData] = await Promise.all([
+                fetchJSON<{ patients?: ArchformPatient[] }>('/api/aligner/archform/patients'),
+                fetchJSON<{ sets?: AlignerSetForMatch[] }>('/api/aligner/archform/matches'),
             ]);
-
-            const patientsData = await patientsRes.json();
-            const matchesData = await matchesRes.json();
-
-            // Handle Archform DB unavailable
-            if (patientsData.unavailable) {
-                setUnavailable(true);
-                setDbPath(patientsData.path || '');
-                return;
-            }
-
-            if (!patientsData.success) {
-                throw new Error(patientsData.error || 'Failed to fetch Archform patients');
-            }
-            if (!matchesData.success) {
-                throw new Error(matchesData.error || 'Failed to fetch aligner sets');
-            }
 
             setArchformPatients(patientsData.patients || []);
             setAlignerSets(matchesData.sets || []);
         } catch (err) {
-            const msg = (err as Error).message;
+            // 503 { unavailable: true } = Archform DB offline (a normal, expected state).
+            const data = (err as HttpError).data as
+                | { unavailable?: boolean; path?: string }
+                | undefined;
+            if (data?.unavailable) {
+                setUnavailable(true);
+                setDbPath(data.path || '');
+                return;
+            }
+            const msg = httpErrorMessage(err, 'Failed to load Archform data');
             setError(msg);
             toast.error(msg);
         } finally {
@@ -181,19 +179,8 @@ const ArchformMatcher: React.FC = () => {
         setSavingRows((prev) => new Set(prev).add(archformId));
 
         try {
-            const res = await fetch(
-                `/api/aligner/sets/${selectedSetId}/archform`,
-                {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ archformId }),
-                }
-            );
-            const data = await res.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to save match');
-            }
+            // Non-2xx throws; success body is { success:true, message }.
+            await patchJSON(`/api/aligner/sets/${selectedSetId}/archform`, { archformId });
 
             toast.success('Match saved');
             setAlignerSets((prev) =>
@@ -209,7 +196,7 @@ const ArchformMatcher: React.FC = () => {
                 return next;
             });
         } catch (err) {
-            toast.error((err as Error).message);
+            toast.error(httpErrorMessage(err, 'Failed to save match'));
         } finally {
             setSavingRows((prev) => {
                 const next = new Set(prev);
@@ -226,16 +213,8 @@ const ArchformMatcher: React.FC = () => {
         setSavingRows((prev) => new Set(prev).add(archformId));
 
         try {
-            const res = await fetch(`/api/aligner/sets/${setId}/archform`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ archformId: null }),
-            });
-            const data = await res.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to remove match');
-            }
+            // Non-2xx throws; success body is { success:true, message }.
+            await patchJSON(`/api/aligner/sets/${setId}/archform`, { archformId: null });
 
             toast.success('Match removed');
             setAlignerSets((prev) =>
@@ -244,7 +223,7 @@ const ArchformMatcher: React.FC = () => {
                 )
             );
         } catch (err) {
-            toast.error((err as Error).message);
+            toast.error(httpErrorMessage(err, 'Failed to remove match'));
         } finally {
             setSavingRows((prev) => {
                 const next = new Set(prev);
@@ -333,16 +312,11 @@ const ArchformMatcher: React.FC = () => {
 
         setEditSaving(true);
         try {
-            const res = await fetch(`/api/aligner/archform/patients/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: editName.trim(), lastName: editLastName.trim() }),
+            // Non-2xx throws; success body is { success:true, message }.
+            await putJSON(`/api/aligner/archform/patients/${id}`, {
+                name: editName.trim(),
+                lastName: editLastName.trim(),
             });
-            const data = await res.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to update patient');
-            }
 
             toast.success('Patient name updated');
             setArchformPatients((prev) =>
@@ -354,7 +328,7 @@ const ArchformMatcher: React.FC = () => {
             );
             handleCancelEdit();
         } catch (err) {
-            toast.error((err as Error).message);
+            toast.error(httpErrorMessage(err, 'Failed to update patient'));
         } finally {
             setEditSaving(false);
         }
@@ -395,16 +369,11 @@ const ArchformMatcher: React.FC = () => {
 
         setEditSaving(true);
         try {
-            const res = await fetch(`/api/aligner/archform/patients/${patient.Id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newName, lastName: newLastName }),
+            // Non-2xx throws; success body is { success:true, message }.
+            await putJSON(`/api/aligner/archform/patients/${patient.Id}`, {
+                name: newName,
+                lastName: newLastName,
             });
-            const data = await res.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to auto-rename patient');
-            }
 
             toast.success(`Renamed to ${newName} ${newLastName}`);
             setArchformPatients((prev) =>
@@ -415,7 +384,7 @@ const ArchformMatcher: React.FC = () => {
                 )
             );
         } catch (err) {
-            toast.error((err as Error).message);
+            toast.error(httpErrorMessage(err, 'Failed to auto-rename patient'));
         } finally {
             setEditSaving(false);
         }
@@ -432,14 +401,8 @@ const ArchformMatcher: React.FC = () => {
 
         setDeleting(true);
         try {
-            const res = await fetch(`/api/aligner/archform/patients/${deleteTarget.Id}`, {
-                method: 'DELETE',
-            });
-            const data = await res.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to delete patient');
-            }
+            // Non-2xx throws; success body is { success:true, message }.
+            await deleteJSON(`/api/aligner/archform/patients/${deleteTarget.Id}`);
 
             toast.success(`Deleted ${deleteTarget.LastName}`);
 
@@ -455,7 +418,7 @@ const ArchformMatcher: React.FC = () => {
 
             setDeleteTarget(null);
         } catch (err) {
-            toast.error((err as Error).message);
+            toast.error(httpErrorMessage(err, 'Failed to delete patient'));
         } finally {
             setDeleting(false);
         }

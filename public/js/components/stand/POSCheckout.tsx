@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { formatNumber, parseMoneyInput } from '../../utils/formatters';
+import { fetchJSON } from '@/core/http';
 import styles from './POSCheckout.module.css';
 
 interface PatientSearchResult {
@@ -94,14 +95,15 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
     const seq = ++patientSearchSeqRef.current;
     setPatientSearchLoading(true);
     try {
-      const response = await fetch(
+      // /api/patients/search returns { patients, totalCount, hasMore } (envelope-
+      // unwrapped to the inner object); read .patients, not the object itself.
+      const data = await fetchJSON<{ patients?: PatientSearchResult[] }>(
         `/api/patients/search?q=${encodeURIComponent(query)}`
       );
-      if (!response.ok) throw new Error('Search failed');
-      const data = (await response.json()) as PatientSearchResult[];
       if (seq !== patientSearchSeqRef.current) return; // superseded by a newer query
-      setPatientResults(data);
-      setShowPatientDropdown(data.length > 0);
+      const patients = data.patients ?? [];
+      setPatientResults(patients);
+      setShowPatientDropdown(patients.length > 0);
     } catch {
       if (seq !== patientSearchSeqRef.current) return;
       setPatientResults([]);

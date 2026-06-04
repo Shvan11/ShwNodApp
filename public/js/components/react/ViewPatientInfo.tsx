@@ -5,6 +5,7 @@ import AlertModal from './AlertModal';
 import PortalAccessCard from './PortalAccessCard';
 import { useToast } from '../../contexts/ToastContext';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
+import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
 import styles from './ViewPatientInfo.module.css';
 
 interface Props {
@@ -162,17 +163,11 @@ const ViewPatientInfo = ({ personId }: Props) => {
 
         try {
             setLoading(true);
-            const response = await fetch(`/api/patients/${personId}/info`, { signal });
-
-            if (!response.ok) {
-                throw new Error('Failed to load patient info');
-            }
-
-            const data = await response.json();
+            const data = await fetchJSON<PatientInfo>(`/api/patients/${personId}/info`, { signal });
             setPatientInfo(data);
         } catch (err) {
             if (err instanceof Error && err.name === 'AbortError') return;
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            setError(httpErrorMessage(err, 'Unknown error'));
         } finally {
             setLoading(false);
         }
@@ -183,12 +178,8 @@ const ViewPatientInfo = ({ personId }: Props) => {
 
         try {
             setAlertsLoading(true);
-            const response = await fetch(`/api/patients/${personId}/alerts`, { signal });
-
-            if (response.ok) {
-                const data = await response.json();
-                setAlerts(data);
-            }
+            const data = await fetchJSON<Alert[]>(`/api/patients/${personId}/alerts`, { signal });
+            setAlerts(data);
         } catch (err) {
             if (err instanceof Error && err.name === 'AbortError') return;
         } finally {
@@ -199,11 +190,8 @@ const ViewPatientInfo = ({ personId }: Props) => {
     const loadCostPresets = useCallback(async () => {
         try {
             setPresetsLoading(true);
-            const response = await fetch('/api/settings/cost-presets');
-            if (response.ok) {
-                const data = await response.json();
-                setCostPresets(data);
-            }
+            const data = await fetchJSON<CostPreset[]>('/api/settings/cost-presets');
+            setCostPresets(data);
         } catch (err) {
             console.error('Error loading cost presets:', err);
         } finally {
@@ -213,11 +201,8 @@ const ViewPatientInfo = ({ personId }: Props) => {
 
     const loadAlertTypes = useCallback(async () => {
         try {
-            const response = await fetch('/api/alert-types');
-            if (response.ok) {
-                const data = await response.json();
-                setAlertTypes(data);
-            }
+            const data = await fetchJSON<AlertType[]>('/api/alert-types');
+            setAlertTypes(data);
         } catch (err) {
             console.error('Error loading alert types:', err);
         }
@@ -240,21 +225,13 @@ const ViewPatientInfo = ({ personId }: Props) => {
     const handleDeleteAlert = async (alertId: number) => {
         try {
             setDeletingAlertId(alertId);
-            const response = await fetch(`/api/alerts/${alertId}/status`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isActive: false })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to delete alert');
-            }
+            await putJSON(`/api/alerts/${alertId}/status`, { isActive: false });
 
             loadAlerts(); // Reload alerts
             toast.success('Alert deleted');
         } catch (err) {
             console.error('Error deleting alert:', err);
-            toast.error('Failed to delete alert');
+            toast.error(httpErrorMessage(err, 'Failed to delete alert'));
         } finally {
             setDeletingAlertId(null);
         }
@@ -274,25 +251,17 @@ const ViewPatientInfo = ({ personId }: Props) => {
         try {
             setSavingCost(true);
 
-            const response = await fetch(`/api/patients/${validPersonId}/estimated-cost`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    estimatedCost: parseCostInput(editingCost.value),
-                    currency: editingCost.currency
-                })
+            await putJSON(`/api/patients/${validPersonId}/estimated-cost`, {
+                estimatedCost: parseCostInput(editingCost.value),
+                currency: editingCost.currency
             });
-
-            if (!response.ok) {
-                throw new Error('Failed to save cost');
-            }
 
             toast.success('Cost updated successfully');
             setEditingCost(null);
             loadPatientInfo(); // Reload to get updated data
         } catch (err) {
             console.error('Error saving cost:', err);
-            toast.error('Failed to save cost');
+            toast.error(httpErrorMessage(err, 'Failed to save cost'));
         } finally {
             setSavingCost(false);
         }

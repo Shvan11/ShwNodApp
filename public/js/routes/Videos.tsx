@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '../contexts/ToastContext';
+import { fetchJSON, putJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
 import Modal from '../components/react/Modal';
 import styles from './Videos.module.css';
 
@@ -80,13 +81,10 @@ export default function Videos() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/videos');
-      if (!response.ok) throw new Error('Failed to fetch videos');
-
-      const result = await response.json();
-      setVideos(result.data || []);
+      const data = await fetchJSON<Video[]>('/api/videos');
+      setVideos(data || []);
     } catch (err) {
-      setError((err as Error).message);
+      setError(httpErrorMessage(err, 'Failed to load videos'));
       toast.error('Failed to load videos');
     } finally {
       setLoading(false);
@@ -98,11 +96,8 @@ export default function Videos() {
    */
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await fetch('/api/videos/categories');
-      if (!response.ok) throw new Error('Failed to fetch categories');
-
-      const result = await response.json();
-      setCategories(result.data || []);
+      const data = await fetchJSON<VideoCategory[]>('/api/videos/categories');
+      setCategories(data || []);
     } catch (err) {
       console.error('Failed to fetch categories:', err);
     }
@@ -187,14 +182,13 @@ export default function Videos() {
     setIsQRModalOpen(true);
 
     try {
-      const response = await fetch(`/api/videos/${video.id}/qr`);
-      if (!response.ok) throw new Error('Failed to generate QR code');
-
-      const result = await response.json();
+      const data = await fetchJSON<{ qr: string; url: string; title: string }>(
+        `/api/videos/${video.id}/qr`
+      );
       setQRData({
-        qr: result.data.qr,
-        url: result.data.url,
-        title: result.data.title,
+        qr: data.qr,
+        url: data.url,
+        title: data.title,
       });
     } catch {
       toast.error('Failed to generate QR code');
@@ -330,17 +324,11 @@ export default function Videos() {
     try {
       if (editingVideo) {
         // Update existing video (metadata only)
-        const response = await fetch(`/api/videos/${editingVideo.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            description: formData.description,
-            category: formData.category,
-            details: formData.details,
-          }),
+        await putJSON(`/api/videos/${editingVideo.id}`, {
+          description: formData.description,
+          category: formData.category,
+          details: formData.details,
         });
-
-        if (!response.ok) throw new Error('Failed to update video');
 
         toast.success('Video updated successfully');
       } else {
@@ -352,12 +340,7 @@ export default function Videos() {
         if (formData.details) uploadData.append('details', formData.details);
         if (thumbnailFile) uploadData.append('thumbnail', thumbnailFile);
 
-        const response = await fetch('/api/videos', {
-          method: 'POST',
-          body: uploadData,
-        });
-
-        if (!response.ok) throw new Error('Failed to upload video');
+        await postFormData('/api/videos', uploadData);
 
         toast.success('Video uploaded successfully');
       }
@@ -365,7 +348,7 @@ export default function Videos() {
       setIsFormModalOpen(false);
       fetchVideos();
     } catch (err) {
-      toast.error((err as Error).message);
+      toast.error(httpErrorMessage(err, 'Failed to save video'));
     } finally {
       setIsSubmitting(false);
     }
@@ -378,18 +361,14 @@ export default function Videos() {
     if (!videoToDelete) return;
 
     try {
-      const response = await fetch(`/api/videos/${videoToDelete.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Failed to delete video');
+      await deleteJSON(`/api/videos/${videoToDelete.id}`);
 
       toast.success('Video deleted successfully');
       setIsDeleteModalOpen(false);
       setVideoToDelete(null);
       fetchVideos();
     } catch (err) {
-      toast.error((err as Error).message);
+      toast.error(httpErrorMessage(err, 'Failed to delete video'));
     }
   };
 
