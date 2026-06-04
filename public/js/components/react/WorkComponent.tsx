@@ -602,9 +602,20 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         if (work.status === WORK_STATUS.DISCONTINUED) return 0;
         if (!work.start_date) return 0;
 
-        let progress = 25;
-        // Note: IPhotoDate, DebondDate, FPhotoDate may need to be added to Work interface
-        return progress;
+        const start = new Date(work.start_date).getTime();
+        if (Number.isNaN(start)) return 0;
+
+        // Estimate progress from elapsed treatment time against the estimated
+        // duration (in months; fall back to a typical ortho course when unset).
+        // Clamped to 5–95% while active so the bar always shows movement and
+        // never implies completion before the work is actually marked finished.
+        const months = work.estimated_duration && work.estimated_duration > 0
+            ? work.estimated_duration
+            : 18;
+        const totalMs = months * 30 * 24 * 60 * 60 * 1000;
+        if (totalMs <= 0) return 5;
+        const pct = Math.round(((Date.now() - start) / totalMs) * 100);
+        return Math.min(95, Math.max(5, pct));
     };
 
     const filteredWorks = works

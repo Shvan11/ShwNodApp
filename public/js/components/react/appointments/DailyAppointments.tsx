@@ -9,6 +9,7 @@ import type { ConnectionStatusType, FreshnessType } from './ConnectionStatus';
 import styles from './DailyAppointments.module.css';
 
 import { useAppointments } from '../../../hooks/useAppointments';
+import type { Appointment } from '../../../hooks/useAppointments';
 import { useWebSocketSync } from '../../../hooks/useWebSocketSync';
 
 interface LoaderData {
@@ -65,7 +66,13 @@ const DailyAppointments = () => {
         markDismissed,
         undoState,
         getStats
-    } = useAppointments(loaderData as unknown as Parameters<typeof useAppointments>[0]);
+    } = useAppointments({
+        // The loader types appointments as DailyAppointment[] (UI shape); the hook
+        // wants Appointment[] (data shape). They differ only nominally, so assert
+        // per-array rather than blanket-casting the whole loader payload.
+        allAppointments: loaderData.allAppointments as Appointment[] | undefined,
+        checkedInAppointments: loaderData.checkedInAppointments as Appointment[] | undefined,
+    });
 
     // 6. Flash update indicator
     const flashUpdateIndicator = useCallback((): void => {

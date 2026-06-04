@@ -143,7 +143,7 @@ export default function MessageStatusTable({
                 messageText.substring(0, 50) + (messageText.length > 50 ? '...' : '');
 
               return (
-                <tr key={index} className={`status-row ${statusClass}`}>
+                <tr key={`${rawPhone || 'na'}-${timeSent}-${index}`} className={`status-row ${statusClass}`}>
                   <td className={styles.patientName}>
                     <div dangerouslySetInnerHTML={{ __html: escapeHtml(patientName) }} />
                   </td>

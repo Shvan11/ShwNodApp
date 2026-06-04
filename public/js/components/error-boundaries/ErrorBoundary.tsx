@@ -11,6 +11,7 @@
  */
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { useNavigate, useLocation, type NavigateFunction } from 'react-router-dom';
+import styles from './ErrorBoundary.module.css';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -89,148 +90,38 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
       // Default fallback UI
       return (
-        <div className="error-boundary-fallback">
-          <div className="error-boundary-content">
-            <div className="error-icon">⚠️</div>
+        <div className={styles.errorBoundaryFallback}>
+          <div className={styles.errorBoundaryContent}>
+            <div className={styles.errorIcon}>⚠️</div>
             <h2>Something went wrong</h2>
             <p>An error occurred while rendering this component.</p>
 
             {this.props.showDetails && this.state.error && (
-              <details className="error-details">
+              <details className={styles.errorDetails}>
                 <summary>Error details (for developers)</summary>
-                <pre className="error-message">
+                <pre className={styles.errorMessage}>
                   {this.state.error.toString()}
                 </pre>
                 {this.state.errorInfo && (
-                  <pre className="error-stack">
+                  <pre className={styles.errorStack}>
                     {this.state.errorInfo.componentStack}
                   </pre>
                 )}
               </details>
             )}
 
-            <div className="error-actions">
-              <button onClick={this.handleReset} className="retry-btn">
+            <div className={styles.errorActions}>
+              <button onClick={this.handleReset} className={styles.retryBtn}>
                 Try Again
               </button>
-              <button onClick={() => { this.handleReset(); this.props.navigate?.('/'); }} className="reload-btn">
+              <button onClick={() => { this.handleReset(); this.props.navigate?.('/'); }} className={styles.reloadBtn}>
                 Return to Dashboard
               </button>
-              <button onClick={() => this.props.navigate?.('/')} className="home-btn">
+              <button onClick={() => this.props.navigate?.('/')} className={styles.homeBtn}>
                 Go to Dashboard
               </button>
             </div>
           </div>
-
-          <style>{`
-            .error-boundary-fallback {
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              min-height: 400px;
-              padding: 40px 20px;
-              background-color: #f8f9fa;
-            }
-
-            .error-boundary-content {
-              max-width: 600px;
-              text-align: center;
-              background: white;
-              padding: 40px;
-              border-radius: 8px;
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            }
-
-            .error-icon {
-              font-size: 64px;
-              margin-bottom: 20px;
-            }
-
-            .error-boundary-content h2 {
-              color: #dc3545;
-              margin-bottom: 10px;
-              font-size: 24px;
-            }
-
-            .error-boundary-content p {
-              color: #666;
-              margin-bottom: 20px;
-              font-size: 16px;
-            }
-
-            .error-details {
-              margin: 20px 0;
-              text-align: left;
-              background: #f8f9fa;
-              padding: 15px;
-              border-radius: 4px;
-              border: 1px solid #dee2e6;
-            }
-
-            .error-details summary {
-              cursor: pointer;
-              font-weight: 600;
-              color: #495057;
-              margin-bottom: 10px;
-            }
-
-            .error-message,
-            .error-stack {
-              background: #fff;
-              padding: 10px;
-              border-radius: 4px;
-              border: 1px solid #dee2e6;
-              overflow-x: auto;
-              font-size: 12px;
-              font-family: 'Courier New', monospace;
-              color: #dc3545;
-              margin: 10px 0;
-            }
-
-            .error-actions {
-              display: flex;
-              gap: 10px;
-              justify-content: center;
-              flex-wrap: wrap;
-            }
-
-            .error-actions button {
-              padding: 10px 20px;
-              border: none;
-              border-radius: 4px;
-              cursor: pointer;
-              font-size: 14px;
-              font-weight: 500;
-              transition: all 0.2s;
-            }
-
-            .retry-btn {
-              background-color: #007bff;
-              color: white;
-            }
-
-            .retry-btn:hover {
-              background-color: #0056b3;
-            }
-
-            .reload-btn {
-              background-color: #6c757d;
-              color: white;
-            }
-
-            .reload-btn:hover {
-              background-color: #545b62;
-            }
-
-            .home-btn {
-              background-color: #28a745;
-              color: white;
-            }
-
-            .home-btn:hover {
-              background-color: #218838;
-            }
-          `}</style>
         </div>
       );
     }

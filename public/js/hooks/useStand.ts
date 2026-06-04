@@ -126,7 +126,7 @@ export interface StandReportData {
   purchases: { totalPurchases: number; restockCount: number };
 }
 
-interface StandItemCreateData {
+export interface StandItemCreateData {
   itemName: string;
   sku?: string | null;
   barcode?: string | null;
@@ -146,6 +146,12 @@ interface SaleCreateData {
   paymentMethod?: string;
   customerNote?: string | null;
   personId?: number | null;
+}
+
+/** Result payload from POST /api/stand/sales. */
+export interface StandSaleResult {
+  saleId: number;
+  change: number;
 }
 
 // ============================================================================
@@ -574,7 +580,7 @@ export function useStandItemMutations(onSuccess?: () => void): {
 // ============================================================================
 
 export function useStandSaleMutations(onSuccess?: () => void): {
-  createSale: (data: SaleCreateData) => Promise<unknown>;
+  createSale: (data: SaleCreateData) => Promise<StandSaleResult>;
   voidSale: (id: number, reason: string) => Promise<void>;
   loading: boolean;
   error: string | null;

@@ -94,7 +94,7 @@ export default function StandPOS() {
         paymentMethod,
         customerNote,
         personId,
-      }) as { saleId: number; change: number };
+      });
 
       setLastSale({ change: result.change, saleId: result.saleId });
       setCart([]);

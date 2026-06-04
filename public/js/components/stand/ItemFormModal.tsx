@@ -4,7 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import type { StandItem } from '../../hooks/useStand';
+import type { StandItem, StandItemCreateData } from '../../hooks/useStand';
 import { useStandCategories } from '../../hooks/useStand';
 import { useToast } from '../../contexts/ToastContext';
 import { formatNumber } from '../../utils/formatters';
@@ -15,7 +15,7 @@ interface ItemFormModalProps {
   isOpen: boolean;
   item: StandItem | null;
   onClose: () => void;
-  onSave: (data: Record<string, unknown>) => void | Promise<void>;
+  onSave: (data: StandItemCreateData) => void | Promise<void>;
 }
 
 interface FormData {
@@ -377,7 +377,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
     e.preventDefault();
     if (submitting || !validateForm()) return;
 
-    const data: Record<string, unknown> = {
+    const data: StandItemCreateData = {
       itemName: formData.itemName.trim(),
       sku: formData.sku.trim() || null,
       barcode: formData.barcode.trim() || null,

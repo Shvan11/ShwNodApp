@@ -1,0 +1,113 @@
+/*
+ * Styles for the app-level ErrorBoundary fallback. Kept as literal values
+ * (not design tokens) so the fallback still renders correctly even if a CSS
+ * variable sheet failed to load — which is plausible when something has
+ * already broken badly enough to trip the boundary.
+ */
+.errorBoundaryFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 40px 20px;
+  background-color: #f8f9fa;
+}
+
+.errorBoundaryContent {
+  max-width: 600px;
+  text-align: center;
+  background: white;
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.errorIcon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.errorBoundaryContent h2 {
+  color: #dc3545;
+  margin-bottom: 10px;
+  font-size: 24px;
+}
+
+.errorBoundaryContent p {
+  color: #666;
+  margin-bottom: 20px;
+  font-size: 16px;
+}
+
+.errorDetails {
+  margin: 20px 0;
+  text-align: left;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+}
+
+.errorDetails summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 10px;
+}
+
+.errorMessage,
+.errorStack {
+  background: #fff;
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+  overflow-x: auto;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  color: #dc3545;
+  margin: 10px 0;
+}
+
+.errorActions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.errorActions button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.retryBtn {
+  background-color: #007bff;
+  color: white;
+}
+
+.retryBtn:hover {
+  background-color: #0056b3;
+}
+
+.reloadBtn {
+  background-color: #6c757d;
+  color: white;
+}
+
+.reloadBtn:hover {
+  background-color: #545b62;
+}
+
+.homeBtn {
+  background-color: #28a745;
+  color: white;
+}
+
+.homeBtn:hover {
+  background-color: #218838;
+}

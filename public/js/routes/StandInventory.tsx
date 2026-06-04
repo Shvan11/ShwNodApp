@@ -3,7 +3,7 @@ import {
   useStandItems,
   useStandItemMutations,
 } from '../hooks/useStand';
-import type { StandItem, StandItemFilters } from '../hooks/useStand';
+import type { StandItem, StandItemFilters, StandItemCreateData } from '../hooks/useStand';
 
 const MODAL_STATE_KEY = 'standInventory.modalState';
 
@@ -97,13 +97,13 @@ export default function StandInventory() {
     setIsFormOpen(true);
   };
 
-  const handleSaveItem = async (data: Record<string, unknown>) => {
+  const handleSaveItem = async (data: StandItemCreateData) => {
     try {
       if (formItem) {
         await updateItem(formItem.item_id, data);
         toast.success('Item updated successfully');
       } else {
-        await createItem(data as unknown as Parameters<typeof createItem>[0]);
+        await createItem(data);
         toast.success('Item created successfully');
       }
       setIsFormOpen(false);

@@ -1,0 +1,88 @@
+/*
+ * Styles for the per-route error fallback. Literal values (not design tokens)
+ * on purpose: the fallback must render even if a variable sheet failed to load.
+ */
+.routeErrorScreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 50px);
+  padding: 40px 20px;
+  background-color: #f8f9fa;
+}
+
+.routeErrorContent {
+  max-width: 500px;
+  text-align: center;
+  background: white;
+  padding: 50px 40px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.errorIcon {
+  font-size: 72px;
+  margin-bottom: 20px;
+}
+
+.routeErrorContent h2 {
+  color: #dc3545;
+  margin-bottom: 15px;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.routeErrorContent p {
+  color: #666;
+  margin-bottom: 15px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.errorActions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 30px;
+  flex-wrap: wrap;
+}
+
+.errorActions button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.primaryBtn {
+  background-color: #007bff;
+  color: white;
+}
+
+.primaryBtn:hover {
+  background-color: #0056b3;
+  transform: translateY(-1px);
+}
+
+.secondaryBtn {
+  background-color: #28a745;
+  color: white;
+}
+
+.secondaryBtn:hover {
+  background-color: #218838;
+  transform: translateY(-1px);
+}
+
+.tertiaryBtn {
+  background-color: #6c757d;
+  color: white;
+}
+
+.tertiaryBtn:hover {
+  background-color: #545b62;
+  transform: translateY(-1px);
+}

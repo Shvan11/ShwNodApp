@@ -20,7 +20,7 @@ interface ColumnConfig {
 }
 
 interface LookupItem {
-    [key: string]: any;
+    [key: string]: string | number | boolean | null;
 }
 
 interface Position {
@@ -286,7 +286,7 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
     const getDisplayValue = (item: LookupItem): string => {
         if (columns.length === 0) return 'Item';
         const displayCol = columns[0];
-        return item[displayCol.name] || 'Unnamed';
+        return String(item[displayCol.name] || 'Unnamed');
     };
 
     return (
@@ -355,7 +355,7 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
                                 </tr>
                             ) : (
                                 filteredItems.map((item, idx) => (
-                                    <tr key={item[idColumn] || idx}>
+                                    <tr key={String(item[idColumn] || idx)}>
                                         <td className="id-cell">{item[idColumn]}</td>
                                         {columns.map(col => (
                                             <td key={col.name}>{getCellValue(item, col)}</td>
