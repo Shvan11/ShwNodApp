@@ -68,8 +68,16 @@ const UniversalHeader = () => {
             fetch(`/api/patients/${patientCode}/info`, { signal })
                 .then(response => response.json())
                 .then(data => {
-                    if (data && data.length > 0) {
-                        setCurrentPatient(data[0]);
+                    // `/info` returns a single patient object (not an array). Map
+                    // it onto the header's {code,name} shape; person_id is the code.
+                    if (data && data.person_id) {
+                        setCurrentPatient({
+                            ...data,
+                            code: data.person_id,
+                            name: data.patient_name ?? data.name ?? '',
+                        });
+                    } else {
+                        setCurrentPatient(null);
                     }
                 })
                 .catch(error => {

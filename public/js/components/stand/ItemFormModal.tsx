@@ -15,7 +15,7 @@ interface ItemFormModalProps {
   isOpen: boolean;
   item: StandItem | null;
   onClose: () => void;
-  onSave: (data: Record<string, unknown>) => void;
+  onSave: (data: Record<string, unknown>) => void | Promise<void>;
 }
 
 interface FormData {
@@ -130,6 +130,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
   const [scanImages, setScanImages] = useState<File[]>([]);
   const [scanPreviews, setScanPreviews] = useState<string[]>([]);
   const [scanning, setScanning] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const isEditMode = !!item;
 
@@ -372,9 +373,9 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (submitting || !validateForm()) return;
 
     const data: Record<string, unknown> = {
       itemName: formData.itemName.trim(),
@@ -393,7 +394,12 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
       data.currentStock = formData.currentStock;
     }
 
-    onSave(data);
+    setSubmitting(true);
+    try {
+      await onSave(data);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -684,11 +690,11 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
           </div>
 
           <div className={styles.modalFooter}>
-            <button type="button" className="btn btn-secondary" onClick={handleClose}>
+            <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={submitting}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
-              {isEditMode ? 'Update Item' : 'Add Item'}
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
+              {submitting ? 'Saving…' : isEditMode ? 'Update Item' : 'Add Item'}
             </button>
           </div>
         </form>

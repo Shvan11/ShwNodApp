@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { PortalPatient } from './PortalApp';
-import type { LoginResponse } from '@/types/api.types';
+import { loginResponseSchema } from './portal.schemas';
 import styles from './portal.module.css';
 
 interface Props {
@@ -42,11 +42,12 @@ const PortalLogin = ({ onLogin }: Props) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ personId: pid, pin: cleanPin }),
       });
-      const data = (await res.json()) as LoginResponse;
-      if (!res.ok || !data.success) {
-        setError(data.error || 'Invalid credentials');
+      const parsed = loginResponseSchema.safeParse(await res.json());
+      if (!res.ok || !parsed.success || !parsed.data.success) {
+        setError((parsed.success ? parsed.data.error : undefined) || 'Invalid credentials');
         return;
       }
+      const data = parsed.data;
       const pidNum = Number(pid);
       onLogin({
         personId: pidNum,

@@ -299,17 +299,13 @@ const PatientSets: React.FC = () => {
     };
 
     const markNoteAsRead = async (noteId: number): Promise<void> => {
+        // Callers only pass notes already known to be unread (is_read === false from
+        // the just-loaded notes payload), so toggling to read directly is safe — no
+        // need for a per-note /status round-trip first.
         try {
-            // First check current status
-            const checkResponse = await fetch(`/api/aligner/notes/${noteId}/status`);
-            const checkData = await checkResponse.json();
-
-            // Only toggle if it's currently unread
-            if (checkData.success && checkData.isRead === false) {
-                await fetch(`/api/aligner/notes/${noteId}/toggle-read`, {
-                    method: 'PATCH'
-                });
-            }
+            await fetch(`/api/aligner/notes/${noteId}/toggle-read`, {
+                method: 'PATCH'
+            });
         } catch (error) {
             console.error('Error marking note as read:', error);
         }
@@ -1557,7 +1553,7 @@ const PatientSets: React.FC = () => {
                                                 </div>
                                                 <div className="set-info-item">
                                                     <i className="fas fa-balance-scale"></i>
-                                                    <span>Balance: <strong>{set.Balance || set.set_cost} {set.currency || 'USD'}</strong></span>
+                                                    <span>Balance: <strong>{set.Balance ?? set.set_cost} {set.currency || 'USD'}</strong></span>
                                                 </div>
                                                 <div className="set-info-item">
                                                     <span className={`payment-status-badge ${set.PaymentStatus?.toLowerCase().replace(/\s+/g, '-') || 'unpaid'}`}>

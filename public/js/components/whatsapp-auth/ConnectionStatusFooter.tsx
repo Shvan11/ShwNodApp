@@ -3,7 +3,7 @@
  * Shows connection status indicator
  */
 
-import { AUTH_STATES, AuthState } from '../../hooks/useWhatsAppAuth';
+import { AUTH_STATES, type AuthState } from '../../hooks/useWhatsAppAuth';
 import styles from '../../routes/WhatsAppAuth.module.css';
 
 interface ConnectionStatus {
@@ -23,10 +23,12 @@ export const ConnectionStatusFooter = ({ authState }: ConnectionStatusFooterProp
       case AUTH_STATES.CONNECTING:
         return { text: 'Connecting...', connected: false };
       case AUTH_STATES.CONNECTED:
-      case AUTH_STATES.QR_REQUIRED:
-      case AUTH_STATES.CHECKING_SESSION:
       case AUTH_STATES.AUTHENTICATED:
         return { text: 'Connected', connected: true };
+      case AUTH_STATES.QR_REQUIRED:
+        return { text: 'Scan QR Code', connected: false };
+      case AUTH_STATES.CHECKING_SESSION:
+        return { text: 'Checking session...', connected: false };
       case AUTH_STATES.DISCONNECTED:
         return { text: 'Disconnected', connected: false };
       case AUTH_STATES.ERROR:

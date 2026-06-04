@@ -1,5 +1,5 @@
 // SearchPatient.tsx - Quick search for patients by name/ID/phone
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, useRef, useEffect, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PhoneDisplay from '../../components/react/PhoneDisplay';
 import styles from './SearchPatient.module.css';
@@ -21,14 +21,20 @@ const SearchPatient: React.FC = () => {
     const [searchResults, setSearchResults] = useState<AlignerPatient[]>([]);
     const [showResults, setShowResults] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(false);
-    const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+    const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Clear any pending debounce timer on unmount so it can't fire setState
+    // (or a fetch) after the component is gone.
+    useEffect(() => () => {
+        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    }, []);
 
     const handleSearchChange = (e: ChangeEvent<HTMLInputElement>): void => {
         const query = e.target.value;
         setSearchQuery(query);
 
-        if (searchTimeout) {
-            clearTimeout(searchTimeout);
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
         }
 
         if (query.trim().length < 2) {
@@ -36,11 +42,9 @@ const SearchPatient: React.FC = () => {
             return;
         }
 
-        const timeout = setTimeout(() => {
+        searchTimeoutRef.current = setTimeout(() => {
             searchPatients(query);
         }, 300);
-
-        setSearchTimeout(timeout);
     };
 
     const searchPatients = async (query: string): Promise<void> => {
@@ -97,9 +101,9 @@ const SearchPatient: React.FC = () => {
                                 <p>No aligner patients found</p>
                             </div>
                         ) : (
-                            searchResults.map((patient, index) => (
+                            searchResults.map((patient) => (
                                 <div
-                                    key={index}
+                                    key={patient.workid}
                                     className={styles.searchResultItem}
                                     onClick={() => selectPatient(patient)}
                                 >

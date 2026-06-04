@@ -82,7 +82,7 @@ function MovementsTable({ movements }: { movements: StandStockMovement[] }) {
 }
 
 export default function StockMovementsModal({ isOpen, item, onClose }: StockMovementsModalProps) {
-  const { movements, loading } = useStockMovements(isOpen && item ? item.item_id : null);
+  const { movements, loading, error } = useStockMovements(isOpen && item ? item.item_id : null);
 
   if (!item) return null;
 
@@ -112,6 +112,10 @@ export default function StockMovementsModal({ isOpen, item, onClose }: StockMove
             <div className={styles.loadingState}>
               <div className={styles.loadingSpinner}></div>
               <p>Loading movements...</p>
+            </div>
+          ) : error ? (
+            <div className={styles.emptyState}>
+              <p>{error}</p>
             </div>
           ) : movements.length === 0 ? (
             <div className={styles.emptyState}>

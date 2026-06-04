@@ -439,7 +439,6 @@ const CompareComponent = ({ personId, phone }: Props) => {
             if (!response.ok) throw new Error('Failed to load timepoints');
 
             const data: Timepoint[] = await response.json();
-            console.log('Loaded timepoints data:', data);
             setTimepoints(data);
 
             // Auto-select first and last timepoints (skip tp_code 0)
@@ -503,7 +502,6 @@ const CompareComponent = ({ personId, phone }: Props) => {
             autoScale: 1,
 
             loadImages: async function(urls: string[]) {
-                console.log('Loading images:', urls);
                 this.images = [];
                 for (let i = 0; i < urls.length; i++) {
                     const url = urls[i];
@@ -517,7 +515,6 @@ const CompareComponent = ({ personId, phone }: Props) => {
 
                             img.onload = () => {
                                 clearTimeout(timeout);
-                                console.log(`Image ${i} loaded successfully:`, url);
                                 resolve();
                             };
 
@@ -536,7 +533,6 @@ const CompareComponent = ({ personId, phone }: Props) => {
                         return;
                     }
                 }
-                console.log(`Loaded ${this.images.length} images, rendering...`);
 
                 // Auto-resize canvas if in auto mode
                 if (this.autoMode) {
@@ -588,8 +584,6 @@ const CompareComponent = ({ personId, phone }: Props) => {
                 if (this.updateDimensions) {
                     this.updateDimensions({ width: canvasWidth, height: canvasHeight });
                 }
-
-                console.log(`Auto-resized canvas to ${canvasWidth}x${canvasHeight} for ${this.orientation} orientation with container size ${containerWidth}x${containerHeight}`);
             },
 
             render: function() {

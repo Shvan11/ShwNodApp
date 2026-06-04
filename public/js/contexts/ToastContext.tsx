@@ -4,7 +4,7 @@
  * Replaces traditional alert() calls with modern, non-blocking notifications
  */
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 
 /**
  * Toast type variants
@@ -181,14 +181,14 @@ export function ToastProvider({ children }: ToastProviderProps) {
     [showToast]
   );
 
-  const value: ToastContextValue = {
-    showToast,
-    success,
-    error,
-    warning,
-    info,
-    removeToast,
-  };
+  // Memoize so the context value keeps a stable identity across renders.
+  // Without this, `useToast()` returns a fresh object every ToastProvider
+  // render (i.e. whenever any toast is shown/removed anywhere), which makes
+  // any consumer effect with `toast` in its deps re-fire — a refetch storm.
+  const value = useMemo<ToastContextValue>(
+    () => ({ showToast, success, error, warning, info, removeToast }),
+    [showToast, success, error, warning, info, removeToast]
+  );
 
   // Make toast functions globally available for non-React code
   useEffect(() => {

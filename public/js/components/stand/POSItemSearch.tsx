@@ -22,6 +22,9 @@ const POSItemSearch: React.FC<POSItemSearchProps> = ({ onSelect }) => {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Monotonic request id — ignore responses that arrive out of order so a
+  // slow earlier query can't clobber the results of the latest one.
+  const requestSeqRef = useRef(0);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -44,6 +47,7 @@ const POSItemSearch: React.FC<POSItemSearchProps> = ({ onSelect }) => {
       return;
     }
 
+    const seq = ++requestSeqRef.current;
     setLoading(true);
     try {
       const response = await fetch(
@@ -53,13 +57,15 @@ const POSItemSearch: React.FC<POSItemSearchProps> = ({ onSelect }) => {
         throw new Error('Search failed');
       }
       const data = (await response.json()) as StandItem[];
+      if (seq !== requestSeqRef.current) return; // a newer query superseded this one
       setResults(data);
       setShowDropdown(data.length > 0);
     } catch {
+      if (seq !== requestSeqRef.current) return;
       setResults([]);
       setShowDropdown(false);
     } finally {
-      setLoading(false);
+      if (seq === requestSeqRef.current) setLoading(false);
     }
   }, []);
 

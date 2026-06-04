@@ -530,3 +530,12 @@
         justify-content: center;
     }
 }
+
+.adminHint {
+    margin-left: 8px;
+}
+
+.optionalHint {
+    font-weight: normal;
+    opacity: 0.7;
+}

@@ -7,7 +7,7 @@ import ExpiringItemsPanel from '../components/stand/ExpiringItemsPanel';
 import RestockModal from '../components/stand/RestockModal';
 import { useStandItemMutations } from '../hooks/useStand';
 import { useToast } from '../contexts/ToastContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import styles from './Stand.module.css';
 
 export default function Stand() {
@@ -15,8 +15,12 @@ export default function Stand() {
   const toast = useToast();
 
   const { kpis, loading: kpisLoading, refetch: refetchKPIs } = useStandDashboardKPIs();
-  const { items: lowStockItems, loading: lowStockLoading, refetch: refetchLowStock } = useLowStockItems();
-  const { items: expiringItems, loading: expiringLoading } = useExpiringItems(30);
+  const { items: lowStockItems, loading: lowStockLoading, error: lowStockError, refetch: refetchLowStock } = useLowStockItems();
+  const { items: expiringItems, loading: expiringLoading, error: expiringError } = useExpiringItems(30);
+
+  // Surface fetch failures instead of silently showing an empty panel.
+  useEffect(() => { if (lowStockError) toast.error(lowStockError); }, [lowStockError, toast]);
+  useEffect(() => { if (expiringError) toast.error(expiringError); }, [expiringError, toast]);
 
   const [restockItem, setRestockItem] = useState<StandItem | null>(null);
 

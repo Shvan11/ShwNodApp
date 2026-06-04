@@ -134,31 +134,6 @@ export async function getDocumentTypes(): Promise<DocumentType[]> {
     .execute() as Promise<DocumentType[]>;
 }
 
-/**
- * Get a specific document type by id
- */
-export async function getDocumentTypeById(typeId: number): Promise<DocumentType | null> {
-  const db = getKysely();
-  const row = await db
-    .selectFrom('document_types')
-    .select([
-      'type_id',
-      'type_code',
-      'type_name',
-      'description',
-      'icon',
-      'default_paper_width',
-      'default_paper_height',
-      'default_orientation',
-      'is_active',
-      'sort_order',
-    ])
-    .where('type_id', '=', typeId)
-    .executeTakeFirst();
-
-  return (row as DocumentType | undefined) ?? null;
-}
-
 // ============================================================================
 // DOCUMENT TEMPLATES
 // ============================================================================
@@ -270,46 +245,6 @@ export async function getTemplateWithElements(
 ): Promise<DocumentTemplate | null> {
   // File-based templates don't have elements in database
   return getTemplateById(templateId);
-}
-
-/**
- * Get default template for a document type
- */
-export async function getDefaultTemplate(
-  documentTypeId: number
-): Promise<DocumentTemplate | null> {
-  const db = getKysely();
-  const row = await db
-    .selectFrom('document_templates as t')
-    .innerJoin('document_types as dt', 't.document_type_id', 'dt.type_id')
-    .select([
-      't.template_id',
-      't.template_name',
-      't.description',
-      't.document_type_id',
-      'dt.type_name as document_type_name',
-      'dt.type_code as document_type_code',
-      't.template_file_path',
-      't.paper_width',
-      't.paper_height',
-      't.paper_orientation',
-      't.paper_margin_top',
-      't.paper_margin_right',
-      't.paper_margin_bottom',
-      't.paper_margin_left',
-      't.background_color',
-      't.is_default',
-      't.is_active',
-      't.is_system',
-    ])
-    .where('t.document_type_id', '=', documentTypeId)
-    .where('t.is_active', '=', true)
-    .where('t.is_default', '=', true)
-    .orderBy('t.template_id')
-    .limit(1)
-    .executeTakeFirst();
-
-  return (row as DocumentTemplate | undefined) ?? null;
 }
 
 /**

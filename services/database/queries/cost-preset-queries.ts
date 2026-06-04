@@ -78,17 +78,3 @@ export async function deleteCostPreset(presetId: number): Promise<void> {
   await db.deleteFrom('estimated_cost_presets').where('preset_id', '=', presetId).execute();
 }
 
-/**
- * Get distinct currencies that have presets
- */
-export async function getCostPresetCurrencies(): Promise<string[]> {
-  const db = getKysely();
-  const rows = await db
-    .selectFrom('estimated_cost_presets')
-    .select('currency')
-    .distinct()
-    .orderBy('currency')
-    .execute();
-
-  return rows.map((r) => r.currency);
-}

@@ -426,7 +426,13 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
                 <button
                     className={`${styles.btn} ${styles.btnInfo}`}
-                    onClick={restartApplication}
+                    onClick={async () => {
+                        const ok = await confirm(
+                            'This will restart the live application server for all users. Continue?',
+                            { title: 'Restart Application', danger: true, confirmText: 'Restart Now', cancelText: 'Cancel' }
+                        );
+                        if (ok) restartApplication();
+                    }}
                     title="Restart application to apply configuration changes"
                 >
                     <i className="fas fa-sync-alt"></i>

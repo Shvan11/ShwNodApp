@@ -106,8 +106,6 @@ export function useAppointments(
     const existing = inFlightFetchesRef.current.get(date);
     if (existing) return existing;
 
-    console.log('Loading appointments for date:', date);
-
     const fetchPromise = (async (): Promise<boolean> => {
       try {
         setLoading(true);
@@ -120,12 +118,6 @@ export function useAppointments(
         }
 
         const data = await response.json();
-
-        console.log('Loaded appointments:', {
-          all: data.allAppointments?.length || 0,
-          checkedIn: data.checkedInAppointments?.length || 0,
-          stats: data.stats,
-        });
 
         setAllAppointments(data.allAppointments || []);
         setCheckedInAppointments(data.checkedInAppointments || []);
@@ -171,7 +163,6 @@ export function useAppointments(
   const checkInPatient = useCallback(
     async (appointmentId: number, currentDate: string): Promise<{ success: boolean }> => {
       const currentTime = getCurrentTime();
-      console.log(`Checking in appointment ${appointmentId}`);
 
       try {
         setLoading(true);
@@ -194,8 +185,7 @@ export function useAppointments(
           throw new Error('Failed to check in patient');
         }
 
-        const result = await response.json();
-        console.log('Check-in confirmed:', result);
+        await response.json();
 
         // Reload appointments to get fresh data
         await loadAppointments(currentDate);
@@ -219,7 +209,6 @@ export function useAppointments(
   const markSeated = useCallback(
     async (appointmentId: number, currentDate: string): Promise<{ success: boolean }> => {
       const currentTime = getCurrentTime();
-      console.log(`Seating appointment ${appointmentId}`);
 
       try {
         setLoading(true);
@@ -242,8 +231,7 @@ export function useAppointments(
           throw new Error('Failed to seat patient');
         }
 
-        const result = await response.json();
-        console.log('Seated confirmed:', result);
+        await response.json();
 
         // Reload appointments to get fresh data
         await loadAppointments(currentDate);
@@ -267,7 +255,6 @@ export function useAppointments(
   const markDismissed = useCallback(
     async (appointmentId: number, currentDate: string): Promise<{ success: boolean }> => {
       const currentTime = getCurrentTime();
-      console.log(`Dismissing appointment ${appointmentId}`);
 
       try {
         setLoading(true);
@@ -290,8 +277,7 @@ export function useAppointments(
           throw new Error('Failed to complete visit');
         }
 
-        const result = await response.json();
-        console.log('Dismissed confirmed:', result);
+        await response.json();
 
         // Reload appointments to get fresh data
         await loadAppointments(currentDate);
@@ -318,7 +304,6 @@ export function useAppointments(
       stateToUndo: string,
       currentDate: string
     ): Promise<{ success: boolean }> => {
-      console.log(`Undoing ${stateToUndo} for appointment ${appointmentId}`);
 
       try {
         setLoading(true);
@@ -344,8 +329,7 @@ export function useAppointments(
           throw new Error(`Failed to undo ${stateToUndo}`);
         }
 
-        const result = await response.json();
-        console.log(`Undo ${stateToUndo} confirmed:`, result);
+        await response.json();
 
         // Reload appointments to get fresh data
         await loadAppointments(currentDate);

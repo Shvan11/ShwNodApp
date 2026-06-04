@@ -236,17 +236,6 @@ interface AlignerNote {
   doctor_name: string;
 }
 
-interface AlignerActivity {
-  activity_id: number;
-  aligner_set_id: number;
-  activity_type: string;
-  activity_description: string;
-  created_at: Date;
-  is_read: boolean;
-  read_at: Date | null;
-  related_record_id: number | null;
-}
-
 interface AlignerPaymentData {
   workid: number;
   aligner_set_id: number | null;
@@ -1892,87 +1881,6 @@ export async function getNoteReadStatus(noteId: number): Promise<boolean | null>
 }
 
 // ==============================
-// ALIGNER ACTIVITY FLAGS QUERIES
-// ==============================
-
-/**
- * Get unread activities for a set
- */
-export async function getUnreadActivitiesBySetId(setId: number): Promise<AlignerActivity[]> {
-  try {
-    const rows = await getKysely()
-      .selectFrom('aligner_activity_flags')
-      .where('aligner_set_id', '=', setId)
-      .where('is_read', '=', false)
-      .select((eb) => [
-        'activity_id',
-        'aligner_set_id',
-        'activity_type',
-        'activity_description',
-        eb.ref('created_at').$castTo<Date>().as('created_at'),
-        'is_read',
-        eb.ref('read_at').$castTo<Date | null>().as('read_at'),
-        'related_record_id',
-      ])
-      .orderBy('created_at', 'desc')
-      .execute();
-
-    return rows.map((r) => ({
-      activity_id: r.activity_id,
-      aligner_set_id: r.aligner_set_id,
-      activity_type: r.activity_type,
-      activity_description: r.activity_description,
-      created_at: r.created_at,
-      is_read: !!r.is_read,
-      read_at: r.read_at,
-      related_record_id: r.related_record_id,
-    }));
-  } catch (err) {
-    log.error('Failed to get unread activities by set id', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    throw err;
-  }
-}
-
-/**
- * Mark an activity as read
- */
-export async function markActivityAsRead(activityId: number): Promise<void> {
-  try {
-    await getKysely()
-      .updateTable('aligner_activity_flags')
-      .set({ is_read: true, read_at: sql`localtimestamp` })
-      .where('activity_id', '=', activityId)
-      .execute();
-  } catch (err) {
-    log.error('Failed to mark activity as read', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    throw err;
-  }
-}
-
-/**
- * Mark all activities for a set as read
- */
-export async function markAllActivitiesAsRead(setId: number): Promise<void> {
-  try {
-    await getKysely()
-      .updateTable('aligner_activity_flags')
-      .set({ is_read: true, read_at: sql`localtimestamp` })
-      .where('aligner_set_id', '=', setId)
-      .where('is_read', '=', false)
-      .execute();
-  } catch (err) {
-    log.error('Failed to mark all activities as read', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    throw err;
-  }
-}
-
-// ==============================
 // ALIGNER PAYMENTS QUERIES
 // ==============================
 
@@ -2223,46 +2131,3 @@ export async function clearArchformIdByPatientId(archformPatientId: number): Pro
   }
 }
 
-/**
- * Get a single doctor by id
- */
-export async function getDoctorById(drId: number): Promise<AlignerDoctor[]> {
-  try {
-    return (await getKysely()
-      .selectFrom('aligner_doctors')
-      .select(['dr_id', 'doctor_name', 'doctor_email', 'logo_path'])
-      .where('dr_id', '=', drId)
-      .execute()) as AlignerDoctor[];
-  } catch (err) {
-    log.error('Failed to get doctor by id', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    throw err;
-  }
-}
-
-/**
- * Get a single doctor by email (used by the external aligner portal to map a
- * Cloudflare-Access identity to a dr_id). doctor_email is citext, so the
- * comparison is case-insensitive.
- */
-export async function getDoctorByEmail(email: string): Promise<AlignerDoctor | null> {
-  if (!email || email.trim() === '') {
-    return null;
-  }
-
-  try {
-    const row = await getKysely()
-      .selectFrom('aligner_doctors')
-      .select(['dr_id', 'doctor_name', 'doctor_email', 'logo_path'])
-      .where('doctor_email', '=', email.trim())
-      .executeTakeFirst();
-
-    return (row as AlignerDoctor) ?? null;
-  } catch (err) {
-    log.error('Failed to get doctor by email', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    throw err;
-  }
-}

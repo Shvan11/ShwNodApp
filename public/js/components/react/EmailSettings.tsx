@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, ChangeEvent } from 'react';
+import { useState, useEffect, useCallback, type ChangeEvent } from 'react';
+import { Link } from 'react-router-dom';
 import Modal from './Modal';
 
 interface EmailConfig {
@@ -324,7 +325,7 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                                 <i className="fas fa-info-circle"></i>
                                 <span>
                                     Email notifications are sent to employees with "Receive Email" enabled.
-                                    Manage recipients in <a href="/settings/employees">Settings → Employees</a>.
+                                    Manage recipients in <Link to="/settings/employees">Settings → Employees</Link>.
                                 </span>
                             </div>
                         </div>

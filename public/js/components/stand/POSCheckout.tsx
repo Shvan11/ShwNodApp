@@ -43,6 +43,8 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
 
   const patientContainerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Monotonic request id — drop out-of-order patient-search responses.
+  const patientSearchSeqRef = useRef(0);
 
   const amountPaid = parseMoneyInput(amountPaidRaw);
   const change = amountPaid - total;
@@ -89,6 +91,7 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
       return;
     }
 
+    const seq = ++patientSearchSeqRef.current;
     setPatientSearchLoading(true);
     try {
       const response = await fetch(
@@ -96,13 +99,15 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
       );
       if (!response.ok) throw new Error('Search failed');
       const data = (await response.json()) as PatientSearchResult[];
+      if (seq !== patientSearchSeqRef.current) return; // superseded by a newer query
       setPatientResults(data);
       setShowPatientDropdown(data.length > 0);
     } catch {
+      if (seq !== patientSearchSeqRef.current) return;
       setPatientResults([]);
       setShowPatientDropdown(false);
     } finally {
-      setPatientSearchLoading(false);
+      if (seq === patientSearchSeqRef.current) setPatientSearchLoading(false);
     }
   }, []);
 

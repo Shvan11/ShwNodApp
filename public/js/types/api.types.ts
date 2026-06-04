@@ -152,15 +152,6 @@ export interface PhotoRenderResult {
     tp_code: number;
 }
 
-/** POST /api/portal/login (patient portal). */
-export interface LoginResponse {
-    success: boolean;
-    patientName?: string | null;
-    language?: number | null;
-    error?: string;
-    lockedUntil?: string;
-}
-
 // =============================================================================
 // PORTAL ACCESS (staff side — managing a patient's portal access)
 // =============================================================================
@@ -192,56 +183,9 @@ export interface PortalPinResetResponse {
 // =============================================================================
 // PORTAL — PATIENT-FACING DATA TABS
 // =============================================================================
-
-export interface PortalPaymentRow {
-    Payment: number;
-    Date: string;
-}
-
-/** GET /api/portal/payments. */
-export interface PortalPaymentsResponse {
-    success: boolean;
-    payments?: PortalPaymentRow[];
-    error?: string;
-}
-
-export interface PortalNextAppointment {
-    appointment_id: number;
-    app_date: string;
-    app_detail: string | null;
-    DrName: string | null;
-}
-
-/** GET /api/portal/appointments/next. */
-export interface PortalNextAppointmentResponse {
-    success: boolean;
-    appointment: PortalNextAppointment | null;
-    error?: string;
-}
-
-/**
- * Visit summary returned by the patient portal.
- * Distinct from the staff-side VisitSummary in services/appointment.ts — different shape.
- */
-export interface PortalVisitSummary {
-    patient_name: string;
-    work_id: number;
-    id: number;
-    visit_date: string;
-    opg: boolean;
-    i_photo: boolean;
-    f_photo: boolean;
-    p_photo: boolean;
-    appliance_removed: boolean;
-    Summary: string | null;
-}
-
-/** GET /api/portal/visits. */
-export interface PortalVisitsResponse {
-    success: boolean;
-    visits?: PortalVisitSummary[];
-    error?: string;
-}
+// The patient-facing portal response shapes are external/untrusted input, so
+// they're validated at the fetch boundary with Zod and live (as the single
+// source of truth, via `z.infer`) in `public/js/portal/portal.schemas.ts`.
 
 // =============================================================================
 // MESSAGING / WHATSAPP (HTTP only — WebSocket payloads are not in scope)

@@ -3,7 +3,7 @@
  * Action buttons for WhatsApp authentication
  */
 
-import { AUTH_STATES, AuthState, WhatsAppAuthActions } from '../../hooks/useWhatsAppAuth';
+import { AUTH_STATES, type AuthState, type WhatsAppAuthActions } from '../../hooks/useWhatsAppAuth';
 import styles from '../../routes/WhatsAppAuth.module.css';
 
 interface ControlButtonsProps {

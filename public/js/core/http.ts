@@ -117,9 +117,9 @@ export function postJSON<T = unknown, D = unknown>(
   options: FetchOptions = {}
 ): Promise<T> {
   return fetchData<T>(url, {
+    ...options,
     method: 'POST',
     body: JSON.stringify(data),
-    ...options,
   });
 }
 
@@ -136,9 +136,9 @@ export function putJSON<T = unknown, D = unknown>(
   options: FetchOptions = {}
 ): Promise<T> {
   return fetchData<T>(url, {
+    ...options,
     method: 'PUT',
     body: JSON.stringify(data),
-    ...options,
   });
 }
 
@@ -150,8 +150,8 @@ export function putJSON<T = unknown, D = unknown>(
  */
 export function deleteJSON<T = unknown>(url: string, options: FetchOptions = {}): Promise<T> {
   return fetchData<T>(url, {
-    method: 'DELETE',
     ...options,
+    method: 'DELETE',
   });
 }
 

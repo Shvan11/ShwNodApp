@@ -1038,3 +1038,7 @@
         justify-content: space-between;
     }
 }
+
+.customDateInput {
+    margin-top: var(--spacing-sm);
+}

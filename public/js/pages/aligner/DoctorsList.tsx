@@ -1,6 +1,7 @@
 // DoctorsList.tsx - Select a doctor to browse their patients
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useToast } from '../../contexts/ToastContext';
 import styles from './DoctorsList.module.css';
 
 interface Doctor {
@@ -11,6 +12,7 @@ interface Doctor {
 
 const DoctorsList: React.FC = () => {
     const navigate = useNavigate();
+    const toast = useToast();
     const [doctors, setDoctors] = useState<Doctor[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
 
@@ -26,9 +28,12 @@ const DoctorsList: React.FC = () => {
 
             if (data.success) {
                 setDoctors(data.doctors || []);
+            } else {
+                toast.error(data.error || 'Failed to load doctors');
             }
         } catch (error) {
             console.error('Error loading doctors:', error);
+            toast.error('Failed to load doctors');
         } finally {
             setLoading(false);
         }

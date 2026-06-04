@@ -246,7 +246,10 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
         const days: (DayInfo | null)[] = [];
 
         // Adjust start to Saturday (6) - if Saturday, offset is 0, if Sunday, offset is 1, etc.
-        const offset = (startDay + 1) % 7;
+        // The grid has 6 columns (Sat–Thu; Friday is omitted). When the 1st falls
+        // on a Friday it isn't rendered, so the first shown day (Saturday) belongs
+        // in column 0 — guard against (5+1)%7=6 producing an empty leading row.
+        const offset = startDay === 5 ? 0 : (startDay + 1) % 7;
         for (let i = 0; i < offset; i++) {
             days.push(null);
         }

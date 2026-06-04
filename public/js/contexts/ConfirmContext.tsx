@@ -23,7 +23,12 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 
     const confirm = useCallback((message: string, options: ConfirmOptions = {}): Promise<boolean> => {
         return new Promise<boolean>((resolve) => {
-            setPending({ message, options, resolve });
+            // If a confirm is already awaiting an answer, resolve it as cancelled
+            // before replacing it — otherwise its promise would leak unresolved.
+            setPending((prev) => {
+                prev?.resolve(false);
+                return { message, options, resolve };
+            });
         });
     }, []);
 

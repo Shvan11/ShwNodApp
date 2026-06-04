@@ -171,6 +171,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         setLoading(true);
         hideAlert();
 
+        let succeeded = false;
         try {
             const response = await fetch('/api/patients', {
                 method: 'POST',
@@ -184,6 +185,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
             if (response.ok) {
                 const personId = result.personId;
+                succeeded = true;
                 showAlert(
                     `Patient "${formData.patientName}" has been successfully added. Redirecting to works page...`,
                     'success',
@@ -203,7 +205,9 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             console.error('Error adding patient:', error);
             showAlert('Network error. Please check your connection and try again.');
         } finally {
-            setLoading(false);
+            // On success the button stays disabled through the 1.5s redirect
+            // window so a second click can't create a duplicate patient.
+            if (!succeeded) setLoading(false);
         }
     };
 
@@ -397,9 +401,9 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         onChange={handleInputChange}
                         className="form-control"
                     >
-                        <option value="0">English</option>
+                        <option value="0">Kurdish</option>
                         <option value="1">Arabic</option>
-                        <option value="2">Kurdish</option>
+                        <option value="2">English</option>
                     </select>
                 </div>
             </div>

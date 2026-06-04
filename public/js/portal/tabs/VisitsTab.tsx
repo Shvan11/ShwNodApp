@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { PortalVisitSummary, PortalVisitsResponse } from '@/types/api.types';
+import type { PortalVisitSummary } from '../portal.schemas';
+import { portalVisitsResponseSchema } from '../portal.schemas';
 import styles from '../portal.module.css';
 
 function formatVisitDate(iso: string): string {
@@ -17,13 +18,13 @@ const VisitsTab = () => {
     (async () => {
       try {
         const res = await fetch('/api/portal/visits', { credentials: 'same-origin' });
-        const data = (await res.json()) as PortalVisitsResponse;
+        const parsed = portalVisitsResponseSchema.safeParse(await res.json());
         if (cancelled) return;
-        if (!res.ok || !data.success || !data.visits) {
-          setError(data.error || 'Unable to load your visit history.');
+        if (!res.ok || !parsed.success || !parsed.data.success || !parsed.data.visits) {
+          setError((parsed.success ? parsed.data.error : undefined) || 'Unable to load your visit history.');
           return;
         }
-        const sorted = [...data.visits].sort(
+        const sorted = [...parsed.data.visits].sort(
           (a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()
         );
         setVisits(sorted);

@@ -631,7 +631,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             </div>
 
             {/* Regenerate Calendar Section */}
-            <div className={sectionStyles.section} style={{ marginTop: '1.5rem' }}>
+            <div className={`${sectionStyles.section} ${styles.regenerateSection}`}>
                 <h3>
                     <i className="fas fa-sync-alt"></i>
                     Regenerate Calendar
@@ -640,10 +640,9 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                     If you've added new time slots, click this button to populate them into the calendar for all future dates.
                 </p>
                 <button
-                    className="btn btn-secondary"
+                    className={`btn btn-secondary ${styles.regenerateButton}`}
                     onClick={handleRegenerateCalendar}
                     disabled={isRegenerating || isSaving}
-                    style={{ marginTop: '0.5rem' }}
                 >
                     {isRegenerating ? (
                         <>

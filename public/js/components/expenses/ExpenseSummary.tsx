@@ -2,7 +2,6 @@
  * ExpenseSummary Component
  * Displays expense summary with totals by currency
  */
-import React from 'react';
 import { useExpenseSummary } from '../../hooks/useExpenses';
 import type { Expense } from '../../hooks/useExpenses';
 import styles from '../../routes/Expenses.module.css';

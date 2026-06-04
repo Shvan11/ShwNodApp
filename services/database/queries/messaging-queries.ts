@@ -632,24 +632,6 @@ export async function getWhatsAppDeliveryStatus(
 }
 
 /**
- * Batch status update with DB circuit-breaker protection.
- */
-export async function batchUpdateMessageStatuses(
-  updates: StatusUpdateMessage[]
-): Promise<UpdateResult> {
-  const operationName = 'batchUpdateMessageStatuses';
-
-  if (!updates || updates.length === 0) {
-    return { success: true, updatedCount: 0 };
-  }
-
-  return dbCircuitBreaker.execute(async () => {
-    log.info('Starting batch message status update', { updateCount: updates.length });
-    return updateWhatsAppDeliveryStatus(updates);
-  }, operationName);
-}
-
-/**
  * SMS messages to send for a date. (was: ProcSMS) Returns nothing when the date is outside
  * [today, today+3]. Uses '+964' + raw phone, matching the proc.
  */
@@ -958,30 +940,3 @@ export async function resetMessagingForDate(date: string): Promise<ResetResult> 
   });
 }
 
-/**
- * Get circuit breaker status for monitoring
- */
-export function getCircuitBreakerStatus(): { database: CircuitBreakerStatus; timestamp: number } {
-  return {
-    database: dbCircuitBreaker.getStatus(),
-    timestamp: Date.now(),
-  };
-}
-
-/**
- * Reset circuit breaker (for manual recovery)
- */
-export function resetCircuitBreaker(): {
-  success: boolean;
-  message: string;
-  newStatus: CircuitBreakerStatus;
-} {
-  dbCircuitBreaker.reset();
-  log.info('Database circuit breaker manually reset');
-
-  return {
-    success: true,
-    message: 'Circuit breaker reset successfully',
-    newStatus: dbCircuitBreaker.getStatus(),
-  };
-}

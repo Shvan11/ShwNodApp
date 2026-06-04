@@ -8,6 +8,7 @@ import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
+import Modal from './Modal';
 import styles from './NewWorkComponent.module.css';
 
 interface WorkType {
@@ -444,8 +445,13 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
 
             {/* Confirmation Dialog for Duplicate Active Work */}
             {showConfirmDialog && existingWorkData && (
-                <div className={styles.confirmationDialogOverlay}>
-                    <div className={styles.confirmationDialog}>
+                <Modal
+                    isOpen
+                    onClose={handleCancelConfirmation}
+                    closeOnBackdropClick={!loading}
+                    closeOnEscape={!loading}
+                    contentClassName={styles.confirmationDialog}
+                >
                         <div className={styles.confirmationHeader}>
                             <i className="fas fa-exclamation-triangle"></i>
                             <h3>Active Work Already Exists</h3>
@@ -486,14 +492,18 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 <i className="fas fa-times"></i> Cancel
                             </button>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             )}
 
             {/* Confirmation Dialog for Finished Work with Invoice */}
             {showFinishedWorkConfirm && (
-                <div className={styles.confirmationDialogOverlay}>
-                    <div className={styles.confirmationDialog}>
+                <Modal
+                    isOpen
+                    onClose={handleCancelFinishedWork}
+                    closeOnBackdropClick={!loading}
+                    closeOnEscape={!loading}
+                    contentClassName={styles.confirmationDialog}
+                >
                         <div className={styles.confirmationHeader}>
                             <i className="fas fa-check-circle"></i>
                             <h3>Confirm Completed Work Creation</h3>
@@ -546,8 +556,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 <i className="fas fa-times"></i> Cancel
                             </button>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             )}
 
             {/* Form */}
@@ -713,7 +722,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                     <label>
                                         Discount
                                         {!isAdmin && (
-                                            <small className={styles.formHint} style={{ marginLeft: 8 }}>
+                                            <small className={`${styles.formHint} ${styles.adminHint}`}>
                                                 <i className="fas fa-lock"></i> Admin only
                                             </small>
                                         )}
@@ -759,7 +768,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                             </div>
 
                             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                                <label>Discount Reason <small style={{ fontWeight: 'normal', opacity: 0.7 }}>(optional)</small></label>
+                                <label>Discount Reason <small className={styles.optionalHint}>(optional)</small></label>
                                 <textarea
                                     value={formData.discount_reason}
                                     onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, discount_reason: e.target.value })}

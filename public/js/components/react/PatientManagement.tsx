@@ -139,6 +139,7 @@ const PatientManagement = () => {
     // -- UI State (Non-persistent) --
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const [showQuickSearch, setShowQuickSearch] = useState(true);
 
     // -- Dropdown Data (from loader, no state needed) --
@@ -384,7 +385,8 @@ const PatientManagement = () => {
     const handleDeleteClick = (patient: Patient) => { setSelectedPatient(patient); setShowDeleteConfirm(true); };
 
     const handleDeleteConfirm = async () => {
-        if (!selectedPatient) return;
+        if (!selectedPatient || deleting) return;
+        setDeleting(true);
         try {
             const res = await fetch(`/api/patients/${selectedPatient.person_id}`, { method: 'DELETE' });
             if(!res.ok) throw new Error('Delete failed');
@@ -398,6 +400,8 @@ const PatientManagement = () => {
             }
         } catch(err) {
             toast.error(err instanceof Error ? err.message : 'Delete failed');
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -516,8 +520,7 @@ const PatientManagement = () => {
                                         type="date"
                                         value={lastAppointmentCustomDate}
                                         onChange={(e) => setLastAppointmentCustomDate(e.target.value)}
-                                        className="form-control"
-                                        style={{ marginTop: 'var(--spacing-sm)' }}
+                                        className={`form-control ${styles.customDateInput}`}
                                     />
                                 )}
                             </div>
@@ -648,8 +651,8 @@ const PatientManagement = () => {
                                 This cannot be undone.
                             </p>
                             <div className={styles.deleteModalActions}>
-                                <button onClick={() => setShowDeleteConfirm(false)} className="btn btn-secondary">Cancel</button>
-                                <button onClick={handleDeleteConfirm} className="btn btn-danger">Delete</button>
+                                <button onClick={() => setShowDeleteConfirm(false)} className="btn btn-secondary" disabled={deleting}>Cancel</button>
+                                <button onClick={handleDeleteConfirm} className="btn btn-danger" disabled={deleting}>{deleting ? 'Deleting…' : 'Delete'}</button>
                             </div>
                         </div>
                     </>

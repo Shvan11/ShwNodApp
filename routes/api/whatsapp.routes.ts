@@ -588,31 +588,6 @@ router.get('/qr', async (_req: Request, res: Response): Promise<void> => {
 });
 
 /**
- * Get WhatsApp client status
- * GET /status (mounted at /api/wa)
- * Returns current client status including readiness and activity
- */
-router.get('/status', (_req: Request, res: Response): void => {
-  try {
-    const status = whatsapp.getStatus();
-
-    res.json({
-      success: true,
-      clientReady: status.active,
-      initializing: status.initializing,
-      lastActivity: status.lastActivity,
-      reconnectAttempts: status.reconnectAttempts,
-      qr: messageState.qr
-    });
-  } catch (error) {
-    log.error('Error getting WhatsApp client status:', error);
-    ErrorResponses.internalError(res, 'Failed to get WhatsApp client status', {
-      error: (error as Error).message
-    });
-  }
-});
-
-/**
  * Get initial WhatsApp state (replaces the WS REQUEST_WHATSAPP_INITIAL_STATE RPC).
  * GET /initial-state (mounted at /api/wa)
  * Returns the same payload shape the WS handler used to push, so hooks can

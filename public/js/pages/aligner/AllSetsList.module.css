@@ -387,6 +387,7 @@
 .badgeFinal {
     background-color: #f3e8ff;
     color: #7c3aed;
+    margin-left: 4px;
 }
 
 /* Notes Text */
@@ -690,4 +691,8 @@
     .table tbody tr:hover {
         transform: none;
     }
+}
+
+.legendFlagFinal {
+    color: #7c3aed;
 }

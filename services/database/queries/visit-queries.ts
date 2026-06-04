@@ -39,11 +39,6 @@ interface wire {
   name: string;
 }
 
-interface LatestWire {
-  upperWireID: number | null;
-  lowerWireID: number | null;
-}
-
 interface LatestWireDetails {
   upper_wire_id: number | null;
   UpperWireName: string | null;
@@ -390,23 +385,6 @@ export function getWires(): Promise<wire[]> {
     .select(['wire_id as id', 'wire as name'])
     .orderBy('wire')
     .execute() as Promise<wire[]>;
-}
-
-/**
- * Retrieves the latest wire IDs for a given patient id. (was: proGetLatestWire)
- */
-export async function getLatestWire(PID: number): Promise<LatestWire | null> {
-  const WID = await getActiveWID(PID);
-  if (WID == null) return null;
-  const row = await getKysely()
-    .selectFrom('visits')
-    .where('work_id', '=', WID)
-    .orderBy('visit_date', 'desc')
-    .select(['upper_wire_id', 'lower_wire_id'])
-    .limit(1)
-    .executeTakeFirst();
-  if (!row) return null;
-  return { upperWireID: row.upper_wire_id, lowerWireID: row.lower_wire_id };
 }
 
 /**

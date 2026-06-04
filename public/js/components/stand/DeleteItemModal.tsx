@@ -2,6 +2,7 @@
  * DeleteItemModal Component
  * Confirmation modal for soft-deleting (deactivating) a stand inventory item
  */
+import { useState } from 'react';
 import type { StandItem } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
 import Modal from '../react/Modal';
@@ -10,12 +11,24 @@ import styles from './DeleteItemModal.module.css';
 interface DeleteItemModalProps {
   isOpen: boolean;
   item: StandItem | null;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }
 
 export default function DeleteItemModal({ isOpen, item, onConfirm, onCancel }: DeleteItemModalProps) {
+  const [submitting, setSubmitting] = useState(false);
+
   if (!item) return null;
+
+  const handleConfirm = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <Modal
@@ -59,11 +72,11 @@ export default function DeleteItemModal({ isOpen, item, onConfirm, onCancel }: D
       </div>
 
       <div className={styles.modalFooter}>
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+        <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={submitting}>
           Cancel
         </button>
-        <button type="button" className="btn btn-danger" onClick={onConfirm}>
-          Delete Item
+        <button type="button" className="btn btn-danger" onClick={handleConfirm} disabled={submitting}>
+          {submitting ? 'Deleting…' : 'Delete Item'}
         </button>
       </div>
     </Modal>

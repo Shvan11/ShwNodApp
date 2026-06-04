@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
-import type {
-  PortalNextAppointment,
-  PortalNextAppointmentResponse,
-} from '@/types/api.types';
+import type { PortalNextAppointment } from '../portal.schemas';
+import { portalNextAppointmentResponseSchema } from '../portal.schemas';
 import styles from '../portal.module.css';
 
 function formatAppointmentDate(iso: string): { date: string; time: string } {
@@ -27,14 +25,14 @@ const AppointmentTab = () => {
     (async () => {
       try {
         const res = await fetch('/api/portal/appointments/next', { credentials: 'same-origin' });
-        const data = (await res.json()) as PortalNextAppointmentResponse;
+        const parsed = portalNextAppointmentResponseSchema.safeParse(await res.json());
         if (cancelled) return;
-        if (!res.ok || !data.success) {
-          setError(data.error || 'Unable to load your next appointment.');
+        if (!res.ok || !parsed.success || !parsed.data.success) {
+          setError((parsed.success ? parsed.data.error : undefined) || 'Unable to load your next appointment.');
           setAppt(null);
           return;
         }
-        setAppt(data.appointment);
+        setAppt(parsed.data.appointment);
       } catch {
         if (!cancelled) setError('Unable to reach the server.');
       }

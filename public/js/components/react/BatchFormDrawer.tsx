@@ -426,14 +426,20 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         }
     };
 
+    // Block dismissal (backdrop / X / Cancel) while a save or date-apply is in
+    // flight so the batch edit can't be abandoned mid-request.
+    const handleClose = () => {
+        if (!saving && !savingDate) onClose();
+    };
+
     if (!isOpen) return null;
 
     return (
-        <div className="drawer-overlay" onClick={onClose}>
+        <div className="drawer-overlay" onClick={handleClose}>
             <div className="drawer-container" onClick={(e: MouseEvent) => e.stopPropagation()}>
                 <div className="drawer-header">
                     <h2>{batch ? 'Edit Batch' : 'Add New Batch'}</h2>
-                    <button className="close-btn" onClick={onClose}>
+                    <button className="close-btn" onClick={handleClose}>
                         <i className="fas fa-times"></i>
                     </button>
                 </div>
@@ -442,7 +448,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                     <form onSubmit={handleSubmit} className="drawer-form-flex">
                         {/* Action Buttons - Top */}
                         <div className="drawer-footer drawer-footer-top">
-                            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+                            <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={saving}>
                                 Cancel
                             </button>
                             <button type="submit" className="btn btn-primary" disabled={saving}>
@@ -859,7 +865,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                         </div>
 
                         <div className="drawer-footer">
-                            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+                            <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={saving}>
                                 Cancel
                             </button>
                             <button type="submit" className="btn btn-primary" disabled={saving}>

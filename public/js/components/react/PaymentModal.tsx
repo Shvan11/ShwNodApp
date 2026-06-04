@@ -165,7 +165,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             calculateSuggestedCash();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData.amountToRegister, formData.paymentCurrency, exchangeRate, entryMode]);
+    }, [formData.amountToRegister, formData.paymentCurrency, exchangeRate, entryMode, calculations.accountCurrency]);
 
     // Recalculate when actual cash amounts change
     useEffect(() => {
@@ -173,7 +173,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             calculateTotalAndChange();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData.actualUSD, formData.actualIQD, formData.amountToRegister, exchangeRate]);
+    }, [formData.actualUSD, formData.actualIQD, formData.amountToRegister, exchangeRate, calculations.accountCurrency]);
 
     // Auto-format display values when formData changes (handles auto-population)
     useEffect(() => {
@@ -892,7 +892,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                     <span className={styles.balanceLabel}>Balance</span>
                                     <span className={styles.balanceAmount}>{formatCurrency(calculations.remainingBalance, calculations.accountCurrency)}</span>
                                     {Number(workData.discount ?? 0) > 0 && (
-                                        <span className={styles.balanceLabel} style={{ marginTop: 4 }}>
+                                        <span className={`${styles.balanceLabel} ${styles.discountNote}`}>
                                             <i className="fas fa-tag"></i> {formatCurrency(Number(workData.discount), calculations.accountCurrency)} discount applied
                                         </span>
                                     )}

@@ -286,24 +286,4 @@ router.post(
   }
 );
 
-/**
- * GET /api/auth/status
- * Check authentication status (useful for frontend)
- */
-router.get('/status', (req: Request, res: Response): void => {
-  const isAuthenticated = !!(req.session && req.session.userId);
-
-  res.json({
-    success: true,
-    authenticated: isAuthenticated,
-    user: isAuthenticated
-      ? {
-          username: req.session.username,
-          fullName: req.session.fullName,
-          role: req.session.userRole
-        }
-      : null
-  });
-});
-
 export default router;

@@ -72,7 +72,6 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
     const [saving, setSaving] = useState<boolean>(false);
     const [activeTab, setActiveTab] = useState<string>('details');
     const [pdfFile, setPdfFile] = useState<File | null>(null);
-    const [, setUploadingPdf] = useState<boolean>(false);
     const [deletingPdf, setDeletingPdf] = useState<boolean>(false);
     const [displaySetCost, setDisplaySetCost] = useState('');
 
@@ -257,8 +256,6 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
         }
 
         try {
-            setUploadingPdf(true);
-
             const formDataUpload = new FormData();
             formDataUpload.append('pdf', pdfFile);
 
@@ -276,8 +273,6 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
         } catch (error) {
             console.error('Error uploading PDF:', error);
             toast.error('Failed to upload PDF: ' + (error as Error).message);
-        } finally {
-            setUploadingPdf(false);
         }
     };
 

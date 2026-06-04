@@ -41,9 +41,9 @@ function TemplateManagement() {
     }, []);
 
     useEffect(() => {
-        if (allTemplates.length > 0) {
-            calculateStats();
-        }
+        // Recalculate unconditionally — including when the list becomes empty
+        // (e.g. after deleting the last template) so the stat cards reset to 0.
+        calculateStats();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [allTemplates]);
 
@@ -59,7 +59,7 @@ function TemplateManagement() {
             const result: ApiStatusResponse<DocumentType[]> = await response.json();
 
             if (result.success) {
-                setDocumentTypes(result.data);
+                setDocumentTypes(result.data ?? []);
             } else {
                 throw new Error(result.message || 'Failed to load document types');
             }
@@ -76,7 +76,7 @@ function TemplateManagement() {
             const result: ApiStatusResponse<Template[]> = await response.json();
 
             if (result.success) {
-                setAllTemplates(result.data);
+                setAllTemplates(result.data ?? []);
                 setError(null);
             } else {
                 throw new Error(result.message || 'Failed to load templates');

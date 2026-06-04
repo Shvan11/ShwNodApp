@@ -7,6 +7,7 @@ import React, { useRef, useEffect } from 'react';
 import Chart from 'chart.js/auto';
 import type { SalesSummaryRow } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
+import styles from './SalesTrendChart.module.css';
 
 interface SalesTrendChartProps {
   data: SalesSummaryRow[];
@@ -126,7 +127,7 @@ const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ data }) => {
   }
 
   return (
-    <div style={{ position: 'relative', height: '350px', width: '100%' }}>
+    <div className={styles.chartContainer}>
       <canvas ref={canvasRef} />
     </div>
   );

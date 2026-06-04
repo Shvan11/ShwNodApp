@@ -60,7 +60,6 @@ function TemplateDesigner() {
             }
 
             const result: ApiStatusResponse<Template> = await response.json();
-            console.log('Template loaded:', result);
 
             if (result.success) {
                 setTemplate(result.data);

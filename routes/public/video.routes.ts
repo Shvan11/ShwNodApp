@@ -44,35 +44,6 @@ function normalizePath(dbPath: string): string {
 // ==============================
 
 /**
- * Get video info (JSON)
- * GET /:id/info
- */
-router.get('/:id/info', async (req: Request<VideoIdParams>, res: Response): Promise<void> => {
-  try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
-      res.status(400).json({ error: 'Invalid video id' });
-      return;
-    }
-
-    const video = await videoQueries.getVideoById(id);
-    if (!video) {
-      res.status(404).json({ error: 'Video not found' });
-      return;
-    }
-
-    res.json({
-      id: video.id,
-      title: video.description,
-      details: video.details,
-    });
-  } catch (error) {
-    log.error('[Public Video] Error fetching video info:', error);
-    res.status(500).json({ error: 'Failed to fetch video info' });
-  }
-});
-
-/**
  * Stream video file
  * GET /:id/stream
  */

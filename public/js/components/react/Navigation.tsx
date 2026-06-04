@@ -60,19 +60,19 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
     // Check if this is the "new patient" form
     const isNewPatient = personId === 'new';
 
-    // Cache for timepoints
-    const [cache, setCache] = useState<Map<string, CacheEntry>>(new Map());
+    // Cache for timepoints — held in a ref so updating it doesn't change
+    // loadTimepoints' identity (which would re-fire the load effect → refetch loop).
+    const cacheRef = useRef<Map<string, CacheEntry>>(new Map());
     const cacheTimeout = 5 * 60 * 1000; // 5 minutes
 
     const loadTimepoints = useCallback(async (personIdParam: string) => {
         if (!personIdParam || personIdParam === 'new') return;
 
         const cacheKey = `patient_${personIdParam}`;
-        const cached = cache.get(cacheKey);
+        const cached = cacheRef.current.get(cacheKey);
 
         // Check cache first
         if (cached && (Date.now() - cached.timestamp) < cacheTimeout) {
-            console.log('Using cached timepoints for patient', personIdParam);
             setTimepoints(cached.data);
             setLoading(false);
             return;
@@ -80,7 +80,6 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
 
         try {
             setLoading(true);
-            console.log('Fetching timepoints for patient', personIdParam);
 
             const response = await fetch(`/api/patients/${personIdParam}/timepoints`);
             if (!response.ok) {
@@ -90,12 +89,10 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
             const data = await response.json();
 
             // Update cache
-            const newCache = new Map(cache);
-            newCache.set(cacheKey, {
+            cacheRef.current.set(cacheKey, {
                 data: data,
                 timestamp: Date.now()
             });
-            setCache(newCache);
 
             setTimepoints(data);
             setError(null);
@@ -106,7 +103,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         } finally {
             setLoading(false);
         }
-    }, [cache, cacheTimeout]);
+    }, [cacheTimeout]);
 
     useEffect(() => {
         // Skip API calls for new patient form
@@ -162,10 +159,6 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
 
     const handleOpenCSImaging = () => {
         try {
-            // Debug: Log patient info to see what we have
-            console.log('Patient Info:', patientInfo);
-            console.log('Patient Info Keys:', patientInfo ? Object.keys(patientInfo) : 'null');
-
             // Try different possible field names for patient name
             const patientName = patientInfo?.patient_name
                 || patientInfo?.patientName
@@ -174,8 +167,6 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                 || patientInfo?.FullName
                 || patientInfo?.fullName
                 || 'Unknown';
-
-            console.log('Resolved Patient Name:', patientName);
 
             // Format patient name (replace spaces with underscores for URL)
             const formattedName = String(patientName).replace(/ /g, '_');
@@ -186,7 +177,6 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
             // Trigger the protocol handler
             window.location.href = csimagingUrl;
 
-            console.log('Opening CS Imaging for patient:', personId, formattedName);
         } catch (err) {
             console.error('Error opening CS Imaging:', err);
             toast.error('Failed to open CS Imaging: ' + (err instanceof Error ? err.message : 'Unknown error'));
@@ -208,7 +198,6 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
             const url = `tshape:${personId}?firstname=${encodeURIComponent(firstName)}&lastname=${encodeURIComponent(lastName)}`;
             window.location.href = url;
 
-            console.log('Opening 3Shape Unite for patient:', personId, firstName, lastName);
         } catch (err) {
             console.error('Error opening 3Shape Unite:', err);
             toast.error('Failed to open 3Shape Unite: ' + (err instanceof Error ? err.message : 'Unknown error'));
@@ -222,14 +211,14 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
             const url = `dolphin:${personId}?action=open`;
             window.location.href = url;
 
-            console.log('Opening Dolphin Imaging for patient:', personId);
         } catch (err) {
             console.error('Error opening Dolphin Imaging:', err);
             toast.error('Failed to open Dolphin Imaging: ' + (err instanceof Error ? err.message : 'Unknown error'));
         }
     };
 
-    const formatDate = (dateTime: string): string => {
+    const formatDate = (dateTime: string | null | undefined): string => {
+        if (!dateTime) return '';
         return dateTime.substring(0, 10).split("-").reverse().join("-");
     };
 

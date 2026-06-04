@@ -37,7 +37,6 @@ import lookupAdminRoutes from './routes/api/lookup-admin.routes.js';
 import holidayRoutes from './routes/api/holiday.routes.js';
 import publicVideoRoutes from './routes/public/video.routes.js';
 import portalRoutes from './routes/portal.js';
-import alignerPortalRoutes from './routes/api/portal-aligner.routes.js';
 import whatsappService from './services/messaging/whatsapp.js';
 import session from 'express-session';
 import pgSession from 'connect-pg-simple';
@@ -274,7 +273,6 @@ async function initializeApplication(): Promise<AppInitResult> {
     app.use('/api', lookupRoutes);
     app.use('/v', publicVideoRoutes); // Public video sharing (no auth - educational content)
     app.use('/api/portal', portalRoutes); // Patient portal (own session, own auth)
-    app.use('/api/aligner-portal', alignerPortalRoutes); // External aligner portal auth bridge (own CF Access verification)
 
     // Serve login page BEFORE auth check (public access)
     app.get('/login.html', (_req: Request, res: Response) => {

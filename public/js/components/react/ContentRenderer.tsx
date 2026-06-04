@@ -139,8 +139,7 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                     <NewWorkComponent
                         personId={personId}
                         workId={workId ? parseInt(workId) : null}
-                        onSave={(result: unknown) => {
-                            console.log('Work saved successfully:', result);
+                        onSave={() => {
                             // Navigate back to works page
                             if (personId) navigate(`/patient/${personId}/works`);
                         }}
@@ -214,8 +213,7 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                             // Go back to previous page
                             navigate(-1);
                         }}
-                        onSuccess={(result: unknown) => {
-                            console.log('Appointment created successfully:', result);
+                        onSuccess={() => {
                             // Navigate to works page after success
                             if (personId) navigate(`/patient/${personId}/works`);
                         }}
@@ -232,8 +230,7 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                             // Go back to previous page
                             navigate(-1);
                         }}
-                        onSuccess={(result: unknown) => {
-                            console.log('Appointment updated successfully:', result);
+                        onSuccess={() => {
                             // Go back to previous page after success
                             navigate(-1);
                         }}
@@ -259,7 +256,6 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                 return (
                     <AddPatientForm
                         onSuccess={(newPatientId: string | number) => {
-                            console.log('Patient created successfully with ID:', newPatientId);
                             // Navigate to the new patient's works page
                             if (newPatientId) {
                                 navigate(`/patient/${newPatientId}/works`);
@@ -279,6 +275,10 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                 return (
                     <Suspense fallback={<div className="loading-spinner">Loading editor…</div>}>
                         <PhotoEditor
+                            // Remount per timepoint so slot state never leaks across
+                            // timepoints (HYDRATE only overwrites slots present in the
+                            // new timepoint's data, leaving others stale otherwise).
+                            key={tpCode || 'none'}
                             personId={personId}
                             tpCode={tpCode ? tpCode.replace('tp', '') : ''}
                             tpName={searchParams.get('tpName') || ''}

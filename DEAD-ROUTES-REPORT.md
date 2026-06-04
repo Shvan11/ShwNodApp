@@ -3,7 +3,9 @@
 **Branch:** `fix/backend-audit-remediation`
 **Method:** A subagent fleet built an exact inventory of all 335 mounted backend routes, adversarially searched the entire repo (staff app, patient portal, external aligner portal, scripts, services, configs, docs) for any consumer of each, and traced the downstream code that dies with each confirmed-dead route. Every DEAD verdict was then independently re-verified by hand (frontend + whole-repo grep) before removal.
 
-**Result:** 335 routes → **275 USED**, **26 DEAD (removed)**, **34 UNCERTAIN (kept)**.
+**Result (two passes):** 335 routes → **276 USED**, **45 DEAD (removed)**, **14 still-kept (external/operational)**.
+- **Pass 1** (first sweep): 275 USED · 26 DEAD removed · 34 UNCERTAIN kept.
+- **Pass 2** (re-audit of the 34 UNCERTAIN, incl. a deep read of the `aligner-portal-external` consumer): **19 removed**, **1 reclassified USED** (`/api/videos/:id`), **14 kept** (genuinely external/operational). See [Pass 2](#pass-2--re-audit-of-the-34-uncertain) below.
 
 Rule applied: a route is removed **only** if used by *nothing* — frontend, portal, kiosk, batch/cron, OAuth, sync/ops, browser-print, scripts, or docs. Anything uncertain was kept.
 
@@ -49,16 +51,55 @@ Verification after removal: `npm run typecheck:all` ✅ · `npm run lint:fix` �
 
 ---
 
-## Kept despite no React-staff-app caller (34 UNCERTAIN) — these are NOT dead
+## Pass 2 — re-audit of the 34 UNCERTAIN
 
-These are reached by non-frontend consumers (the exact reason "unused by the frontend" ≠ "deletable"). Left untouched:
+The 34 routes Pass 1 kept were re-examined individually, including a deep read of **`aligner-portal-external/`** as a potential consumer. **Decisive finding:** that external app consumes **zero** main-app `/api/*` routes — it talks only to its own Supabase Edge Function (`/functions/v1/aligner-portal-auth/{token,doctors}`, which its own header calls the *"always-on replacement for the main app's `/api/aligner-portal/{token,doctors}`"*) and to PostgREST. This flipped the two `aligner-portal` routes from "kept for the external portal" to confirmed dead.
 
-- **Ops / sync / health:** `/api/sync/trigger`, `/api/sync/queue-notify`, `/api/sync/status`, `/api/health/*`.
-- **External batch / cron:** `/api/sendtwilio`, `/api/checktwilio`.
-- **OAuth / Google:** `/api/admin/google-drive/auth-url`, `/api/admin/google-drive/test`, `/api/admin/google-drive/status`.
-- **External aligner portal (Cloudflare Access):** `/api/aligner-portal`, `/api/aligner-portal/token`, `/api/aligner-portal/doctors`.
-- **Public video / kiosk:** `/v/:id/info`, `/api/videos/:id`.
-- **WhatsApp/messaging status & activity:** `/api/wa/status`, `/api/messaging/circuit-breaker-status`, `/api/messaging/reset-circuit-breaker`, `/api/messaging/batch-status-update`, `/api/messaging/details/:date`, aligner activity routes.
-- **Calendar / templates / misc** built via dynamic paths the static search couldn't fully resolve: `/api/calendar/time-slots`, `/api/calendar/day/:date`, `/api/calendar/ensure-range`, `/api/templates/document-types/:typeId`, `/api/templates/default/:documentTypeId`, `/api/getLatestwire`, `/api/auth/status`, `/api/settings/cost-presets/currencies`.
+### Removed in Pass 2 (19) + downstream code deleted
 
-> Some of these (e.g. cost-presets/currencies, calendar/time-slots) may in fact be callable via dynamically-built frontend URLs; they were kept precisely because that could not be ruled out with certainty. Re-audit individually if you want a second pass.
+| # | Method | Route | Router file | Downstream removed (orphaned only) |
+|---|--------|-------|-------------|-------------------------------------|
+| 1 | POST | `/api/aligner-portal/token` | portal-aligner.routes.ts | **whole file deleted** (only 2 routes) + `index.ts` mount + `getDoctorById`, `getDoctorByEmail` (aligner-queries.ts) |
+| 2 | GET | `/api/aligner-portal/doctors` | portal-aligner.routes.ts | (same file) — `getAllDoctors` kept (used by `aligner.routes.ts` + a script) |
+| 3 | GET | `/api/aligner/activity/:setId` | aligner.routes.ts | `getUnreadActivitiesBySetId` + `AlignerActivity` interface (aligner-queries.ts) |
+| 4 | PATCH | `/api/aligner/activity/:activityId/mark-read` | aligner.routes.ts | `markActivityAsRead` (aligner-queries.ts) |
+| 5 | PATCH | `/api/aligner/activity/set/:setId/mark-all-read` | aligner.routes.ts | `markAllActivitiesAsRead` (aligner-queries.ts) |
+| 6 | GET | `/v/:id/info` | public/video.routes.ts | — (`/v/:id/stream` + `/download` kept: referenced by the `/v/:id` share page) |
+| 7 | GET | `/api/wa/status` | whatsapp.routes.ts | — (`getStatus`/`messageState` shared by `/initial-state`) |
+| 8 | GET | `/api/messaging/circuit-breaker-status` | messaging.routes.ts | `getCircuitBreakerStatus` (messaging-queries.ts) |
+| 9 | POST | `/api/messaging/reset-circuit-breaker` | messaging.routes.ts | `resetCircuitBreaker` (messaging-queries.ts) |
+| 10 | POST | `/api/messaging/batch-status-update` | messaging.routes.ts | `batchUpdateMessageStatuses` (messaging-queries.ts) + local `statusToAck`, `convertToStatusUpdateMessage`, 3 interfaces |
+| 11 | GET | `/api/messaging/details/:date` | messaging.routes.ts | `getMessageDetails` import only (kept in MessagingService) |
+| 12 | GET | `/api/calendar/time-slots` | calendar.ts | `TimeSlot` interface + `formatTimeForDisplay` |
+| 13 | GET | `/api/calendar/day/:date` | calendar.ts | `getCalendarDay` + `CalendarDayRow` (calendar-queries.ts) + `DateParams` interface |
+| 14 | POST | `/api/calendar/ensure-range` | calendar.ts | `EnsureRangeBody` interface (`ensureCalendarRange` kept: called internally by `/week`+`/month`) |
+| 15 | GET | `/api/templates/document-types/:typeId` | template-api.ts | `getDocumentTypeById` (template-queries.ts) + `TypeIdParams` interface |
+| 16 | GET | `/api/templates/default/:documentTypeId` | template-api.ts | `getDefaultTemplate` (template-queries.ts) + `DocumentTypeIdParams` interface |
+| 17 | GET | `/api/getLatestwire` | visit.routes.ts | `getLatestWire` + `LatestWire` interface (visit-queries.ts). Note: frontend uses the **plural** `/api/getlatestwires` (a different, live route) |
+| 18 | GET | `/api/auth/status` | auth.ts | — (frontend uses `/api/auth/me`) |
+| 19 | GET | `/api/settings/cost-presets/currencies` | cost-preset.routes.ts | `getCostPresetCurrencies` (cost-preset-queries.ts) |
+
+> Queries 13/17/19/3 were initially **kept** in Pass 2 because checked-in PG-migration scripts still imported them; they were pruned only after those scripts were removed (see next section).
+
+### Reclassified USED (1)
+
+- **`/api/videos/:id`** — actually called by `Videos.tsx` (staff app); it was mis-grouped as uncertain. **Kept.**
+
+### Still kept (14) — "no in-repo caller" ≠ dead
+
+External/operational consumers the static search can't see; left untouched:
+- **Ops / sync / health:** `/api/sync/trigger`, `/api/sync/queue-notify`, `/api/sync/status`, `/api/health/*` (hit by Supabase nudge / manual drain / monitoring infra).
+- **External batch / cron:** `/api/sendtwilio`, `/api/checktwilio` (plausibly an external scheduler).
+- **OAuth / Google:** `/api/admin/google-drive/auth-url`, `/api/admin/google-drive/test`, `/api/admin/google-drive/status` (`auth-url` is opened in a browser during one-time OAuth consent — no code caller by design).
+- **Public video / kiosk:** `/v/:id` share page (+ its `/stream` and `/download`).
+
+---
+
+## Migration-tooling cleanup (Postgres cutover complete)
+
+With the Postgres cutover declared complete, the one-off `postgres-migration-plan.md` tooling was removed (it was the *only* remaining consumer of 4 query functions kept above). **14 scripts deleted** (~2,500 LOC): `check-pg.ts`, `check-pg-phase4.ts`, `check-pg-phase5.ts`, `etl-mssql-to-pg.ts`, `parity-lib.ts`, `parity-diff.ts`, `parity-write.ts`, `probe-sysstarttime.ts`, `probe-prod-mssql.ts`, `check-schema-parity.ts`, `diff-sandbox-vs-prod.ts`, and `scripts/schema-rename/{build-mapping,emit-migration,apply-codemod}.ts`.
+
+- **Kept:** `mssql` package + `services/database/pool.ts` — the Dolphin sink is their sole remaining runtime importer.
+- **Doc updated:** `CLAUDE.md`'s "mssql on disk" + `DB_*` env notes now reflect the cutover and the removals.
+
+Verification after Pass 2 + cleanup: `npm run typecheck:all` ✅ · `npm run lint:fix` ✅ · `npm run build` ✅.

@@ -36,15 +36,6 @@ export interface CalendarStatsRow {
   utilizationPercent: number;
 }
 
-export interface CalendarDayRow {
-  appointment_id: number | null;
-  appDetail: string | null;
-  drID: number | null;
-  patientName: string | null;
-  appDate: Date;
-  appTime: string;
-}
-
 export interface EnsureRangeResult {
   status: string;
   previousMaxDate: string | null;
@@ -124,28 +115,6 @@ export async function getCalendarStats(startDate: string, endDate: string): Prom
     ) s
   `.execute(getKysely());
   return rows[0];
-}
-
-/**
- * All calendar slots for a single day with appointment info where booked. (was: ProcDay)
- */
-export async function getCalendarDay(date: string): Promise<CalendarDayRow[]> {
-  const { rows } = await sql<CalendarDayRow>`
-    SELECT
-      a."appointment_id"                       AS "appointment_id",
-      a."app_detail"                           AS "appDetail",
-      a."dr_id"                                AS "drID",
-      p."patient_name"                         AS "patientName",
-      tc."app_date"                            AS "appDate",
-      to_char(tc."app_date", 'HH12:MI')        AS "appTime"
-    FROM "calendar" tc
-    LEFT JOIN "appointments" a ON a."app_date" = tc."app_date"
-    LEFT JOIN "patients" p ON a."person_id" = p."person_id"
-    WHERE tc."app_date" >= ${date}::date
-      AND tc."app_date" < (${date}::date + INTERVAL '1 day')
-    ORDER BY tc."app_date"
-  `.execute(getKysely());
-  return rows;
 }
 
 /**

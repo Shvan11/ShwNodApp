@@ -38,16 +38,8 @@ function withAutoPrint(html: string): string {
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface TypeIdParams {
-  typeId: string;
-}
-
 interface TemplateIdParams {
   templateId: string;
-}
-
-interface DocumentTypeIdParams {
-  documentTypeId: string;
 }
 
 interface WorkIdParams {
@@ -133,42 +125,6 @@ router.get(
   }
 );
 
-/**
- * GET /api/templates/document-types/:typeId
- * Get a specific document type
- */
-router.get(
-  '/document-types/:typeId',
-  async (req: Request<TypeIdParams>, res: Response): Promise<void> => {
-    try {
-      const { typeId } = req.params;
-      const documentType = await templateQueries.getDocumentTypeById(
-        parseInt(typeId)
-      );
-
-      if (!documentType) {
-        res.status(404).json({
-          success: false,
-          message: 'Document type not found'
-        });
-        return;
-      }
-
-      res.json({
-        success: true,
-        data: documentType
-      });
-    } catch (error) {
-      log.error('Error fetching document type', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch document type',
-        error: (error as Error).message
-      });
-    }
-  }
-);
-
 // ============================================================================
 // TEMPLATES - CRUD OPERATIONS
 // ============================================================================
@@ -248,45 +204,6 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Failed to fetch template',
-        error: (error as Error).message
-      });
-    }
-  }
-);
-
-/**
- * GET /api/templates/default/:documentTypeId
- * Get the default template for a document type
- */
-router.get(
-  '/default/:documentTypeId',
-  async (
-    req: Request<DocumentTypeIdParams>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { documentTypeId } = req.params;
-      const template = await templateQueries.getDefaultTemplate(
-        parseInt(documentTypeId)
-      );
-
-      if (!template) {
-        res.status(404).json({
-          success: false,
-          message: 'No default template found for this document type'
-        });
-        return;
-      }
-
-      res.json({
-        success: true,
-        data: template
-      });
-    } catch (error) {
-      log.error('Error fetching default template', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch default template',
         error: (error as Error).message
       });
     }

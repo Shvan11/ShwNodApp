@@ -179,12 +179,14 @@ export function useSubcategories(categoryId: number | string | null | undefined)
   useEffect(() => {
     if (!categoryId) {
       setSubcategories([]);
+      setError(null);
       return;
     }
 
     const fetchSubcategories = async () => {
       try {
         setLoading(true);
+        setError(null);
         const response = await fetch(`/api/expenses/subcategories/${categoryId}`);
         if (!response.ok) throw new Error('Failed to fetch subcategories');
         const data = await response.json();

@@ -1,6 +1,7 @@
-import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
+import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import Modal from './Modal';
 import styles from './AdminUserManagement.module.css';
 
 type UserRole = 'secretary' | 'admin';
@@ -39,6 +40,11 @@ export default function AdminUserManagement() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [message, setMessage] = useState<Message>({ type: '', text: '' });
 
+  // Password-reset modal state
+  const [resetTarget, setResetTarget] = useState<{ userId: number; username: string } | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [resetting, setResetting] = useState(false);
+
   // Form state
   const [formData, setFormData] = useState<FormData>({
     username: '',
@@ -60,7 +66,7 @@ export default function AdminUserManagement() {
       const data = await response.json();
 
       if (data.success) {
-        setUsers(data.users);
+        setUsers(data.users ?? []);
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to load users' });
       }
@@ -120,32 +126,42 @@ export default function AdminUserManagement() {
     }
   };
 
-  const handleResetPassword = async (userId: number, username: string) => {
-    const newPassword = prompt(`Enter new password for ${username}:`);
-    if (!newPassword) return;
+  const handleResetPassword = (userId: number, username: string) => {
+    setResetTarget({ userId, username });
+    setNewPasswordInput('');
+  };
 
-    if (newPassword.length < 6) {
+  const submitResetPassword = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!resetTarget || resetting) return;
+
+    if (newPasswordInput.length < 6) {
       toast.error('Password must be at least 6 characters');
       return;
     }
 
+    setResetting(true);
     try {
-      const response = await fetch(`/api/users/${userId}/password`, {
+      const response = await fetch(`/api/users/${resetTarget.userId}/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ newPassword })
+        body: JSON.stringify({ newPassword: newPasswordInput })
       });
 
       const data = await response.json();
 
       if (data.success) {
-        setMessage({ type: 'success', text: `Password reset for ${username}` });
+        setMessage({ type: 'success', text: `Password reset for ${resetTarget.username}` });
+        setResetTarget(null);
+        setNewPasswordInput('');
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to reset password' });
       }
     } catch {
       setMessage({ type: 'error', text: 'Network error' });
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -318,6 +334,44 @@ export default function AdminUserManagement() {
           </table>
         )}
       </div>
+
+      {resetTarget && (
+        <Modal
+          isOpen
+          onClose={() => { if (!resetting) setResetTarget(null); }}
+          closeOnBackdropClick={!resetting}
+          closeOnEscape={!resetting}
+          contentClassName={styles.createForm}
+        >
+          <h3>Reset Password — {resetTarget.username}</h3>
+          <form onSubmit={submitResetPassword}>
+            <div className={styles.formGroup}>
+              <label>New Password * (min 6 characters)</label>
+              <input
+                type="password"
+                value={newPasswordInput}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setNewPasswordInput(e.target.value)}
+                required
+                minLength={6}
+                autoFocus
+              />
+            </div>
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnSecondary}`}
+                onClick={() => setResetTarget(null)}
+                disabled={resetting}
+              >
+                Cancel
+              </button>
+              <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={resetting}>
+                <i className="fas fa-key"></i> {resetting ? 'Resetting…' : 'Reset Password'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

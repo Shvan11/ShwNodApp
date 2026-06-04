@@ -102,11 +102,9 @@ const DailyAppointments = () => {
     useEffect(() => {
         // Skip if this is loader data (already loaded)
         if (loaderData.loadedDate === selectedDate) {
-            console.log('📦 [DailyAppointments] Using loader data, skip fetch');
             return;
         }
 
-        console.log('📅 [DailyAppointments] Date changed, fetching new data');
         loadAppointments(selectedDate);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedDate]);

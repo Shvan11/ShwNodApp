@@ -102,7 +102,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const [loadingTimepoints, setLoadingTimepoints] = useState(true);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [lightbox, setLightbox] = useState<PhotoSwipeLightbox | null>(null);
+    const lightboxRef = useRef<PhotoSwipeLightbox | null>(null);
     // Time-point edit/delete UI state.
     const [menuFor, setMenuFor] = useState<{ tp: Timepoint; x: number; y: number } | null>(null);
     // Originals-folder existence for the open menu (null = still checking).
@@ -357,17 +357,14 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
 
     // Initialize PhotoSwipe AFTER images are loaded AND component is mounted
     useEffect(() => {
+        let cancelled = false;
         // Only initialize if component is actually mounted and rendered in DOM
         if (!loading && images.length > 0 && componentRef.current) {
             const initPhotoSwipe = async () => {
                 try {
-                    // Clean up any existing lightbox
-                    if (lightbox) {
-                        lightbox.destroy();
-                    }
-
                     // Wait a bit to ensure React has finished rendering DOM
                     await new Promise(resolve => setTimeout(resolve, 200));
+                    if (cancelled) return;
 
                     // Check if our component's DOM elements exist (more specific check)
                     const galleryElement = componentRef.current?.querySelector('#dolph_gallery');
@@ -411,6 +408,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                             }
                         });
                     }
+                    if (cancelled) return;
 
                     if (!window.PhotoSwipeLightbox) {
                         throw new Error('PhotoSwipeLightbox not available');
@@ -562,9 +560,6 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                                 webPath = url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
                                             }
 
-                                            console.log('Original path:', imageSrc);
-                                            console.log('Extracted web path:', webPath);
-
                                             const response = await fetch(`/api/convert-path?path=${encodeURIComponent(webPath)}`);
 
                                             if (!response.ok) {
@@ -575,7 +570,6 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
 
                                             // Use actual file path - backend will handle filename conversion
                                             const convertedPath = fullPath;
-                                            console.log('Converted to full path:', convertedPath);
 
                                             const sendMessageUrl = `/send-message?file=${encodeURIComponent(convertedPath)}`;
                                             window.open(sendMessageUrl, '_blank');
@@ -614,8 +608,11 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                         });
                     }
 
+                    // Bail before init if this effect run was superseded/unmounted,
+                    // so we don't attach handlers or setState on a stale instance.
+                    if (cancelled) return;
                     lightboxInstance.init();
-                    setLightbox(lightboxInstance);
+                    lightboxRef.current = lightboxInstance;
 
                 } catch (error) {
                     console.error('Failed to initialize PhotoSwipe:', error);
@@ -624,6 +621,17 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
 
             initPhotoSwipe();
         }
+
+        // This effect solely owns the lightbox lifecycle: its cleanup destroys the
+        // instance it created (on deps change or unmount), so there's no second
+        // destroyer to double-free it.
+        return () => {
+            cancelled = true;
+            if (lightboxRef.current) {
+                lightboxRef.current.destroy();
+                lightboxRef.current = null;
+            }
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loading, images]);
 
@@ -675,16 +683,13 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [personId, tpCode]);
 
-    // Cleanup on unmount
+    // Clear cached share blob on unmount. The lightbox instance itself is owned
+    // and destroyed by the init effect's cleanup above.
     useEffect(() => {
         return () => {
-            if (lightbox) {
-                lightbox.destroy();
-            }
-            // Clear cached share blob
             clearCachedBlob();
         };
-    }, [lightbox]);
+    }, []);
 
     if (loading) {
         return (

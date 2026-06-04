@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import PortalLogin from './PortalLogin';
 import PortalDashboard from './PortalDashboard';
+import { portalMeResponseSchema } from './portal.schemas';
 import styles from './portal.module.css';
 
 export interface PortalPatient {
@@ -27,10 +28,10 @@ const PortalApp = () => {
     try {
       const res = await fetch('/api/portal/me', { credentials: 'same-origin' });
       if (!res.ok) return null;
-      const data = (await res.json()) as { success: boolean; patient: PortalPatient };
-      if (!data.success || !data.patient) return null;
-      applyLanguage(data.patient.language);
-      return data.patient;
+      const parsed = portalMeResponseSchema.safeParse(await res.json());
+      if (!parsed.success || !parsed.data.success || !parsed.data.patient) return null;
+      applyLanguage(parsed.data.patient.language);
+      return parsed.data.patient;
     } catch {
       return null;
     }

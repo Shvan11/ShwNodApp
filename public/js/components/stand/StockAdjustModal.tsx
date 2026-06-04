@@ -13,7 +13,7 @@ interface StockAdjustModalProps {
   isOpen: boolean;
   item: StandItem | null;
   onClose: () => void;
-  onSave: (delta: number, reason: string) => void;
+  onSave: (delta: number, reason: string) => void | Promise<void>;
 }
 
 interface FormErrors {
@@ -25,6 +25,7 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
   const [delta, setDelta] = useState(0);
   const [reason, setReason] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -49,10 +50,15 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!validateForm()) return;
-    onSave(delta, reason.trim());
+    if (submitting || !validateForm()) return;
+    setSubmitting(true);
+    try {
+      await onSave(delta, reason.trim());
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -144,11 +150,11 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
           </div>
 
           <div className={styles.modalFooter}>
-            <button type="button" className="btn btn-secondary" onClick={handleClose}>
+            <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={submitting}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
-              Adjust Stock
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
+              {submitting ? 'Adjusting…' : 'Adjust Stock'}
             </button>
           </div>
         </form>

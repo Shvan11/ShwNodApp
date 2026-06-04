@@ -3,7 +3,7 @@
  * Displays connection and client status
  */
 
-import { UI_STATES, UIState } from '../../utils/whatsapp-send-constants';
+import { UI_STATES, type UIState } from '../../utils/whatsapp-send-constants';
 import type { SendingProgress } from './ProgressBar';
 import styles from '../../routes/WhatsAppSend.module.css';
 

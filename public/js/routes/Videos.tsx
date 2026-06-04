@@ -238,11 +238,18 @@ export default function Videos() {
       return;
     }
 
+    // Escape server-supplied values (title derives from the user-entered video
+    // description) before interpolating into the print-window HTML.
+    const esc = (s: string): string =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const safeTitle = esc(qrData.title);
+    const safeUrl = esc(qrData.url);
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>QR Code - ${qrData.title}</title>
+          <title>QR Code - ${safeTitle}</title>
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -262,8 +269,8 @@ export default function Videos() {
         </head>
         <body>
           <img src="${qrData.qr}" alt="QR Code" />
-          <h2>${qrData.title}</h2>
-          <p>${qrData.url}</p>
+          <h2>${safeTitle}</h2>
+          <p>${safeUrl}</p>
           <p class="footer">Shwan Orthodontics</p>
           <script>window.onload = () => { window.print(); window.close(); }</script>
         </body>

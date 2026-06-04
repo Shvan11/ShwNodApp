@@ -429,3 +429,8 @@
     border-left: none;
     border-right: 4px solid var(--accent-color);
 }
+
+.deleteButton {
+    background-color: var(--error-color);
+    color: white;
+}

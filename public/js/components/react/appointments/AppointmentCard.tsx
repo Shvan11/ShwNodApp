@@ -244,7 +244,7 @@ const AppointmentCard = ({
                 <div className={styles.infoLine1}>
                     <div className={styles.patientName}>
                         <a
-                            href="javascript:void(0)"
+                            href={appointment.person_id ? `/patient/${appointment.person_id}/works` : '#'}
                             className={styles.patientLink}
                             onClick={handlePatientClick}
                         >

@@ -1,6 +1,7 @@
 // AllSetsList.tsx - Simple list view of all aligner sets from v_allsets
-import React, { useState, useEffect, ChangeEvent, ReactNode } from 'react';
+import React, { useState, useEffect, type ChangeEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../../contexts/ToastContext';
 import styles from './AllSetsList.module.css';
 
 interface AlignerSetView {
@@ -27,6 +28,7 @@ type SortDirection = 'asc' | 'desc';
 
 const AllSetsList: React.FC = () => {
     const navigate = useNavigate();
+    const toast = useToast();
     const [sets, setSets] = useState<AlignerSetView[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [filter, setFilter] = useState<string>('');
@@ -51,9 +53,12 @@ const AllSetsList: React.FC = () => {
 
             if (data.success) {
                 setSets(data.sets || []);
+            } else {
+                toast.error(data.error || 'Failed to load aligner sets');
             }
         } catch (error) {
             console.error('Error loading aligner sets:', error);
+            toast.error('Failed to load aligner sets');
         } finally {
             setLoading(false);
         }
@@ -379,7 +384,7 @@ const AllSetsList: React.FC = () => {
                     <span className={`${styles.legendDot} ${styles.amber}`}></span> Pending ({pendingManufactureCount})
                 </span>
                 <span className={styles.legendItem}>
-                    <i className="fas fa-flag-checkered" style={{ color: '#7c3aed' }}></i> Final ({lastBatchCount})
+                    <i className={`fas fa-flag-checkered ${styles.legendFlagFinal}`}></i> Final ({lastBatchCount})
                 </span>
                 <span className={styles.legendItem}>
                     <span className={`${styles.legendDot} ${styles.red}`}></span> Not Created ({notCreatedCount})
@@ -465,7 +470,7 @@ const AllSetsList: React.FC = () => {
                                                 Batch {set.batch_sequence} · {formatDate(set.delivered_to_patient_date)}
                                             </span>
                                             {isFinal && (
-                                                <span className={`${styles.badge} ${styles.badgeFinal}`} style={{ marginLeft: '4px' }}>
+                                                <span className={`${styles.badge} ${styles.badgeFinal}`}>
                                                     <i className="fas fa-flag-checkered"></i>
                                                 </span>
                                             )}

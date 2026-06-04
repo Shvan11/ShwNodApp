@@ -19,8 +19,7 @@ import { getWhatsAppMessages } from '../../services/database/queries/messaging-q
 import { ErrorResponses } from '../../utils/error-response.js';
 import {
   transformMessageStatuses,
-  calculateMessageCount,
-  getMessageDetails
+  calculateMessageCount
 } from '../../services/business/MessagingService.js';
 
 const router = Router();
@@ -31,22 +30,6 @@ const router = Router();
 
 interface DateParams {
   date: string;
-}
-
-interface BatchStatusUpdate {
-  appointmentId: number;
-  status: string;
-  messageId?: string;
-  error?: string;
-}
-
-/**
- * StatusUpdateMessage compatible with messaging-queries.ts
- */
-interface StatusUpdateMessage {
-  id: number;
-  ack: number;
-  whatsappMessageId?: string;
 }
 
 /**
@@ -68,43 +51,6 @@ interface DatabaseMessageStatus {
  * note: ids are numbers from the database
  */
 type WhatsAppMessagesResult = [string[], string[], number[], string[]];
-
-interface BatchStatusUpdateBody {
-  updates: BatchStatusUpdate[];
-}
-
-/**
- * Convert string status to numeric ack code for messaging-queries compatibility
- */
-function statusToAck(status: string): number {
-  switch (status.toUpperCase()) {
-    case 'ERROR':
-      return -1;
-    case 'PENDING':
-      return 0;
-    case 'SERVER':
-      return 1;
-    case 'DEVICE':
-      return 2;
-    case 'READ':
-      return 3;
-    case 'PLAYED':
-      return 4;
-    default:
-      return 0;
-  }
-}
-
-/**
- * Convert BatchStatusUpdate to StatusUpdateMessage for messaging-queries compatibility
- */
-function convertToStatusUpdateMessage(update: BatchStatusUpdate): StatusUpdateMessage {
-  return {
-    id: update.appointmentId,
-    ack: statusToAck(update.status),
-    whatsappMessageId: update.messageId
-  };
-}
 
 /**
  * Convert DatabaseMessageStatus to DatabaseMessage for MessagingService compatibility
@@ -130,67 +76,6 @@ function convertWhatsAppMessagesResult(
   const [numbers, messages, ids, names] = result;
   return [numbers, messages, ids.map(String), names];
 }
-
-/**
- * Circuit breaker status for messaging operations
- */
-router.get(
-  '/circuit-breaker-status',
-  (_req: Request, res: Response): void => {
-    try {
-      const status = messagingQueries.getCircuitBreakerStatus();
-      res.json({
-        success: true,
-        ...status
-      });
-    } catch (error) {
-      ErrorResponses.internalError(res, (error as Error).message, error as Error);
-    }
-  }
-);
-
-/**
- * Reset circuit breaker (manual recovery)
- */
-router.post(
-  '/reset-circuit-breaker',
-  (_req: Request, res: Response): void => {
-    try {
-      const result = messagingQueries.resetCircuitBreaker();
-      res.json(result);
-    } catch (error) {
-      ErrorResponses.internalError(res, (error as Error).message, error as Error);
-    }
-  }
-);
-
-/**
- * Batch status update endpoint
- */
-router.post(
-  '/batch-status-update',
-  async (
-    req: Request<unknown, unknown, BatchStatusUpdateBody>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { updates } = req.body;
-
-      if (!updates || !Array.isArray(updates)) {
-        ErrorResponses.badRequest(res, 'Updates array is required');
-        return;
-      }
-
-      // Convert BatchStatusUpdate[] to StatusUpdateMessage[] for messaging-queries compatibility
-      const statusUpdates = updates.map(convertToStatusUpdateMessage);
-      const result = await messagingQueries.batchUpdateMessageStatuses(statusUpdates);
-      res.json(result);
-    } catch (error) {
-      log.error('Error in batch status update:', error);
-      ErrorResponses.internalError(res, (error as Error).message, error as Error);
-    }
-  }
-);
 
 /**
  * Get message status by date
@@ -301,53 +186,6 @@ router.post(
         'Failed to reset messaging status',
         error as Error
       );
-    }
-  }
-);
-
-/**
- * Get detailed message information for a specific date
- * Returns both potential messages and existing message statuses
- */
-router.get(
-  '/details/:date',
-  async (req: Request<DateParams>, res: Response): Promise<void> => {
-    try {
-      const { date } = req.params;
-      log.info(`Getting message details for date: ${date}`);
-
-      // Get WhatsApp messages to be sent for the date
-      const whatsappMessagesResult = await getWhatsAppMessages(date);
-      // Convert number[] ids to string[] for WhatsAppMessagesArray compatibility
-      const whatsappMessages = convertWhatsAppMessagesResult(whatsappMessagesResult);
-
-      // Get existing message statuses
-      let existingMessages: import('../../services/business/MessagingService.js').TransformedMessage[] = [];
-      try {
-        const messageStatuses = await messagingQueries.getMessageStatusByDate(date);
-        if (messageStatuses && messageStatuses.messages) {
-          // Convert database format to service format and transform
-          const dbMessages = (messageStatuses.messages as DatabaseMessageStatus[]).map(convertToDatabaseMessage);
-          existingMessages = transformMessageStatuses(dbMessages);
-        }
-      } catch (msgError) {
-        log.warn(
-          'Could not get message statuses for details:',
-          (msgError as Error).message
-        );
-      }
-
-      // Delegate to service layer for multi-source coordination and summary
-      const result = getMessageDetails(date, whatsappMessages, existingMessages);
-
-      res.json({
-        success: true,
-        data: result,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      log.error('Error getting message details:', error);
-      ErrorResponses.internalError(res, (error as Error).message, error as Error);
     }
   }
 );

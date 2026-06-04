@@ -315,7 +315,8 @@ const ArchformMatcher: React.FC = () => {
 
     const handleStartEdit = (patient: ArchformPatient): void => {
         setEditingPatientId(patient.Id);
-        setEditName(patient.LastName);
+        setEditName(patient.Name);
+        setEditLastName(patient.LastName);
     };
 
     const handleCancelEdit = (): void => {

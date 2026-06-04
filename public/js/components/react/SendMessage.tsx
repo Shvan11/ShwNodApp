@@ -211,9 +211,9 @@ const SendMessage = () => {
             minHeight: '42px',
             width: '100%',
             minWidth: '350px',
-            border: '1px solid #ccc',
+            border: '1px solid var(--border-color)',
             borderRadius: '4px',
-            fontSize: '16px',
+            fontSize: 'var(--font-size-base)',
             fontFamily: "'Raleway', sans-serif"
         }),
         container: (provided) => ({
@@ -231,13 +231,13 @@ const SendMessage = () => {
         }),
         option: (provided, state) => ({
             ...provided,
-            backgroundColor: state.isSelected ? 'var(--whatsapp-green)' : state.isFocused ? '#f8f9fa' : 'white',
-            color: state.isSelected ? 'white' : '#333',
+            backgroundColor: state.isSelected ? 'var(--whatsapp-green)' : state.isFocused ? 'var(--surface-hover)' : 'white',
+            color: state.isSelected ? 'white' : 'var(--text-color)',
             padding: '10px 12px'
         }),
         placeholder: (provided, state) => ({
             ...provided,
-            color: '#666',
+            color: 'var(--text-secondary)',
             fontStyle: 'italic',
             opacity: state.isFocused ? 0 : 1,
             transition: 'opacity 0.15s ease'

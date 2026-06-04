@@ -70,6 +70,9 @@ async function makeFlippedUrl(srcUrl: string, flipH: boolean, flipV: boolean): P
   ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
   ctx.drawImage(img, 0, 0);
   const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', 0.95));
+  // Release the full-resolution backing store now that the blob is encoded.
+  canvas.width = 0;
+  canvas.height = 0;
   if (!blob) throw new Error('toBlob failed');
   return URL.createObjectURL(blob);
 }
@@ -111,7 +114,13 @@ const SlotCanvas = ({ personId, slot, active, onCropChange, onZoomChange, onCrop
         setMediaUrl(url);
       })
       .catch(() => {
-        if (!cancelled) setMediaUrl(base); // fall back to unflipped preview
+        if (!cancelled) {
+          // Release any stale flipped blob before falling back, otherwise it
+          // leaks (the success path revokes, but this error path skipped it).
+          revoke();
+          urlRef.current = base;
+          setMediaUrl(base); // fall back to unflipped preview
+        }
       });
     return () => {
       cancelled = true;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MouseEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
 import type { CalendarDay, MenuPosition } from './calendar.types';
 
 interface CalendarDayContextMenuProps {
@@ -59,20 +59,24 @@ const CalendarDayContextMenu = ({
         };
     }, [onClose]);
 
-    // Adjust position to keep menu in viewport
-    const adjustedPosition = { ...position };
-    if (menuRef.current) {
+    // Adjust position to keep menu in viewport. Measured after mount in a layout
+    // effect — reading getBoundingClientRect during render hits a null ref on the
+    // first paint, so the clamp never applied and the menu could overflow.
+    const [adjustedPosition, setAdjustedPosition] = useState<MenuPosition>(position);
+    useLayoutEffect(() => {
+        if (!menuRef.current) return;
         const rect = menuRef.current.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
-
+        const next = { ...position };
         if (position.x + rect.width > viewportWidth - 20) {
-            adjustedPosition.x = viewportWidth - rect.width - 20;
+            next.x = viewportWidth - rect.width - 20;
         }
         if (position.y + rect.height > viewportHeight - 20) {
-            adjustedPosition.y = viewportHeight - rect.height - 20;
+            next.y = viewportHeight - rect.height - 20;
         }
-    }
+        setAdjustedPosition(next);
+    }, [position]);
 
     const formatDate = (dateStr: string): string => {
         const d = new Date(dateStr);

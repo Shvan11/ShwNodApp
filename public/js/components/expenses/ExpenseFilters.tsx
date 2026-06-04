@@ -2,7 +2,6 @@
  * ExpenseFilters Component
  * Provides filtering interface for expenses with date range, category, and currency filters
  */
-import React from 'react';
 import type { ChangeEvent } from 'react';
 import { useCategories, useSubcategories } from '../../hooks/useExpenses';
 import type { ExpenseFilters as ExpenseFiltersType } from '../../hooks/useExpenses';

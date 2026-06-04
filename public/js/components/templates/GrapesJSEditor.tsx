@@ -37,21 +37,17 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
     useEffect(() => {
         // Wait for container to be rendered (it's rendered when isLoading becomes false)
         if (!containerRef.current) {
-            console.log('GrapesJSEditor: Waiting for container to render...');
             return;
         }
 
         if (editorRef.current) {
-            console.log('GrapesJSEditor: Editor already initialized');
             return;
         }
 
         if (isInitializingRef.current) {
-            console.log('GrapesJSEditor: Already initializing, skipping...');
             return;
         }
 
-        console.log('GrapesJSEditor: Container is ready, starting to load GrapesJS...', containerRef.current);
         isInitializingRef.current = true;
 
         // Dynamically import GrapesJS only when component mounts
@@ -60,7 +56,6 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
         // Cleanup on unmount
         return () => {
             if (editorRef.current) {
-                console.log('GrapesJSEditor: Destroying editor');
                 try {
                     editorRef.current.destroy();
                 } catch (err) {
@@ -75,21 +70,18 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
 
     const loadGrapesJS = async () => {
         try {
-            console.log('GrapesJSEditor: Loading GrapesJS module...');
             setIsLoading(true);
 
             // Dynamic import - GrapesJS is only loaded when this component mounts
             // CSS is loaded globally in index.html
             const grapesJSModule = await import('grapesjs');
 
-            console.log('GrapesJSEditor: GrapesJS module loaded successfully', grapesJSModule);
             const grapesjs = grapesJSModule.default;
 
             if (!grapesjs) {
                 throw new Error('GrapesJS module loaded but default export is undefined');
             }
 
-            console.log('GrapesJSEditor: Initializing editor...');
             setIsLoading(false);
             initializeEditor(grapesjs);
         } catch (error) {
@@ -110,8 +102,6 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
 
     const initializeEditor = (grapesjs: typeof import('grapesjs').default) => {
         try {
-            console.log('GrapesJSEditor: Initializing GrapesJS with container:', containerRef.current);
-
             if (!containerRef.current) {
                 throw new Error('Container element is not available');
             }
@@ -171,20 +161,14 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
                 }
             });
 
-            console.log('GrapesJSEditor: Editor initialized successfully', editor);
-
             // Add custom receipt blocks
             addReceiptBlocks(editor);
 
             editorRef.current = editor;
-            console.log('GrapesJSEditor: Editor reference stored, ready to use');
 
             // Load template if available
             if (template) {
-                console.log('GrapesJSEditor: Template available, loading content...');
                 loadTemplateContent();
-            } else {
-                console.log('GrapesJSEditor: No template to load, editor ready for new content');
             }
         } catch (error) {
             console.error('Error initializing GrapesJS editor:', error);

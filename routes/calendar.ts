@@ -13,7 +13,6 @@ import { getHolidaysInRange } from '../services/database/queries/holiday-queries
 import {
   getWeeklyCalendarSlots,
   getCalendarStats,
-  getCalendarDay,
   ensureCalendarRange,
   fillCalendar,
 } from '../services/database/queries/calendar-queries.js';
@@ -31,14 +30,6 @@ interface CalendarQueryParams {
   endDate?: string;
 }
 
-interface DateParams {
-  date: string;
-}
-
-interface EnsureRangeBody {
-  daysAhead?: number;
-}
-
 interface CalendarSlotData {
   slotDateTime: string;
   calendarDate: string;
@@ -51,12 +42,6 @@ interface CalendarSlotData {
   personID: number | null;
   slotStatus: string;
   appointmentCount: number;
-}
-
-interface TimeSlot {
-  timeID: number;
-  timeSlot: string;
-  formattedTime: string;
 }
 
 interface Holiday {
@@ -367,91 +352,6 @@ router.get(
 );
 
 /**
- * GET /api/calendar/time-slots
- * Returns available time slots from existing tbltimes table
- */
-router.get(
-  '/time-slots',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      log.info('🕐 Fetching time slots from tbltimes');
-
-      const db = getKysely();
-      const { rows } = await sql<{ time_id: number; my_time: string | null }>`
-        SELECT "time_id", "my_time" FROM "times" ORDER BY "time_id"
-      `.execute(db);
-      const timeSlots: TimeSlot[] = rows.map((row) => ({
-        timeID: row.time_id,
-        timeSlot: row.my_time as string,
-        formattedTime: formatTimeForDisplay(row.my_time)
-      }));
-
-      log.info(`✅ Retrieved ${timeSlots.length} time slots`);
-
-      res.json({
-        success: true,
-        timeSlots,
-        totalSlots: timeSlots.length
-      });
-    } catch (error) {
-      log.error('❌ Time slots API error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch time slots',
-        details: (error as Error).message
-      });
-    }
-  }
-);
-
-/**
- * GET /api/calendar/day/:date
- * Returns appointments for a specific day (compatible with existing ProcDay)
- */
-router.get(
-  '/day/:date',
-  async (req: Request<DateParams>, res: Response): Promise<void> => {
-    try {
-      const { date } = req.params;
-
-      if (!date) {
-        res.status(400).json({
-          success: false,
-          error: 'Date parameter is required'
-        });
-        return;
-      }
-
-      const targetDate = new Date(date);
-      log.info(
-        `📅 Fetching day appointments for: ${targetDate.toISOString().split('T')[0]}`
-      );
-
-      // Single-day appointments (was ProcDay)
-      const dayAppointments = await getCalendarDay(targetDate.toISOString().split('T')[0]);
-
-      log.info(
-        `✅ Retrieved ${dayAppointments.length} appointments for ${date}`
-      );
-
-      res.json({
-        success: true,
-        date: targetDate.toISOString().split('T')[0],
-        appointments: dayAppointments,
-        totalAppointments: dayAppointments.length
-      });
-    } catch (error) {
-      log.error('❌ Day appointments API error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch day appointments',
-        details: (error as Error).message
-      });
-    }
-  }
-);
-
-/**
  * POST /api/calendar/regenerate
  * Regenerates calendar entries by running FillCalender stored procedure
  * This adds any missing time slot combinations to tblcalender
@@ -479,40 +379,6 @@ router.post(
       res.status(500).json({
         success: false,
         error: 'Failed to regenerate calendar',
-        details: (error as Error).message
-      });
-    }
-  }
-);
-
-/**
- * POST /api/calendar/ensure-range
- * Ensures calendar has enough future dates for the web interface
- */
-router.post(
-  '/ensure-range',
-  async (
-    req: Request<unknown, unknown, EnsureRangeBody>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { daysAhead = 60 } = req.body;
-
-      log.info(`🔄 Ensuring calendar range: ${daysAhead} days ahead`);
-
-      const result = await ensureCalendarRange(daysAhead);
-
-      log.info(`✅ Calendar range check completed: ${result?.status}`);
-
-      res.json({
-        success: true,
-        result: result || { status: 'No update needed' }
-      });
-    } catch (error) {
-      log.error('❌ Calendar range API error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to ensure calendar range',
         details: (error as Error).message
       });
     }
@@ -1068,21 +934,6 @@ function transformToMonthlyStructure(
   return {
     days: allDays
   };
-}
-
-function formatTimeForDisplay(timeValue: unknown): string {
-  if (!timeValue) return '';
-
-  try {
-    const date = new Date(timeValue as string);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-  } catch {
-    return String(timeValue);
-  }
 }
 
 export default router;

@@ -37,8 +37,10 @@ const HolidayQuickModal = ({
             setHolidayName(existingHoliday?.HolidayName || '');
             setDescription(existingHoliday?.Description || '');
             setShowWarning(false);
-            // Focus input after modal opens
-            setTimeout(() => inputRef.current?.focus(), 100);
+            // Focus input after modal opens; clear on unmount/close so the timer
+            // can't fire (and focus) after the modal is gone.
+            const timer = setTimeout(() => inputRef.current?.focus(), 100);
+            return () => clearTimeout(timer);
         }
     }, [isOpen, existingHoliday]);
 

@@ -3,7 +3,7 @@
  * Displays message status for selected date
  */
 
-import { MessageStatusValue } from '../../utils/whatsapp-send-constants';
+import type { MessageStatusValue } from '../../utils/whatsapp-send-constants';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import styles from '../../routes/WhatsAppSend.module.css';
 import { formatISODate } from '../../core/utils';

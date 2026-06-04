@@ -393,3 +393,11 @@
         justify-content: space-between;
     }
 }
+
+.regenerateSection {
+    margin-top: 1.5rem;
+}
+
+.regenerateButton {
+    margin-top: 0.5rem;
+}

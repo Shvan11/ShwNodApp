@@ -9,8 +9,8 @@
  *   <YourComponent />
  * </ErrorBoundary>
  */
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { useNavigate, NavigateFunction } from 'react-router-dom';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { useNavigate, useLocation, type NavigateFunction } from 'react-router-dom';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -18,6 +18,8 @@ interface ErrorBoundaryProps {
   showDetails?: boolean;
   onReset?: () => void;
   navigate?: NavigateFunction;
+  /** When this value changes, a caught error is cleared (e.g. route pathname). */
+  resetKey?: string;
 }
 
 interface ErrorBoundaryState {
@@ -39,6 +41,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   static getDerivedStateFromError(_error: Error): Partial<ErrorBoundaryState> {
     // Update state so next render shows fallback UI
     return { hasError: true };
+  }
+
+  componentDidUpdate(prevProps: ErrorBoundaryProps): void {
+    // Auto-clear the error when the route (resetKey) changes, so navigating
+    // away from a crashed screen doesn't leave the user stuck on the fallback.
+    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false, error: null, errorInfo: null });
+    }
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
@@ -241,7 +251,8 @@ interface ErrorBoundaryWithNavigateProps {
 // Wrapper component to provide navigate function via hooks
 function ErrorBoundaryWithNavigate(props: ErrorBoundaryWithNavigateProps) {
   const navigate = useNavigate();
-  return <ErrorBoundary {...props} navigate={navigate} />;
+  const location = useLocation();
+  return <ErrorBoundary {...props} navigate={navigate} resetKey={location.pathname} />;
 }
 
 export default ErrorBoundaryWithNavigate;

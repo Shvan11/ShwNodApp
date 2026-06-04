@@ -5,7 +5,7 @@
  * Form functionality handled by separate NewVisitComponent via routing
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import styles from './VisitsComponent.module.css';
@@ -76,6 +76,9 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    // Monotonic guard so a slow earlier fetch (e.g. after a workId switch) can't
+    // overwrite the results of a newer one.
+    const loadReqIdRef = useRef(0);
 
     useEffect(() => {
         if (workId) {
@@ -85,18 +88,20 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
     }, [workId]);
 
     const loadVisits = async () => {
+        const reqId = ++loadReqIdRef.current;
         try {
             setLoading(true);
             const response = await fetch(`/api/getvisitsbywork?workId=${workId}`);
             if (!response.ok) throw new Error('Failed to fetch visits');
             const data: Visit[] = await response.json();
-            // Sort by visit date descending (most recent first)
-            const sortedData = data.sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime());
-            setVisits(sortedData);
+            // Sort by visit date descending (most recent first) on a copy, leaving
+            // the fetched array untouched.
+            const sortedData = [...data].sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime());
+            if (reqId === loadReqIdRef.current) setVisits(sortedData);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            if (reqId === loadReqIdRef.current) setError(err instanceof Error ? err.message : 'An error occurred');
         } finally {
-            setLoading(false);
+            if (reqId === loadReqIdRef.current) setLoading(false);
         }
     };
 

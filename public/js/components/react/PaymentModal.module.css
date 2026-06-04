@@ -1671,3 +1671,7 @@
         display: none !important;
     }
 }
+
+.discountNote {
+    margin-top: 4px;
+}

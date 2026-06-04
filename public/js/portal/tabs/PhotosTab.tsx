@@ -1,29 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { PortalTimePoint, PortalPhoto } from '../portal.schemas';
+import {
+  portalTimepointsResponseSchema,
+  portalPhotosResponseSchema,
+} from '../portal.schemas';
 import styles from '../portal.module.css';
-
-interface TimePoint {
-  tp_code: string;
-  tp_date_time: string;
-  tp_description: string;
-}
-
-interface Photo {
-  name: string;
-  width: number;
-  height: number;
-}
-
-interface TpResponse {
-  success: boolean;
-  timepoints?: TimePoint[];
-  error?: string;
-}
-
-interface PhotoResponse {
-  success: boolean;
-  photos?: Photo[];
-  error?: string;
-}
 
 function formatTpDate(iso: string): string {
   const d = new Date(iso);
@@ -32,10 +13,10 @@ function formatTpDate(iso: string): string {
 }
 
 const PhotosTab = () => {
-  const [tps, setTps] = useState<TimePoint[] | null>(null);
+  const [tps, setTps] = useState<PortalTimePoint[] | null>(null);
   const [tpsError, setTpsError] = useState<string | null>(null);
   const [selectedTp, setSelectedTp] = useState<string | null>(null);
-  const [photos, setPhotos] = useState<Photo[] | null>(null);
+  const [photos, setPhotos] = useState<PortalPhoto[] | null>(null);
   const [photosError, setPhotosError] = useState<string | null>(null);
   const [photosLoading, setPhotosLoading] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
@@ -45,13 +26,13 @@ const PhotosTab = () => {
     (async () => {
       try {
         const res = await fetch('/api/portal/timepoints', { credentials: 'same-origin' });
-        const data = (await res.json()) as TpResponse;
+        const parsed = portalTimepointsResponseSchema.safeParse(await res.json());
         if (cancelled) return;
-        if (!res.ok || !data.success || !data.timepoints) {
-          setTpsError(data.error || 'Unable to load your photo history.');
+        if (!res.ok || !parsed.success || !parsed.data.success || !parsed.data.timepoints) {
+          setTpsError((parsed.success ? parsed.data.error : undefined) || 'Unable to load your photo history.');
           return;
         }
-        const sorted = [...data.timepoints].sort(
+        const sorted = [...parsed.data.timepoints].sort(
           (a, b) => new Date(b.tp_date_time).getTime() - new Date(a.tp_date_time).getTime()
         );
         setTps(sorted);
@@ -76,13 +57,13 @@ const PhotosTab = () => {
         const res = await fetch(`/api/portal/photos/${encodeURIComponent(selectedTp)}`, {
           credentials: 'same-origin',
         });
-        const data = (await res.json()) as PhotoResponse;
+        const parsed = portalPhotosResponseSchema.safeParse(await res.json());
         if (cancelled) return;
-        if (!res.ok || !data.success || !data.photos) {
-          setPhotosError(data.error || 'Unable to load photos.');
+        if (!res.ok || !parsed.success || !parsed.data.success || !parsed.data.photos) {
+          setPhotosError((parsed.success ? parsed.data.error : undefined) || 'Unable to load photos.');
           return;
         }
-        setPhotos(data.photos);
+        setPhotos(parsed.data.photos);
       } catch {
         if (!cancelled) setPhotosError('Unable to reach the server.');
       } finally {
@@ -173,7 +154,7 @@ const PhotosTab = () => {
               aria-label={`View photo ${idx + 1}`}
             >
               <img
-                src={`/DolImgs/${p.name}`}
+                src={`/DolImgs/${encodeURIComponent(p.name)}`}
                 alt={`Photo ${idx + 1}`}
                 loading="lazy"
                 className={styles.photoImg}
@@ -199,7 +180,7 @@ const PhotosTab = () => {
             <i className="fas fa-times" aria-hidden="true" />
           </button>
           <img
-            src={`/DolImgs/${photos[lightbox].name}`}
+            src={`/DolImgs/${encodeURIComponent(photos[lightbox].name)}`}
             alt=""
             className={styles.lightboxImg}
             onClick={(e) => e.stopPropagation()}

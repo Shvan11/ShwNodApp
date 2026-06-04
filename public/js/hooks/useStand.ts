@@ -206,24 +206,31 @@ export function useStandItems(filters: StandItemFilters = {}): {
 export function useStandItemByBarcode(): {
   lookupByBarcode: (barcode: string) => Promise<StandItem | null>;
   loading: boolean;
+  error: string | null;
 } {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const lookupByBarcode = useCallback(async (barcode: string): Promise<StandItem | null> => {
     try {
       setLoading(true);
+      setError(null);
       const response = await fetch(`/api/stand/items/barcode/${encodeURIComponent(barcode)}`);
+      // 404 is a genuine "no such barcode", not an error — keep returning null.
       if (response.status === 404) return null;
       if (!response.ok) throw new Error('Lookup failed');
       return await response.json();
-    } catch {
-      return null;
+    } catch (err) {
+      // Surface real failures (network/5xx) to the caller instead of masking
+      // them as "not found" — only a 404 above means a genuinely unknown barcode.
+      setError(err instanceof Error ? err.message : 'Barcode lookup failed');
+      throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  return { lookupByBarcode, loading };
+  return { lookupByBarcode, loading, error };
 }
 
 // ============================================================================
@@ -243,6 +250,7 @@ export function useStandCategories(): {
   const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await fetch('/api/stand/categories');
       if (!response.ok) throw new Error('Failed to fetch categories');
       const data = await response.json();
@@ -276,6 +284,7 @@ export function useStandDashboardKPIs(): {
   const fetchKPIs = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await fetch('/api/stand/dashboard');
       if (!response.ok) throw new Error('Failed to fetch KPIs');
       const data = await response.json();
@@ -344,11 +353,12 @@ export function useStandSale(id: number | null): {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!id) { setSale(null); return; }
+    if (!id) { setSale(null); setError(null); return; }
 
     const fetchSale = async () => {
       try {
         setLoading(true);
+        setError(null);
         const response = await fetch(`/api/stand/sales/${id}`);
         if (!response.ok) throw new Error('Failed to fetch sale');
         const data = await response.json();
@@ -373,49 +383,59 @@ export function useStandSale(id: number | null): {
 export function useLowStockItems(): {
   items: StandItem[];
   loading: boolean;
+  error: string | null;
   refetch: () => Promise<void>;
 } {
   const [items, setItems] = useState<StandItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchItems = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await fetch('/api/stand/items/low-stock');
-      if (!response.ok) throw new Error('Failed');
+      if (!response.ok) throw new Error('Failed to fetch low-stock items');
       setItems(await response.json());
-    } catch { /* ignore */ } finally {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch low-stock items');
+    } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  return { items, loading, refetch: fetchItems };
+  return { items, loading, error, refetch: fetchItems };
 }
 
 export function useExpiringItems(daysAhead: number = 30): {
   items: StandItem[];
   loading: boolean;
+  error: string | null;
   refetch: () => Promise<void>;
 } {
   const [items, setItems] = useState<StandItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchItems = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await fetch(`/api/stand/items/expiring?days=${daysAhead}`);
-      if (!response.ok) throw new Error('Failed');
+      if (!response.ok) throw new Error('Failed to fetch expiring items');
       setItems(await response.json());
-    } catch { /* ignore */ } finally {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch expiring items');
+    } finally {
       setLoading(false);
     }
   }, [daysAhead]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  return { items, loading, refetch: fetchItems };
+  return { items, loading, error, refetch: fetchItems };
 }
 
 // ============================================================================
@@ -425,26 +445,31 @@ export function useExpiringItems(daysAhead: number = 30): {
 export function useStockMovements(itemId: number | null): {
   movements: StandStockMovement[];
   loading: boolean;
+  error: string | null;
   refetch: () => Promise<void>;
 } {
   const [movements, setMovements] = useState<StandStockMovement[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchMovements = useCallback(async () => {
-    if (!itemId) { setMovements([]); return; }
+    if (!itemId) { setMovements([]); setError(null); return; }
     try {
       setLoading(true);
+      setError(null);
       const response = await fetch(`/api/stand/items/${itemId}/movements`);
-      if (!response.ok) throw new Error('Failed');
+      if (!response.ok) throw new Error('Failed to fetch stock movements');
       setMovements(await response.json());
-    } catch { /* ignore */ } finally {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch stock movements');
+    } finally {
       setLoading(false);
     }
   }, [itemId]);
 
   useEffect(() => { fetchMovements(); }, [fetchMovements]);
 
-  return { movements, loading, refetch: fetchMovements };
+  return { movements, loading, error, refetch: fetchMovements };
 }
 
 // ============================================================================
@@ -610,21 +635,25 @@ export function useStandReportSummary(startDate: string | null, endDate: string 
   useEffect(() => {
     if (!startDate || !endDate) { setData(null); return; }
 
+    let cancelled = false;
     const fetchData = async () => {
       try {
         setLoading(true);
+        setError(null);
         const params = new URLSearchParams({ startDate, endDate });
         const response = await fetch(`/api/stand/reports/summary?${params}`);
         if (!response.ok) throw new Error('Failed to fetch report');
-        setData(await response.json());
+        const json = await response.json();
+        if (!cancelled) setData(json);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch report');
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to fetch report');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchData();
+    return () => { cancelled = true; };
   }, [startDate, endDate]);
 
   return { data, loading, error };
@@ -633,29 +662,37 @@ export function useStandReportSummary(startDate: string | null, endDate: string 
 export function useTopSellingItems(startDate: string | null, endDate: string | null, limit: number = 10): {
   items: TopItemRow[];
   loading: boolean;
+  error: string | null;
 } {
   const [items, setItems] = useState<TopItemRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!startDate || !endDate) { setItems([]); return; }
 
+    let cancelled = false;
     const fetchData = async () => {
       try {
         setLoading(true);
+        setError(null);
         const params = new URLSearchParams({ startDate, endDate, limit: String(limit) });
         const response = await fetch(`/api/stand/reports/top-items?${params}`);
-        if (!response.ok) throw new Error('Failed');
-        setItems(await response.json());
-      } catch { /* ignore */ } finally {
-        setLoading(false);
+        if (!response.ok) throw new Error('Failed to fetch top-selling items');
+        const json = await response.json();
+        if (!cancelled) setItems(json);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to fetch top-selling items');
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchData();
+    return () => { cancelled = true; };
   }, [startDate, endDate, limit]);
 
-  return { items, loading };
+  return { items, loading, error };
 }
 
 // ============================================================================

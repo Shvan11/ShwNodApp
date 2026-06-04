@@ -340,10 +340,9 @@ const Diagnosis = () => {
                     {diagnosisExists && (
                         <button
                             type="button"
-                            className="btn-delete"
+                            className={`btn-delete ${styles.deleteButton}`}
                             onClick={handleReset}
                             disabled={saving || deleting}
-                            style={{ backgroundColor: 'var(--error-color)', color: 'white' }}
                         >
                             {deleting ? (
                                 <>

@@ -41,12 +41,13 @@ interface ExpenseModalProps {
     isOpen: boolean;
     expense: Expense | null;
     onClose: () => void;
-    onSave: (data: ExpenseData) => void;
+    onSave: (data: ExpenseData) => void | Promise<void>;
 }
 
 export default function ExpenseModal({ isOpen, expense, onClose, onSave }: ExpenseModalProps) {
     const { categories } = useCategories() as { categories: Category[] };
     const [categoryId, setCategoryId] = useState<string | number>('');
+    const [submitting, setSubmitting] = useState(false);
     const { subcategories } = useSubcategories(categoryId) as { subcategories: Subcategory[] };
 
     const [formData, setFormData] = useState<FormData>({
@@ -141,23 +142,28 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        if (!validateForm()) {
+        if (submitting || !validateForm()) {
             return;
         }
 
         const expenseData: ExpenseData = {
             expense_date: formData.expenseDate,
-            amount: parseInt(String(formData.amount)),
+            amount: parseInt(String(formData.amount), 10),
             currency: formData.currency,
             note: formData.note,
             categoryId: formData.categoryId ? Number(formData.categoryId) : undefined,
             subcategoryId: formData.subcategoryId ? Number(formData.subcategoryId) : undefined
         };
 
-        onSave(expenseData);
+        setSubmitting(true);
+        try {
+            await onSave(expenseData);
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const handleClose = () => {
@@ -301,14 +307,16 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                             type="button"
                             className="btn btn-secondary"
                             onClick={handleClose}
+                            disabled={submitting}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             className="btn btn-primary"
+                            disabled={submitting}
                         >
-                            {isEditMode ? 'Update Expense' : 'Add Expense'}
+                            {submitting ? 'Saving…' : isEditMode ? 'Update Expense' : 'Add Expense'}
                         </button>
                     </div>
                 </form>

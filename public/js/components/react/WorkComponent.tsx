@@ -1,4 +1,4 @@
-import React, { useState, useEffect, type FormEvent, type ChangeEvent, type SyntheticEvent } from 'react';
+import React, { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WorkCard, { type Work, type WorkStatus } from './WorkCard';
 import PaymentModal from './PaymentModal';
@@ -127,8 +127,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const [workDetails, setWorkDetails] = useState<WorkDetail[]>([]);
     const [showDetailForm, setShowDetailForm] = useState(false);
     const [editingDetail, setEditingDetail] = useState<WorkDetail | null>(null);
-    const [successMessage, setSuccessMessage] = useState<string | null>(null);
-    const [newAlignerWorkId, setNewAlignerWorkId] = useState<number | null>(null);
+    const [patientPhotoError, setPatientPhotoError] = useState(false);
 
     // Payment-related state
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -255,7 +254,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             if (!response.ok) throw new Error('Failed to check appointment status');
             const data = await response.json();
             setHasNextAppointment(data.hasAppointment);
-            console.log(`[WORK-COMPONENT] Patient ${personId} has next appointment:`, data.hasAppointment);
         } catch (err) {
             console.error('[WORK-COMPONENT] Error checking appointment status:', err);
             setHasNextAppointment(false);
@@ -265,8 +263,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     };
 
     const handlePrintNoWorkReceipt = () => {
-        console.log(`[WORK-COMPONENT] Print no-work receipt clicked for patient ${personId}`);
-
         if (!hasNextAppointment) {
             toast.warning('Patient has no scheduled appointment');
             return;
@@ -274,7 +270,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
         // Open receipt in new window
         const receiptUrl = `/api/templates/receipt/no-work/${personId}?autoprint=1`;
-        console.log(`[WORK-COMPONENT] Opening receipt window: ${receiptUrl}`);
 
         const receiptWindow = window.open(receiptUrl, '_blank');
 
@@ -453,8 +448,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 throw new Error(result.error || 'Failed to delete work');
             }
 
-            setSuccessMessage('Work deleted successfully!');
-            setTimeout(() => setSuccessMessage(null), 3000);
+            toast.success('Work deleted successfully!');
             await loadWorks();
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
@@ -715,17 +709,15 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             const result = await response.json();
 
             if (result.alreadyCheckedIn) {
-                setSuccessMessage(`${patientInfo?.name || 'Patient'} is already checked in today!`);
+                toast.success(`${patientInfo?.name || 'Patient'} is already checked in today!`);
                 setCheckedIn(true);
             } else if (result.created) {
-                setSuccessMessage(`${patientInfo?.name || 'Patient'} added to today's appointments and checked in!`);
+                toast.success(`${patientInfo?.name || 'Patient'} added to today's appointments and checked in!`);
                 setCheckedIn(true);
             } else {
-                setSuccessMessage(`${patientInfo?.name || 'Patient'} checked in successfully!`);
+                toast.success(`${patientInfo?.name || 'Patient'} checked in successfully!`);
                 setCheckedIn(true);
             }
-
-            setTimeout(() => setSuccessMessage(null), 5000);
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'An error occurred', 5000);
         } finally {
@@ -741,17 +733,16 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             {patientInfo && (
                 <div className={styles.patientInfoCard}>
                     <div className={styles.patientPhotoContainer}>
-                        <img
-                            src={`/DolImgs/${personId}00.i13`}
-                            alt={`${patientInfo.patient_name} - Smile`}
-                            className={styles.patientPhoto}
-                            onError={(e: SyntheticEvent<HTMLImageElement>) => {
-                                e.currentTarget.style.display = 'none';
-                                if (e.currentTarget.parentElement) {
-                                    e.currentTarget.parentElement.innerHTML = `<i class="fas fa-user ${styles.patientPhotoFallback}"></i>`;
-                                }
-                            }}
-                        />
+                        {patientPhotoError ? (
+                            <i className={`fas fa-user ${styles.patientPhotoFallback}`} aria-hidden="true"></i>
+                        ) : (
+                            <img
+                                src={`/DolImgs/${personId}00.i13`}
+                                alt={`${patientInfo.patient_name} - Smile`}
+                                className={styles.patientPhoto}
+                                onError={() => setPatientPhotoError(true)}
+                            />
+                        )}
                     </div>
                     <div className={styles.patientInfoDetails}>
                         <div className={styles.patientInfoRow}>
@@ -838,34 +829,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 Add New Work
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {successMessage && newAlignerWorkId && (
-                <div className={styles.success}>
-                    <div>
-                        <strong>{successMessage}</strong>
-                        <p>
-                            This is an aligner work. Would you like to add aligner sets now?
-                        </p>
-                    </div>
-                    <div className={styles.successActions}>
-                        <button
-                            onClick={() => handleAddAlignerSet({ work_id: newAlignerWorkId } as Work)}
-                            className={styles.btnSuccessAction}
-                        >
-                            <i className="fas fa-tooth"></i> Add Aligner Set
-                        </button>
-                        <button
-                            onClick={() => {
-                                setSuccessMessage(null);
-                                setNewAlignerWorkId(null);
-                            }}
-                            className={styles.btnSuccessClose}
-                        >
-                            ×
-                        </button>
                     </div>
                 </div>
             )}
@@ -1265,7 +1228,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         loadWorks();
                     }}
                     onSuccess={() => {
-                        setSuccessMessage('Payment added successfully!');
+                        toast.success('Payment added successfully!');
                     }}
                 />
             )}

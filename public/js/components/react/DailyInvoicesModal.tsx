@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters';
+import Modal from './Modal';
 import styles from './StatisticsComponent.module.css';
 
 interface Invoice {
@@ -66,7 +67,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                 throw new Error(data.error || 'Failed to fetch daily invoices');
             }
 
-            setInvoices(data.invoices);
+            setInvoices(data.invoices ?? []);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Unknown error');
             console.error('Error fetching daily invoices:', err);
@@ -123,8 +124,12 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
     if (!selectedDate) return null;
 
     return (
-        <div className={styles.statisticsModalOverlay} onClick={onClose}>
-            <div className={styles.statisticsModalContainer} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+        <Modal
+            isOpen
+            onClose={onClose}
+            overlayClassName={styles.statisticsModalOverlay}
+            contentClassName={styles.statisticsModalContainer}
+        >
                 {/* Modal Header */}
                 <div className={styles.statisticsModalHeader}>
                     <h2>
@@ -255,8 +260,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                         Close
                     </button>
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 };
 

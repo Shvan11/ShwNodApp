@@ -11,7 +11,6 @@
 import { Router, type Request, type Response } from 'express';
 import {
   getWires,
-  getLatestWire,
   getVisitsByWorkId,
   getVisitById,
   addVisitByWorkId,
@@ -102,37 +101,6 @@ router.get(
       ErrorResponses.internalError(
         res,
         'Failed to fetch latest wires',
-        error as Error
-      );
-    }
-  }
-);
-
-/**
- * GET /getLatestwire
- * Get latest wire for a specific patient
- * Query params: PID (Patient id)
- */
-router.get(
-  '/getLatestwire',
-  async (
-    req: Request<unknown, unknown, unknown, VisitQueryParams>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { PID } = req.query;
-      if (!PID) {
-        ErrorResponses.missingParameter(res, 'PID');
-        return;
-      }
-
-      const latestWire = await getLatestWire(parseInt(PID, 10));
-      res.json(latestWire);
-    } catch (error) {
-      log.error('Error fetching latest wire:', error);
-      ErrorResponses.internalError(
-        res,
-        'Failed to fetch latest wire',
         error as Error
       );
     }

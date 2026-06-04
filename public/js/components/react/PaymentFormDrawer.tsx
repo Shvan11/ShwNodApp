@@ -130,6 +130,12 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
         }
     };
 
+    // Block dismissal (backdrop / X / Cancel) while a save is in flight so the
+    // payment can't be abandoned mid-request.
+    const handleClose = () => {
+        if (!saving) onClose();
+    };
+
     if (!isOpen) return null;
 
     const remainingBalance = set?.Balance || set?.set_cost || 0;
@@ -138,11 +144,11 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
     const currency = set?.currency || 'USD';
 
     return (
-        <div className="drawer-overlay" onClick={onClose}>
+        <div className="drawer-overlay" onClick={handleClose}>
             <div className="drawer-container aligner-payment-drawer" onClick={(e) => e.stopPropagation()}>
                 <div className="drawer-header">
                     <h2>Add Payment</h2>
-                    <button className="drawer-close-btn" onClick={onClose}>
+                    <button className="drawer-close-btn" onClick={handleClose} disabled={saving}>
                         <i className="fas fa-times"></i>
                     </button>
                 </div>
@@ -230,7 +236,7 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
                 </div>
 
                 <div className="drawer-footer">
-                    <button type="button" className="btn-cancel" onClick={onClose} disabled={saving}>
+                    <button type="button" className="btn-cancel" onClick={handleClose} disabled={saving}>
                         Cancel
                     </button>
                     <button

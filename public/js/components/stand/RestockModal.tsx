@@ -13,7 +13,7 @@ interface RestockModalProps {
   isOpen: boolean;
   item: StandItem | null;
   onClose: () => void;
-  onSave: (quantity: number, unitCost: number) => void;
+  onSave: (quantity: number, unitCost: number) => void | Promise<void>;
 }
 
 interface FormErrors {
@@ -26,6 +26,7 @@ export default function RestockModal({ isOpen, item, onClose, onSave }: RestockM
   const [unitCost, setUnitCost] = useState(0);
   const [displayUnitCost, setDisplayUnitCost] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen && item) {
@@ -66,10 +67,15 @@ export default function RestockModal({ isOpen, item, onClose, onSave }: RestockM
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!validateForm()) return;
-    onSave(quantity, unitCost);
+    if (submitting || !validateForm()) return;
+    setSubmitting(true);
+    try {
+      await onSave(quantity, unitCost);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -150,11 +156,11 @@ export default function RestockModal({ isOpen, item, onClose, onSave }: RestockM
           </div>
 
           <div className={styles.modalFooter}>
-            <button type="button" className="btn btn-secondary" onClick={handleClose}>
+            <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={submitting}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
-              Restock
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
+              {submitting ? 'Restocking…' : 'Restock'}
             </button>
           </div>
         </form>

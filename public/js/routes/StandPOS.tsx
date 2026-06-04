@@ -5,6 +5,7 @@ import BarcodeInput from '../components/stand/BarcodeInput';
 import POSItemSearch from '../components/stand/POSItemSearch';
 import POSCart from '../components/stand/POSCart';
 import POSCheckout from '../components/stand/POSCheckout';
+import Modal from '../components/react/Modal';
 import { useToast } from '../contexts/ToastContext';
 import { formatNumber } from '../utils/formatters';
 import styles from './StandPOS.module.css';
@@ -47,11 +48,15 @@ export default function StandPOS() {
   }, [toast]);
 
   const handleBarcodeScan = async (barcode: string) => {
-    const item = await lookupByBarcode(barcode);
-    if (item) {
-      addToCart(item);
-    } else {
-      toast.error(`No item found for barcode: ${barcode}`);
+    try {
+      const item = await lookupByBarcode(barcode);
+      if (item) {
+        addToCart(item);
+      } else {
+        toast.error(`No item found for barcode: ${barcode}`);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Barcode lookup failed');
     }
   };
 
@@ -133,8 +138,12 @@ export default function StandPOS() {
       </div>
 
       {lastSale && (
-        <div className={styles.successOverlay} onClick={() => setLastSale(null)}>
-          <div className={styles.successCard} onClick={e => e.stopPropagation()}>
+        <Modal
+          isOpen
+          onClose={() => setLastSale(null)}
+          overlayClassName={styles.successOverlay}
+          contentClassName={styles.successCard}
+        >
             <div className={styles.successIcon}><i className="fas fa-check-circle"></i></div>
             <h2>Sale Complete!</h2>
             <p>Sale #{lastSale.saleId}</p>
@@ -146,8 +155,7 @@ export default function StandPOS() {
             <button className="btn btn-primary" onClick={() => setLastSale(null)}>
               New Sale
             </button>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

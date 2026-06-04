@@ -100,23 +100,23 @@ export function useMessageStatus(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchMessageStatus = useCallback(async () => {
+  const fetchMessageStatus = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!currentDate) return;
 
-    setLoading(true);
+    // Silent refreshes (triggered by live SSE status ticks during a send) keep
+    // the current rows on screen and just swap in fresh data. Flipping `loading`
+    // would unmount the table for the full-screen placeholder on every status
+    // update — which reads as the page "refreshing" after each message.
+    if (!silent) setLoading(true);
     setError(null);
 
     try {
-      console.log(`Loading message status table for date: ${currentDate}`);
-
       const data = await apiClient.get<MessageStatusApiResponse>(
         API_ENDPOINTS.MESSAGE_STATUS(currentDate),
         {
           cancelPrevious: 'messageStatus',
         }
       );
-
-      console.log('Message status API response:', data);
 
       // Handle different API response formats
       let messagesData: Message[] | null = null;
@@ -136,7 +136,6 @@ export function useMessageStatus(
             hasValidResponse = true;
           }
         } else if (data.success === false) {
-          console.log('API returned success=false:', data.error || 'No data available');
           hasValidResponse = true; // Valid response, just no data
         }
       }
@@ -146,7 +145,6 @@ export function useMessageStatus(
           setMessages(messagesData);
         } else {
           setMessages([]);
-          console.log(`No messages found for date: ${currentDate}`);
         }
       } else {
         console.warn('Invalid API response structure:', data);
@@ -162,7 +160,6 @@ export function useMessageStatus(
       const errorMessage =
         err instanceof Error ? err.message : err?.toString() || 'Unknown error';
       if (errorMessage.includes('HTTP 404') || errorMessage.includes('Not Found')) {
-        console.log(`No message data available for date: ${currentDate}`);
         setMessages([]);
       } else {
         console.warn('Failed to load message status table:', errorMessage);
@@ -178,11 +175,16 @@ export function useMessageStatus(
     fetchMessageStatus();
   }, [fetchMessageStatus]);
 
-  // Reload when message status updates
+  // Reload when message status updates. These fire rapidly during a live send
+  // (server → device → read per message), so refresh silently to avoid blanking
+  // the table on every tick, and debounce so a burst of ticks coalesces into a
+  // single refetch instead of one request per tick.
   useEffect(() => {
-    if (messageStatusUpdate) {
-      fetchMessageStatus();
-    }
+    if (!messageStatusUpdate) return;
+    const timer = setTimeout(() => {
+      fetchMessageStatus({ silent: true });
+    }, 400);
+    return () => clearTimeout(timer);
   }, [messageStatusUpdate, fetchMessageStatus]);
 
   // Calculate summary statistics

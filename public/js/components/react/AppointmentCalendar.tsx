@@ -28,6 +28,19 @@ interface ContextMenuState {
     appointment: CalendarAppointment;
 }
 
+/**
+ * Parse a `Date | 'YYYY-MM-DD'` into a local Date anchored at noon. A bare
+ * `new Date('YYYY-MM-DD')` parses as UTC midnight, which shifts the calendar
+ * day backward in any timezone west of UTC; anchoring at local noon keeps the
+ * wall-clock day correct everywhere the week/day math reads getDate()/getDay().
+ */
+function parseLocalDate(value: Date | string): Date {
+    if (value instanceof Date) return value;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12);
+    return new Date(value);
+}
+
 interface DayContextMenuState {
     position: MenuPosition;
     day: CalendarDay;
@@ -45,7 +58,6 @@ interface AppointmentCalendarProps {
     mode?: CalendarMode;
     onSlotSelect?: (slot: SlotData) => void;
     selectedSlot?: SlotData | null;
-    showOnlyAvailable?: boolean;
 }
 
 /**
@@ -66,7 +78,7 @@ const AppointmentCalendar = ({
 
     // State management
     const [currentDate, setCurrentDate] = useState<Date>(
-        initialDate ? new Date(initialDate) : new Date()
+        initialDate ? parseLocalDate(initialDate) : new Date()
     );
     const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
     const [calendarStats, setCalendarStats] = useState<CalendarStats | null>(null);
@@ -418,7 +430,7 @@ const AppointmentCalendar = ({
     // Handler for clicking on a day in monthly view
     const handleDayClick = useCallback((day: CalendarDay) => {
         // Switch to day view for the selected day
-        setCurrentDate(new Date(day.date));
+        setCurrentDate(parseLocalDate(day.date));
         setViewMode('day');
     }, []);
 

@@ -80,3 +80,26 @@
     align-items: stretch;
   }
 }
+
+.voidModal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-width: 320px;
+}
+
+.voidModal h2 {
+  margin: 0 0 var(--spacing-xs);
+}
+
+.voidModal textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.voidModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}

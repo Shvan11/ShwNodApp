@@ -31,7 +31,6 @@ const XraysComponent = ({ personId }: Props) => {
     const loadXrays = async () => {
         try {
             setLoading(true);
-            console.log('Loading X-rays for patient:', personId);
 
             const response = await fetch(`/api/patients/${personId}/info`);
             if (!response.ok) {
@@ -39,7 +38,6 @@ const XraysComponent = ({ personId }: Props) => {
             }
 
             const patientData = await response.json();
-            console.log('Patient info received:', patientData);
             setPatientInfo(patientData);
         } catch (err) {
             console.error('Error loading X-rays:', err);
@@ -49,13 +47,15 @@ const XraysComponent = ({ personId }: Props) => {
         }
     };
 
+    const buildXrayUrl = (xray: Xray): string =>
+        `/api/patients/${personId}/xray?file=${encodeURIComponent(xray.name)}&detailsDir=${encodeURIComponent(xray.detailsDirName ?? '')}`;
+
     const handleXrayClick = (xray: Xray) => {
-        const xrayUrl = `/api/patients/${personId}/xray?file=${xray.name}&detailsDir=${xray.detailsDirName}`;
-        window.open(xrayUrl, '_blank');
+        window.open(buildXrayUrl(xray), '_blank');
     };
 
     const handleSendClick = (xray: Xray) => {
-        const xrayUrl = `/api/patients/${personId}/xray?file=${xray.name}&detailsDir=${xray.detailsDirName}`;
+        const xrayUrl = buildXrayUrl(xray);
         const sendMessageUrl = `/send-message?file=${encodeURIComponent(xrayUrl)}`;
         window.open(sendMessageUrl, '_blank');
     };
@@ -112,8 +112,6 @@ const XraysComponent = ({ personId }: Props) => {
             </div>
         );
     }
-
-    console.log('X-rays Component Rendering:', { personId, xraysCount: xrays.length });
 
     return (
         <div className={styles.component}>

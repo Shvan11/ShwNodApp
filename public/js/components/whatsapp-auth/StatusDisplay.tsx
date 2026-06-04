@@ -3,7 +3,7 @@
  * Shows different authentication status messages
  */
 
-import { AUTH_STATES, AuthState } from '../../hooks/useWhatsAppAuth';
+import { AUTH_STATES, type AuthState } from '../../hooks/useWhatsAppAuth';
 import styles from '../../routes/WhatsAppAuth.module.css';
 
 interface StatusContent {

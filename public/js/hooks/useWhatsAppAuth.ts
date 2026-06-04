@@ -360,6 +360,10 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     } else {
       stopQRRefreshTimer();
     }
+    // Clear the interval on unmount — otherwise it keeps firing
+    // requestInitialState() forever if the component unmounts while in
+    // QR_REQUIRED state.
+    return () => stopQRRefreshTimer();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authState]);
 

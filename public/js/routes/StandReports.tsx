@@ -26,8 +26,8 @@ export default function StandReports() {
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [endDate, setEndDate] = useState(defaults.endDate);
 
-  const { data: reportData, loading } = useStandReportSummary(startDate, endDate);
-  const { items: topItems } = useTopSellingItems(startDate, endDate, 10);
+  const { data: reportData, loading, error: reportError } = useStandReportSummary(startDate, endDate);
+  const { items: topItems, error: topError } = useTopSellingItems(startDate, endDate, 10);
 
   // Compute summary totals from daily data
   const totalRevenue = reportData?.salesSummary.reduce((s, r) => s + r.Revenue, 0) ?? 0;
@@ -54,6 +54,8 @@ export default function StandReports() {
 
       {loading ? (
         <div className={styles.loadingState}>Loading reports...</div>
+      ) : reportError ? (
+        <div className={styles.loadingState}>{reportError}</div>
       ) : (
         <>
           <div className={styles.summaryCards}>
@@ -82,7 +84,11 @@ export default function StandReports() {
             </div>
             <div className={styles.chartPanel}>
               <h2>Top Selling Items</h2>
-              <TopItemsChart data={topItems} />
+              {topError ? (
+                <div className={styles.loadingState}>{topError}</div>
+              ) : (
+                <TopItemsChart data={topItems} />
+              )}
             </div>
           </div>
         </>

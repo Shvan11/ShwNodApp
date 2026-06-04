@@ -484,6 +484,8 @@ const LabelPreviewModal = ({
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
             window.open(url, '_blank');
+            // Release the blob URL once the new tab has had a chance to load it.
+            setTimeout(() => URL.revokeObjectURL(url), 60_000);
 
             const totalLabelsHeader = response.headers.get('X-Total-Labels');
             const totalPagesHeader = response.headers.get('X-Total-Pages');
@@ -646,7 +648,7 @@ const LabelPreviewModal = ({
                                 {queueStats?.patientCount} {queueStats?.patientCount === 1 ? 'patient' : 'patients'} &bull; {queueStats?.batchCount} {queueStats?.batchCount === 1 ? 'batch' : 'batches'} &bull; {queueStats?.totalLabels} labels
                             </span>
                         </h2>
-                        <button className={styles.closeBtn} onClick={onClose}>
+                        <button className={styles.closeBtn} onClick={handleClose}>
                             <i className="fas fa-times"></i>
                         </button>
                     </div>
@@ -831,7 +833,7 @@ const LabelPreviewModal = ({
 
                     {/* Footer */}
                     <div className={styles.footer}>
-                        <button className={styles.btnCancel} onClick={onClose}>Cancel</button>
+                        <button className={styles.btnCancel} onClick={handleClose}>Cancel</button>
                         <button
                             className={styles.btnGenerate}
                             onClick={handleGenerate}
@@ -857,7 +859,7 @@ const LabelPreviewModal = ({
                         <i className="fas fa-print"></i>
                         Print Aligner Labels
                     </h2>
-                    <button className={styles.closeBtn} onClick={onClose}>
+                    <button className={styles.closeBtn} onClick={handleClose}>
                         <i className="fas fa-times"></i>
                     </button>
                 </div>
@@ -951,7 +953,7 @@ const LabelPreviewModal = ({
                                     type="text"
                                     value={newLabelText}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => setNewLabelText(e.target.value)}
-                                    onKeyPress={handleNewLabelKeyPress}
+                                    onKeyDown={handleNewLabelKeyPress}
                                     placeholder="Add label (e.g., U7, L5, U3/L3)"
                                     className={styles.addLabelInput}
                                 />
@@ -1005,7 +1007,7 @@ const LabelPreviewModal = ({
 
                 {/* Footer */}
                 <div className={styles.footer}>
-                    <button className={styles.btnCancel} onClick={onClose}>Cancel</button>
+                    <button className={styles.btnCancel} onClick={handleClose}>Cancel</button>
                     <button
                         className={styles.btnGenerate}
                         onClick={handleGenerate}

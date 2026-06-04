@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { PortalPaymentRow, PortalPaymentsResponse } from '@/types/api.types';
+import type { PortalPaymentRow } from '../portal.schemas';
+import { portalPaymentsResponseSchema } from '../portal.schemas';
 import styles from '../portal.module.css';
 
 function formatDate(iso: string): string {
@@ -21,13 +22,13 @@ const PaymentsTab = () => {
     (async () => {
       try {
         const res = await fetch('/api/portal/payments', { credentials: 'same-origin' });
-        const data = (await res.json()) as PortalPaymentsResponse;
+        const parsed = portalPaymentsResponseSchema.safeParse(await res.json());
         if (cancelled) return;
-        if (!res.ok || !data.success || !data.payments) {
-          setError(data.error || 'Unable to load your payments.');
+        if (!res.ok || !parsed.success || !parsed.data.success || !parsed.data.payments) {
+          setError((parsed.success ? parsed.data.error : undefined) || 'Unable to load your payments.');
           return;
         }
-        const sorted = [...data.payments].sort(
+        const sorted = [...parsed.data.payments].sort(
           (a, b) => new Date(b.Date).getTime() - new Date(a.Date).getTime()
         );
         setPayments(sorted);

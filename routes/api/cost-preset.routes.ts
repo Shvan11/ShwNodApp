@@ -12,8 +12,7 @@ import {
   getCostPresets,
   createCostPreset,
   updateCostPreset,
-  deleteCostPreset,
-  getCostPresetCurrencies
+  deleteCostPreset
 } from '../../services/database/queries/cost-preset-queries.js';
 import { ErrorResponses } from '../../utils/error-response.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
@@ -65,20 +64,6 @@ router.get('/settings/cost-presets', async (req: Request<object, object, object,
   } catch (error) {
     log.error('Error fetching cost presets:', error);
     ErrorResponses.internalError(res, 'Failed to fetch cost presets', error as Error);
-  }
-});
-
-/**
- * GET /settings/cost-presets/currencies
- * Get list of currencies that have presets
- */
-router.get('/settings/cost-presets/currencies', async (_req: Request, res: Response): Promise<void> => {
-  try {
-    const currencies = await getCostPresetCurrencies();
-    res.json(currencies);
-  } catch (error) {
-    log.error('Error fetching cost preset currencies:', error);
-    ErrorResponses.internalError(res, 'Failed to fetch currencies', error as Error);
   }
 });
 
