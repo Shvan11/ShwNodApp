@@ -94,6 +94,36 @@ exercised end-to-end on real data.
 
 ---
 
+## Tier completion (Wave 3 — "100% rollout")
+
+> **Plan:** `~/.claude/plans/here-is-a-draft-toasty-shannon.md` — *"Finish the shared-contract rollout
+> to 100% — client wiring, response modeling, params/query, lock-in."* Delivery is **plan-only / user-driven
+> sessions**: Phase 0 (this scaffold) landed; Phases 1–5 each run in their own gated session.
+
+The body tier is done (zero `interface *Body` in `routes/`). Three tiers remain open across the full
+request+response surface, now measured by `npm run contracts:check` (`scripts/contracts-dod.mjs`,
+report-only until Phase 5 flips `STRICT`):
+
+| Tier | DoD | Phase-0 baseline (2026-06-05) | Target |
+|------|-----|-------------------------------|--------|
+| **D1** — hand-written request interfaces (`*Body\|*Params\|*Query\|*Filters`) in `routes/` | grep = 0 | **33** | 0 |
+| **D2** — loose response markers (`z.unknown()` / `anyArray` / `z.array(z.unknown`) in `shared/contracts/` | allowlist only | **103** lines | allowlist only |
+| **D3** — staff-app reads without a client `{ schema }` guard | `require-schema-on-reads` ESLint passes | **178** read call sites · **120** `schema:` usages · **~58** unguarded (heuristic) | every read guarded |
+
+**Phases:** 1 = client `{schema}` on reads · 2 = client `{schema}` on meaningful mutations · 3 = full
+response modeling + per-read runtime verify (heaviest: aligner 16 / patient 10 / file-explorer·expense 9 /
+video·reports 7 / calendar 6) · 4 = full params/query fold (delete the 33 D1 interfaces) · 5 = lock-in
+(extend ESLint `routes/**` selector to `*Params|*Query|*Filters`; add `require-schema-on-reads`; flip
+`STRICT`; `npm run gate`; net-new `.github/workflows/gate.yml`).
+
+**Session 9 — 2026-06-05 — Phase 0 (measurement scaffold).** Added `scripts/contracts-dod.mjs` +
+`npm run contracts:check` (report-only, exits 0; `STRICT=1`/`--strict` will fail on regression past the
+baselines above — for Phase 5). `scripts/**` is eslint-ignored so the script isn't linted. Baselines
+recorded above. No ESLint rule / CI workflow added yet (deferred to Phase 5 so they don't break before the
+work lands). **Next: Phase 1 (client `{schema}` on reads).**
+
+---
+
 ## Phase 0 — Foundation
 
 **Must be green before any group phase.** Source: plan §"Phase 0 — Foundation". **✅ COMPLETE (2026-06-05).**
