@@ -36,6 +36,7 @@ export default function WhatsAppAuth() {
     if (initRequestedRef.current) return;
     initRequestedRef.current = true;
     // Fire-and-forget: response ignored, so a non-2xx (now thrown by fetchJSON) just logs.
+    // eslint-disable-next-line no-restricted-syntax -- fire-and-forget init; response ignored
     fetchJSON('/api/wa/initialize').catch((err) => {
       console.error('[WhatsAppAuth] dev auto-init request failed:', err);
     });

@@ -58,19 +58,21 @@ export default [
       'no-undef': 'off'
     }
   },
-  // Lock-in: forbid hand-written `interface *Body` in routes/. Every request body
-  // must be authored once as a strict Zod `z.object` in shared/contracts/*.contract.ts
-  // and the handler typed from its `z.infer` (the shared-contract convention — see
-  // CLAUDE.md). This keeps the body the single source of truth shared with the client.
+  // Lock-in: forbid hand-written request interfaces (`*Body|*Params|*Query|*Filters`)
+  // in routes/. Every request shape — body, params, AND query — must be authored once
+  // as Zod in shared/contracts/*.contract.ts and the handler typed from its `z.infer`
+  // (the shared-contract convention — see CLAUDE.md). This keeps the request shape the
+  // single source of truth shared with the client. (Extended from `*Body` to all four
+  // suffixes once Phase 4 drove the params/query fold to D1 = 0.)
   {
     files: ['routes/**/*.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
         {
-          selector: 'TSInterfaceDeclaration[id.name=/Body$/]',
+          selector: 'TSInterfaceDeclaration[id.name=/(Body|Params|Query|Filters?)$/]',
           message:
-            'Hand-written `interface *Body` is forbidden in routes/. Author the request body as a strict Zod `z.object` in shared/contracts/*.contract.ts and type the handler from its `z.infer`.'
+            'Hand-written request interfaces (`*Body|*Params|*Query|*Filters`) are forbidden in routes/. Author the request shape as Zod in shared/contracts/*.contract.ts and type the handler from its `z.infer`. (A non-request shape that happens to end in one of these words should be renamed.)'
         }
       ]
     }
@@ -125,6 +127,16 @@ export default [
       // fetch() now fails CI. The few legitimate raw uses (blob/stream downloads,
       // the Zod portal boundary, sendBeacon) take an inline
       // // eslint-disable-next-line no-restricted-syntax with a reason.
+      // require-schema-on-reads (shared-contract lock-in — D3): every read via
+      // fetchJSON/apiLoader must carry a Zod `{ schema: <contract>.response }`. That
+      // client schema is the ONLY fail-loud response guard in prod (the server
+      // sendData parse is dev-only), so an unguarded read silently accepts drift.
+      // The esquery `:not(:has(Property[key.name='schema']))` matches a fetchJSON/
+      // apiLoader CallExpression with no `schema:` property anywhere in its arguments.
+      // The few legitimately schema-less reads (literal-null signals, raw passthroughs,
+      // status pings, fire-and-forget) take an inline
+      // // eslint-disable-next-line no-restricted-syntax with a reason — same escape
+      // hatch as the bare-fetch() ban below.
       'no-restricted-syntax': [
         'error',
         {
@@ -135,6 +147,12 @@ export default [
         {
           selector: "CallExpression[callee.object.name='window'][callee.property.name='fetch']",
           message: 'Use the helpers in core/http.ts instead of window.fetch(). (Audit H1 funnel.)'
+        },
+        {
+          selector:
+            "CallExpression[callee.name=/^(fetchJSON|apiLoader)$/]:not(:has(Property[key.name='schema']))",
+          message:
+            'Reads via fetchJSON/apiLoader must pass a Zod guard `{ schema: <contract>.response }` — it is the only fail-loud response validation in prod (the server sendData parse is dev-only). For a deliberately schema-less read (literal-null signal, raw passthrough, status ping, fire-and-forget) add an inline // eslint-disable-next-line no-restricted-syntax with a reason. (Shared-contract lock-in — D3.)'
         }
       ]
     }

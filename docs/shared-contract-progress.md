@@ -110,9 +110,10 @@ report-only until Phase 5 flips `STRICT`):
 | **D2** — loose response markers (`z.unknown()` / `anyArray` / `z.array(z.unknown`) in `shared/contracts/` | allowlist only | **103** lines | allowlist only |
 | **D3** — staff-app reads without a client `{ schema }` guard | `require-schema-on-reads` ESLint passes | **178** read call sites · **120** `schema:` usages · **~58** unguarded (heuristic) | every read guarded |
 
-**Current state (2026-06-06):** D1 = **0** ✅ (Phase 4) · D2 = **41** ✅ (Phase 3 — every slot fully modeled or
-allowlisted; `BASELINE.D2` ratcheted **103 → 41**) · D3 = **~0** unguarded (heuristic). `npm run contracts:check
---strict` passes (no regression). **Phases 1–4 complete; only Phase 5 (lock-in) remains.**
+**Current state (2026-06-06):** D1 = **0** ✅ (Phase 4; `BASELINE.D1` ratcheted **33 → 0**) · D2 = **41** ✅
+(Phase 3 — every slot fully modeled or allowlisted; `BASELINE.D2` ratcheted **103 → 41**) · D3 = **0** unguarded
+(`require-schema-on-reads` ESLint rule live; the documented raw reads carry inline-disables). `npm run gate` green.
+**🎉 WAVE 3 COMPLETE — Phases 1–5 all done; the rollout is 100% finished and locked-in.**
 
 **Phases:** 1 = client `{schema}` on reads · 2 = client `{schema}` on meaningful mutations · 3 = full
 response modeling + per-read runtime verify (heaviest: aligner 16 / patient 10 / file-explorer·expense 9 /
@@ -188,6 +189,30 @@ in container; same safe-no-op-guard rationale as Phase 1).
 - **Phase 3 DoD met.** Rollout remainder = **Phase 5 (lock-in)**: extend the ESLint `routes/**` interface-ban to
   `*Params|*Query|*Filters`, add `require-schema-on-reads`, flip `contracts-dod` `STRICT` in CI + `.github/workflows/
   gate.yml`, and ratchet `BASELINE.D1` 33 → 0 (D1 is already 0, so the ban extension can land now without breaking lint).
+
+**Session 16 — 2026-06-06 — Phase 5 (lock-in) COMPLETE → 🎉 WAVE 3 (100% rollout) DONE.** Committed Phase 3
+first (it had been gate-green but uncommitted in the working tree — commit `856de3c`), then landed the lock-in:
+- **ESLint `routes/**` interface-ban extended** `/Body$/` → `/(Body|Params|Query|Filters?)$/` (one selector). Passes
+  because Phase 4 already drove D1 = 0; no route interface trips it.
+- **`require-schema-on-reads` added** to the `public/**` `no-restricted-syntax` array (esquery
+  `CallExpression[callee.name=/^(fetchJSON|apiLoader)$/]:not(:has(Property[key.name='schema']))` — validated on a
+  throwaway fixture before wiring: fires on schema-less reads incl. multi-line, ignores `postJSON`). Blast radius was
+  only **9** real reads: **wired** `loaders.ts:401` (work loader in `patientShellLoader` — a genuine Phase-1 miss; now
+  `workContract.getWorkDetails.response`, same as its siblings :335/:505); **deleted dead** `public/js/services/
+  appointment.ts` (3 reads; unimported, routes gone — the Session-10 TODO); **inline-disabled** the 5 documented raw
+  reads (`/api/auth/verify` ping, `/api/diagnosis/:workId` null-signal, `/api/sync/supabase-status`, `/api/wa/initialize`
+  fire-and-forget, `/api/email/test` semantic-success), each `// eslint-disable-next-line no-restricted-syntax` + reason.
+- **`BASELINE.D1` ratcheted 33 → 0** in `scripts/contracts-dod.mjs` (+ header note: STRICT is now on in the gate).
+- **`npm run gate`** added = `typecheck:all && lint && contracts:check -- --strict && build`. **Net-new CI**
+  `.github/workflows/gate.yml` (repo's first) mirrors it exactly (push→main + PR; Node 22; `npm ci` then `npm run gate`;
+  DB-/secret-free).
+- **Docs:** `CLAUDE.md` `### Shared API contracts` (Client bullet → reads MUST carry `{schema}`; new **Lock-in** para;
+  contract count 25→29) + this tracker + the `shared-contract-rollout` memory.
+- **Gate GREEN:** `npm run gate` EXIT 0 — `typecheck:all` ✅, `lint` ✅ (both new rules), `contracts:check --strict` ✅
+  (**D1 = 0 ≤ 0, D2 = 41 ≤ 41**), `build` ✅. **Runtime smoke** (live :3101, NODE_ENV=development, dev-parse active):
+  the one new guard — `GET /api/getworkdetails?workId=100`/`200` → **200** (server dev-parsed `getWorkDetails.response`
+  on real data, identical to the client schema); `1`/`500` → clean 404. No fail-loud.
+- **Verdict:** all six DoD checks (D1–D6) met. The shared-contract rollout is **100% complete and enforced** end-to-end.
 
 **Session 14 — 2026-06-06 — Phase 3 continued. D2 64 → 41. BASELINE.D2 ratcheted to 41.**
 - **Group 7 (Visit, 5 → 0):** Flipped 3 private interfaces (`wire`/`LatestWireDetails`/`Visit`) → `type` in `visit-queries.ts`. Fully modeled all 4 visit/wire responses: `getWires` → `z.array(z.looseObject({id}))`, `latestWires` → `z.looseObject({upper_wire_id,…4 nullable fields})`, `visitsByWork` → `z.array(z.looseObject({id}))`, `visitById` → `z.looseObject({id}).nullable()`. Removed `const anyArray`.

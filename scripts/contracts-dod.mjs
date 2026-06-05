@@ -10,10 +10,11 @@
  *   D3 — staff-app reads lacking a client `{ schema }` guard                            (heuristic; authoritative
  *        check is the `require-schema-on-reads` ESLint rule added in Phase 5)
  *
- * REPORT-ONLY by default (always exits 0). Phase 5 flips enforcement on by setting
- * `STRICT=1` (env) or passing `--strict`: the script then exits non-zero when D1/D2
- * regress past the BASELINE thresholds below. As each phase drives a tier toward its
- * target, lower the matching BASELINE entry so the gate ratchets and can't slip back.
+ * REPORT-ONLY by default (always exits 0) for ad-hoc human runs. Enforcement is on in
+ * the gate: `npm run gate` (and `.github/workflows/gate.yml`) invoke this with `--strict`
+ * (equivalently `STRICT=1`), so the script exits non-zero when D1/D2 regress past the
+ * BASELINE thresholds below. As each phase drives a tier toward its target, lower the
+ * matching BASELINE entry so the gate ratchets and can't slip back.
  *
  * `scripts/**` is eslint-ignored (see eslint.config.js), so this file is not linted.
  */
@@ -24,10 +25,13 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const STRICT = process.env.STRICT === '1' || process.argv.includes('--strict');
 
-// Phase-0 baselines (captured 2026-06-05). In STRICT mode the run fails if a count
-// EXCEEDS its threshold — i.e. a regression. Lower these toward the target (0 /
-// allowlist length) as each tier completes. D3 has no hard threshold (ESLint owns it).
-const BASELINE = { D1: 33, D2: 41 };
+// Ratcheting baselines. In STRICT mode the run fails if a count EXCEEDS its
+// threshold — i.e. a regression past where the tier has already been driven. As each
+// tier completes, its threshold is lowered toward the target so the gate can't slip
+// back. D3 has no hard threshold (the `require-schema-on-reads` ESLint rule owns it).
+//   D1: 33 (Phase-0 baseline) → 0 (Phase 4 folded all params/query; Phase 5 ratchets to target).
+//   D2: 103 (Phase-0 baseline) → 41 (Phase 3 modeled all non-allowlisted slots).
+const BASELINE = { D1: 0, D2: 41 };
 
 /** Recursively collect files under `dir` whose name ends with one of `exts`. */
 function walk(dir, exts, acc = []) {

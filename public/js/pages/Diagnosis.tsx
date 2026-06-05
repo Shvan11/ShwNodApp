@@ -174,6 +174,7 @@ const Diagnosis = () => {
                 // Raw, un-enveloped: `/api/diagnosis/:workId` returns the row or literal
                 // `null` (the "no diagnosis yet" signal) — not the sendSuccess envelope —
                 // so it stays out of the contract and carries no client schema by design.
+                // eslint-disable-next-line no-restricted-syntax -- raw literal-null signal; no contract response
                 fetchJSON<Partial<DiagnosisData> | null>(`/api/diagnosis/${workId}`).catch(() => null)
             ]);
 
