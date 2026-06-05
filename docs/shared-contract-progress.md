@@ -122,6 +122,31 @@ baselines above — for Phase 5). `scripts/**` is eslint-ignored so the script i
 recorded above. No ESLint rule / CI workflow added yet (deferred to Phase 5 so they don't break before the
 work lands). **Next: Phase 1 (client `{schema}` on reads).**
 
+**Session 10 — 2026-06-05 — Phase 1 (client `{schema}` on reads) — COMPLETE.** Wired the client
+fail-loud guard on every **contracted** staff-app read; **D3 unguarded ~58 → ~3** (the by-design raw set).
+Gate green after each batch: `typecheck:all` (backend + frontend EXIT 0), `build` (client + `build:server`
+EXIT 0), `lint` (0 errors; the 2 pre-existing aligner `exhaustive-deps` warnings). **No runtime smoke** —
+no PostgreSQL in the fresh container; safe because adding `{schema}` against schemas the server already
+dev-parsed on real data (prior sessions) is a no-op guard that only fail-louds on genuine drift.
+- **Convention:** namespace imports (`import * as <group>Contract`), explicit generic kept + `{ schema }`
+  passed (the option does NOT infer the generic). 4 committed batches: patient-cluster (25 reads) →
+  lookup/file/appointment/loaders → auth-me/templates → whatsapp/raw-docs.
+- **2 new flat reads authored** (response-only, server unchanged): `auth.contract.me`
+  (`looseObject{success,user}`) and `whatsapp.contract.initialState`/`qr` (`looseObject{}` — realtime
+  fields preserved, deliberately not tightened). Also `template.contract.getTemplates`/`documentTypes`
+  (`anyArray`)/`getTemplate` (`z.unknown`).
+- **By-design RAW reads (no client schema; get `require-schema-on-reads` inline-disables in Phase 5):**
+  `/api/diagnosis/:workId` (literal-null signal), `/api/email/test` (raw semantic-success at 200),
+  `/api/wa/initialize` (fire-and-forget), `/api/auth/verify` (session ping),
+  `/api/sync/supabase-status` (out-of-surface sync read). Each carries an inline comment.
+- **`public/js/services/appointment.ts` is DEAD CODE** (not imported anywhere; `/getTimePointImgs` &
+  `/getLatestVisitsSum` no longer exist as routes) — left untouched; **delete or disable in Phase 5**.
+- **Pre-existing latent bug noted (NOT fixed — out of scope):** `templateListLoader` types `/api/templates`
+  as `{ templates? }` but the route returns the bare array (funnel-unwrapped) → `.templates` is always
+  undefined. The wired `getTemplates` (`anyArray`) guard is the correct assertion; fix the generic later.
+
+**Next: Phase 2 (client `{schema}` on meaningful mutations).**
+
 ---
 
 ## Phase 0 — Foundation
