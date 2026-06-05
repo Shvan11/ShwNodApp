@@ -8,6 +8,7 @@ import PhoneDisplay from './PhoneDisplay';
 import Modal from './Modal';
 import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { patientSearch as patientSearchContract } from '@shared/contracts/patient.contract';
+import * as appointmentContract from '@shared/contracts/appointment.contract';
 import styles from './PatientManagement.module.css';
 
 interface Patient {
@@ -366,7 +367,7 @@ const PatientManagement = () => {
         e.preventDefault(); e.stopPropagation();
         try {
             setLoading(true);
-            const data = await postJSON<{ alreadyCheckedIn?: boolean }>('/api/appointments/quick-checkin', { person_id: patient.person_id });
+            const data = await postJSON<{ alreadyCheckedIn?: boolean }>('/api/appointments/quick-checkin', { person_id: patient.person_id }, { schema: appointmentContract.quickCheckin.response });
             toast.success(data.alreadyCheckedIn ? 'Already checked in' : 'Checked in successfully');
         } catch(err) {
             toast.error(httpErrorMessage(err, 'Check-in failed'));

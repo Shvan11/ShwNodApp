@@ -219,7 +219,7 @@ export function useExpenseMutations(onSuccess?: () => void): {
         setLoading(true);
         setError(null);
 
-        const data = await postJSON<Expense>('/api/expenses', expenseData);
+        const data = await postJSON<Expense>('/api/expenses', expenseData, { schema: expenseContract.createExpense.response });
         if (onSuccess) onSuccess();
         return data;
       } catch (err) {
@@ -240,7 +240,7 @@ export function useExpenseMutations(onSuccess?: () => void): {
         setLoading(true);
         setError(null);
 
-        const data = await putJSON<Expense>(`/api/expenses/${id}`, expenseData);
+        const data = await putJSON<Expense>(`/api/expenses/${id}`, expenseData, { schema: expenseContract.updateExpense.response });
         if (onSuccess) onSuccess();
         return data;
       } catch (err) {

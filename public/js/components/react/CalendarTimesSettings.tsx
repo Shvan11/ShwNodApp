@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import * as settings from '@shared/contracts/settings.contract';
 import * as lookupAdminContract from '@shared/contracts/lookup-admin.contract';
+import * as calendarContract from '@shared/contracts/calendar.contract';
 import styles from './CalendarTimesSettings.module.css';
 import sectionStyles from './SettingsSection.module.css';
 
@@ -311,7 +312,8 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
         try {
             const data = await postJSON<{ entriesAdded?: number; message?: string }>(
                 '/api/calendar/regenerate',
-                {}
+                {},
+                { schema: calendarContract.regenerate.response }
             );
 
             setSuccessMessage(data.message || `Added ${data.entriesAdded} calendar entries`);

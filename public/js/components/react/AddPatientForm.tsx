@@ -9,6 +9,7 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import * as lookup from '@shared/contracts/lookup.contract';
+import * as patientContract from '@shared/contracts/patient.contract';
 import PhoneInput from './PhoneInput';
 import styles from './AddPatientForm.module.css';
 
@@ -177,7 +178,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         try {
             // Success body is the flat `{ success, personId, message }` (no `data`
             // key), so the envelope unwrap is a passthrough — `personId` is read off it.
-            const result = await postJSON<{ personId: number }>('/api/patients', formData);
+            const result = await postJSON<{ personId: number }>('/api/patients', formData, { schema: patientContract.createPatient.response });
 
             succeeded = true;
             showAlert(

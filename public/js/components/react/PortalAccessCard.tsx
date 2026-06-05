@@ -82,7 +82,7 @@ const PortalAccessCard = ({ personId }: Props) => {
     if (busyAction) return;
     setBusyAction('reset');
     try {
-      const data = await postJSON<PortalPinResetResponse>(`/api/patients/${personId}/portal/reset-pin`, {});
+      const data = await postJSON<PortalPinResetResponse>(`/api/patients/${personId}/portal/reset-pin`, {}, { schema: patientContract.resetPin.response });
       if (!data.pin) {
         throw new Error(data.error || 'Failed to reset PIN');
       }

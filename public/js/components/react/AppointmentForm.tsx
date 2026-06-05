@@ -215,7 +215,8 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                     app_date: appointmentDateTime,
                     app_detail: formData.AppDetail,
                     dr_id: parseInt(formData.DrID)
-                }
+                },
+                { schema: appointment.createAppointment.response }
             );
 
             // postJSON throws on non-2xx, so reaching here means the create succeeded.

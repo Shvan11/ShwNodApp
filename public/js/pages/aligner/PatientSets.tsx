@@ -453,7 +453,7 @@ const PatientSets: React.FC = () => {
             onConfirm: async () => {
                 try {
                     // fetchJSON unwraps { success, message, data } → the inner data object.
-                    const result = await patchJSON<MarkDeliveredResult>(`/api/aligner/batches/${batch.aligner_batch_id}/deliver`, {});
+                    const result = await patchJSON<MarkDeliveredResult>(`/api/aligner/batches/${batch.aligner_batch_id}/deliver`, {}, { schema: alignerContract.deliverBatch.response });
 
                     // Show appropriate toast based on what happened
                     if (result.wasAlreadyDelivered) {
@@ -490,7 +490,7 @@ const PatientSets: React.FC = () => {
                     // fetchJSON unwraps to the inner data; the idempotency signal is now
                     // the structured wasAlreadyManufactured flag (was the envelope message,
                     // which unwrapEnvelope strips — see audit N19).
-                    const result = await patchJSON<BatchStatusResult>(`/api/aligner/batches/${batch.aligner_batch_id}/manufacture`, {});
+                    const result = await patchJSON<BatchStatusResult>(`/api/aligner/batches/${batch.aligner_batch_id}/manufacture`, {}, { schema: alignerContract.manufactureBatch.response });
 
                     // Handle idempotent case where batch was already manufactured
                     if (result.wasAlreadyManufactured) {

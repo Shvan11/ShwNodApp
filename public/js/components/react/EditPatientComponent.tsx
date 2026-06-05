@@ -288,7 +288,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                 {
                     personId: patientData.person_id,
                     patientData: webcephPatientData
-                }
+                },
+                { schema: mediaContract.createPatient.response }
             );
 
             setWebcephData({
@@ -326,7 +327,8 @@ const EditPatientComponent = ({ personId }: Props) => {
 
             const result = await postFormData<{ big?: string; thumbnail?: string; link: string }>(
                 '/api/webceph/upload-image',
-                formDataObj
+                formDataObj,
+                { schema: mediaContract.uploadImage.response }
             );
 
             setWebcephSuccess(`Image uploaded successfully! View at: ${result.link}`);

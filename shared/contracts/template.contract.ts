@@ -37,6 +37,9 @@ export const createTemplate = {
     parent_template_id: z.number().optional(),
     created_by: z.string().optional(),
   }),
+  // POST /api/templates → 201 { success, message, data: { template_id } } (funnel
+  // unwraps `data`). The consumer reads the new id.
+  response: z.object({ template_id: z.number() }),
 } as const;
 export type CreateTemplateBody = z.infer<typeof createTemplate.body>;
 

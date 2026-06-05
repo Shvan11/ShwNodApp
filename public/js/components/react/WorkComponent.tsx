@@ -25,6 +25,7 @@ import {
 import * as workContract from '@shared/contracts/work.contract';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as lookupContract from '@shared/contracts/lookup.contract';
+import * as appointmentContract from '@shared/contracts/appointment.contract';
 import styles from './WorkComponent.module.css';
 
 interface PatientInfo {
@@ -665,7 +666,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             setCheckingIn(true);
             const result = await postJSON<{ alreadyCheckedIn?: boolean; created?: boolean }>(
                 '/api/appointments/quick-checkin',
-                { person_id: personId }
+                { person_id: personId },
+                { schema: appointmentContract.quickCheckin.response }
             );
 
             if (result.alreadyCheckedIn) {

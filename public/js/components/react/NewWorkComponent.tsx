@@ -292,14 +292,18 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     delete updatePayload.discount;
                     delete updatePayload.discount_date;
                 }
-                result = await putJSON<WorkResponse>('/api/updatework', updatePayload);
+                result = await putJSON<WorkResponse>('/api/updatework', updatePayload, { schema: workContract.updateWork.response });
             } else {
                 // Add new work - use special endpoint if createAsFinished is true
                 // Strip discount fields from creation payload (not supported at creation)
                 const { discount: _d, discount_date: _dd, discount_reason: _dr, ...creationData } = formData;
                 void _d; void _dd; void _dr;
                 const endpoint = formData.createAsFinished ? '/api/addWorkWithInvoice' : '/api/addwork';
-                result = await postJSON<WorkResponse>(endpoint, creationData);
+                // Schema matches the chosen endpoint ({ workId } vs { workId, invoiceId }).
+                const schema = formData.createAsFinished
+                    ? workContract.addWorkWithInvoice.response
+                    : workContract.addWork.response;
+                result = await postJSON<WorkResponse>(endpoint, creationData, { schema });
             }
 
             if (onSave) {
@@ -366,7 +370,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                       return rest;
                   })()
                 : pendingFormData;
-            const result = await postJSON<WorkResponse>('/api/addwork', pendingCreation)
+            const result = await postJSON<WorkResponse>('/api/addwork', pendingCreation, { schema: workContract.addWork.response })
                 .catch((addErr) => {
                     throw new Error(httpErrorMessage(addErr, 'Failed to add new work'));
                 });
