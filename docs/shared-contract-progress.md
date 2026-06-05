@@ -162,6 +162,34 @@ in container; same safe-no-op-guard rationale as Phase 1).
 
 **Next: Phase 3 (full response modeling + per-read runtime verify — the big tier; needs a live DB).**
 
+**Session 12 — 2026-06-05 — Phase 4 (params/query fold) — COMPLETE. D1 33 → 0.** Removed every
+hand-written `interface *Params|*Query|*Filters` from `routes/`. Gate green: `typecheck:all` (backend +
+frontend EXIT 0) + `lint` (0 errors) + `build` (client + `build:server`). No runtime smoke (no DB in
+container).
+- **Mechanism:** the established `type X = <contract>.X` alias pattern (cf. `settings.routes.ts` body
+  aliases). For each interface, authored the matching `query`/`params` Zod schema + `z.infer` export in the
+  group's contract, then replaced the route `interface` with a contract-derived `type` alias.
+- **Behavior-preserving (deliberate):** the new query schemas are **optional-string** views with **no new
+  coercion** — handlers keep their manual `parseInt`/`if(!x)` checks and friendly errors. The silent-NaN
+  hardening (coercing query params + dropping the manual guards) is a **later verified pass**, not done
+  blind. Pre-existing validated boundaries (`expenseList.query`, `tableIdParams`, calendar per-endpoint
+  `dateString` queries, etc.) are untouched.
+- **Kept as local `type` (NOT contract-derived), by design:** `ExpenseFilters` (internal parsed filter, not
+  a request shape); `ExpenseQueryParams` + lookup-admin `TableNameIdParams` (raw req.query **string** views
+  that diverge from their **coerced** validated contract boundary — aliasing to the coerced type would break
+  the handlers' `parseInt`); `admin.OAuthCallbackQuery` (Google-Drive OAuth root route, outside the
+  staff-app contract surface). All are `type` (not `interface`), so D1 = 0 holds and the Phase-5 ESLint ban
+  will pass.
+- **Owed before merge:** runtime verification of the folded query/params routes (a live read per group;
+  confirm no behavior change). Same DB-unavailable deferral as Phases 1–2.
+
+**Phases 3 & 5 NOT done this session** (user: "stop after finishing phase 4"). Phase 3 (response modeling,
+103→ allowlist) still needs a live DB for the mandated per-read verify; Phase 5 (lock-in: extend the ESLint
+`routes/**` ban to `*Params|*Query|*Filters`, add `require-schema-on-reads` + inline-disables on the
+documented raw reads, `npm run gate`, `.github/workflows/gate.yml`, flip `contracts-dod` `STRICT`) is ready
+to do once Phase 3 sets the D2 baseline. **D1 is already at 0**, so the Phase-5 interface-ban extension can
+be enabled now without breaking lint.
+
 ---
 
 ## Phase 0 — Foundation
