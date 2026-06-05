@@ -44,13 +44,11 @@ const PatientsList: React.FC = () => {
             // failure must not block the patient list, so it has its own try/catch.
             if (doctorId !== 'all') {
                 try {
-                    const doctorData = await fetchJSON<{ success: boolean; doctors?: Doctor[] }>(
+                    const doctorData = await fetchJSON<{ doctors?: Doctor[] }>(
                         '/api/aligner/doctors'
                     );
-                    if (doctorData.success) {
-                        const foundDoctor = doctorData.doctors?.find((d: Doctor) => d.dr_id === parseInt(doctorId || ''));
-                        setDoctor(foundDoctor || { dr_id: 0, doctor_name: 'Unknown Doctor' });
-                    }
+                    const foundDoctor = doctorData.doctors?.find((d: Doctor) => d.dr_id === parseInt(doctorId || ''));
+                    setDoctor(foundDoctor || { dr_id: 0, doctor_name: 'Unknown Doctor' });
                 } catch (e) {
                     console.error('Error loading doctor info:', e);
                 }
@@ -63,11 +61,9 @@ const PatientsList: React.FC = () => {
                 ? '/api/aligner/patients/all'
                 : `/api/aligner/patients/by-doctor/${doctorId}`;
 
-            const data = await fetchJSON<{ success: boolean; patients?: Patient[] }>(url);
+            const data = await fetchJSON<{ patients?: Patient[] }>(url);
 
-            if (data.success) {
-                setPatients(data.patients || []);
-            }
+            setPatients(data.patients || []);
         } catch (error) {
             console.error('Error loading data:', error);
         } finally {

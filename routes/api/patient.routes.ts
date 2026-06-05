@@ -11,6 +11,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import { sql, type RawBuilder } from 'kysely';
 import { log } from '../../utils/logger.js';
 import { isUniqueViolation } from '../../utils/pg-errors.js';
@@ -37,6 +38,8 @@ import {
 } from '../../middleware/time-based-auth.js';
 import { getOption } from '../../services/database/queries/options-queries.js';
 import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { validate } from '../../middleware/validate.js';
+import { idParams, numericParam, intId, optionalDateString } from '../../middleware/validation-schemas.js';
 import * as PatientService from '../../services/business/PatientService.js';
 import { PatientValidationError } from '../../services/business/PatientService.js';
 import { transliterateNameToEnglish } from '../../services/business/name-transliteration.js';
@@ -154,6 +157,33 @@ interface UpdateAlertBody {
   alertDetails: string;
 }
 
+// ── Boundary schemas (Zod = trust boundary) ──
+// create/update patient build/spread into createPatient/updatePatient, whose query
+// layer writes EXPLICIT named columns (over-posting closed downstream) — so LOOSE:
+// validate name presence + a real-calendar (empty-tolerant) DOB, pass the rest through.
+const createPatientBodySchema = z.looseObject({
+  patientName: z.string().min(1, 'Patient name is required'),
+  dateOfBirth: optionalDateString,
+});
+const updatePatientBodySchema = z.looseObject({
+  patient_name: z.string().min(1, 'Patient name is required'),
+  date_of_birth: optionalDateString,
+});
+const estimatedCostBodySchema = z.looseObject({ estimatedCost: z.coerce.number(), currency: z.string() });
+const alertBodySchema = z.looseObject({ alertTypeId: intId, alertDetails: z.string().min(1) });
+const alertStatusBodySchema = z.object({ isActive: z.boolean() });
+const portalEnableBodySchema = z.object({ enabled: z.boolean() });
+const photoVisibilityBodySchema = z.looseObject({ name: z.string().min(1), isPrivate: z.boolean() });
+const personIdParams = idParams('personId');
+const alertIdParams = idParams('alertId');
+// PUT /timepoints/:tpCode — fixes the H10 weak-date sub-issue (the inline regex at
+// the old :362 accepted 2024-02-30); dateString's refine rejects impossible dates.
+const timepointParams = z.object({ personId: numericParam, tpCode: numericParam });
+const timepointUpdateBodySchema = z.object({
+  tpDescription: z.string().optional(),
+  tpDateTime: optionalDateString,
+});
+
 interface TagOption {
   id: number;
   tag: string;
@@ -181,7 +211,7 @@ router.get(
     try {
       const { personId } = req.params;
       const info = await PatientService.getPatientInfo(personId);
-      res.json(info);
+      sendSuccess(res, info);
     } catch (error) {
       if (error instanceof PatientValidationError) {
         ErrorResponses.badRequest(res, error.message, {
@@ -342,6 +372,7 @@ function parseLocalDate(s: string): Date | null {
 router.put(
   '/patients/:personId/timepoints/:tpCode',
   authorize(['admin', 'secretary']),
+  validate({ params: timepointParams, body: timepointUpdateBodySchema }),
   async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
     try {
       const personId = Number.parseInt(req.params.personId, 10);
@@ -425,7 +456,7 @@ router.put(
         }
       }
 
-      res.json({ success: true, tpCode, tp_description: finalName, tp_date_time: finalDate });
+      sendSuccess(res, { tpCode, tp_description: finalName, tp_date_time: finalDate });
     } catch (error) {
       log.error('Error updating time point:', error);
       ErrorResponses.internalError(res, 'Failed to update time point', error as Error);
@@ -444,6 +475,7 @@ router.put(
 router.delete(
   '/patients/:personId/timepoints/:tpCode',
   authorize(['admin', 'secretary']),
+  validate({ params: timepointParams }),
   async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
     try {
       const personId = Number.parseInt(req.params.personId, 10);
@@ -494,7 +526,7 @@ router.delete(
       }
 
       log.info('[TimePoint] deleted', { userId: req.session?.userId, personId, tpCode, scope });
-      res.json({ success: true, scope });
+      sendSuccess(res, { scope });
     } catch (error) {
       log.error('Error deleting time point:', error);
       ErrorResponses.internalError(res, 'Failed to delete time point', error as Error);
@@ -515,7 +547,7 @@ router.get(
     try {
       const { personId, tp } = req.params;
       const images = await imaging.getImageSizes(personId, tp);
-      res.json(images);
+      sendSuccess(res, images);
     } catch (error) {
       log.error('Error getting gallery images:', error);
       ErrorResponses.internalError(res, 'Failed to load gallery images', {
@@ -577,7 +609,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const phonesList = await getPatientsPhones();
-      res.json(phonesList);
+      sendSuccess(res, phonesList);
     } catch (error) {
       log.error('Error fetching patients phones:', error);
       ErrorResponses.internalError(
@@ -863,7 +895,7 @@ router.get(
       const { rows: tags } = await sql<TagOption>`
         SELECT "id" as "id", "tag" as "tag" FROM "tag_options" ORDER BY "tag"
       `.execute(getKysely());
-      res.json(tags);
+      sendSuccess(res, tags);
     } catch (error) {
       log.error('Error fetching tag options:', error);
       ErrorResponses.internalError(
@@ -887,7 +919,7 @@ router.get(
       const { rows: types } = await sql<PatientTypeOption>`
         SELECT "id" as "id", "patient_type" as "type" FROM "patient_types" ORDER BY "patient_type"
       `.execute(getKysely());
-      res.json(types);
+      sendSuccess(res, types);
     } catch (error) {
       log.error('Error fetching patient type options:', error);
       ErrorResponses.internalError(
@@ -941,7 +973,7 @@ router.get(
       const patientWithAlerts = patient as typeof patient & { alerts: typeof alerts };
       patientWithAlerts.alerts = alerts;
 
-      res.json(patientWithAlerts);
+      sendSuccess(res, patientWithAlerts);
     } catch (error) {
       log.error('Error fetching patient:', error);
       ErrorResponses.internalError(
@@ -959,6 +991,7 @@ router.get(
  */
 router.post(
   '/patients',
+  validate({ body: createPatientBodySchema }),
   async (
     req: Request<unknown, unknown, CreatePatientBody>,
     res: Response
@@ -1017,11 +1050,7 @@ router.post(
       // Create the patient
       const result = await createPatient(processedData);
 
-      res.json({
-        success: true,
-        personId: result.personId,
-        message: 'Patient created successfully'
-      });
+      sendSuccess(res, { personId: result.personId }, 'Patient created successfully');
 
       // English first/last not supplied → auto-fill by romanizing the Arabic patientName
       // with Gemini, AFTER responding so the create request never blocks on the API call.
@@ -1078,6 +1107,7 @@ router.post(
  */
 router.put(
   '/patients/:personId',
+  validate({ params: personIdParams, body: updatePatientBodySchema }),
   async (
     req: Request<{ personId: string }, unknown, UpdatePatientBody>,
     res: Response
@@ -1103,7 +1133,7 @@ router.put(
       };
 
       await updatePatient(personId, updateData);
-      res.json({ success: true, message: 'Patient updated successfully' });
+      sendSuccess(res, null, 'Patient updated successfully');
     } catch (error) {
       // Duplicate patient name → pg unique violation on index ix_name_id (was mssql 2601).
       if (isUniqueViolation(error, 'ix_name_id')) {
@@ -1137,6 +1167,7 @@ router.delete(
   '/patients/:personId',
   authenticate,
   authorize(['admin', 'secretary']),
+  validate({ params: personIdParams }),
   requireRecordAge({
     resourceType: 'patient',
     operation: 'delete',
@@ -1189,13 +1220,13 @@ router.delete(
           error: (dolphinErr as Error).message,
         });
       }
-      res.json({
-        success: true,
-        message: folderRemoved
+      sendSuccess(
+        res,
+        { folderRemoved },
+        folderRemoved
           ? 'Patient and folder deleted successfully'
-          : 'Patient deleted, but its photo folder could not be removed (a file may be open). Please delete it manually.',
-        folderRemoved,
-      });
+          : 'Patient deleted, but its photo folder could not be removed (a file may be open). Please delete it manually.'
+      );
     } catch (error) {
       log.error('Error deleting patient:', error);
       ErrorResponses.internalError(
@@ -1219,6 +1250,7 @@ router.put(
   '/patients/:personId/estimated-cost',
   authenticate,
   authorize(['admin', 'secretary', 'doctor']),
+  validate({ params: personIdParams, body: estimatedCostBodySchema }),
   async (
     req: Request<{ personId: string }, unknown, { estimatedCost: number; currency: string }>,
     res: Response
@@ -1240,10 +1272,7 @@ router.put(
         WHERE "person_id" = ${personId}
       `.execute(getKysely());
 
-      res.json({
-        success: true,
-        message: 'Estimated cost updated successfully'
-      });
+      sendSuccess(res, null, 'Estimated cost updated successfully');
     } catch (error) {
       log.error('Error updating estimated cost:', error);
       ErrorResponses.internalError(
@@ -1280,7 +1309,7 @@ router.get(
       }
 
       const alerts = await getAlertsByPersonId(personId);
-      res.json(alerts);
+      sendSuccess(res, alerts);
     } catch (error) {
       log.error('Error fetching patient alerts:', error);
       ErrorResponses.internalError(
@@ -1300,6 +1329,7 @@ router.post(
   '/patients/:personId/alerts',
   authenticate,
   authorize(['admin', 'secretary', 'doctor']),
+  validate({ params: personIdParams, body: alertBodySchema }),
   async (
     req: Request<{ personId: string }, unknown, CreateAlertBody>,
     res: Response
@@ -1322,9 +1352,7 @@ router.post(
         alert_details: alertDetails
       });
 
-      res
-        .status(201)
-        .json({ success: true, message: 'Alert created successfully' });
+      sendSuccess(res, null, 'Alert created successfully', 201);
     } catch (error) {
       log.error('Error creating alert:', error);
       ErrorResponses.internalError(
@@ -1344,6 +1372,7 @@ router.put(
   '/alerts/:alertId/status',
   authenticate,
   authorize(['admin', 'secretary', 'doctor']),
+  validate({ params: alertIdParams, body: alertStatusBodySchema }),
   async (
     req: Request<{ alertId: string }, unknown, UpdateAlertStatusBody>,
     res: Response
@@ -1360,10 +1389,7 @@ router.put(
 
       await setAlertStatus(alertId, isActive);
 
-      res.json({
-        success: true,
-        message: `Alert status updated to ${isActive}`
-      });
+      sendSuccess(res, null, `Alert status updated to ${isActive}`);
     } catch (error) {
       log.error('Error updating alert status:', error);
       ErrorResponses.internalError(
@@ -1383,6 +1409,7 @@ router.put(
   '/alerts/:alertId',
   authenticate,
   authorize(['admin', 'secretary', 'doctor']),
+  validate({ params: alertIdParams, body: alertBodySchema }),
   async (
     req: Request<{ alertId: string }, unknown, UpdateAlertBody>,
     res: Response
@@ -1405,10 +1432,7 @@ router.put(
 
       await updateAlert(alertId, alertTypeId, alertSeverity, alertDetails);
 
-      res.json({
-        success: true,
-        message: 'Alert updated successfully'
-      });
+      sendSuccess(res, null, 'Alert updated successfully');
     } catch (error) {
       log.error('Error updating alert:', error);
       ErrorResponses.internalError(
@@ -1445,10 +1469,7 @@ router.get(
 
       const hasAppointment = await hasNextAppointment(personId);
 
-      res.json({
-        success: true,
-        hasAppointment
-      });
+      sendSuccess(res, { hasAppointment });
     } catch (error) {
       log.error(
         `Error checking appointment for patient ${req.params.personId}:`,
@@ -1485,8 +1506,7 @@ router.get(
         PatientPortalService.getStatus(personId),
         PatientPortalService.getQrDataUrl(personId),
       ]);
-      res.json({
-        success: true,
+      sendSuccess(res, {
         enabled: status.enabled,
         hasPin: status.hasPin,
         lockedUntil: status.lockedUntil,
@@ -1509,6 +1529,7 @@ router.get(
 router.post(
   '/patients/:personId/portal/reset-pin',
   authorize(['admin', 'secretary']),
+  validate({ params: personIdParams }),
   async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
     try {
       const personId = parseInt(req.params.personId, 10);
@@ -1517,7 +1538,7 @@ router.post(
         return;
       }
       const pin = await PatientPortalService.resetToDefaultPin(personId);
-      res.json({ success: true, pin });
+      sendSuccess(res, { pin });
     } catch (error) {
       const msg = (error as Error).message;
       log.warn('Portal reset-pin failed', { error: msg });
@@ -1533,6 +1554,7 @@ router.post(
 router.post(
   '/patients/:personId/portal/enable',
   authorize(['admin', 'secretary']),
+  validate({ params: personIdParams, body: portalEnableBodySchema }),
   async (
     req: Request<{ personId: string }, unknown, { enabled: boolean }>,
     res: Response
@@ -1549,7 +1571,7 @@ router.post(
         return;
       }
       await PatientPortalService.setEnabled(personId, enabled);
-      res.json({ success: true });
+      sendSuccess(res, null);
     } catch (error) {
       ErrorResponses.internalError(res, 'Failed to update portal access', error as Error);
     }
@@ -1563,6 +1585,7 @@ router.post(
 router.post(
   '/patients/:personId/portal/unlock',
   authorize(['admin', 'secretary']),
+  validate({ params: personIdParams }),
   async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
     try {
       const personId = parseInt(req.params.personId, 10);
@@ -1571,7 +1594,7 @@ router.post(
         return;
       }
       await PatientPortalService.unlock(personId);
-      res.json({ success: true });
+      sendSuccess(res, null);
     } catch (error) {
       ErrorResponses.internalError(res, 'Failed to unlock portal', error as Error);
     }
@@ -1597,8 +1620,7 @@ router.get(
         return;
       }
       const rows = await PatientPortalService.getPrivateList(personId);
-      res.json({
-        success: true,
+      sendSuccess(res, {
         privateImages: rows.map((r) => ({ tp: r.timepoint_code, name: r.image_name })),
       });
     } catch (error) {
@@ -1615,6 +1637,7 @@ router.get(
 router.post(
   '/patients/:personId/photos/visibility',
   authorize(['admin', 'secretary']),
+  validate({ params: personIdParams, body: photoVisibilityBodySchema }),
   async (
     req: Request<
       { personId: string },
@@ -1636,7 +1659,7 @@ router.post(
       }
       const byUserId = req.session.userId ?? null;
       await PatientPortalService.togglePhotoPrivacy(personId, tp, name, isPrivate, byUserId);
-      res.json({ success: true });
+      sendSuccess(res, null);
     } catch (error) {
       ErrorResponses.internalError(res, 'Failed to update photo visibility', error as Error);
     }

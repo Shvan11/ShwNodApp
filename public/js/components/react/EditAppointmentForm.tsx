@@ -100,10 +100,10 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     const loadAppointmentData = async (id: number | string): Promise<void> => {
         try {
             setLoadingData(true);
-            const data = await fetchJSON<{ success?: boolean; appointment?: ExistingAppointment }>(
+            const data = await fetchJSON<{ appointment?: ExistingAppointment }>(
                 `/api/appointments/${id}`
             );
-            if (data.success && data.appointment) {
+            if (data.appointment) {
                 prefillFormData(data.appointment);
             } else {
                 throw new Error('Appointment not found');

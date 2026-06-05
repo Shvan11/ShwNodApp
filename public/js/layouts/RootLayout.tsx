@@ -1,7 +1,7 @@
 /**
  * Root Layout for Data Router
  * Wraps all routes with:
- * - GlobalStateProvider (WebSocket, patient state)
+ * - GlobalStateProvider (realtime + patient state)
  * - ToastProvider (notifications)
  * - PrintQueueProvider (multi-batch label printing)
  * - UniversalHeader (persistent header)

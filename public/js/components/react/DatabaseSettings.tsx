@@ -3,7 +3,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import Modal from './Modal';
 import styles from './DatabaseSettings.module.css';
 import { formatISODate } from '../../core/utils';
-import { fetchJSON, postJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { fetchJSON, postJSON, putJSON, httpErrorMessage } from '@/core/http';
 
 interface DatabaseConfig {
     PG_HOST: string;
@@ -67,14 +67,14 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
     const loadCurrentConfig = async () => {
         setIsLoading(true);
         try {
-            const data = await fetchJSON<{ success: boolean; config?: DatabaseConfig; message?: string }>(
+            const data = await fetchJSON<{ config?: DatabaseConfig }>(
                 '/api/config/database'
             );
 
-            if (data.success && data.config) {
+            if (data.config) {
                 setConfig(data.config);
             } else {
-                throw new Error(data.message || 'Failed to load database configuration');
+                throw new Error('Failed to load database configuration');
             }
         } catch (error) {
             console.error('Error loading database config:', error);
@@ -128,27 +128,24 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                 return;
             }
 
-            const data = await postJSON<{ success: boolean; message: string; details?: string }>(
+            const data = await postJSON<{ connectionOk: boolean; message: string; details?: string }>(
                 '/api/config/database/test',
                 testConfig
             );
 
             setConnectionStatus({
-                success: data.success,
+                success: data.connectionOk,
                 message: data.message,
                 details: data.details
             });
 
         } catch (error) {
-            // A failed test is returned as HTTP 400 with { success:false, message, details },
-            // so it lands here — surface the server's reason rather than a generic message.
-            const body = (error as HttpError).data as
-                | { message?: string; details?: string }
-                | undefined;
+            // The test result (reachable / not) now rides a 200 `connectionOk`, so this
+            // only fires on a genuine transport/server error — surface its reason.
             setConnectionStatus({
                 success: false,
-                message: body?.message || 'Connection test failed',
-                details: body?.details || (error as Error).message
+                message: httpErrorMessage(error, 'Connection test failed'),
+                details: (error as Error).message
             });
         } finally {
             setIsTestingConnection(false);
@@ -165,32 +162,28 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
             // Get complete configuration (current + pending changes)
             const completeConfig = { ...config, ...pendingChanges };
 
-            const data = await putJSON<{ success: boolean; message?: string; requiresRestart?: boolean }>(
+            const data = await putJSON<{ message?: string; requiresRestart?: boolean }>(
                 '/api/config/database',
                 completeConfig
             );
 
-            if (data.success) {
-                // Update local state
-                setConfig(prev => ({ ...prev, ...pendingChanges }));
-                setPendingChanges({});
+            // A failed save throws from putJSON → caught below.
+            setConfig(prev => ({ ...prev, ...pendingChanges }));
+            setPendingChanges({});
 
-                if (data.requiresRestart) {
-                    const shouldRestart = await confirm(
-                        data.message + '\n\nThe application must be restarted for database changes to take effect.\n\nRestart now?',
-                        { title: 'Restart Required', danger: true, confirmText: 'Restart Now', cancelText: 'Later' }
-                    );
+            if (data.requiresRestart) {
+                const shouldRestart = await confirm(
+                    data.message + '\n\nThe application must be restarted for database changes to take effect.\n\nRestart now?',
+                    { title: 'Restart Required', danger: true, confirmText: 'Restart Now', cancelText: 'Later' }
+                );
 
-                    if (shouldRestart) {
-                        restartApplication();
-                    } else {
-                        showModal('Success', data.message + '\n\nRemember to restart the application for changes to take effect.');
-                    }
+                if (shouldRestart) {
+                    restartApplication();
                 } else {
-                    showModal('Success', data.message || 'Configuration saved successfully.');
+                    showModal('Success', data.message + '\n\nRemember to restart the application for changes to take effect.');
                 }
             } else {
-                throw new Error(data.message || 'Failed to save configuration');
+                showModal('Success', data.message || 'Configuration saved successfully.');
             }
 
         } catch (error) {
@@ -201,28 +194,24 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
     const exportConfiguration = async () => {
         try {
-            const data = await fetchJSON<{ success: boolean; config?: unknown; message?: string }>(
+            const data = await fetchJSON<{ config?: unknown }>(
                 '/api/config/database/export'
             );
 
-            if (data.success) {
-                // Create downloadable file
-                const blob = new Blob([JSON.stringify(data.config, null, 2)], {
-                    type: 'application/json'
-                });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `database-config-${formatISODate()}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+            // A failed export throws from fetchJSON → caught below.
+            const blob = new Blob([JSON.stringify(data.config, null, 2)], {
+                type: 'application/json'
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `database-config-${formatISODate()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
 
-                showModal('Success', 'Configuration exported successfully.');
-            } else {
-                throw new Error(data.message || 'Failed to export configuration');
-            }
+            showModal('Success', 'Configuration exported successfully.');
         } catch (error) {
             console.error('Error exporting configuration:', error);
             showModal('Error', 'Failed to export configuration: ' + httpErrorMessage(error, 'Unknown error'));
@@ -231,21 +220,18 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
     const restartApplication = async () => {
         try {
-            const data = await postJSON<{ success: boolean; message?: string }>(
+            await postJSON<{ message?: string }>(
                 '/api/system/restart',
                 { reason: 'Database configuration update' }
             );
 
-            if (data.success) {
-                showModal('Restarting', 'Application is restarting. Please wait...');
+            // A failed restart-init throws from postJSON → caught below.
+            showModal('Restarting', 'Application is restarting. Please wait...');
 
-                // Check if server is back up
-                setTimeout(() => {
-                    window.location.reload();
-                }, 5000);
-            } else {
-                throw new Error(data.message || 'Failed to restart application');
-            }
+            // Check if server is back up
+            setTimeout(() => {
+                window.location.reload();
+            }, 5000);
         } catch (error) {
             console.error('Error restarting application:', error);
             showModal('Error', 'Failed to restart application: ' + httpErrorMessage(error, 'Unknown error'));

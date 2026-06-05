@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import PortalLogin from './PortalLogin';
 import PortalDashboard from './PortalDashboard';
 import { portalMeResponseSchema } from './portal.schemas';
+import { portalCsrfHeader } from './portal.csrf';
 import styles from './portal.module.css';
 
 export interface PortalPatient {
@@ -63,6 +64,9 @@ const PortalApp = () => {
       await fetch('/api/portal/logout', {
         method: 'POST',
         credentials: 'same-origin',
+        // CSRF token (audit H2) — required, else the server rejects logout and
+        // the portal session survives despite the client clearing its state.
+        headers: await portalCsrfHeader(),
       });
     } catch {
       /* ignore */

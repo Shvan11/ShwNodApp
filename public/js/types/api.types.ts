@@ -49,8 +49,13 @@ export interface ApiResponse<T = unknown> {
     code?: string;
     /** Structured error context; conflict routes carry the error code here as `details.code`. */
     details?: { code?: string } & Record<string, unknown>;
-    /** ISO timestamp emitted by the backend envelope (sendSuccess / ErrorResponses). */
-    timestamp?: IsoTimestamp;
+    /**
+     * ISO timestamp emitted by the backend envelope (sendSuccess / ErrorResponses).
+     * Required as of H4 — every staff route now rides the envelope, which always
+     * stamps `timestamp`. (Raw-consumer exceptions — whatsapp/portal — don't use
+     * this shared type.)
+     */
+    timestamp: IsoTimestamp;
 }
 
 export interface ApiSuccessResponse<T = unknown> {
@@ -67,8 +72,8 @@ export interface ApiErrorResponse {
     code?: string;
     /** Structured error context; conflict routes nest the error code here as `details.code`. */
     details?: { code?: string } & Record<string, unknown>;
-    /** ISO timestamp emitted by ErrorResponses. */
-    timestamp?: IsoTimestamp;
+    /** ISO timestamp emitted by ErrorResponses — always present (every error rides the envelope). */
+    timestamp: IsoTimestamp;
 }
 
 // =============================================================================
@@ -228,7 +233,7 @@ export interface PortalPinResetResponse {
 // source of truth, via `z.infer`) in `public/js/portal/portal.schemas.ts`.
 
 // =============================================================================
-// MESSAGING / WHATSAPP (HTTP only — WebSocket payloads are not in scope)
+// MESSAGING / WHATSAPP (HTTP only — SSE payloads are not in scope)
 // =============================================================================
 
 /** POST /api/messages/reset/:date. Distinct from PortalPinResetResponse. */

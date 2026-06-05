@@ -23,6 +23,13 @@ import {
   teardownWhatsappSseBroadcaster,
 } from './services/messaging/sse-whatsapp.js';
 import { setupMiddleware, errorHandler } from './middleware/index.js';
+import {
+  staffCsrfProtection,
+  portalCsrfProtection,
+  staffCsrfTokenHandler,
+  portalCsrfTokenHandler,
+  csrfErrorHandler,
+} from './middleware/csrf.js';
 import apiRoutes from './routes/api/index.js';
 import webRoutes from './routes/web.js';
 import calendarRoutes from './routes/calendar.js';
@@ -225,6 +232,23 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     log.info('✅ Session management configured');
 
+    // ===== CSRF protection (audit H2) — double-submit token =====
+    // Checked on mutations only (GET/HEAD/OPTIONS ignored, so SSE/reads are
+    // untouched). Mounted AFTER the session middleware (the token is bound to
+    // req.sessionID) and BEFORE every route, so it covers the pre-auth-mounted
+    // reference routes (cost-preset admin mutations) and the auth routes
+    // (change-password/logout) as well as the main API. Portal first (its own
+    // session + cookie); staff covers the rest of /api and skips portal paths.
+    // The SPA fetches a token from the *-csrf-token endpoints and echoes it in
+    // the x-csrf-token header (injected by core/http.ts). cookie-parser
+    // (setupMiddleware) populates req.cookies for the double-submit check.
+    log.info('🛡️  Setting up CSRF protection...');
+    app.use('/api/portal', portalCsrfProtection);
+    app.get('/api/portal/csrf-token', portalCsrfTokenHandler);
+    app.use('/api', staffCsrfProtection);
+    app.get('/api/csrf-token', staffCsrfTokenHandler);
+    log.info('✅ CSRF protection configured');
+
     // ===== ADDED: Request timeout configuration =====
     log.info('⏱️  Setting up request timeout middleware...');
     // Set global timeout for all requests (30 seconds default)
@@ -352,6 +376,10 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     // Final catch-all for SPA routing
     app.use('/', webRoutes);
+
+    // CSRF failure → conformant 403 envelope (audit H2). Must precede the global
+    // handler, which would otherwise flatten the http-errors 403 to a 500.
+    app.use(csrfErrorHandler);
 
     // Global error handler — must be LAST (after every route mount). Catches
     // anything that propagates out of a route via next(err) or an unhandled

@@ -221,9 +221,9 @@ const Diagnosis = () => {
             toast.success('Diagnosis saved successfully');
             setDiagnosisExists(true);
 
-            // Navigate back to work page
+            // Navigate back to the works list
             setTimeout(() => {
-                navigate(`/patient/${personId}/work`);
+                navigate(`/patient/${personId}/works`);
             }, 500);
         } catch (err) {
             console.error('Error saving diagnosis:', err);
@@ -234,7 +234,7 @@ const Diagnosis = () => {
     };
 
     const handleCancel = () => {
-        navigate(`/patient/${personId}/work`);
+        navigate(`/patient/${personId}/works`);
     };
 
     const handleReset = async () => {
@@ -249,9 +249,9 @@ const Diagnosis = () => {
 
             toast.success('Diagnosis deleted successfully');
 
-            // Navigate back to work page
+            // Navigate back to the works list
             setTimeout(() => {
-                navigate(`/patient/${personId}/work`);
+                navigate(`/patient/${personId}/works`);
             }, 500);
         } catch (err) {
             console.error('Error deleting diagnosis:', err);

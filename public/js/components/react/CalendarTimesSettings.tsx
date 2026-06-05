@@ -22,7 +22,6 @@ interface CategorizedSlots {
 
 // GET /api/options/:name success shape ({ status:'success', optionName, value }).
 interface OptionResponse {
-    status?: string;
     value?: string | null;
 }
 
@@ -110,7 +109,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             // audit N12/N20), so the 404 path is defensive, not the norm.
             // Fetch early slots option
             const earlyData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_EARLY_SLOTS').catch(() => null);
-            const earlySlotsArr = earlyData?.status === 'success' && earlyData.value
+            const earlySlotsArr = earlyData?.value
                 ? earlyData.value.split(',').filter(Boolean)
                 : ['12:00', '12:30', '13:00', '13:30']; // Default
             setEarlySlots(earlySlotsArr);
@@ -118,7 +117,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
 
             // Fetch late slots option
             const lateData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_LATE_SLOTS').catch(() => null);
-            const lateSlotsArr = lateData?.status === 'success' && lateData.value
+            const lateSlotsArr = lateData?.value
                 ? lateData.value.split(',').filter(Boolean)
                 : ['21:00', '21:30', '22:00', '22:30']; // Default
             setLateSlots(lateSlotsArr);
@@ -126,7 +125,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
 
             // Fetch default toggle setting
             const toggleData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT').catch(() => null);
-            const toggleValue = toggleData?.status === 'success' && toggleData.value === 'true';
+            const toggleValue = toggleData?.value === 'true';
             setShowExtendedSlotsDefault(toggleValue);
             setOriginalShowExtendedDefault(toggleValue);
 

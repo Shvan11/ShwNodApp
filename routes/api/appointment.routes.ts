@@ -14,6 +14,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import type { EventEmitter } from 'events';
 import { sql } from 'kysely';
 import { getKysely } from '../../services/database/kysely.js';
@@ -24,6 +25,8 @@ import {
 } from '../../services/database/queries/appointment-queries.js';
 import { InternalEmitterEvents } from '../../services/messaging/websocket-events.js';
 import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { validate } from '../../middleware/validate.js';
+import { idParams, intId } from '../../middleware/validation-schemas.js';
 import { log } from '../../utils/logger.js';
 import {
   validateAndCreateAppointment,
@@ -33,6 +36,28 @@ import {
 } from '../../services/business/AppointmentService.js';
 
 const router = Router();
+
+// Boundary schemas. `app_date` is deliberately a LOOSE string (not dateString): the
+// create/update handlers accept BOTH `YYYY-MM-DD` and other formats (regex-branch +
+// `new Date` fallback / PG `::timestamp` cast), so a strict date schema would 400 a
+// currently-valid format. We NaN-proof the ids + require the scalar fields; the
+// AppointmentService owns the holiday/conflict business rules.
+const appointmentIdParams = idParams('appointmentId');
+const appointmentStateBodySchema = z.looseObject({ appointment_id: intId, state: z.string().min(1) });
+const createAppointmentBodySchema = z.looseObject({
+  person_id: intId,
+  dr_id: intId,
+  app_detail: z.string().min(1), // required, non-empty — create + update share this
+  app_date: z.string().min(1),
+});
+// Only person_id is required: quickCheckIn() defaults app_detail→'Walk-in' and
+// dr_id→null, and both callers send only person_id. Keeping dr_id/app_detail
+// required here 400s those calls before the service's defaults can apply.
+const quickCheckinBodySchema = z.looseObject({
+  person_id: intId,
+  dr_id: intId.optional(),
+  app_detail: z.string().optional(),
+});
 
 // WebSocket emitter will be injected to avoid circular imports
 let wsEmitter: EventEmitter | null = null;
@@ -73,11 +98,7 @@ interface UpdateAppointmentBody {
   dr_id: number;
 }
 
-interface QuickCheckInBody {
-  person_id: number;
-  app_detail: string;
-  dr_id: number;
-}
+type QuickCheckInBody = z.infer<typeof quickCheckinBodySchema>;
 
 interface AppointmentDetail {
   id: number;
@@ -137,7 +158,7 @@ router.get(
   ): Promise<void> => {
     const { PDate } = req.query;
     const result = await getPresentAps(PDate as string);
-    res.json(result);
+    sendSuccess(res, result);
   }
 );
 
@@ -168,7 +189,7 @@ router.get(
       // Delegate to service layer
       const result = await getDailyAppointments(AppsDate);
 
-      res.json(result);
+      sendSuccess(res, result);
     } catch (error) {
       log.error('Error fetching daily appointments (optimized):', error);
 
@@ -200,6 +221,7 @@ router.get(
  */
 router.post(
   '/updateAppointmentState',
+  validate({ body: appointmentStateBodySchema }),
   async (
     req: Request<unknown, unknown, AppointmentStateBody>,
     res: Response
@@ -236,12 +258,7 @@ router.post(
         wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, appointmentDate);
       }
 
-      res.json({
-        success: true,
-        appointment_id,
-        state,
-        time: currentTime
-      });
+      sendSuccess(res, { appointment_id, state, time: currentTime });
     } catch (error) {
       log.error('Error updating appointment state:', error);
 
@@ -272,6 +289,7 @@ router.post(
  */
 router.post(
   '/undoAppointmentState',
+  validate({ body: appointmentStateBodySchema }),
   async (
     req: Request<unknown, unknown, AppointmentStateBody>,
     res: Response
@@ -300,7 +318,7 @@ router.post(
         wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, appointmentDate);
       }
 
-      res.json(result);
+      sendSuccess(res, result);
     } catch (error) {
       log.error('Error undoing appointment state:', error);
 
@@ -338,6 +356,7 @@ router.post(
  */
 router.post(
   '/appointments',
+  validate({ body: createAppointmentBodySchema }),
   async (
     req: Request<unknown, unknown, CreateAppointmentBody>,
     res: Response
@@ -373,12 +392,11 @@ router.post(
         wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, appointmentDay);
       }
 
-      res.json({
-        success: true,
-        appointment_id: appointment.appointment_id,
-        message: 'Appointment created successfully',
-        appointment
-      });
+      sendSuccess(
+        res,
+        { appointment_id: appointment.appointment_id, appointment },
+        'Appointment created successfully'
+      );
     } catch (error) {
       log.error('Error creating appointment:', error);
 
@@ -437,10 +455,7 @@ router.get(
             ORDER BY a."app_date" DESC
         `.execute(db);
 
-      res.json({
-        success: true,
-        appointments: rows || []
-      });
+      sendSuccess(res, { appointments: rows || [] });
     } catch (error) {
       log.error('Error fetching patient appointments:', error);
       ErrorResponses.internalError(
@@ -489,10 +504,7 @@ router.get(
         return;
       }
 
-      res.json({
-        success: true,
-        appointment: rows[0]
-      });
+      sendSuccess(res, { appointment: rows[0] });
     } catch (error) {
       log.error('Error fetching appointment:', error);
       ErrorResponses.internalError(
@@ -510,6 +522,7 @@ router.get(
  */
 router.put(
   '/appointments/:appointmentId',
+  validate({ params: appointmentIdParams, body: createAppointmentBodySchema }),
   async (
     req: Request<{ appointmentId: string }, unknown, UpdateAppointmentBody>,
     res: Response
@@ -518,19 +531,10 @@ router.put(
       const { appointmentId } = req.params;
       const { person_id, app_date, app_detail, dr_id } = req.body;
 
-      if (!appointmentId || isNaN(parseInt(appointmentId))) {
-        ErrorResponses.badRequest(res, 'Invalid appointment id');
-        return;
-      }
-
-      // Validate required fields
-      if (!person_id || !app_date || !app_detail || !dr_id) {
-        ErrorResponses.badRequest(
-          res,
-          'person_id, app_date, app_detail, and dr_id are required'
-        );
-        return;
-      }
+      // params + body are validated by the validate() middleware above
+      // (appointmentIdParams + createAppointmentBodySchema): appointmentId is a
+      // digit string, the ids are positive ints, and app_date/app_detail are
+      // non-empty strings — so no manual re-check is needed here.
 
       // Cast the app_date string to timestamp on the PG side to avoid timezone conversion
       const db = getKysely();
@@ -543,10 +547,7 @@ router.put(
             WHERE "appointment_id" = ${parseInt(appointmentId)}
         `.execute(db);
 
-      res.json({
-        success: true,
-        message: 'Appointment updated successfully'
-      });
+      sendSuccess(res, null, 'Appointment updated successfully');
     } catch (error) {
       log.error('Error updating appointment:', error);
       ErrorResponses.internalError(
@@ -564,6 +565,7 @@ router.put(
  */
 router.delete(
   '/appointments/:appointmentId',
+  validate({ params: appointmentIdParams }),
   async (
     req: Request<{ appointmentId: string }>,
     res: Response
@@ -581,10 +583,7 @@ router.delete(
         DELETE FROM "appointments" WHERE "appointment_id" = ${parseInt(appointmentId)}
       `.execute(db);
 
-      res.json({
-        success: true,
-        message: 'Appointment deleted successfully'
-      });
+      sendSuccess(res, null, 'Appointment deleted successfully');
     } catch (error) {
       log.error('Error deleting appointment:', error);
       ErrorResponses.internalError(
@@ -607,6 +606,7 @@ router.delete(
  */
 router.post(
   '/appointments/quick-checkin',
+  validate({ body: quickCheckinBodySchema }),
   async (
     req: Request<unknown, unknown, QuickCheckInBody>,
     res: Response
@@ -632,7 +632,7 @@ router.post(
         wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, todayDateOnly);
       }
 
-      res.json(result);
+      sendSuccess(res, result);
     } catch (error) {
       log.error('Error in quick check-in:', error);
 

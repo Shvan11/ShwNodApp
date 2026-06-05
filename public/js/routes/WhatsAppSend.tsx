@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useDateManager } from '../hooks/useDateManager';
-import { useWhatsAppWebSocket } from '../hooks/useWhatsAppWebSocket';
+import { useWhatsAppSync } from '../hooks/useWhatsAppSync';
 import { useMessageCount } from '../hooks/useMessageCount';
 import { useMessageStatus } from '../hooks/useMessageStatus';
 import { useToast } from '../contexts/ToastContext';
@@ -27,14 +27,14 @@ export default function WhatsAppSend() {
   // Date management
   const { currentDate, dateOptions, setCurrentDate, sendability } = useDateManager();
 
-  // WebSocket connection and state
+  // SSE connection and state
   const {
     connectionStatus,
     clientReady,
     sendingProgress,
     messageStatusUpdate,
     requestInitialState
-  } = useWhatsAppWebSocket(currentDate);
+  } = useWhatsAppSync(currentDate);
 
   // Message count
   const {

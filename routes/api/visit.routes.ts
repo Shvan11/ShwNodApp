@@ -9,6 +9,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import {
   getWires,
   getVisitsByWorkId,
@@ -19,9 +20,21 @@ import {
   getLatestWiresByWorkId
 } from '../../services/database/queries/visit-queries.js';
 import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { validate } from '../../middleware/validate.js';
+import { intId, dateString } from '../../middleware/validation-schemas.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
+
+// Boundary schemas. add/update REST-SPREAD `...visitData` into the query, but the
+// query builders (addVisitByWorkId/updateVisitByWorkId) write an EXPLICIT named-column
+// `.values()`/`.set()` — so over-posting is closed at the query layer AND the route's
+// own body interface is incomplete (the query reads bracket_change/opg/operator_id/…
+// that the FE sends through). Hence LOOSE: validate only the required id + a real-date
+// visit_date; pass every other visit field through untouched.
+const addVisitBodySchema = z.looseObject({ work_id: intId, visit_date: dateString });
+const updateVisitBodySchema = z.looseObject({ visitId: intId, visit_date: dateString });
+const deleteVisitBodySchema = z.object({ visitId: intId });
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -182,6 +195,7 @@ router.get(
  */
 router.post(
   '/addvisitbywork',
+  validate({ body: addVisitBodySchema }),
   async (
     req: Request<unknown, unknown, AddVisitByWorkBody>,
     res: Response
@@ -201,7 +215,7 @@ router.post(
         visit_date: new Date(visitData.visit_date)
       };
       const result = await addVisitByWorkId(visitDataWithDate);
-      res.json({ success: true, visitId: result?.id });
+      sendSuccess(res, { visitId: result?.id });
     } catch (error) {
       log.error('Error adding visit:', error);
       ErrorResponses.internalError(res, 'Failed to add visit', error as Error);
@@ -216,6 +230,7 @@ router.post(
  */
 router.put(
   '/updatevisitbywork',
+  validate({ body: updateVisitBodySchema }),
   async (
     req: Request<unknown, unknown, UpdateVisitByWorkBody>,
     res: Response
@@ -235,7 +250,7 @@ router.put(
         visit_date: new Date(visitData.visit_date)
       };
       await updateVisitByWorkId(visitId, visitDataWithDate);
-      res.json({ success: true });
+      sendSuccess(res, null);
     } catch (error) {
       log.error('Error updating visit:', error);
       ErrorResponses.internalError(
@@ -254,6 +269,7 @@ router.put(
  */
 router.delete(
   '/deletevisitbywork',
+  validate({ body: deleteVisitBodySchema }),
   async (
     req: Request<unknown, unknown, DeleteVisitByWorkBody>,
     res: Response
@@ -265,7 +281,7 @@ router.delete(
         return;
       }
       await deleteVisitByWorkId(visitId);
-      res.json({ success: true });
+      sendSuccess(res, null);
     } catch (error) {
       log.error('Error deleting visit:', error);
       ErrorResponses.internalError(

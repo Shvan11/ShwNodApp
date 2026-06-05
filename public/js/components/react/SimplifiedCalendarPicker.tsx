@@ -12,7 +12,6 @@ interface Appointment {
 
 // GET /api/options/:name success shape ({ status:'success', optionName, value }).
 interface OptionResponse {
-    status?: string;
     value?: string | null;
 }
 
@@ -94,15 +93,15 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                     fetchJSON<OptionResponse>('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT').catch(() => null)
                 ]);
 
-                if (earlyData?.status === 'success' && earlyData.value) {
+                if (earlyData?.value) {
                     setEarlySlotTimes(earlyData.value.split(',').filter(Boolean));
                 }
 
-                if (lateData?.status === 'success' && lateData.value) {
+                if (lateData?.value) {
                     setLateSlotTimes(lateData.value.split(',').filter(Boolean));
                 }
 
-                if (defaultData?.status === 'success' && defaultData.value != null) {
+                if (defaultData?.value != null) {
                     setShowExtendedSlotsDefault(defaultData.value === 'true');
                 }
             } catch (err) {

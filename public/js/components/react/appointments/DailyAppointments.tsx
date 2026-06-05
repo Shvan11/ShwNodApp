@@ -9,13 +9,16 @@ import type { ConnectionStatusType, FreshnessType } from './ConnectionStatus';
 import styles from './DailyAppointments.module.css';
 
 import { useAppointments } from '../../../hooks/useAppointments';
-import type { Appointment } from '../../../hooks/useAppointments';
-import { useWebSocketSync } from '../../../hooks/useWebSocketSync';
+import type { Appointment, AppointmentStats } from '../../../hooks/useAppointments';
+import { useAppointmentsSync } from '../../../hooks/useAppointmentsSync';
 
 interface LoaderData {
     loadedDate?: string;
     allAppointments?: DailyAppointment[];
     checkedInAppointments?: DailyAppointment[];
+    stats?: AppointmentStats;
+    error?: string;
+    _loaderTimestamp?: number;
     [key: string]: unknown; // Allow additional properties from loader
 }
 
@@ -26,7 +29,7 @@ interface LoaderData {
  * HYBRID APPROACH:
  * - Loader pre-fetches initial data (eliminates loading flash)
  * - URL searchParams as single source of truth for date
- * - WebSocket for real-time updates
+ * - SSE for real-time updates
  * - Native scroll restoration via React Router
  */
 const DailyAppointments = () => {
@@ -54,7 +57,10 @@ const DailyAppointments = () => {
     const [showFlash, setShowFlash] = useState<boolean>(false);
     const [searchTerm, setSearchTerm] = useState<string>('');
 
-    // 5. Pass loader data to hook
+    // 5. React Query owns the read, keyed by selectedDate; seed its cache with
+    // the loader payload for the loaded date (no first-paint flash). The loader
+    // types appointments as DailyAppointment[] (UI shape); the hook wants
+    // Appointment[] (data shape) — they differ only nominally, so assert per-array.
     const {
         allAppointments,
         checkedInAppointments,
@@ -66,12 +72,13 @@ const DailyAppointments = () => {
         markDismissed,
         undoState,
         getStats
-    } = useAppointments({
-        // The loader types appointments as DailyAppointment[] (UI shape); the hook
-        // wants Appointment[] (data shape). They differ only nominally, so assert
-        // per-array rather than blanket-casting the whole loader payload.
+    } = useAppointments(selectedDate, {
+        loadedDate: loaderData.loadedDate,
         allAppointments: loaderData.allAppointments as Appointment[] | undefined,
         checkedInAppointments: loaderData.checkedInAppointments as Appointment[] | undefined,
+        stats: loaderData.stats,
+        error: loaderData.error,
+        _loaderTimestamp: loaderData._loaderTimestamp,
     });
 
     // 6. Flash update indicator
@@ -80,16 +87,16 @@ const DailyAppointments = () => {
         setTimeout(() => setShowFlash(false), 1000);
     }, []);
 
-    // 7. WebSocket update handler — return success so the hook can detect
+    // 7. SSE update handler — return success so the hook can detect
     // recovery-fetch failure and trigger markStale + retry.
-    const handleWebSocketUpdate = useCallback(async (): Promise<boolean> => {
+    const handleAppointmentsUpdate = useCallback(async (): Promise<boolean> => {
         const ok = await loadAppointments(selectedDate);
         if (ok) flashUpdateIndicator();
         return ok;
     }, [selectedDate, loadAppointments, flashUpdateIndicator]);
 
-    // 8. WebSocket integration
-    const { connectionStatus, dataFreshness } = useWebSocketSync(selectedDate, handleWebSocketUpdate);
+    // 8. SSE realtime sync integration
+    const { connectionStatus, dataFreshness } = useAppointmentsSync(selectedDate, handleAppointmentsUpdate);
 
     // 9. Sync URL when date changes (component-driven updates)
     useEffect(() => {
@@ -105,18 +112,11 @@ const DailyAppointments = () => {
         }
     }, [selectedDate, searchParams, setSearchParams]);
 
-    // 10. Load appointments when date changes (for user-initiated date changes)
-    useEffect(() => {
-        // Skip if this is loader data (already loaded)
-        if (loaderData.loadedDate === selectedDate) {
-            return;
-        }
+    // 10. Date-change fetching is automatic: useAppointments keys React Query on
+    // selectedDate, so changing the date fetches the new day (from cache if warm)
+    // with no manual effect — the loader seeds only the initial date.
 
-        loadAppointments(selectedDate);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedDate]);
-
-    // 11. Reconnect-driven refetch is handled inside useWebSocketSync via the
+    // 11. Reconnect-driven refetch is handled inside useAppointmentsSync via the
     // debounced recovery trigger (sseAppointments 'reconnected' + window 'online' +
     // visibilitychange). No additional listener needed here.
 

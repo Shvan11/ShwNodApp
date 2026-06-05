@@ -132,7 +132,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         const fetchCompleteWorkData = async () => {
             if (workData && workData.work_id) {
                 try {
-                    // Raw object (not enveloped) → fetchJSON passthrough.
+                    // sendSuccess-enveloped → fetchJSON unwraps to the WorkData object.
                     const data = await fetchJSON<WorkData>(`/api/getworkforreceipt/${workData.work_id}`);
                     setCompleteWorkData(data);
                 } catch (error) {
@@ -759,8 +759,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
             if (onSuccess) {
                 // postJSON unwrapped the envelope; reconstruct an ApiResponse for the
-                // (arg-ignoring) consumer so the prop type is honoured.
-                onSuccess({ success: true, data: result });
+                // (arg-ignoring) consumer so the prop type is honoured. `timestamp` is
+                // required on the shared type (H4), so stamp one on the shim.
+                onSuccess({ success: true, data: result, timestamp: new Date().toISOString() });
             }
         } catch (error) {
             console.error('Error adding payment:', error);

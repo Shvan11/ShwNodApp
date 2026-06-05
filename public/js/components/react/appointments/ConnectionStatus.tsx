@@ -12,9 +12,9 @@ interface ConnectionStatusProps {
 
 /**
  * ConnectionStatus Component
- * Honest indicator: only shows "Live" when both the socket is OPEN and the
+ * Honest indicator: only shows "Live" when both the SSE stream is OPEN and the
  * server heartbeat has been received recently. Past/future dates render as
- * "Static" because WebSocket subscriptions don't apply to non-today views.
+ * "Static" because SSE subscriptions don't apply to non-today views.
  */
 const ConnectionStatus = ({ status, freshness, isViewingToday, showFlash = false }: ConnectionStatusProps) => {
     type EffectiveState = 'static' | 'live' | 'stale' | 'reconnecting' | 'disconnected' | 'error' | 'connecting';

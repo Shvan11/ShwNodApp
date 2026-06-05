@@ -43,7 +43,7 @@ import {
   requireRecordAge,
   getWorkCreationDate
 } from '../../middleware/time-based-auth.js';
-import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { sendSuccess, sendError, ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 import {
   validateAndCreateWork,
@@ -54,7 +54,8 @@ import {
   validateAndUpdateWork,
   WorkUpdateError,
   WorkValidationError,
-  type WorkStatusType
+  type WorkStatusType,
+  type WorkCreateData
 } from '../../services/business/WorkService.js';
 import { getWorkDetails as getWorkDetailsFromQueries } from '../../services/database/queries/work-queries.js';
 
@@ -69,30 +70,6 @@ interface WorkQueryParams {
   workId?: string;
   permanent?: string;
   deciduous?: string;
-}
-
-interface AddWorkBody {
-  person_id: number;
-  total_required: number;
-  currency: string;
-  type_of_work: number;
-  dr_id: number;
-  notes?: string;
-  start_date?: string;
-  keyword_id_1?: number;
-  keyword_id_2?: number;
-  keyword_id_3?: number;
-  keyword_id_4?: number;
-  keyword_id_5?: number;
-  [key: string]: string | number | boolean | Date | null | undefined;
-}
-
-interface AddWorkWithInvoiceBody extends AddWorkBody {
-  paymentDate: string;
-  usdReceived?: number;
-  iqdReceived?: number;
-  change?: number;
-  [key: string]: string | number | boolean | Date | null | undefined;
 }
 
 interface UpdateWorkBody {
@@ -137,6 +114,37 @@ const workStatusBodySchema = z.object({
   personId: z.coerce.number().int().positive().optional(),
 });
 type WorkStatusBody = z.infer<typeof workStatusBodySchema>;
+
+// Boundary guards for the remaining work mutations. Loose schemas (every non-listed
+// field passes through to the service spread); we validate only the fields the
+// service/handler already requires, so no previously-valid request starts 400ing.
+// See CLAUDE.md (Zod = boundaries) and the updateWorkBodySchema note above.
+const addWorkBodySchema = z.looseObject({
+  person_id: z.coerce.number().int().positive(),
+  dr_id: z.coerce.number().int().positive(),
+  type_of_work: z.coerce.number().int().positive(),
+});
+// addWorkWithInvoice additionally needs a positive total + currency (finished work).
+const addWorkWithInvoiceBodySchema = z.looseObject({
+  person_id: z.coerce.number().int().positive(),
+  dr_id: z.coerce.number().int().positive(),
+  type_of_work: z.coerce.number().int().positive(),
+  total_required: z.coerce.number().positive(),
+  currency: z.string().min(1),
+});
+const deleteWorkBodySchema = z.object({ workId: z.coerce.number().int().positive() });
+const addWorkDetailBodySchema = z.looseObject({ work_id: z.coerce.number().int().positive() });
+// update/delete work-detail accept detailId OR itemId — the either-or presence
+// stays a handler check; the schema only coerces whichever id is present.
+const workDetailIdBodySchema = z.looseObject({
+  detailId: z.coerce.number().int().positive().optional(),
+  itemId: z.coerce.number().int().positive().optional(),
+});
+const diagnosisBodySchema = z.looseObject({
+  work_id: z.coerce.number().int().positive(),
+  diagnosis: z.string().trim().min(1),
+  treatment_plan: z.string().trim().min(1),
+});
 
 interface DeleteWorkBody {
   workId: number;
@@ -236,7 +244,7 @@ router.get(
         ErrorResponses.notFound(res, 'Work');
         return;
       }
-      res.json(toWorkWire(work));
+      sendSuccess(res, toWorkWire(work));
     } catch (error) {
       log.error('Error fetching work details:', error);
       sendError(res, 500, 'Failed to fetch work details', error as Error);
@@ -262,7 +270,7 @@ router.get(
       }
 
       const works = await getWorksByPatient(parseInt(personId));
-      res.json(works.map(toWorkWire));
+      sendSuccess(res, works.map(toWorkWire));
     } catch (error) {
       log.error('Error fetching works:', error);
       sendError(res, 500, 'Failed to fetch works', error as Error);
@@ -275,19 +283,16 @@ router.get(
  */
 router.post(
   '/addwork',
+  validate({ body: addWorkBodySchema }),
   async (
-    req: Request<unknown, unknown, AddWorkBody>,
+    req: Request<unknown, unknown, WorkCreateData>,
     res: Response
   ): Promise<void> => {
     try {
       // Delegate to service layer for validation and creation
       const result = await validateAndCreateWork(req.body);
 
-      res.json({
-        success: true,
-        workId: result.work_id,
-        message: 'Work added successfully'
-      });
+      sendSuccess(res, { workId: result.work_id }, 'Work added successfully');
     } catch (error) {
       // Handle validation errors from service layer (expected business-rule
       // rejections — log at warn, not error, and without a stack trace).
@@ -322,20 +327,20 @@ router.post(
  */
 router.post(
   '/addWorkWithInvoice',
+  validate({ body: addWorkWithInvoiceBodySchema }),
   async (
-    req: Request<unknown, unknown, AddWorkWithInvoiceBody>,
+    req: Request<unknown, unknown, WorkCreateData>,
     res: Response
   ): Promise<void> => {
     try {
       // Delegate to service layer for validation and creation
       const result = await validateAndCreateWorkWithInvoice(req.body);
 
-      res.json({
-        success: true,
-        workId: result.workId,
-        invoiceId: result.invoiceId,
-        message: 'Work and invoice created successfully'
-      });
+      sendSuccess(
+        res,
+        { workId: result.workId, invoiceId: result.invoiceId },
+        'Work and invoice created successfully'
+      );
     } catch (error) {
       // Handle validation errors from service layer (expected business-rule
       // rejections — log at warn, not error, and without a stack trace).
@@ -387,11 +392,7 @@ router.put(
         workData
       });
 
-      res.json({
-        success: true,
-        message: 'Work updated successfully',
-        rowsAffected: result.rowsAffected
-      });
+      sendSuccess(res, { rowsAffected: result.rowsAffected }, 'Work updated successfully');
     } catch (error) {
       if (error instanceof WorkUpdateError) {
         const details = error.details ?? null;
@@ -430,11 +431,7 @@ router.post(
     try {
       const { workId } = req.body;
       const result = await finishWork(workId);
-      res.json({
-        success: true,
-        message: 'Work completed successfully',
-        rowsAffected: result.rowCount
-      });
+      sendSuccess(res, { rowsAffected: result.rowCount }, 'Work completed successfully');
     } catch (error) {
       log.error('Error finishing work:', error);
       sendError(res, 500, 'Failed to finish work', error as Error);
@@ -455,11 +452,7 @@ router.post(
     try {
       const { workId } = req.body;
       const result = await discontinueWork(workId);
-      res.json({
-        success: true,
-        message: 'Work discontinued successfully',
-        rowsAffected: result.rowCount
-      });
+      sendSuccess(res, { rowsAffected: result.rowCount }, 'Work discontinued successfully');
     } catch (error) {
       log.error('Error discontinuing work:', error);
       sendError(res, 500, 'Failed to discontinue work', error as Error);
@@ -497,11 +490,7 @@ router.post(
       }
 
       const result = await reactivateWork(workId);
-      res.json({
-        success: true,
-        message: 'Work reactivated successfully',
-        rowsAffected: result.rowCount
-      });
+      sendSuccess(res, { rowsAffected: result.rowCount }, 'Work reactivated successfully');
     } catch (error) {
       // Reactivating sets status=1, which can collide with the patient's existing
       // active work (partial unique index unq_tblwork_active → pg SQLSTATE 23505).
@@ -530,6 +519,7 @@ router.delete(
     operation: 'delete',
     getRecordDate: getWorkCreationDate
   }),
+  validate({ body: deleteWorkBodySchema }),
   async (
     req: Request<unknown, unknown, DeleteWorkBody>,
     res: Response
@@ -537,26 +527,10 @@ router.delete(
     try {
       const { workId } = req.body;
 
-      if (!workId) {
-        log.warn('Delete work request missing workId');
-        ErrorResponses.missingParameter(res, 'workId');
-        return;
-      }
-
-      if (isNaN(parseInt(String(workId)))) {
-        log.warn('Delete work invalid workId', { workId });
-        ErrorResponses.badRequest(res, 'workId must be a valid number');
-        return;
-      }
-
-      // Delegate to service layer for validation and deletion
+      // workId validated + coerced to a positive int by deleteWorkBodySchema above.
       const result = await validateAndDeleteWork(parseInt(String(workId)));
 
-      res.json({
-        success: true,
-        message: 'Work deleted successfully',
-        rowsAffected: result.rowsAffected
-      });
+      sendSuccess(res, { rowsAffected: result.rowsAffected }, 'Work deleted successfully');
     } catch (error) {
       // Handle validation errors from service layer (expected business-rule
       // rejections — log at warn, not error, and without a stack trace).
@@ -583,7 +557,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const workTypes = await getWorkTypes();
-      res.json(workTypes);
+      sendSuccess(res, workTypes);
     } catch (error) {
       log.error('Error fetching work types:', error);
       sendError(res, 500, 'Failed to fetch work types', error as Error);
@@ -599,7 +573,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const keywords = await getWorkKeywords();
-      res.json(keywords);
+      sendSuccess(res, keywords);
     } catch (error) {
       log.error('Error fetching work keywords:', error);
       sendError(res, 500, 'Failed to fetch work keywords', error as Error);
@@ -622,11 +596,7 @@ router.get(
       const includeDeciduous = deciduous !== 'false';
 
       const teeth = await getToothNumbers(includePermanent, includeDeciduous);
-      res.json({
-        success: true,
-        teeth,
-        count: teeth.length
-      });
+      sendSuccess(res, { teeth, count: teeth.length });
     } catch (error) {
       log.error('Error fetching tooth numbers:', error);
       sendError(res, 500, 'Failed to fetch tooth numbers', error as Error);
@@ -656,7 +626,7 @@ router.get(
       }
 
       const workDetailsList = await getWorkDetailsList(parseInt(workId));
-      res.json(workDetailsList);
+      sendSuccess(res, workDetailsList);
     } catch (error) {
       log.error('Error fetching work details list:', error);
       sendError(res, 500, 'Failed to fetch work details list', error as Error);
@@ -669,6 +639,7 @@ router.get(
  */
 router.post(
   '/addworkdetail',
+  validate({ body: addWorkDetailBodySchema }),
   async (
     req: Request<unknown, unknown, WorkDetailBody>,
     res: Response
@@ -676,19 +647,7 @@ router.post(
     try {
       const workDetailData = req.body;
 
-      // Validate required fields
-      if (!workDetailData.work_id) {
-        log.warn('Add work detail missing work_id');
-        ErrorResponses.missingParameter(res, 'work_id');
-        return;
-      }
-
-      // Validate data types
-      if (isNaN(parseInt(String(workDetailData.work_id)))) {
-        log.warn('Add work detail invalid work_id', { work_id: workDetailData.work_id });
-        ErrorResponses.badRequest(res, 'work_id must be a valid number');
-        return;
-      }
+      // work_id validated + coerced to a positive int by addWorkDetailBodySchema above.
 
       // Validate canals_no if provided
       if (
@@ -720,19 +679,18 @@ router.post(
         return;
       }
 
-      // Create item data with required work_id
+      // Create item data with required work_id (validated + coerced by the schema above).
       const itemData = {
-        work_id: workDetailData.work_id,
-        ...workDetailData
+        ...workDetailData,
+        work_id: parseInt(String(workDetailData.work_id))
       };
 
       const result = await addWorkDetail(itemData);
-      res.json({
-        success: true,
-        detailId: result?.id,
-        itemId: result?.id, // Alias for new naming
-        message: 'Work item added successfully'
-      });
+      sendSuccess(
+        res,
+        { detailId: result?.id, itemId: result?.id },
+        'Work item added successfully'
+      );
     } catch (error) {
       log.error('Error adding work item:', error);
       sendError(res, 500, 'Failed to add work item', error as Error);
@@ -745,6 +703,7 @@ router.post(
  */
 router.put(
   '/updateworkdetail',
+  validate({ body: workDetailIdBodySchema }),
   async (
     req: Request<unknown, unknown, WorkDetailBody>,
     res: Response
@@ -800,11 +759,7 @@ router.put(
       }
 
       const result = await updateWorkDetail(parseInt(String(id)), workDetailData);
-      res.json({
-        success: true,
-        message: 'Work item updated successfully',
-        rowsAffected: result.rowCount
-      });
+      sendSuccess(res, { rowsAffected: result.rowCount }, 'Work item updated successfully');
     } catch (error) {
       log.error('Error updating work item:', error);
       sendError(res, 500, 'Failed to update work item', error as Error);
@@ -817,6 +772,7 @@ router.put(
  */
 router.delete(
   '/deleteworkdetail',
+  validate({ body: workDetailIdBodySchema }),
   async (
     req: Request<unknown, unknown, WorkDetailBody>,
     res: Response
@@ -841,11 +797,7 @@ router.delete(
       }
 
       const result = await deleteWorkDetail(parseInt(String(id)));
-      res.json({
-        success: true,
-        message: 'Work item deleted successfully',
-        rowsAffected: result.rowCount
-      });
+      sendSuccess(res, { rowsAffected: result.rowCount }, 'Work item deleted successfully');
     } catch (error) {
       log.error('Error deleting work item:', error);
       sendError(res, 500, 'Failed to delete work item', error as Error);
@@ -925,7 +877,11 @@ router.get(
             WHERE "work_id" = ${parseInt(workId)}
         `.execute(getKysely());
 
-      // Return null if no diagnosis found (not an error)
+      // Stays raw (not sendSuccess): the "no diagnosis yet / new diagnosis"
+      // state is signalled by a literal 200 `null`, which Diagnosis.tsx detects
+      // via `if (diagnosis)`. sendSuccess(res, null) would omit `data` and the
+      // FE would receive `{success,timestamp}` (truthy) instead of null, breaking
+      // that signal. See audit H4/N18/N22.
       if (rows.length === 0) {
         res.json(null);
         return;
@@ -945,6 +901,7 @@ router.get(
  */
 router.post(
   '/diagnosis',
+  validate({ body: diagnosisBodySchema }),
   async (
     req: Request<unknown, unknown, DiagnosisData>,
     res: Response
@@ -952,22 +909,8 @@ router.post(
     try {
       const diagnosisData = req.body;
 
-      // Validate required fields
-      if (!diagnosisData.work_id) {
-        log.warn('Save diagnosis missing work_id');
-        ErrorResponses.missingParameter(res, 'work_id');
-        return;
-      }
-      if (!diagnosisData.diagnosis || !diagnosisData.diagnosis.trim()) {
-        log.warn('Save diagnosis missing diagnosis', { work_id: diagnosisData.work_id });
-        ErrorResponses.missingParameter(res, 'diagnosis');
-        return;
-      }
-      if (!diagnosisData.treatment_plan || !diagnosisData.treatment_plan.trim()) {
-        log.warn('Save diagnosis missing treatment_plan', { work_id: diagnosisData.work_id });
-        ErrorResponses.missingParameter(res, 'treatment_plan');
-        return;
-      }
+      // work_id / diagnosis / treatment_plan validated by diagnosisBodySchema above
+      // (work_id a positive int; both text fields trimmed + non-empty).
 
       const db = getKysely();
       const workIdNum = parseInt(String(diagnosisData.work_id));
@@ -1111,10 +1054,7 @@ router.post(
         successMessage = 'diagnosis created successfully';
       }
 
-      res.json({
-        success: true,
-        message: successMessage
-      });
+      sendSuccess(res, null, successMessage);
     } catch (error) {
       log.error('Error saving diagnosis:', error);
       sendError(res, 500, 'Failed to save diagnosis', error as Error);
@@ -1142,10 +1082,7 @@ router.delete(
         getKysely()
       );
 
-      res.json({
-        success: true,
-        message: 'diagnosis deleted successfully'
-      });
+      sendSuccess(res, null, 'diagnosis deleted successfully');
     } catch (error) {
       log.error('Error deleting diagnosis:', error);
       sendError(res, 500, 'Failed to delete diagnosis', error as Error);
@@ -1194,8 +1131,7 @@ router.get(
       // Get related record counts
       const relatedCounts = await getTransferPreview(parseInt(workId));
 
-      res.json({
-        success: true,
+      sendSuccess(res, {
         work: {
           workId: work.work_id,
           type: work.type_name,
@@ -1272,10 +1208,7 @@ router.post(
         targetPatientId: result.targetPatientId
       });
 
-      res.json({
-        ...result,
-        message: 'Work transferred successfully'
-      });
+      sendSuccess(res, result, 'Work transferred successfully');
     } catch (error) {
       if (error instanceof WorkValidationError) {
         log.warn('Work transfer rejected by validation', {

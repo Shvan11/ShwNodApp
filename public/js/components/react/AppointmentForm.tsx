@@ -206,7 +206,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
 
         try {
             const appointmentDateTime = `${formData.AppDate}T${formData.AppTime}:00`;
-            const result = await postJSON<{ success?: boolean; appointment_id?: number; error?: string }>(
+            const result = await postJSON<{ appointment_id?: number }>(
                 '/api/appointments',
                 {
                     person_id: parseInt(String(formData.PersonID)),
@@ -216,30 +216,27 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                 }
             );
 
-            if (result.success) {
-                postJSON<{ success: boolean; message?: string }>('/api/wa/send-appointment', {
-                    appointmentId: result.appointment_id
+            // postJSON throws on non-2xx, so reaching here means the create succeeded.
+            postJSON<{ success: boolean; message?: string }>('/api/wa/send-appointment', {
+                appointmentId: result.appointment_id
+            })
+                .then((waResult) => {
+                    if (waResult.success) {
+                        toast.success('Appointment confirmation sent via WhatsApp!');
+                    } else {
+                        toast.warning(waResult.message || 'Failed to send WhatsApp');
+                    }
                 })
-                    .then((waResult) => {
-                        if (waResult.success) {
-                            toast.success('Appointment confirmation sent via WhatsApp!');
-                        } else {
-                            toast.warning(waResult.message || 'Failed to send WhatsApp');
-                        }
-                    })
-                    .catch(err => {
-                        toast.error('WhatsApp error: ' + httpErrorMessage(err, 'send failed'));
-                    });
+                .catch(err => {
+                    toast.error('WhatsApp error: ' + httpErrorMessage(err, 'send failed'));
+                });
 
-                // Only call onSuccess, it will handle navigation
-                // Don't call onClose as it might interfere with navigation
-                if (onSuccess) {
-                    onSuccess(result);
-                } else if (onClose) {
-                    onClose();
-                }
-            } else {
-                throw new Error(result.error || 'Failed to create appointment');
+            // Only call onSuccess, it will handle navigation
+            // Don't call onClose as it might interfere with navigation
+            if (onSuccess) {
+                onSuccess(result);
+            } else if (onClose) {
+                onClose();
             }
         } catch (err) {
             // postJSON throws on non-2xx; the conflict codes ride the thrown

@@ -6,6 +6,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import { log } from '../../utils/logger.js';
 import {
   getLookupTableConfigs,
@@ -18,8 +19,20 @@ import {
   ReferentialError
 } from '../../services/database/queries/lookup-admin-queries.js';
 import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { validate } from '../../middleware/validate.js';
+import { numericParam } from '../../middleware/validation-schemas.js';
 
 const router = Router();
+
+// PUT/DELETE param guard. The BODY here is intentionally dynamic (columns vary per
+// `tableName`), so it stays validated by the existing whitelist (`isValidTableKey`) +
+// per-column required-field loop — not statically schemable. What we CAN add is a
+// numeric `:id` guard so a junk id 400s instead of reaching the integer-PK query as a 500.
+const tableIdParams = z.object({ tableName: z.string().min(1), id: numericParam });
+// Lookup item bodies are dynamic per-table key/value maps; required columns are
+// validated from the table config in-handler. The boundary guard only asserts a
+// JSON object so a null/array body can't reach the column-required loop.
+const lookupItemBodySchema = z.looseObject({});
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -99,6 +112,7 @@ router.get(
  */
 router.post(
   '/lookups/:tableName',
+  validate({ body: lookupItemBodySchema }),
   async (
     req: Request<TableNameParams, unknown, LookupItemBody>,
     res: Response
@@ -150,6 +164,7 @@ router.post(
  */
 router.put(
   '/lookups/:tableName/:id',
+  validate({ params: tableIdParams, body: lookupItemBodySchema }),
   async (
     req: Request<TableNameIdParams, unknown, LookupItemBody>,
     res: Response
@@ -206,6 +221,7 @@ router.put(
  */
 router.delete(
   '/lookups/:tableName/:id',
+  validate({ params: tableIdParams }),
   async (req: Request<TableNameIdParams>, res: Response): Promise<void> => {
     try {
       const { tableName, id } = req.params;

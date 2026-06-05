@@ -30,11 +30,11 @@ interface PatientInfo {
     email?: string;
     DateOfBirth?: string;
     gender?: string;
-    GenderDisplay?: string;
-    Address?: string;
-    ReferralSource?: string;
-    patient_type?: string;
-    tag?: string;
+    gender_display?: string;
+    address_name?: string;
+    referral_source?: string;
+    patient_type_name?: string;
+    tag_name?: string;
     notes?: string;
     date_added?: string;
     country_code?: string;
@@ -456,7 +456,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         </div>
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Address:</span>
-                            <span className={styles.patientInfoValue}>{patientInfo.Address || '-'}</span>
+                            <span className={styles.patientInfoValue}>{patientInfo.address_name || '-'}</span>
                         </div>
                     </div>
                 </div>
@@ -483,7 +483,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Gender:</span>
                             <span className={styles.patientInfoValue}>
-                                {patientInfo.GenderDisplay || patientInfo.gender || '-'}
+                                {patientInfo.gender_display || patientInfo.gender || '-'}
                             </span>
                         </div>
                         <div className={styles.patientInfoRow}>
@@ -504,16 +504,16 @@ const ViewPatientInfo = ({ personId }: Props) => {
                     <div className={styles.patientInfoRows}>
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Patient Type:</span>
-                            <span className={styles.patientInfoValue}>{patientInfo.patient_type || '-'}</span>
+                            <span className={styles.patientInfoValue}>{patientInfo.patient_type_name || '-'}</span>
                         </div>
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>Referral Source:</span>
-                            <span className={styles.patientInfoValue}>{patientInfo.ReferralSource || '-'}</span>
+                            <span className={styles.patientInfoValue}>{patientInfo.referral_source || '-'}</span>
                         </div>
-                        {patientInfo.tag && (
+                        {patientInfo.tag_name && (
                             <div className={styles.patientInfoRow}>
                                 <span className={styles.patientInfoLabel}>Tag:</span>
-                                <span className={`${styles.patientInfoValue} ${styles.patientTag}`}>{patientInfo.tag}</span>
+                                <span className={`${styles.patientInfoValue} ${styles.patientTag}`}>{patientInfo.tag_name}</span>
                             </div>
                         )}
                         <div className={styles.patientInfoRow}>

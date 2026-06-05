@@ -8,6 +8,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import { sql } from 'kysely';
 import { getKysely } from '../../services/database/kysely.js';
 import {
@@ -17,9 +18,21 @@ import {
   employeeEmailExists,
 } from '../../services/database/queries/employee-queries.js';
 import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { validate } from '../../middleware/validate.js';
+import { idParams } from '../../middleware/validation-schemas.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
+
+// Boundary guard for create/update. Deliberately LOOSE: createEmployee/updateEmployee
+// are called with an EXPLICIT object literal (no `...req.body` spread), so extra body
+// keys can never reach the DB — over-posting is already closed. We only need to enforce
+// the two required scalars (name present, position a positive int) and NaN-proof position;
+// the soft fields (email/phone/flags/color) keep their existing handler-side coercion.
+const employeeBodySchema = z.looseObject({
+  employee_name: z.string().min(1, 'Employee name is required'),
+  position: z.coerce.number().int().positive(),
+});
 
 /**
  * Query parameters for filtering employees
@@ -168,7 +181,7 @@ router.get('/positions', async (_req: Request, res: Response): Promise<void> => 
  * POST /employees
  * Add new employee
  */
-router.post('/employees', async (req: Request<object, object, EmployeeBody>, res: Response): Promise<void> => {
+router.post('/employees', validate({ body: employeeBodySchema }), async (req: Request<object, object, EmployeeBody>, res: Response): Promise<void> => {
   try {
     const { employee_name, position, email, phone, percentage, receiveEmail, getAppointments, sort_order, appointment_color } = req.body;
 
@@ -214,7 +227,7 @@ router.post('/employees', async (req: Request<object, object, EmployeeBody>, res
  * PUT /employees/:id
  * Update employee
  */
-router.put('/employees/:id', async (req: Request<EmployeeParams, object, EmployeeBody>, res: Response): Promise<void> => {
+router.put('/employees/:id', validate({ params: idParams('id'), body: employeeBodySchema }), async (req: Request<EmployeeParams, object, EmployeeBody>, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { employee_name, position, email, phone, percentage, receiveEmail, getAppointments, sort_order, appointment_color } = req.body;
@@ -261,7 +274,7 @@ router.put('/employees/:id', async (req: Request<EmployeeParams, object, Employe
  * DELETE /employees/:id
  * Delete employee
  */
-router.delete('/employees/:id', async (req: Request<EmployeeParams>, res: Response): Promise<void> => {
+router.delete('/employees/:id', validate({ params: idParams('id') }), async (req: Request<EmployeeParams>, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 

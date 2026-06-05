@@ -86,8 +86,9 @@ const ArchformMatcher: React.FC = () => {
             // /archform/matches reads Postgres, so only /archform/patients can return
             // 503 { unavailable: true } when the Archform SQLite DB is offline. That
             // rejection is now caught below (the detection moved from a body-read to the
-            // catch — see audit N18). Both bodies are flat { success, patients|sets }
-            // with no `data` key, so fetchJSON is a passthrough.
+            // catch — see audit N18). Both success bodies are the sendSuccess envelope
+            // ({ success, data: { patients|sets, count } }); core/http.ts unwraps `data`,
+            // so we read `.patients`/`.sets` directly (audit H4).
             const [patientsData, matchesData] = await Promise.all([
                 fetchJSON<{ patients?: ArchformPatient[] }>('/api/aligner/archform/patients'),
                 fetchJSON<{ sets?: AlignerSetForMatch[] }>('/api/aligner/archform/matches'),

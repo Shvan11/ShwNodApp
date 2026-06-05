@@ -4,6 +4,7 @@
  */
 import express, { type Application } from 'express';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 
 // Re-export authentication middleware
 export {
@@ -102,4 +103,9 @@ export function setupMiddleware(app: Application): void {
   // multer (multipart/form-data) and don't need this raised.
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  // Cookie parser — populates req.cookies, required by the CSRF double-submit
+  // middleware (audit H2) to read its token cookie. No secret here: the CSRF
+  // cookie is HMAC-validated by csrf-csrf, not by express signed cookies.
+  app.use(cookieParser());
 }

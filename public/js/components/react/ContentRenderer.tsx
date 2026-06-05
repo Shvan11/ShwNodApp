@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import GridComponent from './GridComponent';
 import XraysComponent from './XraysComponent';
 import FileExplorer from './files/FileExplorer';
@@ -117,8 +117,12 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                     // Diagnosis component uses useParams() to get patientId and workId
                     return <Diagnosis />;
                 }
-                // If just /work, redirect to /works
-                if (personId) navigate(`/patient/${personId}/works`, { replace: true });
+                // If just /work, redirect to /works. Must use <Navigate> (not the
+                // navigate() function) because this runs during render — calling
+                // navigate() here updates RouterProvider mid-render ("Cannot update a
+                // component while rendering a different component"). <Navigate> defers
+                // the redirect to an effect.
+                if (personId) return <Navigate to={`/patient/${personId}/works`} replace />;
                 return null;
 
             case 'diagnosis':

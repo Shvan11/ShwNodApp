@@ -24,15 +24,11 @@ const DoctorsList: React.FC = () => {
 
     const loadDoctors = async (): Promise<void> => {
         try {
-            const data = await fetchJSON<{ success: boolean; doctors?: Doctor[]; error?: string }>(
+            const data = await fetchJSON<{ doctors?: Doctor[] }>(
                 '/api/aligner/doctors'
             );
 
-            if (data.success) {
-                setDoctors(data.doctors || []);
-            } else {
-                toast.error(data.error || 'Failed to load doctors');
-            }
+            setDoctors(data.doctors || []);
         } catch (error) {
             console.error('Error loading doctors:', error);
             toast.error(httpErrorMessage(error, 'Failed to load doctors'));

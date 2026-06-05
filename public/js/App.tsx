@@ -5,7 +5,7 @@
  * - Centralized route configuration in routes.config.tsx
  * - Route loaders for optimized data fetching
  * - Error boundaries per route
- * - WebSocket singleton for real-time updates
+ * - SSE singletons for real-time updates
  *
  * Performance: Route loaders eliminate loading flashes for static data
  * Stability: Global + route-level error boundaries
@@ -36,8 +36,32 @@ import '../css/components/calendar-holidays.css';
 
 import { StrictMode } from 'react';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GlobalErrorBoundary } from './components/error-boundaries/GlobalErrorBoundary';
 import routesConfig from './router/routes.config';
+
+// ===================================
+// REACT QUERY (audit M7/M8)
+// ===================================
+//
+// The shared client for component-level server state (the appointments screen
+// is the first migrated surface — useAppointments / useAppointmentsSync). It gives
+// real cache invalidation (SSE → invalidateQueries, fixing the M7 dead
+// cache-key no-op), automatic refetch on key change, request abort, and retry.
+// The per-request timeout (M8) lives one layer down in core/http.ts, so it
+// covers route loaders and direct fetches too — not just RQ-managed queries.
+// Route *loaders* keep using apiLoader/fetchJSON (they run outside React); RQ is
+// layered on top for live component data, per the staged session-4 plan.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000, // clinic data changes by the minute, not the second
+      gcTime: 5 * 60_000,
+      retry: 2, // transient network/5xx retry (idempotent reads)
+      refetchOnWindowFocus: false, // refetch is driven by SSE + explicit triggers
+    },
+  },
+});
 
 // ===================================
 // STALE-CHUNK / TRANSIENT-FETCH RECOVERY
@@ -117,7 +141,7 @@ const router = createBrowserRouter(routesConfig, {
  * - 5-minute cache for static data (patient info, work details)
  *
  * Real-time Updates:
- * - WebSocket singleton preserved in GlobalStateContext
+ * - SSE singletons for realtime; shared client state in GlobalStateContext
  * - Appointments, messaging use component-level fetching
  * - Loaders only for static/cacheable data
  */
@@ -125,7 +149,9 @@ export default function App() {
   return (
     <StrictMode>
       <GlobalErrorBoundary>
-        <RouterProvider router={router} />
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
       </GlobalErrorBoundary>
     </StrictMode>
   );

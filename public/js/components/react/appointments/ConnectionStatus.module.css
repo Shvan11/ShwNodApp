@@ -1,4 +1,4 @@
-/* ConnectionStatus.module.css - WebSocket connection status indicator */
+/* ConnectionStatus.module.css - SSE connection status indicator */
 
 .indicator {
     display: inline-flex;

@@ -31,19 +31,15 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
         setIsLoading(true);
         try {
             const data = await fetchJSON<{
-                status?: string;
                 options?: Array<{ option_name: string; option_value: string }>;
-                message?: string;
             }>('/api/options');
 
-            if (data.status === 'success' && data.options) {
+            if (data.options) {
                 const optionsMap: OptionsMap = {};
                 data.options.forEach((option) => {
                     optionsMap[option.option_name] = option.option_value;
                 });
                 setOptions(optionsMap);
-            } else {
-                throw new Error(data.message || 'Failed to load settings');
             }
         } catch (error) {
             console.error('Error loading settings:', error);
@@ -104,25 +100,19 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
             }));
 
             const data = await putJSON<{
-                status?: string;
                 updated?: number;
                 failed?: string[];
-                message?: string;
             }>('/api/options/bulk', { options: optionsArray });
 
-            if (data.status === 'success') {
-                // Update local options
-                setOptions(prev => ({ ...prev, ...pendingChanges }));
-                setPendingChanges({});
+            // putJSON throws on non-2xx, so reaching here means the save succeeded.
+            setOptions(prev => ({ ...prev, ...pendingChanges }));
+            setPendingChanges({});
 
-                const message = data.failed && data.failed.length > 0
-                    ? `Settings saved successfully! ${data.updated} updated, ${data.failed.length} failed: ${data.failed.join(', ')}`
-                    : `All settings saved successfully! ${data.updated} options updated.`;
+            const message = data.failed && data.failed.length > 0
+                ? `Settings saved successfully! ${data.updated} updated, ${data.failed.length} failed: ${data.failed.join(', ')}`
+                : `All settings saved successfully! ${data.updated} options updated.`;
 
-                showModal('Success', message);
-            } else {
-                throw new Error(data.message || 'Failed to save settings');
-            }
+            showModal('Success', message);
         } catch (error) {
             console.error('Error saving settings:', error);
             showModal('Error', 'Failed to save settings: ' + httpErrorMessage(error, 'Unknown error'));

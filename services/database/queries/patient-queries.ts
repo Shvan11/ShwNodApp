@@ -30,11 +30,11 @@ interface PatientInfo {
   email: string | null;
   DateOfBirth: string | null;
   gender: number | null;
-  GenderDisplay: string | null;
-  Address: string | null;
-  ReferralSource: string | null;
-  patient_type: string | null;
-  tag: string | null;
+  gender_display: string | null;
+  address_name: string | null;
+  referral_source: string | null;
+  patient_type_name: string | null;
+  tag_name: string | null;
   notes: string | null;
   language: number | null;
   country_code: string | null;
@@ -215,11 +215,11 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
       // date_of_birth is a PG `date` → the parser already returns 'YYYY-MM-DD' (was CONVERT(...,23)).
       eb.ref('p.date_of_birth').$castTo<string>().as('DateOfBirth'),
       'p.gender',
-      'g.gender as GenderDisplay',
-      'a.zone as Address',
-      'r.referral as ReferralSource',
-      'pt.patient_type',
-      'tag.tag',
+      'g.gender as gender_display',
+      'a.zone as address_name',
+      'r.referral as referral_source',
+      'pt.patient_type as patient_type_name',
+      'tag.tag as tag_name',
       'p.notes',
       'p.language',
       'p.country_code',
@@ -255,11 +255,11 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
         email: row.email,
         DateOfBirth: row.DateOfBirth,
         gender: row.gender,
-        GenderDisplay: row.GenderDisplay,
-        Address: row.Address,
-        ReferralSource: row.ReferralSource,
-        patient_type: row.patient_type,
-        tag: row.tag,
+        gender_display: row.gender_display,
+        address_name: row.address_name,
+        referral_source: row.referral_source,
+        patient_type_name: row.patient_type_name,
+        tag_name: row.tag_name,
         notes: row.notes,
         language: row.language,
         country_code: row.country_code,

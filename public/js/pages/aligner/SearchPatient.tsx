@@ -51,13 +51,9 @@ const SearchPatient: React.FC = () => {
     const searchPatients = async (query: string): Promise<void> => {
         try {
             setLoading(true);
-            const data = await fetchJSON<{ success: boolean; patients?: AlignerPatient[]; error?: string }>(
+            const data = await fetchJSON<{ patients?: AlignerPatient[] }>(
                 `/api/aligner/patients?search=${encodeURIComponent(query)}`
             );
-
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to search patients');
-            }
 
             setSearchResults(data.patients || []);
             setShowResults(true);

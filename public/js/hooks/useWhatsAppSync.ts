@@ -41,9 +41,9 @@ interface InitialStateResponse {
 }
 
 /**
- * Return type for useWhatsAppWebSocket hook
+ * Return type for useWhatsAppSync hook
  */
-export interface UseWhatsAppWebSocketReturn {
+export interface UseWhatsAppSyncReturn {
   connectionStatus: UIState;
   clientReady: boolean;
   sendingProgress: SendingProgress;
@@ -51,7 +51,7 @@ export interface UseWhatsAppWebSocketReturn {
   requestInitialState: (dateToRequest?: string) => void;
 }
 
-export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketReturn {
+export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
   const { whatsappClientReady: clientReady } = useGlobalState();
 
   const [connectionStatus, setConnectionStatus] = useState<UIState>(UI_STATES.DISCONNECTED);
@@ -103,7 +103,7 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
     fetchJSON<InitialStateResponse>('/api/wa/initial-state')
       .then(applyInitialState)
       .catch((err) => {
-        console.error('[useWhatsAppWebSocket] initial-state fetch failed', err);
+        console.error('[useWhatsAppSync] initial-state fetch failed', err);
         // Clear the dedupe key so a later trigger can retry this date.
         // Guarded so we don't clobber a newer in-flight request for another date.
         if (lastRequestedDateRef.current === dateToRequest) {
@@ -177,7 +177,7 @@ export function useWhatsAppWebSocket(currentDate: string): UseWhatsAppWebSocketR
         requestInitialState();
       })
       .catch((err) => {
-        console.error('[useWhatsAppWebSocket] Failed to open SSE:', err);
+        console.error('[useWhatsAppSync] Failed to open SSE:', err);
         setConnectionStatus(UI_STATES.ERROR);
       });
 

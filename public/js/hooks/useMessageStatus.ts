@@ -1,7 +1,26 @@
 /**
- * Custom hook for fetching and displaying message status
+ * Custom hook for fetching and displaying WhatsApp message status.
+ *
+ * React Query owns the read: keyed by date, so changing the date auto-fetches
+ * (with cache), and live status ticks — the SSE `whatsapp_message_status` event,
+ * surfaced by useWhatsAppSync as `messageStatusUpdate` — refetch via
+ * `invalidateQueries(whatsappMessagesKey(date))`. This is the same SSE→invalidate
+ * pattern the daily-appointments screen uses (see useAppointments /
+ * useAppointmentsSync), reusing the shared QueryClient in App.tsx.
+ *
+ * RQ keeps the prior rows on screen during a background refetch (it only blanks
+ * to the loading placeholder on the first load of an uncached date — `isLoading`),
+ * so the burst of server→device→read ticks during a live send updates the table
+ * in place; the 400ms debounce coalesces that burst into a single refetch.
+ *
+ * The read goes through core/http's `fetchJSON`, which unwraps the `sendSuccess`
+ * envelope (`/status/:date` rides `data.messages`) — so the hand-rolled
+ * multi-shape parsing + bespoke APIClient retry/abort the old version carried are
+ * gone (RQ + the funnel provide retry, abort, and dedup).
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchJSON, httpErrorMessage } from '@/core/http';
 import {
   API_ENDPOINTS,
   MESSAGE_STATUS_TEXT,
@@ -9,9 +28,12 @@ import {
   type MessageStatusValue,
 } from '../utils/whatsapp-send-constants';
 import { escapeHtml } from '../utils/whatsapp-validation';
-import { APIClient } from '../utils/whatsapp-api-client';
 
-const apiClient = new APIClient();
+/**
+ * Coalesce the burst of status ticks during a live send (server → device → read
+ * per message) into a single refetch.
+ */
+const MESSAGE_STATUS_DEBOUNCE_MS = 400;
 
 /**
  * Message data from API
@@ -24,16 +46,6 @@ export interface Message {
   status: MessageStatusValue;
   SentAt?: string;
   [key: string]: unknown;
-}
-
-/**
- * Message status API response
- */
-interface MessageStatusApiResponse {
-  success?: boolean;
-  messages?: Message[];
-  data?: Message[];
-  error?: string;
 }
 
 /**
@@ -51,8 +63,8 @@ export interface MessageSummary {
 }
 
 /**
- * Message status update data from WebSocket
- * Using number for status to be compatible with MessageStatusUpdateData from useWhatsAppWebSocket
+ * Message status update data from the WhatsApp SSE channel
+ * Using number for status to be compatible with MessageStatusUpdateData from useWhatsAppSync
  */
 export interface MessageStatusUpdate {
   date?: string;
@@ -76,6 +88,22 @@ export interface UseMessageStatusReturn {
   escapeHtml: typeof escapeHtml;
 }
 
+/** Query key for a day's WhatsApp message statuses — shared with the SSE status-tick invalidation. */
+export const whatsappMessagesKey = (date: string): [string, string] => ['whatsapp-messages', date];
+
+const EMPTY_MESSAGES: Message[] = [];
+
+/**
+ * Fetch one day's message statuses. `/status/:date` rides the sendSuccess
+ * envelope (`{ data: { messages } }`), which core/http unwraps — so we read
+ * `.messages` directly and default a missing/empty payload to `[]`.
+ */
+function fetchMessageStatus(date: string, signal?: AbortSignal): Promise<Message[]> {
+  return fetchJSON<{ messages?: Message[] } | null>(API_ENDPOINTS.MESSAGE_STATUS(date), {
+    signal,
+  }).then((payload) => payload?.messages ?? []);
+}
+
 /**
  * Format display date
  */
@@ -96,96 +124,33 @@ export function useMessageStatus(
   currentDate: string | null,
   messageStatusUpdate: MessageStatusUpdate | null
 ): UseMessageStatusReturn {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const fetchMessageStatus = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
-    if (!currentDate) return;
+  const query = useQuery({
+    queryKey: whatsappMessagesKey(currentDate ?? ''),
+    queryFn: ({ signal }) => fetchMessageStatus(currentDate as string, signal),
+    enabled: !!currentDate,
+  });
 
-    // Silent refreshes (triggered by live SSE status ticks during a send) keep
-    // the current rows on screen and just swap in fresh data. Flipping `loading`
-    // would unmount the table for the full-screen placeholder on every status
-    // update — which reads as the page "refreshing" after each message.
-    if (!silent) setLoading(true);
-    setError(null);
+  const messages = query.data ?? EMPTY_MESSAGES;
 
-    try {
-      const data = await apiClient.get<MessageStatusApiResponse>(
-        API_ENDPOINTS.MESSAGE_STATUS(currentDate),
-        {
-          cancelPrevious: 'messageStatus',
-        }
-      );
-
-      // Handle different API response formats
-      let messagesData: Message[] | null = null;
-      let hasValidResponse = false;
-
-      if (data && typeof data === 'object') {
-        // Try different possible response structures
-        if (data.success === true || data.success === undefined) {
-          if (data.messages && Array.isArray(data.messages)) {
-            messagesData = data.messages;
-            hasValidResponse = true;
-          } else if (data.data && Array.isArray(data.data)) {
-            messagesData = data.data;
-            hasValidResponse = true;
-          } else if (Array.isArray(data)) {
-            messagesData = data as unknown as Message[];
-            hasValidResponse = true;
-          }
-        } else if (data.success === false) {
-          hasValidResponse = true; // Valid response, just no data
-        }
-      }
-
-      if (hasValidResponse) {
-        if (messagesData && messagesData.length > 0) {
-          setMessages(messagesData);
-        } else {
-          setMessages([]);
-        }
-      } else {
-        console.warn('Invalid API response structure:', data);
-        setMessages([]);
-      }
-    } catch (err) {
-      // Ignore AbortError - this is expected when a request is cancelled
-      if (err instanceof Error && err.name === 'AbortError') {
-        return;
-      }
-
-      // Don't show error for missing data - it's normal for dates with no messages
-      const errorMessage =
-        err instanceof Error ? err.message : err?.toString() || 'Unknown error';
-      if (errorMessage.includes('HTTP 404') || errorMessage.includes('Not Found')) {
-        setMessages([]);
-      } else {
-        console.warn('Failed to load message status table:', errorMessage);
-        setMessages([]);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [currentDate]);
-
-  // Fetch message status on mount and when date changes
+  // Live status ticks → debounced background refetch of the current day. These
+  // fire rapidly during a send, so a 400ms debounce coalesces the burst into one
+  // refetch; RQ keeps the existing rows visible while it refetches (no blanking).
+  // Like the old version, any status tick refreshes the active date — the send
+  // in progress is always for the day on screen.
   useEffect(() => {
-    fetchMessageStatus();
-  }, [fetchMessageStatus]);
-
-  // Reload when message status updates. These fire rapidly during a live send
-  // (server → device → read per message), so refresh silently to avoid blanking
-  // the table on every tick, and debounce so a burst of ticks coalesces into a
-  // single refetch instead of one request per tick.
-  useEffect(() => {
-    if (!messageStatusUpdate) return;
+    if (!messageStatusUpdate || !currentDate) return;
     const timer = setTimeout(() => {
-      fetchMessageStatus({ silent: true });
-    }, 400);
+      queryClient.invalidateQueries({ queryKey: whatsappMessagesKey(currentDate) });
+    }, MESSAGE_STATUS_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [messageStatusUpdate, fetchMessageStatus]);
+  }, [messageStatusUpdate, currentDate, queryClient]);
+
+  const refresh = useCallback(async (): Promise<void> => {
+    if (!currentDate) return;
+    await queryClient.invalidateQueries({ queryKey: whatsappMessagesKey(currentDate) });
+  }, [currentDate, queryClient]);
 
   // Calculate summary statistics
   const summary: MessageSummary = {
@@ -201,10 +166,12 @@ export function useMessageStatus(
 
   return {
     messages,
-    loading,
-    error,
+    // Only the first load of an uncached date blanks to the placeholder; live
+    // refetches keep the table on screen.
+    loading: query.isLoading,
+    error: query.isError ? httpErrorMessage(query.error, 'Failed to load message status') : null,
     summary,
-    refresh: fetchMessageStatus,
+    refresh,
     formatDisplayDate,
     MESSAGE_STATUS_TEXT,
     MESSAGE_STATUS_CLASS,

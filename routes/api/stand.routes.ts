@@ -35,11 +35,29 @@ import {
   StandValidationError,
 } from '../../services/business/StandService.js';
 import { GoogleGenAI, Type } from '@google/genai';
+import { z } from 'zod';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { ErrorResponses, sendError, sendSuccess } from '../../utils/error-response.js';
+import { validate } from '../../middleware/validate.js';
+import { idParams } from '../../middleware/validation-schemas.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
+
+// Boundary schemas (Zod = trust boundary). Item/sale creates REST-SPREAD `...req.body`
+// into addStandItem/validateAndCreateSale, whose query/service map EXPLICIT named columns
+// (over-posting closed downstream) — so these stay LOOSE: validate the required scalars,
+// pass the rest through. createSale's cart shape is owned by validateAndCreateSale
+// (the "validateAnd…" service is the boundary), so its POST keeps service-side validation.
+const standCategoryBodySchema = z.object({ name: z.string().min(1, 'category name is required') });
+const standScanVisionBodySchema = z.object({ images: z.array(z.string()) });
+const standCreateItemBodySchema = z.looseObject({
+  itemName: z.string().min(1),
+  costPrice: z.coerce.number(),
+  sellPrice: z.coerce.number(),
+});
+const standRestockBodySchema = z.looseObject({ quantity: z.coerce.number(), unitCost: z.coerce.number() });
+const standAdjustBodySchema = z.looseObject({ delta: z.coerce.number(), reason: z.string().min(1) });
 
 // Singleton Gemini client — created once, reused across requests
 let geminiClient: InstanceType<typeof GoogleGenAI> | null = null;
@@ -94,6 +112,7 @@ router.post(
   '/stand/categories',
   authenticate,
   authorize(['admin']),
+  validate({ body: standCategoryBodySchema }),
   async (req: Request<unknown, unknown, { name: string }>, res: Response): Promise<void> => {
     try {
       const { name } = req.body;
@@ -113,6 +132,7 @@ router.put(
   '/stand/categories/:id',
   authenticate,
   authorize(['admin']),
+  validate({ params: idParams('id') }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
@@ -129,6 +149,7 @@ router.delete(
   '/stand/categories/:id',
   authenticate,
   authorize(['admin']),
+  validate({ params: idParams('id') }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
@@ -168,6 +189,7 @@ router.post(
   '/stand/items/scan-vision',
   authenticate,
   authorize(['admin', 'secretary']),
+  validate({ body: standScanVisionBodySchema }),
   async (req: Request<unknown, unknown, { images: string[] }>, res: Response): Promise<void> => {
     try {
       const { images } = req.body;
@@ -323,6 +345,7 @@ router.post(
   '/stand/items',
   authenticate,
   authorize(['admin', 'secretary']),
+  validate({ body: standCreateItemBodySchema }),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { itemName, costPrice, sellPrice } = req.body;
@@ -343,6 +366,7 @@ router.put(
   '/stand/items/:id',
   authenticate,
   authorize(['admin', 'secretary']),
+  validate({ params: idParams('id') }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
@@ -359,6 +383,7 @@ router.delete(
   '/stand/items/:id',
   authenticate,
   authorize(['admin']),
+  validate({ params: idParams('id') }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
@@ -375,6 +400,7 @@ router.post(
   '/stand/items/:id/restock',
   authenticate,
   authorize(['admin', 'secretary']),
+  validate({ params: idParams('id'), body: standRestockBodySchema }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
@@ -397,6 +423,7 @@ router.post(
   '/stand/items/:id/adjust',
   authenticate,
   authorize(['admin']),
+  validate({ params: idParams('id'), body: standAdjustBodySchema }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
@@ -487,6 +514,7 @@ router.post(
   '/stand/sales/:id/void',
   authenticate,
   authorize(['admin']),
+  validate({ params: idParams('id') }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);

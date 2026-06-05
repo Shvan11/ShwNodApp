@@ -10,12 +10,15 @@
  * audit-logged with the acting user id.
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
+import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
 import { createReadStream, promises as fsp } from 'fs';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendError, sendSuccess } from '../../utils/error-response.js';
 import { authorize } from '../../middleware/auth.js';
+import { validate } from '../../middleware/validate.js';
+import { idParams } from '../../middleware/validation-schemas.js';
 import { timeouts } from '../../middleware/timeout.js';
 import { getFileMimeType } from '../../utils/file-mime.js';
 import {
@@ -53,6 +56,15 @@ type PersonIdParams = { personId: string };
 
 const isTruthy = (v: unknown): boolean => v === '1' || v === 'true';
 const queryString = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+// Boundary guards. `:personId` is validated numeric so a non-numeric/traversal-y
+// id is rejected up front (defense-in-depth ahead of the service's path safety,
+// and — for upload — BEFORE any bytes are accepted). The folder/rename bodies only
+// need a string-TYPE guard; all path-safety (traversal, emptiness) stays in
+// file-explorer.service.ts, which remains the authority.
+const personIdParams = idParams('personId');
+const folderBodySchema = z.object({ path: z.string().optional(), name: z.string().optional() });
+const renameBodySchema = z.object({ path: z.string().optional(), newName: z.string().optional() });
 
 /** Map a thrown error to a response (FileExplorerError carries its own status). */
 function handleError(res: Response, err: unknown, op: string): void {
@@ -325,6 +337,7 @@ function runUpload(req: Request, res: Response, next: NextFunction): void {
 router.post(
   '/patients/:personId/files/upload',
   authorize(['admin', 'secretary']),
+  validate({ params: personIdParams }),
   runUpload,
   async (req: Request<PersonIdParams>, res: Response): Promise<void> => {
     const files = (req.files as Express.Multer.File[]) || [];
@@ -368,6 +381,7 @@ router.post(
 router.post(
   '/patients/:personId/files/folder',
   authorize(['admin', 'secretary']),
+  validate({ params: personIdParams, body: folderBodySchema }),
   async (req: Request<PersonIdParams, unknown, { path?: string; name?: string }>, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
@@ -388,6 +402,7 @@ router.post(
 router.post(
   '/patients/:personId/files/rename',
   authorize(['admin', 'secretary']),
+  validate({ params: personIdParams, body: renameBodySchema }),
   async (req: Request<PersonIdParams, unknown, { path?: string; newName?: string }>, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
@@ -412,6 +427,7 @@ router.post(
 router.delete(
   '/patients/:personId/files',
   authorize(['admin', 'secretary']),
+  validate({ params: personIdParams }),
   async (req: Request<PersonIdParams>, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
@@ -439,6 +455,7 @@ const MAX_BATCH_DELETE = 5000;
 router.post(
   '/patients/:personId/files/delete-batch',
   authorize(['admin', 'secretary']),
+  validate({ params: personIdParams }),
   timeouts.long, // bulk renames over SMB can exceed the global 30s gate
   async (
     req: Request<PersonIdParams, unknown, { paths?: unknown }>,

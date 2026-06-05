@@ -33,11 +33,11 @@ interface PatientInfoResult {
   email: string | null;
   DateOfBirth: string | null;
   gender: number | null;
-  GenderDisplay: string | null;
-  Address: string | null;
-  ReferralSource: string | null;
-  patient_type: string | null;
-  tag: string | null;
+  gender_display: string | null;
+  address_name: string | null;
+  referral_source: string | null;
+  patient_type_name: string | null;
+  tag_name: string | null;
   notes: string | null;
   language: number | null;
   country_code: string | null;

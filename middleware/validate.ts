@@ -28,7 +28,12 @@ export interface ValidationSchemas {
 // params/query before body so a bad route param short-circuits cheaply.
 const TARGETS = ['params', 'query', 'body'] as const;
 
-export function validate(schemas: ValidationSchemas): RequestHandler {
+// Returns a param-agnostic RequestHandler: the middleware reads req.params /
+// req.query / req.body generically, so it must not pin the route's param type.
+// Typing it as the default `RequestHandler` (ParamsDictionary) makes Express's
+// overload inference clash with handlers typed `Request<{ id: string }>` when
+// validate() precedes them — `<any, ...>` lets the handler's own params win.
+export function validate(schemas: ValidationSchemas): RequestHandler<any, any, any, any> {
   return (req: Request, res: Response, next: NextFunction): void => {
     for (const key of TARGETS) {
       const schema = schemas[key];

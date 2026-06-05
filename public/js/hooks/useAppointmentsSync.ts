@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import sseAppointments, { type Freshness } from '../services/sse-appointments';
-import { clearLoaderCacheKey } from '../router/loaders';
 
 // Periodic safety net for missed SSE messages on the today view.
 const PERIODIC_SYNC_INTERVAL_MS = 5 * 60 * 1000;
@@ -23,7 +22,7 @@ export type AppointmentsUpdateCallback = (
   data: AppointmentsUpdatedData
 ) => void | boolean | Promise<void | boolean>;
 
-export interface UseWebSocketSyncReturn {
+export interface UseAppointmentsSyncReturn {
   connectionStatus: ConnectionStatus;
   isConnected: boolean;
   dataFreshness: Freshness;
@@ -48,10 +47,10 @@ function getTodayDate(): string {
  * something changed. Recovery is idempotent REST refetch coalesced across
  * multiple trigger sources (reconnect, network resume, periodic safety net).
  */
-export function useWebSocketSync(
+export function useAppointmentsSync(
   currentDate: string,
   onAppointmentsUpdated: AppointmentsUpdateCallback
-): UseWebSocketSyncReturn {
+): UseAppointmentsSyncReturn {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
   const [dataFreshness, setDataFreshness] = useState<Freshness>(sseAppointments.getFreshness());
 
@@ -81,7 +80,10 @@ export function useWebSocketSync(
 
   const runRecovery = useCallback(async () => {
     const date = currentDateRef.current;
-    clearLoaderCacheKey(`daily-appointments:${date}`);
+    // The callback (DailyAppointments → loadAppointments) invalidates the React
+    // Query key, which refetches the live data — that IS the cache invalidation
+    // now (audit M7). The old clearLoaderCacheKey('daily-appointments:…') was a
+    // no-op: dailyAppointmentsLoader never wrote that key.
     try {
       const result = await callbackRef.current({ date });
       if (cancelledRef.current) return;
@@ -96,7 +98,7 @@ export function useWebSocketSync(
       const delay = RECOVERY_RETRY_DELAYS_MS[
         Math.min(retryAttemptRef.current, RECOVERY_RETRY_DELAYS_MS.length - 1)
       ];
-      console.warn('[useWebSocketSync] Recovery fetch failed; retrying', {
+      console.warn('[useAppointmentsSync] Recovery fetch failed; retrying', {
         attempt: retryAttemptRef.current + 1,
         delayMs: delay,
         error: err instanceof Error ? err.message : String(err),
@@ -132,7 +134,7 @@ export function useWebSocketSync(
         await sseAppointments.ensureConnected();
         setConnectionStatus('connected');
       } catch (err) {
-        console.error('[useWebSocketSync] SSE connection failed, will retry:', err);
+        console.error('[useAppointmentsSync] SSE connection failed, will retry:', err);
         setConnectionStatus('connecting');
       }
     };
@@ -214,7 +216,6 @@ export function useWebSocketSync(
       const expectedDate = normalizeDate(currentDate);
 
       if (receivedDate && receivedDate === expectedDate) {
-        clearLoaderCacheKey(`daily-appointments:${currentDate}`);
         // Direct invocation here (not the debounced path) — broadcasts are
         // already coalesced server-side and we want minimal latency on the
         // common case. On failure, mirror runRecovery: mark stale and engage

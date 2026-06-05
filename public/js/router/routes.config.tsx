@@ -404,7 +404,7 @@ export const routesConfig: RouteObject[] = [
       // MESSAGING & APPOINTMENTS
       // ============================================================
 
-      // Daily Appointments (Hybrid: Loader + WebSocket)
+      // Daily Appointments (Hybrid: Loader + SSE)
       {
         path: '/appointments',
         element: (
@@ -415,7 +415,7 @@ export const routesConfig: RouteObject[] = [
         loader: dailyAppointmentsLoader, // Pre-fetch initial data for scroll restoration
       },
 
-      // Monthly Calendar (100% WebSocket-driven)
+      // Monthly Calendar (100% SSE-driven)
       {
         path: '/calendar',
         element: (
@@ -423,10 +423,10 @@ export const routesConfig: RouteObject[] = [
             <Calendar />
           </RouteErrorBoundary>
         ),
-        // No loader - 100% WebSocket-driven real-time data
+        // No loader - 100% SSE-driven real-time data
       },
 
-      // WhatsApp Send (100% WebSocket-driven)
+      // WhatsApp Send (100% SSE-driven)
       {
         path: '/send',
         element: (
@@ -434,10 +434,10 @@ export const routesConfig: RouteObject[] = [
             <WhatsAppSend />
           </RouteErrorBoundary>
         ),
-        // No loader - 100% WebSocket-driven real-time data
+        // No loader - 100% SSE-driven real-time data
       },
 
-      // Send Message (100% WebSocket-driven)
+      // Send Message (100% SSE-driven)
       {
         path: '/send-message',
         element: (
@@ -445,10 +445,10 @@ export const routesConfig: RouteObject[] = [
             <SendMessage />
           </RouteErrorBoundary>
         ),
-        // No loader - 100% WebSocket-driven real-time data
+        // No loader - 100% SSE-driven real-time data
       },
 
-      // WhatsApp Authentication (100% WebSocket-driven)
+      // WhatsApp Authentication (100% SSE-driven)
       {
         path: '/auth',
         element: (
@@ -456,7 +456,7 @@ export const routesConfig: RouteObject[] = [
             <WhatsAppAuth />
           </RouteErrorBoundary>
         ),
-        // No loader - 100% WebSocket-driven real-time data
+        // No loader - 100% SSE-driven real-time data
       },
 
       // ============================================================

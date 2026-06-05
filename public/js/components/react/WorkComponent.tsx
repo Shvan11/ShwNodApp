@@ -16,6 +16,7 @@ import {
     FILLING_DEPTH_OPTIONS
 } from '../../config/workTypeConfig';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { paymentHistorySchema } from '@/core/api.schemas';
 import styles from './WorkComponent.module.css';
 
 interface PatientInfo {
@@ -632,7 +633,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const loadPaymentHistory = async (workId: number) => {
         try {
             setLoadingPayments(true);
-            const data = await fetchJSON<Payment[]>(`/api/getpaymenthistory?workId=${workId}`);
+            const data = await fetchJSON<Payment[]>(`/api/getpaymenthistory?workId=${workId}`, {
+                schema: paymentHistorySchema, // Validate the boundary (audit H11)
+            });
             setPaymentHistory(data);
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to fetch payment history'), 5000);

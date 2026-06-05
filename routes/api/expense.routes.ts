@@ -13,6 +13,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import {
   getAllExpenses,
   getExpenseById,
@@ -30,9 +31,39 @@ import {
   getExpenseCreationDate
 } from '../../middleware/time-based-auth.js';
 import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { validate } from '../../middleware/validate.js';
+import {
+  idParams,
+  dateString,
+  optionalPositiveIntQuery,
+  optionalNonNegIntQuery,
+} from '../../middleware/validation-schemas.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
+
+// Boundary schemas (Zod = trust boundary). LOOSE bodies: addExpense/updateExpense
+// receive an EXPLICIT `ExpenseData` literal (no `...req.body` spread), so over-posting
+// is already closed; we only enforce the two required fields the handler checks
+// (`expense_date`, `amount`) — validating the date is a real calendar day (the H10
+// "weak date input" sub-issue) and NaN-proofing amount. The soft fields
+// (currency/note/categoryId/subcategoryId) keep their handler-side coercion.
+const expenseBodySchema = z.looseObject({
+  expense_date: dateString,
+  amount: z.coerce.number().positive('amount must be a positive number'),
+});
+
+// Query coercion for GET /expenses — closes the H10 `limit='abc'` silent-NaN
+// sub-issue. Empty/absent filters stay absent; junk numerics 400.
+const expenseQuerySchema = z.object({
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  categoryId: optionalPositiveIntQuery,
+  subcategoryId: optionalPositiveIntQuery,
+  currency: z.string().optional(),
+  limit: optionalPositiveIntQuery,
+  offset: optionalNonNegIntQuery,
+});
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -86,6 +117,7 @@ interface ExpenseData {
  */
 router.get(
   '/expenses',
+  validate({ query: expenseQuerySchema }),
   async (
     req: Request<unknown, unknown, unknown, ExpenseQueryParams>,
     res: Response
@@ -180,6 +212,7 @@ router.get(
  */
 router.post(
   '/expenses',
+  validate({ body: expenseBodySchema }),
   async (
     req: Request<unknown, unknown, CreateExpenseBody>,
     res: Response
@@ -212,11 +245,7 @@ router.post(
       };
 
       const result = await addExpense(expenseData);
-      res.status(201).json({
-        success: true,
-        message: 'Expense created successfully',
-        data: result
-      });
+      sendSuccess(res, result, 'Expense created successfully', 201);
     } catch (error) {
       log.error('Error creating expense:', error);
       ErrorResponses.internalError(
@@ -312,6 +341,7 @@ router.put(
   '/expenses/:id',
   authenticate,
   authorize(['admin', 'secretary']),
+  validate({ params: idParams('id'), body: expenseBodySchema }),
   requireRecordAge({
     resourceType: 'expense',
     operation: 'update',
@@ -358,11 +388,7 @@ router.put(
       };
 
       const result = await updateExpense(expenseId, expenseData);
-      res.json({
-        success: true,
-        message: 'Expense updated successfully',
-        data: result
-      });
+      sendSuccess(res, result, 'Expense updated successfully');
     } catch (error) {
       log.error('Error updating expense:', error);
       ErrorResponses.internalError(
@@ -382,6 +408,7 @@ router.delete(
   '/expenses/:id',
   authenticate,
   authorize(['admin', 'secretary']),
+  validate({ params: idParams('id') }),
   requireRecordAge({
     resourceType: 'expense',
     operation: 'delete',
@@ -399,11 +426,7 @@ router.delete(
       }
 
       const result = await deleteExpense(expenseId);
-      res.json({
-        success: true,
-        message: 'Expense deleted successfully',
-        data: result
-      });
+      sendSuccess(res, result, 'Expense deleted successfully');
     } catch (error) {
       log.error('Error deleting expense:', error);
       ErrorResponses.internalError(

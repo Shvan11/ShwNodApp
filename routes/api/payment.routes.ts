@@ -15,6 +15,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import { log } from '../../utils/logger.js';
 import { sql } from 'kysely';
 import { getKysely } from '../../services/database/kysely.js';
@@ -32,12 +33,30 @@ import {
   getInvoiceCreationDate
 } from '../../middleware/time-based-auth.js';
 import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { validate } from '../../middleware/validate.js';
+import { idParams, intId, dateString } from '../../middleware/validation-schemas.js';
 import {
   validateAndCreateInvoice,
   PaymentValidationError
 } from '../../services/business/PaymentService.js';
 
 const router = Router();
+
+// Boundary schemas (Zod = trust boundary). The handlers/PaymentService own the
+// money rules (cross-currency change, ≥1 currency > 0, non-negative amounts); the
+// boundary only NaN-proofs the ids, enforces a real-calendar payment/exchange date
+// (the H10 "zero date validation in payment" sub-issue), and ensures numeric amounts.
+// addInvoice stays LOOSE so the optional usd/iqd/change currency fields pass through
+// to the service (which reads them with `?? 0`).
+const exchangeRateBodySchema = z.object({
+  date: dateString,
+  exchangeRate: z.coerce.number().positive(),
+});
+const addInvoiceBodySchema = z.looseObject({
+  workid: intId,
+  amountPaid: z.coerce.number(),
+  paymentDate: dateString,
+});
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -98,7 +117,7 @@ router.get(
         return;
       }
       const payments = await getPaymentHistoryByWorkId(parseInt(workId));
-      res.json(payments);
+      sendSuccess(res, payments);
     } catch (error) {
       log.error('Error fetching payment history:', error);
       ErrorResponses.internalError(
@@ -160,7 +179,7 @@ router.get(
         return;
       }
 
-      res.json(result[0]);
+      sendSuccess(res, result[0]);
     } catch (error) {
       log.error('Error fetching work for receipt:', error);
       ErrorResponses.internalError(
@@ -312,6 +331,7 @@ router.get(
  */
 router.post(
   '/updateExchangeRateForDate',
+  validate({ body: exchangeRateBodySchema }),
   async (
     req: Request<unknown, unknown, ExchangeRateForDateBody>,
     res: Response
@@ -367,6 +387,7 @@ router.post(
  */
 router.post(
   '/addInvoice',
+  validate({ body: addInvoiceBodySchema }),
   async (
     req: Request<unknown, unknown, AddInvoiceBody>,
     res: Response
@@ -433,6 +454,7 @@ router.delete(
   '/deleteInvoice/:invoiceId',
   authenticate,
   authorize(['admin', 'secretary']),
+  validate({ params: idParams('invoiceId') }),
   requireRecordAge({
     resourceType: 'invoice',
     operation: 'delete',

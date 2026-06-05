@@ -10,6 +10,7 @@
 
 import type { LoaderFunctionArgs } from 'react-router-dom';
 import { fetchData, fetchJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { dailyAppointmentsSchema, patientListSchema, patientSearchSchema } from '@/core/api.schemas';
 
 /**
  * Cached data structure
@@ -632,7 +633,7 @@ export async function patientManagementLoader({
     // (fetchJSON passthrough) and tolerates its own non-2xx (→ empty) so one bad
     // lookup doesn't blank the rest; a network/abort error still rejects → outer catch.
     const [allPatients, workTypesData, keywordsData, tagsData, patientTypesData] = await Promise.all([
-      emptyOnHttpError(fetchJSON<PatientData[]>('/api/patients/phones', { signal })),
+      emptyOnHttpError(fetchJSON<PatientData[]>('/api/patients/phones', { signal, schema: patientListSchema })),
       emptyOnHttpError(fetchJSON<Array<{ id: number; work_type: string }>>('/api/getworktypes', { signal })),
       emptyOnHttpError(fetchJSON<Array<{ id: number; key_word: string }>>('/api/getworkkeywords', { signal })),
       emptyOnHttpError(fetchJSON<Array<{ id: number; tag: string }>>('/api/patients/tag-options', { signal })),
@@ -696,7 +697,7 @@ export async function patientManagementLoader({
       // Non-2xx → empty results (old behavior); a network/abort error rejects → outer catch.
       const data = await fetchJSON<{ patients?: PatientData[] } | PatientData[]>(
         `/api/patients/search?${searchParams.toString()}`,
-        { signal }
+        { signal, schema: patientSearchSchema } // Validate the boundary (audit H11)
       ).catch((err: unknown) => {
         if (typeof (err as HttpError).status === 'number') return [] as PatientData[];
         throw err;
@@ -785,6 +786,7 @@ export async function dailyAppointmentsLoader({
       stats?: AppointmentStats;
     }>(`/api/getDailyAppointments?AppsDate=${targetDate}`, {
       signal: request.signal, // Abort on navigation
+      schema: dailyAppointmentsSchema, // Validate the boundary (audit H11)
     });
 
     return {

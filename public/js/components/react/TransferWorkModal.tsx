@@ -23,7 +23,6 @@ interface Work {
  * Transfer preview data from API
  */
 interface TransferPreview {
-  success: boolean;
   work: {
     workId: number;
     type: string;

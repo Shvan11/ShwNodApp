@@ -5,6 +5,13 @@
  * such as referral sources, patient types, addresses, and genders.
  * These endpoints are primarily used for populating dropdowns and select fields
  * in the frontend application.
+ *
+ * @public — EVERY route here is mounted BEFORE the auth gate (`index.ts`:
+ * `app.use('/api', lookupRoutes)` precedes `app.use('/api', authenticate)`), so
+ * all are reachable WITHOUT a session. Intentional: this is non-sensitive
+ * reference data and the module is strictly READ-ONLY (GET only). Do NOT add a
+ * mutation here — it would be unauthenticated. Writes to these lookup tables live
+ * in `lookup-admin.routes.ts` (mounted post-auth at `/api/admin`).
  */
 
 import { Router, type Request, type Response } from 'express';

@@ -5,7 +5,7 @@
 // bfcache force-reconnect.
 //
 // Transport-only: ensureConnected does NOT prime initial state. The hooks
-// (useWhatsAppAuth, useWhatsAppWebSocket) call `fetch('/api/wa/initial-state')`
+// (useWhatsAppAuth, useWhatsAppSync) call `fetch('/api/wa/initial-state')`
 // themselves — they already own the date-change, visibility, and 30 s QR-
 // refresh triggers.
 

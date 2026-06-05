@@ -70,7 +70,16 @@ const ASSET_EXT =
   /\.(?:js|mjs|cjs|css|map|json|wasm|woff2?|ttf|eot|otf|png|jpe?g|gif|svg|webp|avif|ico)$/i;
 
 function looksLikeAsset(reqPath: string): boolean {
-  return reqPath.startsWith('/assets/') || ASSET_EXT.test(reqPath);
+  return (
+    reqPath.startsWith('/assets/') ||
+    // Dolphin patient images are served by the `/DolImgs` static mount and use
+    // non-standard extensions (`.iNN`, `.ZZZ`) that ASSET_EXT doesn't list. A
+    // request reaching this catch-all means the file is missing on disk, so it
+    // must 404 — not fall through to the SPA shell (a 500 in dev with no build,
+    // or a 200 text/html body served as a JPEG in prod).
+    reqPath.startsWith('/DolImgs/') ||
+    ASSET_EXT.test(reqPath)
+  );
 }
 
 // Catch-all route - serves index.html for ALL routes

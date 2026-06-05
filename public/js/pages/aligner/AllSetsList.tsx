@@ -49,15 +49,11 @@ const AllSetsList: React.FC = () => {
     const loadAllSets = async (): Promise<void> => {
         try {
             setLoading(true);
-            const data = await fetchJSON<{ success: boolean; sets?: AlignerSetView[]; error?: string }>(
+            const data = await fetchJSON<{ sets?: AlignerSetView[] }>(
                 '/api/aligner/all-sets'
             );
 
-            if (data.success) {
-                setSets(data.sets || []);
-            } else {
-                toast.error(data.error || 'Failed to load aligner sets');
-            }
+            setSets(data.sets || []);
         } catch (error) {
             console.error('Error loading aligner sets:', error);
             toast.error(httpErrorMessage(error, 'Failed to load aligner sets'));

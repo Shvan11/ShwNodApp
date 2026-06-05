@@ -1,9 +1,17 @@
 /**
  * Cost Preset API Routes
  *
- * Read endpoints are public (used to populate dropdowns during data entry).
- * Write endpoints require an authenticated admin — they change clinic-wide
- * billing presets and were previously reachable without a session.
+ * Mounted BEFORE the global auth gate (`index.ts`: `app.use('/api', costPresetRoutes)`
+ * precedes `app.use('/api', authenticate)`), so the module is responsible for its
+ * OWN per-route protection:
+ *   - @public    GET  /settings/cost-presets        — read-only, populates dropdowns.
+ *   - @protected POST/PUT/DELETE /settings/cost-presets[/:id] — self-guarded with
+ *               inline `authenticate, authorize(['admin'])`; they change clinic-wide
+ *               billing presets and were previously reachable without a session.
+ *
+ * Because the gate is bypassed for this mount, any NEW route added here MUST carry
+ * its own `authenticate`/`authorize` if it is meant to be protected — there is no
+ * outer gate to fall back on.
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -55,6 +63,7 @@ const VALID_CURRENCIES: currency[] = ['IQD', 'USD', 'EUR'];
 /**
  * GET /settings/cost-presets
  * Get all cost presets or filter by currency
+ * @public — no auth (pre-gate mount); read-only reference data.
  */
 router.get('/settings/cost-presets', async (req: Request<object, object, object, CostPresetQuery>, res: Response): Promise<void> => {
   try {
@@ -71,6 +80,7 @@ router.get('/settings/cost-presets', async (req: Request<object, object, object,
  * POST /settings/cost-presets
  * Create a new cost preset
  * Body: { amount: number, currency: string, displayOrder: number }
+ * @protected admin — self-guarded (pre-gate mount): authenticate + authorize(['admin']).
  */
 router.post('/settings/cost-presets', authenticate, authorize(['admin']), async (req: Request<object, object, CostPresetBody>, res: Response): Promise<void> => {
   try {
@@ -105,6 +115,7 @@ router.post('/settings/cost-presets', authenticate, authorize(['admin']), async 
  * PUT /settings/cost-presets/:id
  * Update an existing cost preset
  * Body: { amount: number, currency: string, displayOrder: number }
+ * @protected admin — self-guarded (pre-gate mount): authenticate + authorize(['admin']).
  */
 router.put('/settings/cost-presets/:id', authenticate, authorize(['admin']), async (req: Request<CostPresetParams, object, CostPresetBody>, res: Response): Promise<void> => {
   try {
@@ -143,6 +154,7 @@ router.put('/settings/cost-presets/:id', authenticate, authorize(['admin']), asy
 /**
  * DELETE /settings/cost-presets/:id
  * Delete a cost preset
+ * @protected admin — self-guarded (pre-gate mount): authenticate + authorize(['admin']).
  */
 router.delete('/settings/cost-presets/:id', authenticate, authorize(['admin']), async (req: Request<CostPresetParams>, res: Response): Promise<void> => {
   try {

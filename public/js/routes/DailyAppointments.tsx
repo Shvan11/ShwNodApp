@@ -9,7 +9,7 @@ import '../../css/components/appointment-calendar.css';
  * Standalone appointment management for clinic-wide daily operations.
  * Features:
  * - Date-based appointment viewing
- * - Real-time WebSocket updates
+ * - Real-time SSE updates
  * - Check-in workflow (Scheduled → Present → Seated → Dismissed)
  * - Mobile-responsive design
  * - Context menus and notifications
