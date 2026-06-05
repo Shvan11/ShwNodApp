@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalState, type UserData } from '../../contexts/GlobalStateContext';
 import { fetchJSON } from '@/core/http';
 import * as patientContract from '@shared/contracts/patient.contract';
+import * as authContract from '@shared/contracts/auth.contract';
 
 interface Patient {
     code: string | number;
@@ -90,7 +91,7 @@ const UniversalHeader = () => {
     };
 
     const loadCurrentUser = (signal: AbortSignal) => {
-        fetchJSON<{ success?: boolean; user?: User & UserData }>('/api/auth/me', { signal })
+        fetchJSON<{ success?: boolean; user?: User & UserData }>('/api/auth/me', { signal, schema: authContract.me.response })
             .then(data => {
                 if (data && data.success && data.user) {
                     setCurrentUser(data.user);

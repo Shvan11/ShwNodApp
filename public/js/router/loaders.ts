@@ -15,6 +15,7 @@ import { patientPhones, patientSearch, tagOptions, typeOptions } from '@shared/c
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as workContract from '@shared/contracts/work.contract';
 import * as alignerContract from '@shared/contracts/aligner.contract';
+import * as templateContract from '@shared/contracts/template.contract';
 
 /**
  * Cached data structure
@@ -543,6 +544,7 @@ export async function templateListLoader({
     signal,
     cache: true,
     cacheKey: 'template_list',
+    schema: templateContract.getTemplates.response,
   });
 
   return { templates: data.templates || [] };
@@ -577,6 +579,7 @@ export async function templateDesignerLoader({
     signal,
     cache: true,
     cacheKey: `template_${templateId}`,
+    schema: templateContract.getTemplate.response,
   });
 
   return { template: data, mode: 'edit' };

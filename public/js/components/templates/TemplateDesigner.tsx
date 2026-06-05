@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Editor as GrapesJSEditorType } from 'grapesjs';
 import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import * as templateContract from '@shared/contracts/template.contract';
 
 import styles from './TemplateDesigner.module.css';
 import GrapesJSEditor from './GrapesJSEditor';
@@ -50,7 +51,7 @@ function TemplateDesigner() {
     const loadTemplate = async (id: string) => {
         try {
             setIsLoading(true);
-            const template = await fetchJSON<Template>(`/api/templates/${id}`);
+            const template = await fetchJSON<Template>(`/api/templates/${id}`, { schema: templateContract.getTemplate.response });
             setTemplate(template);
             setError(null);
         } catch (err) {

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { fetchJSON } from '@/core/http';
+import * as authContract from '@shared/contracts/auth.contract';
 import sseWhatsapp from '../services/sse-whatsapp';
 
 /**
@@ -104,7 +105,7 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
   });
 
   useEffect(() => {
-    fetchJSON<{ success?: boolean; user?: UserData }>('/api/auth/me')
+    fetchJSON<{ success?: boolean; user?: UserData }>('/api/auth/me', { schema: authContract.me.response })
       .then(data => {
         if (data?.success && data?.user) {
           setUser(data.user);
