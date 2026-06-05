@@ -9,8 +9,11 @@
  */
 
 import type { LoaderFunctionArgs } from 'react-router-dom';
-import { fetchData, fetchJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import { dailyAppointmentsSchema, patientListSchema, patientSearchSchema } from '@/core/api.schemas';
+import { fetchData, fetchJSON, httpErrorMessage, type HttpError, type ResponseSchema } from '@/core/http';
+import { dailyAppointments } from '@shared/contracts/appointment.contract';
+import { patientPhones, patientSearch, tagOptions, typeOptions } from '@shared/contracts/patient.contract';
+import * as workContract from '@shared/contracts/work.contract';
+import * as alignerContract from '@shared/contracts/aligner.contract';
 
 /**
  * Cached data structure
@@ -72,6 +75,8 @@ interface ApiLoaderOptions {
   signal?: AbortSignal;
   cache?: boolean;
   cacheKey?: string | null;
+  /** Optional Zod schema to validate the unwrapped response (fail-loud, H11). */
+  schema?: ResponseSchema;
 }
 
 /**
@@ -182,7 +187,7 @@ export async function apiLoader<T = unknown>(
   url: string,
   options: ApiLoaderOptions = {}
 ): Promise<T> {
-  const { signal, cache = false, cacheKey = null } = options;
+  const { signal, cache = false, cacheKey = null, schema } = options;
 
   // Check cache first (if enabled)
   if (cache && cacheKey) {
@@ -206,7 +211,7 @@ export async function apiLoader<T = unknown>(
     // fetchData unwraps the success envelope (so flipping a route onto sendSuccess
     // — audit H4 — is transparent here) and throws an HttpError on non-2xx, which
     // we re-map below to the Response/401 contract loaders rely on.
-    const data = await fetchData<T>(url, { signal });
+    const data = await fetchData<T>(url, { signal, schema });
 
     // Cache response if enabled (best-effort — a large payload can throw
     // QuotaExceededError, which must not fail the route loader).
@@ -324,6 +329,7 @@ export async function workDetailsLoader({
     signal,
     cache: true,
     cacheKey: `work_${effectiveWorkId}`,
+    schema: workContract.getWorkDetails.response,
   });
 
   return { work: data };
@@ -456,6 +462,7 @@ export async function alignerDoctorsLoader({
       signal,
       cache: true,
       cacheKey: 'aligner_doctors',
+      schema: alignerContract.alignerDoctors.response,
     }
   );
 
@@ -490,6 +497,7 @@ export async function alignerPatientWorkLoader({
     signal,
     cache: true,
     cacheKey: `work_${workId}`,
+    schema: workContract.getWorkDetails.response,
   });
 
   // Validate person_id before fetching patient data
@@ -633,11 +641,11 @@ export async function patientManagementLoader({
     // (fetchJSON passthrough) and tolerates its own non-2xx (→ empty) so one bad
     // lookup doesn't blank the rest; a network/abort error still rejects → outer catch.
     const [allPatients, workTypesData, keywordsData, tagsData, patientTypesData] = await Promise.all([
-      emptyOnHttpError(fetchJSON<PatientData[]>('/api/patients/phones', { signal, schema: patientListSchema })),
-      emptyOnHttpError(fetchJSON<Array<{ id: number; work_type: string }>>('/api/getworktypes', { signal })),
-      emptyOnHttpError(fetchJSON<Array<{ id: number; key_word: string }>>('/api/getworkkeywords', { signal })),
-      emptyOnHttpError(fetchJSON<Array<{ id: number; tag: string }>>('/api/patients/tag-options', { signal })),
-      emptyOnHttpError(fetchJSON<Array<{ id: number; type: string }>>('/api/patients/type-options', { signal })),
+      emptyOnHttpError(fetchJSON<PatientData[]>('/api/patients/phones', { signal, schema: patientPhones.response })),
+      emptyOnHttpError(fetchJSON<Array<{ id: number; work_type: string }>>('/api/getworktypes', { signal, schema: workContract.getWorkTypes.response })),
+      emptyOnHttpError(fetchJSON<Array<{ id: number; key_word: string }>>('/api/getworkkeywords', { signal, schema: workContract.getWorkKeywords.response })),
+      emptyOnHttpError(fetchJSON<Array<{ id: number; tag: string }>>('/api/patients/tag-options', { signal, schema: tagOptions.response })),
+      emptyOnHttpError(fetchJSON<Array<{ id: number; type: string }>>('/api/patients/type-options', { signal, schema: typeOptions.response })),
     ]);
 
     // Transform to react-select format
@@ -697,7 +705,7 @@ export async function patientManagementLoader({
       // Non-2xx → empty results (old behavior); a network/abort error rejects → outer catch.
       const data = await fetchJSON<{ patients?: PatientData[] } | PatientData[]>(
         `/api/patients/search?${searchParams.toString()}`,
-        { signal, schema: patientSearchSchema } // Validate the boundary (audit H11)
+        { signal, schema: patientSearch.response } // Validate the boundary (audit H11)
       ).catch((err: unknown) => {
         if (typeof (err as HttpError).status === 'number') return [] as PatientData[];
         throw err;
@@ -786,7 +794,7 @@ export async function dailyAppointmentsLoader({
       stats?: AppointmentStats;
     }>(`/api/getDailyAppointments?AppsDate=${targetDate}`, {
       signal: request.signal, // Abort on navigation
-      schema: dailyAppointmentsSchema, // Validate the boundary (audit H11)
+      schema: dailyAppointments.response, // Validate the boundary (audit H11)
     });
 
     return {

@@ -4,6 +4,7 @@ import type { StylesConfig } from 'react-select';
 import cn from 'classnames';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
+import { patientPhones } from '@shared/contracts/patient.contract';
 import styles from './PatientQuickSearch.module.css';
 
 /**
@@ -86,7 +87,7 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
         const fetchPatients = async () => {
             try {
                 setLoading(true);
-                const data = await fetchJSON<PatientOption[]>('/api/patients/phones');
+                const data = await fetchJSON<PatientOption[]>('/api/patients/phones', { schema: patientPhones.response });
                 setPatients(data);
                 setError(null);
             } catch (err) {

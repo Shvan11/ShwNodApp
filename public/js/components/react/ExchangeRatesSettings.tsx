@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import type { HistoryEntry } from '@/types/api.types';
 import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import {
+    currentExchangeRate as currentExchangeRateContract,
+    exchangeRates as exchangeRatesContract,
+    updateExchangeRate as updateExchangeRateContract,
+    type CurrentExchangeRateResponse,
+    type ExchangeRatesResponse,
+} from '@shared/contracts/payment.contract';
 import { useToast } from '../../contexts/ToastContext';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
 import styles from './ExchangeRatesSettings.module.css';
@@ -36,7 +43,9 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
     const loadTodayRate = useCallback(async () => {
         try {
             setTodayLoading(true);
-            const data = await fetchJSON<{ exchangeRate?: number }>('/api/getCurrentExchangeRate');
+            const data = await fetchJSON<CurrentExchangeRateResponse>('/api/getCurrentExchangeRate', {
+                schema: currentExchangeRateContract.response,
+            });
             setTodayRate(data?.exchangeRate || null);
         } catch (error) {
             // 404 = no rate recorded for today — a normal empty state, not an error.
@@ -53,7 +62,9 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
     const loadHistory = useCallback(async (from: string, to: string) => {
         try {
             setHistoryLoading(true);
-            const data = await fetchJSON<{ rates?: HistoryEntry[] }>(`/api/exchange-rates?from=${from}&to=${to}`);
+            const data = await fetchJSON<ExchangeRatesResponse>(`/api/exchange-rates?from=${from}&to=${to}`, {
+                schema: exchangeRatesContract.response,
+            });
             setHistory(data?.rates ?? []);
         } catch (error) {
             console.error('Error loading history:', error);
@@ -100,7 +111,9 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
         }
         try {
             setSaving(true);
-            await postJSON('/api/updateExchangeRateForDate', { date: today, exchangeRate: Math.round(rate) });
+            await postJSON('/api/updateExchangeRateForDate', { date: today, exchangeRate: Math.round(rate) }, {
+                schema: updateExchangeRateContract.response,
+            });
             toast.success("Today's exchange rate updated");
             setTodayRate(Math.round(rate));
             setEditing(false);

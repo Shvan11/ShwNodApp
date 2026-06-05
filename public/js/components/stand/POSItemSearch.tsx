@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { StandItem } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
 import { fetchJSON } from '@/core/http';
+import { items as standItemsContract } from '@shared/contracts/stand.contract';
 import styles from './POSItemSearch.module.css';
 
 interface POSItemSearchProps {
@@ -52,7 +53,8 @@ const POSItemSearch: React.FC<POSItemSearchProps> = ({ onSelect }) => {
     setLoading(true);
     try {
       const data = await fetchJSON<StandItem[]>(
-        `/api/stand/items?search=${encodeURIComponent(query)}`
+        `/api/stand/items?search=${encodeURIComponent(query)}`,
+        { schema: standItemsContract.response }
       );
       if (seq !== requestSeqRef.current) return; // a newer query superseded this one
       setResults(data);

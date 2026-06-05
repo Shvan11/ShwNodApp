@@ -118,7 +118,12 @@ export function toWorkWire<T extends { addition_date: Date | null }>(
   };
 }
 
-interface WorkItem {
+// Row types that feed a `sendData(res, <looseObject>.response, …)` call are
+// `type` aliases, NOT `interface`s — a `z.looseObject` response infers a string
+// index signature, and an `interface` isn't assignable to an index-signatured
+// type (TS2345), whereas a `type` alias gets an implicit one. See the ⚠️ CRITICAL
+// looseObject-index-signature Finding in docs/shared-contract-progress.md.
+type WorkItem = {
   id: number;
   work_id: number;
   filling_type: string | null;
@@ -137,7 +142,7 @@ interface WorkItem {
   note: string | null;
   Teeth: string | null;
   TeethIds: number[];
-}
+};
 
 interface WorkData {
   person_id: number;
@@ -181,17 +186,17 @@ interface WorkItemData {
   TeethIds?: number[];
 }
 
-interface work_type {
+type work_type = {
   id: number;
   work_type: string;
-}
+};
 
-interface Keyword {
+type Keyword = {
   id: number;
   key_word: string;
-}
+};
 
-interface tooth_number {
+type tooth_number = {
   id: number;
   tooth_code: string;
   tooth_name: string;
@@ -199,7 +204,7 @@ interface tooth_number {
   tooth_number?: number;
   is_permanent: boolean;
   sort_order?: number;
-}
+};
 
 interface DependencyCheck {
   InvoiceCount: number;
@@ -990,7 +995,9 @@ export async function getImplantManufacturers(): Promise<ImplantManufacturer[]> 
 /**
  * Related record counts for work transfer preview
  */
-export interface WorkRelatedCounts {
+// `type` (not interface) — feeds a looseObject `sendData` response (transfer-preview);
+// imported only as a type by WorkService + re-exported, so the flip is safe.
+export type WorkRelatedCounts = {
   visits: number;
   invoices: number;
   diagnoses: number;
@@ -1000,18 +1007,19 @@ export interface WorkRelatedCounts {
   wires: number;
   implants: number;
   screws: number;
-}
+};
 
 /**
  * Work transfer result
  */
-export interface TransferWorkResult {
+// `type` (not interface) — feeds a looseObject `sendData` response (transfer).
+export type TransferWorkResult = {
   success: boolean;
   workId: number;
   sourcePatientId: number;
   targetPatientId: number;
   relatedCounts: WorkRelatedCounts;
-}
+};
 
 /**
  * Get counts of all related records for a work

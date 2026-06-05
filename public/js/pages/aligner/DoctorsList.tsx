@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
+import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './DoctorsList.module.css';
 
 interface Doctor {
@@ -25,7 +26,8 @@ const DoctorsList: React.FC = () => {
     const loadDoctors = async (): Promise<void> => {
         try {
             const data = await fetchJSON<{ doctors?: Doctor[] }>(
-                '/api/aligner/doctors'
+                '/api/aligner/doctors',
+                { schema: alignerContract.alignerDoctors.response }
             );
 
             setDoctors(data.doctors || []);

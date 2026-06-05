@@ -34,6 +34,7 @@ import type {
 } from './aligner.types';
 import type { PaymentSaveData } from '@/types/api.types';
 import { fetchJSON, postJSON, putJSON, patchJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
+import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './PatientSets.module.css';
 
 // Page-specific types
@@ -193,7 +194,7 @@ const PatientSets: React.FC = () => {
     const loadDoctors = async (): Promise<void> => {
         try {
             // Flat { success, doctors } (no `data` key) → fetchJSON passthrough.
-            const data = await fetchJSON<{ doctors?: AlignerDoctorWithAliases[] }>('/api/aligner/doctors');
+            const data = await fetchJSON<{ doctors?: AlignerDoctorWithAliases[] }>('/api/aligner/doctors', { schema: alignerContract.alignerDoctors.response });
             setDoctors(data.doctors || []);
         } catch (error) {
             console.error('Error loading doctors:', error);
@@ -216,7 +217,7 @@ const PatientSets: React.FC = () => {
     const loadAlignerSets = async (workIdParam: number): Promise<void> => {
         try {
             // Flat { success, sets, count } (no `data` key) → fetchJSON passthrough.
-            const data = await fetchJSON<{ sets?: AlignerSet[] }>(`/api/aligner/sets/${workIdParam}`);
+            const data = await fetchJSON<{ sets?: AlignerSet[] }>(`/api/aligner/sets/${workIdParam}`, { schema: alignerContract.setsByWorkId.response });
 
             const sets: AlignerSet[] = data.sets || [];
             setAlignerSets(sets);
@@ -243,7 +244,7 @@ const PatientSets: React.FC = () => {
     const loadBatches = async (setId: number): Promise<void> => {
         try {
             // Flat { success, batches } (no `data` key) → fetchJSON passthrough.
-            const data = await fetchJSON<{ batches?: AlignerBatch[] }>(`/api/aligner/batches/${setId}`);
+            const data = await fetchJSON<{ batches?: AlignerBatch[] }>(`/api/aligner/batches/${setId}`, { schema: alignerContract.batchesBySetId.response });
             setBatchesData(prev => ({ ...prev, [setId]: data.batches || [] }));
         } catch (error) {
             console.error('Error loading batches:', error);
@@ -254,7 +255,7 @@ const PatientSets: React.FC = () => {
     const loadNotes = async (setId: number, workIdParam: number, autoMarkRead: boolean = true): Promise<void> => {
         try {
             // Flat { success, notes } (no `data` key) → fetchJSON passthrough.
-            const data = await fetchJSON<{ notes?: AlignerNote[] }>(`/api/aligner/notes/${setId}`);
+            const data = await fetchJSON<{ notes?: AlignerNote[] }>(`/api/aligner/notes/${setId}`, { schema: alignerContract.notesBySetId.response });
 
             setNotesData(prev => ({ ...prev, [setId]: data.notes || [] }));
 

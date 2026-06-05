@@ -5,6 +5,7 @@ import Select, { type SingleValue, type StylesConfig } from 'react-select';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmDialog from '../../components/react/ConfirmDialog';
 import { fetchJSON, putJSON, patchJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import * as alignerContract from '@shared/contracts/aligner.contract';
 import type { ArchformPatient, AlignerSetForMatch } from './aligner.types';
 import styles from './ArchformMatcher.module.css';
 
@@ -90,8 +91,8 @@ const ArchformMatcher: React.FC = () => {
             // ({ success, data: { patients|sets, count } }); core/http.ts unwraps `data`,
             // so we read `.patients`/`.sets` directly (audit H4).
             const [patientsData, matchesData] = await Promise.all([
-                fetchJSON<{ patients?: ArchformPatient[] }>('/api/aligner/archform/patients'),
-                fetchJSON<{ sets?: AlignerSetForMatch[] }>('/api/aligner/archform/matches'),
+                fetchJSON<{ patients?: ArchformPatient[] }>('/api/aligner/archform/patients', { schema: alignerContract.archformPatients.response }),
+                fetchJSON<{ sets?: AlignerSetForMatch[] }>('/api/aligner/archform/matches', { schema: alignerContract.archformMatches.response }),
             ]);
 
             setArchformPatients(patientsData.patients || []);

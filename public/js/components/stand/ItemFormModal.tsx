@@ -9,6 +9,7 @@ import { useStandCategories } from '../../hooks/useStand';
 import { useToast } from '../../contexts/ToastContext';
 import { formatNumber } from '../../utils/formatters';
 import { postJSON, httpErrorMessage } from '@/core/http';
+import { scanVision, type VisionScanResult } from '@shared/contracts/stand.contract';
 import Modal from '../react/Modal';
 import styles from './ItemFormModal.module.css';
 
@@ -38,15 +39,6 @@ interface FormErrors {
   costPrice?: string | null;
   sellPrice?: string | null;
   currentStock?: string | null;
-}
-
-interface VisionScanResult {
-  item_name: string;
-  barcode: string | null;
-  expiry_date: string | null;
-  CategorySuggestion: string;
-  unit: string;
-  notes: string;
 }
 
 function compressImage(file: File, maxWidth = 1024): Promise<string> {
@@ -317,7 +309,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
       // scan-vision is sendSuccess-enveloped → fetchJSON unwraps to VisionScanResult.
       const [localBarcode, scan] = await Promise.all([
         detectBarcode(scanImages),
-        postJSON<VisionScanResult>('/api/stand/items/scan-vision', { images: base64Images }),
+        postJSON<VisionScanResult>('/api/stand/items/scan-vision', { images: base64Images }, { schema: scanVision.response }),
       ]);
 
       // Prefer local BarcodeDetector result over Gemini's AI-read barcode

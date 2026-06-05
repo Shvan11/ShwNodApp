@@ -18,13 +18,15 @@
       "@services/*": ["./public/js/services/*"],
       "@hooks/*": ["./public/js/hooks/*"],
       "@contexts/*": ["./public/js/contexts/*"],
-      "@types/*": ["./public/js/types/*"]
+      "@types/*": ["./public/js/types/*"],
+      "@shared/*": ["./shared/*"]
     },
     "types": ["vite/client"]
   },
   "include": [
     "public/js/**/*.ts",
     "public/js/**/*.tsx",
+    "shared/**/*.ts",
     "vite-env.d.ts"
   ],
   "exclude": [

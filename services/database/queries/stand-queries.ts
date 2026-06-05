@@ -46,13 +46,18 @@ interface StandStockMovementFilters {
   movementType?: string;
 }
 
-interface StandCategoryRow {
+// Row types that feed a `sendData(res, <looseObject>.response, …)` call are
+// `type` aliases, NOT `interface`s: a `z.looseObject` response infers a string
+// index signature, and an `interface` is not assignable to an index-signatured
+// type (TS2345), whereas a `type` alias gets an implicit one. See the ⚠️ CRITICAL
+// looseObject-index-signature Finding in docs/shared-contract-progress.md.
+type StandCategoryRow = {
   category_id: number;
   category_name: string;
   is_active: boolean;
-}
+};
 
-interface StandItemRow {
+type StandItemRow = {
   item_id: number;
   item_name: string;
   sku: string | null;
@@ -70,9 +75,9 @@ interface StandItemRow {
   modified_date: Date | null;
   created_by: number | null;
   category_name: string | null;
-}
+};
 
-interface StandSaleRow {
+type StandSaleRow = {
   sale_id: number;
   sale_date: Date;
   total_amount: number;
@@ -89,9 +94,9 @@ interface StandSaleRow {
   void_reason: string | null;
   patient_name: string | null;
   CashierName: string | null;
-}
+};
 
-interface StandSaleItemRow {
+type StandSaleItemRow = {
   sale_item_id: number;
   sale_id: number;
   item_id: number;
@@ -100,9 +105,9 @@ interface StandSaleItemRow {
   unit_cost: number;
   line_total: number;
   item_name: string;
-}
+};
 
-interface StandMovementRow {
+type StandMovementRow = {
   movement_id: number;
   item_id: number;
   movement_type: string;
@@ -114,7 +119,7 @@ interface StandMovementRow {
   movement_date: Date;
   performed_by: number | null;
   PerformedByName: string | null;
-}
+};
 
 interface StandItemCreateData {
   itemName: string;
@@ -172,21 +177,22 @@ interface DashboardKPIs {
   totalInventoryValue: number;
 }
 
-interface SalesSummaryRow {
+// `type` (not interface) — feeds a looseObject `sendData` response (see note above).
+type SalesSummaryRow = {
   sale_date: string;
   SalesCount: number;
   Revenue: number;
   Cost: number;
   Profit: number;
-}
+};
 
-interface TopItemRow {
+type TopItemRow = {
   item_id: number;
   item_name: string;
   TotalQuantity: number;
   TotalRevenue: number;
   total_profit: number;
-}
+};
 
 // Shared SELECT shape for tblStandItems (+ joined category_name). Reused by every
 // item read so the column projection stays identical across functions.

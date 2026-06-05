@@ -19,51 +19,24 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { z } from 'zod';
 import {
   uploadSinglePdf,
   handleUploadError
 } from '../../middleware/upload.js';
 import driveUploadService from '../../services/google-drive/drive-upload.js';
-import { sendSuccess, ErrorResponses } from '../../utils/error-response.js';
+import { sendSuccess, sendData, ErrorResponses } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
-import { idParams, intId, optionalDateString } from '../../middleware/validation-schemas.js';
 import { log } from '../../utils/logger.js';
 import { timeouts } from '../../middleware/timeout.js';
 
-// Boundary schemas. The create/update routes hand req.body straight to
-// AlignerService.validateAnd* (the "validateAnd…" service owns those shapes), so
-// here we add PARAM guards (NaN-proof every :setId/:batchId/:noteId/:drID/:id) plus
-// small body schemas only where a handler reads specific fields. `targetDate` is a
-// date the manufacture/deliver handlers tolerate as empty/absent → optionalDateString.
-const setIdParams = idParams('setId');
-const noteIdParams = idParams('noteId');
-const batchIdParams = idParams('batchId');
-const drIdParams = idParams('drID');
-const archformPatientIdParams = idParams('id');
-const createNoteBodySchema = z.looseObject({ aligner_set_id: intId, note_text: z.string().min(1) });
-const editNoteBodySchema = z.looseObject({ note_text: z.string().min(1) });
-const targetDateBodySchema = z.looseObject({ targetDate: optionalDateString });
-const archformPatientBodySchema = z.looseObject({ name: z.string().min(1) });
-const labelsBodySchema = z.looseObject({
-  labels: z.array(z.unknown()).min(1, 'No labels to generate'),
-  startingPosition: z.coerce.number().int(),
-});
-// Boundary guards for the aligner CRUD mutations. Loose (non-listed fields pass
-// through to the AlignerService spread); validate only the fields the service
-// already requires, so no previously-valid request starts 400ing. date_of_payment
-// is a presence check (not dateString) to stay format-agnostic like the service.
-const addPaymentBodySchema = z.looseObject({
-  workid: intId,
-  amount_paid: z.coerce.number(),
-  date_of_payment: z.string().min(1),
-});
-const createSetBodySchema = z.looseObject({ work_id: intId, aligner_dr_id: intId });
-const createBatchBodySchema = z.looseObject({ aligner_set_id: intId });
-const doctorBodySchema = z.looseObject({ doctor_name: z.string().trim().min(1) }); // create + update
-// Update set/batch carry no required body fields — assert a JSON object; the
-// per-field rules live in AlignerService and fields pass through untouched.
-const jsonObjectBody = z.looseObject({});
+// Request/response contract (shared with the client via @shared). The boundary
+// param + body guards and every response shape now live in the contract — the
+// create/update routes still hand req.body straight to AlignerService.validateAnd*
+// (the "validateAnd…" service owns those shapes), so the contract bodies are loose
+// guards relocated verbatim; the 2 small note bodies + the shared targetDate body
+// are fully enumerated SSoT. See shared/contracts/aligner.contract.ts +
+// docs/shared-contract-progress.md.
+import * as contract from '../../shared/contracts/aligner.contract.js';
 
 // Query layer imports
 import * as alignerQueries from '../../services/database/queries/aligner-queries.js';
@@ -159,15 +132,6 @@ interface UpdateBatchBody {
   has_lower_template?: boolean;
 }
 
-interface CreateNoteBody {
-  aligner_set_id: number;
-  note_text: string;
-}
-
-interface UpdateNoteBody {
-  note_text: string;
-}
-
 interface CreateDoctorBody {
   doctor_name: string;
   doctor_email?: string;
@@ -219,7 +183,7 @@ router.get(
       log.info('Fetching aligner doctors');
       const doctors = await alignerQueries.getDoctorsWithUnreadCounts();
 
-      sendSuccess(res, {
+      sendData(res, contract.alignerDoctors.response, {
         doctors: doctors || [],
         count: doctors ? doctors.length : 0
       });
@@ -244,7 +208,7 @@ router.get(
       log.info('Fetching all aligner sets from v_allsets');
       const sets = (await alignerQueries.getAllAlignerSets()) as AlignerSetRow[];
 
-      sendSuccess(res, {
+      sendData(res, contract.allSets.response, {
         sets: sets || [],
         count: sets ? sets.length : 0,
         noNextBatchCount: sets
@@ -272,7 +236,7 @@ router.get(
       log.info('Fetching all aligner patients');
       const patients = await alignerQueries.getAllAlignerPatients();
 
-      sendSuccess(res, {
+      sendData(res, contract.allPatients.response, {
         patients: patients || [],
         count: patients ? patients.length : 0
       });
@@ -307,7 +271,7 @@ router.get(
       log.info(`Fetching all patients for doctor id: ${doctorId}`);
       const patients = await alignerQueries.getAlignerPatientsByDoctor(parseInt(doctorId, 10));
 
-      sendSuccess(res, {
+      sendData(res, contract.patientsByDoctor.response, {
         patients: patients || [],
         count: patients ? patients.length : 0
       });
@@ -339,7 +303,7 @@ router.get(
         doctorId ? parseInt(doctorId, 10) : null
       );
 
-      sendSuccess(res, {
+      sendData(res, contract.searchAlignerPatients.response, {
         patients: patients || [],
         count: patients ? patients.length : 0
       });
@@ -396,7 +360,7 @@ router.get(
         );
       }
 
-      sendSuccess(res, {
+      sendData(res, contract.setsByWorkId.response, {
         sets: sets || [],
         count: sets ? sets.length : 0
       });
@@ -416,7 +380,7 @@ router.get(
  */
 router.post(
   '/aligner/payments',
-  validate({ body: addPaymentBodySchema }),
+  validate({ body: contract.addPayment.body }),
   async (
     req: Request<unknown, unknown, AddPaymentBody>,
     res: Response
@@ -424,7 +388,7 @@ router.post(
     try {
       const invoiceID = await AlignerService.validateAndCreatePayment(req.body);
 
-      sendSuccess(res, { invoice_id: invoiceID }, 'Payment added successfully');
+      sendData(res, contract.addPayment.response, { invoice_id: invoiceID }, 'Payment added successfully');
     } catch (error) {
       if (error instanceof AlignerValidationError) {
         ErrorResponses.badRequest(res, error.message, { code: error.code });
@@ -453,7 +417,7 @@ router.get(
       log.info(`Fetching batches for aligner set id: ${setId}`);
       const batches = await alignerQueries.getBatchesBySetId(parseInt(setId, 10));
 
-      sendSuccess(res, {
+      sendData(res, contract.batchesBySetId.response, {
         batches: batches || [],
         count: batches ? batches.length : 0
       });
@@ -477,7 +441,7 @@ router.get(
  */
 router.post(
   '/aligner/sets',
-  validate({ body: createSetBodySchema }),
+  validate({ body: contract.createSet.body }),
   async (
     req: Request<unknown, unknown, CreateSetBody>,
     res: Response
@@ -485,7 +449,7 @@ router.post(
     try {
       const newSetId = await AlignerService.validateAndCreateSet(req.body);
 
-      sendSuccess(res, { setId: newSetId }, 'Aligner set created successfully');
+      sendData(res, contract.createSet.response, { setId: newSetId }, 'Aligner set created successfully');
     } catch (error) {
       if (error instanceof AlignerValidationError) {
         ErrorResponses.badRequest(res, error.message, {
@@ -510,7 +474,7 @@ router.post(
  */
 router.put(
   '/aligner/sets/:setId',
-  validate({ params: setIdParams, body: jsonObjectBody }),
+  validate({ params: contract.setIdParams, body: contract.updateSet.body }),
   async (
     req: Request<{ setId: string }, unknown, UpdateSetBody>,
     res: Response
@@ -541,7 +505,7 @@ router.put(
  */
 router.delete(
   '/aligner/sets/:setId',
-  validate({ params: setIdParams }),
+  validate({ params: contract.setIdParams }),
   async (req: Request<{ setId: string }>, res: Response): Promise<void> => {
     try {
       const { setId } = req.params;
@@ -584,7 +548,7 @@ router.get(
 
       const notes = await alignerQueries.getNotesBySetId(parseInt(setId, 10));
 
-      sendSuccess(res, {
+      sendData(res, contract.notesBySetId.response, {
         notes: notes || [],
         count: notes ? notes.length : 0
       });
@@ -600,9 +564,9 @@ router.get(
  */
 router.post(
   '/aligner/notes',
-  validate({ body: createNoteBodySchema }),
+  validate({ body: contract.createNote.body }),
   async (
-    req: Request<unknown, unknown, CreateNoteBody>,
+    req: Request<unknown, unknown, contract.CreateNoteBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -613,7 +577,7 @@ router.post(
         note_text
       );
 
-      sendSuccess(res, { noteId }, 'note added successfully');
+      sendData(res, contract.createNote.response, { noteId }, 'note added successfully');
     } catch (error) {
       if (error instanceof AlignerValidationError) {
         if (error.code === 'SET_NOT_FOUND') {
@@ -634,7 +598,7 @@ router.post(
  */
 router.patch(
   '/aligner/notes/:noteId/toggle-read',
-  validate({ params: noteIdParams }),
+  validate({ params: contract.noteIdParams }),
   async (req: Request<{ noteId: string }>, res: Response): Promise<void> => {
     try {
       const { noteId } = req.params;
@@ -663,9 +627,9 @@ router.patch(
  */
 router.patch(
   '/aligner/notes/:noteId',
-  validate({ params: noteIdParams, body: editNoteBodySchema }),
+  validate({ params: contract.noteIdParams, body: contract.updateNote.body }),
   async (
-    req: Request<{ noteId: string }, unknown, UpdateNoteBody>,
+    req: Request<{ noteId: string }, unknown, contract.UpdateNoteBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -695,7 +659,7 @@ router.patch(
  */
 router.delete(
   '/aligner/notes/:noteId',
-  validate({ params: noteIdParams }),
+  validate({ params: contract.noteIdParams }),
   async (req: Request<{ noteId: string }>, res: Response): Promise<void> => {
     try {
       const { noteId } = req.params;
@@ -735,7 +699,7 @@ router.get(
       const isRead = await alignerQueries.getNoteReadStatus(parseInt(noteId, 10));
 
       if (isRead !== null) {
-        sendSuccess(res, { isRead });
+        sendData(res, contract.noteStatus.response, { isRead });
       } else {
         ErrorResponses.notFound(res, 'note');
       }
@@ -759,7 +723,7 @@ router.get(
  */
 router.post(
   '/aligner/batches',
-  validate({ body: createBatchBodySchema }),
+  validate({ body: contract.createBatch.body }),
   async (
     req: Request<unknown, unknown, CreateBatchBody>,
     res: Response
@@ -767,8 +731,9 @@ router.post(
     try {
       const result = await AlignerService.validateAndCreateBatch(req.body);
 
-      sendSuccess(
+      sendData(
         res,
+        contract.createBatch.response,
         { batchId: result.newBatchId, deactivatedBatch: result.deactivatedBatch },
         'Aligner batch created successfully'
       );
@@ -796,7 +761,7 @@ router.post(
  */
 router.put(
   '/aligner/batches/:batchId',
-  validate({ params: batchIdParams, body: jsonObjectBody }),
+  validate({ params: contract.batchIdParams, body: contract.updateBatch.body }),
   async (
     req: Request<{ batchId: string }, unknown, UpdateBatchBody>,
     res: Response
@@ -814,7 +779,7 @@ router.put(
         data.deactivatedBatch = result.deactivatedBatch;
       }
 
-      sendSuccess(res, data, 'Aligner batch updated successfully');
+      sendData(res, contract.updateBatch.response, data, 'Aligner batch updated successfully');
     } catch (error) {
       if (error instanceof AlignerValidationError) {
         ErrorResponses.badRequest(res, error.message, { code: error.code });
@@ -836,7 +801,7 @@ router.put(
  */
 router.patch(
   '/aligner/batches/:batchId/manufacture',
-  validate({ params: batchIdParams, body: targetDateBodySchema }),
+  validate({ params: contract.batchIdParams, body: contract.targetDateBody }),
   async (req: Request<{ batchId: string }, unknown, { targetDate?: string }>, res: Response): Promise<void> => {
     try {
       const { batchId } = req.params;
@@ -847,8 +812,9 @@ router.patch(
         targetDate ? new Date(targetDate) : null
       );
 
-      sendSuccess(
+      sendData(
         res,
+        contract.manufactureBatch.response,
         {
           batchId: result.batchId,
           batchSequence: result.batchSequence,
@@ -882,7 +848,7 @@ router.patch(
  */
 router.patch(
   '/aligner/batches/:batchId/deliver',
-  validate({ params: batchIdParams, body: targetDateBodySchema }),
+  validate({ params: contract.batchIdParams, body: contract.targetDateBody }),
   async (req: Request<{ batchId: string }, unknown, { targetDate?: string }>, res: Response): Promise<void> => {
     try {
       const { batchId } = req.params;
@@ -893,8 +859,9 @@ router.patch(
         targetDate ? new Date(targetDate) : null
       );
 
-      sendSuccess(
+      sendData(
         res,
+        contract.deliverBatch.response,
         {
           batchId: result.batchId,
           batchSequence: result.batchSequence,
@@ -926,15 +893,16 @@ router.patch(
  */
 router.patch(
   '/aligner/batches/:batchId/undo-manufacture',
-  validate({ params: batchIdParams }),
+  validate({ params: contract.batchIdParams }),
   async (req: Request<{ batchId: string }>, res: Response): Promise<void> => {
     try {
       const { batchId } = req.params;
 
       const result = await AlignerService.undoManufactureBatch(batchId);
 
-      sendSuccess(
+      sendData(
         res,
+        contract.undoManufacture.response,
         { batchId: result.batchId, batchSequence: result.batchSequence },
         result.message
       );
@@ -958,15 +926,16 @@ router.patch(
  */
 router.patch(
   '/aligner/batches/:batchId/undo-deliver',
-  validate({ params: batchIdParams }),
+  validate({ params: contract.batchIdParams }),
   async (req: Request<{ batchId: string }>, res: Response): Promise<void> => {
     try {
       const { batchId } = req.params;
 
       const result = await AlignerService.undoDeliverBatch(batchId);
 
-      sendSuccess(
+      sendData(
         res,
+        contract.undoDeliver.response,
         { batchId: result.batchId, batchSequence: result.batchSequence },
         result.message
       );
@@ -990,7 +959,7 @@ router.patch(
  */
 router.delete(
   '/aligner/batches/:batchId',
-  validate({ params: batchIdParams }),
+  validate({ params: contract.batchIdParams }),
   async (req: Request<{ batchId: string }>, res: Response): Promise<void> => {
     try {
       const { batchId } = req.params;
@@ -1022,7 +991,7 @@ router.delete(
  */
 router.post(
   '/aligner/sets/:setId/upload-pdf',
-  validate({ params: setIdParams }),
+  validate({ params: contract.setIdParams }),
   timeouts.long,
   uploadSinglePdf,
   handleUploadError,
@@ -1056,7 +1025,7 @@ router.post(
 
       const result = await uploadPdfForSet(setId, req.file, uploaderEmail);
 
-      sendSuccess(res, result, 'PDF uploaded successfully');
+      sendData(res, contract.uploadPdf.response, result, 'PDF uploaded successfully');
     } catch (error) {
       if (error instanceof AlignerPdfError) {
         if (error.code === 'SET_NOT_FOUND') {
@@ -1077,7 +1046,7 @@ router.post(
  */
 router.delete(
   '/aligner/sets/:setId/pdf',
-  validate({ params: setIdParams }),
+  validate({ params: contract.setIdParams }),
   async (req: Request<{ setId: string }>, res: Response): Promise<void> => {
     try {
       const setId = parseInt(req.params.setId, 10);
@@ -1118,7 +1087,7 @@ router.get(
       log.info('Fetching Archform patients');
       const patients = await getArchformPatients();
 
-      sendSuccess(res, {
+      sendData(res, contract.archformPatients.response, {
         patients,
         count: patients.length
       });
@@ -1151,7 +1120,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const status = await isArchformAvailable();
-      sendSuccess(res, status);
+      sendData(res, contract.archformStatus.response, status);
     } catch (error) {
       log.error('Error checking Archform status:', error);
       ErrorResponses.internalError(
@@ -1173,7 +1142,7 @@ router.get(
       log.info('Fetching aligner sets with Archform IDs');
       const sets = await alignerQueries.getSetsWithArchformIds();
 
-      sendSuccess(res, {
+      sendData(res, contract.archformMatches.response, {
         sets: sets || [],
         count: sets ? sets.length : 0
       });
@@ -1193,7 +1162,7 @@ router.get(
  */
 router.patch(
   '/aligner/sets/:setId/archform',
-  validate({ params: setIdParams }),
+  validate({ params: contract.setIdParams }),
   async (
     req: Request<{ setId: string }, unknown, { archformId: number | null }>,
     res: Response
@@ -1237,7 +1206,7 @@ router.patch(
  */
 router.put(
   '/aligner/archform/patients/:id',
-  validate({ params: archformPatientIdParams, body: archformPatientBodySchema }),
+  validate({ params: contract.archformPatientIdParams, body: contract.updateArchformPatient.body }),
   async (
     req: Request<{ id: string }, unknown, { name: string; lastName: string }>,
     res: Response
@@ -1284,7 +1253,7 @@ router.put(
  */
 router.delete(
   '/aligner/archform/patients/:id',
-  validate({ params: archformPatientIdParams }),
+  validate({ params: contract.archformPatientIdParams }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id, 10);
@@ -1312,8 +1281,9 @@ router.delete(
         deletedFromTables: result.deletedFromTables
       });
 
-      sendSuccess(
+      sendData(
         res,
+        contract.deleteArchformPatient.response,
         { deletedFromTables: result.deletedFromTables },
         'Archform patient deleted successfully'
       );
@@ -1346,7 +1316,7 @@ router.delete(
  */
 router.post(
   '/aligner/labels/generate',
-  validate({ body: labelsBodySchema }),
+  validate({ body: contract.generateLabels.body }),
   async (
     req: Request<unknown, unknown, GenerateLabelsBody>,
     res: Response
@@ -1442,7 +1412,7 @@ router.get(
     try {
       const doctors = await alignerQueries.getAllDoctors();
 
-      sendSuccess(res, { doctors: doctors || [] });
+      sendData(res, contract.doctorsList.response, { doctors: doctors || [] });
     } catch (error) {
       log.error('Error fetching aligner doctors:', error);
       ErrorResponses.internalError(
@@ -1459,7 +1429,7 @@ router.get(
  */
 router.post(
   '/aligner-doctors',
-  validate({ body: doctorBodySchema }),
+  validate({ body: contract.doctorBody }),
   async (
     req: Request<unknown, unknown, CreateDoctorBody>,
     res: Response
@@ -1467,7 +1437,7 @@ router.post(
     try {
       const newDrID = await AlignerService.validateAndCreateDoctor(req.body);
 
-      sendSuccess(res, { drID: newDrID }, 'Doctor added successfully');
+      sendData(res, contract.createDoctor.response, { drID: newDrID }, 'Doctor added successfully');
     } catch (error) {
       if (error instanceof AlignerValidationError) {
         if (error.code === 'EMAIL_ALREADY_EXISTS') {
@@ -1495,7 +1465,7 @@ router.post(
  */
 router.put(
   '/aligner-doctors/:drID',
-  validate({ params: drIdParams, body: doctorBodySchema }),
+  validate({ params: contract.drIdParams, body: contract.doctorBody }),
   async (
     req: Request<{ drID: string }, unknown, UpdateDoctorBody>,
     res: Response
@@ -1533,7 +1503,7 @@ router.put(
  */
 router.delete(
   '/aligner-doctors/:drID',
-  validate({ params: drIdParams }),
+  validate({ params: contract.drIdParams }),
   async (req: Request<{ drID: string }>, res: Response): Promise<void> => {
     try {
       const { drID } = req.params;

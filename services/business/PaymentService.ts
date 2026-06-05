@@ -25,7 +25,10 @@ import { getWorkDetails } from '../database/queries/work-queries.js';
  * real JS `Date` built from the request, and `InvoiceID` is the id returned by
  * the insert. Co-located here because it's a service-layer DTO.
  */
-interface CreatedInvoice {
+// `type` (not `interface`) so it carries an implicit string index signature and
+// is assignable to the `z.looseObject` addInvoice response contract that
+// `sendData` validates against (see shared-contract-progress.md, Phase 1 finding).
+type CreatedInvoice = {
   InvoiceID: number | undefined;
   workid: number;
   amount_paid: number;
@@ -33,7 +36,7 @@ interface CreatedInvoice {
   usd_received: number | null;
   iqd_received: number | null;
   change: number | null;
-}
+};
 
 /**
  * Payment error codes

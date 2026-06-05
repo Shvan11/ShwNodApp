@@ -8,6 +8,14 @@ import { formatISODate } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import {
+    workForReceipt as workForReceiptContract,
+    exchangeRateForDate as exchangeRateForDateContract,
+    updateExchangeRate as updateExchangeRateContract,
+    addInvoice as addInvoiceContract,
+    type ExchangeRateForDateResponse,
+    type AddInvoiceResponse,
+} from '@shared/contracts/payment.contract';
 
 // Types
 interface WorkData {
@@ -133,7 +141,11 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             if (workData && workData.work_id) {
                 try {
                     // sendSuccess-enveloped → fetchJSON unwraps to the WorkData object.
-                    const data = await fetchJSON<WorkData>(`/api/getworkforreceipt/${workData.work_id}`);
+                    // Contract response is a loose boundary guard (work_id); the richer
+                    // local WorkData stays the consumer type.
+                    const data = await fetchJSON<WorkData>(`/api/getworkforreceipt/${workData.work_id}`, {
+                        schema: workForReceiptContract.response,
+                    });
                     setCompleteWorkData(data);
                 } catch (error) {
                     console.error('Error fetching complete work data:', error);
@@ -196,8 +208,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const loadExchangeRate = async (date: string) => {
         try {
             // Enveloped (sendSuccess) → fetchJSON unwraps to the inner { exchangeRate, date }.
-            const result = await fetchJSON<{ exchangeRate?: number; date?: string }>(
-                `/api/getExchangeRateForDate?date=${date}`
+            const result = await fetchJSON<ExchangeRateForDateResponse>(
+                `/api/getExchangeRateForDate?date=${date}`,
+                { schema: exchangeRateForDateContract.response }
             );
 
             if (result?.exchangeRate) {
@@ -231,7 +244,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             await postJSON('/api/updateExchangeRateForDate', {
                 date: formData.paymentDate,
                 exchangeRate: Math.round(rate)
-            });
+            }, { schema: updateExchangeRateContract.response });
 
             setExchangeRate(Math.round(rate));
             setExchangeRateError(false);
@@ -727,7 +740,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
             // Enveloped (sendSuccess) → postJSON unwraps to the inner result; a non-2xx
             // (validation/insufficient-balance) now throws and is handled in the catch.
-            const result = await postJSON<Record<string, unknown>>('/api/addInvoice', invoiceData);
+            const result = await postJSON<AddInvoiceResponse>('/api/addInvoice', invoiceData, {
+                schema: addInvoiceContract.response,
+            });
 
             // Set success state and prepare receipt data with complete work data
             setPaymentSuccess(true);

@@ -5,6 +5,7 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import styles from './Diagnosis.module.css';
 import { formatISODate } from '../core/utils';
 import { fetchJSON, postJSON, deleteJSON } from '@/core/http';
+import { getWorks as getWorksContract } from '@shared/contracts/work.contract';
 
 /**
  * Diagnosis Page
@@ -168,7 +169,7 @@ const Diagnosis = () => {
             // N18), so the `if (diagnosis)` null-check still means "new diagnosis".
             const [patient, works, diagnosis] = await Promise.all([
                 fetchJSON<PatientInfo>(`/api/patients/${personId}/info`).catch(() => null),
-                fetchJSON<WorkInfo[]>(`/api/getworks?code=${personId}`).catch(() => null),
+                fetchJSON<WorkInfo[]>(`/api/getworks?code=${personId}`, { schema: getWorksContract.response }).catch(() => null),
                 fetchJSON<Partial<DiagnosisData> | null>(`/api/diagnosis/${workId}`).catch(() => null)
             ]);
 

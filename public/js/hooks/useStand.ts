@@ -4,36 +4,43 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import * as standContract from '@shared/contracts/stand.contract';
 
 // ============================================================================
 // TYPES
 // ============================================================================
+//
+// Response shapes are the single source of truth in the shared contract
+// (shared/contracts/stand.contract.ts), re-exported here so existing component
+// imports (`from '../../hooks/useStand'`) keep resolving unchanged. Each typed
+// read below pairs the contract-inferred generic with `{ schema: …response }`
+// (the generic types it; the schema validates the boundary at runtime — H11).
+// Request/filter shapes stay frontend-owned below.
 
-export interface StandCategory {
-  category_id: number;
-  category_name: string;
-  is_active: boolean;
-}
-
-export interface StandItem {
-  item_id: number;
-  item_name: string;
-  sku: string | null;
-  barcode: string | null;
-  category_id: number | null;
-  cost_price: number;
-  sell_price: number;
-  current_stock: number;
-  reorder_level: number;
-  expiry_date: string | null;
-  unit: string | null;
-  notes: string | null;
-  is_active: boolean;
-  date_added: string;
-  modified_date: string | null;
-  created_by: number | null;
-  category_name: string | null;
-}
+export type {
+  StandCategory,
+  StandItem,
+  StandSale,
+  StandSaleItem,
+  StandSaleWithItems,
+  StandStockMovement,
+  StandDashboardKPIs,
+  SalesSummaryRow,
+  TopItemRow,
+  StandReportData,
+  StandSaleResult,
+} from '@shared/contracts/stand.contract';
+import type {
+  StandItem,
+  StandCategory,
+  StandSale,
+  StandSaleWithItems,
+  StandStockMovement,
+  StandDashboardKPIs,
+  TopItemRow,
+  StandReportData,
+  StandSaleResult,
+} from '@shared/contracts/stand.contract';
 
 export interface StandItemFilters {
   search?: string;
@@ -42,89 +49,11 @@ export interface StandItemFilters {
   includeInactive?: boolean;
 }
 
-export interface StandSale {
-  sale_id: number;
-  sale_date: string;
-  total_amount: number;
-  total_cost: number;
-  total_profit: number;
-  amount_paid: number;
-  change: number;
-  payment_method: string;
-  customer_note: string | null;
-  person_id: number | null;
-  cashier_id: number | null;
-  voided_date: string | null;
-  voided_by: number | null;
-  void_reason: string | null;
-  patient_name: string | null;
-  CashierName: string | null;
-}
-
-export interface StandSaleItem {
-  sale_item_id: number;
-  sale_id: number;
-  item_id: number;
-  quantity: number;
-  unit_price: number;
-  unit_cost: number;
-  line_total: number;
-  item_name: string;
-}
-
-export interface StandSaleWithItems extends StandSale {
-  Items: StandSaleItem[];
-}
-
 export interface StandSaleFilters {
   startDate?: string;
   endDate?: string;
   cashierId?: number;
   personId?: number;
-}
-
-export interface StandStockMovement {
-  movement_id: number;
-  item_id: number;
-  movement_type: string;
-  quantity: number;
-  unit_cost: number | null;
-  total_cost: number | null;
-  related_sale_id: number | null;
-  reason: string | null;
-  movement_date: string;
-  performed_by: number | null;
-  PerformedByName: string | null;
-}
-
-export interface StandDashboardKPIs {
-  todaySalesCount: number;
-  todayRevenue: number;
-  todayProfit: number;
-  lowStockCount: number;
-  expiringSoonCount: number;
-  totalInventoryValue: number;
-}
-
-export interface SalesSummaryRow {
-  sale_date: string;
-  SalesCount: number;
-  Revenue: number;
-  Cost: number;
-  Profit: number;
-}
-
-export interface TopItemRow {
-  item_id: number;
-  item_name: string;
-  TotalQuantity: number;
-  TotalRevenue: number;
-  total_profit: number;
-}
-
-export interface StandReportData {
-  salesSummary: SalesSummaryRow[];
-  purchases: { totalPurchases: number; restockCount: number };
 }
 
 export interface StandItemCreateData {
@@ -147,12 +76,6 @@ interface SaleCreateData {
   paymentMethod?: string;
   customerNote?: string | null;
   personId?: number | null;
-}
-
-/** Result payload from POST /api/stand/sales. */
-export interface StandSaleResult {
-  saleId: number;
-  change: number;
 }
 
 // ============================================================================
@@ -180,7 +103,7 @@ export function useStandItems(filters: StandItemFilters = {}): {
       if (filters.stockStatus) params.append('stockStatus', filters.stockStatus);
       if (filters.includeInactive) params.append('includeInactive', 'true');
 
-      const data = await fetchJSON<StandItem[]>(`/api/stand/items?${params}`);
+      const data = await fetchJSON<StandItem[]>(`/api/stand/items?${params}`, { schema: standContract.items.response });
       setItems(data);
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to fetch items'));
@@ -206,7 +129,7 @@ export function useStandItemByBarcode(): {
     try {
       setLoading(true);
       setError(null);
-      return await fetchJSON<StandItem>(`/api/stand/items/barcode/${encodeURIComponent(barcode)}`);
+      return await fetchJSON<StandItem>(`/api/stand/items/barcode/${encodeURIComponent(barcode)}`, { schema: standContract.itemByBarcode.response });
     } catch (err) {
       // 404 is a genuine "no such barcode", not an error — keep returning null.
       if ((err as HttpError).status === 404) return null;
@@ -240,7 +163,7 @@ export function useStandCategories(): {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchJSON<StandCategory[]>('/api/stand/categories');
+      const data = await fetchJSON<StandCategory[]>('/api/stand/categories', { schema: standContract.categories.response });
       setCategories(data);
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to fetch categories'));
@@ -272,7 +195,7 @@ export function useStandDashboardKPIs(): {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchJSON<StandDashboardKPIs>('/api/stand/dashboard');
+      const data = await fetchJSON<StandDashboardKPIs>('/api/stand/dashboard', { schema: standContract.dashboard.response });
       setKpis(data);
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to fetch KPIs'));
@@ -311,7 +234,7 @@ export function useStandSales(filters: StandSaleFilters = {}): {
       if (filters.cashierId) params.append('cashierId', String(filters.cashierId));
       if (filters.personId) params.append('personId', String(filters.personId));
 
-      const data = await fetchJSON<StandSale[]>(`/api/stand/sales?${params}`);
+      const data = await fetchJSON<StandSale[]>(`/api/stand/sales?${params}`, { schema: standContract.sales.response });
       setSales(data);
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to fetch sales'));
@@ -341,7 +264,7 @@ export function useStandSale(id: number | null): {
       try {
         setLoading(true);
         setError(null);
-        const data = await fetchJSON<StandSaleWithItems>(`/api/stand/sales/${id}`);
+        const data = await fetchJSON<StandSaleWithItems>(`/api/stand/sales/${id}`, { schema: standContract.saleById.response });
         setSale(data);
       } catch (err) {
         setError(httpErrorMessage(err, 'Failed to fetch sale'));
@@ -374,7 +297,7 @@ export function useLowStockItems(): {
     try {
       setLoading(true);
       setError(null);
-      setItems(await fetchJSON<StandItem[]>('/api/stand/items/low-stock'));
+      setItems(await fetchJSON<StandItem[]>('/api/stand/items/low-stock', { schema: standContract.itemsLowStock.response }));
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to fetch low-stock items'));
     } finally {
@@ -401,7 +324,7 @@ export function useExpiringItems(daysAhead: number = 30): {
     try {
       setLoading(true);
       setError(null);
-      setItems(await fetchJSON<StandItem[]>(`/api/stand/items/expiring?days=${daysAhead}`));
+      setItems(await fetchJSON<StandItem[]>(`/api/stand/items/expiring?days=${daysAhead}`, { schema: standContract.itemsExpiring.response }));
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to fetch expiring items'));
     } finally {
@@ -433,7 +356,7 @@ export function useStockMovements(itemId: number | null): {
     try {
       setLoading(true);
       setError(null);
-      setMovements(await fetchJSON<StandStockMovement[]>(`/api/stand/items/${itemId}/movements`));
+      setMovements(await fetchJSON<StandStockMovement[]>(`/api/stand/items/${itemId}/movements`, { schema: standContract.itemMovements.response }));
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to fetch stock movements'));
     } finally {
@@ -465,7 +388,7 @@ export function useStandItemMutations(onSuccess?: () => void): {
   const createItem = useCallback(async (data: StandItemCreateData): Promise<{ item_id: number }> => {
     try {
       setLoading(true); setError(null);
-      const result = await postJSON<{ item_id: number }>('/api/stand/items', data);
+      const result = await postJSON<{ item_id: number }>('/api/stand/items', data, { schema: standContract.createItem.response });
       onSuccess?.();
       return result;
     } catch (err) {
@@ -532,7 +455,7 @@ export function useStandSaleMutations(onSuccess?: () => void): {
   const createSale = useCallback(async (data: SaleCreateData) => {
     try {
       setLoading(true); setError(null);
-      const result = await postJSON<StandSaleResult>('/api/stand/sales', data);
+      const result = await postJSON<StandSaleResult>('/api/stand/sales', data, { schema: standContract.createSale.response });
       onSuccess?.();
       return result;
     } catch (err) {
@@ -575,7 +498,7 @@ export function useStandReportSummary(startDate: string | null, endDate: string 
         setLoading(true);
         setError(null);
         const params = new URLSearchParams({ startDate, endDate });
-        const json = await fetchJSON<StandReportData>(`/api/stand/reports/summary?${params}`);
+        const json = await fetchJSON<StandReportData>(`/api/stand/reports/summary?${params}`, { schema: standContract.reportSummary.response });
         if (!cancelled) setData(json);
       } catch (err) {
         if (!cancelled) setError(httpErrorMessage(err, 'Failed to fetch report'));
@@ -609,7 +532,7 @@ export function useTopSellingItems(startDate: string | null, endDate: string | n
         setLoading(true);
         setError(null);
         const params = new URLSearchParams({ startDate, endDate, limit: String(limit) });
-        const json = await fetchJSON<TopItemRow[]>(`/api/stand/reports/top-items?${params}`);
+        const json = await fetchJSON<TopItemRow[]>(`/api/stand/reports/top-items?${params}`, { schema: standContract.reportTopItems.response });
         if (!cancelled) setItems(json);
       } catch (err) {
         if (!cancelled) setError(httpErrorMessage(err, 'Failed to fetch top-selling items'));

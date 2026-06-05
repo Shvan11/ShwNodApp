@@ -5,6 +5,7 @@ import PhoneInput from './PhoneInput';
 import styles from './EditPatientComponent.module.css';
 import { formatISODate } from '../../core/utils';
 import { fetchJSON, postJSON, putJSON, postFormData, httpErrorMessage, type HttpError } from '@/core/http';
+import { tagOptions as tagOptionsContract } from '@shared/contracts/patient.contract';
 
 interface Props {
     personId?: number | null;  // Validated PersonID from loader (null if invalid)
@@ -157,7 +158,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                 fetchJSON<Address[]>('/api/addresses').catch(() => null),
                 fetchJSON<ReferralSource[]>('/api/referral-sources').catch(() => null),
                 fetchJSON<PatientType[]>('/api/patient-types').catch(() => null),
-                fetchJSON<Tag[]>('/api/patients/tag-options').catch(() => null)
+                fetchJSON<Tag[]>('/api/patients/tag-options', { schema: tagOptionsContract.response }).catch(() => null)
             ]);
 
             if (gendersData) setGenders(gendersData);

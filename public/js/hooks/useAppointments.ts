@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import { dailyAppointmentsSchema, type DailyAppointmentsResponse } from '@/core/api.schemas';
+import { dailyAppointments, type DailyAppointmentsResponse } from '@shared/contracts/appointment.contract';
 
 /**
  * Appointment statistics from API
@@ -72,7 +72,7 @@ function getCurrentTime(): string {
 function fetchDailyAppointments(date: string, signal?: AbortSignal): Promise<DailyAppointmentsResponse> {
   return fetchJSON<DailyAppointmentsResponse>(`/api/getDailyAppointments?AppsDate=${date}`, {
     signal,
-    schema: dailyAppointmentsSchema,
+    schema: dailyAppointments.response,
   });
 }
 

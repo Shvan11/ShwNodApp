@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PhoneDisplay from '../../components/react/PhoneDisplay';
 import { fetchJSON } from '@/core/http';
+import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './SearchPatient.module.css';
 
 interface AlignerPatient {
@@ -52,7 +53,8 @@ const SearchPatient: React.FC = () => {
         try {
             setLoading(true);
             const data = await fetchJSON<{ patients?: AlignerPatient[] }>(
-                `/api/aligner/patients?search=${encodeURIComponent(query)}`
+                `/api/aligner/patients?search=${encodeURIComponent(query)}`,
+                { schema: alignerContract.searchAlignerPatients.response }
             );
 
             setSearchResults(data.patients || []);

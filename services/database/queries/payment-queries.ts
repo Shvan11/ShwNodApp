@@ -28,7 +28,10 @@ export interface Payment {
   Date: string;
 }
 
-interface WorkForInvoice {
+// `type` (not `interface`) so it carries an implicit string index signature and
+// is therefore assignable to the `z.looseObject(...)` response contract that
+// `sendData` validates against (see shared-contract-progress.md, Phase 1 finding).
+type WorkForInvoice = {
   work_id: number;
   person_id: number;
   total_required: number | null;
@@ -38,7 +41,7 @@ interface WorkForInvoice {
   patient_name: string;
   phone: string | null;
   TotalPaid: number;
-}
+};
 
 interface InvoiceData {
   workid: number;
@@ -49,7 +52,9 @@ interface InvoiceData {
   change: number | null;
 }
 
-interface PaymentRecord {
+// `type` (not `interface`): see WorkForInvoice — implicit index signature so it
+// satisfies the `z.looseObject` paymentHistory response contract via `sendData`.
+type PaymentRecord = {
   InvoiceID: number;
   work_id: number;
   amount_paid: number;
@@ -57,7 +62,7 @@ interface PaymentRecord {
   actual_amount: number | null;
   actual_cur: string | null;
   change: number | null;
-}
+};
 
 /**
  * Retrieves payments for a given patient id.

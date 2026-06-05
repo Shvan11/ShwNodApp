@@ -7,15 +7,31 @@
 // DOCTOR TYPES
 // =============================================================================
 
-/**
- * Full AlignerDoctor type matching database schema (snake_case)
- */
-export interface AlignerDoctor {
-    dr_id: number;
-    doctor_name: string;
-    doctor_email?: string | null;
-    logo_path?: string | null;
-}
+// Canonical API-boundary row types now live in the shared contract (the Phase-5
+// "fold aligner.types.ts" goal). The contract's Zod row schemas (`alignerDoctorRow`,
+// `alignerSetRow`, …) mirror these shapes EXACTLY via `z.infer`; the UI-only types
+// below (aliases, form data, hook returns) stay inline — UI state, not an API
+// boundary. We `import` them into local scope (the `WithAliases`/`Pick<>` helpers
+// below reference them) AND re-export so existing `from '.../aligner.types'`
+// imports keep resolving unchanged. See shared/contracts/aligner.contract.ts +
+// docs/shared-contract-progress.md.
+import type {
+    AlignerDoctor,
+    AlignerSet,
+    AlignerBatch,
+    AlignerNote,
+    ArchformPatient,
+    AlignerSetForMatch,
+} from '@shared/contracts/aligner.contract';
+
+export type {
+    AlignerDoctor,
+    AlignerSet,
+    AlignerBatch,
+    AlignerNote,
+    ArchformPatient,
+    AlignerSetForMatch,
+};
 
 /**
  * Extended AlignerDoctor with UI-friendly aliases
@@ -35,38 +51,6 @@ export type AlignerDoctorMinimal = Pick<AlignerDoctor, 'dr_id' | 'doctor_name'>;
 // =============================================================================
 // SET TYPES
 // =============================================================================
-
-/**
- * Full AlignerSet type matching backend snake_case response
- * This is the canonical type - use Pick<> for minimal versions
- */
-export interface AlignerSet {
-    aligner_set_id: number;
-    set_sequence: number;
-    type?: string;
-    upper_aligners_count: number;
-    lower_aligners_count: number;
-    remaining_upper_aligners: number;
-    remaining_lower_aligners: number;
-    days?: number;
-    aligner_dr_id?: number;
-    AlignerDoctorName?: string;
-    set_url?: string;
-    set_pdf_url?: string;
-    set_video?: string;
-    set_cost?: number;
-    currency?: string;
-    notes?: string;
-    archform_id?: number | null;
-    is_active: boolean;
-    creation_date?: string;
-    TotalBatches?: number;
-    DeliveredBatches?: number;
-    TotalPaid?: number;
-    Balance?: number;
-    PaymentStatus?: string;
-    UnreadActivityCount?: number;
-}
 
 /**
  * Minimal set type for batch operations
@@ -122,34 +106,6 @@ export interface AlignerSetFormData {
 // =============================================================================
 
 /**
- * Full AlignerBatch type matching backend snake_case response
- * This is the canonical type - use Pick<> for minimal versions
- */
-export interface AlignerBatch {
-    aligner_batch_id: number;
-    aligner_set_id: number;
-    batch_sequence: number;
-    upper_aligner_count?: number;
-    lower_aligner_count?: number;
-    upper_aligner_start_sequence?: number;
-    upper_aligner_end_sequence?: number;
-    lower_aligner_start_sequence?: number;
-    lower_aligner_end_sequence?: number;
-    days?: number;
-    validity_period?: number;
-    manufacture_date?: string | null;
-    delivered_to_patient_date?: string | null;
-    batch_expiry_date?: string | null;
-    notes?: string;
-    creation_date?: string;
-    // Form-specific fields (used in BatchFormDrawer)
-    is_active?: boolean;
-    is_last?: boolean;
-    has_upper_template?: boolean;
-    has_lower_template?: boolean;
-}
-
-/**
  * Minimal batch type for label printing
  * Used in useLabelModal
  */
@@ -166,20 +122,6 @@ export type AlignerBatchForLabel = Pick<AlignerBatch,
 // =============================================================================
 // NOTE TYPES
 // =============================================================================
-
-/**
- * Communication note between lab and doctor
- */
-export interface AlignerNote {
-    note_id: number;
-    aligner_set_id: number;
-    note_type: 'Lab' | 'Doctor';
-    note_text: string;
-    doctor_name?: string;
-    created_at: string;
-    is_read: boolean;
-    is_edited?: boolean;
-}
 
 // =============================================================================
 // HOOK RETURN TYPES
@@ -225,32 +167,6 @@ export interface UseSetDrawerReturn {
 // =============================================================================
 // ARCHFORM MATCHING TYPES
 // =============================================================================
-
-/**
- * Patient record from Archform SQLite database
- */
-export interface ArchformPatient {
-    Id: number;
-    Name: string;
-    LastName: string;
-    CreatedDate: string;
-    LastModifiedDate: string | null;
-}
-
-/**
- * Aligner set with patient context for Archform matching
- */
-export interface AlignerSetForMatch {
-    aligner_set_id: number;
-    work_id: number;
-    person_id: number;
-    archform_id: number | null;
-    patient_name: string;
-    first_name: string | null;
-    last_name: string | null;
-    set_sequence: number | null;
-    doctor_name: string;
-}
 
 // =============================================================================
 // HOOK RETURN TYPES (continued)

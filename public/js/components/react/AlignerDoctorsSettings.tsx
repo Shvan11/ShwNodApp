@@ -2,6 +2,7 @@ import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './AlignerDoctorsSettings.module.css';
 import type { AlignerDoctor } from '../../pages/aligner/aligner.types';
 
@@ -38,7 +39,7 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
         try {
             setLoading(true);
             setError(null);
-            const data = await fetchJSON<{ doctors?: AlignerDoctor[] }>('/api/aligner-doctors');
+            const data = await fetchJSON<{ doctors?: AlignerDoctor[] }>('/api/aligner-doctors', { schema: alignerContract.doctorsList.response });
             setDoctors(data.doctors || []);
         } catch (err) {
             console.error('Error loading doctors:', err);

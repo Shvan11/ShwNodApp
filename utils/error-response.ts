@@ -12,6 +12,7 @@
  */
 
 import type { Response } from 'express';
+import { z, type ZodType } from 'zod';
 
 /**
  * Error response structure
@@ -94,6 +95,42 @@ export function sendSuccess<T>(
 }
 
 /**
+ * Send a contract-typed success response (shared/contracts API rollout).
+ *
+ * Like `sendSuccess`, but the payload is pinned to a Zod response schema:
+ *  - COMPILE-TIME: `data` must be `z.input<S>`, so a handler that drifts from the
+ *    contract is a build error (the whole point — no more silent `undefined` in the UI).
+ *  - DEV RUNTIME: `schema.parse(data)` runs only when `NODE_ENV !== 'production'`
+ *    (mirrors `sendError`'s existing NODE_ENV gate) — fail-loud in dev, zero prod CPU.
+ *
+ * The client still re-validates via `fetchJSON({ schema })`, so the consumer's
+ * final value is identical whether or not the dev-parse reshaped it.
+ *
+ * NOTE — `data` is typed `z.input<S>`, NOT `z.infer<S>` (= `z.output`). The handler
+ * holds the PRE-serialization value, which for a `timestampString` column is a raw
+ * `Date` (the `pg` parser's `timestamp` type) — the schema's INPUT, transformed to
+ * the ISO `string` OUTPUT the client receives. For every schema without a transform
+ * (the vast majority) `z.input === z.output`, so this is a no-op; it only matters for
+ * the transform-bearing primitives, where the server legitimately passes the input.
+ *
+ * @param res - Express response object
+ * @param schema - Zod schema describing the UNWRAPPED data payload (the inner `data`)
+ * @param data - Response data (the schema's INPUT type — what the handler holds)
+ * @param message - Optional success message
+ * @param statusCode - HTTP status code (defaults to 200; pass 201 for resource creation)
+ */
+export function sendData<S extends ZodType>(
+  res: Response,
+  schema: S,
+  data: z.input<S>,
+  message: string | null = null,
+  statusCode: number = 200
+): Response {
+  const payload = process.env.NODE_ENV !== 'production' ? schema.parse(data) : data;
+  return sendSuccess(res, payload, message, statusCode);
+}
+
+/**
  * Common error response helpers
  */
 export const ErrorResponses = {
@@ -134,5 +171,6 @@ export const ErrorResponses = {
 export default {
   sendError,
   sendSuccess,
+  sendData,
   ...ErrorResponses
 };

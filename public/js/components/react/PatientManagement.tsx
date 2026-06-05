@@ -7,6 +7,7 @@ import PatientQuickSearch, { type SelectedPatient, type PatientOption } from './
 import PhoneDisplay from './PhoneDisplay';
 import Modal from './Modal';
 import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { patientSearch as patientSearchContract } from '@shared/contracts/patient.contract';
 import styles from './PatientManagement.module.css';
 
 interface Patient {
@@ -246,7 +247,7 @@ const PatientManagement = () => {
 
             const data = await fetchJSON<Patient[] | { patients?: Patient[]; totalCount?: number; hasMore?: boolean }>(
                 `/api/patients/search?${params.toString()}`,
-                { signal: abortController.signal }
+                { signal: abortController.signal, schema: patientSearchContract.response }
             );
 
             // Handle both new format {patients, totalCount, hasMore} and legacy array format
@@ -341,7 +342,7 @@ const PatientManagement = () => {
         setLastAppointmentFilter(''); setLastAppointmentCustomDate(''); setHasFinalPhotos(false);
         setCurrentOffset(0);
         setLoading(true);
-        fetchJSON<Patient[] | { patients?: Patient[]; totalCount?: number; hasMore?: boolean }>(`/api/patients/search?q=&sortBy=name&order=asc&limit=100&offset=0`)
+        fetchJSON<Patient[] | { patients?: Patient[]; totalCount?: number; hasMore?: boolean }>(`/api/patients/search?q=&sortBy=name&order=asc&limit=100&offset=0`, { schema: patientSearchContract.response })
             .then(data => {
                 // Handle both new format {patients, totalCount, hasMore} and legacy array format
                 const patientsArray: Patient[] = Array.isArray(data) ? data : (data.patients || []);

@@ -16,7 +16,13 @@ import {
     FILLING_DEPTH_OPTIONS
 } from '../../config/workTypeConfig';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import { paymentHistorySchema } from '@/core/api.schemas';
+// aliased: the component already has a `paymentHistory` state var (collision)
+import {
+    paymentHistory as paymentHistoryContract,
+    deleteInvoice as deleteInvoiceContract,
+    type PaymentHistoryResponse,
+} from '@shared/contracts/payment.contract';
+import * as workContract from '@shared/contracts/work.contract';
 import styles from './WorkComponent.module.css';
 
 interface PatientInfo {
@@ -89,15 +95,6 @@ interface ImplantManufacturer {
     name: string;
 }
 
-interface Payment {
-    InvoiceID: number;
-    date_of_payment: string;
-    amount_paid: number;
-    actual_amount?: number;
-    actual_cur?: string;
-    change?: number;
-}
-
 /** Blocking-record counts carried on a work-delete 409 (`details.dependencies`). */
 interface WorkDeleteDependencies {
     InvoiceCount?: number;
@@ -146,7 +143,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
     const [selectedWorkForPayment, setSelectedWorkForPayment] = useState<Work | null>(null);
-    const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+    const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryResponse>([]);
     const [loadingPayments, setLoadingPayments] = useState(false);
 
     // Patient info state
@@ -219,7 +216,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     const loadTeethOptions = async () => {
         try {
-            const data = await fetchJSON<{ teeth?: ToothOption[] }>('/api/teeth');
+            const data = await fetchJSON<{ teeth?: ToothOption[] }>('/api/teeth', { schema: workContract.teeth.response });
             setTeethOptions(data.teeth || []);
         } catch (err) {
             console.error('Error loading teeth options:', err);
@@ -288,7 +285,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const loadWorks = async () => {
         try {
             setLoading(true);
-            const data = await fetchJSON<Work[]>(`/api/getworks?code=${personId}`);
+            const data = await fetchJSON<Work[]>(`/api/getworks?code=${personId}`, { schema: workContract.getWorks.response });
             setWorks(data);
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to fetch works'), 5000);
@@ -470,7 +467,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     const loadWorkDetails = async (workId: number) => {
         try {
-            const data = await fetchJSON<WorkDetail[]>(`/api/getworkdetailslist?workId=${workId}`);
+            const data = await fetchJSON<WorkDetail[]>(`/api/getworkdetailslist?workId=${workId}`, { schema: workContract.getWorkDetailsList.response });
             setWorkDetails(data);
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to fetch work details'), 5000);
@@ -601,7 +598,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             return dateA.getTime() - dateB.getTime();
         });
 
-    const formatCurrency = (amount?: number, currency?: string): string => {
+    const formatCurrency = (amount?: number | null, currency?: string | null): string => {
         if (!amount && amount !== 0) return 'N/A';
         return formatCurrencyUtil(amount, currency || 'USD');
     };
@@ -633,8 +630,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const loadPaymentHistory = async (workId: number) => {
         try {
             setLoadingPayments(true);
-            const data = await fetchJSON<Payment[]>(`/api/getpaymenthistory?workId=${workId}`, {
-                schema: paymentHistorySchema, // Validate the boundary (audit H11)
+            const data = await fetchJSON<PaymentHistoryResponse>(`/api/getpaymenthistory?workId=${workId}`, {
+                schema: paymentHistoryContract.response, // Validate the boundary (audit H11)
             });
             setPaymentHistory(data);
         } catch (err) {
@@ -1279,7 +1276,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                                     if (await confirm(`Are you sure you want to delete this payment?\n\nAmount: ${formatCurrency(payment.amount_paid, selectedWorkForPayment.currency)}\nDate: ${formatDate(payment.date_of_payment)}\n\nThis action cannot be undone.`, { title: 'Delete Payment', danger: true, confirmText: 'Delete' })) {
                                                                         try {
                                                                             // Route is sendSuccess-enveloped → fetchData unwraps + throws on non-2xx.
-                                                                            await deleteJSON(`/api/deleteInvoice/${payment.InvoiceID}`);
+                                                                            await deleteJSON(`/api/deleteInvoice/${payment.InvoiceID}`, {
+                                                                                schema: deleteInvoiceContract.response, // Validate the boundary (audit H11)
+                                                                            });
                                                                             toast.success('Payment deleted successfully!');
                                                                             loadPaymentHistory(selectedWorkForPayment.work_id);
                                                                             loadWorks();

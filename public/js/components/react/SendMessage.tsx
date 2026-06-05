@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Select, { SingleValue, StylesConfig } from 'react-select';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { fetchJSON, postFormData, httpErrorMessage } from '@/core/http';
+import { patientPhones } from '@shared/contracts/patient.contract';
 
 interface ContactData {
     id?: string | number;
@@ -64,7 +65,7 @@ const SendMessage = () => {
     const loadContacts = async (source: string) => {
         try {
             const data = source === 'pat'
-                ? await fetchJSON('/api/patients/phones')
+                ? await fetchJSON('/api/patients/phones', { schema: patientPhones.response })
                 : await fetchJSON(`/api/google?source=${encodeURIComponent(source)}`);
 
             const contactsArray: ContactData[] = Array.isArray(data) ? data : [];

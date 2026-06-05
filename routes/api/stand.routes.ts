@@ -35,29 +35,21 @@ import {
   StandValidationError,
 } from '../../services/business/StandService.js';
 import { GoogleGenAI, Type } from '@google/genai';
-import { z } from 'zod';
 import { authenticate, authorize } from '../../middleware/auth.js';
-import { ErrorResponses, sendError, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendData, sendError, sendSuccess } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
-import { idParams } from '../../middleware/validation-schemas.js';
+import * as standContract from '../../shared/contracts/stand.contract.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
 
-// Boundary schemas (Zod = trust boundary). Item/sale creates REST-SPREAD `...req.body`
-// into addStandItem/validateAndCreateSale, whose query/service map EXPLICIT named columns
-// (over-posting closed downstream) — so these stay LOOSE: validate the required scalars,
-// pass the rest through. createSale's cart shape is owned by validateAndCreateSale
-// (the "validateAnd…" service is the boundary), so its POST keeps service-side validation.
-const standCategoryBodySchema = z.object({ name: z.string().min(1, 'category name is required') });
-const standScanVisionBodySchema = z.object({ images: z.array(z.string()) });
-const standCreateItemBodySchema = z.looseObject({
-  itemName: z.string().min(1),
-  costPrice: z.coerce.number(),
-  sellPrice: z.coerce.number(),
-});
-const standRestockBodySchema = z.looseObject({ quantity: z.coerce.number(), unitCost: z.coerce.number() });
-const standAdjustBodySchema = z.looseObject({ delta: z.coerce.number(), reason: z.string().min(1) });
+// Request/response shapes (the inline `stand*BodySchema` boundary schemas + the
+// `idParams` param checks) now live in shared/contracts/stand.contract.ts — shared
+// with the client. Item creates still REST-SPREAD `...req.body` into addStandItem;
+// the contract bodies stay `looseObject` so over-posting passes through to the
+// query/service (which map EXPLICIT named columns). POST /stand/sales keeps its
+// service-side cart validation — validateAndCreateSale IS the boundary — so the
+// contract pins only its response.
 
 // Singleton Gemini client — created once, reused across requests
 let geminiClient: InstanceType<typeof GoogleGenAI> | null = null;
@@ -89,7 +81,7 @@ function handleStandError(res: Response, error: unknown, fallbackMessage: string
 router.get('/stand/dashboard', async (_req: Request, res: Response): Promise<void> => {
   try {
     const kpis = await getStandDashboardKPIs();
-    sendSuccess(res, kpis);
+    sendData(res, standContract.dashboard.response, kpis);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch stand dashboard KPIs');
   }
@@ -102,7 +94,7 @@ router.get('/stand/dashboard', async (_req: Request, res: Response): Promise<voi
 router.get('/stand/categories', async (_req: Request, res: Response): Promise<void> => {
   try {
     const categories = await getStandCategories();
-    sendSuccess(res, categories);
+    sendData(res, standContract.categories.response, categories);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch stand categories');
   }
@@ -112,8 +104,8 @@ router.post(
   '/stand/categories',
   authenticate,
   authorize(['admin']),
-  validate({ body: standCategoryBodySchema }),
-  async (req: Request<unknown, unknown, { name: string }>, res: Response): Promise<void> => {
+  validate({ body: standContract.createCategory.body }),
+  async (req: Request<unknown, unknown, standContract.CreateCategoryBody>, res: Response): Promise<void> => {
     try {
       const { name } = req.body;
       if (!name || !name.trim()) {
@@ -121,7 +113,7 @@ router.post(
         return;
       }
       const result = await addStandCategory(name.trim());
-      sendSuccess(res, result, null, 201);
+      sendData(res, standContract.createCategory.response, result, null, 201);
     } catch (error) {
       handleStandError(res, error, 'Failed to create stand category');
     }
@@ -132,7 +124,7 @@ router.put(
   '/stand/categories/:id',
   authenticate,
   authorize(['admin']),
-  validate({ params: idParams('id') }),
+  validate({ params: standContract.updateCategory.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
@@ -149,7 +141,7 @@ router.delete(
   '/stand/categories/:id',
   authenticate,
   authorize(['admin']),
-  validate({ params: idParams('id') }),
+  validate({ params: standContract.deleteCategory.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
@@ -169,7 +161,7 @@ router.delete(
 router.get('/stand/items/low-stock', async (_req: Request, res: Response): Promise<void> => {
   try {
     const items = await getLowStockItems();
-    sendSuccess(res, items);
+    sendData(res, standContract.itemsLowStock.response, items);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch low stock items');
   }
@@ -179,7 +171,7 @@ router.get('/stand/items/expiring', async (req: Request, res: Response): Promise
   try {
     const days = parseInt(req.query.days as string) || 30;
     const items = await getExpiringItems(days);
-    sendSuccess(res, items);
+    sendData(res, standContract.itemsExpiring.response, items);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch expiring items');
   }
@@ -189,8 +181,8 @@ router.post(
   '/stand/items/scan-vision',
   authenticate,
   authorize(['admin', 'secretary']),
-  validate({ body: standScanVisionBodySchema }),
-  async (req: Request<unknown, unknown, { images: string[] }>, res: Response): Promise<void> => {
+  validate({ body: standContract.scanVision.body }),
+  async (req: Request<unknown, unknown, standContract.ScanVisionBody>, res: Response): Promise<void> => {
     try {
       const { images } = req.body;
 
@@ -281,7 +273,7 @@ For item_name, combine the brand name and product name as shown on packaging.`;
       const parsed = JSON.parse(result.text ?? '{}');
 
       log.info('Vision scan completed', { itemName: parsed.item_name });
-      sendSuccess(res, parsed);
+      sendData(res, standContract.scanVision.response, parsed);
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
       if (errMsg.includes('429') || errMsg.includes('quota')) {
@@ -303,7 +295,7 @@ router.get('/stand/items/barcode/:barcode', async (req: Request<{ barcode: strin
   try {
     const item = await getStandItemByBarcode(req.params.barcode);
     if (!item) { ErrorResponses.notFound(res, 'Item'); return; }
-    sendSuccess(res, item);
+    sendData(res, standContract.itemByBarcode.response, item);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch item by barcode');
   }
@@ -322,7 +314,7 @@ router.get(
         stockStatus: req.query.stockStatus as 'in-stock' | 'low-stock' | 'out-of-stock' | undefined,
         includeInactive: req.query.includeInactive === 'true',
       });
-      sendSuccess(res, items);
+      sendData(res, standContract.items.response, items);
     } catch (error) {
       handleStandError(res, error, 'Failed to fetch stand items');
     }
@@ -335,7 +327,7 @@ router.get('/stand/items/:id', async (req: Request<{ id: string }>, res: Respons
     if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
     const item = await getStandItemById(id);
     if (!item) { ErrorResponses.notFound(res, 'Item'); return; }
-    sendSuccess(res, item);
+    sendData(res, standContract.itemById.response, item);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch stand item');
   }
@@ -345,7 +337,11 @@ router.post(
   '/stand/items',
   authenticate,
   authorize(['admin', 'secretary']),
-  validate({ body: standCreateItemBodySchema }),
+  validate({ body: standContract.createItem.body }),
+  // Body left untyped (`req.body: any`): the handler's `costPrice === undefined`
+  // guards would be TS2367 ("no overlap") against the contract's `number` fields,
+  // and validate() already enforces the contract shape at the boundary. The
+  // CreateItemBody z.infer remains the SSoT (shared with the client).
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { itemName, costPrice, sellPrice } = req.body;
@@ -355,7 +351,7 @@ router.post(
       }
       const userId = req.session?.userId ?? null;
       const result = await addStandItem({ ...req.body, createdBy: userId });
-      sendSuccess(res, result, null, 201);
+      sendData(res, standContract.createItem.response, result, null, 201);
     } catch (error) {
       handleStandError(res, error, 'Failed to create stand item');
     }
@@ -366,7 +362,7 @@ router.put(
   '/stand/items/:id',
   authenticate,
   authorize(['admin', 'secretary']),
-  validate({ params: idParams('id') }),
+  validate({ params: standContract.updateItem.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
@@ -383,7 +379,7 @@ router.delete(
   '/stand/items/:id',
   authenticate,
   authorize(['admin']),
-  validate({ params: idParams('id') }),
+  validate({ params: standContract.deleteItem.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
@@ -400,7 +396,9 @@ router.post(
   '/stand/items/:id/restock',
   authenticate,
   authorize(['admin', 'secretary']),
-  validate({ params: idParams('id'), body: standRestockBodySchema }),
+  validate({ params: standContract.restock.params, body: standContract.restock.body }),
+  // Body untyped: the `unitCost === undefined` guard would be TS2367 against the
+  // contract's `number`; validate({ body: restock.body }) enforces the shape.
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
@@ -423,7 +421,9 @@ router.post(
   '/stand/items/:id/adjust',
   authenticate,
   authorize(['admin']),
-  validate({ params: idParams('id'), body: standAdjustBodySchema }),
+  validate({ params: standContract.adjust.params, body: standContract.adjust.body }),
+  // Body untyped: the `delta === undefined` guard would be TS2367 against the
+  // contract's `number`; validate({ body: adjust.body }) enforces the shape.
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
@@ -451,7 +451,7 @@ router.get('/stand/items/:id/movements', async (req: Request<{ id: string }>, re
       endDate: req.query.endDate as string | undefined,
       movementType: req.query.movementType as string | undefined,
     });
-    sendSuccess(res, movements);
+    sendData(res, standContract.itemMovements.response, movements);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch stock movements');
   }
@@ -469,7 +469,7 @@ router.post(
     try {
       const cashierId = req.session?.userId ?? null;
       const result = await validateAndCreateSale({ ...req.body, cashierId });
-      sendSuccess(res, result, null, 201);
+      sendData(res, standContract.createSale.response, result, null, 201);
     } catch (error) {
       handleStandError(res, error, 'Failed to create sale');
     }
@@ -491,7 +491,7 @@ router.get(
         limit: req.query.limit ? parseInt(req.query.limit) : undefined,
         offset: req.query.offset ? parseInt(req.query.offset) : undefined,
       });
-      sendSuccess(res, sales);
+      sendData(res, standContract.sales.response, sales);
     } catch (error) {
       handleStandError(res, error, 'Failed to fetch sales');
     }
@@ -504,7 +504,7 @@ router.get('/stand/sales/:id', async (req: Request<{ id: string }>, res: Respons
     if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid sale id'); return; }
     const sale = await getStandSaleById(id);
     if (!sale) { ErrorResponses.notFound(res, 'Sale'); return; }
-    sendSuccess(res, sale);
+    sendData(res, standContract.saleById.response, sale);
   } catch (error) {
     handleStandError(res, error, 'Failed to fetch sale');
   }
@@ -514,7 +514,7 @@ router.post(
   '/stand/sales/:id/void',
   authenticate,
   authorize(['admin']),
-  validate({ params: idParams('id') }),
+  validate({ params: standContract.voidSale.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
@@ -553,7 +553,7 @@ router.get(
         getStandSalesSummary(startDate, endDate),
         getStandPurchasesSummary(startDate, endDate),
       ]);
-      sendSuccess(res, { salesSummary, purchases });
+      sendData(res, standContract.reportSummary.response, { salesSummary, purchases });
     } catch (error) {
       handleStandError(res, error, 'Failed to fetch stand report summary');
     }
@@ -574,7 +574,7 @@ router.get(
       }
       const limit = parseInt(req.query.limit || '10');
       const topItems = await getTopSellingItems(startDate, endDate, limit);
-      sendSuccess(res, topItems);
+      sendData(res, standContract.reportTopItems.response, topItems);
     } catch (error) {
       handleStandError(res, error, 'Failed to fetch top selling items');
     }

@@ -137,7 +137,10 @@ export default defineConfig(({ mode }) => {
     alias: {
       '@': resolve(publicRoot, 'js'),
       '@components': resolve(publicRoot, 'js/components'),
-      '@services': resolve(publicRoot, 'js/services')
+      '@services': resolve(publicRoot, 'js/services'),
+      // Shared API contracts (shared/contracts/*) + Zod primitives (shared/validation.ts),
+      // imported by both the React bundle (this alias) and the Express routes (relative .js).
+      '@shared': resolve(projectRoot, 'shared')
     }
   },
   optimizeDeps: {

@@ -11,7 +11,6 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { z } from 'zod';
 import { sql, type RawBuilder } from 'kysely';
 import { log } from '../../utils/logger.js';
 import { isUniqueViolation } from '../../utils/pg-errors.js';
@@ -37,9 +36,9 @@ import {
   getPatientCreationDate
 } from '../../middleware/time-based-auth.js';
 import { getOption } from '../../services/database/queries/options-queries.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
-import { idParams, numericParam, intId, optionalDateString } from '../../middleware/validation-schemas.js';
+import * as patientContract from '../../shared/contracts/patient.contract.js';
 import * as PatientService from '../../services/business/PatientService.js';
 import { PatientValidationError } from '../../services/business/PatientService.js';
 import { transliterateNameToEnglish } from '../../services/business/name-transliteration.js';
@@ -73,7 +72,11 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface PatientSearchResult {
+// `type` (not interface) — feeds the tightened looseObject `patientSearch`
+// response via `sendData`; an interface isn't assignable to the inferred string
+// index signature (TS2345). See the looseObject-index-signature Finding in
+// docs/shared-contract-progress.md.
+type PatientSearchResult = {
   person_id: number;
   patient_name: string;
   first_name: string | null;
@@ -99,7 +102,7 @@ interface PatientSearchResult {
   PatientTypeName: string | null;
   TagName: string | null;
   ActiveWorkTypes: string | null;
-}
+};
 
 interface CreatePatientBody {
   patientName: string;
@@ -157,42 +160,24 @@ interface UpdateAlertBody {
   alertDetails: string;
 }
 
-// ── Boundary schemas (Zod = trust boundary) ──
-// create/update patient build/spread into createPatient/updatePatient, whose query
-// layer writes EXPLICIT named columns (over-posting closed downstream) — so LOOSE:
-// validate name presence + a real-calendar (empty-tolerant) DOB, pass the rest through.
-const createPatientBodySchema = z.looseObject({
-  patientName: z.string().min(1, 'Patient name is required'),
-  dateOfBirth: optionalDateString,
-});
-const updatePatientBodySchema = z.looseObject({
-  patient_name: z.string().min(1, 'Patient name is required'),
-  date_of_birth: optionalDateString,
-});
-const estimatedCostBodySchema = z.looseObject({ estimatedCost: z.coerce.number(), currency: z.string() });
-const alertBodySchema = z.looseObject({ alertTypeId: intId, alertDetails: z.string().min(1) });
-const alertStatusBodySchema = z.object({ isActive: z.boolean() });
-const portalEnableBodySchema = z.object({ enabled: z.boolean() });
-const photoVisibilityBodySchema = z.looseObject({ name: z.string().min(1), isPrivate: z.boolean() });
-const personIdParams = idParams('personId');
-const alertIdParams = idParams('alertId');
-// PUT /timepoints/:tpCode — fixes the H10 weak-date sub-issue (the inline regex at
-// the old :362 accepted 2024-02-30); dateString's refine rejects impossible dates.
-const timepointParams = z.object({ personId: numericParam, tpCode: numericParam });
-const timepointUpdateBodySchema = z.object({
-  tpDescription: z.string().optional(),
-  tpDateTime: optionalDateString,
-});
+// Request schemas + the shared param schemas (`personIdParams`/`alertIdParams`/
+// `timepointParams`) now live in shared/contracts/patient.contract.ts (imported as
+// `patientContract`) — shared with the client. The create/update/alert/photo bodies
+// keep their loose guard there; the handlers below keep their local hand-written
+// body interfaces (CreatePatientBody, UpdatePatientBody, CreateAlertBody, …) for
+// typing — the loose contract can't enumerate those full shapes (see the caveat).
+const { personIdParams, alertIdParams, timepointParams } = patientContract;
 
-interface TagOption {
+// `type` (not interface) — feed looseObject `sendData` responses (tag/type options).
+type TagOption = {
   id: number;
   tag: string;
-}
+};
 
-interface PatientTypeOption {
+type PatientTypeOption = {
   id: number;
   type: string;
-}
+};
 
 // ============================================================================
 // PATIENT INFORMATION ROUTES
@@ -211,7 +196,7 @@ router.get(
     try {
       const { personId } = req.params;
       const info = await PatientService.getPatientInfo(personId);
-      sendSuccess(res, info);
+      sendData(res, patientContract.patientInfo.response, info);
     } catch (error) {
       if (error instanceof PatientValidationError) {
         ErrorResponses.badRequest(res, error.message, {
@@ -239,7 +224,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const patientsFolder = await getOption('PatientsFolder');
-      sendSuccess(res, { patientsFolder: patientsFolder || '' });
+      sendData(res, patientContract.patientsFolder.response, { patientsFolder: patientsFolder || '' });
     } catch (error) {
       log.error('Error fetching PatientsFolder setting:', error);
       ErrorResponses.internalError(
@@ -268,7 +253,7 @@ router.get(
     try {
       const { personId } = req.params;
       const timepoints = await PatientService.getPatientTimePoints(personId);
-      sendSuccess(res, timepoints);
+      sendData(res, patientContract.timepoints.response, timepoints);
     } catch (error) {
       if (error instanceof PatientValidationError) {
         ErrorResponses.badRequest(res, error.message, {
@@ -303,7 +288,7 @@ router.get(
         personId,
         tp
       );
-      sendSuccess(res, timepointimgs);
+      sendData(res, patientContract.timepointImages.response, timepointimgs);
     } catch (error) {
       if (error instanceof PatientValidationError) {
         ErrorResponses.badRequest(res, error.message, {
@@ -345,7 +330,7 @@ router.get(
       }
       const folder = timepointFolderName(existing.tp_description ?? '', existing.tp_date_time);
       const exists = folder ? await entryExists(personId, folder) : false;
-      sendSuccess(res, { folder, exists });
+      sendData(res, patientContract.timepointFolder.response, { folder, exists });
     } catch (error) {
       log.error('Error checking time point folder:', error);
       ErrorResponses.internalError(res, 'Failed to check time point folder', error as Error);
@@ -372,7 +357,7 @@ function parseLocalDate(s: string): Date | null {
 router.put(
   '/patients/:personId/timepoints/:tpCode',
   authorize(['admin', 'secretary']),
-  validate({ params: timepointParams, body: timepointUpdateBodySchema }),
+  validate({ params: timepointParams, body: patientContract.updateTimepoint.body }),
   async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
     try {
       const personId = Number.parseInt(req.params.personId, 10);
@@ -456,7 +441,7 @@ router.put(
         }
       }
 
-      sendSuccess(res, { tpCode, tp_description: finalName, tp_date_time: finalDate });
+      sendData(res, patientContract.updateTimepoint.response, { tpCode, tp_description: finalName, tp_date_time: finalDate });
     } catch (error) {
       log.error('Error updating time point:', error);
       ErrorResponses.internalError(res, 'Failed to update time point', error as Error);
@@ -526,7 +511,7 @@ router.delete(
       }
 
       log.info('[TimePoint] deleted', { userId: req.session?.userId, personId, tpCode, scope });
-      sendSuccess(res, { scope });
+      sendData(res, patientContract.deleteTimepoint.response, { scope });
     } catch (error) {
       log.error('Error deleting time point:', error);
       ErrorResponses.internalError(res, 'Failed to delete time point', error as Error);
@@ -547,7 +532,7 @@ router.get(
     try {
       const { personId, tp } = req.params;
       const images = await imaging.getImageSizes(personId, tp);
-      sendSuccess(res, images);
+      sendData(res, patientContract.gallery.response, images);
     } catch (error) {
       log.error('Error getting gallery images:', error);
       ErrorResponses.internalError(res, 'Failed to load gallery images', {
@@ -609,7 +594,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const phonesList = await getPatientsPhones();
-      sendSuccess(res, phonesList);
+      sendData(res, patientContract.patientPhones.response, phonesList);
     } catch (error) {
       log.error('Error fetching patients phones:', error);
       ErrorResponses.internalError(
@@ -863,7 +848,7 @@ router.get(
 
       const hasMore = offset + patients.length < totalCount;
 
-      sendSuccess(res, {
+      sendData(res, patientContract.patientSearch.response, {
         patients,
         totalCount,
         hasMore
@@ -895,7 +880,7 @@ router.get(
       const { rows: tags } = await sql<TagOption>`
         SELECT "id" as "id", "tag" as "tag" FROM "tag_options" ORDER BY "tag"
       `.execute(getKysely());
-      sendSuccess(res, tags);
+      sendData(res, patientContract.tagOptions.response, tags);
     } catch (error) {
       log.error('Error fetching tag options:', error);
       ErrorResponses.internalError(
@@ -919,7 +904,7 @@ router.get(
       const { rows: types } = await sql<PatientTypeOption>`
         SELECT "id" as "id", "patient_type" as "type" FROM "patient_types" ORDER BY "patient_type"
       `.execute(getKysely());
-      sendSuccess(res, types);
+      sendData(res, patientContract.typeOptions.response, types);
     } catch (error) {
       log.error('Error fetching patient type options:', error);
       ErrorResponses.internalError(
@@ -973,7 +958,7 @@ router.get(
       const patientWithAlerts = patient as typeof patient & { alerts: typeof alerts };
       patientWithAlerts.alerts = alerts;
 
-      sendSuccess(res, patientWithAlerts);
+      sendData(res, patientContract.patientById.response, patientWithAlerts);
     } catch (error) {
       log.error('Error fetching patient:', error);
       ErrorResponses.internalError(
@@ -991,7 +976,7 @@ router.get(
  */
 router.post(
   '/patients',
-  validate({ body: createPatientBodySchema }),
+  validate({ body: patientContract.createPatient.body }),
   async (
     req: Request<unknown, unknown, CreatePatientBody>,
     res: Response
@@ -1050,7 +1035,7 @@ router.post(
       // Create the patient
       const result = await createPatient(processedData);
 
-      sendSuccess(res, { personId: result.personId }, 'Patient created successfully');
+      sendData(res, patientContract.createPatient.response, { personId: result.personId }, 'Patient created successfully');
 
       // English first/last not supplied → auto-fill by romanizing the Arabic patientName
       // with Gemini, AFTER responding so the create request never blocks on the API call.
@@ -1107,7 +1092,7 @@ router.post(
  */
 router.put(
   '/patients/:personId',
-  validate({ params: personIdParams, body: updatePatientBodySchema }),
+  validate({ params: personIdParams, body: patientContract.updatePatient.body }),
   async (
     req: Request<{ personId: string }, unknown, UpdatePatientBody>,
     res: Response
@@ -1220,8 +1205,9 @@ router.delete(
           error: (dolphinErr as Error).message,
         });
       }
-      sendSuccess(
+      sendData(
         res,
+        patientContract.deletePatient.response,
         { folderRemoved },
         folderRemoved
           ? 'Patient and folder deleted successfully'
@@ -1250,7 +1236,7 @@ router.put(
   '/patients/:personId/estimated-cost',
   authenticate,
   authorize(['admin', 'secretary', 'doctor']),
-  validate({ params: personIdParams, body: estimatedCostBodySchema }),
+  validate({ params: personIdParams, body: patientContract.estimatedCost.body }),
   async (
     req: Request<{ personId: string }, unknown, { estimatedCost: number; currency: string }>,
     res: Response
@@ -1309,7 +1295,7 @@ router.get(
       }
 
       const alerts = await getAlertsByPersonId(personId);
-      sendSuccess(res, alerts);
+      sendData(res, patientContract.alerts.response, alerts);
     } catch (error) {
       log.error('Error fetching patient alerts:', error);
       ErrorResponses.internalError(
@@ -1329,7 +1315,7 @@ router.post(
   '/patients/:personId/alerts',
   authenticate,
   authorize(['admin', 'secretary', 'doctor']),
-  validate({ params: personIdParams, body: alertBodySchema }),
+  validate({ params: personIdParams, body: patientContract.alertBody }),
   async (
     req: Request<{ personId: string }, unknown, CreateAlertBody>,
     res: Response
@@ -1372,7 +1358,7 @@ router.put(
   '/alerts/:alertId/status',
   authenticate,
   authorize(['admin', 'secretary', 'doctor']),
-  validate({ params: alertIdParams, body: alertStatusBodySchema }),
+  validate({ params: alertIdParams, body: patientContract.alertStatus.body }),
   async (
     req: Request<{ alertId: string }, unknown, UpdateAlertStatusBody>,
     res: Response
@@ -1409,7 +1395,7 @@ router.put(
   '/alerts/:alertId',
   authenticate,
   authorize(['admin', 'secretary', 'doctor']),
-  validate({ params: alertIdParams, body: alertBodySchema }),
+  validate({ params: alertIdParams, body: patientContract.alertBody }),
   async (
     req: Request<{ alertId: string }, unknown, UpdateAlertBody>,
     res: Response
@@ -1469,7 +1455,7 @@ router.get(
 
       const hasAppointment = await hasNextAppointment(personId);
 
-      sendSuccess(res, { hasAppointment });
+      sendData(res, patientContract.hasAppointment.response, { hasAppointment });
     } catch (error) {
       log.error(
         `Error checking appointment for patient ${req.params.personId}:`,
@@ -1506,7 +1492,7 @@ router.get(
         PatientPortalService.getStatus(personId),
         PatientPortalService.getQrDataUrl(personId),
       ]);
-      sendSuccess(res, {
+      sendData(res, patientContract.portalStatus.response, {
         enabled: status.enabled,
         hasPin: status.hasPin,
         lockedUntil: status.lockedUntil,
@@ -1538,7 +1524,7 @@ router.post(
         return;
       }
       const pin = await PatientPortalService.resetToDefaultPin(personId);
-      sendSuccess(res, { pin });
+      sendData(res, patientContract.resetPin.response, { pin });
     } catch (error) {
       const msg = (error as Error).message;
       log.warn('Portal reset-pin failed', { error: msg });
@@ -1554,7 +1540,7 @@ router.post(
 router.post(
   '/patients/:personId/portal/enable',
   authorize(['admin', 'secretary']),
-  validate({ params: personIdParams, body: portalEnableBodySchema }),
+  validate({ params: personIdParams, body: patientContract.portalEnable.body }),
   async (
     req: Request<{ personId: string }, unknown, { enabled: boolean }>,
     res: Response
@@ -1620,7 +1606,7 @@ router.get(
         return;
       }
       const rows = await PatientPortalService.getPrivateList(personId);
-      sendSuccess(res, {
+      sendData(res, patientContract.photoVisibilityList.response, {
         privateImages: rows.map((r) => ({ tp: r.timepoint_code, name: r.image_name })),
       });
     } catch (error) {
@@ -1637,7 +1623,7 @@ router.get(
 router.post(
   '/patients/:personId/photos/visibility',
   authorize(['admin', 'secretary']),
-  validate({ params: personIdParams, body: photoVisibilityBodySchema }),
+  validate({ params: personIdParams, body: patientContract.photoVisibility.body }),
   async (
     req: Request<
       { personId: string },

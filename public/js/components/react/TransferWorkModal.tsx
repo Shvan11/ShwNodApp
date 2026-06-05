@@ -4,6 +4,7 @@ import Modal from './Modal';
 import { useToast } from '../../contexts/ToastContext';
 import PatientQuickSearch, { type SelectedPatient } from './PatientQuickSearch';
 import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { transferPreview as transferPreviewContract } from '@shared/contracts/work.contract';
 
 /**
  * Work data for transfer
@@ -77,7 +78,7 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
   const loadPreview = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
-      const data = await fetchJSON<TransferPreview>(`/api/work/${work.work_id}/transfer-preview`);
+      const data = await fetchJSON<TransferPreview>(`/api/work/${work.work_id}/transfer-preview`, { schema: transferPreviewContract.response });
       setPreview(data);
       setStep('confirm');
     } catch (error) {

@@ -3,6 +3,7 @@ import React, { useState, useEffect, type ChangeEvent, type ReactNode } from 're
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
+import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './AllSetsList.module.css';
 
 interface AlignerSetView {
@@ -50,7 +51,8 @@ const AllSetsList: React.FC = () => {
         try {
             setLoading(true);
             const data = await fetchJSON<{ sets?: AlignerSetView[] }>(
-                '/api/aligner/all-sets'
+                '/api/aligner/all-sets',
+                { schema: alignerContract.allSets.response }
             );
 
             setSets(data.sets || []);

@@ -15,7 +15,6 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { z } from 'zod';
 import { log } from '../../utils/logger.js';
 import { sql } from 'kysely';
 import { getKysely } from '../../services/database/kysely.js';
@@ -32,9 +31,21 @@ import {
   requireRecordAge,
   getInvoiceCreationDate
 } from '../../middleware/time-based-auth.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
-import { idParams, intId, dateString } from '../../middleware/validation-schemas.js';
+import {
+  paymentHistory,
+  workForReceipt,
+  activeWorkForInvoice,
+  currentExchangeRate,
+  exchangeRateForDate,
+  exchangeRates,
+  updateExchangeRate,
+  addInvoice,
+  deleteInvoice,
+  type UpdateExchangeRateBody,
+  type AddInvoiceBody,
+} from '../../shared/contracts/payment.contract.js';
 import {
   validateAndCreateInvoice,
   PaymentValidationError
@@ -42,21 +53,10 @@ import {
 
 const router = Router();
 
-// Boundary schemas (Zod = trust boundary). The handlers/PaymentService own the
-// money rules (cross-currency change, ≥1 currency > 0, non-negative amounts); the
-// boundary only NaN-proofs the ids, enforces a real-calendar payment/exchange date
-// (the H10 "zero date validation in payment" sub-issue), and ensures numeric amounts.
-// addInvoice stays LOOSE so the optional usd/iqd/change currency fields pass through
-// to the service (which reads them with `?? 0`).
-const exchangeRateBodySchema = z.object({
-  date: dateString,
-  exchangeRate: z.coerce.number().positive(),
-});
-const addInvoiceBodySchema = z.looseObject({
-  workid: intId,
-  amountPaid: z.coerce.number(),
-  paymentDate: dateString,
-});
+// Request/response shapes (incl. the money rules' trust boundary) now live in
+// shared/contracts/payment.contract.ts — imported above, shared with the client.
+// The handlers/PaymentService still own the money rules (cross-currency change,
+// ≥1 currency > 0, non-negative amounts, overpayment block).
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -69,32 +69,21 @@ interface PaymentQueryParams {
   PID?: string;
 }
 
-interface WorkForReceiptResult {
+// `type` (not `interface`) so it carries an implicit string index signature and
+// is assignable to the `z.looseObject` workForReceipt response contract that
+// `sendData` validates against (see shared-contract-progress.md, Phase 1 finding).
+type WorkForReceiptResult = {
   person_id: number;
   patient_name: string;
   phone: string | null;
   TotalPaid: number;
   app_date: Date;
-  workid: number;
+  work_id: number;
   total_required: number;
   currency: string;
   discount: number | null;
   discount_date: Date | null;
-}
-
-interface ExchangeRateForDateBody {
-  date: string;
-  exchangeRate: number;
-}
-
-interface AddInvoiceBody {
-  workid: number;
-  amountPaid: number;
-  paymentDate: string;
-  usdReceived?: number;
-  iqdReceived?: number;
-  change?: number;
-}
+};
 
 // ============================================================================
 // PAYMENT RETRIEVAL ROUTES
@@ -117,7 +106,7 @@ router.get(
         return;
       }
       const payments = await getPaymentHistoryByWorkId(parseInt(workId));
-      sendSuccess(res, payments);
+      sendData(res, paymentHistory.response, payments);
     } catch (error) {
       log.error('Error fetching payment history:', error);
       ErrorResponses.internalError(
@@ -179,7 +168,7 @@ router.get(
         return;
       }
 
-      sendSuccess(res, result[0]);
+      sendData(res, workForReceipt.response, result[0]);
     } catch (error) {
       log.error('Error fetching work for receipt:', error);
       ErrorResponses.internalError(
@@ -209,7 +198,7 @@ router.get(
       }
 
       const workData = await getActiveWorkForInvoice(parseInt(PID, 10));
-      sendSuccess(res, workData);
+      sendData(res, activeWorkForInvoice.response, workData);
     } catch (error) {
       log.error('Error getting active work for invoice:', error);
       ErrorResponses.internalError(
@@ -244,7 +233,7 @@ router.get(
         return;
       }
 
-      sendSuccess(res, { exchangeRate });
+      sendData(res, currentExchangeRate.response, { exchangeRate });
     } catch (error) {
       log.error('Error getting exchange rate:', error);
       ErrorResponses.internalError(
@@ -281,7 +270,7 @@ router.get(
         return;
       }
 
-      sendSuccess(res, { exchangeRate, date });
+      sendData(res, exchangeRateForDate.response, { exchangeRate, date });
     } catch (error) {
       log.error('Error getting exchange rate for date:', error);
       ErrorResponses.internalError(
@@ -312,7 +301,7 @@ router.get(
       }
 
       const rates = await listExchangeRates(from, to);
-      sendSuccess(res, { rates });
+      sendData(res, exchangeRates.response, { rates });
     } catch (error) {
       log.error('Error listing exchange rates:', error);
       ErrorResponses.internalError(
@@ -331,9 +320,9 @@ router.get(
  */
 router.post(
   '/updateExchangeRateForDate',
-  validate({ body: exchangeRateBodySchema }),
+  validate({ body: updateExchangeRate.body }),
   async (
-    req: Request<unknown, unknown, ExchangeRateForDateBody>,
+    req: Request<unknown, unknown, UpdateExchangeRateBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -348,7 +337,7 @@ router.post(
       }
 
       const result = await updateExchangeRateForDate(date, exchangeRate);
-      sendSuccess(res, { result, date, exchangeRate });
+      sendData(res, updateExchangeRate.response, { result, date, exchangeRate });
     } catch (error) {
       log.error('Error updating exchange rate for date:', error);
       ErrorResponses.internalError(
@@ -387,7 +376,7 @@ router.post(
  */
 router.post(
   '/addInvoice',
-  validate({ body: addInvoiceBodySchema }),
+  validate({ body: addInvoice.body }),
   async (
     req: Request<unknown, unknown, AddInvoiceBody>,
     res: Response
@@ -414,7 +403,7 @@ router.post(
         change: change ?? 0
       });
 
-      sendSuccess(res, result);
+      sendData(res, addInvoice.response, result);
     } catch (error) {
       log.error('Error adding invoice:', error);
 
@@ -454,7 +443,7 @@ router.delete(
   '/deleteInvoice/:invoiceId',
   authenticate,
   authorize(['admin', 'secretary']),
-  validate({ params: idParams('invoiceId') }),
+  validate({ params: deleteInvoice.params }),
   requireRecordAge({
     resourceType: 'invoice',
     operation: 'delete',
@@ -479,7 +468,7 @@ router.delete(
         return;
       }
 
-      sendSuccess(res, { rowsAffected }, 'Invoice deleted successfully');
+      sendData(res, deleteInvoice.response, { rowsAffected }, 'Invoice deleted successfully');
     } catch (error) {
       log.error('Error deleting invoice:', error);
       ErrorResponses.internalError(

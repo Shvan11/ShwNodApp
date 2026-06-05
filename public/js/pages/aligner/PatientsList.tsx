@@ -2,6 +2,7 @@
 import React, { useState, useEffect, ChangeEvent, SyntheticEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchJSON } from '@/core/http';
+import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './PatientsList.module.css';
 
 interface Doctor {
@@ -45,7 +46,8 @@ const PatientsList: React.FC = () => {
             if (doctorId !== 'all') {
                 try {
                     const doctorData = await fetchJSON<{ doctors?: Doctor[] }>(
-                        '/api/aligner/doctors'
+                        '/api/aligner/doctors',
+                        { schema: alignerContract.alignerDoctors.response }
                     );
                     const foundDoctor = doctorData.doctors?.find((d: Doctor) => d.dr_id === parseInt(doctorId || ''));
                     setDoctor(foundDoctor || { dr_id: 0, doctor_name: 'Unknown Doctor' });
@@ -61,7 +63,11 @@ const PatientsList: React.FC = () => {
                 ? '/api/aligner/patients/all'
                 : `/api/aligner/patients/by-doctor/${doctorId}`;
 
-            const data = await fetchJSON<{ patients?: Patient[] }>(url);
+            const data = await fetchJSON<{ patients?: Patient[] }>(url, {
+                schema: doctorId === 'all'
+                    ? alignerContract.allPatients.response
+                    : alignerContract.patientsByDoctor.response,
+            });
 
             setPatients(data.patients || []);
         } catch (error) {

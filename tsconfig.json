@@ -25,6 +25,7 @@
   },
   "include": [
     "index.ts",
+    "shared/**/*.ts",
     "config/**/*.ts",
     "services/**/*.ts",
     "routes/**/*.ts",

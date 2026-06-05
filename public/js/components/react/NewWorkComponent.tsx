@@ -9,6 +9,7 @@ import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { fetchJSON, postJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import * as workContract from '@shared/contracts/work.contract';
 import Modal from './Modal';
 import styles from './NewWorkComponent.module.css';
 
@@ -182,8 +183,8 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
             // Independent dropdowns — each tolerates its own failure so one bad
             // lookup doesn't blank the rest, matching the old per-`res.ok` guards.
             const [types, kw, employeesData] = await Promise.all([
-                fetchJSON<WorkType[]>('/api/getworktypes').catch(() => null),
-                fetchJSON<Keyword[]>('/api/getworkkeywords').catch(() => null),
+                fetchJSON<WorkType[]>('/api/getworktypes', { schema: workContract.getWorkTypes.response }).catch(() => null),
+                fetchJSON<Keyword[]>('/api/getworkkeywords', { schema: workContract.getWorkKeywords.response }).catch(() => null),
                 fetchJSON<{ employees?: Doctor[] }>('/api/employees?percentage=true').catch(() => null)
             ]);
 
@@ -203,7 +204,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
 
         try {
             setLoading(true);
-            const works = await fetchJSON<WorkResponse[]>(`/api/getworks?code=${personId}`);
+            const works = await fetchJSON<WorkResponse[]>(`/api/getworks?code=${personId}`, { schema: workContract.getWorks.response });
             const work = works.find(w => w.work_id === workId);
 
             if (work) {
