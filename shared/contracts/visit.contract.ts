@@ -89,3 +89,13 @@ export const deleteVisit = {
   body: z.object({ visitId: intId }),
 } as const;
 export type DeleteVisitBody = z.infer<typeof deleteVisit.body>;
+
+// Shared GET query for the visit read endpoints. Type-only (handlers parse manually;
+// the per-endpoint numericParam query schemas above stay the validated boundary).
+export const visitQuery = z.object({
+  PID: z.string().optional(),
+  VID: z.string().optional(),
+  workId: z.string().optional(),
+  visitId: z.string().optional(),
+});
+export type VisitQueryParams = z.infer<typeof visitQuery>;

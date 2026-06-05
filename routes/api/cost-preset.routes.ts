@@ -37,9 +37,7 @@ type currency = 'IQD' | 'USD' | 'EUR';
 /**
  * Query params for filtering cost presets
  */
-interface CostPresetQuery {
-  currency?: string;
-}
+type CostPresetQuery = costPreset.CostPresetQuery;
 
 /**
  * Route params for cost preset by id.

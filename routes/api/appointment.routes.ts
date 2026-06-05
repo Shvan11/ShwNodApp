@@ -50,10 +50,7 @@ export function setWebSocketEmitter(emitter: EventEmitter): void {
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface AppointmentQueryParams {
-  PDate?: string;
-  AppsDate?: string;
-}
+type AppointmentQueryParams = appointment.AppointmentQueryParams;
 
 type QuickCheckInBody = appointment.QuickCheckinBody;
 

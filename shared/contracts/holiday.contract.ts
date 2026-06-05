@@ -15,5 +15,7 @@ const anyArray = z.array(z.unknown());
 
 // GET /api/holidays/appointments-on-date?date= → { appointments, count }.
 export const appointmentsOnDate = {
+  query: z.object({ date: z.string().optional() }),
   response: z.object({ appointments: anyArray, count: z.number() }),
 } as const;
+export type DateQuery = z.infer<typeof appointmentsOnDate.query>;

@@ -6,6 +6,7 @@ import Modal from './Modal';
 import { parseLocalDate } from '../../utils/calendarDate';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import * as holiday from '@shared/contracts/holiday.contract';
+import * as lookupAdminContract from '@shared/contracts/lookup-admin.contract';
 
 interface Column {
     name: string;
@@ -167,7 +168,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
     const loadItems = useCallback(async () => {
         try {
             setLoading(true);
-            const data = await fetchJSON<HolidayItem[]>(`/api/admin/lookups/${tableKey}`);
+            const data = await fetchJSON<HolidayItem[]>(`/api/admin/lookups/${tableKey}`, { schema: lookupAdminContract.items.response });
             setItems(data);
         } catch (err) {
             toast.error(httpErrorMessage(err, `Failed to load ${tableName}`));

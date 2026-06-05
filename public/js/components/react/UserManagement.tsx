@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import * as authContract from '@shared/contracts/auth.contract';
 import styles from './UserManagement.module.css';
 
 interface UserInfo {
@@ -34,7 +35,7 @@ export default function UserManagement() {
   useEffect(() => {
     async function fetchUserInfo() {
       try {
-        const data = await fetchJSON<{ success: boolean; user?: UserInfo }>('/api/auth/me');
+        const data = await fetchJSON<{ success: boolean; user?: UserInfo }>('/api/auth/me', { schema: authContract.me.response });
         if (data.success && data.user) {
           setUserInfo(data.user);
         }

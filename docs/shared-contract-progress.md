@@ -94,6 +94,104 @@ exercised end-to-end on real data.
 
 ---
 
+## Tier completion (Wave 3 — "100% rollout")
+
+> **Plan:** `~/.claude/plans/here-is-a-draft-toasty-shannon.md` — *"Finish the shared-contract rollout
+> to 100% — client wiring, response modeling, params/query, lock-in."* Delivery is **plan-only / user-driven
+> sessions**: Phase 0 (this scaffold) landed; Phases 1–5 each run in their own gated session.
+
+The body tier is done (zero `interface *Body` in `routes/`). Three tiers remain open across the full
+request+response surface, now measured by `npm run contracts:check` (`scripts/contracts-dod.mjs`,
+report-only until Phase 5 flips `STRICT`):
+
+| Tier | DoD | Phase-0 baseline (2026-06-05) | Target |
+|------|-----|-------------------------------|--------|
+| **D1** — hand-written request interfaces (`*Body\|*Params\|*Query\|*Filters`) in `routes/` | grep = 0 | **33** | 0 |
+| **D2** — loose response markers (`z.unknown()` / `anyArray` / `z.array(z.unknown`) in `shared/contracts/` | allowlist only | **103** lines | allowlist only |
+| **D3** — staff-app reads without a client `{ schema }` guard | `require-schema-on-reads` ESLint passes | **178** read call sites · **120** `schema:` usages · **~58** unguarded (heuristic) | every read guarded |
+
+**Phases:** 1 = client `{schema}` on reads · 2 = client `{schema}` on meaningful mutations · 3 = full
+response modeling + per-read runtime verify (heaviest: aligner 16 / patient 10 / file-explorer·expense 9 /
+video·reports 7 / calendar 6) · 4 = full params/query fold (delete the 33 D1 interfaces) · 5 = lock-in
+(extend ESLint `routes/**` selector to `*Params|*Query|*Filters`; add `require-schema-on-reads`; flip
+`STRICT`; `npm run gate`; net-new `.github/workflows/gate.yml`).
+
+**Session 9 — 2026-06-05 — Phase 0 (measurement scaffold).** Added `scripts/contracts-dod.mjs` +
+`npm run contracts:check` (report-only, exits 0; `STRICT=1`/`--strict` will fail on regression past the
+baselines above — for Phase 5). `scripts/**` is eslint-ignored so the script isn't linted. Baselines
+recorded above. No ESLint rule / CI workflow added yet (deferred to Phase 5 so they don't break before the
+work lands). **Next: Phase 1 (client `{schema}` on reads).**
+
+**Session 10 — 2026-06-05 — Phase 1 (client `{schema}` on reads) — COMPLETE.** Wired the client
+fail-loud guard on every **contracted** staff-app read; **D3 unguarded ~58 → ~3** (the by-design raw set).
+Gate green after each batch: `typecheck:all` (backend + frontend EXIT 0), `build` (client + `build:server`
+EXIT 0), `lint` (0 errors; the 2 pre-existing aligner `exhaustive-deps` warnings). **No runtime smoke** —
+no PostgreSQL in the fresh container; safe because adding `{schema}` against schemas the server already
+dev-parsed on real data (prior sessions) is a no-op guard that only fail-louds on genuine drift.
+- **Convention:** namespace imports (`import * as <group>Contract`), explicit generic kept + `{ schema }`
+  passed (the option does NOT infer the generic). 4 committed batches: patient-cluster (25 reads) →
+  lookup/file/appointment/loaders → auth-me/templates → whatsapp/raw-docs.
+- **2 new flat reads authored** (response-only, server unchanged): `auth.contract.me`
+  (`looseObject{success,user}`) and `whatsapp.contract.initialState`/`qr` (`looseObject{}` — realtime
+  fields preserved, deliberately not tightened). Also `template.contract.getTemplates`/`documentTypes`
+  (`anyArray`)/`getTemplate` (`z.unknown`).
+- **By-design RAW reads (no client schema; get `require-schema-on-reads` inline-disables in Phase 5):**
+  `/api/diagnosis/:workId` (literal-null signal), `/api/email/test` (raw semantic-success at 200),
+  `/api/wa/initialize` (fire-and-forget), `/api/auth/verify` (session ping),
+  `/api/sync/supabase-status` (out-of-surface sync read). Each carries an inline comment.
+- **`public/js/services/appointment.ts` is DEAD CODE** (not imported anywhere; `/getTimePointImgs` &
+  `/getLatestVisitsSum` no longer exist as routes) — left untouched; **delete or disable in Phase 5**.
+- **Pre-existing latent bug noted (NOT fixed — out of scope):** `templateListLoader` types `/api/templates`
+  as `{ templates? }` but the route returns the bare array (funnel-unwrapped) → `.templates` is always
+  undefined. The wired `getTemplates` (`anyArray`) guard is the correct assertion; fix the generic later.
+
+**Session 11 — 2026-06-05 — Phase 2 (client `{schema}` on meaningful mutations) — COMPLETE.**
+Wired the client guard on mutations whose returned payload the UI consumes (created/updated ids & rows).
+Gate green: `typecheck:all` + `lint` (0 errors) + `build` (client + `build:server`). No runtime smoke (no DB
+in container; same safe-no-op-guard rationale as Phase 1).
+- **Wired:** patient `createPatient`/`resetPin`; appointment `createAppointment`/`quickCheckin` (×2);
+  work `updateWork`/`addWork`/`addWorkWithInvoice` (NewWorkComponent — schema picked per endpoint, since
+  `addWork`→`{workId}` vs `addWorkWithInvoice`→`{workId,invoiceId}`); aligner `deliverBatch`/
+  `manufactureBatch`; expense `create`/`update`; media webceph `createPatient`/`uploadImage`; photo-editor
+  `prepare`; file-explorer `deleteBatch`; settings `testDatabaseConnection`/`updateDatabaseConfig`/
+  `bulkOptions`; calendar `regenerate`; template `createTemplate` (**added its `{template_id}` response** —
+  it had body-only).
+- **Skipped (per scope):** `{success}`-only acks (e.g. `updateAppointment` from EditAppointmentForm — its
+  consumer reads `{success,error}`, an ack), and the **raw whatsapp send** responses (`/api/wa/send-*`,
+  `sendmedia2` — apiClient/flat top-level reads, leave raw).
+
+**Next: Phase 3 (full response modeling + per-read runtime verify — the big tier; needs a live DB).**
+
+**Session 12 — 2026-06-05 — Phase 4 (params/query fold) — COMPLETE. D1 33 → 0.** Removed every
+hand-written `interface *Params|*Query|*Filters` from `routes/`. Gate green: `typecheck:all` (backend +
+frontend EXIT 0) + `lint` (0 errors) + `build` (client + `build:server`). No runtime smoke (no DB in
+container).
+- **Mechanism:** the established `type X = <contract>.X` alias pattern (cf. `settings.routes.ts` body
+  aliases). For each interface, authored the matching `query`/`params` Zod schema + `z.infer` export in the
+  group's contract, then replaced the route `interface` with a contract-derived `type` alias.
+- **Behavior-preserving (deliberate):** the new query schemas are **optional-string** views with **no new
+  coercion** — handlers keep their manual `parseInt`/`if(!x)` checks and friendly errors. The silent-NaN
+  hardening (coercing query params + dropping the manual guards) is a **later verified pass**, not done
+  blind. Pre-existing validated boundaries (`expenseList.query`, `tableIdParams`, calendar per-endpoint
+  `dateString` queries, etc.) are untouched.
+- **Kept as local `type` (NOT contract-derived), by design:** `ExpenseFilters` (internal parsed filter, not
+  a request shape); `ExpenseQueryParams` + lookup-admin `TableNameIdParams` (raw req.query **string** views
+  that diverge from their **coerced** validated contract boundary — aliasing to the coerced type would break
+  the handlers' `parseInt`); `admin.OAuthCallbackQuery` (Google-Drive OAuth root route, outside the
+  staff-app contract surface). All are `type` (not `interface`), so D1 = 0 holds and the Phase-5 ESLint ban
+  will pass.
+- **Owed before merge:** runtime verification of the folded query/params routes (a live read per group;
+  confirm no behavior change). Same DB-unavailable deferral as Phases 1–2.
+
+**Phases 3 & 5 NOT done this session** (user: "stop after finishing phase 4"). Phase 3 (response modeling,
+103→ allowlist) still needs a live DB for the mandated per-read verify; Phase 5 (lock-in: extend the ESLint
+`routes/**` ban to `*Params|*Query|*Filters`, add `require-schema-on-reads` + inline-disables on the
+documented raw reads, `npm run gate`, `.github/workflows/gate.yml`, flip `contracts-dod` `STRICT`) is ready
+to do once Phase 3 sets the D2 baseline. **D1 is already at 0**, so the Phase-5 interface-ban extension can
+be enabled now without breaking lint.
+
+---
+
 ## Phase 0 — Foundation
 
 **Must be green before any group phase.** Source: plan §"Phase 0 — Foundation". **✅ COMPLETE (2026-06-05).**

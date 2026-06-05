@@ -13,9 +13,11 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface OAuthCallbackQuery {
+// OAuth callback query (Google Drive setup; not part of the staff-app contract
+// surface, so kept as a local type rather than a contract export).
+type OAuthCallbackQuery = {
   code?: string;
-}
+};
 
 /**
  * Get Google Drive authorization URL

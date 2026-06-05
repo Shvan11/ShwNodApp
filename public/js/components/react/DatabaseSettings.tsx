@@ -132,7 +132,8 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
             const data = await postJSON<{ connectionOk: boolean; message: string; details?: string }>(
                 '/api/config/database/test',
-                testConfig
+                testConfig,
+                { schema: settings.testDatabaseConnection.response }
             );
 
             setConnectionStatus({
@@ -166,7 +167,8 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
             const data = await putJSON<{ message?: string; requiresRestart?: boolean }>(
                 '/api/config/database',
-                completeConfig
+                completeConfig,
+                { schema: settings.updateDatabaseConfig.response }
             );
 
             // A failed save throws from putJSON → caught below.

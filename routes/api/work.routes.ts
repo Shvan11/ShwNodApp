@@ -63,12 +63,7 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface WorkQueryParams {
-  code?: string;
-  workId?: string;
-  permanent?: string;
-  deciduous?: string;
-}
+type WorkQueryParams = workContract.WorkQueryParams;
 
 // Request schemas live in shared/contracts/work.contract.ts (imported above as
 // `workContract`) — shared with the client. Every write body is now FULLY

@@ -17,9 +17,7 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface SendAppointmentsQuery {
-  date?: string;
-}
+type SendAppointmentsQuery = emailApi.SendAppointmentsQuery;
 
 
 /**

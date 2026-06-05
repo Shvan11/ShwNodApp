@@ -46,9 +46,7 @@ const uploadImage = (req: Request, res: Response, next: NextFunction): void => {
 /**
  * Route params for person id
  */
-interface PersonIdParams {
-  personId: string;
-}
+type PersonIdParams = media.PersonIdParams;
 
 /**
  * WebCeph patient link result

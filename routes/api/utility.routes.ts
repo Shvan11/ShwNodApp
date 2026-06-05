@@ -19,26 +19,11 @@ import * as utility from '../../shared/contracts/utility.contract.js';
 
 const router = Router();
 
-/**
- * Query params for date-based endpoints
- */
-interface DateQuery {
-  date?: string;
-}
-
-/**
- * Query params for Google contacts
- */
-interface GoogleQuery {
-  source?: string;
-}
-
-/**
- * Query params for path conversion
- */
-interface PathQuery {
-  path?: string;
-}
+// Request query types are contracted in shared/contracts/utility.contract.ts
+// (handlers keep their own required-param checks + plain-text/sendData responses).
+type DateQuery = utility.TwilioDateQuery;
+type GoogleQuery = utility.GoogleQuery;
+type PathQuery = utility.ConvertPathQuery;
 
 /**
  * GET /sendtwilio

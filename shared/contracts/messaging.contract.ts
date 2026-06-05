@@ -28,3 +28,7 @@ export const count = {
 export const reset = {
   response: z.unknown(),
 } as const;
+
+// Shared `:date` path param for the messaging endpoints. Type-only.
+export const dateParams = z.object({ date: z.string() });
+export type DateParams = z.infer<typeof dateParams>;

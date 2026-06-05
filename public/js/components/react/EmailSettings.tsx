@@ -111,6 +111,9 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
     const testConnection = async () => {
         setIsTesting(true);
         try {
+            // Raw read (excluded from contracts): /api/email/test returns a raw top-level
+            // { success, message?, error? } at 200 (semantic-success, NOT the envelope) —
+            // see docs/shared-contract-progress.md. Left unguarded by design.
             const data = await fetchJSON<{ success?: boolean; message?: string; error?: string }>('/api/email/test');
 
             if (data.success) {

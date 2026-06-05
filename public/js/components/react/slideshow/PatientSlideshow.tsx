@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useToast } from '../../../contexts/ToastContext';
 import { generateId } from '../../../core/utils';
 import { fetchJSON } from '@/core/http';
+import * as patientContract from '@shared/contracts/patient.contract';
 import SlideshowBuilder from './SlideshowBuilder';
 import SlideshowPlayer from './SlideshowPlayer';
 import { labelForImageName, isLogoImage } from './photoTypes';
@@ -102,7 +103,7 @@ const PatientSlideshow = ({ personId }: Props) => {
     }
     const ctrl = new AbortController();
     setLoadingTimepoints(true);
-    fetchJSON<TimepointApiRow[]>(`/api/patients/${personId}/timepoints`, { signal: ctrl.signal })
+    fetchJSON<TimepointApiRow[]>(`/api/patients/${personId}/timepoints`, { signal: ctrl.signal, schema: patientContract.timepoints.response })
       .then((data) =>
         setTimepoints(
           Array.isArray(data)
@@ -141,7 +142,7 @@ const PatientSlideshow = ({ personId }: Props) => {
   const loadGallery = async (tp: Timepoint): Promise<SlidePhoto[]> => {
     if (galleries[tp.tpCode]) return galleries[tp.tpCode];
     if (!personId) return [];
-    const raw = await fetchJSON<(GalleryEntry | null)[]>(`/api/patients/${personId}/gallery/${tp.tpCode}`);
+    const raw = await fetchJSON<(GalleryEntry | null)[]>(`/api/patients/${personId}/gallery/${tp.tpCode}`, { schema: patientContract.gallery.response });
     const items: SlidePhoto[] = raw
       .filter((e): e is GalleryEntry => !!e && !isLogoImage(e.name))
       .map((e) => ({

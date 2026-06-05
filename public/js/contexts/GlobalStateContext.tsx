@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { fetchJSON } from '@/core/http';
+import * as authContract from '@shared/contracts/auth.contract';
+import * as whatsappContract from '@shared/contracts/whatsapp.contract';
 import sseWhatsapp from '../services/sse-whatsapp';
 
 /**
@@ -104,7 +106,7 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
   });
 
   useEffect(() => {
-    fetchJSON<{ success?: boolean; user?: UserData }>('/api/auth/me')
+    fetchJSON<{ success?: boolean; user?: UserData }>('/api/auth/me', { schema: authContract.me.response })
       .then(data => {
         if (data?.success && data?.user) {
           setUser(data.user);
@@ -149,7 +151,7 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
     // Authoritative reconcile. On REST failure keep the last known state — the
     // live SSE events above remain the fallback — rather than forcing `false`.
     const reconcileFromRest = (): void => {
-      fetchJSON<{ clientReady?: boolean }>('/api/wa/initial-state')
+      fetchJSON<{ clientReady?: boolean }>('/api/wa/initial-state', { schema: whatsappContract.initialState.response })
         .then((data) => {
           if (!data) return;
           if (data.clientReady) {

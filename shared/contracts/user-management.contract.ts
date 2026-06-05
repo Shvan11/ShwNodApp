@@ -62,3 +62,6 @@ export const deleteUser = {
   params: userIdParams,
   response: z.object({ message: z.string() }),
 } as const;
+
+// `:userId` path param shared by the user-management routes (type-only).
+export type UserIdParams = z.infer<typeof userIdParams>;

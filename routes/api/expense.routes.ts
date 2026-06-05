@@ -40,7 +40,7 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface ExpenseQueryParams {
+type ExpenseQueryParams = {
   startDate?: string;
   endDate?: string;
   categoryId?: string;
@@ -48,9 +48,11 @@ interface ExpenseQueryParams {
   currency?: string;
   limit?: string;
   offset?: string;
-}
+};
 
-interface ExpenseFilters {
+// Internal parsed-filter shape (NOT a request body) + the raw req.query view. The
+// validated query boundary is `expense.expenseList.query` (wired on the list route).
+type ExpenseFilters = {
   startDate?: string;
   endDate?: string;
   categoryId?: number | null;
@@ -58,7 +60,7 @@ interface ExpenseFilters {
   currency?: string;
   limit?: number | null;
   offset?: number | null;
-}
+};
 
 interface ExpenseData {
   expense_date: string;

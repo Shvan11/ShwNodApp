@@ -11,13 +11,12 @@ import { log } from '../../utils/logger.js';
 import { getMediaMimeType } from '../../utils/video-mime.js';
 import { streamFile } from '../../utils/stream-file.js';
 import * as videoQueries from '../../services/database/queries/video-queries.js';
+import * as videoContract from '../../shared/contracts/video.contract.js';
 
 const router = Router();
 
-// type definitions
-interface VideoIdParams {
-  id: string;
-}
+// `:id` path param — contracted in shared/contracts/video.contract.ts (type-only).
+type VideoIdParams = videoContract.VideoIdParams;
 
 /**
  * Convert Windows/UNC path from database to WSL-compatible path

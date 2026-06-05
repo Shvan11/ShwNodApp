@@ -29,12 +29,7 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface VisitQueryParams {
-  PID?: string;
-  VID?: string;
-  workId?: string;
-  visitId?: string;
-}
+type VisitQueryParams = visit.VisitQueryParams;
 
 // ============================================================================
 // wire Management Routes

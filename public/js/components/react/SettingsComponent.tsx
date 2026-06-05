@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, ComponentType } from '
 import { useParams, useNavigate } from 'react-router-dom';
 import type { UserResponse } from '@/types/api.types';
 import { fetchJSON } from '@/core/http';
+import * as authContract from '@shared/contracts/auth.contract';
 
 // CSS Modules
 import styles from './SettingsContainer.module.css';
@@ -71,7 +72,7 @@ const SettingsComponent: React.FC = () => {
     useEffect(() => {
         async function fetchUserRole(): Promise<void> {
             try {
-                const data = await fetchJSON<UserResponse>('/api/auth/me');
+                const data = await fetchJSON<UserResponse>('/api/auth/me', { schema: authContract.me.response });
                 if (data.success && data.user) {
                     setUserRole(data.user.role);
                 }

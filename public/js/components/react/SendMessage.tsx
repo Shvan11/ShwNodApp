@@ -5,6 +5,7 @@ import Select, { SingleValue, StylesConfig } from 'react-select';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { fetchJSON, postFormData, httpErrorMessage } from '@/core/http';
 import { patientPhones } from '@shared/contracts/patient.contract';
+import * as utilityContract from '@shared/contracts/utility.contract';
 
 interface ContactData {
     id?: string | number;
@@ -66,7 +67,7 @@ const SendMessage = () => {
         try {
             const data = source === 'pat'
                 ? await fetchJSON('/api/patients/phones', { schema: patientPhones.response })
-                : await fetchJSON(`/api/google?source=${encodeURIComponent(source)}`);
+                : await fetchJSON(`/api/google?source=${encodeURIComponent(source)}`, { schema: utilityContract.google.response });
 
             const contactsArray: ContactData[] = Array.isArray(data) ? data : [];
 

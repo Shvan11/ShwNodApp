@@ -26,12 +26,7 @@ const router = Router();
 /**
  * Query parameters for filtering employees
  */
-interface EmployeeQuery {
-  getAppointments?: string;
-  receiveEmail?: string;
-  percentage?: string;
-  position?: string;
-}
+type EmployeeQuery = employee.EmployeeQuery;
 
 /**
  * Employee record from database.
@@ -64,9 +59,7 @@ type position = {
 /**
  * Route params for employee by id
  */
-interface EmployeeParams {
-  id: string;
-}
+type EmployeeParams = employee.EmployeeParams;
 
 /**
  * GET /employees

@@ -29,9 +29,7 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface DateParams {
-  date: string;
-}
+type DateParams = messaging.DateParams;
 
 /**
  * Message status from database query result

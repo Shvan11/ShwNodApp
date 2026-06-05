@@ -6,6 +6,8 @@ import styles from './EditPatientComponent.module.css';
 import { formatISODate } from '../../core/utils';
 import { fetchJSON, postJSON, putJSON, postFormData, httpErrorMessage, type HttpError } from '@/core/http';
 import { tagOptions as tagOptionsContract } from '@shared/contracts/patient.contract';
+import * as patientContract from '@shared/contracts/patient.contract';
+import * as mediaContract from '@shared/contracts/media.contract';
 import * as lookup from '@shared/contracts/lookup.contract';
 
 interface Props {
@@ -181,7 +183,7 @@ const EditPatientComponent = ({ personId }: Props) => {
 
         try {
             setLoading(true);
-            const data = await fetchJSON<PatientData>(`/api/patients/${personId}`);
+            const data = await fetchJSON<PatientData>(`/api/patients/${personId}`, { schema: patientContract.patientById.response });
             setPatientData(data);
 
             // Populate form
@@ -228,7 +230,8 @@ const EditPatientComponent = ({ personId }: Props) => {
         try {
             // A hit is `{success:true, data}` → unwrapped to the link object.
             const link = await fetchJSON<WebcephData>(
-                `/api/webceph/patient-link/${personId}`
+                `/api/webceph/patient-link/${personId}`,
+                { schema: mediaContract.patientLink.response }
             );
             setWebcephData(link);
         } catch (err) {
@@ -243,7 +246,7 @@ const EditPatientComponent = ({ personId }: Props) => {
     // Load available photo types
     const loadPhotoTypes = async () => {
         try {
-            const photoTypes = await fetchJSON<PhotoType[]>('/api/webceph/photo-types');
+            const photoTypes = await fetchJSON<PhotoType[]>('/api/webceph/photo-types', { schema: mediaContract.photoTypes.response });
             setPhotoTypes(photoTypes);
         } catch (err) {
             console.error('Error loading photo types:', err);
@@ -285,7 +288,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                 {
                     personId: patientData.person_id,
                     patientData: webcephPatientData
-                }
+                },
+                { schema: mediaContract.createPatient.response }
             );
 
             setWebcephData({
@@ -323,7 +327,8 @@ const EditPatientComponent = ({ personId }: Props) => {
 
             const result = await postFormData<{ big?: string; thumbnail?: string; link: string }>(
                 '/api/webceph/upload-image',
-                formDataObj
+                formDataObj,
+                { schema: mediaContract.uploadImage.response }
             );
 
             setWebcephSuccess(`Image uploaded successfully! View at: ${result.link}`);

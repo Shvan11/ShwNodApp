@@ -7,6 +7,7 @@ import type {
 import Modal from './Modal';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import * as patientContract from '@shared/contracts/patient.contract';
 import viewStyles from './ViewPatientInfo.module.css';
 import styles from './PortalAccessCard.module.css';
 
@@ -41,7 +42,7 @@ const PortalAccessCard = ({ personId }: Props) => {
   const loadStatus = useCallback(async () => {
     setError(null);
     try {
-      const data = await fetchJSON<PortalStatusResponse>(`/api/patients/${personId}/portal`);
+      const data = await fetchJSON<PortalStatusResponse>(`/api/patients/${personId}/portal`, { schema: patientContract.portalStatus.response });
       setStatus({
         enabled: data.enabled ?? false,
         hasPin: data.hasPin ?? false,
@@ -81,7 +82,7 @@ const PortalAccessCard = ({ personId }: Props) => {
     if (busyAction) return;
     setBusyAction('reset');
     try {
-      const data = await postJSON<PortalPinResetResponse>(`/api/patients/${personId}/portal/reset-pin`, {});
+      const data = await postJSON<PortalPinResetResponse>(`/api/patients/${personId}/portal/reset-pin`, {}, { schema: patientContract.resetPin.response });
       if (!data.pin) {
         throw new Error(data.error || 'Failed to reset PIN');
       }

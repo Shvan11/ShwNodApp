@@ -78,9 +78,7 @@ const upload = multer({
 });
 
 // type definitions
-interface VideoIdParams {
-  id: string;
-}
+type VideoIdParams = videoContract.VideoIdParams;
 
 /**
  * Convert Windows/UNC path from database to WSL-compatible path

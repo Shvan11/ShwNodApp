@@ -83,3 +83,8 @@ export const updateEmployee = {
 export const deleteEmployee = {
   params: idParams('id'),
 } as const;
+
+// Route-level type aliases for the GET-list query + `:id` param (the validated
+// boundaries are `employees.query` / `updateEmployee.params`). Type-only.
+export type EmployeeQuery = z.infer<typeof employees.query>;
+export type EmployeeParams = z.infer<typeof updateEmployee.params>;

@@ -299,7 +299,8 @@ const FileExplorer = ({ personId, subPath }: Props) => {
     try {
       const result = await postJSON<FileBatchDeleteResult>(
         `/api/patients/${personId}/files/delete-batch`,
-        { paths: sel.map((e) => e.relPath) }
+        { paths: sel.map((e) => e.relPath) },
+        { schema: fileExplorer.deleteBatch.response }
       );
       const { succeeded, failed } = result;
       if (failed === 0) toast.success(`Moved ${succeeded} item(s) to trash`);

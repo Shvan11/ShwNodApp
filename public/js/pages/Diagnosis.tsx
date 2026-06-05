@@ -6,6 +6,7 @@ import styles from './Diagnosis.module.css';
 import { formatISODate } from '../core/utils';
 import { fetchJSON, postJSON, deleteJSON } from '@/core/http';
 import { getWorks as getWorksContract } from '@shared/contracts/work.contract';
+import * as patientContract from '@shared/contracts/patient.contract';
 
 /**
  * Diagnosis Page
@@ -168,8 +169,11 @@ const Diagnosis = () => {
             // with a null body when no diagnosis exists yet (NOT a non-2xx — see audit
             // N18), so the `if (diagnosis)` null-check still means "new diagnosis".
             const [patient, works, diagnosis] = await Promise.all([
-                fetchJSON<PatientInfo>(`/api/patients/${personId}/info`).catch(() => null),
+                fetchJSON<PatientInfo>(`/api/patients/${personId}/info`, { schema: patientContract.patientInfo.response }).catch(() => null),
                 fetchJSON<WorkInfo[]>(`/api/getworks?code=${personId}`, { schema: getWorksContract.response }).catch(() => null),
+                // Raw, un-enveloped: `/api/diagnosis/:workId` returns the row or literal
+                // `null` (the "no diagnosis yet" signal) — not the sendSuccess envelope —
+                // so it stays out of the contract and carries no client schema by design.
                 fetchJSON<Partial<DiagnosisData> | null>(`/api/diagnosis/${workId}`).catch(() => null)
             ]);
 

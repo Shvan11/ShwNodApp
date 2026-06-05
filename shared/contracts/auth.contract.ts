@@ -28,3 +28,22 @@ export const changePassword = {
   }),
 } as const;
 export type ChangePasswordBody = z.infer<typeof changePassword.body>;
+
+// GET /api/auth/me — flat `{ success, user }` (NOT the sendSuccess envelope, so the
+// funnel passes it through unchanged). 401 when unauthenticated. Response-only: the
+// handler keeps its raw `res.json`; this schema is the client-side fail-loud guard.
+// `looseObject` preserves any user fields a consumer's generic reads beyond the
+// session-derived username/fullName/role.
+export const me = {
+  response: z.looseObject({
+    success: z.boolean(),
+    user: z
+      .looseObject({
+        username: z.string().nullable().optional(),
+        fullName: z.string().nullable().optional(),
+        role: z.string().nullable().optional(),
+      })
+      .optional(),
+  }),
+} as const;
+export type MeResponse = z.infer<typeof me.response>;

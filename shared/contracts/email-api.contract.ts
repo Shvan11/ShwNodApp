@@ -55,3 +55,7 @@ export const testSend = {
   response: z.looseObject({ message: z.string() }),
 } as const;
 export type TestSendBody = z.infer<typeof testSend.body>;
+
+// GET /api/email/send-appointments?date= — type-only (handler reads `date` directly).
+export const sendAppointmentsQuery = z.object({ date: z.string().optional() });
+export type SendAppointmentsQuery = z.infer<typeof sendAppointmentsQuery>;

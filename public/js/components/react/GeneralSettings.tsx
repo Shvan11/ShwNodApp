@@ -103,7 +103,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
             const data = await putJSON<{
                 updated?: number;
                 failed?: string[];
-            }>('/api/options/bulk', { options: optionsArray });
+            }>('/api/options/bulk', { options: optionsArray }, { schema: settings.bulkOptions.response });
 
             // putJSON throws on non-2xx, so reaching here means the save succeeded.
             setOptions(prev => ({ ...prev, ...pendingChanges }));

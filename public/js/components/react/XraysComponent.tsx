@@ -1,5 +1,6 @@
 import React, { useState, useEffect, SyntheticEvent } from 'react';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
+import * as patientContract from '@shared/contracts/patient.contract';
 import styles from './XraysComponent.module.css';
 
 interface Props {
@@ -33,7 +34,7 @@ const XraysComponent = ({ personId }: Props) => {
         try {
             setLoading(true);
 
-            const patientData = await fetchJSON<PatientInfo>(`/api/patients/${personId}/info`);
+            const patientData = await fetchJSON<PatientInfo>(`/api/patients/${personId}/info`, { schema: patientContract.patientInfo.response });
             setPatientInfo(patientData);
         } catch (err) {
             console.error('Error loading X-rays:', err);

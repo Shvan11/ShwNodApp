@@ -133,7 +133,7 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                 tpDate: selectedDate,
                 overrideDate,
                 ...(needsName ? { firstName: firstName.trim(), lastName: lastName.trim() } : {})
-            });
+            }, { schema: photoEditor.prepare.response });
 
             // Patient has no English name — Dolphin can't store Arabic, so capture one and resubmit.
             if ('needsName' in result) {

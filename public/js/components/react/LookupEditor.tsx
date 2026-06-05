@@ -2,6 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, Mouse
 import { createPortal } from 'react-dom';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import * as lookupAdminContract from '@shared/contracts/lookup-admin.contract';
 import LookupEditorModal from './LookupEditorModal';
 
 // Types
@@ -153,7 +154,7 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
     const loadItems = useCallback(async (): Promise<void> => {
         try {
             setLoading(true);
-            const data = await fetchJSON<LookupItem[]>(`/api/admin/lookups/${tableKey}`);
+            const data = await fetchJSON<LookupItem[]>(`/api/admin/lookups/${tableKey}`, { schema: lookupAdminContract.items.response });
             setItems(data);
         } catch (err) {
             toast.error(httpErrorMessage(err, `Failed to load ${tableName}`));

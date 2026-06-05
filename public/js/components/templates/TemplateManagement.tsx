@@ -15,6 +15,7 @@ import type { Template } from './TemplateCard';
 import type { DocumentType, TemplateSubmissionData } from './CreateTemplateModal';
 import type { TemplateStatsData } from './TemplateStats';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import * as templateContract from '@shared/contracts/template.contract';
 
 function TemplateManagement() {
     const navigate = useNavigate();
@@ -55,7 +56,7 @@ function TemplateManagement() {
 
     const loadDocumentTypes = async () => {
         try {
-            const data = await fetchJSON<DocumentType[]>('/api/templates/document-types');
+            const data = await fetchJSON<DocumentType[]>('/api/templates/document-types', { schema: templateContract.documentTypes.response });
             setDocumentTypes(data ?? []);
         } catch (err) {
             console.error('Error loading document types:', err);
@@ -66,7 +67,7 @@ function TemplateManagement() {
     const loadAllTemplates = async () => {
         try {
             setIsLoading(true);
-            const data = await fetchJSON<Template[]>('/api/templates');
+            const data = await fetchJSON<Template[]>('/api/templates', { schema: templateContract.getTemplates.response });
             setAllTemplates(data ?? []);
             setError(null);
         } catch (err) {
