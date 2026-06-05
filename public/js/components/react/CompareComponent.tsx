@@ -10,6 +10,7 @@ import { formatISODate } from '../../core/utils';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import * as patientContract from '@shared/contracts/patient.contract';
 import Modal from './Modal';
 import styles from './CompareComponent.module.css';
 
@@ -420,7 +421,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
     // Empty array on failure — callers use it to disable photo types whose image is missing.
     const fetchTimepointImages = useCallback(async (tpCode: number): Promise<string[]> => {
         try {
-            return await fetchJSON<string[]>(`/api/patients/${personId}/timepoints/${tpCode}/images`);
+            return await fetchJSON<string[]>(`/api/patients/${personId}/timepoints/${tpCode}/images`, { schema: patientContract.timepointImages.response });
         } catch {
             return [];
         }
@@ -434,7 +435,7 @@ const CompareComponent = ({ personId, phone }: Props) => {
 
         try {
             setLoading(true);
-            const data = await fetchJSON<Timepoint[]>(`/api/patients/${personId}/timepoints`);
+            const data = await fetchJSON<Timepoint[]>(`/api/patients/${personId}/timepoints`, { schema: patientContract.timepoints.response });
             setTimepoints(data);
 
             // Auto-select first and last timepoints (skip tp_code 0)

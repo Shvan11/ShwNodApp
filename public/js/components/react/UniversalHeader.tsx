@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalState, type UserData } from '../../contexts/GlobalStateContext';
 import { fetchJSON } from '@/core/http';
+import * as patientContract from '@shared/contracts/patient.contract';
 
 interface Patient {
     code: string | number;
@@ -66,7 +67,7 @@ const UniversalHeader = () => {
         const patientCode = extractPatientCodeFromURL();
 
         if (patientCode) {
-            fetchJSON<{ person_id?: number; patient_name?: string; name?: string; [key: string]: unknown }>(`/api/patients/${patientCode}/info`, { signal })
+            fetchJSON<{ person_id?: number; patient_name?: string; name?: string; [key: string]: unknown }>(`/api/patients/${patientCode}/info`, { signal, schema: patientContract.patientInfo.response })
                 .then(data => {
                     // `/info` returns a single patient object (not an array). Map
                     // it onto the header's {code,name} shape; person_id is the code.

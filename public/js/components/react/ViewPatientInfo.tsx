@@ -7,6 +7,8 @@ import { useToast } from '../../contexts/ToastContext';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
 import * as costPreset from '@shared/contracts/cost-preset.contract';
+import * as patientContract from '@shared/contracts/patient.contract';
+import * as lookupContract from '@shared/contracts/lookup.contract';
 import styles from './ViewPatientInfo.module.css';
 
 interface Props {
@@ -164,7 +166,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
 
         try {
             setLoading(true);
-            const data = await fetchJSON<PatientInfo>(`/api/patients/${personId}/info`, { signal });
+            const data = await fetchJSON<PatientInfo>(`/api/patients/${personId}/info`, { signal, schema: patientContract.patientInfo.response });
             setPatientInfo(data);
         } catch (err) {
             if (err instanceof Error && err.name === 'AbortError') return;
@@ -179,7 +181,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
 
         try {
             setAlertsLoading(true);
-            const data = await fetchJSON<Alert[]>(`/api/patients/${personId}/alerts`, { signal });
+            const data = await fetchJSON<Alert[]>(`/api/patients/${personId}/alerts`, { signal, schema: patientContract.alerts.response });
             setAlerts(data);
         } catch (err) {
             if (err instanceof Error && err.name === 'AbortError') return;
@@ -202,7 +204,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
 
     const loadAlertTypes = useCallback(async () => {
         try {
-            const data = await fetchJSON<AlertType[]>('/api/alert-types');
+            const data = await fetchJSON<AlertType[]>('/api/alert-types', { schema: lookupContract.alertTypes.response });
             setAlertTypes(data);
         } catch (err) {
             console.error('Error loading alert types:', err);

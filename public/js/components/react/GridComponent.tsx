@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, MouseEvent as ReactMouseEvent } fro
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import * as patientContract from '@shared/contracts/patient.contract';
+import * as utilityContract from '@shared/contracts/utility.contract';
 import tpStyles from './TimePointsSelector.module.css';
 import styles from './GridComponent.module.css';
 import EditTimepointModal from './EditTimepointModal';
@@ -204,7 +206,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
 
         try {
             setLoadingTimepoints(true);
-            const data = await fetchJSON<Timepoint[]>(`/api/patients/${personId}/timepoints`);
+            const data = await fetchJSON<Timepoint[]>(`/api/patients/${personId}/timepoints`, { schema: patientContract.timepoints.response });
             setTimepoints(data);
             return data;
         } catch (err) {
@@ -229,11 +231,11 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             // best-effort (per-promise .catch → null → no private flags), mirroring
             // the old `if (visibilityRes.ok)` tolerance.
             const [galleryImages, visData] = await Promise.all([
-                fetchJSON<GalleryImage[]>(`/api/patients/${personId}/gallery/${tpCode}`),
+                fetchJSON<GalleryImage[]>(`/api/patients/${personId}/gallery/${tpCode}`, { schema: patientContract.gallery.response }),
                 fetchJSON<{
                     success: boolean;
                     privateImages?: Array<{ tp: string; name: string }>;
-                }>(`/api/patients/${personId}/photos/visibility`).catch(() => null),
+                }>(`/api/patients/${personId}/photos/visibility`, { schema: patientContract.photoVisibilityList.response }).catch(() => null),
             ]);
 
             setImages(galleryImages);
@@ -486,7 +488,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                             }
 
                                             const { fullPath } = await fetchJSON<{ fullPath: string }>(
-                                                `/api/convert-path?path=${encodeURIComponent(webPath)}`
+                                                `/api/convert-path?path=${encodeURIComponent(webPath)}`,
+                                                { schema: utilityContract.convertPath.response }
                                             );
 
                                             // Use actual file path - backend will handle filename conversion
@@ -647,7 +650,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         menuTpRef.current = tp.tp_code;
         if (personId) {
             fetchJSON<{ folder: string | null; exists: boolean }>(
-                `/api/patients/${personId}/timepoints/${tp.tp_code}/folder`
+                `/api/patients/${personId}/timepoints/${tp.tp_code}/folder`,
+                { schema: patientContract.timepointFolder.response }
             )
                 .then((data) => {
                     // Ignore a stale resolve if another tab's menu was opened meanwhile.

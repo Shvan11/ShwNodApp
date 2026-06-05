@@ -23,6 +23,8 @@ import {
     type PaymentHistoryResponse,
 } from '@shared/contracts/payment.contract';
 import * as workContract from '@shared/contracts/work.contract';
+import * as patientContract from '@shared/contracts/patient.contract';
+import * as lookupContract from '@shared/contracts/lookup.contract';
 import styles from './WorkComponent.module.css';
 
 interface PatientInfo {
@@ -225,7 +227,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     const loadImplantManufacturers = async () => {
         try {
-            const data = await fetchJSON<ImplantManufacturer[]>('/api/implant-manufacturers');
+            const data = await fetchJSON<ImplantManufacturer[]>('/api/implant-manufacturers', { schema: lookupContract.implantManufacturers.response });
             setImplantManufacturers(data || []);
         } catch (err) {
             console.error('Error loading implant manufacturers:', err);
@@ -244,7 +246,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     const loadPatientInfo = async () => {
         try {
-            const data = await fetchJSON<PatientInfo>(`/api/patients/${personId}/info`);
+            const data = await fetchJSON<PatientInfo>(`/api/patients/${personId}/info`, { schema: patientContract.patientInfo.response });
             setPatientInfo(data);
         } catch (err) {
             console.error('Error loading patient info:', err);
@@ -254,7 +256,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const checkAppointmentStatus = async () => {
         try {
             setLoadingAppointment(true);
-            const data = await fetchJSON<{ hasAppointment: boolean }>(`/api/patients/${personId}/has-appointment`);
+            const data = await fetchJSON<{ hasAppointment: boolean }>(`/api/patients/${personId}/has-appointment`, { schema: patientContract.hasAppointment.response });
             setHasNextAppointment(data.hasAppointment);
         } catch (err) {
             console.error('[WORK-COMPONENT] Error checking appointment status:', err);

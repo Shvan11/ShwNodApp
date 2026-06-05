@@ -4,6 +4,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import PhotoSessionDialog from './PhotoSessionDialog';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
+import * as patientContract from '@shared/contracts/patient.contract';
 
 interface Timepoint {
     tp_code: string;
@@ -82,7 +83,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         try {
             setLoading(true);
 
-            const data = await fetchJSON<Timepoint[]>(`/api/patients/${personIdParam}/timepoints`);
+            const data = await fetchJSON<Timepoint[]>(`/api/patients/${personIdParam}/timepoints`, { schema: patientContract.timepoints.response });
 
             // Update cache
             cacheRef.current.set(cacheKey, {
@@ -120,7 +121,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
             }
 
             // If not in cache, fetch from API
-            const data = await fetchJSON<{ patientsFolder?: string }>('/api/settings/patients-folder');
+            const data = await fetchJSON<{ patientsFolder?: string }>('/api/settings/patients-folder', { schema: patientContract.patientsFolder.response });
             const folderPath = data.patientsFolder || '';
 
             // Store in localStorage for future use
@@ -138,7 +139,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         if (!personIdParam || personIdParam === 'new') return;
 
         try {
-            const data = await fetchJSON<PatientInfo>(`/api/patients/${personIdParam}/info`);
+            const data = await fetchJSON<PatientInfo>(`/api/patients/${personIdParam}/info`, { schema: patientContract.patientInfo.response });
             setPatientInfo(data);
         } catch (err) {
             console.error('Error loading patient info:', err);
