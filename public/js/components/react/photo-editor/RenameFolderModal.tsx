@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import Modal from '../Modal';
 import { useToast } from '@/contexts/ToastContext';
 import { fetchJSON, postJSON, type HttpError } from '@/core/http';
+import * as fileExplorerContract from '@shared/contracts/file-explorer.contract';
 import type { FileListing, FileEntry } from '@/types/api.types';
 import styles from './RenameFolderModal.module.css';
 
@@ -33,7 +34,7 @@ const RenameFolderModal = ({ personId, targetName, onClose, onRenamed }: Props) 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchJSON<FileListing>(`/api/patients/${personId}/files?path=`)
+    fetchJSON<FileListing>(`/api/patients/${personId}/files?path=`, { schema: fileExplorerContract.list.response })
       .then((listing) => {
         if (cancelled) return;
         // Top-level folders only, minus the timepoint folder itself if it already exists.

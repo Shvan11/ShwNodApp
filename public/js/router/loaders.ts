@@ -12,6 +12,7 @@ import type { LoaderFunctionArgs } from 'react-router-dom';
 import { fetchData, fetchJSON, httpErrorMessage, type HttpError, type ResponseSchema } from '@/core/http';
 import { dailyAppointments } from '@shared/contracts/appointment.contract';
 import { patientPhones, patientSearch, tagOptions, typeOptions } from '@shared/contracts/patient.contract';
+import * as patientContract from '@shared/contracts/patient.contract';
 import * as workContract from '@shared/contracts/work.contract';
 import * as alignerContract from '@shared/contracts/aligner.contract';
 
@@ -295,6 +296,7 @@ export async function patientInfoLoader({
     signal,
     cache: true,
     cacheKey: `patient_${personId}`,
+    schema: patientContract.patientInfo.response,
   });
 
   return { patient: data, isNew: false };
@@ -389,6 +391,7 @@ export async function patientShellLoader({
     signal,
     cache: true,
     cacheKey: `patient_${personId}`,
+    schema: patientContract.patientInfo.response,
   });
 
   // Load work details if workId is present
@@ -408,6 +411,7 @@ export async function patientShellLoader({
       signal,
       cache: true,
       cacheKey: `timepoints_${personId}`,
+      schema: patientContract.timepoints.response,
     });
   }
 
@@ -510,6 +514,7 @@ export async function alignerPatientWorkLoader({
     signal,
     cache: true,
     cacheKey: `patient_${data.person_id}`,
+    schema: patientContract.patientInfo.response,
   });
 
   return {

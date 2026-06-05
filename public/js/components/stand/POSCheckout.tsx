@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { formatNumber, parseMoneyInput } from '../../utils/formatters';
 import { fetchJSON } from '@/core/http';
+import * as patientContract from '@shared/contracts/patient.contract';
 import styles from './POSCheckout.module.css';
 
 interface PatientSearchResult {
@@ -98,7 +99,8 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
       // /api/patients/search returns { patients, totalCount, hasMore } (envelope-
       // unwrapped to the inner object); read .patients, not the object itself.
       const data = await fetchJSON<{ patients?: PatientSearchResult[] }>(
-        `/api/patients/search?q=${encodeURIComponent(query)}`
+        `/api/patients/search?q=${encodeURIComponent(query)}`,
+        { schema: patientContract.patientSearch.response }
       );
       if (seq !== patientSearchSeqRef.current) return; // superseded by a newer query
       const patients = data.patients ?? [];

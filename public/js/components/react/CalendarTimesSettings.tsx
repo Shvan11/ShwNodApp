@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import * as settings from '@shared/contracts/settings.contract';
+import * as lookupAdminContract from '@shared/contracts/lookup-admin.contract';
 import styles from './CalendarTimesSettings.module.css';
 import sectionStyles from './SettingsSection.module.css';
 
@@ -101,7 +102,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
 
         try {
             // Fetch time slots from database
-            const timesData = await fetchJSON<TimeSlot[]>('/api/admin/lookups/tbltimes');
+            const timesData = await fetchJSON<TimeSlot[]>('/api/admin/lookups/tbltimes', { schema: lookupAdminContract.items.response });
             setAllTimeSlots(timesData);
 
             // /api/options/:name 404s when an option is unset; each GET is tolerant

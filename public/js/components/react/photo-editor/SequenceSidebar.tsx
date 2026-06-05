@@ -17,6 +17,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'r
 import styles from './SequenceSidebar.module.css';
 import { useToast } from '../../../contexts/ToastContext';
 import { fetchJSON, postFormData, postJSON, type HttpError } from '@/core/http';
+import * as fileExplorerContract from '@shared/contracts/file-explorer.contract';
 import { ensurePermission, showFilePicker } from '@/core/fileSystemAccess';
 import { useImportFolder } from '@/hooks/useImportFolder';
 import RenameFolderModal from './RenameFolderModal';
@@ -64,7 +65,7 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
   // Top-level folders for the picker.
   useEffect(() => {
     let cancelled = false;
-    fetchJSON<{ entries?: FileEntryLite[] }>(`/api/patients/${personId}/files?path=`)
+    fetchJSON<{ entries?: FileEntryLite[] }>(`/api/patients/${personId}/files?path=`, { schema: fileExplorerContract.list.response })
       .then((res) => {
         if (cancelled || !res?.entries) return;
         const dirs = res.entries
@@ -87,7 +88,8 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
     (async () => {
       try {
         const res = await fetchJSON<{ entries?: FileEntryLite[] }>(
-          `/api/patients/${personId}/files?path=${encodeURIComponent(folder)}`
+          `/api/patients/${personId}/files?path=${encodeURIComponent(folder)}`,
+          { schema: fileExplorerContract.list.response }
         );
         if (cancelled) return;
         setFolderExists(true);

@@ -103,7 +103,8 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
         try {
             setLoadingData(true);
             const data = await fetchJSON<{ appointment?: ExistingAppointment }>(
-                `/api/appointments/${id}`
+                `/api/appointments/${id}`,
+                { schema: appointment.appointmentById.response }
             );
             if (data.appointment) {
                 prefillFormData(data.appointment);

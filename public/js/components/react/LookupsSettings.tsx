@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON } from '@/core/http';
+import * as lookupAdminContract from '@shared/contracts/lookup-admin.contract';
 import LookupEditor from './LookupEditor';
 import HolidayEditor from './HolidayEditor';
 import CostPresetsSettings from './CostPresetsSettings';
@@ -65,7 +66,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
     const loadTableConfigs = async (): Promise<void> => {
         try {
             setLoading(true);
-            const data = await fetchJSON<TableConfig[]>('/api/admin/lookups/tables');
+            const data = await fetchJSON<TableConfig[]>('/api/admin/lookups/tables', { schema: lookupAdminContract.tables.response });
             const costPresetsEntry: TableConfig = {
                 key: COST_PRESETS_TABLE_KEY,
                 displayName: 'Cost Presets',

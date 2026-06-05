@@ -25,6 +25,8 @@ import {
 } from './photoEditorTypes';
 import { useToast } from '../../../contexts/ToastContext';
 import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '../../../core/http';
+import * as patientContract from '@shared/contracts/patient.contract';
+import * as fileExplorerContract from '@shared/contracts/file-explorer.contract';
 
 interface Props {
   personId?: number | null;
@@ -101,9 +103,11 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
         const [gallery, files] = await Promise.all([
           fetchJSON<Array<{ name?: string } | null>>(
             `/api/patients/${personId}/gallery/${tpCode}`,
+            { schema: patientContract.gallery.response },
           ).catch(() => [] as Array<{ name?: string } | null>),
           fetchJSON<{ entries?: Array<{ name: string; relPath: string; type: string }> }>(
             `/api/patients/${personId}/files?path=${encodeURIComponent(folder)}`,
+            { schema: fileExplorerContract.list.response },
           ).catch(() => null),
         ]);
         if (cancelled) return;
