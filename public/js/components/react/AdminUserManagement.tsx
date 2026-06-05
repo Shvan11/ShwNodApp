@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import * as userManagement from '@shared/contracts/user-management.contract';
 import Modal from './Modal';
 import styles from './AdminUserManagement.module.css';
 
@@ -61,7 +62,8 @@ export default function AdminUserManagement() {
 
   const fetchUsers = async () => {
     try {
-      const data = await fetchJSON<{ success: boolean; users?: User[] }>('/api/users');
+      // Post-migration the funnel unwraps the envelope to `{ users }`.
+      const data = await fetchJSON<{ users?: User[] }>('/api/users', { schema: userManagement.usersList.response });
       setUsers(data.users ?? []);
     } catch (err) {
       setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error loading users') });

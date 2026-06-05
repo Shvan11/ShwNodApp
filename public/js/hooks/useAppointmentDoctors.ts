@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { fetchJSON } from '@/core/http';
+import * as employee from '@shared/contracts/employee.contract';
 import { buildDoctorColors, type DoctorColorResult, type DoctorColorSource } from '../components/react/doctorColors';
 
 const EMPTY: DoctorColorResult = { byId: new Map(), legend: [] };
@@ -20,7 +21,7 @@ export function useAppointmentDoctors(): DoctorColorResult & { loading: boolean 
         let cancelled = false;
         (async () => {
             try {
-                const data = await fetchJSON<{ employees?: DoctorColorSource[] }>('/api/employees?getAppointments=true');
+                const data = await fetchJSON<{ employees?: DoctorColorSource[] }>('/api/employees?getAppointments=true', { schema: employee.employees.response });
                 const employees = Array.isArray(data?.employees) ? data.employees : [];
                 if (!cancelled) setResult(buildDoctorColors(employees));
             } catch (err) {

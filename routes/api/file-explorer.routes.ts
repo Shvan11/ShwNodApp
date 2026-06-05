@@ -10,16 +10,15 @@
  * audit-logged with the acting user id.
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
-import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
 import { createReadStream, promises as fsp } from 'fs';
 import { log } from '../../utils/logger.js';
-import { ErrorResponses, sendError, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendError, sendData } from '../../utils/error-response.js';
 import { authorize } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
-import { idParams } from '../../middleware/validation-schemas.js';
 import { timeouts } from '../../middleware/timeout.js';
+import * as fileExplorer from '../../shared/contracts/file-explorer.contract.js';
 import { getFileMimeType } from '../../utils/file-mime.js';
 import {
   FileExplorerError,
@@ -57,14 +56,12 @@ type PersonIdParams = { personId: string };
 const isTruthy = (v: unknown): boolean => v === '1' || v === 'true';
 const queryString = (v: unknown): string => (typeof v === 'string' ? v : '');
 
-// Boundary guards. `:personId` is validated numeric so a non-numeric/traversal-y
-// id is rejected up front (defense-in-depth ahead of the service's path safety,
-// and — for upload — BEFORE any bytes are accepted). The folder/rename bodies only
-// need a string-TYPE guard; all path-safety (traversal, emptiness) stays in
-// file-explorer.service.ts, which remains the authority.
-const personIdParams = idParams('personId');
-const folderBodySchema = z.object({ path: z.string().optional(), name: z.string().optional() });
-const renameBodySchema = z.object({ path: z.string().optional(), newName: z.string().optional() });
+// Boundary guards live in the shared contract
+// (`shared/contracts/file-explorer.contract.ts`). `:personId` is validated numeric
+// so a non-numeric/traversal-y id is rejected up front (defense-in-depth ahead of
+// the service's path safety, and — for upload — BEFORE any bytes are accepted).
+// The folder/rename bodies only assert a string TYPE; all path-safety (traversal,
+// emptiness) stays in file-explorer.service.ts, which remains the authority.
 
 /** Map a thrown error to a response (FileExplorerError carries its own status). */
 function handleError(res: Response, err: unknown, op: string): void {
@@ -137,7 +134,7 @@ router.get(
         : await listDirectory(personId, relPath);
 
       log.info('[Files] list', { userId: req.session?.userId, personId, relPath, flat });
-      sendSuccess(res, listing);
+      sendData(res, fileExplorer.list.response, listing);
     } catch (err) {
       handleError(res, err, 'list');
     }
@@ -228,7 +225,7 @@ router.get(
         count: entries.length,
       });
       // Shape mirrors FileListing so the client can reuse the file-explorer types.
-      sendSuccess(res, { path: 'working', parent: null, flat: false, truncated: false, entries });
+      sendData(res, fileExplorer.workingFiles.response, { path: 'working', parent: null, flat: false, truncated: false, entries });
     } catch (err) {
       handleError(res, err, 'working-list');
     }
@@ -337,7 +334,7 @@ function runUpload(req: Request, res: Response, next: NextFunction): void {
 router.post(
   '/patients/:personId/files/upload',
   authorize(['admin', 'secretary']),
-  validate({ params: personIdParams }),
+  validate({ params: fileExplorer.upload.params }),
   runUpload,
   async (req: Request<PersonIdParams>, res: Response): Promise<void> => {
     const files = (req.files as Express.Multer.File[]) || [];
@@ -363,7 +360,7 @@ router.post(
         });
       }
 
-      sendSuccess(res, { files: created }, `Uploaded ${created.length} file(s)`);
+      sendData(res, fileExplorer.upload.response, { files: created }, `Uploaded ${created.length} file(s)`);
     } catch (err) {
       // Clean up any staged temp files that never made it to their final name.
       await Promise.all(
@@ -381,14 +378,14 @@ router.post(
 router.post(
   '/patients/:personId/files/folder',
   authorize(['admin', 'secretary']),
-  validate({ params: personIdParams, body: folderBodySchema }),
+  validate({ params: fileExplorer.folder.params, body: fileExplorer.folder.body }),
   async (req: Request<PersonIdParams, unknown, { path?: string; name?: string }>, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
       const { path: relPath = '', name = '' } = req.body || {};
       const entry = await createFolder(personId, relPath, name);
       log.info('[Files] mkdir', { userId: req.session?.userId, personId, relPath, name: entry.name });
-      sendSuccess(res, entry, 'Folder created');
+      sendData(res, fileExplorer.folder.response, entry, 'Folder created');
     } catch (err) {
       handleError(res, err, 'mkdir');
     }
@@ -402,7 +399,7 @@ router.post(
 router.post(
   '/patients/:personId/files/rename',
   authorize(['admin', 'secretary']),
-  validate({ params: personIdParams, body: renameBodySchema }),
+  validate({ params: fileExplorer.rename.params, body: fileExplorer.rename.body }),
   async (req: Request<PersonIdParams, unknown, { path?: string; newName?: string }>, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
@@ -413,7 +410,7 @@ router.post(
       }
       const entry = await renameEntry(personId, relPath, newName);
       log.info('[Files] rename', { userId: req.session?.userId, personId, relPath, newName: entry.name });
-      sendSuccess(res, entry, 'Renamed');
+      sendData(res, fileExplorer.rename.response, entry, 'Renamed');
     } catch (err) {
       handleError(res, err, 'rename');
     }
@@ -427,7 +424,7 @@ router.post(
 router.delete(
   '/patients/:personId/files',
   authorize(['admin', 'secretary']),
-  validate({ params: personIdParams }),
+  validate({ params: fileExplorer.deleteEntry.params }),
   async (req: Request<PersonIdParams>, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
@@ -438,7 +435,7 @@ router.delete(
       }
       await softDelete(personId, relPath);
       log.info('[Files] delete', { userId: req.session?.userId, personId, relPath });
-      sendSuccess(res, { path: relPath }, 'Moved to trash');
+      sendData(res, fileExplorer.deleteEntry.response, { path: relPath }, 'Moved to trash');
     } catch (err) {
       handleError(res, err, 'delete');
     }
@@ -455,7 +452,7 @@ const MAX_BATCH_DELETE = 5000;
 router.post(
   '/patients/:personId/files/delete-batch',
   authorize(['admin', 'secretary']),
-  validate({ params: personIdParams }),
+  validate({ params: fileExplorer.deleteBatch.params }),
   timeouts.long, // bulk renames over SMB can exceed the global 30s gate
   async (
     req: Request<PersonIdParams, unknown, { paths?: unknown }>,
@@ -487,8 +484,9 @@ router.post(
         succeeded: result.succeeded,
         failed: result.failed,
       });
-      sendSuccess(
+      sendData(
         res,
+        fileExplorer.deleteBatch.response,
         result,
         result.failed === 0
           ? `Moved ${result.succeeded} item(s) to trash`

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '../contexts/ToastContext';
 import { fetchJSON, putJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
+import * as videoContract from '@shared/contracts/video.contract';
 import Modal from '../components/react/Modal';
 import styles from './Videos.module.css';
 
@@ -81,7 +82,7 @@ export default function Videos() {
       setLoading(true);
       setError(null);
 
-      const data = await fetchJSON<Video[]>('/api/videos');
+      const data = await fetchJSON<Video[]>('/api/videos', { schema: videoContract.list.response });
       setVideos(data || []);
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to load videos'));
@@ -96,7 +97,7 @@ export default function Videos() {
    */
   const fetchCategories = useCallback(async () => {
     try {
-      const data = await fetchJSON<VideoCategory[]>('/api/videos/categories');
+      const data = await fetchJSON<VideoCategory[]>('/api/videos/categories', { schema: videoContract.categories.response });
       setCategories(data || []);
     } catch (err) {
       console.error('Failed to fetch categories:', err);
@@ -183,7 +184,8 @@ export default function Videos() {
 
     try {
       const data = await fetchJSON<{ qr: string; url: string; title: string }>(
-        `/api/videos/${video.id}/qr`
+        `/api/videos/${video.id}/qr`,
+        { schema: videoContract.qr.response }
       );
       setQRData({
         qr: data.qr,

@@ -4,6 +4,7 @@ import Modal from './Modal';
 import styles from './DatabaseSettings.module.css';
 import { formatISODate } from '../../core/utils';
 import { fetchJSON, postJSON, putJSON, httpErrorMessage } from '@/core/http';
+import * as settings from '@shared/contracts/settings.contract';
 
 interface DatabaseConfig {
     PG_HOST: string;
@@ -68,7 +69,8 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
         setIsLoading(true);
         try {
             const data = await fetchJSON<{ config?: DatabaseConfig }>(
-                '/api/config/database'
+                '/api/config/database',
+                { schema: settings.getDatabaseConfig.response }
             );
 
             if (data.config) {
@@ -195,7 +197,8 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
     const exportConfiguration = async () => {
         try {
             const data = await fetchJSON<{ config?: unknown }>(
-                '/api/config/database/export'
+                '/api/config/database/export',
+                { schema: settings.exportDatabaseConfig.response }
             );
 
             // A failed export throws from fetchJSON → caught below.

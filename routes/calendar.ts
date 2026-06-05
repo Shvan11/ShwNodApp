@@ -9,6 +9,8 @@ import { Router, type Request, type Response } from 'express';
 import { sql } from 'kysely';
 import { getKysely } from '../services/database/kysely.js';
 import { log } from '../utils/logger.js';
+import { validate } from '../middleware/validate.js';
+import { sendData, ErrorResponses } from '../utils/error-response.js';
 import { getHolidaysInRange } from '../services/database/queries/holiday-queries.js';
 import {
   getWeeklyCalendarSlots,
@@ -16,6 +18,7 @@ import {
   ensureCalendarRange,
   fillCalendar,
 } from '../services/database/queries/calendar-queries.js';
+import * as calendar from '../shared/contracts/calendar.contract.js';
 
 const router = Router();
 
@@ -104,6 +107,7 @@ interface MonthlyDayData {
  */
 router.get(
   '/week',
+  validate({ query: calendar.week.query }),
   async (
     req: Request<unknown, unknown, unknown, CalendarQueryParams>,
     res: Response
@@ -111,15 +115,7 @@ router.get(
     try {
       const { date, doctorId } = req.query;
 
-      if (!date) {
-        res.status(400).json({
-          success: false,
-          error: 'Date parameter is required'
-        });
-        return;
-      }
-
-      const weekStart = getWeekStart(new Date(date));
+      const weekStart = getWeekStart(new Date(date as string));
       const weekEnd = getWeekEnd(weekStart);
 
       const filterMsg = doctorId
@@ -172,8 +168,7 @@ router.get(
         `✅ Calendar data retrieved: ${calendarData.length} slots, ${structuredData.days.length} days, ${holidays.length} holidays`
       );
 
-      res.json({
-        success: true,
+      sendData(res, calendar.week.response, {
         weekStart,
         weekEnd,
         totalSlots: calendarData.length,
@@ -184,11 +179,7 @@ router.get(
       });
     } catch (error) {
       log.error('❌ Calendar week API error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch calendar data',
-        details: (error as Error).message
-      });
+      ErrorResponses.internalError(res, 'Failed to fetch calendar data', error as Error);
     }
   }
 );
@@ -200,25 +191,19 @@ router.get(
  */
 router.get(
   '/month',
+  validate({ query: calendar.month.query }),
   async (
     req: Request<unknown, unknown, unknown, CalendarQueryParams>,
     res: Response
   ): Promise<void> => {
     try {
       const { date, doctorId } = req.query;
+      const dateStr = date as string;
 
-      if (!date) {
-        res.status(400).json({
-          success: false,
-          error: 'Date parameter is required'
-        });
-        return;
-      }
-
-      const gridStart = getCalendarGridStart(new Date(date));
-      const gridEnd = getCalendarGridEnd(new Date(date));
-      const monthStart = getMonthStart(new Date(date));
-      const monthEnd = getMonthEnd(new Date(date));
+      const gridStart = getCalendarGridStart(new Date(dateStr));
+      const gridEnd = getCalendarGridEnd(new Date(dateStr));
+      const monthStart = getMonthStart(new Date(dateStr));
+      const monthEnd = getMonthEnd(new Date(dateStr));
 
       const filterMsg = doctorId
         ? ` (filtered by doctor id: ${doctorId})`
@@ -272,8 +257,7 @@ router.get(
         `✅ Monthly calendar data retrieved: ${monthlyData.days.length} days, ${holidays.length} holidays`
       );
 
-      res.json({
-        success: true,
+      sendData(res, calendar.month.response, {
         monthStart,
         monthEnd,
         gridStart,
@@ -285,11 +269,7 @@ router.get(
       });
     } catch (error) {
       log.error('❌ Calendar month API error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch monthly calendar data',
-        details: (error as Error).message
-      });
+      ErrorResponses.internalError(res, 'Failed to fetch monthly calendar data', error as Error);
     }
   }
 );
@@ -300,6 +280,7 @@ router.get(
  */
 router.get(
   '/stats',
+  validate({ query: calendar.stats.query }),
   async (
     req: Request<unknown, unknown, unknown, CalendarQueryParams>,
     res: Response
@@ -307,15 +288,7 @@ router.get(
     try {
       const { date } = req.query;
 
-      if (!date) {
-        res.status(400).json({
-          success: false,
-          error: 'Date parameter is required'
-        });
-        return;
-      }
-
-      const weekStart = getWeekStart(new Date(date));
+      const weekStart = getWeekStart(new Date(date as string));
       const weekEnd = getWeekEnd(weekStart);
 
       log.info(
@@ -328,8 +301,7 @@ router.get(
         `✅ Calendar stats retrieved: ${stats?.utilizationPercent}% utilization`
       );
 
-      res.json({
-        success: true,
+      sendData(res, calendar.stats.response, {
         stats: stats || {
           weekStart,
           weekEnd,
@@ -342,11 +314,7 @@ router.get(
       });
     } catch (error) {
       log.error('❌ Calendar stats API error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch calendar statistics',
-        details: (error as Error).message
-      });
+      ErrorResponses.internalError(res, 'Failed to fetch calendar statistics', error as Error);
     }
   }
 );
@@ -367,8 +335,7 @@ router.post(
       const daysAdded = result.DaysAdded || 0;
       log.info(`✅ Calendar regeneration complete: ${daysAdded} entries added`);
 
-      res.json({
-        success: true,
+      sendData(res, calendar.regenerate.response, {
         entriesAdded: daysAdded,
         message: daysAdded > 0
           ? `Added ${daysAdded} missing calendar entries`
@@ -376,11 +343,7 @@ router.post(
       });
     } catch (error) {
       log.error('❌ Calendar regeneration error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to regenerate calendar',
-        details: (error as Error).message
-      });
+      ErrorResponses.internalError(res, 'Failed to regenerate calendar', error as Error);
     }
   }
 );
@@ -391,20 +354,13 @@ router.post(
  */
 router.get(
   '/available-slots',
+  validate({ query: calendar.availableSlots.query }),
   async (
     req: Request<unknown, unknown, unknown, CalendarQueryParams>,
     res: Response
   ): Promise<void> => {
     try {
       const { date } = req.query;
-
-      if (!date) {
-        res.status(400).json({
-          success: false,
-          error: 'Date parameter is required'
-        });
-        return;
-      }
 
       log.info(`🕐 Fetching all slots with details for: ${date}`);
 
@@ -422,7 +378,7 @@ router.get(
       await ensureCalendarRange(60);
 
       // Fetch calendar data for the single day
-      const calendarData = await getWeeklyCalendarSlots(date, date, null);
+      const calendarData = await getWeeklyCalendarSlots(date as string, date as string, null);
 
       // Transform data to get all slots with full details
       const structuredData = transformToCalendarStructure(
@@ -469,8 +425,7 @@ router.get(
         `✅ Found ${allSlots.length} total slots, ${availableCount} available for ${date}`
       );
 
-      res.json({
-        success: true,
+      sendData(res, calendar.availableSlots.response, {
         date,
         slots: allSlots,
         totalSlots: allSlots.length,
@@ -479,11 +434,7 @@ router.get(
       });
     } catch (error) {
       log.error('❌ Available slots API error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch available slots',
-        details: (error as Error).message
-      });
+      ErrorResponses.internalError(res, 'Failed to fetch available slots', error as Error);
     }
   }
 );
@@ -494,20 +445,13 @@ router.get(
  */
 router.get(
   '/month-availability',
+  validate({ query: calendar.monthAvailability.query }),
   async (
     req: Request<unknown, unknown, unknown, CalendarQueryParams>,
     res: Response
   ): Promise<void> => {
     try {
-      const { startDate, endDate } = req.query;
-
-      if (!startDate || !endDate) {
-        res.status(400).json({
-          success: false,
-          error: 'Start date and end date parameters are required'
-        });
-        return;
-      }
+      const { startDate, endDate } = req.query as { startDate: string; endDate: string };
 
       log.info(
         `📅 Fetching month availability: ${startDate} to ${endDate}`
@@ -611,8 +555,7 @@ router.get(
         `✅ Month availability calculated for ${Object.keys(availability).length} days, ${holidays.length} holidays`
       );
 
-      res.json({
-        success: true,
+      sendData(res, calendar.monthAvailability.response, {
         startDate,
         endDate,
         availability,
@@ -621,11 +564,7 @@ router.get(
       });
     } catch (error) {
       log.error('❌ Month availability API error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch month availability',
-        details: (error as Error).message
-      });
+      ErrorResponses.internalError(res, 'Failed to fetch month availability', error as Error);
     }
   }
 );

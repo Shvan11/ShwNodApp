@@ -15,7 +15,8 @@ import { getKysely } from '../../services/database/kysely.js';
 import { log } from '../../utils/logger.js';
 import multer from 'multer';
 import webcephService from '../../services/webceph/webceph-service.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendData } from '../../utils/error-response.js';
+import * as media from '../../shared/contracts/media.contract.js';
 
 const router = Router();
 
@@ -145,7 +146,7 @@ router.post('/webceph/create-patient', async (req: Request<object, object, Creat
 
     log.info(`[WebCeph] Patient created successfully for person_id: ${personId}`);
 
-    sendSuccess(res, {
+    sendData(res, media.createPatient.response, {
       webcephPatientId: result.webcephPatientId,
       link: result.link,
       linkId: result.linkId
@@ -206,7 +207,7 @@ router.post('/webceph/upload-image', uploadImage, async (req: FileRequest, res: 
 
     log.info(`[WebCeph] Image uploaded successfully for patient: ${patient_id}`);
 
-    sendSuccess(res, {
+    sendData(res, media.uploadImage.response, {
       big: result.big,
       thumbnail: result.thumbnail,
       link: result.link
@@ -238,15 +239,16 @@ router.get('/webceph/patient-link/:personId', async (req: Request<PersonIdParams
     `.execute(db);
 
     if (!result || result.length === 0 || !result[0].webcephPatientId) {
-      res.json({
-        success: false,
-        message: 'Patient not found in WebCeph',
-        data: null
-      });
+      // "No WebCeph link yet" is now a proper 404 (was a raw
+      // `res.json({success:false,data:null})`). `sendData(…, null)` can't express
+      // this — `sendSuccess` omits a null `data`, so the funnel would return the
+      // whole envelope (truthy) instead of null. The consumer treats 404 as "no
+      // link" without logging it as an error.
+      ErrorResponses.notFound(res, 'WebCeph patient');
       return;
     }
 
-    sendSuccess(res, result[0]);
+    sendData(res, media.patientLink.response, result[0]);
   } catch (error) {
     log.error('[WebCeph] Error fetching patient link:', error);
     ErrorResponses.serverError(res, 'Failed to fetch WebCeph patient link', error as Error);
@@ -260,7 +262,7 @@ router.get('/webceph/patient-link/:personId', async (req: Request<PersonIdParams
 router.get('/webceph/photo-types', async (_req: Request, res: Response): Promise<void> => {
   try {
     const photoTypes = webcephService.getPhotoTypes();
-    sendSuccess(res, photoTypes);
+    sendData(res, media.photoTypes.response, photoTypes);
   } catch (error) {
     log.error('[WebCeph] Error fetching photo types:', error);
     ErrorResponses.serverError(res, 'Failed to fetch photo types', error as Error);

@@ -2,6 +2,7 @@ import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import * as costPreset from '@shared/contracts/cost-preset.contract';
 import styles from './CostPresetsSettings.module.css';
 
 type Currency = 'IQD' | 'USD' | 'EUR';
@@ -37,7 +38,7 @@ const CostPresetsSettings = () => {
     const loadPresets = async () => {
         try {
             setLoading(true);
-            const data = await fetchJSON<CostPreset[]>('/api/settings/cost-presets');
+            const data = await fetchJSON<CostPreset[]>('/api/settings/cost-presets', { schema: costPreset.getPresets.response });
             setPresets(data);
         } catch (error) {
             console.error('Error loading presets:', error);

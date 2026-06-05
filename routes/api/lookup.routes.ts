@@ -16,7 +16,7 @@
 
 import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import {
   getReferralSources,
   getPatientTypes,
@@ -25,6 +25,7 @@ import {
 } from '../../services/database/queries/patient-queries.js';
 import { getAlertTypes } from '../../services/database/queries/alert-queries.js';
 import { getImplantManufacturers } from '../../services/database/queries/work-queries.js';
+import * as lookup from '../../shared/contracts/lookup.contract.js';
 
 const router = Router();
 
@@ -35,7 +36,7 @@ const router = Router();
 router.get('/referral-sources', async (_req: Request, res: Response): Promise<void> => {
   try {
     const referralSources = await getReferralSources();
-    sendSuccess(res, referralSources);
+    sendData(res, lookup.referralSources.response, referralSources);
   } catch (error) {
     log.error('Error fetching referral sources:', error);
     ErrorResponses.internalError(res, 'Failed to fetch referral sources', error as Error);
@@ -49,7 +50,7 @@ router.get('/referral-sources', async (_req: Request, res: Response): Promise<vo
 router.get('/patient-types', async (_req: Request, res: Response): Promise<void> => {
   try {
     const patientTypes = await getPatientTypes();
-    sendSuccess(res, patientTypes);
+    sendData(res, lookup.patientTypes.response, patientTypes);
   } catch (error) {
     log.error('Error fetching patient types:', error);
     ErrorResponses.internalError(res, 'Failed to fetch patient types', error as Error);
@@ -63,7 +64,7 @@ router.get('/patient-types', async (_req: Request, res: Response): Promise<void>
 router.get('/addresses', async (_req: Request, res: Response): Promise<void> => {
   try {
     const addresses = await getAddresses();
-    sendSuccess(res, addresses);
+    sendData(res, lookup.addresses.response, addresses);
   } catch (error) {
     log.error('Error fetching addresses:', error);
     ErrorResponses.internalError(res, 'Failed to fetch addresses', error as Error);
@@ -77,7 +78,7 @@ router.get('/addresses', async (_req: Request, res: Response): Promise<void> => 
 router.get('/genders', async (_req: Request, res: Response): Promise<void> => {
   try {
     const genders = await getGenders();
-    sendSuccess(res, genders);
+    sendData(res, lookup.genders.response, genders);
   } catch (error) {
     log.error('Error fetching genders:', error);
     ErrorResponses.internalError(res, 'Failed to fetch genders', error as Error);
@@ -91,7 +92,7 @@ router.get('/genders', async (_req: Request, res: Response): Promise<void> => {
 router.get('/alert-types', async (_req: Request, res: Response): Promise<void> => {
   try {
     const alertTypes = await getAlertTypes();
-    sendSuccess(res, alertTypes);
+    sendData(res, lookup.alertTypes.response, alertTypes);
   } catch (error) {
     log.error('Error fetching alert types:', error);
     ErrorResponses.internalError(res, 'Failed to fetch alert types', error as Error);
@@ -105,7 +106,7 @@ router.get('/alert-types', async (_req: Request, res: Response): Promise<void> =
 router.get('/implant-manufacturers', async (_req: Request, res: Response): Promise<void> => {
   try {
     const manufacturers = await getImplantManufacturers();
-    sendSuccess(res, manufacturers);
+    sendData(res, lookup.implantManufacturers.response, manufacturers);
   } catch (error) {
     log.error('Error fetching implant manufacturers:', error);
     ErrorResponses.internalError(res, 'Failed to fetch implant manufacturers', error as Error);

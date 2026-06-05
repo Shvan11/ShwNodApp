@@ -22,8 +22,9 @@ import {
   updateCostPreset,
   deleteCostPreset
 } from '../../services/database/queries/cost-preset-queries.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import * as costPreset from '../../shared/contracts/cost-preset.contract.js';
 
 const router = Router();
 
@@ -69,7 +70,7 @@ router.get('/settings/cost-presets', async (req: Request<object, object, object,
   try {
     const { currency } = req.query;
     const presets = await getCostPresets(currency || null);
-    sendSuccess(res, presets);
+    sendData(res, costPreset.getPresets.response, presets);
   } catch (error) {
     log.error('Error fetching cost presets:', error);
     ErrorResponses.internalError(res, 'Failed to fetch cost presets', error as Error);
@@ -104,7 +105,7 @@ router.post('/settings/cost-presets', authenticate, authorize(['admin']), async 
 
     const presetId = await createCostPreset(amount, currency, displayOrder);
 
-    sendSuccess(res, { presetId }, 'Cost preset created successfully');
+    sendData(res, costPreset.createPreset.response, { presetId }, 'Cost preset created successfully');
   } catch (error) {
     log.error('Error creating cost preset:', error);
     ErrorResponses.internalError(res, 'Failed to create cost preset', error as Error);

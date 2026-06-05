@@ -9,10 +9,11 @@
 
 import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import {
   getAppointmentsOnDate
 } from '../../services/database/queries/holiday-queries.js';
+import * as holiday from '../../shared/contracts/holiday.contract.js';
 
 const router = Router();
 
@@ -37,7 +38,7 @@ router.get('/appointments-on-date', async (req: Request<object, object, object, 
     }
 
     const appointments = await getAppointmentsOnDate(date);
-    sendSuccess(res, {
+    sendData(res, holiday.appointmentsOnDate.response, {
       appointments,
       count: appointments.length
     });

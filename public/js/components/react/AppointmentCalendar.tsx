@@ -11,6 +11,8 @@ import { useToast } from '../../contexts/ToastContext';
 import { useAppointmentDoctors } from '../../hooks/useAppointmentDoctors';
 import { parseLocalDate } from '../../utils/calendarDate';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import * as holiday from '@shared/contracts/holiday.contract';
+import * as calendar from '@shared/contracts/calendar.contract';
 import type {
     ViewMode,
     CalendarMode,
@@ -248,24 +250,21 @@ const AppointmentCalendar = ({
             const endpoint = viewModeParam === 'month'
                 ? `/api/calendar/month?${calendarParams}`
                 : `/api/calendar/week?${calendarParams}`;
+            const dataSchema = viewModeParam === 'month'
+                ? calendar.month.response
+                : calendar.week.response;
 
             // Fetch both calendar data and stats in parallel. Both are required,
             // so a bare fetchJSON in Promise.all (rejects on the first non-2xx)
-            // matches the old per-response !ok throw.
+            // matches the old per-response !ok throw. Post-migration the funnel
+            // unwraps each envelope to its payload (`.days`/`.timeSlots`/`.stats`).
             const [calendarResult, statsResult] = await Promise.all([
-                fetchJSON<Partial<CalendarData> & { success?: boolean; error?: string }>(endpoint),
-                fetchJSON<{ success?: boolean; error?: string; stats?: CalendarStats }>(
-                    `/api/calendar/stats?date=${targetDate}`
+                fetchJSON<Partial<CalendarData>>(endpoint, { schema: dataSchema }),
+                fetchJSON<{ stats?: CalendarStats }>(
+                    `/api/calendar/stats?date=${targetDate}`,
+                    { schema: calendar.stats.response }
                 )
             ]);
-
-            if (!calendarResult.success) {
-                throw new Error(calendarResult.error || 'Failed to fetch calendar data');
-            }
-
-            if (!statsResult.success) {
-                throw new Error(statsResult.error || 'Failed to fetch calendar stats');
-            }
 
             // Validate and set calendar data
             const validatedCalendarData = validateCalendarData(calendarResult);
@@ -423,7 +422,8 @@ const AppointmentCalendar = ({
         // Check for existing appointments on this date
         try {
             const data = await fetchJSON<AppointmentWarning>(
-                `/api/holidays/appointments-on-date?date=${day.date}`
+                `/api/holidays/appointments-on-date?date=${day.date}`,
+                { schema: holiday.appointmentsOnDate.response }
             );
 
             setHolidayModal({

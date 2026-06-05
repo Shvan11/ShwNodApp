@@ -8,6 +8,8 @@ import React, { useState, useEffect, useRef, useCallback, type FormEvent, type C
 import cn from 'classnames';
 import { formatISODate } from '../../core/utils';
 import { fetchJSON, putJSON, postJSON, httpErrorMessage } from '@/core/http';
+import * as staff from '@shared/contracts/staff.contract';
+import * as visitContract from '@shared/contracts/visit.contract';
 import DentalChart from './DentalChart';
 import { useToast } from '../../contexts/ToastContext';
 import styles from './NewVisitComponent.module.css';
@@ -119,9 +121,9 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
             // so per-promise .catch keeps Promise.all from rejecting wholesale —
             // mirrors the old per-response `if (res.ok)` guards.
             const [wiresData, operatorsData, latestWiresData] = await Promise.all([
-                fetchJSON<Wire[]>('/api/getWires').catch(() => null),
-                fetchJSON<Operator[]>('/api/operators').catch(() => null),
-                fetchJSON<LatestWires>(`/api/getlatestwires?workId=${workId}`).catch(() => null)
+                fetchJSON<Wire[]>('/api/getWires', { schema: visitContract.getWires.response }).catch(() => null),
+                fetchJSON<Operator[]>('/api/operators', { schema: staff.operators.response }).catch(() => null),
+                fetchJSON<LatestWires>(`/api/getlatestwires?workId=${workId}`, { schema: visitContract.latestWires.response }).catch(() => null)
             ]);
 
             if (wiresData) setWires(wiresData);
@@ -136,7 +138,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
     const loadVisitData = useCallback(async () => {
         try {
             setLoading(true);
-            const visit = await fetchJSON<VisitResponse>(`/api/getvisitbyid?visitId=${visitId}`);
+            const visit = await fetchJSON<VisitResponse>(`/api/getvisitbyid?visitId=${visitId}`, { schema: visitContract.visitById.response });
 
             setFormData({
                 work_id: visit.work_id,

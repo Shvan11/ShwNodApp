@@ -5,6 +5,7 @@ import LookupEditorModal from './LookupEditorModal';
 import Modal from './Modal';
 import { parseLocalDate } from '../../utils/calendarDate';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import * as holiday from '@shared/contracts/holiday.contract';
 
 interface Column {
     name: string;
@@ -228,7 +229,8 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
         try {
             setCheckingAppointments(true);
             const data = await fetchJSON<{ appointments?: AppointmentWarning['appointments']; count?: number }>(
-                `/api/holidays/appointments-on-date?date=${date}`
+                `/api/holidays/appointments-on-date?date=${date}`,
+                { schema: holiday.appointmentsOnDate.response }
             );
 
             if (data.count && data.count > 0) {

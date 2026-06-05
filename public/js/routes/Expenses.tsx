@@ -8,6 +8,7 @@ import ExpenseModal from '../components/expenses/ExpenseModal';
 import DeleteConfirmModal from '../components/expenses/DeleteConfirmModal';
 import { useToast } from '../contexts/ToastContext';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
+import * as expenseContract from '@shared/contracts/expense.contract';
 import styles from './Expenses.module.css';
 
 /**
@@ -110,7 +111,7 @@ export default function Expenses() {
   // Open edit expense modal
   const handleEditExpense = async (id: number) => {
     try {
-      const expense = await fetchJSON<Expense>(`/api/expenses/${id}`);
+      const expense = await fetchJSON<Expense>(`/api/expenses/${id}`, { schema: expenseContract.expenseById.response });
       setCurrentExpense(expense);
       setIsExpenseModalOpen(true);
     } catch (err) {

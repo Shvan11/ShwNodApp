@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import * as expenseContract from '@shared/contracts/expense.contract';
 
 /**
  * Expense filters
@@ -105,7 +106,7 @@ export function useExpenses(filters: ExpenseFilters = {}): {
       if (filters.subcategoryId) queryParams.append('subcategoryId', String(filters.subcategoryId));
       if (filters.currency) queryParams.append('currency', filters.currency);
 
-      const data = await fetchJSON<Expense[]>(`/api/expenses?${queryParams}`);
+      const data = await fetchJSON<Expense[]>(`/api/expenses?${queryParams}`, { schema: expenseContract.expenseList.response });
       setExpenses(data);
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to fetch expenses'));
@@ -144,7 +145,7 @@ export function useCategories(): {
     const fetchCategories = async () => {
       try {
         setLoading(true);
-        const data = await fetchJSON<Category[]>('/api/expenses/categories');
+        const data = await fetchJSON<Category[]>('/api/expenses/categories', { schema: expenseContract.expenseCategories.response });
         setCategories(data);
       } catch (err) {
         setError(httpErrorMessage(err, 'Failed to fetch categories'));
@@ -183,7 +184,7 @@ export function useSubcategories(categoryId: number | string | null | undefined)
       try {
         setLoading(true);
         setError(null);
-        const data = await fetchJSON<Subcategory[]>(`/api/expenses/subcategories/${categoryId}`);
+        const data = await fetchJSON<Subcategory[]>(`/api/expenses/subcategories/${categoryId}`, { schema: expenseContract.expenseSubcategories.response });
         setSubcategories(data);
       } catch (err) {
         setError(httpErrorMessage(err, 'Failed to fetch subcategories'));
@@ -314,7 +315,7 @@ export function useExpenseSummary(
         queryParams.append('startDate', startDate);
         queryParams.append('endDate', endDate);
 
-        const data = await fetchJSON<ExpenseSummary>(`/api/expenses/summary?${queryParams}`);
+        const data = await fetchJSON<ExpenseSummary>(`/api/expenses/summary?${queryParams}`, { schema: expenseContract.expenseSummary.response });
         setSummary(data);
         setError(null);
       } catch (err) {

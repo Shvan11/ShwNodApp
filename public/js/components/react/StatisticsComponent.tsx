@@ -5,6 +5,7 @@ import Chart from 'chart.js/auto';
 import DailyInvoicesModal from './DailyInvoicesModal';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
+import * as reports from '@shared/contracts/reports.contract';
 import styles from './StatisticsComponent.module.css';
 
 // Types
@@ -122,7 +123,7 @@ const StatisticsComponent = () => {
         setError(null);
 
         try {
-            const data = await fetchJSON<StatisticsData>(`/api/statistics?month=${month}&year=${year}&exchangeRate=${exchangeRate}`);
+            const data = await fetchJSON<StatisticsData>(`/api/statistics?month=${month}&year=${year}&exchangeRate=${exchangeRate}`, { schema: reports.statistics.response });
             setStatistics(data);
             setSearchParams({ month: month.toString(), year: year.toString() });
         } catch (err) {
@@ -137,7 +138,7 @@ const StatisticsComponent = () => {
     const fetchYearlyData = useCallback(async () => {
         setLoadingYearly(true);
         try {
-            const data = await fetchJSON<YearlyData>(`/api/statistics/yearly?startMonth=${periodStartMonth}&startYear=${periodStartYear}&exchangeRate=${exchangeRate}`);
+            const data = await fetchJSON<YearlyData>(`/api/statistics/yearly?startMonth=${periodStartMonth}&startYear=${periodStartYear}&exchangeRate=${exchangeRate}`, { schema: reports.yearlyStatistics.response });
             setYearlyData(data);
         } catch (err) {
             console.error('[Statistics] Error fetching yearly statistics:', err);
@@ -151,7 +152,7 @@ const StatisticsComponent = () => {
     const fetchMultiYearData = useCallback(async () => {
         setLoadingMultiYear(true);
         try {
-            const data = await fetchJSON<MultiYearData>(`/api/statistics/multi-year?startYear=${yearRangeStart}&endYear=${yearRangeEnd}&exchangeRate=${exchangeRate}`);
+            const data = await fetchJSON<MultiYearData>(`/api/statistics/multi-year?startYear=${yearRangeStart}&endYear=${yearRangeEnd}&exchangeRate=${exchangeRate}`, { schema: reports.multiYearStatistics.response });
             setMultiYearData(data);
         } catch (err) {
             console.error('[Statistics] Error fetching multi-year statistics:', err);

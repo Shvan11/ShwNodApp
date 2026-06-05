@@ -6,7 +6,6 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { z } from 'zod';
 import { log } from '../../utils/logger.js';
 import {
   getLookupTableConfigs,
@@ -18,21 +17,17 @@ import {
   getTableConfig,
   ReferentialError
 } from '../../services/database/queries/lookup-admin-queries.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
-import { numericParam } from '../../middleware/validation-schemas.js';
+import * as lookupAdmin from '../../shared/contracts/lookup-admin.contract.js';
 
 const router = Router();
 
-// PUT/DELETE param guard. The BODY here is intentionally dynamic (columns vary per
-// `tableName`), so it stays validated by the existing whitelist (`isValidTableKey`) +
-// per-column required-field loop — not statically schemable. What we CAN add is a
-// numeric `:id` guard so a junk id 400s instead of reaching the integer-PK query as a 500.
-const tableIdParams = z.object({ tableName: z.string().min(1), id: numericParam });
-// Lookup item bodies are dynamic per-table key/value maps; required columns are
-// validated from the table config in-handler. The boundary guard only asserts a
-// JSON object so a null/array body can't reach the column-required loop.
-const lookupItemBodySchema = z.looseObject({});
+// Param + body guards live in the shared contract
+// (`shared/contracts/lookup-admin.contract.ts`). The BODY is intentionally dynamic
+// (columns vary per `tableName`) — validated by the existing whitelist
+// (`isValidTableKey`) + per-column required-field loop — so the contract only
+// asserts a JSON object + a numeric `:id` (a junk id 400s instead of 500-ing).
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -60,7 +55,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const tables = getLookupTableConfigs();
-      sendSuccess(res, tables);
+      sendData(res, lookupAdmin.tables.response, tables);
     } catch (error) {
       log.error('Error fetching lookup table configs:', {
         error: (error as Error).message
@@ -90,7 +85,7 @@ router.get(
       }
 
       const items = await getLookupItems(tableName);
-      sendSuccess(res, items);
+      sendData(res, lookupAdmin.items.response, items);
     } catch (error) {
       log.error('Error fetching lookup items:', {
         table: req.params.tableName,
@@ -112,7 +107,7 @@ router.get(
  */
 router.post(
   '/lookups/:tableName',
-  validate({ body: lookupItemBodySchema }),
+  validate({ body: lookupAdmin.createItem.body }),
   async (
     req: Request<TableNameParams, unknown, LookupItemBody>,
     res: Response
@@ -146,7 +141,7 @@ router.post(
         id: newId
       });
 
-      sendSuccess(res, { id: newId }, 'Item created successfully');
+      sendData(res, lookupAdmin.createItem.response, { id: newId }, 'Item created successfully');
     } catch (error) {
       log.error('Error creating lookup item:', {
         table: req.params.tableName,
@@ -164,7 +159,7 @@ router.post(
  */
 router.put(
   '/lookups/:tableName/:id',
-  validate({ params: tableIdParams, body: lookupItemBodySchema }),
+  validate({ params: lookupAdmin.updateItem.params, body: lookupAdmin.updateItem.body }),
   async (
     req: Request<TableNameIdParams, unknown, LookupItemBody>,
     res: Response
@@ -221,7 +216,7 @@ router.put(
  */
 router.delete(
   '/lookups/:tableName/:id',
-  validate({ params: tableIdParams }),
+  validate({ params: lookupAdmin.deleteItem.params }),
   async (req: Request<TableNameIdParams>, res: Response): Promise<void> => {
     try {
       const { tableName, id } = req.params;

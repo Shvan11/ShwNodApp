@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import * as settings from '@shared/contracts/settings.contract';
 import styles from './CalendarTimesSettings.module.css';
 import sectionStyles from './SettingsSection.module.css';
 
@@ -108,7 +109,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             // failing the whole settings load. The rows are seeded today (verified —
             // audit N12/N20), so the 404 path is defensive, not the norm.
             // Fetch early slots option
-            const earlyData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_EARLY_SLOTS').catch(() => null);
+            const earlyData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_EARLY_SLOTS', { schema: settings.getOptionByName.response }).catch(() => null);
             const earlySlotsArr = earlyData?.value
                 ? earlyData.value.split(',').filter(Boolean)
                 : ['12:00', '12:30', '13:00', '13:30']; // Default
@@ -116,7 +117,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             setOriginalEarlySlots(earlySlotsArr);
 
             // Fetch late slots option
-            const lateData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_LATE_SLOTS').catch(() => null);
+            const lateData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_LATE_SLOTS', { schema: settings.getOptionByName.response }).catch(() => null);
             const lateSlotsArr = lateData?.value
                 ? lateData.value.split(',').filter(Boolean)
                 : ['21:00', '21:30', '22:00', '22:30']; // Default
@@ -124,7 +125,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             setOriginalLateSlots(lateSlotsArr);
 
             // Fetch default toggle setting
-            const toggleData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT').catch(() => null);
+            const toggleData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT', { schema: settings.getOptionByName.response }).catch(() => null);
             const toggleValue = toggleData?.value === 'true';
             setShowExtendedSlotsDefault(toggleValue);
             setOriginalShowExtendedDefault(toggleValue);

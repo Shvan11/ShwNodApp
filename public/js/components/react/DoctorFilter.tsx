@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
+import * as staff from '@shared/contracts/staff.contract';
 
 interface Doctor {
     id: number;
@@ -34,7 +35,7 @@ const DoctorFilter = ({ selectedDoctorId, onDoctorChange, className = '' }: Doct
             setLoading(true);
             setError(null);
 
-            const data = await fetchJSON<Doctor[]>('/api/doctors');
+            const data = await fetchJSON<Doctor[]>('/api/doctors', { schema: staff.doctors.response });
 
             // Validate data structure
             if (Array.isArray(data)) {

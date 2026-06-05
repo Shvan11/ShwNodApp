@@ -4,6 +4,8 @@ import cn from 'classnames';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, postJSON, putJSON, httpErrorMessage } from '@/core/http';
+import * as appointment from '@shared/contracts/appointment.contract';
+import * as employee from '@shared/contracts/employee.contract';
 import styles from './AppointmentForm.module.css';
 
 interface AppointmentFormData {
@@ -138,7 +140,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     const loadDoctors = async (): Promise<void> => {
         try {
             // Fetch all employees who can receive appointments (doctors, hygienists, etc.)
-            const data = await fetchJSON<{ employees?: Doctor[] }>('/api/employees?getAppointments=true');
+            const data = await fetchJSON<{ employees?: Doctor[] }>('/api/employees?getAppointments=true', { schema: employee.employees.response });
             const employees: Doctor[] = data?.employees || [];
             // "Clinic" is the most common assignment, so float it to the top of the
             // dropdown; everyone else keeps the server's SortOrder (Array.sort is stable).
@@ -156,7 +158,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
     const loadDetails = async (): Promise<void> => {
         try {
-            const data = await fetchJSON<AppointmentDetail[]>('/api/appointment-details');
+            const data = await fetchJSON<AppointmentDetail[]>('/api/appointment-details', { schema: appointment.appointmentDetails.response });
             setDetails(data || []);
         } catch (err) {
             console.error('Error loading appointment details:', err);

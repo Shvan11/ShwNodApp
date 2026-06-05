@@ -13,8 +13,9 @@ import sms from '../../services/messaging/sms.js';
 import { getContacts } from '../../services/authentication/google.js';
 import { createPathResolver } from '../../utils/path-resolver.js';
 import config from '../../config/config.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
+import * as utility from '../../shared/contracts/utility.contract.js';
 
 const router = Router();
 
@@ -100,7 +101,7 @@ router.get('/google', async (req: Request<object, unknown, unknown, GoogleQuery>
     }
 
     const contacts = await getContacts(source);
-    sendSuccess(res, contacts);
+    sendData(res, utility.google.response, contacts);
   } catch (error) {
     log.error('Error fetching Google contacts:', error);
     ErrorResponses.internalError(res, 'Failed to fetch Google contacts', error as Error);
@@ -148,14 +149,14 @@ router.get('/convert-path', async (req: Request<object, unknown, unknown, PathQu
 
       log.info('Path conversion successful:', { webPath, fileName, fullPath });
 
-      sendSuccess(res, {
+      sendData(res, utility.convertPath.response, {
         webPath: webPath,
         fullPath: fullPath
       });
     } else {
       // If not a DolImgs path, return as-is (could be already a full path)
       log.info('Path not a DolImgs path, returning as-is:', webPath);
-      sendSuccess(res, {
+      sendData(res, utility.convertPath.response, {
         webPath: webPath,
         fullPath: webPath
       });

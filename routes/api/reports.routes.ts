@@ -4,7 +4,8 @@
  */
 import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendData } from '../../utils/error-response.js';
+import * as reports from '../../shared/contracts/reports.contract.js';
 import {
   calculateMonthlyStatistics,
   enrichInvoicesWithDetails,
@@ -110,7 +111,7 @@ router.get('/statistics', async (req: Request<object, object, object, Statistics
     // Delegate calculation to service layer
     const summary = calculateMonthlyStatistics(dailyData, exRate);
 
-    sendSuccess(res, {
+    sendData(res, reports.statistics.response, {
       month: monthNum,
       year: yearNum,
       exchangeRate: exRate,
@@ -175,7 +176,7 @@ router.get('/statistics/yearly', async (req: Request<object, object, object, Yea
       grandTotal: 0
     });
 
-    sendSuccess(res, {
+    sendData(res, reports.yearlyStatistics.response, {
       startMonth: monthNum,
       startYear: yearNum,
       exchangeRate: exRate,
@@ -293,7 +294,7 @@ router.get('/statistics/multi-year', async (req: Request<object, object, object,
       grandTotal: 0
     });
 
-    sendSuccess(res, {
+    sendData(res, reports.multiYearStatistics.response, {
       startYear: startYearNum,
       endYear: endYearNum,
       exchangeRate: exRate,
@@ -331,7 +332,7 @@ router.get('/daily-invoices', async (req: Request<object, object, object, DailyI
     // Delegate enrichment to service layer
     const enrichedInvoices = await enrichInvoicesWithDetails(baseInvoices);
 
-    sendSuccess(res, {
+    sendData(res, reports.dailyInvoices.response, {
       date: date,
       count: enrichedInvoices.length,
       invoices: enrichedInvoices

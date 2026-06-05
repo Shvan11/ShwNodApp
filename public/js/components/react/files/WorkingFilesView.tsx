@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchJSON } from '@/core/http';
 import type { FileEntry, FileListing } from '@/types/api.types';
+import * as fileExplorer from '@shared/contracts/file-explorer.contract';
 import { buildWorkingContentUrl, errorMessage } from './fileHelpers';
 import FileEntryTile from './FileEntryTile';
 import FilePreviewModal from './FilePreviewModal';
@@ -36,6 +37,7 @@ const WorkingFilesView = ({ personId }: Props) => {
     setError(null);
     fetchJSON<FileListing>(`/api/patients/${personId}/working-files`, {
       signal: ac.signal,
+      schema: fileExplorer.workingFiles.response,
     })
       .then((listing) => {
         if (ac.signal.aborted) return;

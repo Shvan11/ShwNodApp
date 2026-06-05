@@ -23,6 +23,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { useConfirm } from '@/contexts/ConfirmContext';
 import Modal from '@/components/react/Modal';
 import type { FileEntry, FileListing, FileBatchDeleteResult } from '@/types/api.types';
+import * as fileExplorer from '@shared/contracts/file-explorer.contract';
 import { encodeRelPath, errorMessage } from './fileHelpers';
 import FileEntryTile from './FileEntryTile';
 import FilePreviewModal from './FilePreviewModal';
@@ -98,6 +99,7 @@ const FileExplorer = ({ personId, subPath }: Props) => {
     const qs = new URLSearchParams({ path: currentPath, flat: flat ? '1' : '0' });
     fetchJSON<FileListing>(`/api/patients/${personId}/files?${qs}`, {
       signal: ac.signal,
+      schema: fileExplorer.list.response,
     })
       .then((listing) => {
         if (ac.signal.aborted) return;

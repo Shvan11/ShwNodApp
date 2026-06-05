@@ -7,6 +7,9 @@ import { Router, type Request, type Response } from 'express';
 import { log } from '../utils/logger.js';
 import emailService from '../services/email/email-service.js';
 import pdfGenerator from '../services/pdf/appointment-pdf-generator.js';
+import { validate } from '../middleware/validate.js';
+import { sendData, ErrorResponses } from '../utils/error-response.js';
+import * as emailApi from '../shared/contracts/email-api.contract.js';
 
 const router = Router();
 
@@ -37,6 +40,11 @@ interface TestSendBody {
  * POST /api/email/send-appointments
  * Send appointment email to staff with PDF attachment
  * Query params: date (YYYY-MM-DD)
+ *
+ * NOTE (Phase 14): deliberately NOT migrated to `sendData`. Its consumer is the
+ * RAW whatsapp `apiClient` (WhatsAppSend.tsx), which reads `appointmentCount`/
+ * `success` at the TOP LEVEL and does NOT unwrap the `{success,data}` envelope —
+ * nesting the payload would hide those fields. Stays a top-level manual envelope.
  */
 router.post(
   '/send-appointments',
@@ -176,26 +184,17 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       await emailService.loadConfig();
-      const config = emailService.getConfig();
+      const currentConfig = emailService.getConfig();
 
-      if (!config) {
-        res.status(404).json({
-          success: false,
-          error: 'Email configuration not found'
-        });
+      if (!currentConfig) {
+        ErrorResponses.notFound(res, 'Email configuration');
         return;
       }
 
-      res.json({
-        success: true,
-        config: config
-      });
+      sendData(res, emailApi.config.response, { config: currentConfig });
     } catch (error) {
       log.error('Failed to get email configuration', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        error: (error as Error).message
-      });
+      ErrorResponses.internalError(res, (error as Error).message);
     }
   }
 );
@@ -206,6 +205,7 @@ router.get(
  */
 router.post(
   '/config',
+  validate({ body: emailApi.updateConfig.body }),
   async (
     req: Request<unknown, unknown, EmailConfigBody>,
     res: Response
@@ -214,26 +214,19 @@ router.post(
       const newConfig = req.body;
 
       if (!newConfig || Object.keys(newConfig).length === 0) {
-        res.status(400).json({
-          success: false,
-          error: 'Configuration data is required'
-        });
+        ErrorResponses.badRequest(res, 'Configuration data is required');
         return;
       }
 
       const result = await emailService.updateConfig(newConfig);
 
-      res.json({
-        success: true,
+      sendData(res, emailApi.updateConfig.response, {
         message: result.message,
         updated: result.updated
       });
     } catch (error) {
       log.error('Failed to update email configuration', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        error: (error as Error).message
-      });
+      ErrorResponses.internalError(res, (error as Error).message);
     }
   }
 );
@@ -270,6 +263,7 @@ router.get(
  */
 router.post(
   '/test-send',
+  validate({ body: emailApi.testSend.body }),
   async (
     req: Request<unknown, unknown, TestSendBody>,
     res: Response
@@ -294,18 +288,13 @@ router.post(
 
       const result = await emailService.sendEmail(testEmail);
 
-      res.json({
-        success: true,
+      sendData(res, emailApi.testSend.response, {
         message: 'Test email sent successfully',
         messageId: result.messageId
       });
     } catch (error) {
       log.error('Test email failed', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        error: (error as Error).message,
-        details: (error as Error).toString()
-      });
+      ErrorResponses.internalError(res, (error as Error).message);
     }
   }
 );

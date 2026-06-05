@@ -6,8 +6,11 @@ import { Router, type Request, type Response } from 'express';
 import { log } from '../utils/logger.js';
 import { hashPassword } from '../middleware/auth.js';
 import { authorize } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { sendData, ErrorResponses } from '../utils/error-response.js';
 import { sql } from 'kysely';
 import { getKysely } from '../services/database/kysely.js';
+import * as userManagement from '../shared/contracts/user-management.contract.js';
 
 const router = Router();
 
@@ -19,16 +22,9 @@ interface UserIdParams {
   userId: string;
 }
 
-interface CreateUserBody {
-  username: string;
-  password: string;
-  fullName?: string;
-  role: 'admin' | 'secretary';
-}
-
-interface ResetPasswordBody {
-  newPassword: string;
-}
+// Request bodies are the contract's z.infer SSoT (Phase 14 root migration).
+type CreateUserBody = userManagement.CreateUserBody;
+type ResetPasswordBody = userManagement.ResetPasswordBody;
 
 interface UserResult {
   userId: number;
@@ -67,16 +63,10 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
       FROM "users"
       ORDER BY "created_at" DESC`.execute(db);
 
-    res.json({
-      success: true,
-      users: rows
-    });
+    sendData(res, userManagement.usersList.response, { users: rows });
   } catch (error) {
     log.error('Error fetching users', { error: (error as Error).message });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch users'
-    });
+    ErrorResponses.internalError(res, 'Failed to fetch users', error as Error);
   }
 });
 
@@ -86,38 +76,14 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
  */
 router.post(
   '/',
+  validate({ body: userManagement.createUser.body }),
   async (
     req: Request<unknown, unknown, CreateUserBody>,
     res: Response
   ): Promise<void> => {
     try {
+      // Presence/length/role already enforced by validate() (the contract body).
       const { username, password, fullName, role } = req.body;
-
-      // Validation
-      if (!username || !password) {
-        res.status(400).json({
-          success: false,
-          error: 'Username and password are required'
-        });
-        return;
-      }
-
-      if (password.length < 6) {
-        res.status(400).json({
-          success: false,
-          error: 'Password must be at least 6 characters'
-        });
-        return;
-      }
-
-      // Only allow admin and secretary roles
-      if (!['admin', 'secretary'].includes(role)) {
-        res.status(400).json({
-          success: false,
-          error: 'Invalid role. Only admin and secretary roles are allowed.'
-        });
-        return;
-      }
 
       const db = getKysely();
 
@@ -126,10 +92,7 @@ router.post(
         SELECT "user_id" AS "userId" FROM "users" WHERE "username" = ${username}`.execute(db);
 
       if (existing.length > 0) {
-        res.status(400).json({
-          success: false,
-          error: 'Username already exists'
-        });
+        ErrorResponses.badRequest(res, 'Username already exists');
         return;
       }
 
@@ -143,16 +106,10 @@ router.post(
 
       log.info(`User created: ${username} (${role}) by ${req.session.username}`);
 
-      res.json({
-        success: true,
-        message: 'User created successfully'
-      });
+      sendData(res, userManagement.createUser.response, { message: 'User created successfully' });
     } catch (error) {
       log.error('Error creating user', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        error: 'Failed to create user'
-      });
+      ErrorResponses.internalError(res, 'Failed to create user', error as Error);
     }
   }
 );
@@ -163,21 +120,14 @@ router.post(
  */
 router.put(
   '/:userId/password',
+  validate({ params: userManagement.resetPassword.params, body: userManagement.resetPassword.body }),
   async (
     req: Request<UserIdParams, unknown, ResetPasswordBody>,
     res: Response
   ): Promise<void> => {
     try {
       const { userId } = req.params;
-      const { newPassword } = req.body;
-
-      if (!newPassword || newPassword.length < 6) {
-        res.status(400).json({
-          success: false,
-          error: 'Password must be at least 6 characters'
-        });
-        return;
-      }
+      const { newPassword } = req.body; // length enforced by validate()
 
       // Hash new password
       const passwordHash = await hashPassword(newPassword);
@@ -188,16 +138,10 @@ router.put(
 
       log.info(`Password reset for user ID ${userId} by ${req.session.username}`);
 
-      res.json({
-        success: true,
-        message: 'Password reset successfully'
-      });
+      sendData(res, userManagement.resetPassword.response, { message: 'Password reset successfully' });
     } catch (error) {
       log.error('Error resetting password', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        error: 'Failed to reset password'
-      });
+      ErrorResponses.internalError(res, 'Failed to reset password', error as Error);
     }
   }
 );
@@ -208,16 +152,14 @@ router.put(
  */
 router.put(
   '/:userId/toggle',
+  validate({ params: userManagement.toggleUser.params }),
   async (req: Request<UserIdParams>, res: Response): Promise<void> => {
     try {
       const { userId } = req.params;
 
       // Prevent deactivating yourself
       if (parseInt(userId) === req.session.userId) {
-        res.status(400).json({
-          success: false,
-          error: 'Cannot deactivate your own account'
-        });
+        ErrorResponses.badRequest(res, 'Cannot deactivate your own account');
         return;
       }
 
@@ -227,16 +169,10 @@ router.put(
 
       log.info(`User status toggled for ID ${userId} by ${req.session.username}`);
 
-      res.json({
-        success: true,
-        message: 'User status updated'
-      });
+      sendData(res, userManagement.toggleUser.response, { message: 'User status updated' });
     } catch (error) {
       log.error('Error toggling user status', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        error: 'Failed to update user status'
-      });
+      ErrorResponses.internalError(res, 'Failed to update user status', error as Error);
     }
   }
 );
@@ -247,16 +183,14 @@ router.put(
  */
 router.delete(
   '/:userId',
+  validate({ params: userManagement.deleteUser.params }),
   async (req: Request<UserIdParams>, res: Response): Promise<void> => {
     try {
       const { userId } = req.params;
 
       // Prevent deleting yourself
       if (parseInt(userId) === req.session.userId) {
-        res.status(400).json({
-          success: false,
-          error: 'Cannot delete your own account'
-        });
+        ErrorResponses.badRequest(res, 'Cannot delete your own account');
         return;
       }
 
@@ -265,16 +199,10 @@ router.delete(
 
       log.info(`User deleted: ID ${userId} by ${req.session.username}`);
 
-      res.json({
-        success: true,
-        message: 'User deleted successfully'
-      });
+      sendData(res, userManagement.deleteUser.response, { message: 'User deleted successfully' });
     } catch (error) {
       log.error('Error deleting user', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        error: 'Failed to delete user'
-      });
+      ErrorResponses.internalError(res, 'Failed to delete user', error as Error);
     }
   }
 );

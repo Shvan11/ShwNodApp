@@ -9,7 +9,6 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { z } from 'zod';
 import {
   getWires,
   getVisitsByWorkId,
@@ -19,22 +18,12 @@ import {
   deleteVisitByWorkId,
   getLatestWiresByWorkId
 } from '../../services/database/queries/visit-queries.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
-import { intId, dateString } from '../../middleware/validation-schemas.js';
+import * as visit from '../../shared/contracts/visit.contract.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
-
-// Boundary schemas. add/update REST-SPREAD `...visitData` into the query, but the
-// query builders (addVisitByWorkId/updateVisitByWorkId) write an EXPLICIT named-column
-// `.values()`/`.set()` — so over-posting is closed at the query layer AND the route's
-// own body interface is incomplete (the query reads bracket_change/opg/operator_id/…
-// that the FE sends through). Hence LOOSE: validate only the required id + a real-date
-// visit_date; pass every other visit field through untouched.
-const addVisitBodySchema = z.looseObject({ work_id: intId, visit_date: dateString });
-const updateVisitBodySchema = z.looseObject({ visitId: intId, visit_date: dateString });
-const deleteVisitBodySchema = z.object({ visitId: intId });
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -82,7 +71,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const wires = await getWires();
-      sendSuccess(res, wires);
+      sendData(res, visit.getWires.response, wires);
     } catch (error) {
       log.error('Error fetching wires:', error);
       ErrorResponses.internalError(res, 'Failed to fetch wires', error as Error);
@@ -97,6 +86,7 @@ router.get(
  */
 router.get(
   '/getlatestwires',
+  validate({ query: visit.latestWires.query }),
   async (
     req: Request<unknown, unknown, unknown, VisitQueryParams>,
     res: Response
@@ -108,7 +98,7 @@ router.get(
         return;
       }
       const latestWires = await getLatestWiresByWorkId(parseInt(workId));
-      sendSuccess(res, latestWires);
+      sendData(res, visit.latestWires.response, latestWires);
     } catch (error) {
       log.error('Error fetching latest wires:', error);
       ErrorResponses.internalError(
@@ -131,6 +121,7 @@ router.get(
  */
 router.get(
   '/getvisitsbywork',
+  validate({ query: visit.visitsByWork.query }),
   async (
     req: Request<unknown, unknown, unknown, VisitQueryParams>,
     res: Response
@@ -142,7 +133,7 @@ router.get(
         return;
       }
       const visits = await getVisitsByWorkId(parseInt(workId));
-      sendSuccess(res, visits);
+      sendData(res, visit.visitsByWork.response, visits);
     } catch (error) {
       log.error('Error fetching visits by work:', error);
       ErrorResponses.internalError(
@@ -161,6 +152,7 @@ router.get(
  */
 router.get(
   '/getvisitbyid',
+  validate({ query: visit.visitById.query }),
   async (
     req: Request<unknown, unknown, unknown, VisitQueryParams>,
     res: Response
@@ -171,12 +163,13 @@ router.get(
         ErrorResponses.missingParameter(res, 'visitId');
         return;
       }
-      const visit = await getVisitById(parseInt(visitId));
-      if (!visit) {
+      // `visitRow` (not `visit`) to avoid shadowing the contract import.
+      const visitRow = await getVisitById(parseInt(visitId));
+      if (!visitRow) {
         ErrorResponses.notFound(res, 'Visit');
         return;
       }
-      sendSuccess(res, visit);
+      sendData(res, visit.visitById.response, visitRow);
     } catch (error) {
       log.error('Error fetching visit by id:', error);
       ErrorResponses.internalError(
@@ -195,7 +188,7 @@ router.get(
  */
 router.post(
   '/addvisitbywork',
-  validate({ body: addVisitBodySchema }),
+  validate({ body: visit.addVisit.body }),
   async (
     req: Request<unknown, unknown, AddVisitByWorkBody>,
     res: Response
@@ -215,7 +208,7 @@ router.post(
         visit_date: new Date(visitData.visit_date)
       };
       const result = await addVisitByWorkId(visitDataWithDate);
-      sendSuccess(res, { visitId: result?.id });
+      sendData(res, visit.addVisit.response, { visitId: result?.id });
     } catch (error) {
       log.error('Error adding visit:', error);
       ErrorResponses.internalError(res, 'Failed to add visit', error as Error);
@@ -230,7 +223,7 @@ router.post(
  */
 router.put(
   '/updatevisitbywork',
-  validate({ body: updateVisitBodySchema }),
+  validate({ body: visit.updateVisit.body }),
   async (
     req: Request<unknown, unknown, UpdateVisitByWorkBody>,
     res: Response
@@ -269,7 +262,7 @@ router.put(
  */
 router.delete(
   '/deletevisitbywork',
-  validate({ body: deleteVisitBodySchema }),
+  validate({ body: visit.deleteVisit.body }),
   async (
     req: Request<unknown, unknown, DeleteVisitByWorkBody>,
     res: Response

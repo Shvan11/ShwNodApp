@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { fetchJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import * as visitContract from '@shared/contracts/visit.contract';
 import styles from './VisitsComponent.module.css';
 
 interface Visit {
@@ -92,7 +93,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
         const reqId = ++loadReqIdRef.current;
         try {
             setLoading(true);
-            const data = await fetchJSON<Visit[]>(`/api/getvisitsbywork?workId=${workId}`);
+            const data = await fetchJSON<Visit[]>(`/api/getvisitsbywork?workId=${workId}`, { schema: visitContract.visitsByWork.response });
             // Sort by visit date descending (most recent first) on a copy, leaving
             // the fetched array untouched.
             const sortedData = [...data].sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime());

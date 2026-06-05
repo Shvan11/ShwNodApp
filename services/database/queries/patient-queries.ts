@@ -98,10 +98,13 @@ interface CreatePatientResult {
   personId: number;
 }
 
-interface LookupItem {
+// `type` (not `interface`) so a LookupItem[] is assignable to the lookup
+// contract's `z.array(z.looseObject({ id }))` sendData arg — see the index-
+// signature rule in docs/shared-contract-progress.md.
+type LookupItem = {
   id: number;
   name: string;
-}
+};
 
 interface PatientDetails {
   person_id: number;

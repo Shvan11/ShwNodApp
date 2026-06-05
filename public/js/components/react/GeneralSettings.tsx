@@ -3,6 +3,7 @@ import cn from 'classnames';
 import Modal from './Modal';
 import storage from '../../core/storage';
 import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
+import * as settings from '@shared/contracts/settings.contract';
 import styles from './SettingsSection.module.css';
 
 interface OptionsMap {
@@ -32,7 +33,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
         try {
             const data = await fetchJSON<{
                 options?: Array<{ option_name: string; option_value: string }>;
-            }>('/api/options');
+            }>('/api/options', { schema: settings.getOptions.response });
 
             if (data.options) {
                 const optionsMap: OptionsMap = {};

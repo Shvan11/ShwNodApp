@@ -5,18 +5,22 @@
 import { Router, type Request, type Response } from 'express';
 import { sql } from 'kysely';
 import { getKysely } from '../../services/database/kysely.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendData } from '../../utils/error-response.js';
+import * as staff from '../../shared/contracts/staff.contract.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
 
 /**
- * Staff member response type
+ * Staff member response type.
+ * `type` (not `interface`) so a StaffMember[] feeds the contract's
+ * `z.looseObject` sendData arg — the index-signature rule
+ * (docs/shared-contract-progress.md).
  */
-interface StaffMember {
+type StaffMember = {
   id: number;
   employee_name: string;
-}
+};
 
 /**
  * GET /doctors
@@ -32,7 +36,7 @@ router.get('/doctors', async (_req: Request, res: Response): Promise<void> => {
       WHERE p."position_name" = 'Doctor'
       ORDER BY e."employee_name"
     `.execute(db);
-    sendSuccess(res, doctors);
+    sendData(res, staff.doctors.response, doctors);
   } catch (error) {
     log.error('Error fetching doctors:', error);
     ErrorResponses.internalError(res, 'Failed to fetch doctors', error as Error);
@@ -51,7 +55,7 @@ router.get('/operators', async (_req: Request, res: Response): Promise<void> => 
       FROM "employees" e
       ORDER BY e."employee_name"
     `.execute(db);
-    sendSuccess(res, operators);
+    sendData(res, staff.operators.response, operators);
   } catch (error) {
     log.error('Error fetching operators:', error);
     ErrorResponses.internalError(res, 'Failed to fetch operators', error as Error);

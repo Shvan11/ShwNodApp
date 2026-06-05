@@ -10,6 +10,7 @@ import { formatISODate } from '../../core/utils';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { fetchJSON, postJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import * as workContract from '@shared/contracts/work.contract';
+import * as employee from '@shared/contracts/employee.contract';
 import Modal from './Modal';
 import styles from './NewWorkComponent.module.css';
 
@@ -185,7 +186,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
             const [types, kw, employeesData] = await Promise.all([
                 fetchJSON<WorkType[]>('/api/getworktypes', { schema: workContract.getWorkTypes.response }).catch(() => null),
                 fetchJSON<Keyword[]>('/api/getworkkeywords', { schema: workContract.getWorkKeywords.response }).catch(() => null),
-                fetchJSON<{ employees?: Doctor[] }>('/api/employees?percentage=true').catch(() => null)
+                fetchJSON<{ employees?: Doctor[] }>('/api/employees?percentage=true', { schema: employee.employees.response }).catch(() => null)
             ]);
 
             if (types) setWorkTypes(types);

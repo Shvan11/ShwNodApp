@@ -49,6 +49,39 @@ behind a `typecheck:all` + `build` gate.
 
 Legend: ⬜ Not started · 🚧 In progress · ✅ Done & gated · ⚠️ Blocked/needs attention
 
+### Wave 2 ("everything remaining") — plan `~/.claude/plans/continue-planing-pure-engelbart.md`
+
+| Phase | Scope | Status | Gate |
+|------:|-------|--------|------|
+| **6** | lookup (Group B, 6 pre-auth GET dropdown reads) | ✅ Code + gated | ✅ part of the 6–10 gate (below) |
+| **7** | appointment (Group A; extend contract, 10 endpoints) | ✅ Code + gated | ✅ |
+| **8** | expense (Group A, financial) | ✅ Code + gated | ✅ |
+| **9** | employee + staff (Group A + B) | ✅ Code + gated | ✅ |
+| **10** | visit (Group A, clinical) | ✅ Code + gated | ✅ |
+| **11** | settings + cost-preset (Group A + B) | ✅ Done & gated | ✅ part of the Wave-2 final gate (below) |
+| **12** | file-explorer + photo-editor (Group A; exclude streams + /render) | ✅ Done & gated | ✅ |
+| **13** | Group-B remainder (messaging, holiday, reports, video, media, utility, lookup-admin) | ✅ Done & gated | ✅ |
+| **14** | ROOT migration (user-management, email-api, calendar) | ✅ Done & gated | ✅ |
+| **15** | FINAL GATE (typecheck:all + build + lint + runtime read-smoke) | ✅ Done | ✅ **green 2026-06-05** |
+
+**🎉 WAVE 2 COMPLETE (2026-06-05):** all 20 in-scope enveloped route files + the 3 root routes are
+contracted. **Final gate green:** `npm run typecheck:all` ✅ (backend `tsc` + frontend `tsc -p
+tsconfig.frontend.json`, both EXIT 0), `npm run build` ✅ (Vite client + `build:server`; all 14 new
+Wave-2 contracts emitted to `dist-server/shared/contracts/`), `npm run lint` ✅ (0 errors; 2 pre-existing
+`exhaustive-deps` warnings in aligner files, unrelated). **Runtime read-smoke** (NODE_ENV=development,
+dev-parse active, port 3101) — every read across Phases 11–14 returned **200** on real DB data
+(options/cost-presets/db-config, videos/categories, holidays, statistics, messaging status, files/
+working-files/photo-dates, webceph photo-types, `/api/users`, calendar week/month/stats/available-slots/
+month-availability, email/config). **Root-migration envelope verified live:** `/api/users` →
+`{success,data:{users}}` and `/api/calendar/week` → `{success,data:{days,…,timeSlots}}` (funnel unwraps
+`data` → consumer key access intact). Excluded `/api/email/test` confirmed still raw top-level. **Owed
+before merge:** the write-path mutation runtime checks (same deferral as Wave 1).
+
+**Phases 6–10 gate (2026-06-05):** `npm run typecheck:all` ✅ **green** (backend `tsc -p tsconfig.json`
+EXIT 0 + frontend `tsc -p tsconfig.frontend.json` EXIT 0). Unlike Wave-1's deferred gate, this ran clean
+first try — the `sendData` `z.input` fix is already in place and the interface→type flips were applied
+proactively. `build`/`lint` + runtime smoke still owed (deferred to the Wave-2 final gate, Phase 15).
+
 **🎉 ROLLOUT COMPLETE (2026-06-05):** all 5 Tier-1 groups + foundation are contracted, and the
 **deferred final gate has been run green** — `npm run typecheck:all` ✅ (backend `tsc` + frontend
 `tsc -p tsconfig.frontend.json`), `npm run build` ✅ (Vite client bundle + `build:server` exit=0,
@@ -545,6 +578,91 @@ Two contract responses had to match the real (looser) source type, surfaced only
   the **call site** (`?? 0`, behavior-preserving on the success path) rather than loosening the shared
   schema — keeps drift detection strict for discontinue/reactivate/updateWorkDetail/deleteWorkDetail.
 
+### 2026-06-05 — Wave 2 Phases 6–10 (lookup, appointment, expense, employee+staff, visit)
+
+- **Gate green first try** (`typecheck:all` backend + frontend both EXIT 0). The Wave-1 traps did NOT
+  recur because they were pre-empted: `sendData`'s `data: z.input<S>` is already fixed; every `looseObject`
+  `sendData` source was flipped `interface`→`type` up front; service-bound shapes used `anyArray`/`z.unknown()`
+  to sidestep the index-signature tax entirely.
+- **interface→type flips this wave** (all local, non-exported, no `extends`): `LookupItem`
+  (patient-queries), `AlertType` (alert-queries), `ImplantManufacturer` (work-queries); `AppointmentDetail`
+  /`AppointmentResult` (appointment.routes); `Employee`/`position` (employee.routes); `StaffMember`
+  (staff.routes).
+- **`import * as <group>` collides with handler/consumer locals — rename the local, not the import.** The
+  namespace-import style (`import * as appointment from …`) is shadowed by any local of the same name:
+  `appointment.routes` had `const appointment = await validateAndCreateAppointment(...)` → renamed local to
+  `createdAppointment`; `expense.routes` `const expense = await getExpenseById(...)` → `expenseRow`;
+  `visit.routes` `const visit = await getVisitById(...)` → `visitRow`. On the **client**, where the local
+  can't be renamed cleanly, alias the import instead: `EmployeeSettings`/`Expenses`/`useExpenses` →
+  `employeeContract`/`expenseContract`; `NewVisitComponent`/`VisitsComponent` → `visitContract`. (Generalizes
+  the Phase-0 `paymentHistory` collision rule to the whole-module import form.)
+- **`getDailyAppointments` left on `sendSuccess` (NOT converted).** The service returns
+  `DailyAppointmentsOptimizedResult` whose rows are `Record<string, unknown>[]`, which is **not** assignable
+  to the existing `dailyAppointments.response` row `z.input` (`{ appointment_id: number } & …` — a `Record`'s
+  index gives `unknown`, not `number`). It's already client-contracted (Phase 0 `useAppointments`), so the
+  server stays `sendSuccess` and only the other 10 appointment endpoints were converted. (A reminder that the
+  server-side `sendData` conversion is gated by the *source* return type, not just the schema.)
+- **GET query schemas added (the H10 silent-NaN close)** on the manual-`parseInt` reads: employee `/employees`
+  (loose string filters — `position` may be a NAME, so NOT numeric), and visit `/getlatestwires`/
+  `/getvisitsbywork`/`/getvisitbyid` (`numericParam` on `workId`/`visitId`). The manual `if(!x)` guards were
+  left in place (now redundant-but-harmless) to minimize behavior change.
+- **`anyArray`/`z.unknown()` did the heavy lifting** for the service-bound responses (expense list/categories/
+  subcategories/summary arrays; visit wires/visits; getWebApps/quick-checkin rich objects; single
+  expense/visit rows) — flip-free, asserts the N13 array-vs-object class, preserves the payload, and the
+  consumer keeps its explicit generic. Row-id `looseObject` guards were reserved for the dropdown feeds
+  (lookup, appointment-details, employees/positions, doctors/operators, patient-appointments) where the
+  consumer keys on a stable id.
+- **Mutations stayed largely response-modeled-but-client-unwired** (per the read-only-wiring precedent): the
+  state/create/quick-checkin/undo appointment writes, expense/employee create-update-delete, visit add/update/
+  delete — server emits via `sendData` (compile-time + dev-parse), client `{schema}` adopted incrementally.
+
+### 2026-06-05 — Wave 2 Phases 11–15 (settings+cost-preset, file-explorer+photo-editor, Group-B remainder, ROOT migration, final gate)
+
+- **Gate green** (`typecheck:all` + `build` + `lint`) with only ONE backend error surfaced (well within the
+  pre-empted-trap pattern): `lookup-admin createItem` — `createLookupItem` returns `string | number | null`
+  (uuid OR numeric id OR null), so `response.id: z.number()` rejected the source. Fixed → `id: z.unknown()`
+  (heterogeneous id, preserve). No interface→type / `z.input` surprises (pre-empted).
+- **⚠️ NEW CROSS-PHASE GOTCHA — `sendData(res, schema, null)` does NOT yield `{data:null}`.** `sendSuccess`
+  builds the envelope with `...(data !== null && data !== undefined && { data })` (`error-response.ts:90`),
+  so a **null/undefined** payload is **omitted entirely** → the wire is `{success:true,timestamp}` with **no
+  `data` key**. The funnel only unwraps when `success===true && 'data' in body`, so with no `data` key it
+  returns the **whole envelope** (truthy), NOT null. Caught live on media `GET /webceph/patient-link` (the
+  "fix the one raw `res.json({success:false,data:null})`" target): the first attempt `sendData(…, null)`
+  made the consumer receive `{success:true,timestamp}` and treat it as a real link. **Fix: a "soft
+  not-found" that must read as falsy can't ride `sendData(null)` — use `ErrorResponses.notFound` (404) and
+  have the consumer treat 404 as the empty case** (`fetchJSON` throws `HttpError` with `.status`, so
+  `catch (err) { if (err.status !== 404) … }`). Rule: never `sendData(res, schema, null/undefined)` expecting
+  the client to read null — model it as a 404 or as an explicit non-null sentinel object.
+- **ROOT migration (Phase 14) — the funnel-unwrap reasoning ONLY holds for core/http consumers.** Migrating a
+  top-level manual envelope (`{success, X}`) to `sendData` (`{success, data:X}`) is behavior-preserving for a
+  consumer that reads `X` THROUGH the core/http funnel (it unwraps `data` → key access unchanged; drop the
+  dead `.success`-at-2xx checks). But `POST /api/email/send-appointments` is consumed by the **RAW whatsapp
+  `apiClient`** (WhatsAppSend.tsx, `expectedFields:['success']`), which does **NOT** unwrap — it reads
+  `success`/`appointmentCount` at the TOP level. Nesting under `data` would hide those fields → **left it raw**
+  (top-level manual envelope), same class as the messaging `count`/`reset` endpoints. **Always check the
+  consumer's transport (funnel vs raw apiClient) before migrating an envelope.** user-management + the
+  EmailSettings-consumed email endpoints + all 6 calendar GETs use the funnel → migrated cleanly.
+- **Live envelope verification (Phase 14):** confirmed `/api/users` → `{success,data:{users:[…]}}` and
+  `/api/calendar/week` → `{success,data:{days,weekStart,…,timeSlots}}` — the `looseObject` containers
+  preserved every unmodeled key (weekStart/weekEnd/maxAppointmentsPerSlot/…), so the funnel returns exactly
+  what `validateCalendarData`/`.days`/`.timeSlots`/`.users` read. Dropped the dead `!success` guards in
+  AppointmentCalendar (×2) + SimplifiedCalendarPicker (×2) + EmailSettings (×3) — they would have **fired
+  post-unwrap** (the unwrapped payload has no `success`) and thrown/skipped. This was the real migration risk,
+  caught by tracing each consumer.
+- **Excluded endpoints honored:** file-content + working-files/content streams, photo `/render` (202+SSE),
+  video `/:id/stream` + `/:id/thumbnail`, utility twilio `res.send`, `GET /api/email/test` (semantic-success
+  at 200 — verified live it stays raw top-level). Photo `/render` still shares the contract's `personIdParams`
+  guard but keeps its inline body schema + raw 202.
+- **`anyArray`/`z.unknown()` again did the heavy lifting** for service-bound rich shapes (FileListing/FileEntry,
+  Video rows, statistics summary, messaging count/reset, webceph results) — flip-free, asserts the N13 class,
+  preserves payload. Row-id `looseObject` reserved for the genuine dropdown N13 victim (cost-presets `preset_id`).
+  Only one interface→type flip this wave: `CostPreset` (cost-preset-queries).
+- **Group B = response-only** honored: cost-preset/messaging/holiday/reports/video/media/utility/lookup-admin
+  authored responses + `sendSuccess→sendData` (wire-identical for already-enveloped endpoints — adds dev-parse
+  only) + wired `{schema}` on the high-value funnel reads (cost-presets, options, db-config, videos, holidays,
+  statistics, messaging status, files/working-files/photo-dates). media/utility/lookup-admin = server-side
+  dev-parse only (no client `{schema}` per the locked decision), though they DO have consumers.
+
 ## Verification log (gate results per phase)
 
 | Date | Phase | `typecheck:all` | `build` | `lint` | Runtime smoke | Notes |
@@ -556,6 +674,9 @@ Two contract responses had to match the real (looser) source type, surfaced only
 | 2026-06-05 | 4 | ⏸ deferred | ⏸ deferred | ⏸ deferred | ⏸ deferred | **Gate deferred**. Structural review only. Residual risk: 3 route interface→type flips (`PatientSearchResult`/`TagOption`/`PatientTypeOption`); the tightened `patientSearch` rows must hold on real data (person_id/patient_name always present — they're NOT NULL PK/name, so safe); `z.unknown()` info/patientById are no-op guards by design. |
 | **2026-06-05** | **5** | **✅ pass** | **✅ pass** | **✅ pass** | **✅ reads** | **FINAL GATE (all phases) run together.** `typecheck:all` green (after the `sendData` `z.input` fix + 3 residual type-truths — see Findings); `build` green (Vite client + `build:server` exit=0; all 6 contracts emitted to `dist-server/shared/contracts/`); `lint` 0 errors (2 pre-existing `exhaustive-deps` warnings). **Read-smoke (NODE_ENV=development, dev-parse active):** all 11 aligner GETs 200 on real data (incl. `sets/:workId`, `batches/:setId`, `all-sets` `noNextBatchCount`); archform/patients → 503 unavailable (intentional un-contracted branch, WSL has no Archform DB). |
 | **2026-06-05** | **1–4 (final)** | **✅ pass** | **✅ pass** | **✅ pass** | **✅ reads** | Deferred gates from Sessions 2–3 **resolved** by the same final run. Cross-phase read-smoke: stand categories/items/low-stock/dashboard 200 (`timestampString`+`z.input` live), patient `search?q=92` → 200 with **100 tightened rows**, work getworktypes/getworkkeywords 200, payment covered by build/typecheck. **Owed**: mutation (write-path) runtime across all phases. |
+| **2026-06-05** | **W2 6–10** | **✅ pass** | ⏸ deferred | ⏸ deferred | ⏸ deferred | **Wave-2 Phases 6–10 code complete; `typecheck:all` green first try** (backend EXIT 0 + frontend EXIT 0). `build`/`lint`/runtime deferred to the Wave-2 final gate (Phase 15). |
+| **2026-06-05** | **WRITE-PATH (all)** | ✅ (re-run green) | n/a | n/a | **✅ mutations** | **Owed-before-merge mutation smoke DONE** (Session 7). Live create→verify→delete on the dev DB (port 3101, dev-parse active) across 8 domains: expense, stand (full POS: category/item/restock/adjust/sale/void), patient, work-create, payment addInvoice/deleteInvoice + updateExchangeRate, appointment, employee, aligner-doctor, cost-preset. **Zero false 400 (no under-enumeration), persisted rows kept every field (no over-strip / mis-coercion incl. `currency`, optional fields, `timestampString` `date_added`), stock math exact, no client/dev-parse fail-loud.** Self-cleaning verified (ZZZ leftover sweep = 0). Two non-bugs surfaced: addwork needs `currency` (service-bound loose body, not a contract regression — DB `ck_works_cur`); `deletework` is `DELETE` not POST. |
+| **2026-06-05** | **W2 11–15 (FINAL)** | **✅ pass** | **✅ pass** | **✅ pass** | **✅ reads** | **Wave-2 FINAL GATE.** `typecheck:all` green (1 fix: `lookup-admin createItem.id` → `z.unknown()`); `build` green (Vite client + `build:server`; all 14 Wave-2 contracts emitted to `dist-server/shared/contracts/`); `lint` 0 errors (2 pre-existing warnings). **Read-smoke (NODE_ENV=development, port 3101):** every read across P11–14 → 200 on real data; root-migration envelope verified (`/api/users`, `/api/calendar/week` nest payload under `data`, keys preserved); `/api/email/test` confirmed raw. Found+fixed the `sendData(null)` media bug (→ 404). **Owed:** write-path mutation runtime. |
 
 ---
 
@@ -671,3 +792,90 @@ Two contract responses had to match the real (looser) source type, surfaced only
   `sendData` dev-parse are verified, mutations are not yet exercised end-to-end. Per-row response
   tightening (`anyArray`/`z.unknown()` → modeled rows; strict `z.object` bodies to reject over-posting)
   remains the documented later hardening.
+
+### Session 5 — 2026-06-05 — Wave 2 Phases 6–10 (lookup, appointment, expense, employee+staff, visit)
+- Started Wave 2 (plan `~/.claude/plans/continue-planing-pure-engelbart.md`). User: run Phases 6→10
+  continuously without an interim type-check, then stop; afterward asked to run the gate.
+- **Phase 6 (lookup):** new `lookup.contract.ts` (6 response-only dropdown feeds, `looseObject({id})` /
+  `looseObject({alert_type_id})`); converted `lookup.routes.ts` (`sendSuccess`→`sendData`); flipped
+  `LookupItem`/`AlertType`/`ImplantManufacturer` → `type`; wired `{schema}` on `AddPatientForm` +
+  `EditPatientComponent`.
+- **Phase 7 (appointment):** **extended** `appointment.contract.ts` with 10 endpoints (relocated the 3
+  loose bodies state/create/quick-checkin; `z.unknown()` for the rich webApps/create/quick-checkin payloads;
+  closed `z.object` for the state echoes); converted `appointment.routes.ts` (8 `sendData`, 3 `sendSuccess`
+  kept incl. the deliberately-unconverted `getDailyAppointments`); flipped `AppointmentDetail`/
+  `AppointmentResult` → `type`; renamed `const appointment`→`createdAppointment` (import collision); wired
+  `{schema}` on `AppointmentForm`/`EditAppointmentForm`/`PatientAppointments`.
+- **Phase 8 (expense):** new `expense.contract.ts` (relocated query-filter + loose body; `anyArray`/
+  `z.unknown()` responses); converted `expense.routes.ts` (all 8 → `sendData`); renamed `const expense`→
+  `expenseRow`; wired `useExpenses` (list/categories/subcategories/summary) + `Expenses.tsx` (byId), both
+  aliased `expenseContract`.
+- **Phase 9 (employee + staff):** new `employee.contract.ts` (added the missing GET query schema; loose body;
+  `{employees}`/`{positions}` containers) + `staff.contract.ts` (doctors/operators); converted both routes;
+  flipped `Employee`/`position`/`StaffMember` → `type`; wired `AppointmentForm`/`EditAppointmentForm`/
+  `NewWorkComponent`/`useAppointmentDoctors` (employees), `EmployeeSettings` (employees+positions, aliased),
+  `DoctorFilter` (doctors), `NewVisitComponent` (operators).
+- **Phase 10 (visit):** new `visit.contract.ts` (added `numericParam` GET query schemas on workId/visitId;
+  loose add/update bodies, closed delete body; `anyArray`/`z.unknown()` responses); converted
+  `visit.routes.ts` (5 `sendData`, 2 voids kept); renamed `const visit`→`visitRow`; wired `NewVisitComponent`
+  (getWires/latestWires/visitById) + `VisitsComponent` (visitsByWork), aliased `visitContract`.
+- **Gate (user asked mid-flight):** `npm run typecheck:all` → **green first try** (backend + frontend EXIT 0).
+  No interface→type or `z.input` surprises (pre-empted). See the Wave-2 Findings entry.
+- **Owed:** `build` + `lint` + runtime read/mutation smoke — deferred to the Wave-2 final gate (Phase 15).
+- **Next: Phase 11 (settings + cost-preset).**
+
+### Session 6 — 2026-06-05 — Wave 2 Phases 11–15 (WAVE 2 COMPLETE)
+- Ran Phases 11→14 continuously, then the deferred final gate (Phase 15) — all green.
+- **Phase 11 (settings + cost-preset):** new `settings.contract.ts` (relocated the 4 inline schemas
+  bulkOptions/optionName/updateOption/restart — `restart`→`z.infer` SSoT; db-config bodies stay dynamic
+  `looseObject`) + `cost-preset.contract.ts` (Group B response-only; `getPresets` row-id `looseObject({preset_id})`
+  → flipped `CostPreset`→`type`). Wired `{schema}` on CostPresetsSettings/ViewPatientInfo (cost-presets),
+  GeneralSettings/CalendarTimesSettings/SimplifiedCalendarPicker (options), DatabaseSettings (config+export).
+- **Phase 12 (file-explorer + photo-editor):** new contracts; EXCLUDED the 2 content streams + photo `/render`
+  (202+SSE, keeps inline body, shares `personIdParams`). FileListing/FileEntry → `z.unknown()`/`anyArray` (no
+  service-type flips). Converted photo `/photo-dates` raw `res.json`→`sendData`; `/prepare` discriminated result
+  → `looseObject` w/ optional discriminants. Wired FileExplorer/WorkingFilesView/PhotoSessionDialog reads.
+- **Phase 13 (Group-B remainder):** messaging/holiday/reports/video/media/utility/lookup-admin contracts;
+  `sendSuccess→sendData` (wire-identical + dev-parse). **Fixed media's one raw `res.json`** (see the
+  `sendData(null)` gotcha Finding → resolved as a 404). Wired the funnel reads (useMessageStatus RQ, holiday on
+  AppointmentCalendar/HolidayEditor, statistics on StatisticsComponent/DailyInvoicesModal, Videos list/categories/qr);
+  media/utility/lookup-admin = server dev-parse only.
+- **Phase 14 (ROOT migration):** user-management (full `z.infer` bodies, folded the manual guards), email-api
+  (config GET/POST + test-send migrated; `send-appointments` LEFT RAW — raw apiClient consumer; `/test` excluded),
+  calendar (all 6 GETs; `looseObject` containers; `validate({query})` with `dateString`). Converted each consumer:
+  dropped the dead `.success`-at-2xx checks + added `{schema}` (AppointmentCalendar/SimplifiedCalendarPicker/
+  AdminUserManagement/EmailSettings).
+- **Phase 15 final gate:** `typecheck:all`/`build`/`lint` green (1 fix: `lookup-admin createItem.id`→`z.unknown()`);
+  runtime read-smoke all 200 + envelope verified live; found+fixed the `sendData(null)` media bug.
+- **Owed before merge:** the write-path mutation runtime checks across all Wave-2 groups (reads + dev-parse
+  verified; mutations not yet exercised end-to-end — same deferral as Wave 1).
+
+### Session 7 — 2026-06-05 — Write-path mutation smoke (the owed item) + CLAUDE.md paradigm
+- **Ran the deferred write-path mutation verification** live against the dev server (port 3101,
+  `NODE_ENV=development` so `sendData` dev-parse is active), authenticating with the staff session +
+  `GET /api/csrf-token` double-submit token echoed in `x-csrf-token`. Method = clearly-marked
+  (`ZZZ_…`) create → verify-persisted-row → delete, self-cleaning.
+- **8 domains PASS** (no false 400, persisted rows kept every field, no client/dev-parse fail-loud):
+  1. **expense** create→delete — kept `currency:"USD"` (not defaulted to IQD) + optional cat/subcat/note.
+  2. **stand POS** category→item→restock(+50)→adjust(−10)→sale(−3)→void→soft-delete — stock math exact
+     (100→150→140→137), sale totals correct (3×10=30, profit 15, change 20), `timestampString` `date_added`
+     transform exercised, `standSaleWithItemsRow` parsed.
+  3. **patient** create→delete (folder removed; cascade removed the attached work — no orphan).
+  4. **work** create (needs `currency` — service-bound loose body, see non-bug below).
+  5. **payment** `addInvoice` (InvoiceID persisted `amount_paid/usd_received/change` exactly, verified via
+     `getpaymenthistory`) + `deleteInvoice` (`rowsAffected:1`) + `updateExchangeRate` (idempotent re-set 1540).
+  6. **appointment** create→delete (rich `z.unknown()` response preserved).
+  7. **employee** create→delete. 8. **aligner-doctor** create→delete. 9. **cost-preset** create→delete
+     (amount 99 persisted). Leftover sweep (ZZZ markers) = 0 across patients/doctors/employees/stand.
+- **Two non-bugs surfaced (NOT contract regressions):** (a) `POST /addwork` with only `{person_id,dr_id,
+  type_of_work}` hits DB `ck_works_cur` — the contract's loose service-bound body intentionally enforces only
+  the 3 ids; `WorkService` forwards `currency` (UI sends it), so the minimal test payload was the issue, not
+  the contract. (b) `deletework` is `router.delete` (DELETE-with-body), not POST.
+- **CLAUDE.md updated** — added the `### Shared API contracts` Critical-patterns section (**MANDATORY for new
+  endpoints**, "NEVER hand-write a parallel `XxxBody`/response interface for a contracted endpoint → fully
+  enumerate to `z.infer`"), fixed the stale `core/api.schemas.ts` funnel reference (deleted Phase 0) →
+  `shared/contracts/*`, and corrected the folded aligner-types note.
+- **Remaining (lower priority):** other Wave-2 mutation domains not individually smoked (visit, settings
+  options, user-management, lookup-admin, file/photo folder ops, messaging, video) — same proven plumbing;
+  plus the documented later hardening (`anyArray`/`z.unknown()`→modeled rows; strict bodies) and repo hygiene
+  (the whole rollout is still **uncommitted** on `main`; no CI gate enforcing `typecheck:all`; no test framework).

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo, type ChangeEvent, type Keybo
 import { Link } from 'react-router-dom';
 import cn from 'classnames';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
+import * as settings from '@shared/contracts/settings.contract';
+import * as calendar from '@shared/contracts/calendar.contract';
 import styles from './SimplifiedCalendarPicker.module.css';
 
 interface Appointment {
@@ -88,9 +90,9 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                 // default without aborting its siblings (the rows are seeded
                 // today — see audit N12/N20).
                 const [earlyData, lateData, defaultData] = await Promise.all([
-                    fetchJSON<OptionResponse>('/api/options/CALENDAR_EARLY_SLOTS').catch(() => null),
-                    fetchJSON<OptionResponse>('/api/options/CALENDAR_LATE_SLOTS').catch(() => null),
-                    fetchJSON<OptionResponse>('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT').catch(() => null)
+                    fetchJSON<OptionResponse>('/api/options/CALENDAR_EARLY_SLOTS', { schema: settings.getOptionByName.response }).catch(() => null),
+                    fetchJSON<OptionResponse>('/api/options/CALENDAR_LATE_SLOTS', { schema: settings.getOptionByName.response }).catch(() => null),
+                    fetchJSON<OptionResponse>('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT', { schema: settings.getOptionByName.response }).catch(() => null)
                 ]);
 
                 if (earlyData?.value) {
@@ -130,15 +132,14 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                 return `${year}-${month}-${day}`;
             };
 
-            const data = await fetchJSON<{ success?: boolean; availability?: Record<string, DayAvailabilityInfo> }>(
+            // Post-migration the funnel unwraps the envelope to its payload.
+            const data = await fetchJSON<{ availability?: Record<string, DayAvailabilityInfo> }>(
                 `/api/calendar/month-availability?` +
                 `startDate=${formatLocalDate(firstDay)}&` +
-                `endDate=${formatLocalDate(lastDay)}`
+                `endDate=${formatLocalDate(lastDay)}`,
+                { schema: calendar.monthAvailability.response }
             );
-
-            if (data.success) {
-                setDayAvailability(data.availability || {});
-            }
+            setDayAvailability(data.availability || {});
         } catch (err) {
             console.error('Error fetching month availability:', err);
             setError(httpErrorMessage(err, 'Unknown error'));
@@ -156,24 +157,24 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
             const dateStr = `${year}-${month}-${day}`;
-            const data = await fetchJSON<{ success?: boolean; slots?: TimeSlot[] }>(
-                `/api/calendar/available-slots?date=${dateStr}`
+            // Post-migration the funnel unwraps the envelope to its payload.
+            const data = await fetchJSON<{ slots?: TimeSlot[] }>(
+                `/api/calendar/available-slots?date=${dateStr}`,
+                { schema: calendar.availableSlots.response }
             );
 
-            if (data.success) {
-                const slots: TimeSlot[] = data.slots || [];
-                setAvailableSlots(slots);
+            const slots: TimeSlot[] = data.slots || [];
+            setAvailableSlots(slots);
 
-                // Show extended slots if:
-                // 1. The default setting is true, OR
-                // 2. Any extended slot has appointments (auto-expand)
-                const hasAppointmentsInExtendedSlots = slots.some(slot =>
-                    rareAfternoonTimes.includes(slot.time) &&
-                    slot.appointments &&
-                    slot.appointments.length > 0
-                );
-                setShowAfternoonSlots(showExtendedSlotsDefault || hasAppointmentsInExtendedSlots);
-            }
+            // Show extended slots if:
+            // 1. The default setting is true, OR
+            // 2. Any extended slot has appointments (auto-expand)
+            const hasAppointmentsInExtendedSlots = slots.some(slot =>
+                rareAfternoonTimes.includes(slot.time) &&
+                slot.appointments &&
+                slot.appointments.length > 0
+            );
+            setShowAfternoonSlots(showExtendedSlotsDefault || hasAppointmentsInExtendedSlots);
         } catch (err) {
             console.error('Error fetching slots:', err);
             setError(httpErrorMessage(err, 'Unknown error'));

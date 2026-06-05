@@ -6,6 +6,7 @@ import PortalAccessCard from './PortalAccessCard';
 import { useToast } from '../../contexts/ToastContext';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
+import * as costPreset from '@shared/contracts/cost-preset.contract';
 import styles from './ViewPatientInfo.module.css';
 
 interface Props {
@@ -190,7 +191,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
     const loadCostPresets = useCallback(async () => {
         try {
             setPresetsLoading(true);
-            const data = await fetchJSON<CostPreset[]>('/api/settings/cost-presets');
+            const data = await fetchJSON<CostPreset[]>('/api/settings/cost-presets', { schema: costPreset.getPresets.response });
             setCostPresets(data);
         } catch (err) {
             console.error('Error loading cost presets:', err);

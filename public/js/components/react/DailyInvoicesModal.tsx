@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
+import * as reports from '@shared/contracts/reports.contract';
 import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters';
 import Modal from './Modal';
 import styles from './StatisticsComponent.module.css';
@@ -61,7 +62,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
         setError(null);
 
         try {
-            const data = await fetchJSON<{ invoices?: Invoice[] }>(`/api/daily-invoices?date=${dateValue}`);
+            const data = await fetchJSON<{ invoices?: Invoice[] }>(`/api/daily-invoices?date=${dateValue}`, { schema: reports.dailyInvoices.response });
             setInvoices(data.invoices ?? []);
         } catch (err) {
             setError(httpErrorMessage(err, 'Failed to fetch daily invoices'));

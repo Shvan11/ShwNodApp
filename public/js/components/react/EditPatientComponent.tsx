@@ -6,6 +6,7 @@ import styles from './EditPatientComponent.module.css';
 import { formatISODate } from '../../core/utils';
 import { fetchJSON, postJSON, putJSON, postFormData, httpErrorMessage, type HttpError } from '@/core/http';
 import { tagOptions as tagOptionsContract } from '@shared/contracts/patient.contract';
+import * as lookup from '@shared/contracts/lookup.contract';
 
 interface Props {
     personId?: number | null;  // Validated PersonID from loader (null if invalid)
@@ -154,10 +155,10 @@ const EditPatientComponent = ({ personId }: Props) => {
             // .catch) so one bad lookup doesn't blank the rest, matching the old
             // per-`res.ok` guards.
             const [gendersData, addressesData, referralsData, typesData, tagsData] = await Promise.all([
-                fetchJSON<Gender[]>('/api/genders').catch(() => null),
-                fetchJSON<Address[]>('/api/addresses').catch(() => null),
-                fetchJSON<ReferralSource[]>('/api/referral-sources').catch(() => null),
-                fetchJSON<PatientType[]>('/api/patient-types').catch(() => null),
+                fetchJSON<Gender[]>('/api/genders', { schema: lookup.genders.response }).catch(() => null),
+                fetchJSON<Address[]>('/api/addresses', { schema: lookup.addresses.response }).catch(() => null),
+                fetchJSON<ReferralSource[]>('/api/referral-sources', { schema: lookup.referralSources.response }).catch(() => null),
+                fetchJSON<PatientType[]>('/api/patient-types', { schema: lookup.patientTypes.response }).catch(() => null),
                 fetchJSON<Tag[]>('/api/patients/tag-options', { schema: tagOptionsContract.response }).catch(() => null)
             ]);
 
@@ -225,16 +226,17 @@ const EditPatientComponent = ({ personId }: Props) => {
         if (!personId) return;
 
         try {
-            // A hit is `{success:true, data}` → unwrapped to the link object; "no link"
-            // is `{success:false, data:null}` (HTTP 200) → passed through untouched.
-            const link = await fetchJSON<WebcephData | { success: false }>(
+            // A hit is `{success:true, data}` → unwrapped to the link object.
+            const link = await fetchJSON<WebcephData>(
                 `/api/webceph/patient-link/${personId}`
             );
-            if (link && !('success' in link)) {
-                setWebcephData(link);
-            }
+            setWebcephData(link);
         } catch (err) {
-            console.error('Error loading WebCeph data:', err);
+            // 404 = this patient has no WebCeph link yet (the common case, not an
+            // error); only surface genuine failures.
+            if ((err as { status?: number }).status !== 404) {
+                console.error('Error loading WebCeph data:', err);
+            }
         }
     };
 

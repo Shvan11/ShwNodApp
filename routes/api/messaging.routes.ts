@@ -16,11 +16,12 @@ import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
 import * as messagingQueries from '../../services/database/queries/messaging-queries.js';
 import { getWhatsAppMessages } from '../../services/database/queries/messaging-queries.js';
-import { sendSuccess, ErrorResponses } from '../../utils/error-response.js';
+import { sendSuccess, sendData, ErrorResponses } from '../../utils/error-response.js';
 import {
   transformMessageStatuses,
   calculateMessageCount
 } from '../../services/business/MessagingService.js';
+import * as messaging from '../../shared/contracts/messaging.contract.js';
 
 const router = Router();
 
@@ -94,13 +95,15 @@ router.get(
         const transformedMessages = transformMessageStatuses(dbMessages);
         // Envelope the payload (audit M5); the transformed list rides `data.messages`,
         // which the raw APIClient consumer reads via its `data.data.messages` branch.
-        sendSuccess(res, {
+        sendData(res, messaging.status.response, {
           ...result,
           messages: transformedMessages
         });
         return;
       }
 
+      // Defensive null/empty path (getMessageStatusByDate always returns a
+      // { messages, summary } object today, so this is effectively dead).
       sendSuccess(res, result);
     } catch (error) {
       log.error('Error getting message status:', error);
@@ -151,7 +154,7 @@ router.get(
       // Wire-identical to the previous hand-rolled { success, data, timestamp }
       // envelope (audit H4); the raw whatsapp-api-client consumer's
       // expectedFields:['success','data'] still hold.
-      sendSuccess(res, messageCount);
+      sendData(res, messaging.count.response, messageCount);
     } catch (error) {
       log.error('Error getting message count:', error);
       ErrorResponses.internalError(res, (error as Error).message, error as Error);
@@ -175,7 +178,7 @@ router.post(
       log.info(`Reset completed for ${date}:`, result);
 
       // Wire-identical to the previous hand-rolled envelope (audit H4).
-      sendSuccess(res, result, `Messaging reset completed for ${date}`);
+      sendData(res, messaging.reset.response, result, `Messaging reset completed for ${date}`);
     } catch (error) {
       log.error('Error resetting messaging:', error);
       ErrorResponses.internalError(

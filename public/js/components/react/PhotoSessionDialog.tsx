@@ -5,6 +5,7 @@ import Modal from './Modal';
 import styles from './PhotoSessionDialog.module.css';
 import { formatISODate } from '../../core/utils';
 import { fetchJSON, postJSON, httpErrorMessage } from '../../core/http';
+import * as photoEditor from '@shared/contracts/photo-editor.contract';
 import type { PhotoPrepareResult } from '../../types/api.types';
 
 interface Props {
@@ -73,7 +74,8 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
         try {
             setLoading(true);
             const data = await fetchJSON<{ appointments?: Appointment[]; visits?: Visit[] }>(
-                `/api/photo-editor/${personId}/photo-dates`
+                `/api/photo-editor/${personId}/photo-dates`,
+                { schema: photoEditor.photoDates.response }
             );
             setAppointments(data.appointments || []);
             setVisits(data.visits || []);

@@ -14,7 +14,6 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { z } from 'zod';
 import type { EventEmitter } from 'events';
 import { sql } from 'kysely';
 import { getKysely } from '../../services/database/kysely.js';
@@ -24,9 +23,9 @@ import {
   undoAppointmentState
 } from '../../services/database/queries/appointment-queries.js';
 import { InternalEmitterEvents } from '../../services/messaging/websocket-events.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
-import { idParams, intId } from '../../middleware/validation-schemas.js';
+import * as appointment from '../../shared/contracts/appointment.contract.js';
 import { log } from '../../utils/logger.js';
 import {
   validateAndCreateAppointment,
@@ -36,28 +35,6 @@ import {
 } from '../../services/business/AppointmentService.js';
 
 const router = Router();
-
-// Boundary schemas. `app_date` is deliberately a LOOSE string (not dateString): the
-// create/update handlers accept BOTH `YYYY-MM-DD` and other formats (regex-branch +
-// `new Date` fallback / PG `::timestamp` cast), so a strict date schema would 400 a
-// currently-valid format. We NaN-proof the ids + require the scalar fields; the
-// AppointmentService owns the holiday/conflict business rules.
-const appointmentIdParams = idParams('appointmentId');
-const appointmentStateBodySchema = z.looseObject({ appointment_id: intId, state: z.string().min(1) });
-const createAppointmentBodySchema = z.looseObject({
-  person_id: intId,
-  dr_id: intId,
-  app_detail: z.string().min(1), // required, non-empty — create + update share this
-  app_date: z.string().min(1),
-});
-// Only person_id is required: quickCheckIn() defaults app_detail→'Walk-in' and
-// dr_id→null, and both callers send only person_id. Keeping dr_id/app_detail
-// required here 400s those calls before the service's defaults can apply.
-const quickCheckinBodySchema = z.looseObject({
-  person_id: intId,
-  dr_id: intId.optional(),
-  app_detail: z.string().optional(),
-});
 
 // WebSocket emitter will be injected to avoid circular imports
 let wsEmitter: EventEmitter | null = null;
@@ -98,21 +75,23 @@ interface UpdateAppointmentBody {
   dr_id: number;
 }
 
-type QuickCheckInBody = z.infer<typeof quickCheckinBodySchema>;
+type QuickCheckInBody = appointment.QuickCheckinBody;
 
-interface AppointmentDetail {
+// `type` (not `interface`) so these feed the contract's `z.looseObject` sendData
+// args — the index-signature rule (docs/shared-contract-progress.md).
+type AppointmentDetail = {
   id: number;
   detail: string;
-}
+};
 
-interface AppointmentResult {
+type AppointmentResult = {
   appointment_id: number;
   person_id: number;
   app_date: string;
   app_detail: string;
   dr_id: number;
   DrName: string | null;
-}
+};
 
 // ============================================================================
 // APPOINTMENT LOOKUP ROUTES
@@ -130,7 +109,7 @@ router.get(
       const { rows } = await sql<AppointmentDetail>`
         SELECT "id", "detail" FROM "details" ORDER BY "detail"
       `.execute(db);
-      sendSuccess(res, rows);
+      sendData(res, appointment.appointmentDetails.response, rows);
     } catch (error) {
       log.error('Error fetching appointment details:', error);
       ErrorResponses.internalError(
@@ -158,7 +137,7 @@ router.get(
   ): Promise<void> => {
     const { PDate } = req.query;
     const result = await getPresentAps(PDate as string);
-    sendSuccess(res, result);
+    sendData(res, appointment.webApps.response, result);
   }
 );
 
@@ -221,7 +200,7 @@ router.get(
  */
 router.post(
   '/updateAppointmentState',
-  validate({ body: appointmentStateBodySchema }),
+  validate({ body: appointment.updateAppointmentState.body }),
   async (
     req: Request<unknown, unknown, AppointmentStateBody>,
     res: Response
@@ -258,7 +237,11 @@ router.post(
         wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, appointmentDate);
       }
 
-      sendSuccess(res, { appointment_id, state, time: currentTime });
+      sendData(res, appointment.updateAppointmentState.response, {
+        appointment_id,
+        state,
+        time: currentTime,
+      });
     } catch (error) {
       log.error('Error updating appointment state:', error);
 
@@ -289,7 +272,7 @@ router.post(
  */
 router.post(
   '/undoAppointmentState',
-  validate({ body: appointmentStateBodySchema }),
+  validate({ body: appointment.undoAppointmentState.body }),
   async (
     req: Request<unknown, unknown, AppointmentStateBody>,
     res: Response
@@ -318,7 +301,7 @@ router.post(
         wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, appointmentDate);
       }
 
-      sendSuccess(res, result);
+      sendData(res, appointment.undoAppointmentState.response, result);
     } catch (error) {
       log.error('Error undoing appointment state:', error);
 
@@ -356,7 +339,7 @@ router.post(
  */
 router.post(
   '/appointments',
-  validate({ body: createAppointmentBodySchema }),
+  validate({ body: appointment.createAppointment.body }),
   async (
     req: Request<unknown, unknown, CreateAppointmentBody>,
     res: Response
@@ -365,7 +348,8 @@ router.post(
       const { person_id, app_date, app_detail, dr_id } = req.body;
 
       // Delegate to service layer for validation and creation
-      const appointment = await validateAndCreateAppointment({
+      // (named `createdAppointment` to avoid shadowing the `appointment` contract import)
+      const createdAppointment = await validateAndCreateAppointment({
         person_id,
         app_date,
         app_detail,
@@ -392,9 +376,10 @@ router.post(
         wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, appointmentDay);
       }
 
-      sendSuccess(
+      sendData(
         res,
-        { appointment_id: appointment.appointment_id, appointment },
+        appointment.createAppointment.response,
+        { appointment_id: createdAppointment.appointment_id, appointment: createdAppointment },
         'Appointment created successfully'
       );
     } catch (error) {
@@ -455,7 +440,7 @@ router.get(
             ORDER BY a."app_date" DESC
         `.execute(db);
 
-      sendSuccess(res, { appointments: rows || [] });
+      sendData(res, appointment.patientAppointments.response, { appointments: rows || [] });
     } catch (error) {
       log.error('Error fetching patient appointments:', error);
       ErrorResponses.internalError(
@@ -504,7 +489,7 @@ router.get(
         return;
       }
 
-      sendSuccess(res, { appointment: rows[0] });
+      sendData(res, appointment.appointmentById.response, { appointment: rows[0] });
     } catch (error) {
       log.error('Error fetching appointment:', error);
       ErrorResponses.internalError(
@@ -522,7 +507,7 @@ router.get(
  */
 router.put(
   '/appointments/:appointmentId',
-  validate({ params: appointmentIdParams, body: createAppointmentBodySchema }),
+  validate({ params: appointment.updateAppointment.params, body: appointment.updateAppointment.body }),
   async (
     req: Request<{ appointmentId: string }, unknown, UpdateAppointmentBody>,
     res: Response
@@ -532,7 +517,7 @@ router.put(
       const { person_id, app_date, app_detail, dr_id } = req.body;
 
       // params + body are validated by the validate() middleware above
-      // (appointmentIdParams + createAppointmentBodySchema): appointmentId is a
+      // (appointment.updateAppointment.params + .body): appointmentId is a
       // digit string, the ids are positive ints, and app_date/app_detail are
       // non-empty strings — so no manual re-check is needed here.
 
@@ -565,7 +550,7 @@ router.put(
  */
 router.delete(
   '/appointments/:appointmentId',
-  validate({ params: appointmentIdParams }),
+  validate({ params: appointment.deleteAppointment.params }),
   async (
     req: Request<{ appointmentId: string }>,
     res: Response
@@ -606,7 +591,7 @@ router.delete(
  */
 router.post(
   '/appointments/quick-checkin',
-  validate({ body: quickCheckinBodySchema }),
+  validate({ body: appointment.quickCheckin.body }),
   async (
     req: Request<unknown, unknown, QuickCheckInBody>,
     res: Response
@@ -632,7 +617,7 @@ router.post(
         wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, todayDateOnly);
       }
 
-      sendSuccess(res, result);
+      sendData(res, appointment.quickCheckin.response, result);
     } catch (error) {
       log.error('Error in quick check-in:', error);
 

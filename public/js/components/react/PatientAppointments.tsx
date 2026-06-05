@@ -4,6 +4,7 @@ import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
 import Modal from './Modal';
 import { fetchJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import * as appointment from '@shared/contracts/appointment.contract';
 import styles from './PatientAppointments.module.css';
 
 interface PatientAppointment {
@@ -38,7 +39,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
         try {
             setLoading(true);
             setError(null);
-            const data = await fetchJSON<{ appointments?: PatientAppointment[] }>(`/api/patient-appointments/${personId}`);
+            const data = await fetchJSON<{ appointments?: PatientAppointment[] }>(`/api/patient-appointments/${personId}`, { schema: appointment.patientAppointments.response });
             setAppointments(data.appointments || []);
         } catch (err) {
             console.error('Error loading appointments:', err);

@@ -10,7 +10,6 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { z } from 'zod';
 import {
   getAllOptions,
   getOption,
@@ -18,26 +17,18 @@ import {
   bulkUpdateOptions
 } from '../../services/database/queries/options-queries.js';
 import DatabaseConfigService from '../../services/config/DatabaseConfigService.js';
-import { sendSuccess, ErrorResponses } from '../../utils/error-response.js';
+import { sendSuccess, sendData, ErrorResponses } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import { log } from '../../utils/logger.js';
+import * as settings from '../../shared/contracts/settings.contract.js';
 
 const router = Router();
 
-// Boundary schemas. The option `value` is a scalar (string/number/boolean) the
-// options table stores as text; each bulk element is loose-validated for a string
-// `name` (value passes through). The `/config/database` + `/config/database/test`
-// bodies are intentionally DYNAMIC (`{[key]:unknown}` db-config maps) and stay
-// validated by DatabaseConfigService — not statically schemable here (cf. lookup-admin).
-const optionScalar = z.union([z.string(), z.number(), z.boolean()]);
-const bulkOptionsBodySchema = z.object({ options: z.array(z.looseObject({ name: z.string() })) });
-const optionNameParams = z.object({ optionName: z.string().min(1) });
-const updateOptionBodySchema = z.object({ value: optionScalar });
-const restartBodySchema = z.object({ reason: z.string().optional() });
-// DB-config bodies are free-form key/value maps (validated field-by-field by
-// dbConfigService); the boundary guard just asserts a JSON object. Loose so no
-// config key is stripped before reaching the service.
-const dbConfigBodySchema = z.looseObject({});
+// Boundary schemas + bodies live in the shared contract
+// (`shared/contracts/settings.contract.ts`). The DB-config bodies stay DYNAMIC
+// (`{[key]:unknown}` maps validated field-by-field by DatabaseConfigService);
+// the bulk/update bodies keep their local interfaces (the service wants a string
+// `value`, so the looser contract schema isn't the SSoT there).
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -59,9 +50,7 @@ interface DatabaseConfigBody {
   [key: string]: unknown;
 }
 
-interface RestartBody {
-  reason?: string;
-}
+type RestartBody = settings.RestartBody;
 
 // ===== OPTIONS/SETTINGS ENDPOINTS =====
 
@@ -72,7 +61,7 @@ interface RestartBody {
 router.get('/options', async (_req: Request, res: Response): Promise<void> => {
   try {
     const options = await getAllOptions();
-    sendSuccess(res, { options });
+    sendData(res, settings.getOptions.response, { options });
   } catch (error) {
     log.error('Error getting options:', error);
     ErrorResponses.internalError(
@@ -90,7 +79,7 @@ router.get('/options', async (_req: Request, res: Response): Promise<void> => {
  */
 router.put(
   '/options/bulk',
-  validate({ body: bulkOptionsBodySchema }),
+  validate({ body: settings.bulkOptions.body }),
   async (
     req: Request<unknown, unknown, BulkUpdateBody>,
     res: Response
@@ -106,8 +95,9 @@ router.put(
       }
 
       const result = await bulkUpdateOptions(options);
-      sendSuccess(
+      sendData(
         res,
+        settings.bulkOptions.response,
         { updated: result.updated, failed: result.failed },
         'Bulk update completed'
       );
@@ -138,7 +128,7 @@ router.get(
         return;
       }
 
-      sendSuccess(res, { optionName, value });
+      sendData(res, settings.getOptionByName.response, { optionName, value });
     } catch (error) {
       log.error('Error getting option:', error);
       ErrorResponses.internalError(
@@ -156,7 +146,7 @@ router.get(
  */
 router.put(
   '/options/:optionName',
-  validate({ params: optionNameParams, body: updateOptionBodySchema }),
+  validate({ params: settings.updateOption.params, body: settings.updateOption.body }),
   async (
     req: Request<OptionNameParams, unknown, UpdateOptionBody>,
     res: Response
@@ -206,7 +196,7 @@ router.get(
       const result = await dbConfigService.getCurrentConfig(false); // Mask sensitive data
 
       if (result.success) {
-        sendSuccess(res, { config: result.config });
+        sendData(res, settings.getDatabaseConfig.response, { config: result.config });
       } else {
         ErrorResponses.internalError(
           res,
@@ -231,7 +221,7 @@ router.get(
  */
 router.post(
   '/config/database/test',
-  validate({ body: dbConfigBodySchema }),
+  validate({ body: settings.testDatabaseConnection.body }),
   async (
     req: Request<unknown, unknown, DatabaseConfigBody>,
     res: Response
@@ -239,14 +229,14 @@ router.post(
     try {
       const testConfig = req.body;
 
-      // body asserted to be a JSON object by dbConfigBodySchema above.
+      // body asserted to be a JSON object by the contract schema above.
       log.info('Testing database connection...');
       const result = await dbConfigService.testConnection(testConfig);
 
       // The test always *runs* successfully (HTTP 200); whether the DB was
       // reachable rides `connectionOk` in the envelope data. (Was a 200/400
       // split — re-modelled honestly per audit H4/N16, like photo `/prepare`.)
-      sendSuccess(res, {
+      sendData(res, settings.testDatabaseConnection.response, {
         connectionOk: result.success,
         message: result.message,
         details: result.details
@@ -264,7 +254,7 @@ router.post(
  */
 router.put(
   '/config/database',
-  validate({ body: dbConfigBodySchema }),
+  validate({ body: settings.updateDatabaseConfig.body }),
   async (
     req: Request<unknown, unknown, DatabaseConfigBody>,
     res: Response
@@ -272,7 +262,7 @@ router.put(
     try {
       const newConfig = req.body;
 
-      // body asserted to be a JSON object by dbConfigBodySchema above.
+      // body asserted to be a JSON object by the contract schema above.
       log.info('Updating database configuration...');
       const result = await dbConfigService.updateConfiguration(newConfig);
 
@@ -282,7 +272,7 @@ router.put(
           ? { ...result.config, PG_PASSWORD: '••••••••' }
           : result.config;
 
-        sendSuccess(res, {
+        sendData(res, settings.updateDatabaseConfig.response, {
           config: responseConfig,
           requiresRestart: result.requiresRestart,
           message: result.message
@@ -316,7 +306,7 @@ router.get(
       const result = await dbConfigService.exportConfiguration();
 
       if (result.success) {
-        sendSuccess(res, { config: result.config });
+        sendData(res, settings.exportDatabaseConfig.response, { config: result.config });
       } else {
         ErrorResponses.internalError(
           res,
@@ -338,7 +328,7 @@ router.get(
  */
 router.post(
   '/system/restart',
-  validate({ body: restartBodySchema }),
+  validate({ body: settings.restart.body }),
   async (
     req: Request<unknown, unknown, RestartBody>,
     res: Response
@@ -350,8 +340,9 @@ router.post(
         `Application restart requested. reason: ${reason || 'Manual restart'}`
       );
 
-      // Send response before restarting
-      sendSuccess(res, { message: 'Application restart initiated' });
+      // Send response before restarting (then process.exit in the setTimeout
+      // below — the envelope is flushed first; behavior preserved).
+      sendData(res, settings.restart.response, { message: 'Application restart initiated' });
 
       // Give time for response to be sent
       setTimeout(() => {

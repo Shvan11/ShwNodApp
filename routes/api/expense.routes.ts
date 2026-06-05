@@ -13,7 +13,6 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { z } from 'zod';
 import {
   getAllExpenses,
   getExpenseById,
@@ -30,40 +29,12 @@ import {
   requireRecordAge,
   getExpenseCreationDate
 } from '../../middleware/time-based-auth.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
-import {
-  idParams,
-  dateString,
-  optionalPositiveIntQuery,
-  optionalNonNegIntQuery,
-} from '../../middleware/validation-schemas.js';
+import * as expense from '../../shared/contracts/expense.contract.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
-
-// Boundary schemas (Zod = trust boundary). LOOSE bodies: addExpense/updateExpense
-// receive an EXPLICIT `ExpenseData` literal (no `...req.body` spread), so over-posting
-// is already closed; we only enforce the two required fields the handler checks
-// (`expense_date`, `amount`) — validating the date is a real calendar day (the H10
-// "weak date input" sub-issue) and NaN-proofing amount. The soft fields
-// (currency/note/categoryId/subcategoryId) keep their handler-side coercion.
-const expenseBodySchema = z.looseObject({
-  expense_date: dateString,
-  amount: z.coerce.number().positive('amount must be a positive number'),
-});
-
-// Query coercion for GET /expenses — closes the H10 `limit='abc'` silent-NaN
-// sub-issue. Empty/absent filters stay absent; junk numerics 400.
-const expenseQuerySchema = z.object({
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  categoryId: optionalPositiveIntQuery,
-  subcategoryId: optionalPositiveIntQuery,
-  currency: z.string().optional(),
-  limit: optionalPositiveIntQuery,
-  offset: optionalNonNegIntQuery,
-});
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -117,7 +88,7 @@ interface ExpenseData {
  */
 router.get(
   '/expenses',
-  validate({ query: expenseQuerySchema }),
+  validate({ query: expense.expenseList.query }),
   async (
     req: Request<unknown, unknown, unknown, ExpenseQueryParams>,
     res: Response
@@ -147,7 +118,7 @@ router.get(
       });
 
       const expenses = await getAllExpenses(cleanFilters);
-      sendSuccess(res, expenses);
+      sendData(res, expense.expenseList.response, expenses);
     } catch (error) {
       log.error('Error fetching expenses:', error);
       ErrorResponses.internalError(
@@ -167,7 +138,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const categories = await getExpenseCategories();
-      sendSuccess(res, categories);
+      sendData(res, expense.expenseCategories.response, categories);
     } catch (error) {
       log.error('Error fetching expense categories:', error);
       ErrorResponses.internalError(
@@ -195,7 +166,7 @@ router.get(
         return;
       }
       const subcategories = await getExpenseSubcategories(categoryId);
-      sendSuccess(res, subcategories);
+      sendData(res, expense.expenseSubcategories.response, subcategories);
     } catch (error) {
       log.error('Error fetching expense subcategories:', error);
       ErrorResponses.internalError(
@@ -212,7 +183,7 @@ router.get(
  */
 router.post(
   '/expenses',
-  validate({ body: expenseBodySchema }),
+  validate({ body: expense.createExpense.body }),
   async (
     req: Request<unknown, unknown, CreateExpenseBody>,
     res: Response
@@ -245,7 +216,7 @@ router.post(
       };
 
       const result = await addExpense(expenseData);
-      sendSuccess(res, result, 'Expense created successfully', 201);
+      sendData(res, expense.createExpense.response, result, 'Expense created successfully', 201);
     } catch (error) {
       log.error('Error creating expense:', error);
       ErrorResponses.internalError(
@@ -281,7 +252,7 @@ router.get(
       const summary = await getExpenseSummary(startDate, endDate);
       const totals = await getExpenseTotalsByCurrency(startDate, endDate);
 
-      sendSuccess(res, {
+      sendData(res, expense.expenseSummary.response, {
         summary,
         totals
       });
@@ -314,14 +285,15 @@ router.get(
         return;
       }
 
-      const expense = await getExpenseById(expenseId);
+      // `expenseRow` (not `expense`) to avoid shadowing the contract import.
+      const expenseRow = await getExpenseById(expenseId);
 
-      if (!expense) {
+      if (!expenseRow) {
         ErrorResponses.notFound(res, 'Expense');
         return;
       }
 
-      sendSuccess(res, expense);
+      sendData(res, expense.expenseById.response, expenseRow);
     } catch (error) {
       log.error('Error fetching expense:', error);
       ErrorResponses.internalError(
@@ -341,7 +313,7 @@ router.put(
   '/expenses/:id',
   authenticate,
   authorize(['admin', 'secretary']),
-  validate({ params: idParams('id'), body: expenseBodySchema }),
+  validate({ params: expense.updateExpense.params, body: expense.updateExpense.body }),
   requireRecordAge({
     resourceType: 'expense',
     operation: 'update',
@@ -388,7 +360,7 @@ router.put(
       };
 
       const result = await updateExpense(expenseId, expenseData);
-      sendSuccess(res, result, 'Expense updated successfully');
+      sendData(res, expense.updateExpense.response, result, 'Expense updated successfully');
     } catch (error) {
       log.error('Error updating expense:', error);
       ErrorResponses.internalError(
@@ -408,7 +380,7 @@ router.delete(
   '/expenses/:id',
   authenticate,
   authorize(['admin', 'secretary']),
-  validate({ params: idParams('id') }),
+  validate({ params: expense.deleteExpense.params }),
   requireRecordAge({
     resourceType: 'expense',
     operation: 'delete',
@@ -426,7 +398,7 @@ router.delete(
       }
 
       const result = await deleteExpense(expenseId);
-      sendSuccess(res, result, 'Expense deleted successfully');
+      sendData(res, expense.deleteExpense.response, result, 'Expense deleted successfully');
     } catch (error) {
       log.error('Error deleting expense:', error);
       ErrorResponses.internalError(

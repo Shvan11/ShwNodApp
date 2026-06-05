@@ -17,7 +17,8 @@ import type { EventEmitter } from 'events';
 import { authorize } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import { InternalEmitterEvents } from '../../services/messaging/websocket-events.js';
-import { sendSuccess, ErrorResponses } from '../../utils/error-response.js';
+import { sendData, ErrorResponses } from '../../utils/error-response.js';
+import * as photoEditor from '../../shared/contracts/photo-editor.contract.js';
 import {
   getPatientForPhotoSession,
   getExistingPhotoDate,
@@ -67,17 +68,12 @@ interface SlotSpecBody {
   output?: { width: number; height: number };
 }
 
-// --- Boundary schemas (see CLAUDE.md: Zod at trust boundaries only) ---
+// --- Boundary schemas ---
+// The `personId` param + the `prepare`/`view` bodies live in the shared contract
+// (`shared/contracts/photo-editor.contract.ts`). `/render` is EXCLUDED from the
+// contract (raw 202 + background SSE), so its body schema stays inline here — it
+// only reuses the contract's `personIdParams` guard.
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
-const personIdParams = z.object({ personId: z.string().regex(/^\d+$/, 'Invalid patient id') });
-
-const prepareBodySchema = z.object({
-  tpDescription: z.string().min(1, 'tpDescription is required'),
-  tpDate: z.string().regex(YMD, 'Invalid tpDate (expected YYYY-MM-DD)'),
-  overrideDate: z.boolean().optional(),
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-});
 
 const renderBodySchema = z.object({
   tpName: z.string().min(1, 'tpName is required'),
@@ -88,18 +84,11 @@ const renderBodySchema = z.object({
   slots: z.array(z.unknown()).min(1, 'No slots to render'),
 });
 
-const deleteViewBodySchema = z.object({
-  tpCode: z.coerce.number().int().nonnegative(),
-  tpName: z.string().optional(),
-  tpDate: z.string().optional(),
-  view: z.string().regex(/^i(10|12|13|20|21|22|23|24)$/, 'Invalid view code'),
-});
-
 // Schema-derived types — the validated, post-coercion shapes (slots stay opaque
 // and are narrowed to SlotSpecBody[] at the processRenderJob boundary).
-type PrepareBody = z.infer<typeof prepareBodySchema>;
+type PrepareBody = photoEditor.PrepareBody;
 type RenderBody = z.infer<typeof renderBodySchema>;
-type DeleteViewBody = z.infer<typeof deleteViewBodySchema>;
+type DeleteViewBody = photoEditor.DeleteViewBody;
 
 /** Parse 'YYYY-MM-DD' to a LOCAL-midnight Date (pool runs useUTC:false). */
 function parseLocalDate(s: string): Date | null {
@@ -135,7 +124,7 @@ function toDateOnly(d: Date | string): string {
 router.post(
   '/:personId/prepare',
   authorize(['admin', 'secretary']),
-  validate({ params: personIdParams, body: prepareBodySchema }),
+  validate({ params: photoEditor.prepare.params, body: photoEditor.prepare.body }),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
@@ -176,7 +165,7 @@ router.post(
         }
 
         if (!newFirst || !newLast) {
-          sendSuccess(res, {
+          sendData(res, photoEditor.prepare.response, {
             needsName: true,
             message:
               'This patient has no English name. Enter an English (Latin) first and last name to add photos — Dolphin Imaging cannot store Arabic names.',
@@ -207,7 +196,7 @@ router.post(
           const existingDateOnly = toDateOnly(existingDate);
           if (existingDateOnly !== tpDate) {
             if (!overrideDate) {
-              sendSuccess(res, {
+              sendData(res, photoEditor.prepare.response, {
                 conflict: true,
                 conflictType: tpDescription,
                 conflictSource: 'shwan',
@@ -234,7 +223,7 @@ router.post(
 
       const { tp_code } = await findOrCreateNativeTimePoint(Number(personId), tpDescription, parsedDate);
       log.info('[PhotoEditor] prepared timepoint', { personId, tpDescription, tpDate, tp_code });
-      sendSuccess(res, { tp_code });
+      sendData(res, photoEditor.prepare.response, { tp_code });
     } catch (err) {
       log.error('[PhotoEditor] prepare failed', { error: (err as Error).message });
       ErrorResponses.internalError(res, 'Failed to prepare timepoint', err as Error);
@@ -252,7 +241,7 @@ router.post(
 router.post(
   '/:personId/render',
   authorize(['admin', 'secretary']),
-  validate({ params: personIdParams, body: renderBodySchema }),
+  validate({ params: photoEditor.personIdParams, body: renderBodySchema }),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
@@ -417,7 +406,7 @@ async function processRenderJob(job: RenderJob): Promise<void> {
 router.delete(
   '/:personId/view',
   authorize(['admin', 'secretary']),
-  validate({ params: personIdParams, body: deleteViewBodySchema }),
+  validate({ params: photoEditor.view.params, body: photoEditor.view.body }),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
@@ -445,7 +434,7 @@ router.delete(
         tp_code: tpCodeNum,
         view,
       });
-      sendSuccess(res, { removed: view });
+      sendData(res, photoEditor.view.response, { removed: view });
     } catch (err) {
       log.error('[PhotoEditor] remove view failed', { error: (err as Error).message });
       ErrorResponses.internalError(res, 'Failed to remove view', err as Error);
@@ -457,14 +446,14 @@ router.delete(
  * GET /:personId/photo-dates
  * Appointments + visits used to suggest dates in the photo-session dialog.
  */
-router.get('/:personId/photo-dates', validate({ params: personIdParams }), async (req: Request, res: Response): Promise<void> => {
+router.get('/:personId/photo-dates', validate({ params: photoEditor.photoDates.params }), async (req: Request, res: Response): Promise<void> => {
   try {
     const { personId } = req.params;
     const [appointments, visits] = await Promise.all([
       getPhotoSessionAppointments(personId),
       getPhotoSessionVisits(personId),
     ]);
-    res.json({ appointments, visits });
+    sendData(res, photoEditor.photoDates.response, { appointments, visits });
   } catch (err) {
     log.error('[PhotoEditor] photo-dates failed', { error: (err as Error).message });
     ErrorResponses.internalError(res, 'Failed to fetch photo dates', err as Error);

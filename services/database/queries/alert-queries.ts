@@ -20,10 +20,13 @@ interface Alert {
   is_active: boolean;
 }
 
-interface AlertType {
+// `type` (not `interface`) so an AlertType[] is assignable to the lookup
+// contract's `z.array(z.looseObject({ alert_type_id }))` sendData arg (the
+// index-signature rule — docs/shared-contract-progress.md).
+type AlertType = {
   alert_type_id: number;
   type_name: string;
-}
+};
 
 interface AlertData {
   person_id: number;

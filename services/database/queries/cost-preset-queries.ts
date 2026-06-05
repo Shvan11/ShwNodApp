@@ -12,12 +12,15 @@
 import { getKysely } from '../kysely.js';
 
 // type definitions
-interface CostPreset {
+// `type` (not `interface`) so a CostPreset[] feeds the contract's
+// `z.looseObject({ preset_id })` sendData arg — the index-signature rule
+// (docs/shared-contract-progress.md).
+type CostPreset = {
   preset_id: number;
   amount: number;
   currency: string;
   display_order: number;
-}
+};
 
 /**
  * Get all cost presets, optionally filtered by currency

@@ -226,10 +226,13 @@ interface ValidationResult {
   };
 }
 
-interface ImplantManufacturer {
+// `type` (not `interface`) so an ImplantManufacturer[] is assignable to the
+// lookup contract's `z.array(z.looseObject({ id }))` sendData arg (the index-
+// signature rule — docs/shared-contract-progress.md).
+type ImplantManufacturer = {
   id: number;
   name: string;
-}
+};
 
 export async function getWorksByPatient(personId: number): Promise<Work[]> {
   const db = getKysely();

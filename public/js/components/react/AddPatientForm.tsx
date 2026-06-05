@@ -8,6 +8,7 @@
 
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import * as lookup from '@shared/contracts/lookup.contract';
 import PhoneInput from './PhoneInput';
 import styles from './AddPatientForm.module.css';
 
@@ -111,10 +112,10 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         const loadDropdownData = async () => {
             try {
                 const [referralSources, patientTypes, addresses, genders] = await Promise.all([
-                    fetchJSON<DropdownItem[]>('/api/referral-sources'),
-                    fetchJSON<DropdownItem[]>('/api/patient-types'),
-                    fetchJSON<DropdownItem[]>('/api/addresses'),
-                    fetchJSON<DropdownItem[]>('/api/genders')
+                    fetchJSON<DropdownItem[]>('/api/referral-sources', { schema: lookup.referralSources.response }),
+                    fetchJSON<DropdownItem[]>('/api/patient-types', { schema: lookup.patientTypes.response }),
+                    fetchJSON<DropdownItem[]>('/api/addresses', { schema: lookup.addresses.response }),
+                    fetchJSON<DropdownItem[]>('/api/genders', { schema: lookup.genders.response })
                 ]);
 
                 setDropdownData({

@@ -3,6 +3,7 @@ import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import * as employeeContract from '@shared/contracts/employee.contract';
 import Modal from './Modal';
 import { resolveDoctorColor, DEFAULT_PICKER_HEX, NEUTRAL_PICKER_HEX } from './doctorColors';
 import styles from './EmployeeSettings.module.css';
@@ -72,7 +73,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         try {
             setLoading(true);
             setError(null);
-            const data = await fetchJSON<{ employees?: Employee[] }>('/api/employees');
+            const data = await fetchJSON<{ employees?: Employee[] }>('/api/employees', { schema: employeeContract.employees.response });
             setEmployees(data.employees || []);
         } catch (err) {
             console.error('Error loading employees:', err);
@@ -84,7 +85,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
 
     const loadPositions = async () => {
         try {
-            const data = await fetchJSON<{ positions?: Position[] }>('/api/positions');
+            const data = await fetchJSON<{ positions?: Position[] }>('/api/positions', { schema: employeeContract.positions.response });
             setPositions(data.positions || []);
         } catch (err) {
             console.error('Error loading positions:', err);

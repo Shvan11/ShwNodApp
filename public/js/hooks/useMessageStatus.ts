@@ -21,6 +21,7 @@
 import { useCallback, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
+import * as messaging from '@shared/contracts/messaging.contract';
 import {
   API_ENDPOINTS,
   MESSAGE_STATUS_TEXT,
@@ -101,6 +102,7 @@ const EMPTY_MESSAGES: Message[] = [];
 function fetchMessageStatus(date: string, signal?: AbortSignal): Promise<Message[]> {
   return fetchJSON<{ messages?: Message[] } | null>(API_ENDPOINTS.MESSAGE_STATUS(date), {
     signal,
+    schema: messaging.status.response,
   }).then((payload) => payload?.messages ?? []);
 }
 

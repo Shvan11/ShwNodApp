@@ -11,9 +11,12 @@ import path from 'path';
 import { getMediaMimeType } from '../../utils/video-mime.js';
 import { streamFile } from '../../utils/stream-file.js';
 import { log } from '../../utils/logger.js';
-import { ErrorResponses, sendSuccess } from '../../utils/error-response.js';
+import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import * as videoQueries from '../../services/database/queries/video-queries.js';
 import { generateVideoQRCode } from '../../services/imaging/qrcode.js';
+// Aliased `videoContract` — the handlers use a local `const video`, which would
+// shadow a bare `import * as video` (docs/shared-contract-progress.md).
+import * as videoContract from '../../shared/contracts/video.contract.js';
 
 const router = Router();
 
@@ -132,7 +135,7 @@ function normalizePath(dbPath: string): string {
 router.get('/', async (_req: Request, res: Response): Promise<void> => {
   try {
     const videos = await videoQueries.getAllVideos();
-    sendSuccess(res, videos);
+    sendData(res, videoContract.list.response, videos);
   } catch (error) {
     log.error('[Videos] Error fetching videos:', error);
     ErrorResponses.serverError(res, 'Failed to fetch videos', error as Error);
@@ -146,7 +149,7 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
 router.get('/categories', async (_req: Request, res: Response): Promise<void> => {
   try {
     const categories = await videoQueries.getVideoCategories();
-    sendSuccess(res, categories);
+    sendData(res, videoContract.categories.response, categories);
   } catch (error) {
     log.error('[Videos] Error fetching categories:', error);
     ErrorResponses.serverError(res, 'Failed to fetch categories', error as Error);
@@ -171,7 +174,7 @@ router.get('/:id', async (req: Request<VideoIdParams>, res: Response): Promise<v
       return;
     }
 
-    sendSuccess(res, video);
+    sendData(res, videoContract.byId.response, video);
   } catch (error) {
     log.error('[Videos] Error fetching video:', error);
     ErrorResponses.serverError(res, 'Failed to fetch video', error as Error);
@@ -284,7 +287,7 @@ router.get('/:id/qr', async (req: Request<VideoIdParams>, res: Response): Promis
     // Generate QR code
     const qrResult = await generateVideoQRCode(id);
 
-    sendSuccess(res, {
+    sendData(res, videoContract.qr.response, {
       qr: qrResult.qr,
       url: qrResult.url,
       title: video.description,
@@ -361,7 +364,7 @@ router.post(
       const video = await videoQueries.getVideoById(newId);
 
       log.info('[Videos] Video uploaded successfully', { id: newId, fileName });
-      sendSuccess(res, video, 'Video uploaded successfully');
+      sendData(res, videoContract.create.response, video, 'Video uploaded successfully');
     } catch (error) {
       log.error('[Videos] Error uploading video:', error);
       ErrorResponses.serverError(res, 'Failed to upload video', error as Error);
@@ -410,7 +413,7 @@ router.put('/:id', async (req: Request<VideoIdParams, object, UpdateVideoBody>, 
     const video = await videoQueries.getVideoById(id);
 
     log.info('[Videos] Video updated successfully', { id });
-    sendSuccess(res, video, 'Video updated successfully');
+    sendData(res, videoContract.update.response, video, 'Video updated successfully');
   } catch (error) {
     log.error('[Videos] Error updating video:', error);
     ErrorResponses.serverError(res, 'Failed to update video', error as Error);
@@ -466,7 +469,7 @@ router.delete('/:id', async (req: Request<VideoIdParams>, res: Response): Promis
     }
 
     log.info('[Videos] Video deleted successfully', { id });
-    sendSuccess(res, { id }, 'Video deleted successfully');
+    sendData(res, videoContract.remove.response, { id }, 'Video deleted successfully');
   } catch (error) {
     log.error('[Videos] Error deleting video:', error);
     ErrorResponses.serverError(res, 'Failed to delete video', error as Error);
