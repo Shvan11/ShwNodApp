@@ -145,7 +145,22 @@ dev-parsed on real data (prior sessions) is a no-op guard that only fail-louds o
   as `{ templates? }` but the route returns the bare array (funnel-unwrapped) → `.templates` is always
   undefined. The wired `getTemplates` (`anyArray`) guard is the correct assertion; fix the generic later.
 
-**Next: Phase 2 (client `{schema}` on meaningful mutations).**
+**Session 11 — 2026-06-05 — Phase 2 (client `{schema}` on meaningful mutations) — COMPLETE.**
+Wired the client guard on mutations whose returned payload the UI consumes (created/updated ids & rows).
+Gate green: `typecheck:all` + `lint` (0 errors) + `build` (client + `build:server`). No runtime smoke (no DB
+in container; same safe-no-op-guard rationale as Phase 1).
+- **Wired:** patient `createPatient`/`resetPin`; appointment `createAppointment`/`quickCheckin` (×2);
+  work `updateWork`/`addWork`/`addWorkWithInvoice` (NewWorkComponent — schema picked per endpoint, since
+  `addWork`→`{workId}` vs `addWorkWithInvoice`→`{workId,invoiceId}`); aligner `deliverBatch`/
+  `manufactureBatch`; expense `create`/`update`; media webceph `createPatient`/`uploadImage`; photo-editor
+  `prepare`; file-explorer `deleteBatch`; settings `testDatabaseConnection`/`updateDatabaseConfig`/
+  `bulkOptions`; calendar `regenerate`; template `createTemplate` (**added its `{template_id}` response** —
+  it had body-only).
+- **Skipped (per scope):** `{success}`-only acks (e.g. `updateAppointment` from EditAppointmentForm — its
+  consumer reads `{success,error}`, an ack), and the **raw whatsapp send** responses (`/api/wa/send-*`,
+  `sendmedia2` — apiClient/flat top-level reads, leave raw).
+
+**Next: Phase 3 (full response modeling + per-read runtime verify — the big tier; needs a live DB).**
 
 ---
 
