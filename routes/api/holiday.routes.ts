@@ -20,9 +20,7 @@ const router = Router();
 /**
  * Query params for single date
  */
-interface DateQuery {
-  date?: string;
-}
+type DateQuery = holiday.DateQuery;
 
 /**
  * GET /appointments-on-date

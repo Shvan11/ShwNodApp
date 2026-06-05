@@ -32,5 +32,29 @@ export const multiYearStatistics = {
 
 // GET /api/daily-invoices → { date, count, invoices }.
 export const dailyInvoices = {
+  query: z.object({ date: z.string().optional() }),
   response: z.looseObject({ invoices: anyArray, count: z.number() }),
 } as const;
+export type DailyInvoicesQuery = z.infer<typeof dailyInvoices.query>;
+
+// GET statistics query shapes (type-only — handlers parse the strings manually).
+export const statisticsQuery = z.object({
+  month: z.string().optional(),
+  year: z.string().optional(),
+  exchangeRate: z.string().optional(),
+});
+export type StatisticsQuery = z.infer<typeof statisticsQuery>;
+
+export const yearlyStatisticsQuery = z.object({
+  startMonth: z.string().optional(),
+  startYear: z.string().optional(),
+  exchangeRate: z.string().optional(),
+});
+export type YearlyStatisticsQuery = z.infer<typeof yearlyStatisticsQuery>;
+
+export const multiYearStatisticsQuery = z.object({
+  startYear: z.string().optional(),
+  endYear: z.string().optional(),
+  exchangeRate: z.string().optional(),
+});
+export type MultiYearStatisticsQuery = z.infer<typeof multiYearStatisticsQuery>;

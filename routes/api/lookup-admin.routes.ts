@@ -33,14 +33,14 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface TableNameParams {
-  tableName: string;
-}
+type TableNameParams = lookupAdmin.TableNameParams;
 
-interface TableNameIdParams {
+// Raw req.params view for the :tableName/:id routes (the validated boundary is
+// `lookupAdmin.{updateItem,deleteItem}.params`, which coerce id → number). Type-only.
+type TableNameIdParams = {
   tableName: string;
   id: string;
-}
+};
 
 /**
  * Get all available lookup table configurations

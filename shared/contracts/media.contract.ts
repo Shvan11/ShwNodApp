@@ -62,3 +62,7 @@ export const patientLink = {
 export const photoTypes = {
   response: anyArray,
 } as const;
+
+// `:personId` path param shared by the media routes (type-only).
+export const personIdParams = z.object({ personId: z.string() });
+export type PersonIdParams = z.infer<typeof personIdParams>;

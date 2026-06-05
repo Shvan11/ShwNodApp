@@ -54,3 +54,13 @@ export const monthAvailability = {
   query: z.object({ startDate: dateString, endDate: dateString }),
   response: z.looseObject({ availability: z.unknown() }),
 } as const;
+
+// Shared route-level query view (handlers read the strings directly; the per-endpoint
+// `dateString` query schemas above stay the validated boundary). Type-only.
+export const calendarQuery = z.object({
+  date: z.string().optional(),
+  doctorId: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+});
+export type CalendarQueryParams = z.infer<typeof calendarQuery>;

@@ -529,3 +529,10 @@ export const createDoctor = {
 export const updateDoctor = { body: doctorBody } as const;
 
 // DELETE /api/aligner-doctors/:drID — sendSuccess(null).
+
+// GET /api/aligner/patients?search=&doctorId= — type-only (handler reads both directly).
+export const patientsQuery = z.object({
+  search: z.string().optional(),
+  doctorId: z.string().optional(),
+});
+export type AlignerQueryParams = z.infer<typeof patientsQuery>;

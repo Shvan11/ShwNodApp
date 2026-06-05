@@ -93,3 +93,6 @@ export const updateDatabaseConfig = {
 export const exportDatabaseConfig = {
   response: z.object({ config: z.unknown() }),
 } as const;
+
+// `:optionName` path param, shared by the option read/update routes.
+export type OptionNameParams = z.infer<typeof getOptionByName.params>;

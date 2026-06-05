@@ -52,3 +52,7 @@ export const updatePreset = {
 export const deletePreset = {
   params: idParams('id'),
 } as const;
+
+// GET /api/settings/cost-presets?currency= — type-only (handler reads currency directly).
+export const getPresetsQuery = z.object({ currency: z.string().optional() });
+export type CostPresetQuery = z.infer<typeof getPresetsQuery>;

@@ -26,12 +26,7 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface CalendarQueryParams {
-  date?: string;
-  doctorId?: string;
-  startDate?: string;
-  endDate?: string;
-}
+type CalendarQueryParams = calendar.CalendarQueryParams;
 
 interface CalendarSlotData {
   slotDateTime: string;

@@ -53,3 +53,7 @@ export const updateItem = {
 export const deleteItem = {
   params: tableIdParams,
 } as const;
+
+// GET /api/admin/lookups/:tableName — table-name-only param (type-only).
+export const tableParams = z.object({ tableName: z.string().min(1) });
+export type TableNameParams = z.infer<typeof tableParams>;

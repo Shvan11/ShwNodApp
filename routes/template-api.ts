@@ -10,6 +10,9 @@ import type {
   CreateTemplateBody,
   UpdateTemplateBody,
   SaveHtmlBody,
+  TemplateIdParams,
+  WorkIdParams,
+  TemplateQueryParams,
 } from '../shared/contracts/template.contract.js';
 import {
   generateReceiptHTML,
@@ -43,19 +46,8 @@ function withAutoPrint(html: string): string {
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface TemplateIdParams {
-  templateId: string;
-}
-
-interface WorkIdParams {
-  workId: string;
-}
-
-interface TemplateQueryParams {
-  documentTypeId?: string;
-  isActive?: string;
-  isDefault?: string;
-}
+// TemplateIdParams / WorkIdParams / TemplateQueryParams are contracted in
+// shared/contracts/template.contract.ts (imported above; type-only).
 
 // Body shapes (CreateTemplateBody / UpdateTemplateBody / SaveHtmlBody) come from
 // the template contract — these handlers keep their own required-field checks and

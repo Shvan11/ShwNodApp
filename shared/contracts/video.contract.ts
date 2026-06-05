@@ -69,3 +69,7 @@ export const update = {
 export const remove = {
   response: z.object({ id: z.number() }),
 } as const;
+
+// `:id` path param shared by the video routes (staff + public). Type-only.
+export const videoIdParams = z.object({ id: z.string() });
+export type VideoIdParams = z.infer<typeof videoIdParams>;

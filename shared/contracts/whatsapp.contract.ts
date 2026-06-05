@@ -53,3 +53,7 @@ export type SendMedia2Body = z.infer<typeof sendMedia2.body>;
 // runtime-verified without a live WhatsApp client; tighten in Phase 3 if stable.
 export const initialState = { response: z.looseObject({}) } as const;
 export const qr = { response: z.looseObject({}) } as const;
+
+// GET send-by-date endpoints (`?date=`). Type-only — handlers read `date` directly.
+export const sendByDateQuery = z.object({ date: z.string().optional() });
+export type SendByDateQuery = z.infer<typeof sendByDateQuery>;

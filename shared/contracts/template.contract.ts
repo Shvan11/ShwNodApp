@@ -85,3 +85,15 @@ export const documentTypes = { response: anyArray } as const;
 
 // GET /api/templates/:templateId → a single template row.
 export const getTemplate = { response: z.unknown() } as const;
+
+// Path params + list query (type-only; handlers parse the query strings manually).
+export const templateIdParams = z.object({ templateId: z.string() });
+export type TemplateIdParams = z.infer<typeof templateIdParams>;
+export const workIdParams = z.object({ workId: z.string() });
+export type WorkIdParams = z.infer<typeof workIdParams>;
+export const templateQuery = z.object({
+  documentTypeId: z.string().optional(),
+  isActive: z.string().optional(),
+  isDefault: z.string().optional(),
+});
+export type TemplateQueryParams = z.infer<typeof templateQuery>;

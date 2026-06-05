@@ -150,3 +150,11 @@ export const quickCheckin = {
   response: z.unknown(),
 } as const;
 export type QuickCheckinBody = z.infer<typeof quickCheckin.body>;
+
+// Route-level GET query view (`?PDate=` / `?AppsDate=`). Type-only — the
+// dailyAppointments/webApps reads parse the date string themselves.
+export const appointmentQuery = z.object({
+  PDate: z.string().optional(),
+  AppsDate: z.string().optional(),
+});
+export type AppointmentQueryParams = z.infer<typeof appointmentQuery>;

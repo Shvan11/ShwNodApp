@@ -316,3 +316,13 @@ export const transfer = {
   response: z.looseObject({ workId: z.number() }),
 } as const;
 export type TransferBody = z.infer<typeof transfer.body>;
+
+// Shared GET query for the work read endpoints (getworks/getworkdetails/teeth/…).
+// Type-only (handlers parse manually); the schema is the SSoT for the route generic.
+export const workQuery = z.object({
+  code: z.string().optional(),
+  workId: z.string().optional(),
+  permanent: z.string().optional(),
+  deciduous: z.string().optional(),
+});
+export type WorkQueryParams = z.infer<typeof workQuery>;

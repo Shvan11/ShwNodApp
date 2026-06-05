@@ -41,9 +41,7 @@ const upload = multer();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface SendByDateQuery {
-  date?: string;
-}
+type SendByDateQuery = waContract.SendByDateQuery;
 
 // Request bodies are contracted (request-only) in shared/contracts/whatsapp.contract.ts
 // (`waContract`) — the handlers type from its `z.infer` exports. Responses stay RAW

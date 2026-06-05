@@ -18,9 +18,7 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface UserIdParams {
-  userId: string;
-}
+type UserIdParams = userManagement.UserIdParams;
 
 // Request bodies are the contract's z.infer SSoT (Phase 14 root migration).
 type CreateUserBody = userManagement.CreateUserBody;

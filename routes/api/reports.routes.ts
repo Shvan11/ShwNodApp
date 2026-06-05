@@ -23,36 +23,11 @@ const router = Router();
 /**
  * Query parameters for monthly statistics
  */
-interface StatisticsQuery {
-  month?: string;
-  year?: string;
-  exchangeRate?: string;
-}
-
-/**
- * Query parameters for yearly statistics
- */
-interface YearlyStatisticsQuery {
-  startMonth?: string;
-  startYear?: string;
-  exchangeRate?: string;
-}
-
-/**
- * Query parameters for multi-year statistics
- */
-interface MultiYearStatisticsQuery {
-  startYear?: string;
-  endYear?: string;
-  exchangeRate?: string;
-}
-
-/**
- * Query parameters for daily invoices
- */
-interface DailyInvoicesQuery {
-  date?: string;
-}
+// Statistics/daily-invoices query shapes are contracted in reports.contract.ts (type-only).
+type StatisticsQuery = reports.StatisticsQuery;
+type YearlyStatisticsQuery = reports.YearlyStatisticsQuery;
+type MultiYearStatisticsQuery = reports.MultiYearStatisticsQuery;
+type DailyInvoicesQuery = reports.DailyInvoicesQuery;
 
 /**
  * currency totals structure

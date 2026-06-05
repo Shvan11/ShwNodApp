@@ -45,6 +45,7 @@ import {
   deleteInvoice,
   type UpdateExchangeRateBody,
   type AddInvoiceBody,
+  type PaymentQueryParams,
 } from '../../shared/contracts/payment.contract.js';
 import {
   validateAndCreateInvoice,
@@ -62,12 +63,7 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface PaymentQueryParams {
-  code?: string;
-  workId?: string;
-  date?: string;
-  PID?: string;
-}
+// PaymentQueryParams is contracted in shared/contracts/payment.contract.ts (type-only).
 
 // `type` (not `interface`) so it carries an implicit string index signature and
 // is assignable to the `z.looseObject` workForReceipt response contract that

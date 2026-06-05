@@ -68,10 +68,7 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface AlignerQueryParams {
-  search?: string;
-  doctorId?: string;
-}
+type AlignerQueryParams = contract.AlignerQueryParams;
 
 interface AlignerSetRow {
   NextBatchPresent?: string;

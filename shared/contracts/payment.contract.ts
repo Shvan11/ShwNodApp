@@ -155,3 +155,12 @@ export const deleteInvoice = {
   response: z.object({ rowsAffected: z.number() }),
 } as const;
 export type DeleteInvoiceResponse = z.infer<typeof deleteInvoice.response>;
+
+// Shared GET query for the payment read endpoints. Type-only (handlers parse manually).
+export const paymentQuery = z.object({
+  code: z.string().optional(),
+  workId: z.string().optional(),
+  date: z.string().optional(),
+  PID: z.string().optional(),
+});
+export type PaymentQueryParams = z.infer<typeof paymentQuery>;

@@ -33,9 +33,7 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface OptionNameParams {
-  optionName: string;
-}
+type OptionNameParams = settings.OptionNameParams;
 
 type BulkUpdateBody = settings.BulkUpdateBody;
 type UpdateOptionBody = settings.UpdateOptionBody;
