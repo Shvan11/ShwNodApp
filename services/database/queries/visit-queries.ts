@@ -34,17 +34,17 @@ interface LatestVisitSummary {
   Summary: string | null;
 }
 
-interface wire {
+type wire = {
   id: number;
   name: string;
-}
+};
 
-interface LatestWireDetails {
+type LatestWireDetails = {
   upper_wire_id: number | null;
   UpperWireName: string | null;
   lower_wire_id: number | null;
   LowerWireName: string | null;
-}
+};
 
 interface VisitDetails {
   visitDate: string;
@@ -54,7 +54,7 @@ interface VisitDetails {
   next: string | null;
 }
 
-interface Visit {
+type Visit = {
   id: number;
   work_id: number;
   visit_date: string;
@@ -74,7 +74,7 @@ interface Visit {
   UpperWireName: string | null;
   LowerWireName: string | null;
   OperatorName: string | null;
-}
+};
 
 interface VisitData {
   work_id: number;

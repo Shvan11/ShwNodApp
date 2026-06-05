@@ -38,20 +38,20 @@ import { log } from '../../../utils/logger.js';
 // TYPE DEFINITIONS
 // ==============================
 
-interface AlignerDoctor {
+type AlignerDoctor = {
   dr_id: number;
   doctor_name: string;
   doctor_email: string | null;
   logo_path: string | null;
-}
+};
 
-interface AlignerDoctorWithUnread extends AlignerDoctor {
+type AlignerDoctorWithUnread = AlignerDoctor & {
   UnreadDoctorNotes: number;
   // Aliased properties for frontend compatibility
   id: number;
   name: string;
   logoPath: string | null;
-}
+};
 
 interface DoctorData {
   doctor_name: string;
@@ -59,7 +59,7 @@ interface DoctorData {
   logo_path?: string | null;
 }
 
-interface AlignerSet {
+type AlignerSet = {
   aligner_set_id: number;
   work_id: number;
   set_sequence: number | null;
@@ -80,9 +80,9 @@ interface AlignerSet {
   set_cost: number | null;
   currency: string | null;
   archform_id: number | null;
-}
+};
 
-interface AlignerSetWithDetails extends AlignerSet {
+type AlignerSetWithDetails = AlignerSet & {
   AlignerDoctorName: string | null;
   TotalBatches: number;
   DeliveredBatches: number;
@@ -90,9 +90,9 @@ interface AlignerSetWithDetails extends AlignerSet {
   Balance: number | null;
   PaymentStatus: string | null;
   UnreadActivityCount: number;
-}
+};
 
-interface AlignerSetFromView {
+type AlignerSetFromView = {
   person_id: number;
   patient_name: string;
   work_id: number;
@@ -113,7 +113,7 @@ interface AlignerSetFromView {
   doctor_name: string;
   WorkStatus: number | null;
   WorkStatusName: string | null;
-}
+};
 
 interface AlignerSetData {
   work_id: number;
@@ -147,7 +147,7 @@ interface AlignerSetUpdateData {
   is_active?: boolean;
 }
 
-interface AlignerPatient {
+type AlignerPatient = {
   person_id: number;
   first_name: string | null;
   last_name: string | null;
@@ -161,9 +161,9 @@ interface AlignerPatient {
   UnreadDoctorNotes?: number;
   DateOfBirth?: Date | null;
   start_date?: Date | null;
-}
+};
 
-interface AlignerBatch {
+type AlignerBatch = {
   aligner_batch_id: number;
   aligner_set_id: number;
   batch_sequence: number;
@@ -184,7 +184,7 @@ interface AlignerBatch {
   is_last: boolean;
   has_upper_template: boolean;
   has_lower_template: boolean;
-}
+};
 
 interface BatchData {
   aligner_set_id: number;
@@ -224,7 +224,7 @@ function toIntOr<T extends number | null>(value: unknown, fallback: T): number |
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
-interface AlignerNote {
+type AlignerNote = {
   note_id: number;
   aligner_set_id: number;
   note_type: 'Lab' | 'Doctor';
@@ -234,7 +234,7 @@ interface AlignerNote {
   edited_at: Date | null;
   is_read: boolean;
   doctor_name: string;
-}
+};
 
 interface AlignerPaymentData {
   workid: number;
@@ -2050,15 +2050,17 @@ export async function getBatchById(batchId: number): Promise<AlignerBatch[]> {
 // ARCHFORM MATCHING QUERIES
 // ==============================
 
-export interface AlignerSetForMatch {
+export type AlignerSetForMatch = {
   aligner_set_id: number;
   work_id: number;
   person_id: number;
   archform_id: number | null;
   patient_name: string;
+  first_name: string | null;
+  last_name: string | null;
   set_sequence: number | null;
   doctor_name: string;
-}
+};
 
 /**
  * Get all aligner sets with patient context for Archform matching

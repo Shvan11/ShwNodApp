@@ -9,7 +9,7 @@
 import { getKysely } from '../kysely.js';
 
 // type definitions
-interface Alert {
+type Alert = {
   alert_id: number;
   person_id: number;
   alert_type_id: number;
@@ -18,7 +18,7 @@ interface Alert {
   alert_details: string | null;
   creation_date: Date;
   is_active: boolean;
-}
+};
 
 // `type` (not `interface`) so an AlertType[] is assignable to the lookup
 // contract's `z.array(z.looseObject({ alert_type_id }))` sendData arg (the

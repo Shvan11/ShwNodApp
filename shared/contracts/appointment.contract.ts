@@ -63,8 +63,9 @@ export const appointmentDetails = {
 } as const;
 export type AppointmentDetailsResponse = z.infer<typeof appointmentDetails.response>;
 
-// GET /api/getWebApps?PDate= — rich AppointmentsResponse (stats + appointments[]
-// from a query interface) → z.unknown() no-op guard (preserves the payload).
+// GET /api/getWebApps?PDate= — rich AppointmentsResponse (stats + appointments[]).
+// Intentionally loose: assembled by AppointmentService from a query interface;
+// the hierarchical stats+appointments shape is preserved without field enumeration.
 export const webApps = {
   response: z.unknown(),
 } as const;
@@ -108,12 +109,11 @@ const createAppointmentBody = z.object({
 export type CreateAppointmentBody = z.infer<typeof createAppointmentBody>;
 export type UpdateAppointmentBody = CreateAppointmentBody;
 
-// POST /api/appointments — { appointment_id, appointment } (appointment is the
-// rich CreatedAppointment → z.unknown() to preserve it; appointment_id may be
-// undefined on the service return, so `.optional()`).
+// POST /api/appointments — { appointment_id, appointment }.
+// `appointment` is the rich CreatedAppointment object — preserved by looseObject.
 export const createAppointment = {
   body: createAppointmentBody,
-  response: z.object({ appointment_id: z.number().optional(), appointment: z.unknown() }),
+  response: z.looseObject({ appointment_id: z.number().optional() }),
 } as const;
 
 // PUT /api/appointments/:appointmentId — void success (shared create body + id param).
@@ -141,6 +141,8 @@ export const appointmentById = {
 } as const;
 
 // POST /api/appointments/quick-checkin — strict body; rich QuickCheckInResult.
+// Intentionally loose: QuickCheckInResult assembled by AppointmentService contains
+// a nested appointment object with patient/doctor details — not statically enumerable.
 export const quickCheckin = {
   body: z.object({
     person_id: intId,

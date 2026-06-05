@@ -23,13 +23,13 @@ import {
 // TYPE DEFINITIONS
 // ==============================
 
-export interface ArchformPatient {
+export type ArchformPatient = {
   Id: number;
   Name: string;
   LastName: string;
   CreatedDate: string;
   LastModifiedDate: string | null;
-}
+};
 
 // ==============================
 // CUSTOM ERROR

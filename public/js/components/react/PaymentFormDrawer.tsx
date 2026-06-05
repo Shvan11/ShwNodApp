@@ -6,11 +6,11 @@ import { formatISODate } from '../../core/utils';
 
 // Types
 interface SetInfo {
-    set_sequence?: number;
-    Balance?: number;
-    set_cost?: number;
-    TotalPaid?: number;
-    currency?: string;
+    set_sequence?: number | null;
+    Balance?: number | null;
+    set_cost?: number | null;
+    TotalPaid?: number | null;
+    currency?: string | null;
 }
 
 interface WorkInfo {

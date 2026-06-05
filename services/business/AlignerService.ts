@@ -1200,7 +1200,7 @@ export async function validateAndCreatePayment(
 export async function searchPatients(
   searchTerm: string,
   doctorId: number | null = null
-): Promise<AlignerPatientSearchResult[]> {
+) {
   if (!searchTerm || searchTerm.trim().length < 2) {
     throw new AlignerValidationError(
       'Search term must be at least 2 characters',
@@ -1214,10 +1214,7 @@ export async function searchPatients(
   );
 
   try {
-    return (await alignerQueries.searchAlignerPatients(
-      trimmedSearch,
-      doctorId
-    )) as AlignerPatientSearchResult[];
+    return alignerQueries.searchAlignerPatients(trimmedSearch, doctorId);
   } catch (error) {
     log.error('Error searching aligner patients:', { error: error instanceof Error ? error.message : String(error) });
     throw error;

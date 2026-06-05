@@ -22,8 +22,7 @@ import { getPayments, type Payment } from '../database/queries/payment-queries.j
 /**
  * Patient information returned from service
  */
-interface PatientInfoResult {
-  // Full patient details
+type PatientInfoResult = {
   person_id: number;
   patient_name: string | null;
   first_name: string | null;
@@ -46,7 +45,6 @@ interface PatientInfoResult {
   DolphinId: number | null;
   date_added: string | null;
   AlertCount: number;
-  // Legacy fields for backwards compatibility
   name: string | null;
   start_date: string | null;
   estimatedCost: number | null;
@@ -58,16 +56,13 @@ interface PatientInfoResult {
   } | null;
   xrays: Array<{ name: string; detailsDirName?: string; previewImagePartialPath?: string; date?: string | null }>;
   assets: string[];
-}
+};
 
-/**
- * Time point returned from service
- */
-interface TimePointResult {
+type TimePointResult = {
   tp_code: string;
   tp_date_time: string;
   tp_description: string;
-}
+};
 
 /**
  * Error codes for patient validation

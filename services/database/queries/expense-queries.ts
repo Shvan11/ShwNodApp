@@ -27,7 +27,7 @@ interface ExpenseFilters {
 // Upper bound on a single page, so a caller can't request an unbounded scan.
 const MAX_PAGE_SIZE = 1000;
 
-interface Expense {
+type Expense = {
   id: number;
   expense_date: string;
   amount: number;
@@ -37,19 +37,19 @@ interface Expense {
   subcategory_id: number | null;
   category_name: string | null;
   subcategory_name: string | null;
-}
+};
 
-interface ExpenseCategory {
+type ExpenseCategory = {
   category_id: number;
   category_name: string;
-}
+};
 
-interface ExpenseSubcategory {
+type ExpenseSubcategory = {
   subcategory_id: number;
   subcategory_name: string;
   category_id: number;
   category_name: string | null;
-}
+};
 
 interface ExpenseData {
   expense_date: string;

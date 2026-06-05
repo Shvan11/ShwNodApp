@@ -6,13 +6,29 @@
  * docs/shared-contract-progress.md.
  *
  * Phase 13 (Wave 2). Group B — response-only. The `:id/stream` + `:id/thumbnail`
- * endpoints are EXCLUDED (binary Range streams). `Video` rows are rich query
- * types → single-object payloads stay `z.unknown()` (preserve), arrays `anyArray`.
+ * endpoints are EXCLUDED (binary Range streams). Phase 3 Group 4: list/categories/byId
+ * are tightened with looseObject row schemas; create/update stay loose (consumer
+ * doesn't use their response — calls loadVideos() after).
  */
 import { z } from 'zod';
 
-// "is it an array" guard — flip-free (every type is assignable to `unknown`).
-const anyArray = z.array(z.unknown());
+// ROW SCHEMAS (Phase 3, Group 4)
+const videoCategoryRow = z.looseObject({
+  id: z.number(),
+  name: z.string(),
+});
+
+const videoRow = z.looseObject({
+  id: z.number(),
+  description: z.string(),
+  Video: z.string(),
+  Image: z.string(),
+  category: z.number().nullable(),
+  details: z.string().nullable(),
+});
+
+export type VideoCategoryRow = z.infer<typeof videoCategoryRow>;
+export type VideoRow = z.infer<typeof videoRow>;
 
 // Multipart bodies (multer text fields → all strings). `validate({ body })` is
 // wired AFTER the multer middleware so `req.body` is populated. On CREATE,
@@ -35,17 +51,17 @@ export type UpdateVideoBody = z.infer<typeof updateVideoBody>;
 
 // GET /api/videos → Video[].
 export const list = {
-  response: anyArray,
+  response: z.array(videoRow),
 } as const;
 
 // GET /api/videos/categories → category[].
 export const categories = {
-  response: anyArray,
+  response: z.array(videoCategoryRow),
 } as const;
 
-// GET /api/videos/:id → Video (rich → preserve).
+// GET /api/videos/:id → Video (rich → nullable because getVideoById returns Video | null).
 export const byId = {
-  response: z.unknown(),
+  response: videoRow.nullable(),
 } as const;
 
 // GET /api/videos/:id/qr → { qr, url, title }.
@@ -56,12 +72,14 @@ export const qr = {
 // POST /api/videos → created Video (rich → preserve). Multipart body.
 export const create = {
   body: createVideoBody,
+  // Intentionally loose: consumer (Videos.tsx) does not read the create response — calls loadVideos() after
   response: z.unknown(),
 } as const;
 
 // PUT /api/videos/:id → updated Video (rich → preserve). Multipart body.
 export const update = {
   body: updateVideoBody,
+  // Intentionally loose: consumer (Videos.tsx) does not read the update response — calls loadVideos() after
   response: z.unknown(),
 } as const;
 

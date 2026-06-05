@@ -12,7 +12,7 @@
  * `dateOfBirth` was a phantom; the client + service use `birthday`). The
  * upload-image body validates AFTER the multer middleware. The patient-link "not
  * found" case is a proper 404 (`sendData(…, null)` can't express it — `sendSuccess`
- * omits a null `data`); the found path returns the link row → `z.unknown()`.
+ * omits a null `data`); the found path returns the link row as a loose guard.
  */
 import { z } from 'zod';
 import { intId } from '../validation.js';
@@ -53,12 +53,15 @@ export const uploadImage = {
 } as const;
 export type UploadImageBody = z.infer<typeof uploadImage.body>;
 
-// GET /api/webceph/patient-link/:personId → link object | null.
+// GET /api/webceph/patient-link/:personId → link object | null (404 when not found).
+// Intentionally loose: the WebCeph patient link row schema comes from the webceph
+// service and contains a variable set of API-specific fields.
 export const patientLink = {
   response: z.unknown(),
 } as const;
 
 // GET /api/webceph/photo-types → PhotoType[].
+// Intentionally loose: PhotoType[] from WebCeph service; rows use camelCase API fields.
 export const photoTypes = {
   response: anyArray,
 } as const;

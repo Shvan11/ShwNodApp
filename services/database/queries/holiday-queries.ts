@@ -21,14 +21,14 @@ interface Holiday {
   description: string | null;
 }
 
-interface AppointmentOnDate {
+type AppointmentOnDate = {
   appointment_id: number;
   person_id: number;
   app_date: Date;
   app_detail: string | null;
   patient_name: string;
   phone: string | null;
-}
+};
 
 /**
  * Check if a specific date is a holiday

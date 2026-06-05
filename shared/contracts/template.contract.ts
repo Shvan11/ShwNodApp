@@ -11,10 +11,6 @@
  */
 import { z } from 'zod';
 
-// Loose array guard — asserts the array-vs-object class, preserves rows (tighten in
-// Phase 3). Matches the per-contract convention (e.g. patient/video/reports).
-const anyArray = z.array(z.unknown());
-
 // POST /api/templates — create a template. Mirrors TemplateData.
 export const createTemplate = {
   body: z.object({
@@ -78,12 +74,16 @@ export type SaveHtmlBody = z.infer<typeof saveHtml.body>;
 // client-side fail-loud guards. Rich rows preserved loosely (tighten in Phase 3).
 
 // GET /api/templates → DocumentTemplate[] (the unwrapped `data`).
-export const getTemplates = { response: anyArray } as const;
+// Intentionally loose: DocumentTemplate has 25+ fields; route uses manual envelope,
+// not sendData, so tightening yields no server-side type check benefit.
+export const getTemplates = { response: z.array(z.unknown()) } as const;
 
 // GET /api/templates/document-types → DocumentType[].
-export const documentTypes = { response: anyArray } as const;
+// Intentionally loose: DocumentType shape comes from template-queries; route is manual envelope.
+export const documentTypes = { response: z.array(z.unknown()) } as const;
 
 // GET /api/templates/:templateId → a single template row.
+// Intentionally loose: full DocumentTemplate row preserved without field enumeration.
 export const getTemplate = { response: z.unknown() } as const;
 
 // Path params + list query (type-only; handlers parse the query strings manually).

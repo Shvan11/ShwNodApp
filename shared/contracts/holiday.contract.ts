@@ -9,13 +9,18 @@
  * calendar/holiday editor when a date already has appointments.
  */
 import { z } from 'zod';
+import { timestampString } from '../validation.js';
 
-// "is it an array" guard — flip-free (every type is assignable to `unknown`).
-const anyArray = z.array(z.unknown());
+// Appointment row returned by getAppointmentsOnDate (holiday-queries.ts).
+// `app_date` is a PG `timestamp` column: Date on the server, ISO string on the client.
+const appointmentOnDateRow = z.looseObject({
+  appointment_id: z.number(),
+  app_date: timestampString,
+});
 
 // GET /api/holidays/appointments-on-date?date= → { appointments, count }.
 export const appointmentsOnDate = {
   query: z.object({ date: z.string().optional() }),
-  response: z.object({ appointments: anyArray, count: z.number() }),
+  response: z.object({ appointments: z.array(appointmentOnDateRow), count: z.number() }),
 } as const;
 export type DateQuery = z.infer<typeof appointmentsOnDate.query>;

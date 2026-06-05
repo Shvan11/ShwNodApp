@@ -6,7 +6,7 @@
  * alias). See docs/shared-contract-progress.md.
  *
  * Phase 13 (Wave 2). Group A but RESPONSE-ONLY wiring (no client `{schema}`):
- * the lookup tables are generic/dynamic per `tableName`, so rows are `anyArray`
+ * the lookup tables are generic/dynamic per `tableName`, so rows are loose arrays
  * and the create/update bodies stay DYNAMIC `z.looseObject({})` (columns vary per
  * table; required columns are validated in-handler from the table config). The
  * relocated `:id` guard keeps a junk id 400-ing instead of reaching the PK query.
@@ -27,17 +27,19 @@ const lookupItemBody = z.looseObject({});
 export type LookupItemBody = z.infer<typeof lookupItemBody>;
 
 // GET /api/admin/lookups/tables → LookupTableConfig[].
+// Intentionally loose: config rows vary per registered table — no static schema.
 export const tables = {
   response: anyArray,
 } as const;
 
 // GET /api/admin/lookups/:tableName → item[].
+// Intentionally loose: rows are generic per-table key/value pairs; columns vary by tableName.
 export const items = {
   response: anyArray,
 } as const;
 
 // POST /api/admin/lookups/:tableName → { id }. The id is a uuid (string),
-// numeric id, or null depending on the table → modeled loosely (preserve).
+// numeric id, or null depending on the table — modeled loosely to preserve all id types.
 export const createItem = {
   body: lookupItemBody,
   response: z.object({ id: z.unknown() }),

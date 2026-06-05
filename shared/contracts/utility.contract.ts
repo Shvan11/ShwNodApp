@@ -10,13 +10,12 @@
  */
 import { z } from 'zod';
 
-// "is it an array" guard — flip-free (every type is assignable to `unknown`).
-const anyArray = z.array(z.unknown());
-
 // GET /api/google?source= → contacts[].
+// Intentionally loose: Google Contacts API returns dynamic contact objects;
+// the field set varies by source and contact data completeness.
 export const google = {
   query: z.object({ source: z.string().optional() }),
-  response: anyArray,
+  response: z.array(z.unknown()),
 } as const;
 export type GoogleQuery = z.infer<typeof google.query>;
 

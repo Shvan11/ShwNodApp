@@ -19,15 +19,12 @@
  *    returns) stay inline in `aligner.types.ts` — UI state, not an API boundary
  *    (CLAUDE.md). The pure-UI form `LabelData` body type also stays in the route.
  *
- *  - **Row schemas are TYPE-ONLY**: they are exported for their `z.infer` types but
- *    the array RESPONSES stay `anyArray` (`z.array(z.unknown())`) — the Phase 3/4
- *    "minimal responses + keep consumer generics" decision, here applied to the
- *    extreme multi-consumer shape (AlignerSet is mirrored across PatientSets /
- *    AllSetsList / forms). `anyArray` asserts the N13 array-vs-object class AND
- *    accepts an `interface[]` source with no query-row flip; plugging a rich row
- *    schema into the response (runtime row-field validation) is a later,
- *    runtime-verified hardening — NOT done blind here (a too-tight row would
- *    fail-loud on real data).
+ *  - **Row schemas use `z.looseObject`** (Phase 3 hardening): preserves long-tail
+ *    fields the UI reads (joined columns, aliases). Array responses carry
+ *    `z.array(<rowSchema>)` — runtime-verified on real DB data. Source types in
+ *    aligner-queries.ts were flipped from `interface`→`type` to satisfy the
+ *    looseObject index-signature assignment rule. `allSetsRow` and `alignerPatientRow`
+ *    are new schemas for the v_allsets view and patient-list endpoints.
  *
  *  - **Mutation responses ARE modeled** (closed `z.object` inline-literals) — they
  *    carry stable scalar ids/flags the consumers key on (`setId`, `noteId`,
@@ -51,12 +48,7 @@
  *    The Archform 503 "unavailable" branches are error responses, left as-is.
  */
 import { z } from 'zod';
-import { idParams, intId, optionalDateString } from '../validation.js';
-
-/** Minimal array guard: asserts the container is an array (the N13 array-vs-object
- *  class) while accepting any element — including an `interface[]` source, with no
- *  query-row `interface`→`type` flip (everything is assignable to `unknown`). */
-const anyArray = z.array(z.unknown());
+import { idParams, intId, optionalDateString, timestampString } from '../validation.js';
 
 // The aligner set/batch forms send numeric fields as STRINGS ('' when blank) and
 // batch end-sequences as `null`. Both must collapse to `undefined` (NOT 0) so the
@@ -91,72 +83,73 @@ export const drIdParams = idParams('drID');
 export const archformPatientIdParams = idParams('id');
 
 // ===========================================================================
-// CANONICAL ROW SCHEMAS — authored for their `z.infer` TYPES (folded into
-// aligner.types.ts). NOT plugged into the array responses below (those stay
-// `anyArray`); see the file header. Mirror the prior hand-written interfaces
-// exactly so consumers are structurally unchanged. `z.object` (not looseObject)
-// → clean inferred types with NO string index signature, matching the old
-// interfaces. Date columns are modeled as `string` here (the FE-facing type);
-// runtime row validation (where `timestampString` would matter) is deferred.
+// CANONICAL ROW SCHEMAS — `z.looseObject` preserves long-tail fields (joined
+// columns, aliased props) the UI reads. Plugged into array responses below.
+// `timestampString` on PG `timestamp` columns (server-side Date → ISO string).
+// PG `date` columns are already `string` both sides → plain `z.string()`.
 // ===========================================================================
 
-/** Full AlignerDoctor (DB snake_case). */
-export const alignerDoctorRow = z.object({
+/** Full AlignerDoctor (DB snake_case). UnreadDoctorNotes present on the main
+ *  /aligner/doctors endpoint (getDoctorsWithUnreadCounts); absent on /aligner-doctors
+ *  (getAllDoctors) — optional here to cover both. */
+export const alignerDoctorRow = z.looseObject({
   dr_id: z.number(),
   doctor_name: z.string(),
   doctor_email: z.string().nullish(),
   logo_path: z.string().nullish(),
+  UnreadDoctorNotes: z.number().optional(),
 });
 export type AlignerDoctor = z.infer<typeof alignerDoctorRow>;
 
 /** Full AlignerSet (backend snake_case response — the canonical set shape). */
-export const alignerSetRow = z.object({
+export const alignerSetRow = z.looseObject({
   aligner_set_id: z.number(),
-  set_sequence: z.number(),
-  type: z.string().optional(),
+  set_sequence: z.number().nullable(),
+  type: z.string().nullish(),
   upper_aligners_count: z.number(),
   lower_aligners_count: z.number(),
   remaining_upper_aligners: z.number(),
   remaining_lower_aligners: z.number(),
-  days: z.number().optional(),
+  days: z.number().nullish(),
   aligner_dr_id: z.number().optional(),
-  AlignerDoctorName: z.string().optional(),
-  set_url: z.string().optional(),
-  set_pdf_url: z.string().optional(),
-  set_video: z.string().optional(),
-  set_cost: z.number().optional(),
-  currency: z.string().optional(),
-  notes: z.string().optional(),
+  AlignerDoctorName: z.string().nullish(),
+  set_url: z.string().nullish(),
+  set_pdf_url: z.string().nullish(),
+  set_video: z.string().nullish(),
+  set_cost: z.number().nullish(),
+  currency: z.string().nullish(),
+  notes: z.string().nullish(),
   archform_id: z.number().nullish(),
   is_active: z.boolean(),
-  creation_date: z.string().optional(),
+  creation_date: z.string().nullish(),
   TotalBatches: z.number().optional(),
   DeliveredBatches: z.number().optional(),
-  TotalPaid: z.number().optional(),
-  Balance: z.number().optional(),
-  PaymentStatus: z.string().optional(),
+  TotalPaid: z.number().nullish(),
+  Balance: z.number().nullish(),
+  PaymentStatus: z.string().nullish(),
   UnreadActivityCount: z.number().optional(),
 });
 export type AlignerSet = z.infer<typeof alignerSetRow>;
 
-/** Full AlignerBatch (backend snake_case response). */
-export const alignerBatchRow = z.object({
+/** Full AlignerBatch (backend snake_case response).
+ *  creation_date is a PG `timestamp` column → timestampString (Date server-side). */
+export const alignerBatchRow = z.looseObject({
   aligner_batch_id: z.number(),
   aligner_set_id: z.number(),
   batch_sequence: z.number(),
   upper_aligner_count: z.number().optional(),
   lower_aligner_count: z.number().optional(),
-  upper_aligner_start_sequence: z.number().optional(),
-  upper_aligner_end_sequence: z.number().optional(),
-  lower_aligner_start_sequence: z.number().optional(),
-  lower_aligner_end_sequence: z.number().optional(),
-  days: z.number().optional(),
-  validity_period: z.number().optional(),
+  upper_aligner_start_sequence: z.number().nullish(),
+  upper_aligner_end_sequence: z.number().nullish(),
+  lower_aligner_start_sequence: z.number().nullish(),
+  lower_aligner_end_sequence: z.number().nullish(),
+  days: z.number().nullish(),
+  validity_period: z.number().nullish(),
   manufacture_date: z.string().nullish(),
   delivered_to_patient_date: z.string().nullish(),
   batch_expiry_date: z.string().nullish(),
-  notes: z.string().optional(),
-  creation_date: z.string().optional(),
+  notes: z.string().nullish(),
+  creation_date: timestampString.optional(),
   // Form-specific fields (used in BatchFormDrawer)
   is_active: z.boolean().optional(),
   is_last: z.boolean().optional(),
@@ -165,21 +158,22 @@ export const alignerBatchRow = z.object({
 });
 export type AlignerBatch = z.infer<typeof alignerBatchRow>;
 
-/** Communication note between lab and doctor. */
-export const alignerNoteRow = z.object({
+/** Communication note between lab and doctor.
+ *  created_at is a PG `timestamp` column → timestampString (Date server-side). */
+export const alignerNoteRow = z.looseObject({
   note_id: z.number(),
   aligner_set_id: z.number(),
   note_type: z.enum(['Lab', 'Doctor']),
   note_text: z.string(),
   doctor_name: z.string().optional(),
-  created_at: z.string(),
+  created_at: timestampString,
   is_read: z.boolean(),
   is_edited: z.boolean().optional(),
 });
 export type AlignerNote = z.infer<typeof alignerNoteRow>;
 
 /** Patient record from the Archform SQLite database. */
-export const archformPatientRow = z.object({
+export const archformPatientRow = z.looseObject({
   Id: z.number(),
   Name: z.string(),
   LastName: z.string(),
@@ -189,7 +183,7 @@ export const archformPatientRow = z.object({
 export type ArchformPatient = z.infer<typeof archformPatientRow>;
 
 /** Aligner set with patient context for Archform matching. */
-export const alignerSetForMatchRow = z.object({
+export const alignerSetForMatchRow = z.looseObject({
   aligner_set_id: z.number(),
   work_id: z.number(),
   person_id: z.number(),
@@ -202,50 +196,93 @@ export const alignerSetForMatchRow = z.object({
 });
 export type AlignerSetForMatch = z.infer<typeof alignerSetForMatchRow>;
 
+/** v_allsets view row — joined shape for AllSetsList.tsx (different from alignerSetRow).
+ *  PG `date` columns (creation_date, manufacture_date, etc.) are already strings.
+ *  BatchCreationDate (timestamp) and WorkStatusName are not read by the UI; they
+ *  pass through via looseObject. */
+export const allSetsRow = z.looseObject({
+  person_id: z.number(),
+  work_id: z.number(),
+  aligner_set_id: z.number(),
+  aligner_dr_id: z.number(),
+  patient_name: z.string(),
+  doctor_name: z.string(),
+  set_sequence: z.number().nullable(),
+  batch_sequence: z.number().nullable(),
+  SetIsActive: z.boolean(),
+  is_last: z.boolean().nullable(),
+  WorkStatus: z.number().nullable(),
+  delivered_to_patient_date: z.string().nullable(),
+  NextDueDate: z.string().nullable(),
+  NextBatchPresent: z.string().nullable(),
+  LabStatus: z.string().nullable(),
+  notes: z.string().nullable(),
+  creation_date: z.string().nullable(),
+  manufacture_date: z.string().nullable(),
+});
+export type AlignerSetView = z.infer<typeof allSetsRow>;
+
+/** Patient list row for all-patients / by-doctor / search endpoints.
+ *  DateOfBirth and start_date (PG timestamp/date) are not read by UI; pass through. */
+export const alignerPatientRow = z.looseObject({
+  person_id: z.number(),
+  workid: z.number(),
+  patient_name: z.string(),
+  first_name: z.string().nullable(),
+  last_name: z.string().nullable(),
+  phone: z.string().nullable(),
+  work_type: z.string(),
+  WorkTypeID: z.number(),
+  TotalSets: z.number().optional(),
+  ActiveSets: z.number().optional(),
+  UnreadDoctorNotes: z.number().optional(),
+});
+export type AlignerPatient = z.infer<typeof alignerPatientRow>;
+
 // ===========================================================================
 // READS — inline-literal `{ <array>, count, … }` containers built in the
 // handler. Closed `z.object` container (exactly the keys the handler builds) +
-// `anyArray` rows (see header). `count`/`noNextBatchCount` always present.
+// modeled row arrays. `count`/`noNextBatchCount` always present.
 // ===========================================================================
 
 // GET /api/aligner/doctors — doctors with unread counts.
 export const alignerDoctors = {
-  response: z.object({ doctors: anyArray, count: z.number() }),
+  response: z.object({ doctors: z.array(alignerDoctorRow), count: z.number() }),
 } as const;
 
-// GET /api/aligner/all-sets — v_allsets view rows.
+// GET /api/aligner/all-sets — v_allsets view rows (allSetsRow, not alignerSetRow).
 export const allSets = {
-  response: z.object({ sets: anyArray, count: z.number(), noNextBatchCount: z.number() }),
+  response: z.object({ sets: z.array(allSetsRow), count: z.number(), noNextBatchCount: z.number() }),
 } as const;
 
 // GET /api/aligner/patients/all — all aligner patients (all doctors).
 export const allPatients = {
-  response: z.object({ patients: anyArray, count: z.number() }),
+  response: z.object({ patients: z.array(alignerPatientRow), count: z.number() }),
 } as const;
 
 // GET /api/aligner/patients/by-doctor/:doctorId — patients for one doctor.
 export const patientsByDoctor = {
-  response: z.object({ patients: anyArray, count: z.number() }),
+  response: z.object({ patients: z.array(alignerPatientRow), count: z.number() }),
 } as const;
 
 // GET /api/aligner/patients?search&doctorId — patient search.
 export const searchAlignerPatients = {
-  response: z.object({ patients: anyArray, count: z.number() }),
+  response: z.object({ patients: z.array(alignerPatientRow), count: z.number() }),
 } as const;
 
 // GET /api/aligner/sets/:workId — sets for a work.
 export const setsByWorkId = {
-  response: z.object({ sets: anyArray, count: z.number() }),
+  response: z.object({ sets: z.array(alignerSetRow), count: z.number() }),
 } as const;
 
 // GET /api/aligner/batches/:setId — batches for a set.
 export const batchesBySetId = {
-  response: z.object({ batches: anyArray, count: z.number() }),
+  response: z.object({ batches: z.array(alignerBatchRow), count: z.number() }),
 } as const;
 
 // GET /api/aligner/notes/:setId — notes for a set.
 export const notesBySetId = {
-  response: z.object({ notes: anyArray, count: z.number() }),
+  response: z.object({ notes: z.array(alignerNoteRow), count: z.number() }),
 } as const;
 
 // GET /api/aligner/notes/:noteId/status — { isRead } (or 404).
@@ -255,7 +292,7 @@ export const noteStatus = {
 
 // GET /api/aligner/archform/patients — Archform SQLite patients.
 export const archformPatients = {
-  response: z.object({ patients: anyArray, count: z.number() }),
+  response: z.object({ patients: z.array(archformPatientRow), count: z.number() }),
 } as const;
 
 // GET /api/aligner/archform/status — { available, path, error? }.
@@ -265,12 +302,12 @@ export const archformStatus = {
 
 // GET /api/aligner/archform/matches — sets carrying archform_id, for the match UI.
 export const archformMatches = {
-  response: z.object({ sets: anyArray, count: z.number() }),
+  response: z.object({ sets: z.array(alignerSetForMatchRow), count: z.number() }),
 } as const;
 
 // GET /api/aligner-doctors — { doctors } (no count).
 export const doctorsList = {
-  response: z.object({ doctors: anyArray }),
+  response: z.object({ doctors: z.array(alignerDoctorRow) }),
 } as const;
 
 // ===========================================================================

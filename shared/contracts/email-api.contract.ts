@@ -23,6 +23,8 @@
 import { z } from 'zod';
 
 // GET /api/email/config → { config } (masked config object, dynamic shape).
+// Intentionally loose: EmailConfigService sanitizes and returns a dynamic SMTP config
+// map; the exact key set varies by configured transport and is not statically enumerable.
 export const config = {
   response: z.object({ config: z.unknown() }),
 } as const;

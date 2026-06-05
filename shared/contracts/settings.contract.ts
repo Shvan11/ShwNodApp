@@ -14,23 +14,26 @@
  * field-by-field by `DatabaseConfigService` (loose so no config key is stripped
  * before reaching the service); the route's `DatabaseConfigBody` interface is
  * dropped in favour of `z.infer<typeof dbConfigBody>` (structurally identical).
- * DB-config RESPONSES are `z.unknown()`/`z.looseObject` for the same reason.
+ * DB-config responses are dynamic masked objects — intentionally left as loose guards.
  */
 import { z } from 'zod';
-
-// "is it an array" guard — flip-free (every type is assignable to `unknown`).
-const anyArray = z.array(z.unknown());
 
 // The option `value` is stored as TEXT; both the single + bulk services want a
 // `string`. `z.coerce.string()` accepts the old scalar union (string/number/
 // boolean a caller might send) and OUTPUTS the string the service requires.
 const optionValue = z.coerce.string();
 
+// Option row from the `options` table (options-queries.ts#Option — type, non-exported).
+const optionRow = z.looseObject({
+  option_name: z.string(),
+  option_value: z.string().nullable(),
+});
+
 // ===== Options / settings =====
 
 // GET /api/options → { options: Option[] }.
 export const getOptions = {
-  response: z.object({ options: anyArray }),
+  response: z.object({ options: z.array(optionRow) }),
 } as const;
 export type GetOptionsResponse = z.infer<typeof getOptions.response>;
 
@@ -73,6 +76,8 @@ const dbConfigBody = z.looseObject({});
 export type DatabaseConfigBody = z.infer<typeof dbConfigBody>;
 
 // GET /api/config/database → { config } (masked config object, dynamic shape).
+// Intentionally loose: DatabaseConfigService returns a sanitized free-form config map;
+// the exact key set varies by configuration and cannot be statically enumerated.
 export const getDatabaseConfig = {
   response: z.object({ config: z.unknown() }),
 } as const;
@@ -90,6 +95,7 @@ export const updateDatabaseConfig = {
 } as const;
 
 // GET /api/config/database/export → { config } (sanitized export blob).
+// Intentionally loose: same dynamic shape as getDatabaseConfig (sanitized for export).
 export const exportDatabaseConfig = {
   response: z.object({ config: z.unknown() }),
 } as const;

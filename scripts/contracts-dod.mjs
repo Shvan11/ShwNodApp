@@ -27,7 +27,7 @@ const STRICT = process.env.STRICT === '1' || process.argv.includes('--strict');
 // Phase-0 baselines (captured 2026-06-05). In STRICT mode the run fails if a count
 // EXCEEDS its threshold — i.e. a regression. Lower these toward the target (0 /
 // allowlist length) as each tier completes. D3 has no hard threshold (ESLint owns it).
-const BASELINE = { D1: 33, D2: 103 };
+const BASELINE = { D1: 33, D2: 41 };
 
 /** Recursively collect files under `dir` whose name ends with one of `exts`. */
 function walk(dir, exts, acc = []) {

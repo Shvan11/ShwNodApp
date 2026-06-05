@@ -19,9 +19,6 @@
 import { z } from 'zod';
 import { intId, dateString, numericParam } from '../validation.js';
 
-// "is it an array" guard — flip-free (every type is assignable to `unknown`).
-const anyArray = z.array(z.unknown());
-
 // A `<select>`-backed wire/operator id: '' → undefined; chosen value → number
 // (the form sends '' for "none" and the service column is a nullable int).
 const optionalCoercedInt = z
@@ -48,26 +45,35 @@ const visitFields = {
 } as const;
 
 // GET /api/getWires — all wire types (no query).
+// wire row: { id, name } (visit-queries.ts#wire — type, non-exported).
 export const getWires = {
-  response: anyArray,
+  response: z.array(z.looseObject({ id: z.number() })),
 } as const;
 
-// GET /api/getlatestwires?workId= — LatestWireDetails (rich single → preserve).
+// GET /api/getlatestwires?workId= — { upper_wire_id, lower_wire_id, UpperWireName, LowerWireName }.
+// getLatestWiresByWorkId always returns a LatestWireDetails (with null fallback for no wires).
 export const latestWires = {
   query: z.object({ workId: numericParam }),
-  response: z.unknown(),
+  response: z.looseObject({
+    upper_wire_id: z.number().nullable(),
+    lower_wire_id: z.number().nullable(),
+    UpperWireName: z.string().nullable(),
+    LowerWireName: z.string().nullable(),
+  }),
 } as const;
+export type LatestWiresResponse = z.infer<typeof latestWires.response>;
 
 // GET /api/getvisitsbywork?workId= — Visit[].
+// Visit row: { id, visit_date, … } (visit-queries.ts#Visit — type, non-exported).
 export const visitsByWork = {
   query: z.object({ workId: numericParam }),
-  response: anyArray,
+  response: z.array(z.looseObject({ id: z.number() })),
 } as const;
 
-// GET /api/getvisitbyid?visitId= — single Visit row (rich → preserve).
+// GET /api/getvisitbyid?visitId= — single Visit row or null.
 export const visitById = {
   query: z.object({ visitId: numericParam }),
-  response: z.unknown(),
+  response: z.looseObject({ id: z.number() }).nullable(),
 } as const;
 
 // POST /api/addvisitbywork — { visitId } (addVisitByWorkId returns { id } | null).

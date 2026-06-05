@@ -14,11 +14,11 @@ import { log } from '../../utils/logger.js';
 /**
  * Image dimension result
  */
-export interface ImageDimension {
+export type ImageDimension = {
   name: string;
   width: number;
   height: number;
-}
+};
 
 /**
  * Path resolver function type
