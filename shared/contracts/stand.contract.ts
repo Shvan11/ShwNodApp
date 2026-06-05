@@ -164,7 +164,7 @@ export type CategoriesResponse = z.infer<typeof categories.response>;
 
 // POST /api/stand/categories — { name } → { category_id } (201).
 export const createCategory = {
-  body: z.looseObject({ name: z.string().min(1, 'category name is required') }),
+  body: z.object({ name: z.string().min(1, 'category name is required') }),
   response: z.object({ category_id: z.number() }),
 } as const;
 export type CreateCategoryBody = z.infer<typeof createCategory.body>;
@@ -214,7 +214,7 @@ export const itemById = {
 // nullable+optional (Gemini emits them as null per its schema, but tolerate
 // absence rather than fail-loud on unreliable model output). looseObject.
 export const scanVision = {
-  body: z.looseObject({ images: z.array(z.string()) }),
+  body: z.object({ images: z.array(z.string()) }),
   response: z.looseObject({
     item_name: z.string(),
     barcode: z.string().nullable().optional(),
@@ -228,14 +228,15 @@ export type ScanVisionBody = z.infer<typeof scanVision.body>;
 export type VisionScanResult = z.infer<typeof scanVision.response>;
 
 // POST /api/stand/items — create item → { item_id } (201).
-// Body fully enumerated (mirrors the client's StandItemCreateData + every field
-// addStandItem() writes). Required: itemName, costPrice, sellPrice (the handler
-// 400s without them); the rest are optional (the query `?? `-defaults them).
-// expiryDate stays a permissive string (NOT `dateString`) — the service does
-// `|| null` with no validation, so tightening here would newly 400 input that
-// currently passes. looseObject so any un-traced field reaches the service.
+// Body fully enumerated (mirrors the service's `StandItemCreateData` exactly —
+// every field addStandItem() reads; `createdBy` is injected by the handler).
+// Required: itemName, costPrice, sellPrice (validate 400s without them); the rest
+// are optional (the query `?? `-defaults them). expiryDate stays a permissive
+// string (NOT `dateString`) — the service does `|| null` with no validation.
+// Strict `z.object`: the handler REST-SPREADS `...req.body` into addStandItem, and
+// the enumeration is verified-complete, so strip safely closes over-posting.
 export const createItem = {
-  body: z.looseObject({
+  body: z.object({
     itemName: z.string().min(1),
     sku: z.string().nullable().optional(),
     barcode: z.string().nullable().optional(),
@@ -263,14 +264,14 @@ export const deleteItem = { params: idParams('id') } as const;
 // POST /api/stand/items/:id/restock — { quantity, unitCost }, sendSuccess(null).
 export const restock = {
   params: idParams('id'),
-  body: z.looseObject({ quantity: z.coerce.number(), unitCost: z.coerce.number() }),
+  body: z.object({ quantity: z.coerce.number(), unitCost: z.coerce.number() }),
 } as const;
 export type RestockBody = z.infer<typeof restock.body>;
 
 // POST /api/stand/items/:id/adjust — { delta, reason }, sendSuccess(null).
 export const adjust = {
   params: idParams('id'),
-  body: z.looseObject({ delta: z.coerce.number(), reason: z.string().min(1) }),
+  body: z.object({ delta: z.coerce.number(), reason: z.string().min(1) }),
 } as const;
 export type AdjustBody = z.infer<typeof adjust.body>;
 

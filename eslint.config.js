@@ -58,6 +58,23 @@ export default [
       'no-undef': 'off'
     }
   },
+  // Lock-in: forbid hand-written `interface *Body` in routes/. Every request body
+  // must be authored once as a strict Zod `z.object` in shared/contracts/*.contract.ts
+  // and the handler typed from its `z.infer` (the shared-contract convention — see
+  // CLAUDE.md). This keeps the body the single source of truth shared with the client.
+  {
+    files: ['routes/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'TSInterfaceDeclaration[id.name=/Body$/]',
+          message:
+            'Hand-written `interface *Body` is forbidden in routes/. Author the request body as a strict Zod `z.object` in shared/contracts/*.contract.ts and type the handler from its `z.infer`.'
+        }
+      ]
+    }
+  },
   // Frontend TypeScript/TSX files
   {
     files: ['public/**/*.ts', 'public/**/*.tsx'],

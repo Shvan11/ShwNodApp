@@ -25,10 +25,9 @@ import * as settings from '../../shared/contracts/settings.contract.js';
 const router = Router();
 
 // Boundary schemas + bodies live in the shared contract
-// (`shared/contracts/settings.contract.ts`). The DB-config bodies stay DYNAMIC
-// (`{[key]:unknown}` maps validated field-by-field by DatabaseConfigService);
-// the bulk/update bodies keep their local interfaces (the service wants a string
-// `value`, so the looser contract schema isn't the SSoT there).
+// (`shared/contracts/settings.contract.ts`) and are the SSoT — the handlers type
+// from its `z.infer` exports. The DB-config bodies stay DYNAMIC (free-form
+// `{[key]:unknown}` maps validated field-by-field by DatabaseConfigService).
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -38,18 +37,9 @@ interface OptionNameParams {
   optionName: string;
 }
 
-interface BulkUpdateBody {
-  options: Array<{ name: string; value: string }>;
-}
-
-interface UpdateOptionBody {
-  value: string;
-}
-
-interface DatabaseConfigBody {
-  [key: string]: unknown;
-}
-
+type BulkUpdateBody = settings.BulkUpdateBody;
+type UpdateOptionBody = settings.UpdateOptionBody;
+type DatabaseConfigBody = settings.DatabaseConfigBody;
 type RestartBody = settings.RestartBody;
 
 // ===== OPTIONS/SETTINGS ENDPOINTS =====

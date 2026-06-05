@@ -6,6 +6,11 @@
 import { Router, type Request, type Response } from 'express';
 import { log } from '../utils/logger.js';
 import * as templateQueries from '../services/database/queries/template-queries.js';
+import type {
+  CreateTemplateBody,
+  UpdateTemplateBody,
+  SaveHtmlBody,
+} from '../shared/contracts/template.contract.js';
 import {
   generateReceiptHTML,
   generateNoWorkReceiptHTML
@@ -52,50 +57,10 @@ interface TemplateQueryParams {
   isDefault?: string;
 }
 
-interface CreateTemplateBody {
-  template_name: string;
-  document_type_id: number;
-  description?: string | null;
-  paper_width: number;
-  paper_height: number;
-  paper_orientation?: string;
-  paper_margin_top?: number;
-  paper_margin_right?: number;
-  paper_margin_bottom?: number;
-  paper_margin_left?: number;
-  background_color?: string;
-  show_grid?: boolean;
-  grid_size?: number;
-  is_default?: boolean;
-  is_active?: boolean;
-  is_system?: boolean;
-  parent_template_id?: number;
-  created_by?: string;
-}
-
-interface UpdateTemplateBody {
-  template_name?: string;
-  description?: string | null;
-  paper_width?: number;
-  paper_height?: number;
-  paper_orientation?: string;
-  paper_margin_top?: number;
-  paper_margin_right?: number;
-  paper_margin_bottom?: number;
-  paper_margin_left?: number;
-  background_color?: string;
-  show_grid?: boolean;
-  grid_size?: number;
-  is_default?: boolean;
-  is_active?: boolean;
-  is_system?: boolean;
-  template_file_path?: string | null;
-  modified_by?: string;
-}
-
-interface SaveHtmlBody {
-  html: string;
-}
+// Body shapes (CreateTemplateBody / UpdateTemplateBody / SaveHtmlBody) come from
+// the template contract — these handlers keep their own required-field checks and
+// raw response envelopes, so the contract is the type SSoT but isn't wired to
+// `validate()` (no boundary behaviour change).
 
 // ============================================================================
 // DOCUMENT TYPES

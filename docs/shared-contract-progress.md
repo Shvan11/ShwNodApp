@@ -677,6 +677,7 @@ Two contract responses had to match the real (looser) source type, surfaced only
 | **2026-06-05** | **W2 6–10** | **✅ pass** | ⏸ deferred | ⏸ deferred | ⏸ deferred | **Wave-2 Phases 6–10 code complete; `typecheck:all` green first try** (backend EXIT 0 + frontend EXIT 0). `build`/`lint`/runtime deferred to the Wave-2 final gate (Phase 15). |
 | **2026-06-05** | **WRITE-PATH (all)** | ✅ (re-run green) | n/a | n/a | **✅ mutations** | **Owed-before-merge mutation smoke DONE** (Session 7). Live create→verify→delete on the dev DB (port 3101, dev-parse active) across 8 domains: expense, stand (full POS: category/item/restock/adjust/sale/void), patient, work-create, payment addInvoice/deleteInvoice + updateExchangeRate, appointment, employee, aligner-doctor, cost-preset. **Zero false 400 (no under-enumeration), persisted rows kept every field (no over-strip / mis-coercion incl. `currency`, optional fields, `timestampString` `date_added`), stock math exact, no client/dev-parse fail-loud.** Self-cleaning verified (ZZZ leftover sweep = 0). Two non-bugs surfaced: addwork needs `currency` (service-bound loose body, not a contract regression — DB `ck_works_cur`); `deletework` is `DELETE` not POST. |
 | **2026-06-05** | **W2 11–15 (FINAL)** | **✅ pass** | **✅ pass** | **✅ pass** | **✅ reads** | **Wave-2 FINAL GATE.** `typecheck:all` green (1 fix: `lookup-admin createItem.id` → `z.unknown()`); `build` green (Vite client + `build:server`; all 14 Wave-2 contracts emitted to `dist-server/shared/contracts/`); `lint` 0 errors (2 pre-existing warnings). **Read-smoke (NODE_ENV=development, port 3101):** every read across P11–14 → 200 on real data; root-migration envelope verified (`/api/users`, `/api/calendar/week` nest payload under `data`, keys preserved); `/api/email/test` confirmed raw. Found+fixed the `sendData(null)` media bug (→ 404). **Owed:** write-path mutation runtime. |
+| **2026-06-05** | **100%-enum + 4 NEW contracts** | **✅ pass** | n/a | n/a | **✅ mutations** | **Session 8 — newly-added-contract mutation smoke (the OWED item from the 100%-body-enum pass).** Server live (NODE_ENV=development, Express :3101 / Vite :5273, `sendData` dev-parse active). `typecheck:all` re-run **EXIT 0** (backend+frontend). Boundary smoke of all 4 new contracts: **chair-display** (validate-wired) — valid beacons both union directions → 202, missing `personId` + boolean `chairId` → 400 w/ correct field path; **whatsapp** (validate-wired) — valid send-receipt/send-appointment pass validate then short-circuit "WhatsApp not connected" (client INITIALIZING, **no messages sent**), `z.coerce.number` accepts `"12"`, `"abc"`/missing → 400 NaN, `sendmedia` valid→handler "not ready" 400 (validate passed) / missing file → 400, `sendmedia2` valid prog=WhatsApp passed validate **after** `multer upload.none()` (→ "File not found", confirms middleware order), `prog:"Email"`/missing → 400 enum; **template** (type-only) — full create→verify(16 fields exact)→partial-update(name+width only, desc preserved)→delete→GET 404, self-cleaning; **auth** (type-only) — bad creds 401, wrong currentPassword 401, short newPassword 400, **Admin/Yarmok11 still logs in (password un-mutated)**. Leftover ZZZ sweep = 0; test session logged out. Non-destructive on auth change-password by design (type-only ⇒ runtime identical; handler regenerates session mid-request). |
 
 ---
 
@@ -879,3 +880,32 @@ Two contract responses had to match the real (looser) source type, surfaced only
   options, user-management, lookup-admin, file/photo folder ops, messaging, video) — same proven plumbing;
   plus the documented later hardening (`anyArray`/`z.unknown()`→modeled rows; strict bodies) and repo hygiene
   (the whole rollout is still **uncommitted** on `main`; no CI gate enforcing `typecheck:all`; no test framework).
+
+### Session 8 — 2026-06-05 — 100% body-enumeration + 4 NEW contracts + their mutation smoke
+- Working tree at session start: ALL `interface *Body` in `routes/` deleted → contract `z.infer` SSoT
+  (the 100%-enumeration pass), **plus 4 brand-new contracts** for the previously-uncontracted enveloped/raw
+  staff routes: `auth.contract.ts`, `chair-display.contract.ts`, `template.contract.ts`, `whatsapp.contract.ts`
+  (eslint lock-in rule added to forbid re-introducing `interface *Body`). `typecheck:all` was green; the
+  **runtime mutation smoke of these 4 was OWED** (server hadn't booted in-sandbox).
+- **Ran the owed mutation smoke** (user got the dev server up: Express :3101, Vite :5273, NODE_ENV=development
+  so `sendData` dev-parse is live). `typecheck:all` re-run → **EXIT 0** (backend + frontend). Auth via staff
+  session + `GET /api/csrf-token` echoed in `x-csrf-token`. Results (see Verification log row "100%-enum + 4
+  NEW contracts"): **all 4 contracts PASS.**
+- **Two of the four CHANGE runtime behaviour** (wired to `validate({ body })`) and were tested as real
+  boundaries: **chair-display** (`patient-loaded`/`patient-cleared` — public + CSRF-skipped sendBeacon, 202;
+  the `chairId` string|number union + required `personId` both verified — valid passes, malformed → 400) and
+  **whatsapp** (`send-receipt`/`send-appointment`/`sendmedia`/`sendmedia2` — `z.coerce.number`, required
+  fields, and the `prog` `z.enum(['WhatsApp','Telegram'])` all enforced; valid bodies pass validate then fail
+  safe at the not-ready WhatsApp client / fake paths — **no real messages sent**; confirmed `sendmedia2`'s
+  `validate()` runs *after* `multer upload.none()`).
+- **Two are type-only** (NOT wired to `validate()`, contract = handler-generic SSoT, runtime provably
+  unchanged): **template** — got a genuine DB create→verify(16 fields exact)→partial-update→delete→404
+  round-trip anyway (proves the contract-typed handlers persist every field; partial update preserved the
+  un-sent `description`); **auth** — exercised both `ChangePasswordBody` fields via the 401/400 error paths
+  (non-destructive: a real password change is unwarranted for a type-only contract and would regenerate the
+  session mid-request), confirmed `Admin/Yarmok11` still logs in (password un-mutated).
+- **Minor doc-drift noticed (not a bug):** `template.contract.ts`'s `saveHtml` doc-comment says
+  `PUT /api/templates/:templateId/html`, but the actual route is `POST /:templateId/save-html` (the body shape
+  `{ html: string }` is correct). Harmless (type-only, not validate-wired) — fix the comment on next touch.
+- **Self-cleaning verified:** ZZZ_SMOKE template leftover sweep = 0; test session logged out; temp cookie/token
+  files removed.

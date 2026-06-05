@@ -53,9 +53,7 @@ import {
   getTransferPreview,
   validateAndUpdateWork,
   WorkUpdateError,
-  WorkValidationError,
-  type WorkStatusType,
-  type WorkCreateData
+  WorkValidationError
 } from '../../services/business/WorkService.js';
 import { getWorkDetails as getWorkDetailsFromQueries } from '../../services/database/queries/work-queries.js';
 
@@ -72,107 +70,14 @@ interface WorkQueryParams {
   deciduous?: string;
 }
 
-interface UpdateWorkBody {
-  workId: number;
-  person_id?: number;
-  total_required?: number;
-  currency?: string;
-  type_of_work?: number;
-  dr_id: number;
-  notes?: string;
-  status?: WorkStatusType;
-  start_date?: string;
-  debond_date?: string;
-  f_photo_date?: string;
-  i_photo_date?: string;
-  notes_date?: string;
-  keyword_id_1?: number;
-  keyword_id_2?: number;
-  keyword_id_3?: number;
-  keyword_id_4?: number;
-  keyword_id_5?: number;
-  discount?: number | null;
-  discount_date?: string | null;
-  discount_reason?: string | null;
-}
-
-// Request schemas now live in shared/contracts/work.contract.ts (imported above as
-// `workContract`) — shared with the client. The large service-bound bodies keep
-// their loose guard there; the handlers below keep their local hand-written body
-// interfaces (UpdateWorkBody, WorkDetailBody, DiagnosisData) for typing, since the
-// loose contract can't enumerate those 22+-field financial/clinical shapes (see the
-// progress tracker's caveat). These aliases keep the two fully-enumerated body
-// names (WorkStatusBody, DeleteWorkBody) local to the handler signatures.
+// Request schemas live in shared/contracts/work.contract.ts (imported above as
+// `workContract`) — shared with the client. Every write body is now FULLY
+// ENUMERATED there as a strict `z.object` and is the `z.infer` SSoT; the handlers
+// below type from `workContract.*Body` (the hand-written interfaces were deleted).
+// `addWork`/`addWorkWithInvoice` mirror WorkService.WorkCreateData (a strict
+// known-key object stays assignable to its value-union index signature).
 type WorkStatusBody = workContract.WorkStatusBody;
 type DeleteWorkBody = workContract.DeleteWorkBody;
-
-interface WorkDetailBody {
-  work_id?: number;
-  detailId?: number;
-  itemId?: number;
-  canals_no?: number;
-  item_cost?: number;
-  TeethIds?: number[];
-  filling_type?: string;
-  filling_depth?: string;
-  working_length?: string;
-  implant_length?: number;
-  implant_diameter?: number;
-  implant_manufacturer_id?: number;
-  material?: string;
-  lab_name?: string;
-  start_date?: string;
-  completed_date?: string;
-  note?: string;
-}
-
-interface DiagnosisData {
-  work_id: number;
-  dx_date?: string;
-  diagnosis: string;
-  treatment_plan: string;
-  chief_complain?: string;
-  appliance?: string;
-  f_antero_posterior?: string;
-  f_vertical?: string;
-  f_transverse?: string;
-  f_lip_competence?: string;
-  f_naso_labial_angle?: string;
-  f_upper_incisor_show_rest?: string;
-  f_upper_incisor_show_smile?: string;
-  i_teeth_present?: string;
-  i_dental_health?: string;
-  i_lower_crowding?: string;
-  i_lower_incisor_inclination?: string;
-  i_curveof_spee?: string;
-  i_upper_crowding?: string;
-  i_upper_incisor_inclination?: string;
-  o_incisor_relation?: string;
-  o_overjet?: string;
-  o_overbite?: string;
-  o_centerlines?: string;
-  o_molar_relation?: string;
-  o_canine_relation?: string;
-  o_functional_occlusion?: string;
-  c_sna?: string;
-  c_snb?: string;
-  c_anb?: string;
-  c_sn_mx?: string;
-  c_wits?: string;
-  c_fma?: string;
-  c_mma?: string;
-  c_uimx?: string;
-  c_li_md?: string;
-  c_ui_li?: string;
-  c_li_a_po?: string;
-  c_ulip_e?: string;
-  c_llip_e?: string;
-  c_naso_lip?: string;
-  c_tafh?: string;
-  c_uafh?: string;
-  c_lafh?: string;
-  c_percent_lafh?: string;
-}
 
 // ============================================================================
 // WORK MANAGEMENT API ENDPOINTS
@@ -241,7 +146,7 @@ router.post(
   '/addwork',
   validate({ body: workContract.addWork.body }),
   async (
-    req: Request<unknown, unknown, WorkCreateData>,
+    req: Request<unknown, unknown, workContract.AddWorkBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -285,7 +190,7 @@ router.post(
   '/addWorkWithInvoice',
   validate({ body: workContract.addWorkWithInvoice.body }),
   async (
-    req: Request<unknown, unknown, WorkCreateData>,
+    req: Request<unknown, unknown, workContract.AddWorkWithInvoiceBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -335,13 +240,13 @@ router.put(
   authenticate,
   authorize(['admin', 'secretary']),
   validate({ body: workContract.updateWork.body }),
-  async (req: Request, res: Response): Promise<void> => {
+  async (req: Request<unknown, unknown, workContract.UpdateWorkBody>, res: Response): Promise<void> => {
     try {
       // workId + dr_id validated and coerced to positive ints by the schema;
       // all other work fields pass through untouched (loose schema). All update
       // rules (dates, status, financial/discount permissions, total-vs-paid guard)
       // live in WorkService.validateAndUpdateWork — this handler only maps outcomes.
-      const { workId, ...workData } = req.body as UpdateWorkBody;
+      const { workId, ...workData } = req.body;
 
       const result = await validateAndUpdateWork({
         workId,
@@ -600,7 +505,7 @@ router.post(
   '/addworkdetail',
   validate({ body: workContract.addWorkDetail.body }),
   async (
-    req: Request<unknown, unknown, WorkDetailBody>,
+    req: Request<unknown, unknown, workContract.AddWorkDetailBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -665,7 +570,7 @@ router.put(
   '/updateworkdetail',
   validate({ body: workContract.updateWorkDetail.body }),
   async (
-    req: Request<unknown, unknown, WorkDetailBody>,
+    req: Request<unknown, unknown, workContract.UpdateWorkDetailBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -734,7 +639,7 @@ router.delete(
   '/deleteworkdetail',
   validate({ body: workContract.deleteWorkDetail.body }),
   async (
-    req: Request<unknown, unknown, WorkDetailBody>,
+    req: Request<unknown, unknown, workContract.WorkDetailIdBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -863,7 +768,7 @@ router.post(
   '/diagnosis',
   validate({ body: workContract.diagnosis.body }),
   async (
-    req: Request<unknown, unknown, DiagnosisData>,
+    req: Request<unknown, unknown, workContract.DiagnosisBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -1055,13 +960,6 @@ router.delete(
 // ============================================================================
 
 /**
- * Transfer work request body
- */
-interface TransferWorkBody {
-  targetPatientId: number;
-}
-
-/**
  * GET /api/work/:workId/transfer-preview
  * Get preview of what will be transferred (related record counts)
  * Admin only
@@ -1134,8 +1032,9 @@ router.post(
   '/work/:workId/transfer',
   authenticate,
   authorize(['admin']),
+  validate({ body: workContract.transfer.body }),
   async (
-    req: Request<{ workId: string }, unknown, TransferWorkBody>,
+    req: Request<{ workId: string }, unknown, workContract.TransferBody>,
     res: Response
   ): Promise<void> => {
     try {

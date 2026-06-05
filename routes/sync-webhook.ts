@@ -6,10 +6,12 @@
 
 import { Router, type Request, type Response } from 'express';
 import pg from 'pg';
+import { z } from 'zod';
 import { log } from '../utils/logger.js';
 import { drainCdcNow } from '../services/sync/cdc/index.js';
 import { stripSslMode } from '../services/sync/cdc/failover-sink.js';
 import { getPgPool } from '../services/database/kysely.js';
+import { validate } from '../middleware/validate.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -17,9 +19,13 @@ const { Pool: PgPool } = pg;
 
 const router = Router();
 
-interface SyncTriggerBody {
-  direction?: 'sql-to-postgres' | 'postgres-to-sql';
-}
+// Strict Zod schema → `z.infer` SSoT (replacing the hand-written interface) and
+// wired to `validate()` below (internal debug trigger; an unknown `direction`
+// 400s instead of falling through).
+const syncTriggerBody = z.object({
+  direction: z.enum(['sql-to-postgres', 'postgres-to-sql']).optional(),
+});
+type SyncTriggerBody = z.infer<typeof syncTriggerBody>;
 
 interface SyncState {
   lastSyncTimestamp: string | null;
@@ -31,6 +37,7 @@ interface SyncState {
  */
 router.post(
   '/api/sync/trigger',
+  validate({ body: syncTriggerBody }),
   async (
     req: Request<unknown, unknown, SyncTriggerBody>,
     res: Response

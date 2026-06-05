@@ -58,7 +58,12 @@ function isLatin1(s: string): boolean {
   return /^[\u0000-\u00ff]+$/.test(s);
 }
 
-interface SlotSpecBody {
+// Internal narrowing type for ONE render slot. The `/render` request body
+// (`renderBodySchema`) keeps `slots` deliberately OPAQUE (`z.array(z.unknown())`)
+// — each slot is validated tolerantly inside processRenderJob, not at the
+// boundary — so this is a render-job sub-shape, not a request-body contract type
+// (a `type`, never an `interface`, so it isn't a hand-written `*Body`).
+type SlotSpec = {
   view?: string;
   sourceRelPath?: string;
   flipH?: boolean;
@@ -66,7 +71,7 @@ interface SlotSpecBody {
   rotation?: number;
   extract?: { left: number; top: number; width: number; height: number };
   output?: { width: number; height: number };
-}
+};
 
 // --- Boundary schemas ---
 // The `personId` param + the `prepare`/`view` bodies live in the shared contract
@@ -85,7 +90,7 @@ const renderBodySchema = z.object({
 });
 
 // Schema-derived types — the validated, post-coercion shapes (slots stay opaque
-// and are narrowed to SlotSpecBody[] at the processRenderJob boundary).
+// and are narrowed to SlotSpec[] at the processRenderJob boundary).
 type PrepareBody = photoEditor.PrepareBody;
 type RenderBody = z.infer<typeof renderBodySchema>;
 type DeleteViewBody = photoEditor.DeleteViewBody;
@@ -276,7 +281,7 @@ router.post(
         tp_code,
         timePointId,
         // Slot internals are validated tolerantly inside processRenderJob.
-        slots: slots as SlotSpecBody[],
+        slots: slots as SlotSpec[],
         userId: req.session?.userId,
       });
     } catch (err) {
@@ -295,7 +300,7 @@ interface RenderJob {
   parsedDate: Date;
   tp_code: number;
   timePointId: number;
-  slots: SlotSpecBody[];
+  slots: SlotSpec[];
   userId?: number;
 }
 

@@ -15,6 +15,8 @@ import { Router, type Request, type Response } from 'express';
 import type { EventEmitter } from 'events';
 import { log } from '../../utils/logger.js';
 import { InternalEmitterEvents } from '../../services/messaging/websocket-events.js';
+import { validate } from '../../middleware/validate.js';
+import * as chairContract from '../../shared/contracts/chair-display.contract.js';
 
 const router = Router();
 
@@ -24,15 +26,6 @@ export function setWebSocketEmitter(emitter: EventEmitter): void {
   wsEmitter = emitter;
 }
 
-interface PatientLoadedBody {
-  chairId?: unknown;
-  personId?: unknown;
-}
-
-interface PatientClearedBody {
-  chairId?: unknown;
-}
-
 function parseChairId(value: unknown): string | null {
   const str = typeof value === 'number' ? String(value) : typeof value === 'string' ? value : '';
   return /^([1-9]|10)$/.test(str) ? str : null;
@@ -40,7 +33,8 @@ function parseChairId(value: unknown): string | null {
 
 router.post(
   '/chair-display/patient-loaded',
-  (req: Request<unknown, unknown, PatientLoadedBody>, res: Response): void => {
+  validate({ body: chairContract.patientLoaded.body }),
+  (req: Request<unknown, unknown, chairContract.PatientLoadedBody>, res: Response): void => {
     res.sendStatus(202);
 
     const chairId = parseChairId(req.body?.chairId);
@@ -60,7 +54,8 @@ router.post(
 
 router.post(
   '/chair-display/patient-cleared',
-  (req: Request<unknown, unknown, PatientClearedBody>, res: Response): void => {
+  validate({ body: chairContract.patientCleared.body }),
+  (req: Request<unknown, unknown, chairContract.PatientClearedBody>, res: Response): void => {
     res.sendStatus(202);
 
     const chairId = parseChairId(req.body?.chairId);

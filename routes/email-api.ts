@@ -21,20 +21,6 @@ interface SendAppointmentsQuery {
   date?: string;
 }
 
-interface EmailConfigBody {
-  smtp_host?: string;
-  smtp_port?: number;
-  smtp_secure?: boolean;
-  smtp_user?: string;
-  smtp_password?: string;
-  from_address?: string;
-  from_name?: string;
-  [key: string]: string | number | boolean | undefined;
-}
-
-interface TestSendBody {
-  to?: string;
-}
 
 /**
  * POST /api/email/send-appointments
@@ -207,7 +193,7 @@ router.post(
   '/config',
   validate({ body: emailApi.updateConfig.body }),
   async (
-    req: Request<unknown, unknown, EmailConfigBody>,
+    req: Request<unknown, unknown, emailApi.EmailConfigBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -265,7 +251,7 @@ router.post(
   '/test-send',
   validate({ body: emailApi.testSend.body }),
   async (
-    req: Request<unknown, unknown, TestSendBody>,
+    req: Request<unknown, unknown, emailApi.TestSendBody>,
     res: Response
   ): Promise<void> => {
     try {

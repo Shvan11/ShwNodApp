@@ -55,26 +55,6 @@ interface AppointmentQueryParams {
   AppsDate?: string;
 }
 
-interface AppointmentStateBody {
-  appointment_id: number;
-  state: string;
-  time?: string;
-}
-
-interface CreateAppointmentBody {
-  person_id: number;
-  app_date: string;
-  app_detail: string;
-  dr_id: number;
-}
-
-interface UpdateAppointmentBody {
-  person_id: number;
-  app_date: string;
-  app_detail: string;
-  dr_id: number;
-}
-
 type QuickCheckInBody = appointment.QuickCheckinBody;
 
 // `type` (not `interface`) so these feed the contract's `z.looseObject` sendData
@@ -202,7 +182,7 @@ router.post(
   '/updateAppointmentState',
   validate({ body: appointment.updateAppointmentState.body }),
   async (
-    req: Request<unknown, unknown, AppointmentStateBody>,
+    req: Request<unknown, unknown, appointment.AppointmentStateBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -274,7 +254,7 @@ router.post(
   '/undoAppointmentState',
   validate({ body: appointment.undoAppointmentState.body }),
   async (
-    req: Request<unknown, unknown, AppointmentStateBody>,
+    req: Request<unknown, unknown, appointment.AppointmentStateBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -341,7 +321,7 @@ router.post(
   '/appointments',
   validate({ body: appointment.createAppointment.body }),
   async (
-    req: Request<unknown, unknown, CreateAppointmentBody>,
+    req: Request<unknown, unknown, appointment.CreateAppointmentBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -509,7 +489,7 @@ router.put(
   '/appointments/:appointmentId',
   validate({ params: appointment.updateAppointment.params, body: appointment.updateAppointment.body }),
   async (
-    req: Request<{ appointmentId: string }, unknown, UpdateAppointmentBody>,
+    req: Request<{ appointmentId: string }, unknown, appointment.UpdateAppointmentBody>,
     res: Response
   ): Promise<void> => {
     try {

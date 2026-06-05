@@ -31,6 +31,8 @@ import PhoneFormatter from '../../utils/phoneFormatter.js';
 import { sendError, ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 import { timeouts } from '../../middleware/timeout.js';
+import { validate } from '../../middleware/validate.js';
+import * as waContract from '../../shared/contracts/whatsapp.contract.js';
 
 const router = Router();
 const upload = multer();
@@ -43,24 +45,9 @@ interface SendByDateQuery {
   date?: string;
 }
 
-interface SendReceiptBody {
-  workId: number | string;
-}
-
-interface SendAppointmentBody {
-  appointmentId: number | string;
-}
-
-interface SendMediaBody {
-  file: string;
-  phone: string;
-}
-
-interface SendMedia2Body {
-  file: string;
-  phone: string;
-  prog: 'WhatsApp' | 'Telegram';
-}
+// Request bodies are contracted (request-only) in shared/contracts/whatsapp.contract.ts
+// (`waContract`) — the handlers type from its `z.infer` exports. Responses stay RAW
+// (the client reads top-level fields via the raw apiClient — not the funnel).
 
 interface SendMediaResult {
   result: string;
@@ -163,8 +150,9 @@ router.get(
  */
 router.post(
   '/send-receipt',
+  validate({ body: waContract.sendReceipt.body }),
   async (
-    req: Request<unknown, unknown, SendReceiptBody>,
+    req: Request<unknown, unknown, waContract.SendReceiptBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -292,8 +280,9 @@ Thank you for your payment!`;
  */
 router.post(
   '/send-appointment',
+  validate({ body: waContract.sendAppointment.body }),
   async (
-    req: Request<unknown, unknown, SendAppointmentBody>,
+    req: Request<unknown, unknown, waContract.SendAppointmentBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -421,8 +410,9 @@ Thank you.`;
 router.post(
   '/sendmedia',
   timeouts.long,
+  validate({ body: waContract.sendMedia.body }),
   async (
-    req: Request<unknown, unknown, SendMediaBody>,
+    req: Request<unknown, unknown, waContract.SendMediaBody>,
     res: Response
   ): Promise<void> => {
     const { file: imgData, phone } = req.body;
@@ -451,8 +441,9 @@ router.post(
   '/sendmedia2',
   timeouts.long,
   upload.none(),
+  validate({ body: waContract.sendMedia2.body }),
   async (
-    req: Request<unknown, unknown, SendMedia2Body>,
+    req: Request<unknown, unknown, waContract.SendMedia2Body>,
     res: Response
   ): Promise<void> => {
     try {

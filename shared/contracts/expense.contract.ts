@@ -8,12 +8,14 @@
  * docs/shared-contract-progress.md.
  *
  * Phase 8 (Wave 2). The query-filter schema is already structured → relocated
- * verbatim (the H10 silent-NaN guard). The create/update BODY stays LOOSE: the
- * handler builds an EXPLICIT `ExpenseData` literal (no `...req.body` spread), so
- * over-posting is already closed; the contract only enforces the two required
- * fields (`expense_date` real-calendar-day, `amount` positive) the handler
- * checks. Service-bound array responses → `anyArray` (assert array-vs-object,
- * no source-interface flip); single rich rows → `z.unknown()` (preserve payload).
+ * verbatim (the H10 silent-NaN guard). The create/update BODY is now FULLY
+ * ENUMERATED as a strict `z.object` (the route's `CreateExpenseBody` interface was
+ * deleted; the handler types from `CreateExpenseBody = z.infer` below). The
+ * handler builds an EXPLICIT `ExpenseData` literal from these fields; the two
+ * id filters are `coerce.number().int().optional()` WITHOUT `.positive()` so the
+ * form's "no category" empty value can't 400 (the handler's truthy check maps it
+ * to undefined). Service-bound array responses → `anyArray` (assert array-vs-
+ * object, no source-interface flip); single rich rows → `z.unknown()` (preserve).
  */
 import { z } from 'zod';
 import {
@@ -26,11 +28,16 @@ import {
 // "is it an array" guard — flip-free (every type is assignable to `unknown`).
 const anyArray = z.array(z.unknown());
 
-// Shared loose body for create + update (relocated verbatim from the route).
-const expenseBody = z.looseObject({
+// Shared body for create + update — fully enumerated strict `z.object`.
+const expenseBody = z.object({
   expense_date: dateString,
   amount: z.coerce.number().positive('amount must be a positive number'),
+  currency: z.string().optional(),
+  note: z.string().optional(),
+  categoryId: z.coerce.number().int().optional(),
+  subcategoryId: z.coerce.number().int().optional(),
 });
+export type CreateExpenseBody = z.infer<typeof expenseBody>;
 
 // ---------------------------------------------------------------------------
 // GET /api/expenses?startDate=&endDate=&categoryId=&… — filtered list.

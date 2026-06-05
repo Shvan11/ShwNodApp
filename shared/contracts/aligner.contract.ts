@@ -58,6 +58,28 @@ import { idParams, intId, optionalDateString } from '../validation.js';
  *  query-row `interface`→`type` flip (everything is assignable to `unknown`). */
 const anyArray = z.array(z.unknown());
 
+// The aligner set/batch forms send numeric fields as STRINGS ('' when blank) and
+// batch end-sequences as `null`. Both must collapse to `undefined` (NOT 0) so the
+// service `*Data` optionals hold; a chosen value coerces to a number. The bodies
+// below enumerate the full service `*Data` field set (the route interfaces were
+// incomplete), so a strict `z.object` strips only fields the service never reads.
+const optInt = z
+  .preprocess((v) => (v === '' || v === null ? undefined : v), z.coerce.number().int().optional())
+  .optional();
+const optNum = z
+  .preprocess((v) => (v === '' || v === null ? undefined : v), z.coerce.number().optional())
+  .optional();
+
+// One print label (GenerateLabelsBody.labels[]). The handler does its own per-label
+// `!text`/`!patientName` 400s, so these stay plain `z.string()` (empty reaches the
+// handler's specific message) — modeled, not opaque, so the handler can read them.
+const labelData = z.object({
+  text: z.string(),
+  patientName: z.string(),
+  doctorName: z.string().optional(),
+  includeLogo: z.boolean().optional(),
+});
+
 // ===========================================================================
 // Shared param schemas (referenced directly in the route's validate()).
 // ===========================================================================
@@ -255,26 +277,61 @@ export const doctorsList = {
 // SETS — CRUD
 // ===========================================================================
 
-// POST /api/aligner/payments — service-bound body (validateAndCreatePayment owns
-// the shape) → loose guard relocated verbatim; route keeps `AddPaymentBody`.
+// POST /api/aligner/payments — fully enumerated (mirrors PaymentCreateData; the
+// client's `currency`/`actual_*` extras are stripped — the service never reads
+// them). `amount_paid` coerced (form sends a string); `change` may arrive null.
 export const addPayment = {
-  body: z.looseObject({
+  body: z.object({
     workid: intId,
+    aligner_set_id: intId,
     amount_paid: z.coerce.number(),
     date_of_payment: z.string().min(1),
+    usd_received: optNum,
+    iqd_received: optNum,
+    change: optNum,
+    notes: z.string().optional(),
   }),
   response: z.object({ invoice_id: z.number() }),
 } as const;
+export type AddPaymentBody = z.infer<typeof addPayment.body>;
 
-// POST /api/aligner/sets — service-bound (validateAndCreateSet → SetCreateData).
+// POST /api/aligner/sets — fully enumerated (mirrors SetCreateData). SetFormDrawer
+// sends a subset; numeric fields are strings/'' → coerced via optInt/optNum.
 export const createSet = {
-  body: z.looseObject({ work_id: intId, aligner_dr_id: intId }),
+  body: z.object({
+    work_id: intId,
+    aligner_dr_id: intId,
+    is_active: z.boolean().optional(),
+    TotalAligners: optInt,
+    RemainingAligners: optInt,
+    set_cost: optNum,
+    notes: z.string().optional(),
+    set_sequence: optInt,
+    type: z.string().optional(),
+    upper_aligners_count: optInt,
+    lower_aligners_count: optInt,
+  }),
   response: z.object({ setId: z.number() }),
 } as const;
+export type CreateSetBody = z.infer<typeof createSet.body>;
 
-// PUT /api/aligner/sets/:setId — no required body fields (per-field rules live in
-// AlignerService; fields pass through). sendSuccess(null) — no response key.
-export const updateSet = { body: z.looseObject({}) } as const;
+// PUT /api/aligner/sets/:setId — fully enumerated (mirrors SetUpdateData; all
+// optional). sendSuccess(null) — no response key.
+export const updateSet = {
+  body: z.object({
+    aligner_dr_id: optInt,
+    is_active: z.boolean().optional(),
+    TotalAligners: optInt,
+    RemainingAligners: optInt,
+    set_cost: optNum,
+    notes: z.string().optional(),
+    set_sequence: optInt,
+    type: z.string().optional(),
+    upper_aligners_count: optInt,
+    lower_aligners_count: optInt,
+  }),
+} as const;
+export type UpdateSetBody = z.infer<typeof updateSet.body>;
 
 // DELETE /api/aligner/sets/:setId — sendSuccess(null).
 
@@ -285,7 +342,7 @@ export const updateSet = { body: z.looseObject({}) } as const;
 // POST /api/aligner/notes — fully enumerated → SSoT (passed as scalars to the
 // service). { aligner_set_id, note_text }.
 export const createNote = {
-  body: z.looseObject({ aligner_set_id: intId, note_text: z.string().min(1) }),
+  body: z.object({ aligner_set_id: intId, note_text: z.string().min(1) }),
   response: z.object({ noteId: z.number() }),
 } as const;
 export type CreateNoteBody = z.infer<typeof createNote.body>;
@@ -294,7 +351,7 @@ export type CreateNoteBody = z.infer<typeof createNote.body>;
 
 // PATCH /api/aligner/notes/:noteId — fully enumerated → SSoT. { note_text }.
 export const updateNote = {
-  body: z.looseObject({ note_text: z.string().min(1) }),
+  body: z.object({ note_text: z.string().min(1) }),
 } as const;
 export type UpdateNoteBody = z.infer<typeof updateNote.body>;
 
@@ -304,26 +361,62 @@ export type UpdateNoteBody = z.infer<typeof updateNote.body>;
 // BATCHES
 // ===========================================================================
 
-// POST /api/aligner/batches — service-bound (validateAndCreateBatch → BatchCreateData).
+// POST /api/aligner/batches — fully enumerated (mirrors BatchCreateData). The
+// form's `is_last` extra is stripped (BatchCreateData has none on create); end
+// sequences arrive null → undefined via optInt.
 export const createBatch = {
-  body: z.looseObject({ aligner_set_id: intId }),
+  body: z.object({
+    aligner_set_id: intId,
+    is_active: z.boolean().optional(),
+    batch_sequence: optInt,
+    AlignersInBatch: optInt,
+    notes: z.string().optional(),
+    upper_aligner_count: optInt,
+    lower_aligner_count: optInt,
+    upper_aligner_start_sequence: optInt,
+    upper_aligner_end_sequence: optInt,
+    lower_aligner_start_sequence: optInt,
+    lower_aligner_end_sequence: optInt,
+    days: optInt,
+    validity_period: optInt,
+    has_upper_template: z.boolean().optional(),
+    has_lower_template: z.boolean().optional(),
+  }),
   response: z.object({
     batchId: z.number(),
     deactivatedBatch: z.object({ batchId: z.number(), batchSequence: z.number() }).nullable(),
   }),
 } as const;
+export type CreateBatchBody = z.infer<typeof createBatch.body>;
 
-// PUT /api/aligner/batches/:batchId — no required body fields (service-owned).
+// PUT /api/aligner/batches/:batchId — fully enumerated (mirrors BatchUpdateData).
 // Response is the handler's `Record<string, unknown>` (optional `deactivatedBatch`)
 // → open `looseObject({})` so the Record arg assigns and nothing is stripped.
 export const updateBatch = {
-  body: z.looseObject({}),
+  body: z.object({
+    aligner_set_id: optInt,
+    is_active: z.boolean().optional(),
+    batch_sequence: optInt,
+    AlignersInBatch: optInt,
+    notes: z.string().optional(),
+    upper_aligner_count: optInt,
+    lower_aligner_count: optInt,
+    upper_aligner_start_sequence: optInt,
+    upper_aligner_end_sequence: optInt,
+    lower_aligner_start_sequence: optInt,
+    lower_aligner_end_sequence: optInt,
+    days: optInt,
+    is_last: z.boolean().optional(),
+    has_upper_template: z.boolean().optional(),
+    has_lower_template: z.boolean().optional(),
+  }),
   response: z.looseObject({}),
 } as const;
+export type UpdateBatchBody = z.infer<typeof updateBatch.body>;
 
 // Shared OPTIONAL targetDate body for manufacture/deliver (backdating). The
-// handlers read only `targetDate` → SSoT.
-export const targetDateBody = z.looseObject({ targetDate: optionalDateString });
+// handlers read only `targetDate` → SSoT (strict; nothing else is read).
+export const targetDateBody = z.object({ targetDate: optionalDateString });
 export type TargetDateBody = z.infer<typeof targetDateBody>;
 
 // PATCH /api/aligner/batches/:batchId/manufacture.
@@ -380,11 +473,13 @@ export const uploadPdf = {
 
 // PATCH /api/aligner/sets/:setId/archform — sendSuccess(null) (save/clear archform_id).
 
-// PUT /api/aligner/archform/patients/:id — { name } guard verbatim; the handler
-// also reads + checks `lastName` itself. sendSuccess(null).
+// PUT /api/aligner/archform/patients/:id — { name, lastName }. The handler does
+// its own `!name`/`!lastName` 400 (with a specific message), so both stay
+// permissive here (lastName optional; the handler enforces it). sendSuccess(null).
 export const updateArchformPatient = {
-  body: z.looseObject({ name: z.string().min(1) }),
+  body: z.object({ name: z.string().min(1), lastName: z.string().optional() }),
 } as const;
+export type UpdateArchformPatientBody = z.infer<typeof updateArchformPatient.body>;
 
 // DELETE /api/aligner/archform/patients/:id — { deletedFromTables }.
 export const deleteArchformPatient = {
@@ -395,22 +490,34 @@ export const deleteArchformPatient = {
 // LABEL GENERATION (request-only — raw PDF response, not enveloped)
 // ===========================================================================
 
-// POST /api/aligner/labels/generate — service-bound body (the route does its own
-// per-label checks); loose guard relocated verbatim. Response is a raw PDF buffer
-// (res.send) → intentionally NOT modeled.
+// POST /api/aligner/labels/generate — fully enumerated. `labels` modeled as
+// `labelData[]` (the handler reads `.text`/`.patientName`), `arabicFont` enumerated
+// (the handler defaults 'cairo'). Response is a raw PDF buffer (res.send) → NOT modeled.
 export const generateLabels = {
-  body: z.looseObject({
-    labels: z.array(z.unknown()).min(1, 'No labels to generate'),
+  body: z.object({
+    labels: z.array(labelData).min(1, 'No labels to generate'),
     startingPosition: z.coerce.number().int(),
+    arabicFont: z.enum(['cairo', 'noto']).optional(),
   }),
 } as const;
+export type GenerateLabelsBody = z.infer<typeof generateLabels.body>;
 
 // ===========================================================================
 // DOCTORS — CRUD
 // ===========================================================================
 
-// Shared service-bound doctor body (create + update → DoctorCreateData/UpdateData).
-export const doctorBody = z.looseObject({ doctor_name: z.string().trim().min(1) });
+// Shared doctor body (create + update → DoctorCreateData/DoctorUpdateData) — fully
+// enumerated. The client's `logo_path` extra is stripped (the service has no such
+// field; the logo is set via a separate upload).
+export const doctorBody = z.object({
+  doctor_name: z.string().trim().min(1),
+  doctor_email: z.string().optional(),
+  DoctorPhone: z.string().optional(),
+  is_active: z.boolean().optional(),
+  Address: z.string().optional(),
+  notes: z.string().optional(),
+});
+export type DoctorBody = z.infer<typeof doctorBody>;
 
 // POST /api/aligner-doctors — { drID }.
 export const createDoctor = {

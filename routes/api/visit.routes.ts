@@ -36,28 +36,6 @@ interface VisitQueryParams {
   visitId?: string;
 }
 
-interface AddVisitByWorkBody {
-  work_id: number;
-  visit_date: string;
-  upper_wire_id?: number;
-  lower_wire_id?: number;
-  others?: string;
-  Next?: string;
-}
-
-interface UpdateVisitByWorkBody {
-  visitId: number;
-  visit_date: string;
-  upper_wire_id?: number;
-  lower_wire_id?: number;
-  others?: string;
-  Next?: string;
-}
-
-interface DeleteVisitByWorkBody {
-  visitId: number;
-}
-
 // ============================================================================
 // wire Management Routes
 // ============================================================================
@@ -190,7 +168,7 @@ router.post(
   '/addvisitbywork',
   validate({ body: visit.addVisit.body }),
   async (
-    req: Request<unknown, unknown, AddVisitByWorkBody>,
+    req: Request<unknown, unknown, visit.AddVisitBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -225,7 +203,7 @@ router.put(
   '/updatevisitbywork',
   validate({ body: visit.updateVisit.body }),
   async (
-    req: Request<unknown, unknown, UpdateVisitByWorkBody>,
+    req: Request<unknown, unknown, visit.UpdateVisitBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -264,7 +242,7 @@ router.delete(
   '/deletevisitbywork',
   validate({ body: visit.deleteVisit.body }),
   async (
-    req: Request<unknown, unknown, DeleteVisitByWorkBody>,
+    req: Request<unknown, unknown, visit.DeleteVisitBody>,
     res: Response
   ): Promise<void> => {
     try {

@@ -12,6 +12,7 @@ import { getMediaMimeType } from '../../utils/video-mime.js';
 import { streamFile } from '../../utils/stream-file.js';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
+import { validate } from '../../middleware/validate.js';
 import * as videoQueries from '../../services/database/queries/video-queries.js';
 import { generateVideoQRCode } from '../../services/imaging/qrcode.js';
 // Aliased `videoContract` — the handlers use a local `const video`, which would
@@ -79,18 +80,6 @@ const upload = multer({
 // type definitions
 interface VideoIdParams {
   id: string;
-}
-
-interface CreateVideoBody {
-  description: string;
-  category?: string;
-  details?: string;
-}
-
-interface UpdateVideoBody {
-  description?: string;
-  category?: string;
-  details?: string;
 }
 
 /**
@@ -313,7 +302,8 @@ router.post(
     { name: 'video', maxCount: 1 },
     { name: 'thumbnail', maxCount: 1 },
   ]),
-  async (req: Request<object, object, CreateVideoBody>, res: Response): Promise<void> => {
+  validate({ body: videoContract.create.body }),
+  async (req: Request<object, object, videoContract.CreateVideoBody>, res: Response): Promise<void> => {
     try {
       const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
 
@@ -380,7 +370,7 @@ router.post(
  * Update video metadata
  * PUT /:id
  */
-router.put('/:id', async (req: Request<VideoIdParams, object, UpdateVideoBody>, res: Response): Promise<void> => {
+router.put('/:id', validate({ body: videoContract.update.body }), async (req: Request<VideoIdParams, object, videoContract.UpdateVideoBody>, res: Response): Promise<void> => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {

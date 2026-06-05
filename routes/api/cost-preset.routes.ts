@@ -24,6 +24,7 @@ import {
 } from '../../services/database/queries/cost-preset-queries.js';
 import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import { validate } from '../../middleware/validate.js';
 import * as costPreset from '../../shared/contracts/cost-preset.contract.js';
 
 const router = Router();
@@ -38,15 +39,6 @@ type currency = 'IQD' | 'USD' | 'EUR';
  */
 interface CostPresetQuery {
   currency?: string;
-}
-
-/**
- * Request body for creating/updating cost preset
- */
-interface CostPresetBody {
-  amount: number;
-  currency: currency;
-  displayOrder?: number;
 }
 
 /**
@@ -83,7 +75,7 @@ router.get('/settings/cost-presets', async (req: Request<object, object, object,
  * Body: { amount: number, currency: string, displayOrder: number }
  * @protected admin — self-guarded (pre-gate mount): authenticate + authorize(['admin']).
  */
-router.post('/settings/cost-presets', authenticate, authorize(['admin']), async (req: Request<object, object, CostPresetBody>, res: Response): Promise<void> => {
+router.post('/settings/cost-presets', authenticate, authorize(['admin']), validate({ body: costPreset.createPreset.body }), async (req: Request<object, object, costPreset.CostPresetBody>, res: Response): Promise<void> => {
   try {
     const { amount, currency, displayOrder = 0 } = req.body;
 
@@ -118,7 +110,7 @@ router.post('/settings/cost-presets', authenticate, authorize(['admin']), async 
  * Body: { amount: number, currency: string, displayOrder: number }
  * @protected admin — self-guarded (pre-gate mount): authenticate + authorize(['admin']).
  */
-router.put('/settings/cost-presets/:id', authenticate, authorize(['admin']), async (req: Request<CostPresetParams, object, CostPresetBody>, res: Response): Promise<void> => {
+router.put('/settings/cost-presets/:id', authenticate, authorize(['admin']), validate({ body: costPreset.updatePreset.body }), async (req: Request<CostPresetParams, object, costPreset.CostPresetBody>, res: Response): Promise<void> => {
   try {
     const presetId = parseInt(req.params.id, 10);
     if (!Number.isInteger(presetId) || presetId <= 0) {

@@ -19,8 +19,12 @@ const anyArray = z.array(z.unknown());
 
 // PUT/DELETE param guard — numeric `:id` + a table name.
 const tableIdParams = z.object({ tableName: z.string().min(1), id: numericParam });
-// Dynamic per-table key/value map; required columns validated in-handler.
+// Dynamic per-table key/value map; required columns validated in-handler. This is
+// one of the two principled non-strict bodies (columns vary per `tableName`, so
+// there is NO static field list to enumerate) — `looseObject` BY DESIGN. The
+// route's hand-written `LookupItemBody` interface is dropped for this `z.infer`.
 const lookupItemBody = z.looseObject({});
+export type LookupItemBody = z.infer<typeof lookupItemBody>;
 
 // GET /api/admin/lookups/tables → LookupTableConfig[].
 export const tables = {

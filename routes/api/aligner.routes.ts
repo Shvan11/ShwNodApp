@@ -30,12 +30,11 @@ import { log } from '../../utils/logger.js';
 import { timeouts } from '../../middleware/timeout.js';
 
 // Request/response contract (shared with the client via @shared). The boundary
-// param + body guards and every response shape now live in the contract — the
-// create/update routes still hand req.body straight to AlignerService.validateAnd*
-// (the "validateAnd…" service owns those shapes), so the contract bodies are loose
-// guards relocated verbatim; the 2 small note bodies + the shared targetDate body
-// are fully enumerated SSoT. See shared/contracts/aligner.contract.ts +
-// docs/shared-contract-progress.md.
+// param + body guards and every response shape live in the contract. Every write
+// body is now FULLY ENUMERATED there as a strict `z.object` (mirroring the
+// AlignerService `*Data` input types — which the route interfaces under-described)
+// and is the `z.infer` SSoT; the handlers below type from `contract.*Body`. See
+// shared/contracts/aligner.contract.ts + docs/shared-contract-progress.md.
 import * as contract from '../../shared/contracts/aligner.contract.js';
 
 // Query layer imports
@@ -72,95 +71,6 @@ const router = Router();
 interface AlignerQueryParams {
   search?: string;
   doctorId?: string;
-}
-
-interface AddPaymentBody {
-  workid: number;
-  aligner_set_id: number;
-  amount_paid: number | string;
-  date_of_payment: string;
-  currency?: string;
-  usd_received?: number;
-  iqd_received?: number;
-  change?: number;
-  notes?: string;
-}
-
-interface CreateSetBody {
-  work_id: number;
-  aligner_dr_id: number;
-  DoctorID?: number;
-  notes?: string;
-  OrderDate?: string;
-  is_active?: boolean;
-  TotalAligners?: number;
-  RemainingAligners?: number;
-  set_cost?: number;
-  set_sequence?: number;
-  type?: string;
-  upper_aligners_count?: number;
-  lower_aligners_count?: number;
-}
-
-interface UpdateSetBody {
-  DoctorID?: number;
-  notes?: string;
-  OrderDate?: string;
-}
-
-interface CreateBatchBody {
-  aligner_set_id: number;
-  upper_aligner_count?: number;
-  lower_aligner_count?: number;
-  is_active?: boolean;
-  is_last?: boolean;
-  notes?: string;
-  days?: number;
-  has_upper_template?: boolean;
-  has_lower_template?: boolean;
-}
-
-interface UpdateBatchBody {
-  aligner_set_id?: number;
-  upper_aligner_count?: number;
-  lower_aligner_count?: number;
-  is_active?: boolean;
-  is_last?: boolean;
-  notes?: string;
-  days?: number;
-  has_upper_template?: boolean;
-  has_lower_template?: boolean;
-}
-
-interface CreateDoctorBody {
-  doctor_name: string;
-  doctor_email?: string;
-  DoctorPhone?: string;
-  is_active?: boolean;
-  Address?: string;
-  notes?: string;
-}
-
-interface UpdateDoctorBody {
-  doctor_name: string;
-  doctor_email?: string;
-  DoctorPhone?: string;
-  is_active?: boolean;
-  Address?: string;
-  notes?: string;
-}
-
-interface LabelData {
-  text: string;
-  patientName: string;
-  doctorName?: string;
-  includeLogo?: boolean;
-}
-
-interface GenerateLabelsBody {
-  labels: LabelData[];
-  startingPosition: number;
-  arabicFont?: 'cairo' | 'noto';
 }
 
 interface AlignerSetRow {
@@ -382,7 +292,7 @@ router.post(
   '/aligner/payments',
   validate({ body: contract.addPayment.body }),
   async (
-    req: Request<unknown, unknown, AddPaymentBody>,
+    req: Request<unknown, unknown, contract.AddPaymentBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -443,7 +353,7 @@ router.post(
   '/aligner/sets',
   validate({ body: contract.createSet.body }),
   async (
-    req: Request<unknown, unknown, CreateSetBody>,
+    req: Request<unknown, unknown, contract.CreateSetBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -476,7 +386,7 @@ router.put(
   '/aligner/sets/:setId',
   validate({ params: contract.setIdParams, body: contract.updateSet.body }),
   async (
-    req: Request<{ setId: string }, unknown, UpdateSetBody>,
+    req: Request<{ setId: string }, unknown, contract.UpdateSetBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -725,7 +635,7 @@ router.post(
   '/aligner/batches',
   validate({ body: contract.createBatch.body }),
   async (
-    req: Request<unknown, unknown, CreateBatchBody>,
+    req: Request<unknown, unknown, contract.CreateBatchBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -763,7 +673,7 @@ router.put(
   '/aligner/batches/:batchId',
   validate({ params: contract.batchIdParams, body: contract.updateBatch.body }),
   async (
-    req: Request<{ batchId: string }, unknown, UpdateBatchBody>,
+    req: Request<{ batchId: string }, unknown, contract.UpdateBatchBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -1318,7 +1228,7 @@ router.post(
   '/aligner/labels/generate',
   validate({ body: contract.generateLabels.body }),
   async (
-    req: Request<unknown, unknown, GenerateLabelsBody>,
+    req: Request<unknown, unknown, contract.GenerateLabelsBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -1431,7 +1341,7 @@ router.post(
   '/aligner-doctors',
   validate({ body: contract.doctorBody }),
   async (
-    req: Request<unknown, unknown, CreateDoctorBody>,
+    req: Request<unknown, unknown, contract.DoctorBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -1467,7 +1377,7 @@ router.put(
   '/aligner-doctors/:drID',
   validate({ params: contract.drIdParams, body: contract.doctorBody }),
   async (
-    req: Request<{ drID: string }, unknown, UpdateDoctorBody>,
+    req: Request<{ drID: string }, unknown, contract.DoctorBody>,
     res: Response
   ): Promise<void> => {
     try {

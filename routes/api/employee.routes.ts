@@ -62,21 +62,6 @@ type position = {
 };
 
 /**
- * Request body for creating/updating employee
- */
-interface EmployeeBody {
-  employee_name: string;
-  position: number;
-  email?: string;
-  phone?: string;
-  percentage?: boolean;
-  receiveEmail?: boolean;
-  getAppointments?: boolean;
-  sort_order?: number;
-  appointment_color?: string | null;
-}
-
-/**
  * Route params for employee by id
  */
 interface EmployeeParams {
@@ -173,7 +158,7 @@ router.get('/positions', async (_req: Request, res: Response): Promise<void> => 
  * POST /employees
  * Add new employee
  */
-router.post('/employees', validate({ body: employee.createEmployee.body }), async (req: Request<object, object, EmployeeBody>, res: Response): Promise<void> => {
+router.post('/employees', validate({ body: employee.createEmployee.body }), async (req: Request<object, object, employee.EmployeeBody>, res: Response): Promise<void> => {
   try {
     const { employee_name, position, email, phone, percentage, receiveEmail, getAppointments, sort_order, appointment_color } = req.body;
 
@@ -219,7 +204,7 @@ router.post('/employees', validate({ body: employee.createEmployee.body }), asyn
  * PUT /employees/:id
  * Update employee
  */
-router.put('/employees/:id', validate({ params: employee.updateEmployee.params, body: employee.updateEmployee.body }), async (req: Request<EmployeeParams, object, EmployeeBody>, res: Response): Promise<void> => {
+router.put('/employees/:id', validate({ params: employee.updateEmployee.params, body: employee.updateEmployee.body }), async (req: Request<EmployeeParams, object, employee.EmployeeBody>, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { employee_name, position, email, phone, percentage, receiveEmail, getAppointments, sort_order, appointment_color } = req.body;

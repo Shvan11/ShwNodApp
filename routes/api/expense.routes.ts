@@ -60,15 +60,6 @@ interface ExpenseFilters {
   offset?: number | null;
 }
 
-interface CreateExpenseBody {
-  expense_date: string;
-  amount: number | string;
-  currency?: string;
-  note?: string;
-  categoryId?: number | string;
-  subcategoryId?: number | string;
-}
-
 interface ExpenseData {
   expense_date: string;
   amount: number;
@@ -185,7 +176,7 @@ router.post(
   '/expenses',
   validate({ body: expense.createExpense.body }),
   async (
-    req: Request<unknown, unknown, CreateExpenseBody>,
+    req: Request<unknown, unknown, expense.CreateExpenseBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -320,7 +311,7 @@ router.put(
     getRecordDate: getExpenseCreationDate
   }),
   async (
-    req: Request<{ id: string }, unknown, CreateExpenseBody>,
+    req: Request<{ id: string }, unknown, expense.CreateExpenseBody>,
     res: Response
   ): Promise<void> => {
     try {

@@ -42,10 +42,6 @@ interface TableNameIdParams {
   id: string;
 }
 
-interface LookupItemBody {
-  [key: string]: unknown;
-}
-
 /**
  * Get all available lookup table configurations
  * GET /api/admin/lookups/tables
@@ -109,7 +105,7 @@ router.post(
   '/lookups/:tableName',
   validate({ body: lookupAdmin.createItem.body }),
   async (
-    req: Request<TableNameParams, unknown, LookupItemBody>,
+    req: Request<TableNameParams, unknown, lookupAdmin.LookupItemBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -161,7 +157,7 @@ router.put(
   '/lookups/:tableName/:id',
   validate({ params: lookupAdmin.updateItem.params, body: lookupAdmin.updateItem.body }),
   async (
-    req: Request<TableNameIdParams, unknown, LookupItemBody>,
+    req: Request<TableNameIdParams, unknown, lookupAdmin.LookupItemBody>,
     res: Response
   ): Promise<void> => {
     try {

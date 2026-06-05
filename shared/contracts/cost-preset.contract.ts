@@ -6,14 +6,29 @@
  * exported `const <action> = { response } as const` per payload endpoint; types
  * via `z.infer`. See docs/shared-contract-progress.md.
  *
- * Phase 11 (Wave 2). Group B — RESPONSE-ONLY: the route is mounted pre-auth-gate
- * with its OWN inline validation/admin guards (no `validate()`), so no request
- * schema is authored here. The GET feed is a dropdown N13 victim (consumers key
- * on `preset_id`) → modeled `z.looseObject({ preset_id })`; the `CostPreset`
- * query interface is flipped to a `type` so it feeds the looseObject `sendData`
- * arg (the index-signature rule). PUT/DELETE stay `sendSuccess(res, null)` voids.
+ * Phase 11 (Wave 2). The route is mounted pre-auth-gate with its OWN inline
+ * admin guards. The create/update BODY is now fully enumerated here as a strict
+ * `z.object` and wired via `validate({ body })` AFTER the admin guard (the
+ * hand-written `CostPresetBody` interface in the route was deleted; the handler
+ * types from `CostPresetBody = z.infer` below). The GET feed is a dropdown N13
+ * victim (consumers key on `preset_id`) → modeled `z.looseObject({ preset_id })`;
+ * the `CostPreset` query interface is flipped to a `type` so it feeds the
+ * looseObject `sendData` arg (the index-signature rule). PUT/DELETE responses
+ * stay `sendSuccess(res, null)` voids.
  */
 import { z } from 'zod';
+import { idParams } from '../validation.js';
+
+// Shared body for create + update (admin). The client (`CostPresetsSettings.tsx`)
+// always sends all three: amount (>0), currency (one of the three), displayOrder
+// (handler defaults 0 when omitted). Strip via `z.object` — over-posting can't
+// reach the DB, valid form payload is never 400'd.
+const costPresetBody = z.object({
+  amount: z.coerce.number().positive(),
+  currency: z.enum(['IQD', 'USD', 'EUR']),
+  displayOrder: z.coerce.number().int().optional(),
+});
+export type CostPresetBody = z.infer<typeof costPresetBody>;
 
 // GET /api/settings/cost-presets → CostPreset[] (dropdown feed; row-id guard).
 export const getPresets = {
@@ -23,5 +38,17 @@ export type GetPresetsResponse = z.infer<typeof getPresets.response>;
 
 // POST /api/settings/cost-presets → { presetId } (the new id).
 export const createPreset = {
+  body: costPresetBody,
   response: z.object({ presetId: z.number() }),
+} as const;
+
+// PUT /api/settings/cost-presets/:id — void success.
+export const updatePreset = {
+  params: idParams('id'),
+  body: costPresetBody,
+} as const;
+
+// DELETE /api/settings/cost-presets/:id — void success.
+export const deletePreset = {
+  params: idParams('id'),
 } as const;

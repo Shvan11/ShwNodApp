@@ -338,17 +338,12 @@ router.post(
   authenticate,
   authorize(['admin', 'secretary']),
   validate({ body: standContract.createItem.body }),
-  // Body left untyped (`req.body: any`): the handler's `costPrice === undefined`
-  // guards would be TS2367 ("no overlap") against the contract's `number` fields,
-  // and validate() already enforces the contract shape at the boundary. The
-  // CreateItemBody z.infer remains the SSoT (shared with the client).
-  async (req: Request, res: Response): Promise<void> => {
+  // Body typed from the CreateItemBody z.infer (SSoT, shared with the client).
+  // validate() enforces itemName/costPrice/sellPrice at the boundary, so the old
+  // hand `=== undefined` presence guards are dropped (they'd be TS2367 against the
+  // contract's required `number` fields).
+  async (req: Request<unknown, unknown, standContract.CreateItemBody>, res: Response): Promise<void> => {
     try {
-      const { itemName, costPrice, sellPrice } = req.body;
-      if (!itemName || costPrice === undefined || sellPrice === undefined) {
-        ErrorResponses.badRequest(res, 'Missing required fields: itemName, costPrice, sellPrice');
-        return;
-      }
       const userId = req.session?.userId ?? null;
       const result = await addStandItem({ ...req.body, createdBy: userId });
       sendData(res, standContract.createItem.response, result, null, 201);
@@ -397,14 +392,14 @@ router.post(
   authenticate,
   authorize(['admin', 'secretary']),
   validate({ params: standContract.restock.params, body: standContract.restock.body }),
-  // Body untyped: the `unitCost === undefined` guard would be TS2367 against the
-  // contract's `number`; validate({ body: restock.body }) enforces the shape.
-  async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+  // Body typed from RestockBody (SSoT). validate() enforces quantity+unitCost as
+  // numbers; the kept `!quantity` guard still rejects a zero-unit restock.
+  async (req: Request<{ id: string }, unknown, standContract.RestockBody>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
       const { quantity, unitCost } = req.body;
-      if (!quantity || unitCost === undefined) {
+      if (!quantity) {
         ErrorResponses.badRequest(res, 'Missing required fields: quantity, unitCost');
         return;
       }
@@ -422,14 +417,14 @@ router.post(
   authenticate,
   authorize(['admin']),
   validate({ params: standContract.adjust.params, body: standContract.adjust.body }),
-  // Body untyped: the `delta === undefined` guard would be TS2367 against the
-  // contract's `number`; validate({ body: adjust.body }) enforces the shape.
-  async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+  // Body typed from AdjustBody (SSoT). validate() enforces delta (number) + reason
+  // (min 1); `delta === undefined` is dropped (TS2367 against the required number).
+  async (req: Request<{ id: string }, unknown, standContract.AdjustBody>, res: Response): Promise<void> => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
       const { delta, reason } = req.body;
-      if (delta === undefined || !reason) {
+      if (!reason) {
         ErrorResponses.badRequest(res, 'Missing required fields: delta, reason');
         return;
       }

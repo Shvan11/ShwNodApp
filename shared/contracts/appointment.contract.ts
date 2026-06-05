@@ -48,10 +48,13 @@ export type DailyAppointmentsResponse = z.infer<typeof dailyAppointments.respons
 // ===========================================================================
 // Phase 7 (Wave 2) — the remaining appointment endpoints.
 //
-// Bodies are kept LOOSE (relocated verbatim from the route): `app_date` accepts
-// both `YYYY-MM-DD` and other formats (the AppointmentService owns multi-format
-// date parsing + holiday/conflict rules), so a strict `dateString` would 400 a
-// currently-valid payload. `looseObject` so a missed field fails safe.
+// Bodies are now FULLY ENUMERATED as strict `z.object` (the hand-written
+// `AppointmentStateBody`/`CreateAppointmentBody`/`UpdateAppointmentBody`
+// interfaces in the route were deleted; handlers type from the `z.infer` exports
+// below). `app_date` stays a plain `z.string().min(1)` (NOT `dateString`): the
+// AppointmentService owns multi-format date parsing + holiday/conflict rules, so
+// a strict date regex would 400 a currently-valid payload. Strict `z.object`
+// strips any other posted field — the handlers forward only the listed scalars.
 // ===========================================================================
 
 // GET /api/appointment-details — [{ id, detail }] (dropdown feed, inline SQL).
@@ -66,9 +69,14 @@ export const webApps = {
   response: z.unknown(),
 } as const;
 
-// Shared loose body for the two state mutations (appointment_id + state; the
-// handlers also read an optional `time` that the contract leaves to the long tail).
-const appointmentStateBody = z.looseObject({ appointment_id: intId, state: z.string().min(1) });
+// Shared body for the two state mutations. `time` (read by updateAppointmentState
+// as the optional client-supplied clock value) is now enumerated; undo ignores it.
+const appointmentStateBody = z.object({
+  appointment_id: intId,
+  state: z.string().min(1),
+  time: z.string().optional(),
+});
+export type AppointmentStateBody = z.infer<typeof appointmentStateBody>;
 
 // POST /api/updateAppointmentState — echoes { appointment_id, state, time }.
 export const updateAppointmentState = {
@@ -88,14 +96,17 @@ export const undoAppointmentState = {
 } as const;
 export type UndoAppointmentStateResponse = z.infer<typeof undoAppointmentState.response>;
 
-// Shared loose body for create (POST /api/appointments) + update (PUT /:id).
-// `app_detail` required non-empty; ids NaN-proofed; `app_date` a non-empty string.
-const createAppointmentBody = z.looseObject({
+// Shared body for create (POST /api/appointments) + update (PUT /:id).
+// `app_detail` required non-empty; ids NaN-proofed; `app_date` a non-empty string
+// (multi-format — see header). All four are everything the handlers read.
+const createAppointmentBody = z.object({
   person_id: intId,
   dr_id: intId,
   app_detail: z.string().min(1),
   app_date: z.string().min(1),
 });
+export type CreateAppointmentBody = z.infer<typeof createAppointmentBody>;
+export type UpdateAppointmentBody = CreateAppointmentBody;
 
 // POST /api/appointments — { appointment_id, appointment } (appointment is the
 // rich CreatedAppointment → z.unknown() to preserve it; appointment_id may be
@@ -129,9 +140,9 @@ export const appointmentById = {
   response: z.object({ appointment: z.looseObject({ appointment_id: z.number() }) }),
 } as const;
 
-// POST /api/appointments/quick-checkin — loose body; rich QuickCheckInResult.
+// POST /api/appointments/quick-checkin — strict body; rich QuickCheckInResult.
 export const quickCheckin = {
-  body: z.looseObject({
+  body: z.object({
     person_id: intId,
     dr_id: intId.optional(),
     app_detail: z.string().optional(),

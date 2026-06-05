@@ -14,6 +14,25 @@ import { z } from 'zod';
 // "is it an array" guard — flip-free (every type is assignable to `unknown`).
 const anyArray = z.array(z.unknown());
 
+// Multipart bodies (multer text fields → all strings). `validate({ body })` is
+// wired AFTER the multer middleware so `req.body` is populated. On CREATE,
+// `description` is kept `.optional()` here (NOT min(1)) on purpose: the handler's
+// own missing-description check cleans up the already-uploaded temp file before
+// 400ing — a validate() 400 would orphan a 500 MB upload. Strict `z.object`
+// strips any other multipart field.
+const createVideoBody = z.object({
+  description: z.string().optional(),
+  category: z.string().optional(),
+  details: z.string().optional(),
+});
+const updateVideoBody = z.object({
+  description: z.string().optional(),
+  category: z.string().optional(),
+  details: z.string().optional(),
+});
+export type CreateVideoBody = z.infer<typeof createVideoBody>;
+export type UpdateVideoBody = z.infer<typeof updateVideoBody>;
+
 // GET /api/videos → Video[].
 export const list = {
   response: anyArray,
@@ -34,13 +53,15 @@ export const qr = {
   response: z.looseObject({ qr: z.string(), url: z.string() }),
 } as const;
 
-// POST /api/videos → created Video (rich → preserve).
+// POST /api/videos → created Video (rich → preserve). Multipart body.
 export const create = {
+  body: createVideoBody,
   response: z.unknown(),
 } as const;
 
-// PUT /api/videos/:id → updated Video (rich → preserve).
+// PUT /api/videos/:id → updated Video (rich → preserve). Multipart body.
 export const update = {
+  body: updateVideoBody,
   response: z.unknown(),
 } as const;
 

@@ -17,10 +17,15 @@
  *    inline-literal handler payloads use a closed `z.object`/`looseObject` modeling
  *    the keys actually built. Consumers keep their generics; `{ schema }` adds the
  *    runtime boundary guard.
- *  - **Bodies**: the 2 fully-enumerable ones (`alertStatus`, `portalEnable`) →
- *    `z.infer` SSoT; the rest keep their EXISTING loose guard relocated verbatim
- *    (create/update patient + alert + photo-visibility forward extra fields to the
- *    query/service, which write explicit columns — the documented caveat).
+ *  - **Bodies**: now FULLY ENUMERATED as strict `z.object` — the route's
+ *    hand-written `CreatePatientBody`/`UpdatePatientBody`/`CreateAlertBody`/
+ *    `UpdateAlertStatusBody`/`UpdateAlertBody` interfaces were deleted; handlers
+ *    type from the `z.infer` exports below. CREATE ids are coerced to `number`
+ *    (the route's `processedData` is `number`-typed); UPDATE ids stay `string`
+ *    (spread straight into `UpdatePatientData`, which accepts `string|number` and
+ *    runs them through `toInt`). The `<select>` empty string maps to undefined so
+ *    the service's `toInt` yields NULL, not 0. Strict `z.object` strips the extra
+ *    fields the forms over-post (`alerts` on create, `person_id` on update).
  *  - `date_of_birth`/`date_added` are `date` columns (string both sides) →
  *    `optionalDateString`/plain string; no `timestampString` needed.
  */
@@ -31,6 +36,17 @@ import { idParams, numericParam, intId, optionalDateString } from '../validation
  *  class) while accepting any element — including an `interface[]` source, with no
  *  query-row `interface`→`type` flip (everything is assignable to `unknown`). */
 const anyArray = z.array(z.unknown());
+
+/** A `<select>`-backed id on the CREATE body: '' (nothing chosen) → undefined (so
+ *  the service's `toInt` yields NULL, not 0); a chosen value (form string / number)
+ *  → number — matching the route's `number`-typed `processedData`. */
+const optionalSelectId = z
+  .preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().optional())
+  .optional();
+/** Same, but allows a non-integer (estimated cost may carry a decimal). */
+const optionalSelectAmount = z
+  .preprocess((v) => (v === '' ? undefined : v), z.coerce.number().optional())
+  .optional();
 
 // ---------------------------------------------------------------------------
 // Shared param schemas (referenced directly in the route's validate()).
@@ -134,23 +150,55 @@ export const deleteTimepoint = {
 // PATIENT CRUD
 // ===========================================================================
 
-// POST /api/patients — loose guard (name + real-calendar DOB; rest forwarded to
-// createPatient's explicit columns) → { personId }.
+// POST /api/patients — fully enumerated (camelCase, ids→number) → { personId }.
 export const createPatient = {
-  body: z.looseObject({
+  body: z.object({
     patientName: z.string().min(1, 'Patient name is required'),
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+    phone: z.string().optional(),
+    phone2: z.string().optional(),
+    email: z.string().optional(),
     dateOfBirth: optionalDateString,
+    gender: optionalSelectId,
+    addressID: optionalSelectId,
+    referralSourceID: optionalSelectId,
+    patientTypeID: optionalSelectId,
+    tagID: optionalSelectId,
+    notes: z.string().optional(),
+    language: z.string().optional(),
+    countryCode: z.string().optional(),
+    estimatedCost: optionalSelectAmount,
+    currency: z.string().optional(),
   }),
   response: z.object({ personId: z.number() }),
 } as const;
+export type CreatePatientBody = z.infer<typeof createPatient.body>;
 
-// PUT /api/patients/:personId — loose guard; sendSuccess(null) (no response key).
+// PUT /api/patients/:personId — fully enumerated (snake_case, ids stay strings:
+// spread straight into UpdatePatientData → toInt). sendSuccess(null), no resp key.
 export const updatePatient = {
-  body: z.looseObject({
+  body: z.object({
     patient_name: z.string().min(1, 'Patient name is required'),
+    first_name: z.string().optional(),
+    last_name: z.string().optional(),
+    phone: z.string().optional(),
+    phone2: z.string().optional(),
+    email: z.string().optional(),
     date_of_birth: optionalDateString,
+    gender: z.string().optional(),
+    address_id: z.string().optional(),
+    referral_source_id: z.string().optional(),
+    patient_type_id: z.string().optional(),
+    tag_id: z.string().optional(),
+    notes: z.string().optional(),
+    language: z.string().optional(),
+    country_code: z.string().optional(),
+    estimated_cost: z.string().optional(),
+    currency: z.string().optional(),
   }),
 } as const;
+export type UpdatePatientBody = z.infer<typeof updatePatient.body>;
 
 // DELETE /api/patients/:personId — { folderRemoved }.
 export const deletePatient = {
@@ -158,18 +206,25 @@ export const deletePatient = {
 } as const;
 
 // PUT /api/patients/:personId/estimated-cost — { estimatedCost, currency };
-// sendSuccess(null) (no response key).
+// sendSuccess(null) (no response key). Both fields are everything the handler reads.
 export const estimatedCost = {
-  body: z.looseObject({ estimatedCost: z.coerce.number(), currency: z.string() }),
+  body: z.object({ estimatedCost: z.coerce.number(), currency: z.string() }),
 } as const;
+export type EstimatedCostBody = z.infer<typeof estimatedCost.body>;
 
 // ===========================================================================
 // ALERTS
 // ===========================================================================
 
-// Shared body for POST /alerts + PUT /alerts/:alertId (loose: alertSeverity passes
-// through; the handler defaults it). Both endpoints sendSuccess(null).
-export const alertBody = z.looseObject({ alertTypeId: intId, alertDetails: z.string().min(1) });
+// Shared body for POST /alerts + PUT /alerts/:alertId. Fully enumerated: the
+// client (AlertModal) sends both ids as parseInt'd numbers, and `updateAlert`
+// requires `number`s — so `alertSeverity` is now an enumerated coerced int
+// alongside `alertTypeId`. Both endpoints sendSuccess(null).
+export const alertBody = z.object({
+  alertTypeId: intId,
+  alertSeverity: intId,
+  alertDetails: z.string().min(1),
+});
 export type AlertBody = z.infer<typeof alertBody>;
 
 // PUT /api/alerts/:alertId/status — { isActive } (fully enumerated → SSoT).
@@ -197,8 +252,10 @@ export type PortalEnableBody = z.infer<typeof portalEnable.body>;
 // PHOTO VISIBILITY (staff-facing)
 // ===========================================================================
 
-// POST /api/patients/:personId/photos/visibility — { tp, name, isPrivate } (loose:
-// tp passes through). sendSuccess(null).
+// POST /api/patients/:personId/photos/visibility — { tp, name, isPrivate }; fully
+// enumerated. `tp` is `z.coerce.string()` — the client sends the numeric tpCode,
+// `togglePhotoPrivacy` wants a `string`. sendSuccess(null).
 export const photoVisibility = {
-  body: z.looseObject({ name: z.string().min(1), isPrivate: z.boolean() }),
+  body: z.object({ tp: z.coerce.string(), name: z.string().min(1), isPrivate: z.boolean() }),
 } as const;
+export type PhotoVisibilityBody = z.infer<typeof photoVisibility.body>;

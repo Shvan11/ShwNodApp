@@ -8,6 +8,7 @@ import { verifyCredentials, hashPassword } from '../middleware/auth.js';
 import { sql } from 'kysely';
 import { getKysely } from '../services/database/kysely.js';
 import { log } from '../utils/logger.js';
+import type { LoginBody, ChangePasswordBody } from '../shared/contracts/auth.contract.js';
 
 const router = Router();
 
@@ -32,16 +33,9 @@ const loginLimiter = rateLimit({
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface LoginBody {
-  username: string;
-  password: string;
-  rememberMe?: boolean;
-}
-
-interface ChangePasswordBody {
-  currentPassword: string;
-  newPassword: string;
-}
+// Body shapes (LoginBody / ChangePasswordBody) come from the auth contract — these
+// handlers keep their own manual checks + rate limiting + security-specific error
+// responses, so the contract is the type SSoT but isn't wired to `validate()`.
 
 // Extend Express Session
 declare module 'express-session' {

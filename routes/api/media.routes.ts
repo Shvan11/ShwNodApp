@@ -16,6 +16,7 @@ import { log } from '../../utils/logger.js';
 import multer from 'multer';
 import webcephService from '../../services/webceph/webceph-service.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
+import { validate } from '../../middleware/validate.js';
 import * as media from '../../shared/contracts/media.contract.js';
 
 const router = Router();
@@ -41,34 +42,6 @@ const uploadImage = (req: Request, res: Response, next: NextFunction): void => {
     next();
   });
 };
-
-/**
- * Patient data for WebCeph creation
- */
-interface WebCephPatientData {
-  firstName: string;
-  lastName: string;
-  dateOfBirth: string;
-  gender: string;
-  [key: string]: string | number | boolean | null | undefined;
-}
-
-/**
- * Request body for creating WebCeph patient
- */
-interface CreateWebCephPatientBody {
-  personId: number;
-  patientData: WebCephPatientData;
-}
-
-/**
- * Request body for uploading image
- */
-interface UploadImageBody {
-  patient_id: string;
-  recordDate: string;
-  targetClass: string;
-}
 
 /**
  * Route params for person id
@@ -102,7 +75,7 @@ interface MulterFile {
 /**
  * Request with file upload
  */
-interface FileRequest extends Omit<Request<object, object, UploadImageBody>, 'file'> {
+interface FileRequest extends Omit<Request<object, object, media.UploadImageBody>, 'file'> {
   file?: MulterFile;
 }
 
@@ -115,7 +88,7 @@ interface FileRequest extends Omit<Request<object, object, UploadImageBody>, 'fi
  * POST /webceph/create-patient
  * Body: { personId, patientData }
  */
-router.post('/webceph/create-patient', async (req: Request<object, object, CreateWebCephPatientBody>, res: Response): Promise<void> => {
+router.post('/webceph/create-patient', validate({ body: media.createPatient.body }), async (req: Request<object, object, media.CreateWebCephPatientBody>, res: Response): Promise<void> => {
   try {
     const { personId, patientData } = req.body;
 

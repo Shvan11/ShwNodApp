@@ -104,68 +104,11 @@ type PatientSearchResult = {
   ActiveWorkTypes: string | null;
 };
 
-interface CreatePatientBody {
-  patientName: string;
-  firstName?: string;
-  lastName?: string;
-  phone?: string;
-  phone2?: string;
-  email?: string;
-  dateOfBirth?: string;
-  gender?: number;
-  addressID?: number;
-  referralSourceID?: number;
-  patientTypeID?: number;
-  tagID?: number;
-  notes?: string;
-  language?: string;
-  countryCode?: string;
-  estimatedCost?: number;
-  currency?: string;
-}
-
-interface UpdatePatientBody {
-  patient_name: string;
-  first_name?: string;
-  last_name?: string;
-  phone?: string;
-  phone2?: string;
-  email?: string;
-  date_of_birth?: string;
-  gender?: number;
-  address_id?: number;
-  referral_source_id?: number;
-  patient_type_id?: number;
-  tag_id?: number;
-  notes?: string;
-  language?: string;
-  country_code?: string;
-  estimated_cost?: number;
-  currency?: string;
-}
-
-interface CreateAlertBody {
-  alertTypeId: string | number;
-  alertSeverity: string | number;
-  alertDetails: string;
-}
-
-interface UpdateAlertStatusBody {
-  isActive: boolean;
-}
-
-interface UpdateAlertBody {
-  alertTypeId: number;
-  alertSeverity: number;
-  alertDetails: string;
-}
-
 // Request schemas + the shared param schemas (`personIdParams`/`alertIdParams`/
 // `timepointParams`) now live in shared/contracts/patient.contract.ts (imported as
 // `patientContract`) — shared with the client. The create/update/alert/photo bodies
-// keep their loose guard there; the handlers below keep their local hand-written
-// body interfaces (CreatePatientBody, UpdatePatientBody, CreateAlertBody, …) for
-// typing — the loose contract can't enumerate those full shapes (see the caveat).
+// are FULLY ENUMERATED there and are the `z.infer` SSoT; the handlers below type
+// from `patientContract.*Body` (the hand-written interfaces were deleted).
 const { personIdParams, alertIdParams, timepointParams } = patientContract;
 
 // `type` (not interface) — feed looseObject `sendData` responses (tag/type options).
@@ -978,7 +921,7 @@ router.post(
   '/patients',
   validate({ body: patientContract.createPatient.body }),
   async (
-    req: Request<unknown, unknown, CreatePatientBody>,
+    req: Request<unknown, unknown, patientContract.CreatePatientBody>,
     res: Response
   ): Promise<void> => {
     const patientData = req.body;
@@ -1094,7 +1037,7 @@ router.put(
   '/patients/:personId',
   validate({ params: personIdParams, body: patientContract.updatePatient.body }),
   async (
-    req: Request<{ personId: string }, unknown, UpdatePatientBody>,
+    req: Request<{ personId: string }, unknown, patientContract.UpdatePatientBody>,
     res: Response
   ): Promise<void> => {
     const patientData = req.body;
@@ -1238,7 +1181,7 @@ router.put(
   authorize(['admin', 'secretary', 'doctor']),
   validate({ params: personIdParams, body: patientContract.estimatedCost.body }),
   async (
-    req: Request<{ personId: string }, unknown, { estimatedCost: number; currency: string }>,
+    req: Request<{ personId: string }, unknown, patientContract.EstimatedCostBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -1317,7 +1260,7 @@ router.post(
   authorize(['admin', 'secretary', 'doctor']),
   validate({ params: personIdParams, body: patientContract.alertBody }),
   async (
-    req: Request<{ personId: string }, unknown, CreateAlertBody>,
+    req: Request<{ personId: string }, unknown, patientContract.AlertBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -1360,7 +1303,7 @@ router.put(
   authorize(['admin', 'secretary', 'doctor']),
   validate({ params: alertIdParams, body: patientContract.alertStatus.body }),
   async (
-    req: Request<{ alertId: string }, unknown, UpdateAlertStatusBody>,
+    req: Request<{ alertId: string }, unknown, patientContract.AlertStatusBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -1397,7 +1340,7 @@ router.put(
   authorize(['admin', 'secretary', 'doctor']),
   validate({ params: alertIdParams, body: patientContract.alertBody }),
   async (
-    req: Request<{ alertId: string }, unknown, UpdateAlertBody>,
+    req: Request<{ alertId: string }, unknown, patientContract.AlertBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -1542,7 +1485,7 @@ router.post(
   authorize(['admin', 'secretary']),
   validate({ params: personIdParams, body: patientContract.portalEnable.body }),
   async (
-    req: Request<{ personId: string }, unknown, { enabled: boolean }>,
+    req: Request<{ personId: string }, unknown, patientContract.PortalEnableBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -1625,11 +1568,7 @@ router.post(
   authorize(['admin', 'secretary']),
   validate({ params: personIdParams, body: patientContract.photoVisibility.body }),
   async (
-    req: Request<
-      { personId: string },
-      unknown,
-      { tp: string; name: string; isPrivate: boolean }
-    >,
+    req: Request<{ personId: string }, unknown, patientContract.PhotoVisibilityBody>,
     res: Response
   ): Promise<void> => {
     try {
