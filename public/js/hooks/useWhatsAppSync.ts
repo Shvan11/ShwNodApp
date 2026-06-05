@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchJSON } from '@/core/http';
+import * as whatsappContract from '@shared/contracts/whatsapp.contract';
 import { useGlobalState } from '../contexts/GlobalStateContext';
 import { UI_STATES, type UIState } from '../utils/whatsapp-send-constants';
 import sseWhatsapp from '../services/sse-whatsapp';
@@ -100,7 +101,7 @@ export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
     }
     lastRequestedDateRef.current = dateToRequest;
 
-    fetchJSON<InitialStateResponse>('/api/wa/initial-state')
+    fetchJSON<InitialStateResponse>('/api/wa/initial-state', { schema: whatsappContract.initialState.response })
       .then(applyInitialState)
       .catch((err) => {
         console.error('[useWhatsAppSync] initial-state fetch failed', err);

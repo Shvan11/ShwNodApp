@@ -10,6 +10,7 @@ import { useGlobalState } from '../contexts/GlobalStateContext';
 import { useToast } from '../contexts/ToastContext';
 import sseWhatsapp from '../services/sse-whatsapp';
 import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import * as whatsappContract from '@shared/contracts/whatsapp.contract';
 
 // Authentication States
 export const AUTH_STATES = {
@@ -127,7 +128,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   const requestInitialState = useCallback(async () => {
     try {
       // Flat `{ success, qr, clientReady, … }` (no `data` key) → fetchJSON passthrough.
-      const data = await fetchJSON<InitialStateResponse>('/api/wa/initial-state');
+      const data = await fetchJSON<InitialStateResponse>('/api/wa/initial-state', { schema: whatsappContract.initialState.response });
       handleInitialState(data);
     } catch (err) {
       console.error('[useWhatsAppAuth] initial-state fetch failed', err);
@@ -138,7 +139,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   const fetchQRCode = useCallback(async (): Promise<string | null> => {
     try {
       // Flat `{ qr, status, … }` (no `data` key) → fetchJSON passthrough.
-      const qrResponse = await fetchJSON<{ qr?: string }>('/api/wa/qr');
+      const qrResponse = await fetchJSON<{ qr?: string }>('/api/wa/qr', { schema: whatsappContract.qr.response });
       return qrResponse.qr || null;
     } catch (err) {
       // 404 = QR not available yet (a normal signal, not an error).

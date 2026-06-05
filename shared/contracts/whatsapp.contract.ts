@@ -44,3 +44,12 @@ export const sendMedia2 = {
   }),
 } as const;
 export type SendMedia2Body = z.infer<typeof sendMedia2.body>;
+
+// GET /api/wa/initial-state & /api/wa/qr — flat objects (NOT the sendSuccess
+// envelope, so the funnel passes them through). Response-only client guards: loose
+// `looseObject` asserts the object class and PRESERVES every realtime
+// connection-state field (qr/clientReady/status/…) the consumers read. Deliberately
+// not tightened — these fields vary across connection lifecycle and can't be
+// runtime-verified without a live WhatsApp client; tighten in Phase 3 if stable.
+export const initialState = { response: z.looseObject({}) } as const;
+export const qr = { response: z.looseObject({}) } as const;

@@ -78,6 +78,8 @@ const SupabaseStatusSettings = ({ onChangesUpdate }: SupabaseStatusSettingsProps
 
     const fetchStatus = useCallback(async (): Promise<void> => {
         try {
+            // Raw read (no contract): single sync/CDC status endpoint in sync-webhook.ts,
+            // outside the staff-app contract surface. Left unguarded by design (Phase 1).
             const data = await fetchJSON<StatusResponse>('/api/sync/supabase-status');
             if (!isMounted.current) return;
             if (data.success && data.sinks) {
