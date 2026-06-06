@@ -113,11 +113,6 @@ export type {
   PdfOptions,
   PdfResult,
 
-  // Sync types
-  SyncOperation,
-  SyncQueueItem,
-  SyncResult,
-
   // Google Drive types
   DriveFile,
   DriveUploadResult,

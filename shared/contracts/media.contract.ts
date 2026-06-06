@@ -17,9 +17,6 @@
 import { z } from 'zod';
 import { intId } from '../validation.js';
 
-// "is it an array" guard — flip-free (every type is assignable to `unknown`).
-const anyArray = z.array(z.unknown());
-
 // Patient block forwarded to `webcephService.{validate,create}Patient` — mirrors
 // that service's `PatientData` (all-optional strings; the client sends all six).
 const webcephPatientData = z.object({
@@ -38,11 +35,11 @@ export const createPatient = {
 } as const;
 export type CreateWebCephPatientBody = z.infer<typeof createPatient.body>;
 
-// POST /api/webceph/upload-image → { big, thumbnail, link }. Multipart body. This
-// one is TYPE-ONLY (no `validate()` wired): the existing client appends the field
-// as `patientID` while the handler reads `patient_id`, so the fields mirror the
-// old interface's required strings (preserving the pre-existing behaviour) and no
-// boundary validation is added that would 400 the real payload.
+// POST /api/webceph/upload-image → { big, thumbnail, link }. Multipart body, so
+// `validate({ body })` runs AFTER the multer middleware (which populates the text
+// fields onto req.body). The client appends `patient_id` to match this contract +
+// the handler's destructure — previously it sent a stray `patientID` the handler
+// never read, which is why `validate()` was deferred; the field names are now aligned.
 export const uploadImage = {
   body: z.object({
     patient_id: z.string(),
@@ -60,10 +57,9 @@ export const patientLink = {
   response: z.unknown(),
 } as const;
 
-// GET /api/webceph/photo-types → PhotoType[].
-// Intentionally loose: PhotoType[] from WebCeph service; rows use camelCase API fields.
+// GET /api/webceph/photo-types → PhotoType[] (the webceph service's static list).
 export const photoTypes = {
-  response: anyArray,
+  response: z.array(z.object({ class: z.string(), name: z.string() })),
 } as const;
 
 // `:personId` path param shared by the media routes (type-only).

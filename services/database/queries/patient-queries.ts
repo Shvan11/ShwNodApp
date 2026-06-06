@@ -106,7 +106,10 @@ type LookupItem = {
   name: string;
 };
 
-interface PatientDetails {
+// `type` (not `interface`) so a `PatientDetails & { alerts }` value is assignable to
+// the patientById contract's `z.looseObject({...})` sendData arg — the looseObject
+// string index-signature rule (docs/shared-contract-progress.md).
+type PatientDetails = {
   person_id: number;
   patient_name: string;
   first_name: string | null;
@@ -126,7 +129,7 @@ interface PatientDetails {
   currency: string | null;
   tag_id: number | null;
   date_added: string | null;
-}
+};
 
 interface UpdatePatientData {
   patient_name: string;

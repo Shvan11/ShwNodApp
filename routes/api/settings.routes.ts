@@ -189,7 +189,7 @@ router.get(
         ErrorResponses.internalError(
           res,
           'Failed to get database configuration',
-          { error: result.error } as unknown as Error
+          { error: result.error }
         );
       }
     } catch (error) {

@@ -1,9 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import type {
-  PortalStatus,
-  PortalStatusResponse,
-  PortalPinResetResponse,
-} from '@/types/api.types';
 import Modal from './Modal';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
@@ -13,6 +8,35 @@ import styles from './PortalAccessCard.module.css';
 
 interface Props {
   personId: number;
+}
+
+// Staff-side portal read shapes. The contract's `portalStatus.response` is a loose
+// container (only `enabled` enumerated), so these annotate the long-tail fields
+// this card reads — co-located with the sole consumer rather than in the
+// envelope-only api.types.ts.
+
+/** Normalized read-shape of GET /api/patients/:id/portal. */
+interface PortalStatus {
+  enabled: boolean;
+  hasPin: boolean;
+  lockedUntil: string | null;
+  lastLoginAt: string | null;
+  failedAttempts: number;
+  qrDataUrl: string;
+  portalUrl: string;
+}
+
+/** Wrapper for PortalStatus — fields beyond `success` may be missing on error. */
+interface PortalStatusResponse extends Partial<PortalStatus> {
+  success: boolean;
+  error?: string;
+}
+
+/** POST /api/patients/:id/portal/reset-pin. */
+interface PortalPinResetResponse {
+  success: boolean;
+  pin?: string;
+  error?: string;
 }
 
 function formatDateTime(iso: string | null): string {

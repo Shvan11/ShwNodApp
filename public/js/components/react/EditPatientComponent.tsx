@@ -50,26 +50,11 @@ interface WebcephData {
     createdAt?: string;
 }
 
-interface PatientData {
-    person_id: number;
-    patient_name?: string;
-    first_name?: string;
-    last_name?: string;
-    phone?: string;
-    phone2?: string;
-    email?: string;
-    date_of_birth?: string;
-    gender?: string;
-    address_id?: string;
-    referral_source_id?: string;
-    patient_type_id?: string;
-    notes?: string;
-    language?: number | string;
-    country_code?: string;
-    estimated_cost?: string;
-    currency?: string;
-    tag_id?: string;
-}
+// Single source of truth: the patientById contract response (raw `patients`
+// columns + attached alerts). FK ids (gender, address_id, …) and estimated_cost
+// are DB `number`s here — the form-population below coerces them to its `<select>`
+// strings. (Replaces a hand-written parallel interface that lied them as strings.)
+type PatientData = patientContract.PatientByIdResponse;
 
 interface FormData {
     person_id: string | number;
@@ -196,16 +181,19 @@ const EditPatientComponent = ({ personId }: Props) => {
                 phone2: data.phone2 || '',
                 email: data.email || '',
                 date_of_birth: data.date_of_birth ? formatISODate(data.date_of_birth) : '',
-                gender: data.gender || '',
-                address_id: data.address_id || '',
-                referral_source_id: data.referral_source_id || '',
-                patient_type_id: data.patient_type_id || '',
+                // FK ids / cost are DB numbers → coerce to the `<select>`/input strings
+                // the form (and the updatePatient body schema) expect. `falsy ? : ''`
+                // keeps NULL → '' (the "nothing chosen" empty option).
+                gender: data.gender ? String(data.gender) : '',
+                address_id: data.address_id ? String(data.address_id) : '',
+                referral_source_id: data.referral_source_id ? String(data.referral_source_id) : '',
+                patient_type_id: data.patient_type_id ? String(data.patient_type_id) : '',
                 notes: data.notes || '',
                 language: (data.language !== null && data.language !== undefined) ? data.language.toString() : '0',
                 country_code: data.country_code || '',
-                estimated_cost: data.estimated_cost || '',
+                estimated_cost: data.estimated_cost ? String(data.estimated_cost) : '',
                 currency: data.currency || 'IQD',
-                tag_id: data.tag_id || ''
+                tag_id: data.tag_id ? String(data.tag_id) : ''
             });
         } catch (err) {
             console.error('Error loading patient data:', err);
@@ -321,7 +309,7 @@ const EditPatientComponent = ({ personId }: Props) => {
 
             const formDataObj = new FormData();
             formDataObj.append('image', uploadData.imageFile);
-            formDataObj.append('patientID', patientData?.person_id.toString() || '');
+            formDataObj.append('patient_id', patientData?.person_id.toString() || '');
             formDataObj.append('recordDate', uploadData.recordDate);
             formDataObj.append('targetClass', uploadData.targetClass);
 

@@ -6,15 +6,9 @@ import { fetchJSON } from '@/core/http';
 import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './SearchPatient.module.css';
 
-interface AlignerPatient {
-    workid: number;
-    person_id: number;
-    patient_name?: string;
-    first_name?: string;
-    last_name?: string;
-    phone?: string;
-    work_type?: string;
-}
+// Row shape comes from the shared contract (single source of truth, drift-checked
+// against the schema the search read validates with).
+type AlignerPatient = alignerContract.AlignerPatient;
 
 const SearchPatient: React.FC = () => {
     const navigate = useNavigate();

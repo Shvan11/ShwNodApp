@@ -66,8 +66,8 @@ const SendMessage = () => {
     const loadContacts = async (source: string) => {
         try {
             const data = source === 'pat'
-                ? await fetchJSON('/api/patients/phones', { schema: patientPhones.response })
-                : await fetchJSON(`/api/google?source=${encodeURIComponent(source)}`, { schema: utilityContract.google.response });
+                ? await fetchJSON<ContactData[]>('/api/patients/phones', { schema: patientPhones.response })
+                : await fetchJSON<ContactData[]>(`/api/google?source=${encodeURIComponent(source)}`, { schema: utilityContract.google.response });
 
             const contactsArray: ContactData[] = Array.isArray(data) ? data : [];
 

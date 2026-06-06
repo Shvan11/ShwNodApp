@@ -30,8 +30,21 @@ const STRICT = process.env.STRICT === '1' || process.argv.includes('--strict');
 // tier completes, its threshold is lowered toward the target so the gate can't slip
 // back. D3 has no hard threshold (the `require-schema-on-reads` ESLint rule owns it).
 //   D1: 33 (Phase-0 baseline) → 0 (Phase 4 folded all params/query; Phase 5 ratchets to target).
-//   D2: 103 (Phase-0 baseline) → 41 (Phase 3 modeled all non-allowlisted slots).
-const BASELINE = { D1: 0, D2: 41 };
+//   D2: 103 (Phase-0 baseline) → 41 (Phase 3 modeled all non-allowlisted slots)
+//       → 38 (template list/get-one/document-types rows modeled from db.d.ts)
+//       → 37 (patientById modeled from PatientDetails + attached alerts)
+//       → 30 (dead /api/getWebApps endpoint deleted — route + getPresentAps + contract;
+//             + the 6 file-explorer slots modeled from FileEntry/FileListing/BatchDeleteResult)
+//       → 24 (video create/update modeled as videoRow.nullable() — they return getVideoById;
+//             + measureD2 now skips `import { anyArray }` lines, removing 4 false positives)
+//       → 19 (calendar cluster modeled — week/month/stats/available-slots/month-availability
+//             nested rows mirror the DayData/MonthlyDayData/SlotInfo/AppointmentInfo interfaces)
+//       → 9  (Tier-B modeled: reports (4) from DailyData/MonthlyTotalRow/YearTotal/EnrichedInvoice;
+//             messaging (3) from TransformedMessage/MessageCount/ResetResult; expense summary;
+//             appointment quick-checkin (QuickCheckInResult); media photo-types. The remaining 9
+//             are Tier-A principled-dynamic: lookup-admin (3), settings db-config (2), email-api,
+//             utility google, payment raw UpdateResult[], media patient-link).
+const BASELINE = { D1: 0, D2: 9 };
 
 /** Recursively collect files under `dir` whose name ends with one of `exts`. */
 function walk(dir, exts, acc = []) {
@@ -74,15 +87,19 @@ function measureD1() {
 }
 
 // ── D2: loose response markers in shared/contracts/ ────────────────────────────
-// One hit per LINE carrying a marker (matches the DoD grep `grep -rE … shared/contracts/`,
-// which counts lines). A line is one loose slot — `z.array(z.unknown())` contains two
-// sub-patterns but is a single marker, so line-granularity avoids double-counting it.
+// One hit per LINE carrying a marker. A line is one loose slot — `z.array(z.unknown())`
+// contains two sub-patterns but is a single marker, so line-granularity avoids
+// double-counting it. `import { anyArray }` lines are SKIPPED: `anyArray` is the
+// shared primitive, so an import statement would otherwise be miscounted as a loose
+// response slot (it inflated the count by 4 before this guard). The count now
+// reflects actual response slots, not import bookkeeping.
 function measureD2() {
   const hits = [];
   const re = /z\.unknown\(\)|anyArray|z\.array\(z\.unknown/;
   for (const file of walk(join(ROOT, 'shared', 'contracts'), ['.ts'])) {
     const lines = readFileSync(file, 'utf8').split('\n');
     lines.forEach((line, i) => {
+      if (/^\s*import\b/.test(line)) return; // not a response slot — the anyArray import
       if (re.test(line)) hits.push({ file: rel(file), line: i + 1, count: 1 });
     });
   }

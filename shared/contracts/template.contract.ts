@@ -1,15 +1,17 @@
 /**
  * API contract — document-template endpoints (`/api/templates/*`).
  *
- * REQUEST-TYPE source for the create/update/save-html bodies (mirroring the
- * template-queries `TemplateData`/`TemplateUpdateData` service inputs). These
- * handlers keep their own required-field checks and raw response envelopes, so the
- * schemas here are the `z.infer` SSoT for the handler generics but are NOT wired to
- * `validate()` (no boundary behaviour change). The route's hand-written
- * `CreateTemplateBody`/`UpdateTemplateBody`/`SaveHtmlBody` interfaces are dropped
- * for these exports. See docs/shared-contract-progress.md.
+ * SSoT for the create/update/save-html request bodies (mirroring the template-queries
+ * `TemplateData`/`TemplateUpdateData` service inputs) AND the responses. The routes
+ * are wired to `validate({ body/params/query })` against these schemas and return via
+ * `sendData` (data) / `sendSuccess(res, null, …)` (message-only acks) — drift is a
+ * server compile error + a client fail-loud guard. The list / get-one / document-types
+ * read rows are modeled from the generated DB types (types/db.d.ts) — DB-accurate
+ * nullability so the client fail-loud guard accepts every real row.
+ * See docs/shared-contract-progress.md.
  */
 import { z } from 'zod';
+import { timestampString } from '../validation.js';
 
 // POST /api/templates — create a template. Mirrors TemplateData.
 export const createTemplate = {
@@ -63,28 +65,82 @@ export const updateTemplate = {
 } as const;
 export type UpdateTemplateBody = z.infer<typeof updateTemplate.body>;
 
-// PUT /api/templates/:templateId/html — save the rendered HTML.
+// POST /api/templates/:templateId/save-html — write the rendered HTML to disk.
 export const saveHtml = {
-  body: z.object({ html: z.string() }),
+  body: z.object({ html: z.string().min(1) }),
+  // → { file_path } (funnel unwraps `data`). The designer ignores the payload, but
+  // the route returns the resolved path; modeled so the handler is compile-checked.
+  response: z.object({ file_path: z.string() }),
 } as const;
 export type SaveHtmlBody = z.infer<typeof saveHtml.body>;
 
 // ── Read responses (envelope `{ success, data }`; the funnel returns the unwrapped
-// `data`). Response-only — the handlers keep their raw `res.json`; these are the
-// client-side fail-loud guards. Rich rows preserved loosely (tighten in Phase 3).
+// `data`). The handlers return these via `sendData`, so each row schema is BOTH the
+// server-side compile/dev-parse check AND the client fail-loud guard. Shapes +
+// nullability are modeled from the generated DB types (types/db.d.ts), NOT the
+// hand-written template-queries interfaces — those under-declared nullability (e.g.
+// is_active / created_date / background_color / paper_orientation are all `| null` in
+// PG), which would make the client guard reject real rows. Closed `z.object`: the
+// SELECTs list a fixed column set, so there is no long-tail field to preserve.
+
+// One `document_types` row (GET /api/templates/document-types).
+const documentTypeRow = z.object({
+  type_id: z.number(),
+  type_code: z.string(),
+  type_name: z.string(),
+  description: z.string().nullable(),
+  icon: z.string().nullable(),
+  default_paper_width: z.number().nullable(),
+  default_paper_height: z.number().nullable(),
+  default_orientation: z.string().nullable(),
+  is_active: z.boolean().nullable(),
+  sort_order: z.number().nullable(),
+});
+export type DocumentTypeRow = z.infer<typeof documentTypeRow>;
+
+// One template row: `document_templates` INNER JOIN `document_types`, so the joined
+// document_type_name/_code are non-null; document_type_icon is dt.icon (nullable). The
+// `*_date` columns are PG `timestamp` → Date server-side / ISO string client-side.
+const documentTemplateRow = z.object({
+  template_id: z.number(),
+  template_name: z.string(),
+  description: z.string().nullable(),
+  document_type_id: z.number(),
+  document_type_name: z.string(),
+  document_type_code: z.string(),
+  document_type_icon: z.string().nullable().optional(),
+  paper_width: z.number(),
+  paper_height: z.number(),
+  paper_orientation: z.string().nullable(),
+  paper_margin_top: z.number().nullable(),
+  paper_margin_right: z.number().nullable(),
+  paper_margin_bottom: z.number().nullable(),
+  paper_margin_left: z.number().nullable(),
+  background_color: z.string().nullable(),
+  show_grid: z.boolean().nullable(),
+  grid_size: z.number().nullable(),
+  is_default: z.boolean().nullable(),
+  is_active: z.boolean().nullable(),
+  is_system: z.boolean().nullable(),
+  template_version: z.number().nullable().optional(),
+  parent_template_id: z.number().nullable().optional(),
+  created_by: z.string().nullable(),
+  created_date: timestampString.nullable(),
+  modified_by: z.string().nullable().optional(),
+  modified_date: timestampString.nullable().optional(),
+  last_used_date: timestampString.nullable().optional(),
+  template_file_path: z.string().nullable().optional(),
+});
+export type DocumentTemplateRow = z.infer<typeof documentTemplateRow>;
 
 // GET /api/templates → DocumentTemplate[] (the unwrapped `data`).
-// Intentionally loose: DocumentTemplate has 25+ fields; route uses manual envelope,
-// not sendData, so tightening yields no server-side type check benefit.
-export const getTemplates = { response: z.array(z.unknown()) } as const;
+export const getTemplates = { response: z.array(documentTemplateRow) } as const;
 
 // GET /api/templates/document-types → DocumentType[].
-// Intentionally loose: DocumentType shape comes from template-queries; route is manual envelope.
-export const documentTypes = { response: z.array(z.unknown()) } as const;
+export const documentTypes = { response: z.array(documentTypeRow) } as const;
 
-// GET /api/templates/:templateId → a single template row.
-// Intentionally loose: full DocumentTemplate row preserved without field enumeration.
-export const getTemplate = { response: z.unknown() } as const;
+// GET /api/templates/:templateId → a single template row (handler 404s on null).
+export const getTemplate = { response: documentTemplateRow } as const;
 
 // Path params + list query (type-only; handlers parse the query strings manually).
 export const templateIdParams = z.object({ templateId: z.string() });

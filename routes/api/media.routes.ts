@@ -133,7 +133,7 @@ router.post('/webceph/create-patient', validate({ body: media.createPatient.body
  * POST /webceph/upload-image
  * Form data: image (file), patientID, recordDate, targetClass
  */
-router.post('/webceph/upload-image', uploadImage, async (req: FileRequest, res: Response): Promise<void> => {
+router.post('/webceph/upload-image', uploadImage, validate({ body: media.uploadImage.body }), async (req: FileRequest, res: Response): Promise<void> => {
   try {
     const { patient_id, recordDate, targetClass } = req.body;
 

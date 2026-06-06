@@ -6,24 +6,11 @@ import { fetchJSON, httpErrorMessage } from '@/core/http';
 import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './AllSetsList.module.css';
 
-interface AlignerSetView {
-    person_id: number;
-    work_id: number;
-    aligner_set_id: number;
-    patient_name: string;
-    doctor_name: string;
-    aligner_dr_id: number;
-    set_sequence: number | null;
-    batch_sequence: number | null;
-    delivered_to_patient_date: string | null;
-    NextDueDate: string | null;
-    NextBatchPresent: 'True' | 'False';
-    LabStatus: 'no_batches' | 'needs_mfg' | 'in_lab' | 'all_delivered';
-    is_last: boolean | number;
-    SetIsActive: boolean | number;
-    WorkStatus: number;
-    notes: string | null;
-}
+// Row shape comes from the shared contract (single source of truth, drift-checked
+// against the schema the all-sets read validates with). The validated read
+// guarantees `is_last`/`SetIsActive` are booleans, so the numeric (0/1) fallbacks
+// the old local copy carried are gone.
+type AlignerSetView = alignerContract.AlignerSetView;
 
 type SortColumn = 'patient_name' | 'doctor_name' | 'set_sequence' | 'batch_sequence' | 'LabStatus' | 'NextDueDate' | 'notes';
 type SortDirection = 'asc' | 'desc';
@@ -97,7 +84,7 @@ const AllSetsList: React.FC = () => {
 
     // Render next batch status badge (combined status + readiness)
     const renderBatchStateBadge = (set: AlignerSetView): ReactNode => {
-        const isFinal = set.is_last === true || set.is_last === 1;
+        const isFinal = set.is_last === true;
 
         // No batches exist
         if (set.LabStatus === 'no_batches') {
@@ -140,7 +127,7 @@ const AllSetsList: React.FC = () => {
 
         // Filter by inactive sets (hide by default)
         if (!showInactiveSets) {
-            filtered = filtered.filter(s => s.SetIsActive === true || s.SetIsActive === 1);
+            filtered = filtered.filter(s => s.SetIsActive === true);
         }
 
         // Filter by finished/discontinued status (hide by default)
@@ -259,21 +246,21 @@ const AllSetsList: React.FC = () => {
     const uniqueDoctors = getUniqueDoctors();
 
     // Count different patient categories (excluding inactive sets and finished/discontinued if hidden)
-    const baseSets = showInactiveSets ? sets : sets.filter(s => s.SetIsActive === true || s.SetIsActive === 1);
+    const baseSets = showInactiveSets ? sets : sets.filter(s => s.SetIsActive === true);
     const activeSets = showFinished ? baseSets : baseSets.filter(s => s.WorkStatus !== 2 && s.WorkStatus !== 3);
 
     // Count by next batch status
     const noBatchesCount = activeSets.filter(s => s.LabStatus === 'no_batches').length;
     const pendingManufactureCount = activeSets.filter(s => s.LabStatus === 'needs_mfg').length;
     const pendingDeliveryCount = activeSets.filter(s => s.LabStatus === 'in_lab').length;
-    const lastBatchCount = activeSets.filter(s => s.is_last === true || s.is_last === 1).length;
+    const lastBatchCount = activeSets.filter(s => s.is_last === true).length;
     const finishedCount = baseSets.filter(s => s.WorkStatus === 2 || s.WorkStatus === 3).length;
-    const inactiveSetsCount = sets.filter(s => s.SetIsActive !== true && s.SetIsActive !== 1).length;
+    const inactiveSetsCount = sets.filter(s => s.SetIsActive !== true).length;
     const noNextBatchCount = activeSets.filter(s => s.NextBatchPresent === 'False' && s.delivered_to_patient_date).length;
     // Count sets that are "Not Created" - all batches delivered but not marked as final
     const notCreatedCount = activeSets.filter(s =>
         s.batch_sequence &&
-        !(s.is_last === true || s.is_last === 1) &&
+        !(s.is_last === true) &&
         s.NextBatchPresent === 'False' &&
         s.LabStatus === 'all_delivered'
     ).length;
@@ -464,7 +451,7 @@ const AllSetsList: React.FC = () => {
                                         return <span className={`${styles.badge} ${styles.badgeNoBatch}`}>No active batch</span>;
                                     }
                                     // Has delivered batch - show batch number and delivery date
-                                    const isFinal = set.is_last === true || set.is_last === 1;
+                                    const isFinal = set.is_last === true;
                                     return (
                                         <>
                                             <span className={`${styles.badge} ${styles.badgeBatch}`}>

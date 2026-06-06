@@ -22,17 +22,6 @@ export type IsoTimestamp = string;
 // =============================================================================
 
 /**
- * Boolean-success wrapper with a typed data payload. Used by the /api/templates
- * endpoints. Mirrors the backend `{ success, data, message?, error? }` envelope.
- */
-export interface ApiStatusResponse<T> {
-    success: boolean;
-    data: T;
-    message?: string;
-    error?: string;
-}
-
-/**
  * Boolean-success convention — mirrors backend types/api.types.ts ApiResponse<T>.
  * New code should prefer this shape.
  */
@@ -56,12 +45,6 @@ export interface ApiResponse<T = unknown> {
      * this shared type.)
      */
     timestamp: IsoTimestamp;
-}
-
-export interface ApiSuccessResponse<T = unknown> {
-    success: true;
-    data?: T;
-    message?: string;
 }
 
 export interface ApiErrorResponse {
@@ -146,17 +129,6 @@ export interface SlotRenderSpec {
     output: { width: number; height: number };
 }
 
-/** POST /api/photo-editor/:personId/prepare request body. */
-export interface PhotoPrepareRequest {
-    tpDescription: string;
-    tpDate: DateOnly;
-    /** Confirm overriding an existing Initial/Final tblwork photo date. */
-    overrideDate?: boolean;
-    /** Supplied on resubmit when the patient has no English name (Dolphin can't store Arabic). */
-    firstName?: string;
-    lastName?: string;
-}
-
 /**
  * POST /api/photo-editor/:personId/prepare response payload — the inner `data` of
  * the `sendSuccess` envelope (unwrapped by `core/http.ts`). A discriminated union
@@ -178,52 +150,14 @@ export type PhotoPrepareResult =
       }
     | { needsName: true; message: string };
 
-/** POST /api/photo-editor/:personId/render request body. */
-export interface PhotoRenderRequest {
-    tpCode: number;
-    tpName: string;
-    tpDate: string;
-    slots: SlotRenderSpec[];
-}
-
-/**
- * POST /api/photo-editor/:personId/render response (202 Accepted). The render runs
- * in the background; completion is announced over SSE (`photos_rendered`), so the
- * synchronous response only confirms the timepoint was resolved and work was queued.
- */
-export interface PhotoRenderResult {
-    success: true;
-    queued: true;
-    tp_code: number;
-}
-
 // =============================================================================
 // PORTAL ACCESS (staff side — managing a patient's portal access)
 // =============================================================================
-
-/** Read-shape returned by GET /api/patients/:id/portal. */
-export interface PortalStatus {
-    enabled: boolean;
-    hasPin: boolean;
-    lockedUntil: string | null;
-    lastLoginAt: string | null;
-    failedAttempts: number;
-    qrDataUrl: string;
-    portalUrl: string;
-}
-
-/** Wrapper for PortalStatus — fields beyond `success` may be missing on error. */
-export interface PortalStatusResponse extends Partial<PortalStatus> {
-    success: boolean;
-    error?: string;
-}
-
-/** POST /api/patients/:id/portal/reset-pin. Distinct from WhatsAppResetResponse. */
-export interface PortalPinResetResponse {
-    success: boolean;
-    pin?: string;
-    error?: string;
-}
+// The staff-side portal read shapes (PortalStatus / PortalStatusResponse /
+// PortalPinResetResponse) are co-located with their sole consumer,
+// components/react/PortalAccessCard.tsx — they annotate the long tail of the
+// loose `portalStatus.response` contract container, so they belong with the
+// component, not in this envelope/utility-only file.
 
 // =============================================================================
 // PORTAL — PATIENT-FACING DATA TABS
@@ -256,50 +190,16 @@ export interface EmailResponse {
 // FILE EXPLORER (/api/patients/:id/files*)
 // =============================================================================
 
-/** Coarse file class that drives the explorer icon + preview strategy. */
-export type FileCategory =
-    | 'image'
-    | 'video'
-    | 'audio'
-    | 'pdf'
-    | 'text'
-    | 'office'
-    | 'archive'
-    | 'other';
-
-/** A single directory entry. `size`/`modified` are omitted in flat mode. */
-export interface FileEntry {
-    name: string;
-    /** Path relative to the patient root, web-style `/` separators. */
-    relPath: string;
-    type: 'file' | 'dir' | 'symlink';
-    size?: number;
-    /** ISO-8601 timestamp. */
-    modified?: IsoTimestamp;
-    ext: string;
-    category: FileCategory;
-}
-
-/** GET /api/patients/:id/files → ApiResponse<FileListing>. */
-export interface FileListing {
-    /** Browsed path relative to the patient root (`''` = root). */
-    path: string;
-    parent: string | null;
-    flat: boolean;
-    truncated: boolean;
-    entries: FileEntry[];
-}
-
-/** One entry's outcome in a bulk soft-delete. */
-export interface FileDeleteResult {
-    relPath: string;
-    ok: boolean;
-    error?: string;
-}
-
-/** POST /api/patients/:id/files/delete-batch → ApiResponse<FileBatchDeleteResult>. */
-export interface FileBatchDeleteResult {
-    results: FileDeleteResult[];
-    succeeded: number;
-    failed: number;
-}
+// The file-explorer shapes (FileEntry/FileListing/FileBatchDeleteResult + the
+// FileCategory/FileEntryType/FileDeleteResult helpers) are now authored once as Zod
+// in the shared contract and re-exported here so existing `@/types/api.types`
+// imports keep working — the contract is the single source of truth (same fold as
+// pages/aligner/aligner.types.ts). `modified` is a plain ISO string there.
+export type {
+    FileCategory,
+    FileEntryType,
+    FileEntry,
+    FileListing,
+    FileDeleteResult,
+    FileBatchDeleteResult,
+} from '@shared/contracts/file-explorer.contract';

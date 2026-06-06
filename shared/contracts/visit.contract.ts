@@ -82,6 +82,7 @@ export const addVisit = {
   response: z.object({ visitId: z.number().optional() }),
 } as const;
 export type AddVisitBody = z.infer<typeof addVisit.body>;
+export type AddVisitResponse = z.infer<typeof addVisit.response>;
 
 // PUT /api/updatevisitbywork — void success. Client posts { visitId, ...formData },
 // so `work_id` rides along (optional; `updateVisitByWorkId` ignores it).

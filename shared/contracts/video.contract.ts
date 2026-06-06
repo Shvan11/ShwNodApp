@@ -69,18 +69,20 @@ export const qr = {
   response: z.looseObject({ qr: z.string(), url: z.string() }),
 } as const;
 
-// POST /api/videos → created Video (rich → preserve). Multipart body.
+// POST /api/videos → created Video. Multipart body. The handler returns
+// getVideoById(newId) — the same `Video | null` shape as `byId`, so it reuses
+// videoRow. (The consumer Videos.tsx doesn't read the body — it calls loadVideos()
+// after — but modeling it as the row costs nothing and keeps the client guard real.)
 export const create = {
   body: createVideoBody,
-  // Intentionally loose: consumer (Videos.tsx) does not read the create response — calls loadVideos() after
-  response: z.unknown(),
+  response: videoRow.nullable(),
 } as const;
 
-// PUT /api/videos/:id → updated Video (rich → preserve). Multipart body.
+// PUT /api/videos/:id → updated Video. Multipart body. Same as `create`: the
+// handler returns getVideoById(id), so the response reuses videoRow.
 export const update = {
   body: updateVideoBody,
-  // Intentionally loose: consumer (Videos.tsx) does not read the update response — calls loadVideos() after
-  response: z.unknown(),
+  response: videoRow.nullable(),
 } as const;
 
 // DELETE /api/videos/:id → { id }.

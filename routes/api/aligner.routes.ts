@@ -1063,9 +1063,9 @@ router.get(
  */
 router.patch(
   '/aligner/sets/:setId/archform',
-  validate({ params: contract.setIdParams }),
+  validate({ params: contract.setIdParams, body: contract.setArchformMatch.body }),
   async (
-    req: Request<{ setId: string }, unknown, { archformId: number | null }>,
+    req: Request<{ setId: string }, unknown, contract.SetArchformMatchBody>,
     res: Response
   ): Promise<void> => {
     try {

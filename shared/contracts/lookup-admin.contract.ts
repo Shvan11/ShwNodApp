@@ -12,10 +12,7 @@
  * relocated `:id` guard keeps a junk id 400-ing instead of reaching the PK query.
  */
 import { z } from 'zod';
-import { numericParam } from '../validation.js';
-
-// "is it an array" guard — flip-free (every type is assignable to `unknown`).
-const anyArray = z.array(z.unknown());
+import { anyArray, numericParam } from '../validation.js';
 
 // PUT/DELETE param guard — numeric `:id` + a table name.
 const tableIdParams = z.object({ tableName: z.string().min(1), id: numericParam });
@@ -38,8 +35,9 @@ export const items = {
   response: anyArray,
 } as const;
 
-// POST /api/admin/lookups/:tableName → { id }. The id is a uuid (string),
-// numeric id, or null depending on the table — modeled loosely to preserve all id types.
+// POST /api/admin/lookups/:tableName → { id }.
+// Intentionally loose: the id is a uuid (string), numeric id, or null depending on
+// the table — modeled loosely to preserve all id types.
 export const createItem = {
   body: lookupItemBody,
   response: z.object({ id: z.unknown() }),

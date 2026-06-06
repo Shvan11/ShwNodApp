@@ -10,37 +10,6 @@ import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
 
 // type definitions
-export interface AppointmentRow {
-  Num: number;
-  apptime: string;
-  patient_type: string;
-  patient_name: string;
-  app_detail: string;
-  present: string | null;
-  seated: string | null;
-  dismissed: string | null;
-  HasVisit: boolean;
-  appointment_id: number;
-  person_id?: number;
-  phone?: string | null;
-  notes?: string | null;
-  dr_id?: number | null;
-  work_id?: number | null;
-}
-
-interface AppointmentStats {
-  all: number;
-  present: number;
-  waiting: number;
-  completed: number;
-  seated?: number;
-  dismissed?: number;
-}
-
-interface AppointmentsResponse extends AppointmentStats {
-  appointments: AppointmentRow[];
-}
-
 interface UpdatePresentResult {
   success: boolean;
   appointment_id: number;
@@ -68,11 +37,17 @@ export interface DailyAppointmentStats {
   completed?: number;
 }
 
-export interface DailyAppointmentsOptimizedResult {
-  allAppointments: Record<string, unknown>[];
-  checkedInAppointments: Record<string, unknown>[];
+// A daily-appointments row: `appointment_id` is typed (matching the contract's
+// looseObject row); the remaining columns ride the index signature. A `type`
+// (not `interface`) so it stays assignable to the contract's looseObject
+// `z.input` — sendData would reject an interface (TS2345, string index sig).
+type DailyAppointmentRow = { appointment_id: number; [key: string]: unknown };
+
+export type DailyAppointmentsOptimizedResult = {
+  allAppointments: DailyAppointmentRow[];
+  checkedInAppointments: DailyAppointmentRow[];
   stats: DailyAppointmentStats;
-}
+};
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
@@ -97,65 +72,6 @@ function isMidnight(date: Date): boolean {
 
 function toDateStr(d: Date | string): string {
   return typeof d === 'string' ? d.slice(0, 10) : `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
-
-/**
- * Retrieves checked-in (present, not dismissed) appointments for a date + the day's counts.
- * (was: PTodayAppsWeb — note its result placed person_id in the `pid`/appointmentID slot; preserved.)
- */
-export async function getPresentAps(PDate: string): Promise<AppointmentsResponse> {
-  const dateStr = toDateStr(PDate);
-  const db = getKysely();
-
-  const rows = await db
-    .selectFrom('appointments as a')
-    .innerJoin('patients as p', 'p.person_id', 'a.person_id')
-    .leftJoin('patient_types as pt', 'pt.id', 'p.patient_type_id')
-    .where('a.app_day', '=', sql<string>`${dateStr}::date`)
-    .where('a.present', 'is not', null)
-    .where('a.dismissed', 'is', null)
-    .orderBy('a.present')
-    .select([
-      'a.appointment_id', 'a.person_id', 'a.app_date', 'a.present', 'a.seated', 'a.dismissed',
-      'a.app_detail', 'p.patient_name', 'pt.patient_type',
-      sql<boolean>`EXISTS(SELECT 1 FROM "works" w JOIN "visits" v ON v."work_id"=w."work_id" WHERE w."person_id"=a."person_id" AND v."visit_date"=${dateStr}::date)`.as('hasVisit'),
-    ])
-    .execute();
-
-  const appointments: AppointmentRow[] = rows.map((r, i) => {
-    const appDate = r.app_date as unknown as Date;
-    return {
-      Num: i + 1,
-      apptime: isMidnight(appDate) ? (null as unknown as string) : fmtClock(appDate, false),
-      patient_type: r.patient_type ?? '',
-      patient_name: r.patient_name,
-      app_detail: r.app_detail ?? '',
-      present: fmtTimeStr(r.present as string | null),
-      seated: fmtTimeStr(r.seated as string | null),
-      dismissed: fmtTimeStr(r.dismissed as string | null),
-      HasVisit: r.hasVisit,
-      appointment_id: r.person_id, // preserves the proc's `pid AS <last col>` (consumer reads it here)
-    };
-  });
-
-  const counts = await db
-    .selectFrom('appointments')
-    .where('app_day', '=', sql<string>`${dateStr}::date`)
-    .select((eb) => [
-      eb.fn.countAll<number>().as('all'),
-      eb.fn.sum<number>(sql`CASE WHEN "present" IS NOT NULL THEN 1 ELSE 0 END`).as('present'),
-      eb.fn.sum<number>(sql`CASE WHEN "present" IS NOT NULL AND "seated" IS NULL THEN 1 ELSE 0 END`).as('waiting'),
-      eb.fn.sum<number>(sql`CASE WHEN "dismissed" IS NOT NULL THEN 1 ELSE 0 END`).as('completed'),
-    ])
-    .executeTakeFirst();
-
-  return {
-    appointments,
-    all: Number(counts?.all ?? 0),
-    present: Number(counts?.present ?? 0),
-    waiting: Number(counts?.waiting ?? 0),
-    completed: Number(counts?.completed ?? 0),
-  };
 }
 
 /**

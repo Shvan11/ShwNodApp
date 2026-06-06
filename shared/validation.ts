@@ -102,3 +102,13 @@ export const optionalNonNegIntQuery = z
  * `--date-parser string`), so model them as a plain `z.string()`, not this.
  */
 export const timestampString = z.union([z.string(), z.date().transform((d) => d.toISOString())]);
+
+/**
+ * RESPONSE-side "is it an array" guard — `z.array(z.unknown())`. Flip-free (every
+ * type is assignable to `unknown`), so it asserts the array CLASS while preserving the
+ * payload, without forcing a query/route `interface`→`type` flip. Use for a response
+ * whose ROW shape is intentionally long-tail/dynamic (a counted D2 marker — see the
+ * allowlist note in CLAUDE.md). Centralized here (was duplicated as a local `const` in
+ * several contracts) so the docs' "primitive lives in shared/validation.ts" claim holds.
+ */
+export const anyArray = z.array(z.unknown());

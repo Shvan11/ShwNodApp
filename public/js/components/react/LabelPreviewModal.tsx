@@ -12,6 +12,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import { prefetchCsrfToken } from '../../core/http';
 import Modal from './Modal';
 import styles from './LabelPreviewModal.module.css';
 
@@ -465,10 +466,13 @@ const LabelPreviewModal = ({
         try {
             const richLabels = buildRichLabels();
 
-            // eslint-disable-next-line no-restricted-syntax -- returns a PDF blob (res.blob()) + reads X-Total-* response headers; needs the raw Response
+            // eslint-disable-next-line no-restricted-syntax -- returns a PDF blob (res.blob()) + reads X-Total-* response headers; needs the raw Response (so it bypasses core/http.ts's envelope unwrap). The funnel also attaches the CSRF token on mutations, so we replicate that here (audit H2) — staffCsrfProtection 403s tokenless /api mutations.
             const response = await fetch('/api/aligner/labels/generate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-csrf-token': await prefetchCsrfToken(),
+                },
                 body: JSON.stringify({
                     labels: richLabels,
                     startingPosition,

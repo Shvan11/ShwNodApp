@@ -3,6 +3,7 @@
  */
 import { CONFIG } from './whatsapp-send-constants';
 import { validateApiResponse } from './whatsapp-validation';
+import { prefetchCsrfToken } from '../core/http';
 
 /**
  * Retry options for the retry manager
@@ -92,15 +93,26 @@ export class APIClient {
     try {
       return await RetryManager.withRetry<T>(
         async () => {
+          // Attach the CSRF double-submit token on mutations (audit H2): the
+          // unconditional staffCsrfProtection gate 403s tokenless /api mutations.
+          // Mirrors core/http.ts — this bespoke client bypasses that funnel.
+          const method = (fetchOptions.method || 'GET').toUpperCase();
+          const isMutation =
+            method === 'POST' ||
+            method === 'PUT' ||
+            method === 'PATCH' ||
+            method === 'DELETE';
+
           // eslint-disable-next-line no-restricted-syntax -- bespoke WhatsApp-send API client (parallel to core/http.ts): adds retry w/ exponential backoff (RetryManager), per-request AbortController cancellation, and validateApiResponse. Reconcile with core/http.ts once it gains retry (M8) + abort (M7).
           const response = await fetch(url, {
             signal: abortController.signal,
             credentials: 'same-origin', // Include session cookies for authentication
+            ...fetchOptions,
             headers: {
               'Content-Type': 'application/json',
               ...fetchOptions.headers,
+              ...(isMutation ? { 'x-csrf-token': await prefetchCsrfToken() } : {}),
             },
-            ...fetchOptions,
           });
 
           if (!response.ok) {

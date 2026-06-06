@@ -18,7 +18,6 @@ import type { EventEmitter } from 'events';
 import { sql } from 'kysely';
 import { getKysely } from '../../services/database/kysely.js';
 import {
-  getPresentAps,
   updatePresent,
   undoAppointmentState
 } from '../../services/database/queries/appointment-queries.js';
@@ -103,22 +102,6 @@ router.get(
 // ============================================================================
 
 /**
- * Get current web apps (present appointments)
- * Returns appointments that have been checked in for the specified date
- */
-router.get(
-  '/getWebApps',
-  async (
-    req: Request<unknown, unknown, unknown, AppointmentQueryParams>,
-    res: Response
-  ): Promise<void> => {
-    const { PDate } = req.query;
-    const result = await getPresentAps(PDate as string);
-    sendData(res, appointment.webApps.response, result);
-  }
-);
-
-/**
  * Get daily appointments (OPTIMIZED - Phase 2)
  * Unified endpoint that replaces getAllTodayApps + getPresentTodayApps
  * Returns all appointment data in a single API call with 80% performance improvement
@@ -145,7 +128,7 @@ router.get(
       // Delegate to service layer
       const result = await getDailyAppointments(AppsDate);
 
-      sendSuccess(res, result);
+      sendData(res, appointment.dailyAppointments.response, result);
     } catch (error) {
       log.error('Error fetching daily appointments (optimized):', error);
 

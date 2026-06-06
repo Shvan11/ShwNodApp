@@ -9,7 +9,7 @@
  * Phase 0: response-only (migrated from the deleted public/js/core/api.schemas.ts).
  */
 import { z } from 'zod';
-import { idParams, intId } from '../validation.js';
+import { idParams, intId, timestampString } from '../validation.js';
 
 // ---------------------------------------------------------------------------
 // GET /api/getDailyAppointments?AppsDate=YYYY-MM-DD
@@ -19,10 +19,10 @@ import { idParams, intId } from '../validation.js';
 // UI keeps the long tail of row fields (core/http returns the PARSED payload, so
 // looseObject is load-bearing — see the tracker's Findings log).
 //
-// NOTE (Phase 7): the SERVER handler keeps `sendSuccess` (not `sendData`) for this
-// one endpoint — the service returns `Record<string, unknown>[]` rows, which are
-// NOT assignable to this schema's `{ appointment_id: number }` row `z.input`. The
-// CLIENT still validates via `useAppointments` ({ schema: dailyAppointments.response }).
+// The SERVER handler returns via `sendData` (dev-parse fail-loud) — the query's
+// `DailyAppointmentsOptimizedResult` types each row as `{ appointment_id: number;
+// [k: string]: unknown }`, which IS assignable to this schema's looseObject row
+// `z.input`. The CLIENT also validates via `useAppointments` ({ schema }).
 // ---------------------------------------------------------------------------
 
 const appointmentRowSchema = z.looseObject({
@@ -62,13 +62,6 @@ export const appointmentDetails = {
   response: z.array(z.looseObject({ id: z.number() })),
 } as const;
 export type AppointmentDetailsResponse = z.infer<typeof appointmentDetails.response>;
-
-// GET /api/getWebApps?PDate= — rich AppointmentsResponse (stats + appointments[]).
-// Intentionally loose: assembled by AppointmentService from a query interface;
-// the hierarchical stats+appointments shape is preserved without field enumeration.
-export const webApps = {
-  response: z.unknown(),
-} as const;
 
 // Shared body for the two state mutations. `time` (read by updateAppointmentState
 // as the optional client-supplied clock value) is now enumerated; undo ignores it.
@@ -140,23 +133,39 @@ export const appointmentById = {
   response: z.object({ appointment: z.looseObject({ appointment_id: z.number() }) }),
 } as const;
 
-// POST /api/appointments/quick-checkin — strict body; rich QuickCheckInResult.
-// Intentionally loose: QuickCheckInResult assembled by AppointmentService contains
-// a nested appointment object with patient/doctor details — not statically enumerable.
+// POST /api/appointments/quick-checkin — strict body; QuickCheckInResult.
+// Modeled from AppointmentService's QuickCheckInResult (closed → the interface stays
+// assignable to sendData). `appointment_id` is `number | undefined` → optional;
+// `present` is string|Date → timestampString (Date in / string out).
 export const quickCheckin = {
   body: z.object({
     person_id: intId,
     dr_id: intId.optional(),
     app_detail: z.string().optional(),
   }),
-  response: z.unknown(),
+  response: z.object({
+    success: z.boolean(),
+    alreadyCheckedIn: z.boolean().optional(),
+    checkedIn: z.boolean().optional(),
+    created: z.boolean().optional(),
+    appointment_id: z.number().optional(),
+    message: z.string(),
+    appointment: z.object({
+      appointment_id: z.number().optional(),
+      person_id: z.number(),
+      app_date: z.string(),
+      app_detail: z.string().optional(),
+      dr_id: z.number().nullable().optional(),
+      present: timestampString.optional(),
+    }),
+  }),
 } as const;
 export type QuickCheckinBody = z.infer<typeof quickCheckin.body>;
+export type QuickCheckinResponse = z.infer<typeof quickCheckin.response>;
 
-// Route-level GET query view (`?PDate=` / `?AppsDate=`). Type-only — the
-// dailyAppointments/webApps reads parse the date string themselves.
+// Route-level GET query view (`?AppsDate=`). Type-only — the dailyAppointments
+// read parses the date string itself.
 export const appointmentQuery = z.object({
-  PDate: z.string().optional(),
   AppsDate: z.string().optional(),
 });
 export type AppointmentQueryParams = z.infer<typeof appointmentQuery>;

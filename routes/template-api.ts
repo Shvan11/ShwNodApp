@@ -6,14 +6,9 @@
 import { Router, type Request, type Response } from 'express';
 import { log } from '../utils/logger.js';
 import * as templateQueries from '../services/database/queries/template-queries.js';
-import type {
-  CreateTemplateBody,
-  UpdateTemplateBody,
-  SaveHtmlBody,
-  TemplateIdParams,
-  WorkIdParams,
-  TemplateQueryParams,
-} from '../shared/contracts/template.contract.js';
+import * as templateContract from '../shared/contracts/template.contract.js';
+import { sendData, sendSuccess, sendError, ErrorResponses } from '../utils/error-response.js';
+import { validate } from '../middleware/validate.js';
 import {
   generateReceiptHTML,
   generateNoWorkReceiptHTML
@@ -46,13 +41,11 @@ function withAutoPrint(html: string): string {
 // TYPE DEFINITIONS
 // ============================================================================
 
-// TemplateIdParams / WorkIdParams / TemplateQueryParams are contracted in
-// shared/contracts/template.contract.ts (imported above; type-only).
-
-// Body shapes (CreateTemplateBody / UpdateTemplateBody / SaveHtmlBody) come from
-// the template contract — these handlers keep their own required-field checks and
-// raw response envelopes, so the contract is the type SSoT but isn't wired to
-// `validate()` (no boundary behaviour change).
+// All request shapes (bodies, params, query) and the JSON responses are authored
+// in shared/contracts/template.contract.ts and referenced via `templateContract.*`:
+// the routes `validate()` against the contract schemas and return through
+// `sendData` / `sendSuccess`. Receipt + raw-HTML endpoints stay raw on success
+// (res.send) but use the standard error envelope (ErrorResponses / sendError).
 
 // ============================================================================
 // DOCUMENT TYPES
@@ -67,17 +60,10 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const documentTypes = await templateQueries.getDocumentTypes();
-      res.json({
-        success: true,
-        data: documentTypes
-      });
+      sendData(res, templateContract.documentTypes.response, documentTypes);
     } catch (error) {
       log.error('Error fetching document types', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch document types',
-        error: (error as Error).message
-      });
+      ErrorResponses.serverError(res, 'Failed to fetch document types', error as Error);
     }
   }
 );
@@ -93,8 +79,9 @@ router.get(
  */
 router.get(
   '/',
+  validate({ query: templateContract.templateQuery }),
   async (
-    req: Request<unknown, unknown, unknown, TemplateQueryParams>,
+    req: Request<unknown, unknown, unknown, templateContract.TemplateQueryParams>,
     res: Response
   ): Promise<void> => {
     try {
@@ -116,17 +103,10 @@ router.get(
 
       const templates = await templateQueries.getDocumentTemplates(filters);
 
-      res.json({
-        success: true,
-        data: templates
-      });
+      sendData(res, templateContract.getTemplates.response, templates);
     } catch (error) {
       log.error('Error fetching templates', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch templates',
-        error: (error as Error).message
-      });
+      ErrorResponses.serverError(res, 'Failed to fetch templates', error as Error);
     }
   }
 );
@@ -137,7 +117,8 @@ router.get(
  */
 router.get(
   '/:templateId',
-  async (req: Request<TemplateIdParams>, res: Response): Promise<void> => {
+  validate({ params: templateContract.templateIdParams }),
+  async (req: Request<templateContract.TemplateIdParams>, res: Response): Promise<void> => {
     try {
       const { templateId } = req.params;
       const template = await templateQueries.getTemplateById(
@@ -145,24 +126,14 @@ router.get(
       );
 
       if (!template) {
-        res.status(404).json({
-          success: false,
-          message: 'Template not found'
-        });
+        ErrorResponses.notFound(res, 'Template');
         return;
       }
 
-      res.json({
-        success: true,
-        data: template
-      });
+      sendData(res, templateContract.getTemplate.response, template);
     } catch (error) {
       log.error('Error fetching template', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch template',
-        error: (error as Error).message
-      });
+      ErrorResponses.serverError(res, 'Failed to fetch template', error as Error);
     }
   }
 );
@@ -173,36 +144,26 @@ router.get(
  */
 router.post(
   '/',
+  validate({ body: templateContract.createTemplate.body }),
   async (
-    req: Request<unknown, unknown, CreateTemplateBody>,
+    req: Request<unknown, unknown, templateContract.CreateTemplateBody>,
     res: Response
   ): Promise<void> => {
     try {
       const templateData = req.body;
 
-      // Validate required fields
-      if (!templateData.template_name || !templateData.document_type_id) {
-        res.status(400).json({
-          success: false,
-          message: 'Missing required fields: template_name, document_type_id'
-        });
-        return;
-      }
-
       const templateId = await templateQueries.createTemplate(templateData);
 
-      res.status(201).json({
-        success: true,
-        message: 'Template created successfully',
-        data: { template_id: templateId }
-      });
+      sendData(
+        res,
+        templateContract.createTemplate.response,
+        { template_id: templateId },
+        'Template created successfully',
+        201
+      );
     } catch (error) {
       log.error('Error creating template', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        message: 'Failed to create template',
-        error: (error as Error).message
-      });
+      ErrorResponses.serverError(res, 'Failed to create template', error as Error);
     }
   }
 );
@@ -213,8 +174,12 @@ router.post(
  */
 router.put(
   '/:templateId',
+  validate({
+    params: templateContract.templateIdParams,
+    body: templateContract.updateTemplate.body,
+  }),
   async (
-    req: Request<TemplateIdParams, unknown, UpdateTemplateBody>,
+    req: Request<templateContract.TemplateIdParams, unknown, templateContract.UpdateTemplateBody>,
     res: Response
   ): Promise<void> => {
     try {
@@ -226,35 +191,22 @@ router.put(
         parseInt(templateId)
       );
       if (!existingTemplate) {
-        res.status(404).json({
-          success: false,
-          message: 'Template not found'
-        });
+        ErrorResponses.notFound(res, 'Template');
         return;
       }
 
       // Check if it's a system template
       if (existingTemplate.is_system && templateData.is_system === false) {
-        res.status(403).json({
-          success: false,
-          message: 'Cannot modify system template flag'
-        });
+        ErrorResponses.forbidden(res, 'Cannot modify system template flag');
         return;
       }
 
       await templateQueries.updateTemplate(parseInt(templateId), templateData);
 
-      res.json({
-        success: true,
-        message: 'Template updated successfully'
-      });
+      sendSuccess(res, null, 'Template updated successfully');
     } catch (error) {
       log.error('Error updating template', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        message: 'Failed to update template',
-        error: (error as Error).message
-      });
+      ErrorResponses.serverError(res, 'Failed to update template', error as Error);
     }
   }
 );
@@ -265,32 +217,23 @@ router.put(
  */
 router.delete(
   '/:templateId',
-  async (req: Request<TemplateIdParams>, res: Response): Promise<void> => {
+  validate({ params: templateContract.templateIdParams }),
+  async (req: Request<templateContract.TemplateIdParams>, res: Response): Promise<void> => {
     try {
       const { templateId } = req.params;
 
       await templateQueries.deleteTemplate(parseInt(templateId));
 
-      res.json({
-        success: true,
-        message: 'Template deleted successfully'
-      });
+      sendSuccess(res, null, 'Template deleted successfully');
     } catch (error) {
       log.error('Error deleting template', { error: (error as Error).message });
 
       if ((error as Error).message.includes('system template')) {
-        res.status(403).json({
-          success: false,
-          message: (error as Error).message
-        });
+        ErrorResponses.forbidden(res, (error as Error).message);
         return;
       }
 
-      res.status(500).json({
-        success: false,
-        message: 'Failed to delete template',
-        error: (error as Error).message
-      });
+      ErrorResponses.serverError(res, 'Failed to delete template', error as Error);
     }
   }
 );
@@ -305,31 +248,24 @@ router.delete(
  */
 router.post(
   '/:templateId/save-html',
+  validate({
+    params: templateContract.templateIdParams,
+    body: templateContract.saveHtml.body,
+  }),
   async (
-    req: Request<TemplateIdParams, unknown, SaveHtmlBody>,
+    req: Request<templateContract.TemplateIdParams, unknown, templateContract.SaveHtmlBody>,
     res: Response
   ): Promise<void> => {
     try {
       const { templateId } = req.params;
       const { html } = req.body;
 
-      if (!html) {
-        res.status(400).json({
-          success: false,
-          message: 'Missing HTML content'
-        });
-        return;
-      }
-
       // Get template metadata
       const template = await templateQueries.getTemplateById(
         parseInt(templateId)
       );
       if (!template) {
-        res.status(404).json({
-          success: false,
-          message: 'Template not found'
-        });
+        ErrorResponses.notFound(res, 'Template');
         return;
       }
 
@@ -354,18 +290,15 @@ router.post(
       const fullPath = path.join(process.cwd(), filePath);
       await fs.writeFile(fullPath, html, 'utf-8');
 
-      res.json({
-        success: true,
-        message: 'Template saved successfully',
-        data: { file_path: filePath }
-      });
+      sendData(
+        res,
+        templateContract.saveHtml.response,
+        { file_path: filePath },
+        'Template saved successfully'
+      );
     } catch (error) {
       log.error('Error saving template HTML', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        message: 'Failed to save template',
-        error: (error as Error).message
-      });
+      ErrorResponses.serverError(res, 'Failed to save template', error as Error);
     }
   }
 );
@@ -377,11 +310,13 @@ router.post(
  * The template files live under ./data, which is intentionally NOT served as
  * static (see index.ts — that dir holds runtime state). So the designer can't
  * fetch the file directly; we read it server-side via fs.readFile (same trusted
- * path the receipt service uses) and hand back the HTML.
+ * path the receipt service uses) and hand back the HTML. Success is raw HTML
+ * (res.type('html').send) — a deliberately-raw response; only errors are enveloped.
  */
 router.get(
   '/:templateId/html',
-  async (req: Request<TemplateIdParams>, res: Response): Promise<void> => {
+  validate({ params: templateContract.templateIdParams }),
+  async (req: Request<templateContract.TemplateIdParams>, res: Response): Promise<void> => {
     try {
       const { templateId } = req.params;
 
@@ -389,14 +324,11 @@ router.get(
         parseInt(templateId)
       );
       if (!template) {
-        res.status(404).json({ success: false, message: 'Template not found' });
+        ErrorResponses.notFound(res, 'Template');
         return;
       }
       if (!template.template_file_path) {
-        res.status(404).json({
-          success: false,
-          message: 'Template has no saved HTML yet'
-        });
+        sendError(res, 404, 'Template has no saved HTML yet');
         return;
       }
 
@@ -408,18 +340,11 @@ router.get(
     } catch (error) {
       const err = error as NodeJS.ErrnoException;
       if (err.code === 'ENOENT') {
-        res.status(404).json({
-          success: false,
-          message: 'Template file not found on disk'
-        });
+        sendError(res, 404, 'Template file not found on disk');
         return;
       }
       log.error('Error reading template HTML', { error: err.message });
-      res.status(500).json({
-        success: false,
-        message: 'Failed to read template',
-        error: err.message
-      });
+      ErrorResponses.serverError(res, 'Failed to read template', err);
     }
   }
 );
@@ -430,11 +355,13 @@ router.get(
 
 /**
  * GET /api/templates/receipt/work/:workId
- * Generate receipt HTML for a work using file-based template
+ * Generate receipt HTML for a work using file-based template.
+ * Raw HTML on success (printed in the browser); only errors are enveloped.
  */
 router.get(
   '/receipt/work/:workId',
-  async (req: Request<WorkIdParams>, res: Response): Promise<void> => {
+  validate({ params: templateContract.workIdParams }),
+  async (req: Request<templateContract.WorkIdParams>, res: Response): Promise<void> => {
     try {
       const { workId } = req.params;
       const rendered = await generateReceiptHTML(parseInt(workId));
@@ -451,18 +378,15 @@ router.get(
       res.send(html);
     } catch (error) {
       log.error('Error generating receipt', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        message: 'Failed to generate receipt',
-        error: (error as Error).message
-      });
+      ErrorResponses.serverError(res, 'Failed to generate receipt', error as Error);
     }
   }
 );
 
 /**
  * GET /api/templates/receipt/no-work/:personId
- * Generate appointment confirmation receipt for patients with no works
+ * Generate appointment confirmation receipt for patients with no works.
+ * Raw HTML on success; only errors are enveloped.
  */
 router.get(
   '/receipt/no-work/:personId',
@@ -488,17 +412,14 @@ router.get(
       log.error('Error generating no-work receipt', { error: (error as Error).message });
 
       // Determine appropriate status code based on error message
-      const statusCode = (error as Error).message.includes('not found')
+      const message = (error as Error).message;
+      const statusCode = message.includes('not found')
         ? 404
-        : (error as Error).message.includes('no scheduled appointment')
+        : message.includes('no scheduled appointment')
           ? 400
           : 500;
 
-      res.status(statusCode).json({
-        success: false,
-        message: 'Failed to generate appointment receipt',
-        error: (error as Error).message
-      });
+      sendError(res, statusCode, 'Failed to generate appointment receipt', error as Error);
     }
   }
 );

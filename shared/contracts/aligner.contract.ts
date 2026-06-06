@@ -509,6 +509,11 @@ export const uploadPdf = {
 // ===========================================================================
 
 // PATCH /api/aligner/sets/:setId/archform — sendSuccess(null) (save/clear archform_id).
+// `archformId` is the Archform SQLite patient id, or null to clear the match.
+export const setArchformMatch = {
+  body: z.object({ archformId: z.number().int().nullable() }),
+} as const;
+export type SetArchformMatchBody = z.infer<typeof setArchformMatch.body>;
 
 // PUT /api/aligner/archform/patients/:id — { name, lastName }. The handler does
 // its own `!name`/`!lastName` 400 (with a specific message), so both stay

@@ -110,8 +110,8 @@ report-only until Phase 5 flips `STRICT`):
 | **D2** — loose response markers (`z.unknown()` / `anyArray` / `z.array(z.unknown`) in `shared/contracts/` | allowlist only | **103** lines | allowlist only |
 | **D3** — staff-app reads without a client `{ schema }` guard | `require-schema-on-reads` ESLint passes | **178** read call sites · **120** `schema:` usages · **~58** unguarded (heuristic) | every read guarded |
 
-**Current state (2026-06-06):** D1 = **0** ✅ (Phase 4; `BASELINE.D1` ratcheted **33 → 0**) · D2 = **41** ✅
-(Phase 3 — every slot fully modeled or allowlisted; `BASELINE.D2` ratcheted **103 → 41**) · D3 = **0** unguarded
+**Current state (2026-06-06):** D1 = **0** ✅ (Phase 4; `BASELINE.D1` ratcheted **33 → 0**) · D2 = **37** ✅
+(Phase 3 — every slot fully modeled or allowlisted; `BASELINE.D2` ratcheted **103 → 41 → 38 → 37**) · D3 = **0** unguarded
 (`require-schema-on-reads` ESLint rule live; the documented raw reads carry inline-disables). `npm run gate` green.
 **🎉 WAVE 3 COMPLETE — Phases 1–5 all done; the rollout is 100% finished and locked-in.**
 
@@ -213,6 +213,12 @@ first (it had been gate-green but uncommitted in the working tree — commit `85
   the one new guard — `GET /api/getworkdetails?workId=100`/`200` → **200** (server dev-parsed `getWorkDetails.response`
   on real data, identical to the client schema); `1`/`500` → clean 404. No fail-loud.
 - **Verdict:** all six DoD checks (D1–D6) met. The shared-contract rollout is **100% complete and enforced** end-to-end.
+
+**Session 17 — 2026-06-06 — post-lock-in D2 tighten: `patientById` modeled. D2 38 → 37, BASELINE.D2 ratcheted to 37.**
+- **The one remaining patient loose slot.** `patient.contract.patientById.response` was the last `z.unknown()` in `patient.contract.ts` — kept loose since Group 2 only on the FK-number-vs-form-string friction (a solvable coercion issue, not an unknowable shape). Modeled it as `patientByIdRow = z.looseObject({...19 PatientDetails columns..., alerts: z.array(alertRow)})` — the FK ids (`gender`/`address_id`/`referral_source_id`/`patient_type_id`/`tag_id`) + `language`/`estimated_cost` assert their true DB `number` type; `date_of_birth`/`date_added` are `string` (date / to_char'd). Exported `PatientByIdResponse`.
+- **Flipped `interface PatientDetails` → `type`** in `patient-queries.ts` so `PatientDetails & { alerts }` satisfies the looseObject index-sig rule at the route's `sendData(res, patientById.response, patientWithAlerts)` (now a real compile-time drift check).
+- **Client aligned + latent bug fixed.** `EditPatientComponent` replaced its hand-written parallel `interface PatientData` (which lied the FK ids as `string`) with `type PatientData = patientContract.PatientByIdResponse`. The form-population then had to coerce the now-honest numbers → `<select>` strings (`data.gender ? String(data.gender) : ''`, ×6). This also fixes a **pre-existing latent bug**: previously `data.gender || ''` left a runtime *number* in `formData.gender`, so saving an untouched patient POSTed numbers that `updatePatient.body`'s `z.string()` would 400.
+- **Gate GREEN:** `typecheck:all` ✅ (EXIT 0), `lint` ✅ (changed files clean), `contracts:check --strict` ✅ (**D1 = 0 ≤ 0, D2 = 37 ≤ 37**), `build` ✅. (Current-state header had lagged at 41 — the template ratchet to 38 wasn't recorded here; corrected to the live 37.)
 
 **Session 14 — 2026-06-06 — Phase 3 continued. D2 64 → 41. BASELINE.D2 ratcheted to 41.**
 - **Group 7 (Visit, 5 → 0):** Flipped 3 private interfaces (`wire`/`LatestWireDetails`/`Visit`) → `type` in `visit-queries.ts`. Fully modeled all 4 visit/wire responses: `getWires` → `z.array(z.looseObject({id}))`, `latestWires` → `z.looseObject({upper_wire_id,…4 nullable fields})`, `visitsByWork` → `z.array(z.looseObject({id}))`, `visitById` → `z.looseObject({id}).nullable()`. Removed `const anyArray`.
@@ -830,6 +836,31 @@ Two contract responses had to match the real (looser) source type, surfaced only
   only) + wired `{schema}` on the high-value funnel reads (cost-presets, options, db-config, videos, holidays,
   statistics, messaging status, files/working-files/photo-dates). media/utility/lookup-admin = server-side
   dev-parse only (no client `{schema}` per the locked decision), though they DO have consumers.
+
+### 2026-06-06 — Closed the two remaining documented contract exceptions + the raw-fetch CSRF gap
+- **`routes/template-api.ts` fully migrated off the hand-rolled `{success,data}` envelope.** All seven
+  JSON endpoints now `validate({ body/params/query })` against `template.contract` and return via
+  `sendData` (reads, create→`{template_id}` 201, save-html→`{file_path}`) / `sendSuccess(res, null, …)`
+  (update + delete message-only acks — the established holdout pattern, cf. work `diagnosis`, settings
+  `option`). Error paths use `ErrorResponses`/`sendError`. The 3 raw-HTML endpoints (`/:id/html`,
+  `receipt/work`, `receipt/no-work`) keep raw `res.send` on success (deliberately-raw) but adopt the
+  standard error envelope. **No D2 change** (the 3 list/get-one/document-types loose markers were already
+  in the allowlist; `saveHtml.response` is a closed `z.object`). The create body's required
+  `paper_width`/`paper_height` were verified against the client (`CreateTemplateModal` always sends them,
+  defaults 80/297) before wiring `validate` — no legitimate caller is 400'd. Fixed the stale `saveHtml`
+  doc-comment (`POST /save-html`, not `PUT /html` — the drift noted in Session 8).
+- **`media.contract.uploadImage` is now `validate()`-wired** (after multer). Root cause of the prior
+  type-only deferral: the client appended a stray `patientID` the handler never read (it destructures
+  `patient_id`), so the field was silently `undefined`. Aligned the client to send `patient_id` (matches
+  the contract + handler), then wired `validate({ body })`. The contract header's claim that both write
+  bodies were validate-wired is now actually true.
+- **CSRF double-submit closed for the raw-`fetch` consumers** that bypass the `core/http` funnel:
+  `LabelPreviewModal` (PDF blob) and the bespoke `whatsapp-api-client` now attach `x-csrf-token` via
+  `prefetchCsrfToken()` on mutations (audit H2 — `staffCsrfProtection` 403s tokenless `/api` mutations).
+  Audited every `public/js` raw `fetch`: the only other mutation is `PatientShell`→`/api/chair-display/*`,
+  which CSRF deliberately skips (sendBeacon can't set headers). Documented `prefetchCsrfToken`'s dual
+  purpose (eager warm + raw-consumer token source) so it doesn't re-read as a dead export.
+- Gate green: `typecheck:all` + `lint` + `contracts:check --strict` (D1=0, D2=41) + `build`, all EXIT 0.
 
 ## Verification log (gate results per phase)
 

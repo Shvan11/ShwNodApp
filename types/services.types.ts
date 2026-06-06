@@ -194,40 +194,6 @@ export interface PdfResult {
 }
 
 // ===========================================
-// SYNC SERVICE TYPES
-// ===========================================
-
-/**
- * Sync operation type
- */
-export type SyncOperation = 'INSERT' | 'UPDATE' | 'DELETE';
-
-/**
- * Sync queue item
- */
-export interface SyncQueueItem {
-  QueueID: number;
-  TableName: string;
-  RecordID: number;
-  Operation: SyncOperation;
-  JsonData?: string | null;
-  CreatedAt: Date;
-  Status: 'Pending' | 'Synced' | 'Failed';
-  Attempts: number;
-  LastError?: string | null;
-}
-
-/**
- * Sync result
- */
-export interface SyncResult {
-  success: boolean;
-  processed: number;
-  failed: number;
-  errors?: string[];
-}
-
-// ===========================================
 // GOOGLE DRIVE TYPES
 // ===========================================
 

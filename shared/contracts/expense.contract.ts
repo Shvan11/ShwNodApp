@@ -99,9 +99,26 @@ export const createExpense = {
 } as const;
 
 // GET /api/expenses/summary?startDate=&endDate= — { summary[], totals[] }.
+// summary = ExpenseSummary[] (per category+currency), totals = ExpenseTotal[]
+// (per currency) — both from expense-queries.
 export const expenseSummary = {
-  // Intentionally loose: rollup aggregate — computed server-side, structure varies by filter combination
-  response: z.object({ summary: z.array(z.unknown()), totals: z.array(z.unknown()) }),
+  response: z.object({
+    summary: z.array(
+      z.object({
+        category_name: z.string().nullable(),
+        currency: z.string(),
+        ExpenseCount: z.number(),
+        total_amount: z.number(),
+      })
+    ),
+    totals: z.array(
+      z.object({
+        currency: z.string(),
+        ExpenseCount: z.number(),
+        total_amount: z.number(),
+      })
+    ),
+  }),
 } as const;
 
 // GET /api/expenses/:id — single Expense row.

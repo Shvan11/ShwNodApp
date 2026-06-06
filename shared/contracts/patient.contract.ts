@@ -13,8 +13,9 @@
  *  - **Phase-3 hardening**: all array/object responses now carry modeled looseObject
  *    row schemas covering every field the consumer reads. Source interfaces in query
  *    modules were flipped to `type` to satisfy the looseObject index-sig rule.
- *    `patientById` remains loose — merged patient+alerts shape where FK columns
- *    (gender, address_id, etc.) are DB numbers but the form treats as strings.
+ *    `patientById` is now modeled too (`patientByIdRow` = PatientDetails columns +
+ *    attached `alerts`); the FK columns (gender, address_id, etc.) assert their true
+ *    DB `number` type — the edit form coerces them to `<select>` strings client-side.
  *  - **Bodies**: now FULLY ENUMERATED as strict `z.object` — the route's
  *    hand-written `CreatePatientBody`/`UpdatePatientBody`/`CreateAlertBody`/
  *    `UpdateAlertStatusBody`/`UpdateAlertBody` interfaces were deleted; handlers
@@ -115,6 +116,34 @@ const alertRow = z.looseObject({
   is_active: z.boolean(),
 });
 
+/** Single patient by id — the raw `patients` columns (getPatientById ⇒ PatientDetails)
+ *  with the active `alerts` attached. The FK ids (gender, address_id, referral_source_id,
+ *  patient_type_id, tag_id) and language/estimated_cost are DB **numbers**, not the edit
+ *  form's `<select>` strings — the consumer coerces them client-side. `date_of_birth` is
+ *  a `date` column and `date_added` is `to_char`'d → both `string`. */
+const patientByIdRow = z.looseObject({
+  person_id: z.number(),
+  patient_name: z.string(),
+  first_name: z.string().nullable(),
+  last_name: z.string().nullable(),
+  phone: z.string().nullable(),
+  phone2: z.string().nullable(),
+  email: z.string().nullable(),
+  date_of_birth: z.string().nullable(),
+  gender: z.number().nullable(),
+  address_id: z.number().nullable(),
+  referral_source_id: z.number().nullable(),
+  patient_type_id: z.number().nullable(),
+  notes: z.string().nullable(),
+  language: z.number().nullable(),
+  country_code: z.string().nullable(),
+  estimated_cost: z.number().nullable(),
+  currency: z.string().nullable(),
+  tag_id: z.number().nullable(),
+  date_added: z.string().nullable(),
+  alerts: z.array(alertRow),
+});
+
 // ===========================================================================
 // READS
 // ===========================================================================
@@ -168,10 +197,12 @@ export const typeOptions = {
   response: z.array(z.looseObject({ id: z.number() })),
 } as const;
 
-// GET /api/patients/:personId — single patient + alerts (rich, query-typed).
-// Intentionally loose: merged patient+alerts shape; FK columns (gender, address_id,
-// referral_source_id, etc.) are DB numbers but the form treats them as strings.
-export const patientById = { response: z.unknown() } as const;
+// GET /api/patients/:personId — single patient (raw `patients` columns) + active
+// alerts. Modeled from PatientDetails: FK columns (gender, address_id,
+// referral_source_id, etc.) are DB numbers; the edit form coerces them to `<select>`
+// strings client-side (see EditPatientComponent's form-population).
+export const patientById = { response: patientByIdRow } as const;
+export type PatientByIdResponse = z.infer<typeof patientByIdRow>;
 
 // GET /api/patients/:personId/alerts — alert rows.
 export const alerts = { response: z.array(alertRow) } as const;

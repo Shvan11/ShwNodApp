@@ -49,7 +49,9 @@ interface VisitFormData {
     operator_id: number | string;
 }
 
-interface VisitResponse {
+// Full visit row as returned by GET /api/getvisitbyid (visitById.response is a
+// loose container; this annotates the long-tail fields the form reads).
+interface VisitRow {
     id: number;
     work_id: number;
     visit_date: string;
@@ -71,7 +73,8 @@ interface VisitResponse {
 interface NewVisitComponentProps {
     workId: number | null;
     visitId?: number | null;
-    onSave?: (result: VisitResponse) => void;
+    // Add returns { visitId }; update returns void.
+    onSave?: (result: visitContract.AddVisitResponse | void) => void;
     onCancel?: () => void;
 }
 
@@ -138,7 +141,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
     const loadVisitData = useCallback(async () => {
         try {
             setLoading(true);
-            const visit = await fetchJSON<VisitResponse>(`/api/getvisitbyid?visitId=${visitId}`, { schema: visitContract.visitById.response });
+            const visit = await fetchJSON<VisitRow>(`/api/getvisitbyid?visitId=${visitId}`, { schema: visitContract.visitById.response });
 
             setFormData({
                 work_id: visit.work_id,
@@ -180,9 +183,12 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
         try {
             setLoading(true);
 
+            // Save responses differ from the read row: add returns { visitId },
+            // update returns no payload (sendSuccess(null) → void). Type them
+            // accordingly rather than reusing the full-row VisitRow shape.
             const result = visitId
-                ? await putJSON<VisitResponse>('/api/updatevisitbywork', { visitId, ...formData })
-                : await postJSON<VisitResponse>('/api/addvisitbywork', formData);
+                ? await putJSON<void>('/api/updatevisitbywork', { visitId, ...formData })
+                : await postJSON<visitContract.AddVisitResponse>('/api/addvisitbywork', formData);
 
             // Show success toast notification
             if (visitId) {

@@ -107,7 +107,15 @@ function invalidateCsrfToken(): void {
   csrfToken = null;
 }
 
-/** Eagerly warm the CSRF token (optional — mutations fetch it lazily otherwise). */
+/**
+ * Fetch-or-return the CSRF token (single-flight, cached). Two callers:
+ *  - eager warming after login/boot, so the first mutation skips the extra
+ *    round-trip the funnel would otherwise pay fetching it lazily; and
+ *  - the few raw-`fetch` consumers that intentionally bypass this funnel — PDF/blob
+ *    downloads (LabelPreviewModal) and the bespoke whatsapp-send client — which call
+ *    it to attach `x-csrf-token` themselves on their mutations. Without it,
+ *    `staffCsrfProtection` 403s the tokenless request (audit H2).
+ */
 export function prefetchCsrfToken(): Promise<string> {
   return ensureCsrfToken();
 }

@@ -33,6 +33,7 @@ import { getKysely, withPgTransaction, type Database } from '../kysely.js';
 type PgTransaction = Transaction<Database>;
 import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
+import type { AlignerPatient } from '../../../shared/contracts/aligner.contract.js';
 
 // ==============================
 // TYPE DEFINITIONS
@@ -147,21 +148,8 @@ interface AlignerSetUpdateData {
   is_active?: boolean;
 }
 
-type AlignerPatient = {
-  person_id: number;
-  first_name: string | null;
-  last_name: string | null;
-  patient_name: string;
-  phone: string | null;
-  workid: number;
-  work_type: string;
-  WorkTypeID: number;
-  TotalSets?: number;
-  ActiveSets?: number;
-  UnreadDoctorNotes?: number;
-  DateOfBirth?: Date | null;
-  start_date?: Date | null;
-};
+// AlignerPatient row shape is the shared contract's `alignerPatientRow` (imported
+// above) — the single source of truth for the all/by-doctor/search endpoints.
 
 type AlignerBatch = {
   aligner_batch_id: number;
