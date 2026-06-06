@@ -107,6 +107,7 @@ export const updateExchangeRate = {
     exchangeRate: z.coerce.number().positive(),
   }),
   response: z.object({
+    // Intentionally loose: raw Kysely UpdateResult[] — structure is DB-driver-specific.
     result: z.array(z.unknown()),
     date: z.string(),
     exchangeRate: z.number(),

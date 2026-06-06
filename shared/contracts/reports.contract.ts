@@ -6,33 +6,38 @@
  * the Express routes (relative `.js`) and the React app (`@shared` alias). See
  * docs/shared-contract-progress.md.
  *
- * Phase 13 (Wave 2). Group B — response-only. Each statistics aggregate is a
- * closed-ish container: the period/array field is asserted (`anyArray`), the
- * rich `summary` block is `z.unknown()` (preserve — it's a service-computed type).
+ * Phase 13 (Wave 2). Group B — response-only. Phase 3 Group 5: all responses are
+ * intentionally loose (server-side computed aggregates whose structure varies by
+ * period/filter combination). Containers assert the stable array/object key;
+ * inner shapes stay loose to preserve the full service-computed payload.
  */
 import { z } from 'zod';
 
-// "is it an array" guard — flip-free (every type is assignable to `unknown`).
+// "is it an array" guard — flip-free (every type is assignable to unknown).
 const anyArray = z.array(z.unknown());
 
 // GET /api/statistics → { month, year, exchangeRate, dailyData, summary }.
 export const statistics = {
+  // Intentionally loose: computed aggregate — dailyData rows and summary block are service-computed, structure varies by filter
   response: z.looseObject({ dailyData: anyArray, summary: z.unknown() }),
 } as const;
 
 // GET /api/statistics/yearly → { startMonth, startYear, …, monthlyData, summary }.
 export const yearlyStatistics = {
+  // Intentionally loose: computed aggregate — monthlyData rows and summary block are service-computed, structure varies by filter
   response: z.looseObject({ monthlyData: anyArray, summary: z.unknown() }),
 } as const;
 
 // GET /api/statistics/multi-year → { startYear, endYear, …, yearlyData, summary }.
 export const multiYearStatistics = {
+  // Intentionally loose: computed aggregate — yearlyData rows and summary block are service-computed, structure varies by filter
   response: z.looseObject({ yearlyData: anyArray, summary: z.unknown() }),
 } as const;
 
 // GET /api/daily-invoices → { date, count, invoices }.
 export const dailyInvoices = {
   query: z.object({ date: z.string().optional() }),
+  // Intentionally loose: invoices array is an enriched invoice join — structure varies by work/payment state
   response: z.looseObject({ invoices: anyArray, count: z.number() }),
 } as const;
 export type DailyInvoicesQuery = z.infer<typeof dailyInvoices.query>;

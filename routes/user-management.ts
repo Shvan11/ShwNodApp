@@ -24,7 +24,7 @@ type UserIdParams = userManagement.UserIdParams;
 type CreateUserBody = userManagement.CreateUserBody;
 type ResetPasswordBody = userManagement.ResetPasswordBody;
 
-interface UserResult {
+type UserResult = {
   userId: number;
   username: string;
   fullName: string;
@@ -32,7 +32,7 @@ interface UserResult {
   isActive: boolean;
   lastLogin: Date | null;
   createdAt: Date;
-}
+};
 
 // Extend Express Session
 declare module 'express-session' {

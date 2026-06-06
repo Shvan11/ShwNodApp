@@ -11,10 +11,12 @@ import { getKysely, withPgTransaction } from '../kysely.js';
 import { log } from '../../../utils/logger.js';
 
 // type definitions
-interface Option {
+// `type` (not `interface`) so Option[] is assignable to the settings contract's
+// `z.array(z.looseObject({ option_name }))` sendData arg (the looseObject index-signature rule).
+type Option = {
   option_name: string;
   option_value: string | null;
-}
+};
 
 interface BulkUpdateOption {
   name: string;

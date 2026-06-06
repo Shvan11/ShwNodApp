@@ -831,7 +831,7 @@ const PatientSets: React.FC = () => {
                 baseHandle,
                 set.aligner_dr_id || 0,
                 patient?.person_id || 0,
-                set.set_sequence
+                set.set_sequence ?? 0
             );
 
             // Open file picker starting in the set folder
@@ -1308,9 +1308,9 @@ const PatientSets: React.FC = () => {
                                                     className="pdf-btn"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        window.open(set.set_pdf_url, '_blank');
+                                                        window.open(set.set_pdf_url ?? undefined, '_blank');
                                                     }}
-                                                    title={set.set_pdf_url}
+                                                    title={set.set_pdf_url ?? undefined}
                                                 >
                                                     <i className="fas fa-file-pdf"></i>
                                                     <span>View PDF</span>
@@ -1321,7 +1321,7 @@ const PatientSets: React.FC = () => {
                                                     className="video-btn bg-error"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        window.open(set.set_video, '_blank');
+                                                        window.open(set.set_video ?? undefined, '_blank');
                                                     }}
                                                     title="Watch case explanation video"
                                                 >
@@ -1986,7 +1986,7 @@ const PatientSets: React.FC = () => {
                 batch={labelModalData.batch}
                 set={labelModalData.set}
                 patient={patient}
-                doctorName={labelModalData.set?.AlignerDoctorName}
+                doctorName={labelModalData.set?.AlignerDoctorName ?? undefined}
             />
         </div>
     );

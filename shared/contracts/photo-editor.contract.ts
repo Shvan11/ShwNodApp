@@ -16,9 +16,6 @@
  */
 import { z } from 'zod';
 
-// "is it an array" guard — flip-free (every type is assignable to `unknown`).
-const anyArray = z.array(z.unknown());
-
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
 // Shared `:personId` numeric param (also referenced by the excluded /render).
@@ -58,7 +55,12 @@ export const view = {
 export type DeleteViewBody = z.infer<typeof view.body>;
 
 // GET /api/photo-editor/:personId/photo-dates → { appointments, visits }.
+// appointments: PhotoSessionAppointment[] { date, description }
+// visits: PhotoSessionVisit[] { visitDate, hasInitialPhoto, hasFinalPhoto, hasProgressPhoto }
 export const photoDates = {
   params: personIdParams,
-  response: z.object({ appointments: anyArray, visits: anyArray }),
+  response: z.object({
+    appointments: z.array(z.looseObject({ date: z.string() })),
+    visits: z.array(z.looseObject({ visitDate: z.string() })),
+  }),
 } as const;

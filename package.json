@@ -25,6 +25,7 @@
     "typecheck:frontend": "tsc --noEmit -p tsconfig.frontend.json",
     "typecheck:all": "npm run typecheck && npm run typecheck:frontend",
     "contracts:check": "node scripts/contracts-dod.mjs",
+    "gate": "npm run typecheck:all && npm run lint && npm run contracts:check -- --strict && npm run build",
     "css:types": "tcm public/js -p \"**/*.module.css\"",
     "css:types:watch": "tcm public/js -p \"**/*.module.css\" --watch",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",

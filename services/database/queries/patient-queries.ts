@@ -69,11 +69,11 @@ interface XrayInfo {
   date?: string | null;
 }
 
-interface PatientPhone {
+type PatientPhone = {
   id: number;
   name: string;
-  phone: string;
-}
+  phone: string | null;
+};
 
 interface PatientData {
   patientName: string;

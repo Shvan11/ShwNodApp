@@ -14,8 +14,9 @@
  * handler builds an EXPLICIT `ExpenseData` literal from these fields; the two
  * id filters are `coerce.number().int().optional()` WITHOUT `.positive()` so the
  * form's "no category" empty value can't 400 (the handler's truthy check maps it
- * to undefined). Service-bound array responses → `anyArray` (assert array-vs-
- * object, no source-interface flip); single rich rows → `z.unknown()` (preserve).
+ * to undefined). Phase 3: list/categories/subcategories/byId responses are now
+ * modeled with looseObject row schemas. expenseSummary is intentionally loose
+ * (rollup aggregate — computed server-side, structure varies by filter).
  */
 import { z } from 'zod';
 import {
@@ -25,8 +26,33 @@ import {
   optionalNonNegIntQuery,
 } from '../validation.js';
 
-// "is it an array" guard — flip-free (every type is assignable to `unknown`).
-const anyArray = z.array(z.unknown());
+// ---------------------------------------------------------------------------
+// ROW SCHEMAS (Phase 3)
+// ---------------------------------------------------------------------------
+
+const expenseRow = z.looseObject({
+  id: z.number(),
+  expense_date: z.string(),
+  amount: z.number(),
+  currency: z.string().nullable(),
+  note: z.string().nullable(),
+  category_id: z.number().nullable(),
+  subcategory_id: z.number().nullable(),
+  category_name: z.string().nullable(),
+  subcategory_name: z.string().nullable(),
+});
+
+const expenseCategoryRow = z.looseObject({
+  category_id: z.number(),
+  category_name: z.string(),
+});
+
+const expenseSubcategoryRow = z.looseObject({
+  subcategory_id: z.number(),
+  subcategory_name: z.string(),
+  category_id: z.number(),
+  category_name: z.string().nullable(),
+});
 
 // Shared body for create + update — fully enumerated strict `z.object`.
 const expenseBody = z.object({
@@ -53,17 +79,17 @@ export const expenseList = {
     limit: optionalPositiveIntQuery,
     offset: optionalNonNegIntQuery,
   }),
-  response: anyArray,
+  response: z.array(expenseRow),
 } as const;
 
 // GET /api/expenses/categories — ExpenseCategory[].
 export const expenseCategories = {
-  response: anyArray,
+  response: z.array(expenseCategoryRow),
 } as const;
 
 // GET /api/expenses/subcategories/:categoryId — ExpenseSubcategory[].
 export const expenseSubcategories = {
-  response: anyArray,
+  response: z.array(expenseSubcategoryRow),
 } as const;
 
 // POST /api/expenses — addExpense → { NewID }.
@@ -74,12 +100,13 @@ export const createExpense = {
 
 // GET /api/expenses/summary?startDate=&endDate= — { summary[], totals[] }.
 export const expenseSummary = {
-  response: z.object({ summary: anyArray, totals: anyArray }),
+  // Intentionally loose: rollup aggregate — computed server-side, structure varies by filter combination
+  response: z.object({ summary: z.array(z.unknown()), totals: z.array(z.unknown()) }),
 } as const;
 
-// GET /api/expenses/:id — single Expense row (rich) → z.unknown() preserve.
+// GET /api/expenses/:id — single Expense row.
 export const expenseById = {
-  response: z.unknown(),
+  response: expenseRow,
 } as const;
 
 // PUT /api/expenses/:id — updateExpense → { success, id }.

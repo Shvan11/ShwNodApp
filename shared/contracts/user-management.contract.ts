@@ -15,16 +15,28 @@
  * `ErrorResponses.*`.
  */
 import { z } from 'zod';
-
-// "is it an array" guard — flip-free (every type is assignable to `unknown`).
-const anyArray = z.array(z.unknown());
+import { timestampString } from '../validation.js';
 
 // Numeric `:userId` path param (asserts digits without coercing — keeps it a string).
 const userIdParams = z.object({ userId: z.string().regex(/^\d+$/, 'Invalid user id') });
 
+// User row from the `users` table (aliased camelCase in the route's raw SQL query).
+// `lastLogin`/`createdAt` are PG `timestamp` columns: Date on the server, ISO string
+// on the client — `timestampString` handles both sides.
+const userRow = z.looseObject({
+  userId: z.number(),
+  username: z.string(),
+  fullName: z.string(),
+  role: z.string(),
+  isActive: z.boolean(),
+  lastLogin: timestampString.nullable(),
+  createdAt: timestampString,
+});
+export type UserRow = z.infer<typeof userRow>;
+
 // GET /api/users → { users }.
 export const usersList = {
-  response: z.object({ users: anyArray }),
+  response: z.object({ users: z.array(userRow) }),
 } as const;
 
 // POST /api/users → { message }. Body fully enumerated (folds the manual guards).

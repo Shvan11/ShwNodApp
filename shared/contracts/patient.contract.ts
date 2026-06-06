@@ -10,13 +10,11 @@
  *  - **`patientSearch` is the N13 victim** → its response is TIGHTENED here: the
  *    `patients` rows now assert `{ person_id, patient_name }` (the stable ids the
  *    POS/search consumers key on), not the empty `looseObject({})` of Phase 0.
- *  - **Other responses are minimal**: arrays use `z.array(z.unknown())` (asserts
- *    array-vs-object — the N13 class — and, crucially, accepts an `interface[]`
- *    source with NO query-interface flip, since everything is assignable to
- *    `unknown`); single rich objects from a service/query type use `z.unknown()`;
- *    inline-literal handler payloads use a closed `z.object`/`looseObject` modeling
- *    the keys actually built. Consumers keep their generics; `{ schema }` adds the
- *    runtime boundary guard.
+ *  - **Phase-3 hardening**: all array/object responses now carry modeled looseObject
+ *    row schemas covering every field the consumer reads. Source interfaces in query
+ *    modules were flipped to `type` to satisfy the looseObject index-sig rule.
+ *    `patientById` remains loose — merged patient+alerts shape where FK columns
+ *    (gender, address_id, etc.) are DB numbers but the form treats as strings.
  *  - **Bodies**: now FULLY ENUMERATED as strict `z.object` — the route's
  *    hand-written `CreatePatientBody`/`UpdatePatientBody`/`CreateAlertBody`/
  *    `UpdateAlertStatusBody`/`UpdateAlertBody` interfaces were deleted; handlers
@@ -30,12 +28,7 @@
  *    `optionalDateString`/plain string; no `timestampString` needed.
  */
 import { z } from 'zod';
-import { idParams, numericParam, intId, optionalDateString } from '../validation.js';
-
-/** Minimal array guard: asserts the container is an array (the N13 array-vs-object
- *  class) while accepting any element — including an `interface[]` source, with no
- *  query-row `interface`→`type` flip (everything is assignable to `unknown`). */
-const anyArray = z.array(z.unknown());
+import { idParams, numericParam, intId, optionalDateString, timestampString } from '../validation.js';
 
 /** A `<select>`-backed id on the CREATE body: '' (nothing chosen) → undefined (so
  *  the service's `toInt` yields NULL, not 0); a chosen value (form string / number)
@@ -57,11 +50,77 @@ export const alertIdParams = idParams('alertId');
 export const timepointParams = z.object({ personId: numericParam, tpCode: numericParam });
 
 // ===========================================================================
+// ROW SCHEMAS (Phase 3 — all fields the consumers read)
+// ===========================================================================
+
+/** Rich patient info returned by PatientService.getPatientInfo.
+ *  date_added and DateOfBirth are PG `date` columns → string (already). */
+const patientInfoRow = z.looseObject({
+  person_id: z.number(),
+  patient_name: z.string().nullable(),
+  first_name: z.string().nullable(),
+  last_name: z.string().nullable(),
+  phone: z.string().nullable(),
+  phone2: z.string().nullable(),
+  email: z.string().nullable(),
+  DateOfBirth: z.string().nullable(),
+  gender: z.number().nullable(),
+  gender_display: z.string().nullable(),
+  address_name: z.string().nullable(),
+  referral_source: z.string().nullable(),
+  patient_type_name: z.string().nullable(),
+  tag_name: z.string().nullable(),
+  notes: z.string().nullable(),
+  date_added: z.string().nullable(),
+  country_code: z.string().nullable(),
+  estimated_cost: z.number().nullable(),
+  currency: z.string().nullable(),
+  DolphinId: z.number().nullable(),
+  language: z.number().nullable(),
+  AlertCount: z.number(),
+  name: z.string().nullable(),
+  estimatedCost: z.number().nullable(),
+  start_date: z.string().nullable(),
+});
+
+/** Time-point row: three scalar fields, all strings. */
+const timepointRow = z.looseObject({
+  tp_code: z.string(),
+  tp_date_time: z.string(),
+  tp_description: z.string(),
+});
+
+/** Gallery image size entry. Null elements are valid (probe failure for a slot). */
+const galleryImageRow = z.looseObject({
+  name: z.string(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+}).nullable();
+
+/** Patient phone record (id + name + phone for autocomplete). phone is nullable. */
+const patientPhoneRow = z.looseObject({
+  id: z.number(),
+  name: z.string(),
+  phone: z.string().nullable(),
+});
+
+/** Alert row. creation_date is a PG `timestamp` → timestampString transform. */
+const alertRow = z.looseObject({
+  alert_id: z.number(),
+  alert_type_id: z.number(),
+  AlertTypeName: z.string(),
+  alert_severity: z.number(),
+  alert_details: z.string().nullable(),
+  creation_date: timestampString,
+  is_active: z.boolean(),
+});
+
+// ===========================================================================
 // READS
 // ===========================================================================
 
 // GET /api/patients/:personId/info — rich patient info (service-typed object).
-export const patientInfo = { response: z.unknown() } as const;
+export const patientInfo = { response: patientInfoRow } as const;
 
 // GET /api/settings/patients-folder — { patientsFolder }.
 export const patientsFolder = {
@@ -69,10 +128,10 @@ export const patientsFolder = {
 } as const;
 
 // GET /api/patients/:personId/timepoints — time-point rows.
-export const timepoints = { response: anyArray } as const;
+export const timepoints = { response: z.array(timepointRow) } as const;
 
-// GET /api/patients/:personId/timepoints/:tp/images — image rows.
-export const timepointImages = { response: anyArray } as const;
+// GET /api/patients/:personId/timepoints/:tp/images — array of image-code strings.
+export const timepointImages = { response: z.array(z.string()) } as const;
 
 // GET /api/patients/:personId/timepoints/:tpCode/folder — { folder, exists }.
 // `folder` is `timepointFolderName(...)` which returns `string | null` (null when
@@ -82,10 +141,10 @@ export const timepointFolder = {
 } as const;
 
 // GET /api/patients/:personId/gallery/:tp — processed gallery image sizes.
-export const gallery = { response: z.unknown() } as const;
+export const gallery = { response: z.array(galleryImageRow) } as const;
 
 // GET /api/patients/phones — bare array of patient phone records.
-export const patientPhones = { response: anyArray } as const;
+export const patientPhones = { response: z.array(patientPhoneRow) } as const;
 export type PatientPhonesResponse = z.infer<typeof patientPhones.response>;
 
 // GET /api/patients/search — { patients, totalCount?, hasMore? }. TIGHTENED (N13):
@@ -110,10 +169,12 @@ export const typeOptions = {
 } as const;
 
 // GET /api/patients/:personId — single patient + alerts (rich, query-typed).
+// Intentionally loose: merged patient+alerts shape; FK columns (gender, address_id,
+// referral_source_id, etc.) are DB numbers but the form treats them as strings.
 export const patientById = { response: z.unknown() } as const;
 
 // GET /api/patients/:personId/alerts — alert rows.
-export const alerts = { response: anyArray } as const;
+export const alerts = { response: z.array(alertRow) } as const;
 
 // GET /api/patients/:personId/has-appointment — { hasAppointment }.
 export const hasAppointment = {

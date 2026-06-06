@@ -19,17 +19,17 @@ interface PatientForPhotoSession {
   gender: number | null;
 }
 
-interface PhotoSessionAppointment {
+type PhotoSessionAppointment = {
   date: string;
   description: string;
-}
+};
 
-interface PhotoSessionVisit {
+type PhotoSessionVisit = {
   visitDate: string;
   hasInitialPhoto: boolean | null;
   hasFinalPhoto: boolean | null;
   hasProgressPhoto: boolean | null;
-}
+};
 
 interface ExistingPhotoDate {
   iPhotoDate: string | null;

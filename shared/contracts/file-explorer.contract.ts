@@ -8,17 +8,13 @@
  *
  * Phase 12 (Wave 2). Group A. The two file-CONTENT stream endpoints
  * (`/files/content`, `/working-files/content`) are EXCLUDED (binary `res.sendFile`
- * + Range — see CLAUDE.md). `FileListing`/`FileEntry` are rich service types, so
- * single-object payloads are `z.unknown()` (no-op guard, preserves payload — avoids
- * flipping the service types) and containers wrap an array field in `anyArray`.
- * Path-safety stays in file-explorer.service.ts; the folder/rename bodies only
- * assert a string TYPE.
+ * + Range — see CLAUDE.md). All response slots are intentionally loose: FileListing,
+ * FileEntry, and BatchDeleteResult are rich filesystem service types with dynamic
+ * fields (size, mtime, permissions, nested entries). Path-safety stays in
+ * file-explorer.service.ts; the folder/rename bodies only assert a string TYPE.
  */
 import { z } from 'zod';
 import { idParams } from '../validation.js';
-
-// "is it an array" guard — flip-free (every type is assignable to `unknown`).
-const anyArray = z.array(z.unknown());
 
 // Shared `:personId` numeric param (defense-in-depth ahead of the service's path
 // safety; for upload, validated BEFORE any bytes are accepted).
@@ -26,24 +22,28 @@ export const personIdParams = idParams('personId');
 
 // GET /api/patients/:personId/files[?path=&flat=] → FileListing (rich → preserve).
 export const list = {
+  // Intentionally loose: FileListing — filesystem service object with dynamic fields (size, mtime, nested entries)
   response: z.unknown(),
 } as const;
 
 // GET /api/patients/:personId/working-files → { path, parent, flat, truncated, entries }.
 export const workingFiles = {
-  response: z.looseObject({ entries: anyArray }),
+  // Intentionally loose: entries — FileEntry[] with dynamic filesystem fields
+  response: z.looseObject({ entries: z.array(z.unknown()) }),
 } as const;
 
 // POST /api/patients/:personId/files/upload → { files: FileEntry[] }.
 export const upload = {
   params: personIdParams,
-  response: z.object({ files: anyArray }),
+  // Intentionally loose: files — FileEntry[] with dynamic filesystem fields
+  response: z.object({ files: z.array(z.unknown()) }),
 } as const;
 
 // POST /api/patients/:personId/files/folder → FileEntry (rich → preserve).
 export const folder = {
   params: personIdParams,
   body: z.object({ path: z.string().optional(), name: z.string().optional() }),
+  // Intentionally loose: FileEntry — filesystem service object with dynamic fields
   response: z.unknown(),
 } as const;
 
@@ -51,6 +51,7 @@ export const folder = {
 export const rename = {
   params: personIdParams,
   body: z.object({ path: z.string().optional(), newName: z.string().optional() }),
+  // Intentionally loose: FileEntry — filesystem service object with dynamic fields
   response: z.unknown(),
 } as const;
 
@@ -63,5 +64,6 @@ export const deleteEntry = {
 // POST /api/patients/:personId/files/delete-batch → BatchDeleteResult (rich → preserve).
 export const deleteBatch = {
   params: personIdParams,
+  // Intentionally loose: BatchDeleteResult — filesystem service object with dynamic fields
   response: z.unknown(),
 } as const;

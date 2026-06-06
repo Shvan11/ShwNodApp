@@ -38,7 +38,7 @@ interface Batch {
 }
 
 interface Set {
-    set_sequence?: number;
+    set_sequence?: number | null;
 }
 
 interface Patient {

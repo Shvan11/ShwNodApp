@@ -114,6 +114,7 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
             // Raw read (excluded from contracts): /api/email/test returns a raw top-level
             // { success, message?, error? } at 200 (semantic-success, NOT the envelope) —
             // see docs/shared-contract-progress.md. Left unguarded by design.
+            // eslint-disable-next-line no-restricted-syntax -- raw semantic-success body, not the envelope
             const data = await fetchJSON<{ success?: boolean; message?: string; error?: string }>('/api/email/test');
 
             if (data.success) {

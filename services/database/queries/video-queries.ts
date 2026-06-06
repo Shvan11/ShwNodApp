@@ -15,14 +15,14 @@ import { getKysely } from '../kysely.js';
 import { log } from '../../../utils/logger.js';
 
 // type definitions
-export interface Video {
+export type Video = {
   id: number;
   description: string;
   Video: string;
   Image: string;
   category: number | null;
   details: string | null;
-}
+};
 
 export interface VideoRecord {
   id: number;
@@ -162,10 +162,10 @@ export async function getVideosPath(): Promise<string> {
 /**
  * Video category with id and name
  */
-export interface VideoCategory {
+export type VideoCategory = {
   id: number;
   name: string;
-}
+};
 
 /**
  * Get all video categories from tblVidCat

@@ -70,12 +70,6 @@ const router = Router();
 
 type AlignerQueryParams = contract.AlignerQueryParams;
 
-interface AlignerSetRow {
-  NextBatchPresent?: string;
-  UnreadActivityCount?: number;
-  aligner_set_id?: number;
-}
-
 // ============================================================================
 // ALIGNER DOCTORS QUERIES
 // ============================================================================
@@ -113,7 +107,7 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       log.info('Fetching all aligner sets from v_allsets');
-      const sets = (await alignerQueries.getAllAlignerSets()) as AlignerSetRow[];
+      const sets = await alignerQueries.getAllAlignerSets();
 
       sendData(res, contract.allSets.response, {
         sets: sets || [],
@@ -244,9 +238,9 @@ router.get(
       }
 
       log.info(`Fetching aligner sets for work id: ${workId}`);
-      const sets = (await alignerQueries.getAlignerSetsByWorkId(
+      const sets = await alignerQueries.getAlignerSetsByWorkId(
         parseInt(workId, 10)
-      )) as AlignerSetRow[];
+      );
 
       // DEBUG: Log unread activity counts
       const setsWithUnread = (sets || []).filter(

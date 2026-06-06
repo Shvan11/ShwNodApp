@@ -21,6 +21,7 @@ const DoctorsList: React.FC = () => {
     // Load doctors on mount
     useEffect(() => {
         loadDoctors();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const loadDoctors = async (): Promise<void> => {

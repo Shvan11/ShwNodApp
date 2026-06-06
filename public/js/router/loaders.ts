@@ -147,6 +147,7 @@ export function withAuth<T>(
       }
 
       // Auth-only check: verify session with lightweight endpoint
+      // eslint-disable-next-line no-restricted-syntax -- session ping; no payload to validate
       await fetchJSON('/api/auth/verify', { signal: args.request?.signal });
       return null; // No data to return for auth-only loaders
     } catch (error) {
@@ -402,6 +403,7 @@ export async function patientShellLoader({
       signal,
       cache: true,
       cacheKey: `work_${effectiveWorkId}`,
+      schema: workContract.getWorkDetails.response,
     });
   }
 

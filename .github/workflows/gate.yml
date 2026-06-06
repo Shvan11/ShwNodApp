@@ -1,0 +1,38 @@
+# Shared-contract + build gate — the repo's first CI workflow.
+# Mirrors the local `npm run gate` exactly so behavior is identical in both places:
+#   typecheck:all → lint → contracts:check --strict → build
+# All four steps are DB-free and env-free (config is validated at runtime/boot, not at
+# build), so this needs no secrets or services. The strict contracts:check fails the
+# build if D1/D2 regress past their ratcheted baselines (scripts/contracts-dod.mjs).
+name: gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel an in-flight run when a newer commit is pushed to the same ref.
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Gate (typecheck + lint + contracts:check --strict + build)
+        run: npm run gate

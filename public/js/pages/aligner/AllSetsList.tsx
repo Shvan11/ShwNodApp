@@ -45,6 +45,7 @@ const AllSetsList: React.FC = () => {
 
     useEffect(() => {
         loadAllSets();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const loadAllSets = async (): Promise<void> => {
