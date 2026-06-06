@@ -1,5 +1,17 @@
+/*
+ * This modal is opened from *inside* the PhotoSwipe lightbox toolbar, and
+ * PhotoSwipe pins its root at --pswp-root-z-index: 100000. The shared modal
+ * overlay's --z-index-modal (1040) sits far below that, so without bumping the
+ * overlay the dialog renders behind the lightbox images. Beat PhotoSwipe's
+ * constant; this is the one place we must out-stack a third-party fullscreen UI.
+ */
+.overlay {
+  z-index: 100010;
+}
+
 .modal {
   width: min(440px, 92vw);
+  padding: var(--spacing-xl);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);

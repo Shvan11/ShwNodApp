@@ -197,7 +197,13 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
   const settled = transfer ? TERMINAL.includes(transfer.status) : false;
 
   return (
-    <Modal isOpen onClose={onClose} ariaLabelledBy="localsend-title" contentClassName={styles.modal}>
+    <Modal
+      isOpen
+      onClose={onClose}
+      ariaLabelledBy="localsend-title"
+      contentClassName={styles.modal}
+      overlayClassName={styles.overlay}
+    >
       <h3 id="localsend-title" className={styles.title}>
         <i className="fas fa-share-nodes" aria-hidden="true" /> Share to device
       </h3>
