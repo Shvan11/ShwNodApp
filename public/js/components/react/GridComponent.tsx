@@ -9,6 +9,7 @@ import styles from './GridComponent.module.css';
 import EditTimepointModal from './EditTimepointModal';
 import DeleteTimepointModal from './DeleteTimepointModal';
 import TimepointActionsMenu, { type DeleteScope, type FolderState } from './TimepointActionsMenu';
+import LocalSendShareModal, { type ShareSource } from './localsend/LocalSendShareModal';
 import { encodeRelPath } from './files/fileHelpers';
 import sseAppointments from '../../services/sse-appointments';
 import PhotoSwipeLightbox from 'photoswipe/lightbox';
@@ -68,6 +69,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const lightboxRef = useRef<PhotoSwipeLightbox | null>(null);
+    // LocalSend share modal — opened imperatively from the lightbox toolbar.
+    const [shareSources, setShareSources] = useState<ShareSource[] | null>(null);
     // Time-point edit/delete UI state.
     const [menuFor, setMenuFor] = useState<{ tp: Timepoint; x: number; y: number } | null>(null);
     // Originals-folder existence for the open menu (null = still checking).
@@ -506,6 +509,42 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                 }
                             });
                         }
+
+                        // Add LocalSend share button — push the current photo to a LAN
+                        // device (phone/tablet/PC) without WhatsApp or a USB stick.
+                        pswpUi.registerElement({
+                            name: 'localsend-share-button',
+                            order: 9.5,
+                            isButton: true,
+                            tagName: 'button',
+
+                            html: {
+                                isCustomSVG: true,
+                                inner: '<path d="M21 11a3 3 0 0 0-2.6 1.5l-5.5-2.8a3 3 0 0 0 0-1.4l5.5-2.8A3 3 0 1 0 17.5 7L12 9.8a3 3 0 1 0 0 6.4l5.5 2.8A3 3 0 1 0 21 11z" id="pswp__icn-localsend"/>',
+                                outlineID: 'pswp__icn-localsend'
+                            },
+
+                            onInit: (el: HTMLElement, pswp: PhotoSwipeInstance) => {
+                                el.setAttribute('title', 'Share to device');
+                                el.setAttribute('aria-label', 'Share to device');
+
+                                el.addEventListener('click', () => {
+                                    const src = pswp.currSlide?.data?.src;
+                                    if (!src || !personId) return;
+                                    const fileName = getFileNameFromUrl(src);
+                                    // Skip logo / placeholder — only real Dolphin views.
+                                    if (src.includes('logo.png') || src.includes('placeholder') || !/\.i\d+$/i.test(fileName)) {
+                                        return;
+                                    }
+                                    setShareSources([{
+                                        source: 'patient-image',
+                                        personId,
+                                        ref: fileName,
+                                        displayName: getShareFileName(src)
+                                    }]);
+                                });
+                            }
+                        });
                     });
 
                     // Pre-fetch blob for sharing (mobile only)
@@ -904,6 +943,12 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 deleting={deletingTp}
                 onConfirm={handleDeleteTimepoint}
                 onCancel={() => setDeleteTp(null)}
+            />
+
+            <LocalSendShareModal
+                open={!!shareSources}
+                sources={shareSources ?? []}
+                onClose={() => setShareSources(null)}
             />
         </div>
     );

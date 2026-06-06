@@ -27,6 +27,7 @@ import * as fileExplorer from '@shared/contracts/file-explorer.contract';
 import { encodeRelPath, errorMessage } from './fileHelpers';
 import FileEntryTile from './FileEntryTile';
 import FilePreviewModal from './FilePreviewModal';
+import LocalSendShareModal, { type ShareSource } from '@/components/react/localsend/LocalSendShareModal';
 import styles from './FileExplorer.module.css';
 
 interface Props {
@@ -71,6 +72,7 @@ const FileExplorer = ({ personId, subPath }: Props) => {
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [shareSources, setShareSources] = useState<ShareSource[] | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const promptInputRef = useRef<HTMLInputElement>(null);
@@ -277,6 +279,23 @@ const FileExplorer = ({ personId, subPath }: Props) => {
     setSelected(allVisibleSelected ? new Set() : new Set(entries.map((e) => e.relPath)));
   }, [allVisibleSelected, entries]);
 
+  const toSource = useCallback(
+    (en: FileEntry): ShareSource => ({
+      source: 'patient-file',
+      personId: personId as number,
+      ref: en.relPath,
+      displayName: en.name,
+    }),
+    [personId]
+  );
+
+  const shareSelected = useCallback(() => {
+    if (!personId) return;
+    const sel = entries.filter((e) => selected.has(e.relPath) && e.type !== 'dir');
+    if (sel.length === 0) return;
+    setShareSources(sel.map(toSource));
+  }, [personId, entries, selected, toSource]);
+
   const doDeleteBatch = useCallback(async () => {
     if (!personId) return;
     // Intersect with the live listing so we never send stale relPaths.
@@ -386,6 +405,14 @@ const FileExplorer = ({ personId, subPath }: Props) => {
               aria-hidden="true"
             />{' '}
             {allVisibleSelected ? 'Clear' : 'Select all'}
+          </button>
+          <button
+            type="button"
+            className={styles.toolButton}
+            onClick={shareSelected}
+            disabled={selected.size === 0}
+          >
+            <i className="fas fa-share-nodes" aria-hidden="true" /> Share selected
           </button>
           <button
             type="button"
@@ -508,6 +535,7 @@ const FileExplorer = ({ personId, subPath }: Props) => {
                       onRename={(en) => setPrompt({ mode: 'rename', target: en, value: en.name })}
                       onDelete={doDelete}
                       onToggleSelect={toggleSelect}
+                      onShare={personId ? (en) => setShareSources([toSource(en)]) : undefined}
                     />
                   ))}
                 </div>
@@ -570,6 +598,13 @@ const FileExplorer = ({ personId, subPath }: Props) => {
           onClose={() => setPreview(null)}
         />
       )}
+
+      {/* Share to LAN device */}
+      <LocalSendShareModal
+        open={!!shareSources}
+        sources={shareSources ?? []}
+        onClose={() => setShareSources(null)}
+      />
     </div>
   );
 };

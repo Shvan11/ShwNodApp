@@ -54,6 +54,7 @@ import holidayRoutes from './holiday.routes.js';
 import videoRoutes from './video.routes.js';
 import standRoutes from './stand.routes.js';
 import fileExplorerRoutes from './file-explorer.routes.js';
+import localsendRoutes from './localsend.routes.js';
 
 // Import template routes (already modular)
 import templateRouter from '../template-api.js';
@@ -130,5 +131,8 @@ router.use('/videos', videoRoutes); // Educational videos
 
 // Stand / Mini-Pharmacy
 router.use('/', standRoutes); // Stand inventory, POS, reports (routes define /stand/* prefix)
+
+// LocalSend — share patient files/images to LAN devices (mounted at /localsend)
+router.use('/localsend', localsendRoutes);
 
 export default router;
