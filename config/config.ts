@@ -135,6 +135,12 @@ const config: AppConfig = {
     userApiPassword: process.env.WEBCEPH_USER_API_PASSWORD,
     baseUrl: process.env.WEBCEPH_API_BASE_URL || 'https://api.webceph.com'
   },
+  localsend: {
+    enabled: process.env.LOCALSEND_ENABLED === 'true',
+    port: parseInt(process.env.LOCALSEND_PORT || '53317', 10),
+    alias: process.env.LOCALSEND_ALIAS || 'Shwan Clinic Server',
+    multicast: process.env.LOCALSEND_MULTICAST || '224.0.0.167',
+  },
   cs_export: process.env.CS_EXPORT,
   gram_session: process.env.GRAM_SESSION,
 };

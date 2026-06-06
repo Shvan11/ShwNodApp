@@ -59,6 +59,7 @@ import HealthCheck from './services/monitoring/HealthCheck.js';
 import { testConnection, testConnectionWithRetry, shutdown as shutdownDatabase } from './services/database/index.js';
 import { createPathResolver } from './utils/path-resolver.js';
 import { startCdc, stopCdc } from './services/sync/cdc/index.js';
+import { localsendService } from './services/localsend/index.js';
 import ResourceManager from './services/core/ResourceManager.js';
 import { log } from './utils/logger.js';
 import { requestTimeout, TIMEOUTS } from './middleware/timeout.js';
@@ -583,6 +584,15 @@ function startServer(): Promise<HTTPServer> {
       // sink: FAILOVER_SYNC_ENABLED → raw mirror, DOLPHIN_SYNC_ENABLED → Dolphin SQL Server.
       startCdc();
 
+      // LocalSend LAN file-sharing sender (off unless LOCALSEND_ENABLED=true).
+      if (config.localsend.enabled) {
+        try {
+          localsendService.start();
+        } catch (error) {
+          log.warn('⚠️  LocalSend failed to start:', { error: (error as Error).message });
+        }
+      }
+
       resolve(serverInstance);
     });
 
@@ -665,6 +675,14 @@ async function gracefulShutdown(signal: string): Promise<void> {
       await stopCdc();
     } catch (error) {
       log.warn('⚠️  CDC shutdown error:', { error: (error as Error).message });
+    }
+
+    // Stop the LocalSend sender (closes the UDP socket + clears transfers).
+    try {
+      log.info('📤 Stopping LocalSend...');
+      await localsendService.gracefulShutdown();
+    } catch (error) {
+      log.warn('⚠️  LocalSend shutdown error:', { error: (error as Error).message });
     }
 
     // Clean up WhatsApp service

@@ -141,6 +141,16 @@ export interface UrlConfig {
   publicUrl?: string;
 }
 
+/**
+ * LocalSend LAN file-sharing configuration
+ */
+export interface LocalSendConfig {
+  enabled: boolean;
+  port: number;
+  alias: string;
+  multicast: string;
+}
+
 // ===========================================
 // MAIN CONFIG
 // ===========================================
@@ -160,6 +170,7 @@ export interface AppConfig {
   server: ServerConfig;
   urls: UrlConfig;
   webceph: WebCephConfig;
+  localsend: LocalSendConfig;
   cs_export?: string;
   gram_session?: string;
 }

@@ -36,6 +36,8 @@ interface Props {
   onRename: (entry: FileEntry) => void;
   onDelete: (entry: FileEntry) => void;
   onToggleSelect: (entry: FileEntry) => void;
+  /** Share this file to a LAN device (LocalSend). Omitted → no share button. */
+  onShare?: (entry: FileEntry) => void;
 }
 
 const FileEntryTile = ({
@@ -51,6 +53,7 @@ const FileEntryTile = ({
   onRename,
   onDelete,
   onToggleSelect,
+  onShare,
 }: Props) => {
   const [thumbFailed, setThumbFailed] = useState(false);
   const isDir = entry.type === 'dir';
@@ -129,6 +132,17 @@ const FileEntryTile = ({
             >
               <i className="fas fa-download" aria-hidden="true" />
             </a>
+          )}
+          {!isDir && onShare && (
+            <button
+              type="button"
+              className={styles.iconButton}
+              onClick={() => onShare(entry)}
+              title="Share to device"
+              aria-label={`Share ${entry.name} to a device`}
+            >
+              <i className="fas fa-share-nodes" aria-hidden="true" />
+            </button>
           )}
           {!readOnly && (
             <>
