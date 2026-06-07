@@ -736,10 +736,14 @@ router.get(
       // Determine ORDER BY clause
       let orderByClause: RawBuilder<unknown> = sql`ORDER BY p."patient_name" ASC`;
       if (sortBy === 'date') {
+        // Reference the output alias, not p."date_added": SELECT DISTINCT
+        // requires every ORDER BY expression to appear in the select list, and
+        // date_added is exposed there only as the to_char(...)'d alias. The
+        // alias is a 'YYYY-MM-DD' string, which sorts correctly by day.
         orderByClause =
           order === 'desc'
-            ? sql`ORDER BY p."date_added" DESC`
-            : sql`ORDER BY p."date_added" ASC`;
+            ? sql`ORDER BY "date_added" DESC NULLS LAST`
+            : sql`ORDER BY "date_added" ASC NULLS LAST`;
       } else {
         orderByClause =
           order === 'desc'

@@ -110,7 +110,7 @@ const EditPatientComponent = ({ personId }: Props) => {
     const [photoTypes, setPhotoTypes] = useState<PhotoType[]>([]);
     const [uploadData, setUploadData] = useState<UploadData>({
         recordDate: formatISODate(),
-        targetClass: 'ceph_photo',
+        targetClass: 'lateral_ceph',
         imageFile: null
     });
 
@@ -241,29 +241,45 @@ const EditPatientComponent = ({ personId }: Props) => {
         }
     };
 
+    // WebCeph's patient ID is the person_id padded to a 6-char minimum. The SAME
+    // value must be used for both create and upload, or WebCeph reports
+    // "no matching patientid" on upload.
+    const webcephPatientID = patientData ? patientData.person_id.toString().padStart(6, '0') : '';
+
+    // Map gender ID to gender name (WebCeph needs the name, not the local ID)
+    const webcephGenderName = (() => {
+        if (!formData.gender) return '';
+        const gender = genders.find(g => g.id === parseInt(formData.gender));
+        return gender ? gender.name : '';
+    })();
+
+    // WebCeph rejects empty gender/DOB with a cryptic "invalid format" error,
+    // so list what's missing and block the request before anything is sent.
+    const webcephMissingFields = [
+        !webcephGenderName && 'gender',
+        !formData.date_of_birth && 'date of birth',
+    ].filter(Boolean) as string[];
+
     // Create patient in WebCeph
     const handleCreateWebcephPatient = async () => {
         if (!patientData) return;
+
+        if (webcephMissingFields.length > 0) {
+            setWebcephError(
+                `Cannot create in WebCeph: this patient is missing ${webcephMissingFields.join(' and ')}. ` +
+                `Set ${webcephMissingFields.length > 1 ? 'these fields' : 'this field'} and save before creating in WebCeph.`
+            );
+            return;
+        }
 
         try {
             setWebcephLoading(true);
             setWebcephError(null);
 
-            // Map gender ID to gender name
-            let genderName = '';
-            if (formData.gender) {
-                const gender = genders.find(g => g.id === parseInt(formData.gender));
-                genderName = gender ? gender.name : '';
-            }
-
-            // Pad PersonID with zeros to meet 6-character minimum
-            let paddedPatientID = patientData.person_id.toString();
-            if (paddedPatientID.length < 6) {
-                paddedPatientID = paddedPatientID.padStart(6, '0');
-            }
+            const genderName = webcephGenderName;
 
             const webcephPatientData = {
-                patientID: paddedPatientID,
+                patientID: webcephPatientID,
                 firstName: formData.first_name || '',
                 lastName: formData.last_name || '',
                 gender: genderName,
@@ -309,7 +325,7 @@ const EditPatientComponent = ({ personId }: Props) => {
 
             const formDataObj = new FormData();
             formDataObj.append('image', uploadData.imageFile);
-            formDataObj.append('patient_id', patientData?.person_id.toString() || '');
+            formDataObj.append('patient_id', webcephPatientID);
             formDataObj.append('recordDate', uploadData.recordDate);
             formDataObj.append('targetClass', uploadData.targetClass);
 
@@ -325,7 +341,7 @@ const EditPatientComponent = ({ personId }: Props) => {
             // Reset upload form
             setUploadData({
                 recordDate: formatISODate(),
-                targetClass: 'ceph_photo',
+                targetClass: 'lateral_ceph',
                 imageFile: null
             });
 
@@ -711,7 +727,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                             <button
                                 type="button"
                                 onClick={handleCreateWebcephPatient}
-                                disabled={webcephLoading}
+                                disabled={webcephLoading || webcephMissingFields.length > 0}
                                 className={styles.webcephBtnSend}
                             >
                                 {webcephLoading ? (
@@ -726,6 +742,12 @@ const EditPatientComponent = ({ personId }: Props) => {
                                     </>
                                 )}
                             </button>
+                            {webcephMissingFields.length > 0 && (
+                                <p className={styles.webcephCreateDescription}>
+                                    <i className="fas fa-exclamation-triangle"></i>{' '}
+                                    Requires {webcephMissingFields.join(' and ')} — set {webcephMissingFields.length > 1 ? 'them' : 'it'} and save first.
+                                </p>
+                            )}
                         </div>
                     ) : (
                         <div className={styles.webcephStatusContainer}>

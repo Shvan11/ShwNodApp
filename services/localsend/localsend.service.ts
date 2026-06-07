@@ -18,17 +18,10 @@ import dgram from 'dgram';
 import crypto from 'crypto';
 import { createReadStream } from 'fs';
 import https from 'https';
-import path from 'path';
-import { stat } from 'fs/promises';
 import fetch from 'node-fetch';
 import config from '../../config/config.js';
 import { log } from '../../utils/logger.js';
-import { createPathResolver } from '../../utils/path-resolver.js';
-import {
-  resolveFileForServe,
-  FileExplorerError,
-} from '../files/file-explorer.service.js';
-import { getFileMimeType } from '../../utils/file-mime.js';
+import { resolveShareRef } from '../files/share-ref.js';
 import type {
   LocalSendDevice,
   SendFileRef,
@@ -291,7 +284,7 @@ class LocalSendService {
 
     const files: TransferFile[] = [];
     for (const ref of refs) {
-      const resolved = await this.resolveRef(ref);
+      const resolved = await resolveShareRef(ref);
       files.push({
         name: resolved.name,
         status: 'pending',
@@ -482,58 +475,6 @@ class LocalSendService {
     }
   }
 
-  // ── File resolution ──────────────────────────────────────────────────────
-
-  /** Resolve a client `SendFileRef` to a guarded absolute path + metadata. */
-  private async resolveRef(
-    ref: SendFileRef
-  ): Promise<{ abs: string; size: number; name: string; fileType: string }> {
-    if (ref.source === 'patient-file') {
-      const { abs, size } = await resolveFileForServe(ref.personId, ref.ref);
-      return {
-        abs,
-        size,
-        name: ref.displayName || path.basename(abs),
-        fileType: getFileMimeType(abs),
-      };
-    }
-    // patient-image — a rendered Dolphin view in the shared working/ dir.
-    return this.resolveWorkingImage(ref);
-  }
-
-  /**
-   * Safe resolver for a rendered patient image in the flat `working/` dir
-   * (served to the browser as `/DolImgs/<basename>`). The basename must be a
-   * bare Dolphin filename — no separators / traversal — and the resolved path
-   * is containment-checked under `working/` (the real guard).
-   */
-  private async resolveWorkingImage(
-    ref: SendFileRef
-  ): Promise<{ abs: string; size: number; name: string; fileType: string }> {
-    const basename = ref.ref;
-    if (!/^\d+0\d+\.i\d+$/i.test(basename)) {
-      throw new FileExplorerError('Invalid image reference', 400);
-    }
-    const machinePath = config.fileSystem.machinePath;
-    if (!machinePath) throw new FileExplorerError('Server file path not configured', 500);
-    const resolver = createPathResolver(machinePath);
-    const root = resolver('working');
-    const abs = resolver(`working/${basename}`);
-    // Containment: the resolved path must stay under working/.
-    const rel = path.relative(root, abs);
-    if (rel.startsWith('..') || path.isAbsolute(rel)) {
-      throw new FileExplorerError('Path is outside the working folder', 403);
-    }
-    const st = await stat(abs).catch(() => {
-      throw new FileExplorerError('Image not found', 404);
-    });
-    return {
-      abs,
-      size: st.size,
-      name: ref.displayName || `${basename}.jpg`,
-      fileType: 'image/jpeg',
-    };
-  }
 }
 
 export const localsendService = new LocalSendService();

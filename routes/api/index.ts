@@ -55,6 +55,8 @@ import videoRoutes from './video.routes.js';
 import standRoutes from './stand.routes.js';
 import fileExplorerRoutes from './file-explorer.routes.js';
 import localsendRoutes from './localsend.routes.js';
+import telegramRoutes from './telegram.routes.js';
+import integrationsRoutes from './integrations.routes.js';
 
 // Import template routes (already modular)
 import templateRouter from '../template-api.js';
@@ -134,5 +136,11 @@ router.use('/', standRoutes); // Stand inventory, POS, reports (routes define /s
 
 // LocalSend — share patient files/images to LAN devices (mounted at /localsend)
 router.use('/localsend', localsendRoutes);
+
+// Telegram — share patient files/images to a contact via Telegram (mounted at /telegram)
+router.use('/telegram', telegramRoutes);
+
+// Integrations — manage external-service auth (Telegram now; WhatsApp/Google later)
+router.use('/integrations', integrationsRoutes);
 
 export default router;

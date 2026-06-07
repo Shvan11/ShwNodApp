@@ -7,7 +7,36 @@ import bigInt from 'big-integer';
 import fs from 'fs/promises';
 import config from '../../config/config.js';
 import { getPhoneCompatibleFilename } from '../../utils/filename-converter.js';
+import { getOption, upsertOption } from '../database/queries/options-queries.js';
 import { log } from '../../utils/logger.js';
+
+// The MTProto user session is runtime-managed (re-authenticated from Settings →
+// Integrations) and persisted in the `options` table, so it survives without an
+// env change/restart. The `GRAM_SESSION` env var is only a legacy fallback.
+const GRAM_SESSION_OPTION = 'gram_session';
+
+/** Current Telegram user session string: DB-persisted value, else env fallback. */
+export async function getGramSession(): Promise<string> {
+  try {
+    const stored = await getOption(GRAM_SESSION_OPTION);
+    if (stored) return stored;
+  } catch (error) {
+    log.warn('Failed to read gram_session option; falling back to env', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+  return config.gram_session || '';
+}
+
+/** Persist a freshly-authenticated Telegram user session. */
+export async function setGramSession(session: string): Promise<void> {
+  await upsertOption(GRAM_SESSION_OPTION, session);
+}
+
+/** Clear the persisted Telegram user session (logout). */
+export async function clearGramSession(): Promise<void> {
+  await upsertOption(GRAM_SESSION_OPTION, '');
+}
 
 // ===========================================
 // TYPES
@@ -70,13 +99,38 @@ export async function sendDocument(filePath: string): Promise<TelegramBot.Messag
 }
 
 /**
+ * Fully tear a one-shot client down. `destroy()` sets `_destroyed`, which is what
+ * actually stops GramJS's background update loop — `disconnect()` alone leaves it
+ * spinning, pinging a dead connection and logging `Error: TIMEOUT` every ~30s
+ * forever (one leaked loop per send). See updates.js `_updateLoop` (`while (!_destroyed)`).
+ */
+async function teardownClient(client: ExtendedTelegramClient): Promise<void> {
+  try {
+    await Promise.race([
+      client.destroy(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Destroy timeout')), 5000)),
+    ]);
+  } catch (err) {
+    log.warn('Telegram client teardown timeout (non-critical):', (err as Error).message);
+    // Last-resort force close so a hung socket can't keep the loop alive.
+    if (client._connection) {
+      try {
+        client._connection.close();
+      } catch {
+        // Ignore force close errors
+      }
+    }
+  }
+}
+
+/**
  * Send a file using Telegram API
  * @param phone - The recipient's phone number
  * @param filepath - Path to the file to send
  * @returns Promise resolving to the result object
  */
 export async function sendgramfile(phone: string, filepath: string): Promise<SendGramResult> {
-  const gramSession = config.gram_session;
+  const gramSession = await getGramSession();
 
   log.info(`Telegram sendgramfile called - Phone: ${phone}, File: ${filepath}`);
 
@@ -183,26 +237,8 @@ export async function sendgramfile(phone: string, filepath: string): Promise<Sen
     log.info(`File sent successfully: ${filepath}`);
     log.info(`Message ID: ${result?.id}`);
 
-    // Gracefully disconnect with timeout
-    try {
-      await Promise.race([
-        client.disconnect(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Disconnect timeout')), 5000)
-        ),
-      ]);
-      log.info('Telegram client disconnected successfully');
-    } catch (disconnectError) {
-      log.warn('Telegram disconnect timeout (non-critical):', (disconnectError as Error).message);
-      // Force close if needed
-      if (client._connection) {
-        try {
-          client._connection.close();
-        } catch {
-          // Ignore force close errors
-        }
-      }
-    }
+    // destroy() (not disconnect()) so the background update loop actually stops.
+    await teardownClient(client);
 
     return { result: 'OK', messageId: result?.id };
   } catch (error) {
@@ -222,29 +258,9 @@ export async function sendgramfile(phone: string, filepath: string): Promise<Sen
       errorMessage = `File not found: ${filepath}`;
     }
 
-    // Ensure client is disconnected even on error
+    // Ensure the client is fully torn down even on error (stops the update loop).
     if (client) {
-      try {
-        await Promise.race([
-          client.disconnect(),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Disconnect timeout')), 3000)
-          ),
-        ]);
-      } catch (disconnectError) {
-        log.warn(
-          'Telegram disconnect timeout on error (non-critical):',
-          (disconnectError as Error).message
-        );
-        // Force close if needed
-        if (client._connection) {
-          try {
-            client._connection.close();
-          } catch {
-            // Ignore force close errors
-          }
-        }
-      }
+      await teardownClient(client);
     }
 
     return { result: 'ERROR', error: errorMessage };

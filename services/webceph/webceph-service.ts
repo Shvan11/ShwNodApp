@@ -124,6 +124,27 @@ class WebCephService {
   }
 
   /**
+   * Build the `X-User-ApiPass` header value.
+   *
+   * WebCeph does NOT accept the plain API password. The header must be the
+   * XOR-encrypted (Vernam cipher) result of the API password, keyed by
+   * `userEmail + partnerApiKey`, then Base64-encoded. (Per WebCeph Partner API
+   * support; matches their reference `simple_encrypt(plaintext, key)`.)
+   */
+  private encryptApiPass(): string {
+    const data = Buffer.from(this.userApiPassword, 'utf-8');
+    const key = Buffer.from(this.userEmail + this.partnerApiKey, 'utf-8');
+    if (key.length === 0) {
+      return '';
+    }
+    const out = Buffer.allocUnsafe(data.length);
+    for (let i = 0; i < data.length; i++) {
+      out[i] = data[i] ^ key[i % key.length];
+    }
+    return out.toString('base64');
+  }
+
+  /**
    * Make authenticated request to WebCeph API
    * @param endpoint - API endpoint (e.g., '/api/v1/addnewpatient/')
    * @param options - Fetch options
@@ -142,7 +163,7 @@ class WebCephService {
     const headers: Record<string, string> = {
       'X-Partner-ApiKey': this.partnerApiKey,
       'X-User-ApiUsername': this.userEmail,
-      'X-User-ApiPass': this.userApiPassword,
+      'X-User-ApiPass': this.encryptApiPass(),
       ...additionalHeaders,
     };
 
@@ -300,8 +321,9 @@ class WebCephService {
       formData.append('targetclass', uploadData.targetClass);
       formData.append('overwrite', uploadData.overwrite ? 'true' : 'false');
 
-      // Append the image file
-      formData.append('photo', uploadData.image, {
+      // Append the image file — WebCeph's upload field name is "file"
+      // (NOT "photo", which it rejects with "invalid upload").
+      formData.append('file', uploadData.image, {
         filename: uploadData.filename || 'image.jpg',
         contentType: uploadData.contentType || 'image/jpeg',
       });
@@ -332,25 +354,24 @@ class WebCephService {
    * @returns Photo types with class names and display names
    */
   getPhotoTypes(): PhotoType[] {
+    // Class codes verified against the live WebCeph Partner API (an unknown code
+    // is rejected with "no matching photo class"). The X-ray codes are
+    // `lateral_ceph`/`pa_ceph`/`orthopan` — NOT the old
+    // `ceph_photo`/`pa_photo`/`pano_photo`. Extra-intraoral slots are omitted
+    // until their official class codes are confirmed (the guessed codes all 404'd).
     return [
-      { class: 'ceph_photo', name: 'Lateral Cephalogram' },
-      { class: 'pa_photo', name: 'PA Cephalogram' },
-      { class: 'pano_photo', name: 'Panoramic' },
-      { class: 'eo_photo_lateral', name: 'Extra-Oral Lateral' },
+      { class: 'lateral_ceph', name: 'Lateral Cephalogram' },
+      { class: 'pa_ceph', name: 'PA Cephalogram' },
+      { class: 'orthopan', name: 'Panoramic' },
       { class: 'eo_photo_frontal', name: 'Extra-Oral Frontal' },
+      { class: 'eo_photo_lateral', name: 'Extra-Oral Lateral' },
       { class: 'eo_photo_oblique', name: 'Extra-Oral Oblique' },
       { class: 'eo_photo_smile', name: 'Extra-Oral Smile' },
       { class: 'io_photo_frontal', name: 'Intra-Oral Frontal' },
-      { class: 'io_photo_left', name: 'Intra-Oral Left' },
       { class: 'io_photo_right', name: 'Intra-Oral Right' },
+      { class: 'io_photo_left', name: 'Intra-Oral Left' },
       { class: 'io_photo_upper', name: 'Intra-Oral Upper' },
       { class: 'io_photo_lower', name: 'Intra-Oral Lower' },
-      { class: 'io_photo_extra1', name: 'Intra-Oral Extra 1' },
-      { class: 'io_photo_extra2', name: 'Intra-Oral Extra 2' },
-      { class: 'io_photo_extra3', name: 'Intra-Oral Extra 3' },
-      { class: 'io_photo_extra4', name: 'Intra-Oral Extra 4' },
-      { class: 'io_photo_extra5', name: 'Intra-Oral Extra 5' },
-      { class: 'io_photo_extra6', name: 'Intra-Oral Extra 6' },
     ];
   }
 
@@ -381,8 +402,12 @@ class WebCephService {
       errors.push('Last name must be 50 characters or less');
     }
 
+    // WebCeph requires gender — an empty one is rejected server-side with the
+    // same cryptic "invalid format" error, so enforce it here.
     const validGenders = ['male', 'female'];
-    if (patientData.gender && !validGenders.includes(patientData.gender.toLowerCase())) {
+    if (!patientData.gender) {
+      errors.push('Gender is required by WebCeph — set the patient\'s gender first');
+    } else if (!validGenders.includes(patientData.gender.toLowerCase())) {
       errors.push('Gender must be "male" or "female"');
     }
 
@@ -391,7 +416,11 @@ class WebCephService {
       errors.push('Race must be one of: african, asian, caucasian, hispanic');
     }
 
-    if (patientData.birthday) {
+    // WebCeph requires a valid birthdate — an empty/missing one is rejected
+    // server-side with a cryptic "invalid format" error, so enforce it here.
+    if (!patientData.birthday) {
+      errors.push('Date of birth is required by WebCeph — set the patient\'s date of birth first');
+    } else {
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(patientData.birthday)) {
         errors.push('Birthday must be in YYYY-MM-DD format');

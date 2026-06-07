@@ -20,6 +20,7 @@ import LookupsSettings from './LookupsSettings';
 import ProtocolHandlersSettings from './ProtocolHandlersSettings';
 import CalendarTimesSettings from './CalendarTimesSettings';
 import SupabaseStatusSettings from './SupabaseStatusSettings';
+import IntegrationsSettings from './IntegrationsSettings';
 
 // Types
 interface SettingsTabComponentProps {
@@ -62,6 +63,7 @@ const SettingsComponent: React.FC = () => {
         lookups: { hasChanges: false },
         calendarTimes: { hasChanges: false },
         supabaseStatus: { hasChanges: false },
+        integrations: { hasChanges: false },
         messaging: { hasChanges: false },
         system: { hasChanges: false },
         security: { hasChanges: false },
@@ -154,6 +156,14 @@ const SettingsComponent: React.FC = () => {
             icon: 'fas fa-cloud',
             component: SupabaseStatusSettings,
             description: 'Live status of Supabase portal & failover sync'
+        },
+        {
+            id: 'integrations',
+            label: 'Integrations',
+            icon: 'fas fa-plug',
+            component: IntegrationsSettings,
+            description: 'Manage Telegram (and later WhatsApp/Google) authentication',
+            adminOnly: true
         },
         {
             id: 'messaging',

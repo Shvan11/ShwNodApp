@@ -10,7 +10,13 @@
  *  - Coalescing (UNIQUE(sink,tbl,pk)) bounds the backlog to distinct rows touched, not writes.
  *  - Circuit breaker: backlog past maxBacklog disables this sink's capture and flags it stale
  *    (full reload required), protecting the local disk during a pathological outage.
- *  - Capture is tied to the engine lifetime: enabled on start(), disabled on stop().
+ *  - Capture is DECOUPLED from the drainer's process lifetime: start() enables it, but stop()
+ *    does NOT disable it. Recording a change is a cheap, coalesced (UNIQUE(sink,tbl,pk)), bounded
+ *    trigger insert that must survive a restart / SIGHUP / crash so the next boot drains it —
+ *    otherwise writes made while the engine is momentarily down (or by a sibling instance sharing
+ *    the DB) are silently lost from the mirror. Capture turns OFF only on PURPOSE: startCdc() for a
+ *    sink disabled by env (no drainer will run), the circuit breaker on overflow (flags stale →
+ *    reload), or the manual kill switch (UPDATE cdc_sink_control SET enabled=false).
  */
 import { getPgPool } from '../../database/kysely.js';
 import { log } from '../../../utils/logger.js';
@@ -61,17 +67,16 @@ export class CdcEngine {
       clearInterval(this.timer);
       this.timer = null;
     }
-    try {
-      await this.setControl(false, { note: 'engine stopped' });
-    } catch (e) {
-      log.warn(`[cdc:${this.sink.name}] could not disable capture on stop`, { error: (e as Error).message });
-    }
+    // Intentionally do NOT touch cdc_sink_control here — capture is left ON so the next
+    // boot drains whatever was written while we were down (see the class header). A SIGHUP /
+    // crash / sibling-instance shutdown can no longer silently stop capture. Capture is turned
+    // off only deliberately: startCdc() (env-disabled sink), the breaker, or the manual switch.
     try {
       await this.sink.close();
     } catch {
       /* already closing */
     }
-    log.info(`🛑 CDC sink "${this.sink.name}" stopped — capture OFF`);
+    log.info(`🛑 CDC sink "${this.sink.name}" stopped — capture left ON (drains on next start)`);
   }
 
   /** Kick an immediate drain (webhook/admin trigger); harmless if one is already running. */

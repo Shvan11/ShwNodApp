@@ -13,12 +13,26 @@
 import { CdcEngine } from './engine.js';
 import { FailoverSink } from './failover-sink.js';
 import { DolphinSink } from './dolphin-sink.js';
+import { getPgPool } from '../../database/kysely.js';
 import { log } from '../../../utils/logger.js';
 import type { SyncSink, EngineOpts } from './types.js';
 
 function num(v: string | undefined, d: number): number {
   const n = Number.parseInt(v ?? '', 10);
   return Number.isFinite(n) ? n : d;
+}
+
+/**
+ * Turn a sink's capture OFF in the shared cdc_sink_control row. Called at boot for a sink whose
+ * env flag is off: with no drainer running, leaving capture on would let change_log grow with
+ * nothing consuming it. (Capture is otherwise never disabled on a normal stop — see engine.ts.)
+ * Leaves `stale` untouched.
+ */
+async function disableSinkCapture(sink: string): Promise<void> {
+  await getPgPool().query(
+    `UPDATE cdc_sink_control SET enabled = false, note = 'sink disabled by env', updated_at = now() WHERE sink = $1`,
+    [sink]
+  );
 }
 
 const engines: CdcEngine[] = [];
@@ -49,7 +63,10 @@ export function startCdc(): void {
 
   for (const d of defs) {
     if (!d.on) {
-      log.info(`⏭️  CDC sink "${d.sink.name}" disabled`);
+      log.info(`⏭️  CDC sink "${d.sink.name}" disabled — turning capture OFF (no drainer will run)`);
+      void disableSinkCapture(d.sink.name).catch((e) =>
+        log.warn(`[cdc:${d.sink.name}] could not disable capture for off sink`, { error: (e as Error).message })
+      );
       continue;
     }
     const engine = new CdcEngine(d.sink, d.opts);

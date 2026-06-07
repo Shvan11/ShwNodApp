@@ -151,7 +151,7 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
     // Authoritative reconcile. On REST failure keep the last known state — the
     // live SSE events above remain the fallback — rather than forcing `false`.
     const reconcileFromRest = (): void => {
-      fetchJSON<{ clientReady?: boolean }>('/api/wa/initial-state', { schema: whatsappContract.initialState.response })
+      fetchJSON<{ clientReady?: boolean; qr?: string }>('/api/wa/initial-state', { schema: whatsappContract.initialState.response })
         .then((data) => {
           if (!data) return;
           if (data.clientReady) {
@@ -159,6 +159,13 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
             setWhatsappQrCode(null);
           } else {
             setWhatsappClientReady(false);
+            // Seed the QR from the snapshot too. The live `whatsapp_qr_updated`
+            // event is one-shot: a tab whose SSE stream opens *after* the client
+            // already emitted its QR (the normal case — boot emits within ~3s,
+            // long before the auth page loads) never sees it, leaving the page
+            // stuck on "Generating QR Code…" despite a valid QR being available
+            // here. Same missed-event gap the clientReady reconcile above closes.
+            if (data.qr) setWhatsappQrCode(data.qr);
           }
         })
         .catch(() => { /* keep last known state; live events still update it */ });

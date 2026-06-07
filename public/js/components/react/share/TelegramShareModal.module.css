@@ -1,0 +1,86 @@
+/* Telegram share modal — mirrors the LocalSend modal's compact dialog styling. */
+
+.overlay {
+  /* Match LocalSendShareModal: out-stack the PhotoSwipe lightbox if opened from it. */
+  z-index: 100010;
+}
+
+.modal {
+  width: min(440px, 92vw);
+  padding: var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--text-color);
+}
+
+.notice {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  background: var(--amber-50);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+}
+
+.subtle {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.sourceSelect,
+.phoneInput {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  background: var(--background-primary);
+  color: var(--text-color);
+}
+
+.toolButton,
+.primaryButton {
+  border: 1px solid var(--border-color);
+  background: var(--background-primary);
+  color: var(--text-color);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.toolButton:hover {
+  background: var(--hover-bg);
+}
+
+.primaryButton {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: var(--color-white);
+}
+
+.primaryButton:hover {
+  background: var(--primary-hover);
+}
+
+.toolButton:disabled,
+.primaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+}

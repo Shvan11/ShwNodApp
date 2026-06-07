@@ -27,7 +27,8 @@ import * as fileExplorer from '@shared/contracts/file-explorer.contract';
 import { encodeRelPath, errorMessage } from './fileHelpers';
 import FileEntryTile from './FileEntryTile';
 import FilePreviewModal from './FilePreviewModal';
-import LocalSendShareModal, { type ShareSource } from '@/components/react/localsend/LocalSendShareModal';
+import type { ShareSource } from '@/components/react/localsend/LocalSendShareModal';
+import ShareSheet from '@/components/react/share/ShareSheet';
 import styles from './FileExplorer.module.css';
 
 interface Props {
@@ -599,8 +600,8 @@ const FileExplorer = ({ personId, subPath }: Props) => {
         />
       )}
 
-      {/* Share to LAN device */}
-      <LocalSendShareModal
+      {/* Share — chooser (LocalSend / Telegram / …) */}
+      <ShareSheet
         open={!!shareSources}
         sources={shareSources ?? []}
         onClose={() => setShareSources(null)}

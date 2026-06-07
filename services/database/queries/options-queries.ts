@@ -82,6 +82,24 @@ export async function updateOption(optionName: string, optionValue: string): Pro
 }
 
 /**
+ * Insert or update an option (upsert). Unlike `updateOption`, this creates the
+ * row when it doesn't exist yet — needed for runtime-managed keys (e.g. the
+ * Telegram session) that aren't seeded by a migration.
+ */
+export async function upsertOption(optionName: string, optionValue: string): Promise<void> {
+  try {
+    await getKysely()
+      .insertInto('options')
+      .values({ option_name: optionName, option_value: optionValue })
+      .onConflict((oc) => oc.column('option_name').doUpdateSet({ option_value: optionValue }))
+      .execute();
+  } catch (error) {
+    log.error('Error upserting option', { error: (error as Error).message });
+    throw error;
+  }
+}
+
+/**
  * Get options by name pattern (for grouped settings)
  */
 export async function getOptionsByPattern(pattern: string): Promise<Option[]> {
