@@ -127,7 +127,7 @@ const documentTemplateRow = z.object({
   created_by: z.string().nullable(),
   created_date: timestampString.nullable(),
   modified_by: z.string().nullable().optional(),
-  modified_date: timestampString.nullable().optional(),
+  updated_at: timestampString.nullable().optional(),
   last_used_date: timestampString.nullable().optional(),
   template_file_path: z.string().nullable().optional(),
 });

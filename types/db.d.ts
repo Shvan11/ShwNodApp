@@ -30,6 +30,7 @@ export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 export interface Addresses {
   city_id: number | null;
   id: Generated<number>;
+  updated_at: Timestamp | null;
   zone: string | null;
 }
 
@@ -41,6 +42,7 @@ export interface Alerts {
   creation_date: Generated<Timestamp>;
   is_active: Generated<boolean>;
   person_id: number;
+  updated_at: Timestamp | null;
 }
 
 export interface AlertTypes {
@@ -57,6 +59,7 @@ export interface AlignerActivityFlags {
   is_read: Generated<boolean | null>;
   read_at: Timestamp | null;
   related_record_id: number | null;
+  updated_at: Timestamp | null;
 }
 
 export interface AlignerBatches {
@@ -76,6 +79,7 @@ export interface AlignerBatches {
   lower_aligner_start_sequence: number | null;
   manufacture_date: string | null;
   notes: string | null;
+  updated_at: Timestamp | null;
   upper_aligner_count: number;
   upper_aligner_end_sequence: Generated<number | null>;
   upper_aligner_start_sequence: number | null;
@@ -92,12 +96,12 @@ export interface AlignerDoctors {
 export interface AlignerNotes {
   aligner_set_id: number;
   created_at: Generated<Timestamp | null>;
-  edited_at: Timestamp | null;
   is_edited: Generated<boolean | null>;
   is_read: Generated<boolean>;
   note_id: Generated<number>;
   note_text: string;
   note_type: string;
+  updated_at: Timestamp | null;
 }
 
 export interface AlignerSets {
@@ -122,6 +126,7 @@ export interface AlignerSets {
   set_url: string | null;
   set_video: string | null;
   type: string | null;
+  updated_at: Timestamp | null;
   upper_aligners_count: number | null;
   work_id: number;
 }
@@ -137,7 +142,6 @@ export interface Appointments {
   delivered_wa: string | null;
   dismissed: string | null;
   dr_id: number | null;
-  last_updated: Timestamp | null;
   notified: Generated<boolean | null>;
   person_id: number;
   present: string | null;
@@ -147,6 +151,7 @@ export interface Appointments {
   sent_wa: boolean | null;
   sms_sid: string | null;
   sms_status: string | null;
+  updated_at: Timestamp | null;
   wa_message_id: string | null;
   want_notify: Generated<boolean | null>;
   want_wa: Generated<boolean | null>;
@@ -165,6 +170,7 @@ export interface CarriedWires {
   addition_date: string;
   id: Generated<number>;
   person_id: number;
+  updated_at: Timestamp | null;
   upper_lower: string;
   wire_bag: string;
   wire_id: number;
@@ -244,6 +250,7 @@ export interface Diagnoses {
   o_overbite: string | null;
   o_overjet: string | null;
   treatment_plan: string;
+  updated_at: Timestamp | null;
   work_id: number;
 }
 
@@ -259,7 +266,6 @@ export interface DocumentTemplates {
   is_system: Generated<boolean | null>;
   last_used_date: Timestamp | null;
   modified_by: string | null;
-  modified_date: Timestamp | null;
   paper_height: number;
   paper_margin_bottom: Generated<number | null>;
   paper_margin_left: Generated<number | null>;
@@ -273,6 +279,7 @@ export interface DocumentTemplates {
   template_id: Generated<number>;
   template_name: string;
   template_version: Generated<number | null>;
+  updated_at: Timestamp | null;
 }
 
 export interface DocumentTypes {
@@ -311,6 +318,7 @@ export interface Employees {
   position: number | null;
   receive_email: Generated<boolean>;
   sort_order: Generated<number>;
+  updated_at: Timestamp | null;
 }
 
 export interface Endo {
@@ -320,6 +328,7 @@ export interface Endo {
   id: Generated<number>;
   note: string | null;
   refrence_point: string | null;
+  updated_at: Timestamp | null;
   working_length: Numeric | null;
 }
 
@@ -343,17 +352,13 @@ export interface Expenses {
   id: Generated<number>;
   note: string | null;
   subcategory_id: number | null;
+  updated_at: Timestamp | null;
 }
 
 export interface ExpenseSubcategories {
   category_id: number;
   subcategory_id: Generated<number>;
   subcategory_name: string;
-}
-
-export interface Genders {
-  gender: string;
-  gender_id: number;
 }
 
 export interface Holidays {
@@ -381,6 +386,7 @@ export interface Implants {
   implant_length: Numeric | null;
   note: string | null;
   tooth: string | null;
+  updated_at: Timestamp | null;
   work_id: number;
 }
 
@@ -428,6 +434,7 @@ export interface OldOpg {
 export interface Options {
   option_name: string;
   option_value: string | null;
+  updated_at: Timestamp | null;
 }
 
 export interface PatientPortalAuth {
@@ -462,20 +469,10 @@ export interface Patients {
   phone2: string | null;
   referral_source_id: number | null;
   tag_id: number | null;
+  updated_at: Timestamp | null;
   web_ceph_created_at: Timestamp | null;
   web_ceph_link: string | null;
   web_ceph_patient_id: string | null;
-}
-
-export interface PatientsDolphin {
-  pat_birthdate: Timestamp | null;
-  pat_first_name: string | null;
-  pat_gender: string | null;
-  pat_id: string;
-  pat_last_name: string | null;
-  pat_name: string | null;
-  pat_other_id: string | null;
-  pat_phone1: string | null;
 }
 
 export interface PatientTypes {
@@ -520,6 +517,7 @@ export interface Screws {
   placement_date: Timestamp | null;
   position: string | null;
   state: string | null;
+  updated_at: Timestamp | null;
   work_id: Generated<number | null>;
 }
 
@@ -555,12 +553,12 @@ export interface StandItems {
   is_active: Generated<boolean>;
   item_id: Generated<number>;
   item_name: string;
-  modified_date: Timestamp | null;
   notes: string | null;
   reorder_level: Generated<number>;
   sell_price: number;
   sku: string | null;
   unit: string | null;
+  updated_at: Timestamp | null;
 }
 
 export interface StandSaleItems {
@@ -585,6 +583,7 @@ export interface StandSales {
   total_amount: number;
   total_cost: number;
   total_profit: number;
+  updated_at: Timestamp | null;
   void_reason: string | null;
   voided_by: number | null;
   voided_date: Timestamp | null;
@@ -603,19 +602,6 @@ export interface StandStockMovements {
   unit_cost: number | null;
 }
 
-export interface SyncQueue {
-  attempts: Generated<number | null>;
-  created_at: Generated<Timestamp | null>;
-  json_data: string | null;
-  last_attempt: Timestamp | null;
-  last_error: string | null;
-  operation: string;
-  queue_id: Generated<number>;
-  record_id: number;
-  status: Generated<string | null>;
-  table_name: string;
-}
-
 export interface TagOptions {
   id: Generated<number>;
   tag: string;
@@ -630,6 +616,7 @@ export interface TimePointImages {
   time_point_id: number;
   time_point_image_id: Generated<number>;
   title: string | null;
+  updated_at: Timestamp | null;
 }
 
 export interface TimePoints {
@@ -641,6 +628,7 @@ export interface TimePoints {
   tp_code: number;
   tp_date_time: string | null;
   tp_description: string | null;
+  updated_at: Timestamp | null;
 }
 
 export interface Times {
@@ -699,6 +687,7 @@ export interface Visits {
   opg: Generated<boolean | null>;
   others: string | null;
   p_photo: Generated<boolean | null>;
+  updated_at: Timestamp | null;
   upper_wire_id: number | null;
   visit_date: string;
   wire_bending: string | null;
@@ -736,6 +725,7 @@ export interface WorkItems {
   material: string | null;
   note: string | null;
   start_date: string | null;
+  updated_at: Timestamp | null;
   work_id: number;
   working_length: string | null;
 }
@@ -769,6 +759,7 @@ export interface Works {
   status: Generated<number>;
   total_required: number;
   type_of_work: number;
+  updated_at: Timestamp | null;
   work_id: Generated<number>;
 }
 
@@ -810,7 +801,6 @@ export interface DB {
   expense_categories: ExpenseCategories;
   expense_subcategories: ExpenseSubcategories;
   expenses: Expenses;
-  genders: Genders;
   holidays: Holidays;
   image_types: ImageTypes;
   implant_manufacturers: ImplantManufacturers;
@@ -824,7 +814,6 @@ export interface DB {
   patient_portal_auth: PatientPortalAuth;
   patient_types: PatientTypes;
   patients: Patients;
-  patients_dolphin: PatientsDolphin;
   pgmigrations: Pgmigrations;
   portal_sessions: PortalSessions;
   positions: Positions;
@@ -838,7 +827,6 @@ export interface DB {
   stand_sale_items: StandSaleItems;
   stand_sales: StandSales;
   stand_stock_movements: StandStockMovements;
-  sync_queue: SyncQueue;
   tag_options: TagOptions;
   time_point_images: TimePointImages;
   time_points: TimePoints;

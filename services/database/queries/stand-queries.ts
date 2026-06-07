@@ -12,7 +12,7 @@
  * - `expiry_date` is PG `date` → the centralized parser (kysely.ts) returns a
  *   `'YYYY-MM-DD'` string at runtime, and codegen types it `string`; it's selected
  *   as-is and `StandItemRow.expiry_date` is typed `string | null` to match.
- * - `sale_date` / `movement_date` / `date_added` / `modified_date` are `timestamp` → Date.
+ * - `sale_date` / `movement_date` / `date_added` / `updated_at` are `timestamp` → Date.
  * - citext columns (`item_name`/`sku`/`barcode`/`movement_type`/…) make `=`/`LIKE`
  *   case-insensitive with no app churn (matches the old Arabic_CI_AS columns).
  */
@@ -72,7 +72,7 @@ type StandItemRow = {
   notes: string | null;
   is_active: boolean;
   date_added: Date;
-  modified_date: Date | null;
+  updated_at: Date | null;
   created_by: number | null;
   category_name: string | null;
 };
@@ -212,7 +212,7 @@ function selectStandItemColumns() {
     'i.notes',
     'i.is_active',
     'i.date_added',
-    'i.modified_date',
+    'i.updated_at',
     'i.created_by',
     'c.category_name',
   ] as const;
@@ -369,7 +369,7 @@ export async function addStandItem(data: StandItemCreateData): Promise<{ item_id
 }
 
 export async function updateStandItem(id: number, data: StandItemUpdateData): Promise<void> {
-  const set: Record<string, unknown> = { modified_date: sql`localtimestamp` };
+  const set: Record<string, unknown> = {};
 
   if (data.itemName !== undefined) set.item_name = data.itemName;
   if (data.sku !== undefined) set.sku = data.sku;
@@ -382,6 +382,10 @@ export async function updateStandItem(id: number, data: StandItemUpdateData): Pr
   if (data.unit !== undefined) set.unit = data.unit;
   if (data.notes !== undefined) set.notes = data.notes;
 
+  // No fields provided → skip the write (the trg_set_updated_at trigger now owns updated_at;
+  // an empty SET would be invalid SQL and a no-op bump is undesirable).
+  if (Object.keys(set).length === 0) return;
+
   await getKysely()
     .updateTable('stand_items')
     .set(set)
@@ -392,7 +396,7 @@ export async function updateStandItem(id: number, data: StandItemUpdateData): Pr
 export async function softDeleteStandItem(id: number): Promise<void> {
   await getKysely()
     .updateTable('stand_items')
-    .set({ is_active: false, modified_date: sql`localtimestamp` })
+    .set({ is_active: false })
     .where('item_id', '=', id)
     .execute();
 }
@@ -466,7 +470,6 @@ export async function createStandSaleTransaction(data: SaleCreateInput): Promise
         .updateTable('stand_items')
         .set((eb) => ({
           current_stock: eb('current_stock', '-', item.quantity),
-          modified_date: sql`localtimestamp`,
         }))
         .where('item_id', '=', item.itemId)
         .where('current_stock', '>=', item.quantity)
@@ -624,7 +627,6 @@ export async function voidStandSale(
         .updateTable('stand_items')
         .set((eb) => ({
           current_stock: eb('current_stock', '+', row.quantity),
-          modified_date: sql`localtimestamp`,
         }))
         .where('item_id', '=', row.item_id)
         .execute();
@@ -685,7 +687,6 @@ export async function restockItem(
       .updateTable('stand_items')
       .set((eb) => ({
         current_stock: eb('current_stock', '+', quantity),
-        modified_date: sql`localtimestamp`,
       }))
       .where('item_id', '=', itemId)
       .execute();
@@ -717,7 +718,6 @@ export async function adjustStock(
       .updateTable('stand_items')
       .set((eb) => ({
         current_stock: eb('current_stock', '+', delta),
-        modified_date: sql`localtimestamp`,
       }))
       .where('item_id', '=', itemId)
       .where(sql`("current_stock" + ${delta})`, '>=', 0)

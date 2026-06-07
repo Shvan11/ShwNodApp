@@ -357,7 +357,6 @@ export async function updateWhatsAppDeliveryStatus(
             "delivered_wa" = w.delivered,
             "wa_message_id" = w.wamid,
             "want_notify" = CASE WHEN w.delivered IN ('READ','DEVICE','SERVER') THEN false ELSE a."want_notify" END,
-            "last_updated" = ${now}::timestamp,
             "delivered_timestamp" = CASE
               WHEN w.delivered IN ('DEVICE','SERVER') AND a."delivered_timestamp" IS NULL THEN ${now}::timestamp
               ELSE a."delivered_timestamp" END,
@@ -555,7 +554,6 @@ export async function updateSingleMessageStatus(
           UPDATE "appointments" SET
             "delivered_wa" = ${statusText},
             "want_notify" = CASE WHEN ${statusText} IN ('READ','DEVICE','SERVER') THEN false ELSE "want_notify" END,
-            "last_updated" = ${now}::timestamp,
             "delivered_timestamp" = CASE
               WHEN ${statusText} IN ('DEVICE','SERVER') AND "delivered_timestamp" IS NULL THEN ${now}::timestamp
               ELSE "delivered_timestamp" END,
@@ -573,7 +571,7 @@ export async function updateSingleMessageStatus(
           .selectFrom('appointments as a')
           .innerJoin('patients as p', 'p.person_id', 'a.person_id')
           .where('a.appointment_id', '=', existing.appointment_id)
-          .select(['a.appointment_id', 'p.patient_name', 'p.phone', 'a.delivered_wa', 'a.last_updated'])
+          .select(['a.appointment_id', 'p.patient_name', 'p.phone', 'a.delivered_wa', 'a.updated_at'])
           .executeTakeFirst();
 
         log.info('Single message status updated successfully', { messageId, appointmentId: existing.appointment_id });
@@ -586,7 +584,7 @@ export async function updateSingleMessageStatus(
                 patientName: info.patient_name,
                 phone: info.phone ?? '',
                 status: info.delivered_wa ?? '',
-                lastUpdated: info.last_updated as Date,
+                lastUpdated: info.updated_at as Date,
               }
             : undefined,
         };
@@ -790,7 +788,7 @@ export async function getMessageStatusByDate(date: Date | string): Promise<Messa
           'a.delivered_wa as deliveryStatus',
           'a.wa_message_id as messageId',
           'a.sent_timestamp as sentTimestamp',
-          'a.last_updated as lastUpdated',
+          'a.updated_at as lastUpdated',
         ])
         .execute();
 
@@ -906,7 +904,7 @@ export async function resetMessagingForDate(date: string): Promise<ResetResult> 
     const upd = await sql`
       UPDATE "appointments" SET
         "notified" = false, "sent_wa" = false, "delivered_wa" = NULL, "want_wa" = true,
-        "wa_message_id" = NULL, "sent_timestamp" = NULL, "last_updated" = NULL,
+        "wa_message_id" = NULL, "sent_timestamp" = NULL,
         "delivered_timestamp" = NULL, "read_timestamp" = NULL, "want_notify" = true
       WHERE "app_day" = ${date}::date
     `.execute(trx);

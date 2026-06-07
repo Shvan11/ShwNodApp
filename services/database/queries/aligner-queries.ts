@@ -219,7 +219,7 @@ type AlignerNote = {
   note_text: string;
   created_at: Date;
   is_edited: boolean;
-  edited_at: Date | null;
+  updated_at: Date | null;
   is_read: boolean;
   doctor_name: string;
 };
@@ -1667,7 +1667,7 @@ export async function getNotesBySetId(setId: number): Promise<AlignerNote[]> {
         'n.note_text',
         eb.ref('n.created_at').$castTo<Date>().as('created_at'),
         'n.is_edited',
-        eb.ref('n.edited_at').$castTo<Date | null>().as('edited_at'),
+        eb.ref('n.updated_at').$castTo<Date | null>().as('updated_at'),
         'n.is_read',
         'd.doctor_name',
       ])
@@ -1681,7 +1681,7 @@ export async function getNotesBySetId(setId: number): Promise<AlignerNote[]> {
       note_text: r.note_text,
       created_at: r.created_at,
       is_edited: !!r.is_edited,
-      edited_at: r.edited_at,
+      updated_at: r.updated_at,
       is_read: r.is_read,
       doctor_name: r.doctor_name,
     }));
@@ -1800,7 +1800,7 @@ export async function updateNote(noteId: number, noteText: string): Promise<void
     await withPgTransaction(async (trx) => {
       await trx
         .updateTable('aligner_notes')
-        .set({ note_text: noteText.trim(), is_edited: true, edited_at: sql`localtimestamp` })
+        .set({ note_text: noteText.trim(), is_edited: true })
         .where('note_id', '=', noteId)
         .execute();
     });

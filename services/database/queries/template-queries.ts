@@ -5,12 +5,11 @@
  * Migration Phase 4: translated to typed Kysely (PostgreSQL). The positional
  * `ColumnValue` mappers are gone — selects return plain objects. `is_active`/
  * `is_default`/`is_system`/`show_grid` are PG `boolean` columns now, so filters/
- * inserts use JS booleans (was mssql bit 1/0). `created_date`/`modified_date` are PG
+ * inserts use JS booleans (was mssql bit 1/0). `created_date`/`updated_at` are PG
  * `timestamp`, parsed to local-wall-clock `Date` by the centralized kysely.ts parser.
  * `updateTemplate`'s dynamic partial SET clause is built with `eb`/`set()` from the
- * provided fields, with `modified_date` stamped via `now()`.
+ * provided fields; `updated_at` is maintained by the trg_set_updated_at DB trigger.
  */
-import { sql } from 'kysely';
 import type { UpdateObject } from 'kysely';
 import { getKysely, type Database } from '../kysely.js';
 
@@ -54,7 +53,7 @@ interface DocumentTemplate {
   created_by: string;
   created_date: Date;
   modified_by?: string | null;
-  modified_date?: Date | null;
+  updated_at?: Date | null;
   last_used_date?: Date | null;
   template_file_path?: string | null;
 }
@@ -174,7 +173,7 @@ export async function getDocumentTemplates(
       't.created_by',
       't.created_date',
       't.modified_by',
-      't.modified_date',
+      't.updated_at',
       't.last_used_date',
       't.template_file_path',
     ]);
@@ -228,7 +227,7 @@ export async function getTemplateById(templateId: number): Promise<DocumentTempl
       't.created_by',
       't.created_date',
       't.modified_by',
-      't.modified_date',
+      't.updated_at',
       't.last_used_date',
     ])
     .where('t.template_id', '=', templateId)
@@ -292,7 +291,7 @@ export async function updateTemplate(
 ): Promise<boolean> {
   // Build the partial SET object from only the provided fields. The whitelist of
   // updatable columns matches the old fieldTypeMap; booleans pass through as JS
-  // booleans (PG boolean columns). modified_date is always stamped via now().
+  // booleans (PG boolean columns). updated_at is maintained by the trg_set_updated_at trigger.
   const updatableFields: (keyof TemplateUpdateData)[] = [
     'template_name',
     'description',
@@ -323,13 +322,11 @@ export async function updateTemplate(
     }
   }
 
-  // If no fields to update (only modified_date would change), return early — matches
-  // the old behavior of skipping the write when only the timestamp would be touched.
+  // If no fields to update, return early — the trg_set_updated_at trigger now owns
+  // updated_at, and an empty SET would be a no-op bump (matches the old skip behavior).
   if (!hasFields) {
     return true;
   }
-
-  (updateSet as Record<string, unknown>).modified_date = sql`now()`;
 
   const db = getKysely();
   await db

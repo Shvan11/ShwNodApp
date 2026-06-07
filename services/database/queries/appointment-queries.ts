@@ -95,22 +95,21 @@ export async function updatePresent(
     const present = row.present as string | null;
     const seated = row.seated as string | null;
     const dismissed = row.dismissed as string | null;
-    const now = new Date();
 
     if (state === 'present') {
       if (present !== null || seated !== null || dismissed !== null) {
         throw new Error('[INVALID_STATE_TRANSITION] Cannot check in: patient is already checked in, seated, or dismissed');
       }
-      await trx.updateTable('appointments').set({ present: Tim, last_updated: now }).where('appointment_id', '=', Aid).execute();
+      await trx.updateTable('appointments').set({ present: Tim }).where('appointment_id', '=', Aid).execute();
     } else if (state === 'seated') {
       if (present === null) throw new Error('[INVALID_STATE_TRANSITION] Cannot seat: patient is not checked in');
       if (seated !== null) throw new Error('[INVALID_STATE_TRANSITION] Cannot seat: patient is already seated');
       if (dismissed !== null) throw new Error('[INVALID_STATE_TRANSITION] Cannot seat: patient is already dismissed');
-      await trx.updateTable('appointments').set({ seated: Tim, last_updated: now }).where('appointment_id', '=', Aid).execute();
+      await trx.updateTable('appointments').set({ seated: Tim }).where('appointment_id', '=', Aid).execute();
     } else if (state === 'dismissed') {
       if (seated === null) throw new Error('[INVALID_STATE_TRANSITION] Cannot dismiss: patient is not seated');
       if (dismissed !== null) throw new Error('[INVALID_STATE_TRANSITION] Cannot dismiss: patient is already dismissed');
-      await trx.updateTable('appointments').set({ dismissed: Tim, last_updated: now }).where('appointment_id', '=', Aid).execute();
+      await trx.updateTable('appointments').set({ dismissed: Tim }).where('appointment_id', '=', Aid).execute();
     } else {
       throw new Error('Invalid state parameter. Must be present, seated, or dismissed.');
     }
@@ -274,7 +273,6 @@ export async function createAppointment(data: {
         app_detail: data.app_detail,
         dr_id: data.dr_id,
         present: data.present ?? null,
-        last_updated: new Date(),
       })
       .returning('appointment_id')
       .executeTakeFirstOrThrow();

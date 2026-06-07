@@ -19,6 +19,11 @@ import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 import { isUniqueViolation } from '../../../utils/pg-errors.js';
 
+// The `genders` lookup table was dissolved (immutable Male/Female domain, enforced by the
+// existing CHECK on patients.gender). The int→label mapping lives here; any UI translation
+// (Kurdish/Arabic RTL) belongs in app i18n, not the DB.
+const GENDER_LABELS: Record<number, string> = { 1: 'Male', 2: 'Female' };
+
 // type definitions
 interface PatientInfo {
   person_id: number;
@@ -184,7 +189,6 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
   // concurrently rather than serially.
   const rowPromise = getKysely()
     .selectFrom('patients as p')
-    .leftJoin('genders as g', 'g.gender_id', 'p.gender')
     .leftJoin('addresses as a', 'a.id', 'p.address_id')
     .leftJoin('referrals as r', 'r.id', 'p.referral_source_id')
     .leftJoin('patient_types as pt', 'pt.id', 'p.patient_type_id')
@@ -221,7 +225,6 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
       // date_of_birth is a PG `date` → the parser already returns 'YYYY-MM-DD' (was CONVERT(...,23)).
       eb.ref('p.date_of_birth').$castTo<string>().as('DateOfBirth'),
       'p.gender',
-      'g.gender as gender_display',
       'a.zone as address_name',
       'r.referral as referral_source',
       'pt.patient_type as patient_type_name',
@@ -261,7 +264,7 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
         email: row.email,
         DateOfBirth: row.DateOfBirth,
         gender: row.gender,
-        gender_display: row.gender_display,
+        gender_display: row.gender != null ? (GENDER_LABELS[row.gender] ?? null) : null,
         address_name: row.address_name,
         referral_source: row.referral_source,
         patient_type_name: row.patient_type_name,
@@ -521,11 +524,10 @@ export function getAddresses(): Promise<LookupItem[]> {
  * Retrieves all genders for dropdown lists.
  */
 export function getGenders(): Promise<LookupItem[]> {
-  return getKysely()
-    .selectFrom('genders')
-    .select(['gender_id as id', 'gender as name'])
-    .orderBy('gender')
-    .execute() as Promise<LookupItem[]>;
+  // genders lookup dissolved — return the fixed Male/Female domain (was a DB table read).
+  return Promise.resolve(
+    Object.entries(GENDER_LABELS).map(([id, name]) => ({ id: Number(id), name }))
+  );
 }
 
 /**

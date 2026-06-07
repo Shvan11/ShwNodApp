@@ -770,7 +770,7 @@ router.get(
                     p."address_id", p."referral_source_id", p."patient_type_id", p."tag_id",
                     p."notes", p."language", p."country_code",
                     p."estimated_cost", p."currency", to_char(p."date_added", 'YYYY-MM-DD') as "date_added",
-                    g."gender" as "GenderName", a."zone" as "AddressName",
+                    CASE p."gender" WHEN 1 THEN 'Male' WHEN 2 THEN 'Female' END as "GenderName", a."zone" as "AddressName",
                     r."referral" as "ReferralSource", pt."patient_type" as "PatientTypeName",
                     tag."tag" as "TagName",
                     (
@@ -783,7 +783,6 @@ router.get(
                         ) wt
                     ) as "ActiveWorkTypes"
             FROM "patients" p
-            LEFT JOIN "genders" g ON p."gender" = g."gender_id"
             LEFT JOIN "addresses" a ON p."address_id" = a."id"
             LEFT JOIN "referrals" r ON p."referral_source_id" = r."id"
             LEFT JOIN "patient_types" pt ON p."patient_type_id" = pt."id"

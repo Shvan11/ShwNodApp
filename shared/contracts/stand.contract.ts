@@ -56,7 +56,7 @@ const standItemRow = z.looseObject({
   notes: z.string().nullable(),
   is_active: z.boolean(),
   date_added: timestampString, // PG `timestamp` → Date(server)/string(client)
-  modified_date: timestampString.nullable(),
+  updated_at: timestampString.nullable(),
   created_by: z.number().nullable(),
   category_name: z.string().nullable(),
 });
