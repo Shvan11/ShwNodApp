@@ -298,7 +298,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
 
     const calendarDays = generateCalendarDays();
     const monthNumber = currentMonth.getMonth() + 1;
-    const monthNameOnly = currentMonth.toLocaleDateString('en-US', { month: 'long' });
+    const monthNameOnly = currentMonth.toLocaleDateString(undefined, { month: 'long' });
     const year = currentMonth.getFullYear();
     const monthName = `${monthNumber}/${year}`;
 
@@ -466,7 +466,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                     <>
                         <div className={styles.scheduleHeader}>
                             <h3>
-                                {selectedDate.toLocaleDateString('en-US', {
+                                {selectedDate.toLocaleDateString(undefined, {
                                     weekday: 'long',
                                     month: 'short',
                                     day: 'numeric'

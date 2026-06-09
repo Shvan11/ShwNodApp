@@ -96,6 +96,9 @@ const galleryImageRow = z.looseObject({
   name: z.string(),
   width: z.number().optional(),
   height: z.number().optional(),
+  // File mtime (ms) — appended to the image URL as `?v=` so an overwritten render
+  // busts the browser cache instead of showing the stale image at the same URL.
+  mtime: z.number().optional(),
 }).nullable();
 
 /** Patient phone record (id + name + phone for autocomplete). phone is nullable. */

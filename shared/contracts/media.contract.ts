@@ -50,6 +50,24 @@ export const uploadImage = {
 } as const;
 export type UploadImageBody = z.infer<typeof uploadImage.body>;
 
+// POST /api/webceph/upload-from-file → { big, thumbnail, link }. The PRIMARY
+// upload path: instead of the browser POSTing the image bytes (that's the
+// `uploadImage` multipart fallback above), the client sends only `relPath` — a
+// file already sitting in the patient's `clinic1/{personId}` folder — and the
+// server reads it off disk (via the file-explorer service's path-safety) and
+// forwards it to WebCeph. The WebCeph patient id is resolved server-side from
+// `patients.web_ceph_patient_id`, so it isn't part of the body.
+export const uploadFromFile = {
+  body: z.object({
+    personId: intId,
+    relPath: z.string(),
+    recordDate: z.string(),
+    targetClass: z.string(),
+  }),
+  response: z.looseObject({}),
+} as const;
+export type UploadFromFileBody = z.infer<typeof uploadFromFile.body>;
+
 // GET /api/webceph/patient-link/:personId → link object | null (404 when not found).
 // Intentionally loose: the WebCeph patient link row schema comes from the webceph
 // service and contains a variable set of API-specific fields.

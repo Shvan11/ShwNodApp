@@ -392,9 +392,13 @@ async function processRenderJob(job: RenderJob): Promise<void> {
     });
   } finally {
     // Always announce completion so the grid refetches even on partial/total failure.
+    // NOTE: the key MUST be `tpCode` (camelCase) — the SSE broadcaster forwards this
+    // payload verbatim and the grid matches on `tpCode`. Emitting `tp_code` here
+    // silently broke the match (the emitter is untyped, so TS couldn't catch it),
+    // leaving the photos grid showing the stale pre-edit image until a hard refresh.
     wsEmitter?.emit(InternalEmitterEvents.PHOTO_TIMEPOINT_RENDERED, {
       personId,
-      tp_code,
+      tpCode: tp_code,
       written: written.length,
       warnings: warnings.length,
     });

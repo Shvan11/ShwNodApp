@@ -25,6 +25,9 @@ interface GalleryImage {
     name: string;
     width?: number;
     height?: number;
+    /** File mtime (ms) — appended to the image URL as `?v=` to bust the cache when
+     *  an edited slot is re-rendered to the same filename. */
+    mtime?: number;
 }
 
 interface Timepoint {
@@ -121,7 +124,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
 
     // Get descriptive filename from image URL
     const getShareFileName = (imageUrl: string): string => {
-        const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
+        // Drop any `?v=` cache-bust token before parsing the extension.
+        const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1).split('?')[0];
         const extensionMatch = fileName.match(/\.([^.]+)$/);
         const extension = extensionMatch ? extensionMatch[1] : '';
         return fileNameMap[extension] || `patient_${personId}_photo.jpg`;
@@ -288,7 +292,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
 
     // Extract the dolphin filename from a URL served via /DolImgs/{name}.
     const getFileNameFromUrl = (imageUrl: string): string => {
-        return imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
+        // Strip any `?v=` cache-bust token so callers see the bare `….iNN` name.
+        return imageUrl.substring(imageUrl.lastIndexOf('/') + 1).split('?')[0];
     };
 
     const getImageSrc = (element: ImageElement): string => {
@@ -298,7 +303,12 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
 
         const image = images[element.index];
         if (image && image.name) {
-            return `/DolImgs/${image.name}`;
+            // Append the file mtime so a re-rendered slot (same /DolImgs filename)
+            // busts the browser cache; unchanged slots keep a stable URL and stay
+            // cached. Without this the grid shows the stale pre-edit image.
+            return image.mtime
+                ? `/DolImgs/${image.name}?v=${image.mtime}`
+                : `/DolImgs/${image.name}`;
         }
 
         // Optimized placeholder image (single SVG replaces 3 PNGs: 327KB → 1KB)
@@ -489,6 +499,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                                 const url = new URL(imageSrc);
                                                 webPath = url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
                                             }
+                                            // Drop any `?v=` cache-bust token before path conversion.
+                                            webPath = webPath.split('?')[0];
 
                                             const { fullPath } = await fetchJSON<{ fullPath: string }>(
                                                 `/api/convert-path?path=${encodeURIComponent(webPath)}`,
@@ -630,9 +642,13 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     // photos appear without a manual reload.
     useEffect(() => {
         const onPhotosRendered = (payload: unknown): void => {
-            const p = payload as { personId?: number | string; tpCode?: number | string; warnings?: number };
+            const p = payload as { personId?: number | string; tpCode?: number | string; tp_code?: number | string; warnings?: number };
             if (!personId) return;
-            if (String(p.personId) !== String(personId) || String(p.tpCode) !== String(tpCode)) return;
+            // Tolerate either casing for the timepoint code: the internal emitter is
+            // untyped, so a snake_case `tp_code` slipped through historically and
+            // silently broke this match (→ no refetch → stale image until reload).
+            const pTp = p.tpCode ?? p.tp_code;
+            if (String(p.personId) !== String(personId) || String(pTp) !== String(tpCode)) return;
             void loadGalleryImages();
             void loadTimepoints();
             if (p.warnings && p.warnings > 0) {

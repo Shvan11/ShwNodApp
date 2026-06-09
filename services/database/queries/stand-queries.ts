@@ -496,7 +496,9 @@ export async function createStandSaleTransaction(data: SaleCreateInput): Promise
   });
 }
 
-export async function getStandSales(filters: StandSaleFilters = {}): Promise<StandSaleRow[]> {
+export async function getStandSales(
+  filters: StandSaleFilters = {}
+): Promise<(StandSaleRow & { items_summary: string })[]> {
   let q = getKysely()
     .selectFrom('stand_sales as s')
     .leftJoin('patients as p', 's.person_id', 'p.person_id')
@@ -518,6 +520,19 @@ export async function getStandSales(filters: StandSaleFilters = {}): Promise<Sta
       's.void_reason',
       'p.patient_name',
       'u.full_name as CashierName',
+      // Per-sale line-item summary, e.g. "Panadol ×2, Dental Floss". Correlated
+      // subquery (cast item_name out of citext to text for concat) so the
+      // history list shows what was sold without an N+1 detail fetch. coalesce
+      // to '' so a hypothetical item-less sale stays a string, not NULL.
+      sql<string>`coalesce((
+        select string_agg(
+          i.item_name::text || case when si.quantity > 1 then ' ×' || si.quantity else '' end,
+          ', ' order by si.sale_item_id
+        )
+        from stand_sale_items si
+        join stand_items i on i.item_id = si.item_id
+        where si.sale_id = s.sale_id
+      ), '')`.as('items_summary'),
     ]);
 
   if (filters.startDate) {
@@ -543,7 +558,7 @@ export async function getStandSales(filters: StandSaleFilters = {}): Promise<Sta
     q = q.limit(limit).offset(offset);
   }
 
-  return q.execute() as Promise<StandSaleRow[]>;
+  return q.execute() as Promise<(StandSaleRow & { items_summary: string })[]>;
 }
 
 export async function getStandSaleById(id: number): Promise<(StandSaleRow & { Items: StandSaleItemRow[] }) | null> {

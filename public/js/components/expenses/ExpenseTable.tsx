@@ -22,7 +22,7 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
 
     const formatDate = (dateString: string | undefined): string => {
         if (!dateString) return '-';
-        return new Date(dateString).toLocaleDateString('en-US');
+        return new Date(dateString).toLocaleDateString();
     };
 
     if (loading) {

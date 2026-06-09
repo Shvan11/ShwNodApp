@@ -163,7 +163,7 @@ const AppointmentCalendar = ({
         const end = new Date(weekEnd);
 
         if (viewMode === 'day') {
-            return currentDate.toLocaleDateString('en-US', {
+            return currentDate.toLocaleDateString(undefined, {
                 weekday: 'long',
                 month: 'long',
                 day: 'numeric',
@@ -172,16 +172,16 @@ const AppointmentCalendar = ({
         }
 
         if (viewMode === 'month') {
-            return currentDate.toLocaleDateString('en-US', {
+            return currentDate.toLocaleDateString(undefined, {
                 month: 'long',
                 year: 'numeric'
             });
         }
 
-        return `Week of ${start.toLocaleDateString('en-US', {
+        return `Week of ${start.toLocaleDateString(undefined, {
             month: 'short',
             day: 'numeric'
-        })} - ${end.toLocaleDateString('en-US', {
+        })} - ${end.toLocaleDateString(undefined, {
             month: 'short',
             day: 'numeric',
             year: 'numeric'
@@ -190,13 +190,13 @@ const AppointmentCalendar = ({
 
     // Toolbar title — main line (month + year) and sub line (context per view mode)
     const titleMain = useMemo(
-        () => currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        () => currentDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
         [currentDate]
     );
 
     const titleSub = useMemo(() => {
         if (viewMode === 'day') {
-            return currentDate.toLocaleDateString('en-US', {
+            return currentDate.toLocaleDateString(undefined, {
                 weekday: 'long',
                 month: 'long',
                 day: 'numeric',
@@ -220,7 +220,7 @@ const AppointmentCalendar = ({
                     7
             );
         const fmt = (d: Date) =>
-            d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+            d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
         return `Week ${weekNumber} · ${fmt(weekStart)} – ${fmt(weekEnd)}`;
     }, [weekStart, weekEnd, currentDate, viewMode]);
 

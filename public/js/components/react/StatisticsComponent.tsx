@@ -91,7 +91,12 @@ const StatisticsComponent = () => {
     const [yearRangeStart, setYearRangeStart] = useState(new Date().getFullYear() - 4);
     const [yearRangeEnd, setYearRangeEnd] = useState(new Date().getFullYear());
     const [exchangeRate] = useState(1450);
-    const [selectedDate, setSelectedDate] = useState<DailyData | null>(null);
+    // Modal open-state lives in the URL (?day=YYYY-MM-DD) so browser back/forward
+    // and deep links re-open it; the full row is looked up from the loaded month.
+    const selectedDay = searchParams.get('day');
+    const selectedDate = selectedDay
+        ? statistics?.dailyData.find(d => d.Day === selectedDay) ?? null
+        : null;
     const [viewMode, setViewMode] = useState<ViewMode>((searchParams.get('view') as ViewMode) || VIEW_MODES.DAILY);
 
     // Chart reference - single chart for Grand Total (USD)
@@ -125,7 +130,13 @@ const StatisticsComponent = () => {
         try {
             const data = await fetchJSON<StatisticsData>(`/api/statistics?month=${month}&year=${year}&exchangeRate=${exchangeRate}`, { schema: reports.statistics.response });
             setStatistics(data);
-            setSearchParams({ month: month.toString(), year: year.toString() });
+            // Preserve other params (notably ?day for an open modal) when syncing month/year.
+            setSearchParams(prev => {
+                const next = new URLSearchParams(prev);
+                next.set('month', month.toString());
+                next.set('year', year.toString());
+                return next;
+            }, { replace: true });
         } catch (err) {
             setError(httpErrorMessage(err, 'Failed to fetch statistics'));
             console.error('Error fetching statistics:', err);
@@ -380,6 +391,25 @@ const StatisticsComponent = () => {
         } else {
             setMonth(month + 1);
         }
+    };
+
+    // Open/close the daily-invoices modal via the URL so browser navigation works.
+    const openDayModal = (day: DailyData) => {
+        const dayStr = day.Day;
+        if (!dayStr) return;
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.set('day', dayStr);
+            return next;
+        });
+    };
+
+    const closeDayModal = () => {
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.delete('day');
+            return next;
+        }, { replace: true });
     };
 
     // Format currency
@@ -673,7 +703,7 @@ const StatisticsComponent = () => {
                                         <tr
                                             key={index}
                                             className={styles.clickableRow}
-                                            onClick={() => setSelectedDate(day)}
+                                            onClick={() => openDayModal(day)}
                                             title="Click to view daily invoices"
                                         >
                                             <td data-label="Date">{formatDate(day.Day)}</td>
@@ -713,7 +743,7 @@ const StatisticsComponent = () => {
             {selectedDate && (
                 <DailyInvoicesModal
                     selectedDate={selectedDate}
-                    onClose={() => setSelectedDate(null)}
+                    onClose={closeDayModal}
                 />
             )}
         </>

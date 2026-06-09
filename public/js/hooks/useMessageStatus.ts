@@ -111,7 +111,7 @@ function fetchMessageStatus(date: string, signal?: AbortSignal): Promise<Message
  */
 function formatDisplayDate(dateString: string): string {
   const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString(undefined, {
     weekday: 'long',
     year: 'numeric',
     month: 'long',

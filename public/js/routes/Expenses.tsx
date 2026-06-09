@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useExpenses, useExpenseMutations } from '../hooks/useExpenses';
 import type { Expense, ExpenseFilters as ExpenseFiltersType, ExpenseData } from '../hooks/useExpenses';
 import ExpenseFilters from '../components/expenses/ExpenseFilters';
@@ -53,11 +54,32 @@ export default function Expenses() {
   // Toast notifications (now using unified global toast system)
   const toast = useToast();
 
-  // State for filters - initialize with default date range
-  const [filters, setFilters] = useState<FiltersState>(getDefaultDateRange);
+  const [searchParams] = useSearchParams();
 
-  // Applied filters - start with same default to prevent loading all expenses
-  const [appliedFilters, setAppliedFilters] = useState<FiltersState>(getDefaultDateRange);
+  // Seed filters from the URL when deep-linked (e.g. from the statistics
+  // daily-invoices modal: /expenses?startDate=…&endDate=…&currency=…),
+  // otherwise fall back to the current month. Read once on mount only.
+  const getInitialFilters = (): FiltersState => {
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    const currency = searchParams.get('currency');
+    if (!startDate && !endDate && !currency) {
+      return getDefaultDateRange();
+    }
+    const defaults = getDefaultDateRange();
+    return {
+      ...defaults,
+      startDate: startDate ?? defaults.startDate,
+      endDate: endDate ?? defaults.endDate,
+      currency: currency ?? undefined,
+    };
+  };
+
+  // State for filters - initialized from URL params or current month
+  const [filters, setFilters] = useState<FiltersState>(getInitialFilters);
+
+  // Applied filters - start with same initial values to fetch immediately
+  const [appliedFilters, setAppliedFilters] = useState<FiltersState>(getInitialFilters);
 
   // State for modals
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);

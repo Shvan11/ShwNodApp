@@ -298,7 +298,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     const getDateTimeDisplay = (): string => {
         if (formData.AppDate && formData.AppTime) {
             const date = new Date(`${formData.AppDate}T${formData.AppTime}`);
-            return date.toLocaleString('en-US', {
+            return date.toLocaleString(undefined, {
                 weekday: 'short',
                 month: 'short',
                 day: 'numeric',

@@ -169,7 +169,7 @@ const MonthlyCalendarGrid = ({
                             {isExpanded && currentMonth && !isHoliday && appointmentCount > 0 && (
                                 <div className={styles.dayExpandedPanel}>
                                     <div className={styles.expandedHeader}>
-                                        {parseLocalDate(day.date).toLocaleDateString('en-US', {
+                                        {parseLocalDate(day.date).toLocaleDateString(undefined, {
                                             weekday: 'short',
                                             month: 'short',
                                             day: 'numeric'

@@ -10,11 +10,15 @@
  */
 
 import { Router, type Request, type Response, type NextFunction } from 'express';
+import path from 'path';
+import { readFile } from 'fs/promises';
 import { sql } from 'kysely';
 import { getKysely } from '../../services/database/kysely.js';
 import { log } from '../../utils/logger.js';
 import multer from 'multer';
 import webcephService from '../../services/webceph/webceph-service.js';
+import { resolveFileForServe, FileExplorerError } from '../../services/files/file-explorer.service.js';
+import { getFileMimeType } from '../../utils/file-mime.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import * as media from '../../shared/contracts/media.contract.js';
@@ -185,6 +189,96 @@ router.post('/webceph/upload-image', uploadImage, validate({ body: media.uploadI
     }, 'Image uploaded to WebCeph successfully');
   } catch (error) {
     log.error('[WebCeph] Error uploading image:', error);
+    ErrorResponses.serverError(res, 'Failed to upload image to WebCeph', error as Error);
+  }
+});
+
+/**
+ * Upload an x-ray image to WebCeph straight from the patient's server folder.
+ * POST /webceph/upload-from-file
+ * Body: { personId, relPath, recordDate, targetClass }
+ *
+ * The primary upload path: the image already lives in `clinic1/{personId}` on
+ * the server, so the browser sends only its `relPath` and the server reads the
+ * bytes off disk (no multipart round-trip). Mirrors the multipart handler's two
+ * WebCeph calls; the only differences are the image source (disk vs req.file)
+ * and the patient id (resolved from the DB vs sent by the client).
+ */
+router.post('/webceph/upload-from-file', validate({ body: media.uploadFromFile.body }), async (req: Request<object, object, media.UploadFromFileBody>, res: Response): Promise<void> => {
+  try {
+    const { personId, relPath, recordDate, targetClass } = req.body;
+
+    // The WebCeph patient id was stored (person_id padded to 6) when the patient
+    // was created in WebCeph. Read it back rather than re-deriving, and refuse if
+    // the patient isn't in WebCeph yet (the upload UI only shows post-create).
+    const db = getKysely();
+    const { rows } = await sql<{ webcephPatientId: string | null }>`
+      SELECT "web_ceph_patient_id" AS "webcephPatientId"
+      FROM "patients"
+      WHERE "person_id" = ${personId}
+    `.execute(db);
+    const webcephPatientId = rows[0]?.webcephPatientId;
+    if (!webcephPatientId) {
+      ErrorResponses.badRequest(res, 'This patient has not been created in WebCeph yet.');
+      return;
+    }
+
+    // Read the chosen file off the patient's folder. resolveFileForServe applies
+    // the same path-containment + symlink-escape guards as the file browser and
+    // throws FileExplorerError (400/403/404) on anything out-of-bounds or missing.
+    let abs: string;
+    try {
+      ({ abs } = await resolveFileForServe(personId, relPath));
+    } catch (err) {
+      if (err instanceof FileExplorerError) {
+        if (err.status === 404) ErrorResponses.notFound(res, 'File');
+        else ErrorResponses.badRequest(res, err.message);
+        return;
+      }
+      throw err;
+    }
+    const buffer = await readFile(abs);
+
+    // Step 1: ensure the record for this date exists (tolerate "already exists").
+    try {
+      await webcephService.addNewRecord(webcephPatientId, recordDate);
+      log.info(`[WebCeph] Record created or already exists`);
+    } catch (error) {
+      const err = error as Error;
+      if (!err.message.includes('already exist')) {
+        throw error;
+      }
+      log.info(`[WebCeph] Using existing record for ${recordDate}`);
+    }
+
+    // Step 2: upload the file bytes to the record.
+    const uploadData = {
+      patientID: webcephPatientId,
+      recordHash: recordDate,
+      targetClass,
+      image: buffer,
+      filename: path.basename(abs),
+      contentType: getFileMimeType(abs),
+      overwrite: true
+    };
+
+    const uploadValidation = webcephService.validateUploadData(uploadData);
+    if (!uploadValidation.valid) {
+      ErrorResponses.invalidParameter(res, 'uploadData', { errors: uploadValidation.errors });
+      return;
+    }
+
+    const result = await webcephService.uploadImage(uploadData);
+
+    log.info(`[WebCeph] File "${relPath}" uploaded successfully for patient: ${webcephPatientId}`);
+
+    sendData(res, media.uploadFromFile.response, {
+      big: result.big,
+      thumbnail: result.thumbnail,
+      link: result.link
+    }, 'Image uploaded to WebCeph successfully');
+  } catch (error) {
+    log.error('[WebCeph] Error uploading file from folder:', error);
     ErrorResponses.serverError(res, 'Failed to upload image to WebCeph', error as Error);
   }
 });

@@ -18,6 +18,14 @@ export type ImageDimension = {
   name: string;
   width: number;
   height: number;
+  /**
+   * File modification time (ms, integer) — a content-version token the gallery
+   * appends to the image URL as `?v=`. An edited slot is re-rendered to the SAME
+   * `working/{pid}0{tp}.iNN` filename, so without a changing URL the browser keeps
+   * showing the stale cached image; mtime changes only when the file actually
+   * changes, so unchanged slots stay cached (no needless refetch).
+   */
+  mtime: number;
 };
 
 /**
@@ -56,13 +64,18 @@ async function getImageSizes(pid: string, tp: string): Promise<(ImageDimension |
       try {
         const filePath = pathResolver(`working/${fileName}`);
 
-        // imageSizeFromFile is truly async and non-blocking
-        const dimensions = await imageSizeFromFile(filePath);
+        // imageSizeFromFile is truly async and non-blocking; stat runs alongside it
+        // to capture the mtime cache-bust token (see ImageDimension.mtime).
+        const [dimensions, stat] = await Promise.all([
+          imageSizeFromFile(filePath),
+          fs.promises.stat(filePath),
+        ]);
 
         return {
           name: fileName,
           width: dimensions.width || 0,
           height: dimensions.height || 0,
+          mtime: Math.round(stat.mtimeMs),
         };
       } catch {
         // Return null for missing or invalid images

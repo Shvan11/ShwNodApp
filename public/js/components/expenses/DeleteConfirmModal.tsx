@@ -22,7 +22,7 @@ export default function DeleteConfirmModal({ isOpen, expense, onConfirm, onCance
 
     const formatDate = (dateString: string | undefined): string => {
         if (!dateString) return '-';
-        return new Date(dateString).toLocaleDateString('en-US');
+        return new Date(dateString).toLocaleDateString();
     };
 
     const date = formatDate(expense.expense_date);

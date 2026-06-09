@@ -73,7 +73,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
         const date = new Date(dateTime);
 
         // Get day name
-        const dayName = date.toLocaleString('en-US', { weekday: 'short' });
+        const dayName = date.toLocaleString(undefined, { weekday: 'short' });
 
         // Get date components
         const day = String(date.getDate()).padStart(2, '0');
@@ -81,7 +81,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
         const year = date.getFullYear();
 
         // Get time
-        const time = date.toLocaleString('en-US', {
+        const time = date.toLocaleString(undefined, {
             hour: 'numeric',
             minute: '2-digit',
             hour12: true

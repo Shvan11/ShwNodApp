@@ -78,6 +78,15 @@
   white-space: nowrap;
 }
 
+/* Line-item summary — the flexible column; wrap rather than stretch the table.
+   Full text is available via the cell's title tooltip when truncated. */
+.itemsCell {
+  white-space: normal;
+  min-width: 140px;
+  max-width: 240px;
+  color: var(--gray-700);
+}
+
 .profitPositive {
   color: var(--success-600);
 }

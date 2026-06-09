@@ -82,7 +82,15 @@ const standSaleFields = {
   patient_name: z.string().nullable(),
   CashierName: z.string().nullable(),
 };
-const standSaleRow = z.looseObject(standSaleFields);
+// The list endpoint additionally aggregates each sale's line-item names into a
+// readable summary (e.g. "Panadol ×2, Dental Floss") so the history table can
+// show WHAT was sold without a per-row detail fetch. This lives only on the list
+// row — the with-items variant below carries the full `Items` array instead, so
+// it's NOT folded into the shared `standSaleFields`.
+const standSaleRow = z.looseObject({
+  ...standSaleFields,
+  items_summary: z.string(),
+});
 export type StandSale = z.infer<typeof standSaleRow>;
 
 const standSaleItemRow = z.looseObject({

@@ -61,6 +61,7 @@ const SalesHistoryTable: React.FC<SalesHistoryTableProps> = ({
               <tr>
                 <th>Date</th>
                 <th>Sale ID</th>
+                <th>Items</th>
                 <th>Total</th>
                 <th>Profit</th>
                 <th>Payment</th>
@@ -80,6 +81,9 @@ const SalesHistoryTable: React.FC<SalesHistoryTableProps> = ({
                   >
                     <td>{formatDateTime(sale.sale_date)}</td>
                     <td>#{sale.sale_id}</td>
+                    <td className={styles.itemsCell} title={sale.items_summary}>
+                      {sale.items_summary || '-'}
+                    </td>
                     <td className={styles.amountCell}>
                       {formatNumber(sale.total_amount)} IQD
                     </td>

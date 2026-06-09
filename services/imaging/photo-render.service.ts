@@ -165,11 +165,34 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
     const iH = Math.min(rotH, R.top + R.height) - iTop;
 
     const WHITE = { r: 255, g: 255, b: 255, alpha: 1 };
-    let pipeline = sharp(sourceAbs, sharpOpts).autoOrient();
-    if (flipV) pipeline = pipeline.flip(); // vertical flip
-    if (flipH) pipeline = pipeline.flop(); // horizontal mirror
-    if (rotation % 360 !== 0) {
-      pipeline = pipeline.rotate(rotation, { background: WHITE });
+
+    // Geometry must be baked in the order the client cropped against:
+    // autoOrient → flip → flop → rotate, and ONLY THEN extract. The client
+    // (SlotCanvas) pre-flips the image onto a canvas and lets react-easy-crop frame
+    // the mirrored result, so the crop rect arrives in flipped+rotated space. But
+    // sharp performs `extract` at a fixed pipeline stage that runs BEFORE flip/flop
+    // (mirroring ignores call order — verified against sharp 0.34: `flip().extract()`
+    // extracts then mirrors). A lone `…flip().extract()` therefore pulls the rect
+    // from the UN-flipped image and mirrors afterwards — the wrong region for any
+    // flipped view. The occlusal Upper/Lower slots default to a vertical flip, so
+    // they were the visible casualty: an off-centre frame saved a mirror-shifted
+    // band that read as "zoomed in". Fix: when a flip is requested, materialise the
+    // flipped/rotated image to a lossless buffer first, so extract operates on
+    // already-mirrored pixels. Un-flipped views keep the single pass — sharp DOES
+    // honour rotate→extract call order, so rotation-only framing is unaffected.
+    let pipeline: ReturnType<typeof sharp>;
+    if (flipV || flipH) {
+      let geom = sharp(sourceAbs, sharpOpts).autoOrient();
+      if (flipV) geom = geom.flip(); // vertical flip
+      if (flipH) geom = geom.flop(); // horizontal mirror
+      if (rotation % 360 !== 0) geom = geom.rotate(rotation, { background: WHITE });
+      // Lossless intermediate — a JPEG round-trip here would stack a second
+      // generation of compression loss before the final encode.
+      const geomBuf = await geom.png().toBuffer();
+      pipeline = sharp(geomBuf, sharpOpts);
+    } else {
+      pipeline = sharp(sourceAbs, sharpOpts).autoOrient();
+      if (rotation % 360 !== 0) pipeline = pipeline.rotate(rotation, { background: WHITE });
     }
 
     let out: ReturnType<typeof sharp>;

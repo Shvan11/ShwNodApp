@@ -1,0 +1,377 @@
+.dialog {
+    width: 640px;
+    max-width: 92vw;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: linear-gradient(135deg, var(--indigo-100) 0%, var(--indigo-50) 100%);
+    border-bottom: 1px solid var(--indigo-200);
+}
+
+.headerTitle {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--indigo-700);
+}
+
+.closeBtn {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    font-size: var(--font-size-lg);
+    color: var(--gray-500);
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-full);
+    transition: var(--transition-base);
+}
+
+.closeBtn:hover {
+    background: var(--indigo-100);
+    color: var(--gray-700);
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────────── */
+.body {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.subtitle {
+    margin: 0;
+    color: var(--gray-700);
+    font-weight: var(--font-weight-semibold);
+}
+
+.subtleId {
+    color: var(--gray-500);
+    font-weight: var(--font-weight-normal);
+}
+
+/* ── Banners ──────────────────────────────────────────────────────────────── */
+.errorBanner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--error-50);
+    border: 1px solid var(--error-200);
+    color: var(--error-600);
+    border-radius: var(--radius-lg);
+}
+
+.bannerClose {
+    background: transparent;
+    border: none;
+    font-size: var(--font-size-xl);
+    line-height: 1;
+    color: var(--error-600);
+    cursor: pointer;
+}
+
+.successBanner {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--success-100);
+    border: 1px solid var(--success-200);
+    color: var(--success-800);
+    border-radius: var(--radius-lg);
+}
+
+/* ── Create card ──────────────────────────────────────────────────────────── */
+.createCard {
+    text-align: center;
+    padding: var(--spacing-xl);
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+}
+
+.createIcon {
+    font-size: 3rem;
+    color: var(--color-purple-medium);
+    margin-bottom: var(--spacing-md);
+}
+
+.createTitle {
+    margin: 0 0 var(--spacing-sm);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.createDesc {
+    margin: 0 0 var(--spacing-lg);
+    color: var(--gray-500);
+}
+
+.createWarn {
+    margin: var(--spacing-md) 0 0;
+    color: var(--warning-700);
+    font-size: var(--font-size-sm);
+}
+
+/* ── Link card ────────────────────────────────────────────────────────────── */
+.linkCard {
+    padding: var(--spacing-lg);
+    background: linear-gradient(135deg, var(--success-50) 0%, var(--success-100) 100%);
+    border: 1px solid var(--success-300);
+    border-radius: var(--radius-lg);
+}
+
+.linkHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.linkTitle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--success-800);
+}
+
+.linkDate {
+    font-size: var(--font-size-sm);
+    color: var(--gray-500);
+}
+
+.linkInfo {
+    margin-bottom: var(--spacing-md);
+}
+
+.linkLabel {
+    font-size: var(--font-size-sm);
+    color: var(--gray-500);
+    margin-bottom: 0.25rem;
+}
+
+.linkValue {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-md);
+    color: var(--text-primary);
+}
+
+/* ── Upload card ──────────────────────────────────────────────────────────── */
+.uploadCard {
+    padding: var(--spacing-lg);
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+}
+
+.cardTitle {
+    margin: 0 0 var(--spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.formRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+}
+
+.label {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--gray-700);
+}
+
+.input {
+    height: 42px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-md);
+    background: var(--white);
+    transition: var(--transition-base);
+}
+
+.input:focus {
+    outline: none;
+    border-color: var(--indigo-500);
+    box-shadow: 0 0 0 3px var(--indigo-100);
+}
+
+.sourceBlock {
+    margin-top: var(--spacing-md);
+}
+
+.chooseBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0.5rem 1rem;
+    background: var(--indigo-50);
+    border: 1px solid var(--indigo-200);
+    border-radius: var(--radius-md);
+    color: var(--indigo-700);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.chooseBtn:hover {
+    background: var(--indigo-100);
+}
+
+.selectedChip {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background: var(--indigo-50);
+    border: 1px solid var(--indigo-200);
+    border-radius: var(--radius-md);
+}
+
+.chipThumb {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+}
+
+.chipName {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-sm);
+    color: var(--gray-700);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chipClear {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    color: var(--gray-500);
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+}
+
+.chipClear:hover {
+    background: var(--gray-200);
+    color: var(--gray-700);
+}
+
+.fileInput {
+    width: 100%;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    background: var(--white);
+}
+
+.helpText {
+    margin-top: var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    color: var(--gray-500);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.primaryBtn,
+.uploadBtn,
+.openLink {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--radius-lg);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    transition: var(--transition-base);
+    text-decoration: none;
+}
+
+.primaryBtn {
+    background: linear-gradient(135deg, var(--color-purple-medium), var(--indigo-500));
+    color: var(--white);
+}
+
+.primaryBtn:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--indigo-500), var(--indigo-600));
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.uploadBtn {
+    width: 100%;
+    margin-top: var(--spacing-lg);
+    background: linear-gradient(135deg, var(--warning-400), var(--warning-600));
+    color: var(--white);
+}
+
+.uploadBtn:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--warning-600), var(--warning-700));
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-warning-sm);
+}
+
+.primaryBtn:disabled,
+.uploadBtn:disabled {
+    background: var(--gray-400);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.openLink {
+    background: var(--success-600);
+    color: var(--white);
+}
+
+.openLink:hover {
+    background: var(--success-700);
+}
+
+@media (max-width: 640px) {
+    .formRow {
+        grid-template-columns: 1fr;
+    }
+}

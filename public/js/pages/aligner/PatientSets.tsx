@@ -316,13 +316,13 @@ const PatientSets: React.FC = () => {
     const formatDate = (dateString: string | null | undefined): string => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
     };
 
     const formatDateTime = (dateString: string | null | undefined): string => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
-        return date.toLocaleString('en-US', {
+        return date.toLocaleString(undefined, {
             year: 'numeric',
             month: 'short',
             day: 'numeric',

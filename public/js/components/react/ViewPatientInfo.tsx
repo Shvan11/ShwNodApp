@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PhotoSessionDialog from './PhotoSessionDialog';
 import AlertModal from './AlertModal';
+import WebCephModal from './WebCephModal';
 import PortalAccessCard from './PortalAccessCard';
 import { useToast } from '../../contexts/ToastContext';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
@@ -70,6 +71,7 @@ interface AlertType {
 const ViewPatientInfo = ({ personId }: Props) => {
     const navigate = useNavigate();
     const toast = useToast();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [patientInfo, setPatientInfo] = useState<PatientInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -90,6 +92,20 @@ const ViewPatientInfo = ({ personId }: Props) => {
     // Use validated PersonID from loader, fallback to patientInfo.person_id
     const validPersonId = personId ?? patientInfo?.person_id ?? null;
 
+    // WebCeph modal open-state lives in the URL (?webceph=1) so browser Back/Forward
+    // and deep-links work; the functional updater preserves any other query params.
+    const webcephOpen = searchParams.get('webceph') === '1';
+    const openWebceph = () => setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('webceph', '1');
+        return next;
+    });
+    const closeWebceph = () => setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('webceph');
+        return next;
+    });
+
     const formatPhoneDisplay = (countryCode: string | undefined, phone: string | undefined): string => {
         if (!phone) return '-';
         const formatted = formatPhoneForDisplay(phone);
@@ -101,7 +117,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
         if (!dateStr) return '-';
         try {
             const date = new Date(dateStr);
-            return date.toLocaleDateString('en-US', {
+            return date.toLocaleDateString(undefined, {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric'
@@ -355,6 +371,14 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         <i className={`fas fa-camera ${styles.piIconGap}`}></i>
                         Add Photos
                     </button>
+                    <button
+                        onClick={openWebceph}
+                        className="btn btn-secondary"
+                        disabled={!validPersonId}
+                    >
+                        <i className={`fas fa-brain ${styles.piIconGap}`}></i>
+                        WebCeph
+                    </button>
                 </div>
             </div>
 
@@ -390,7 +414,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                                     <span className={styles.patientAlertText}>{alert.alert_details}</span>
                                     {alert.creation_date && (
                                         <span className={styles.patientAlertDate}>
-                                            {new Date(alert.creation_date).toLocaleDateString('en-US', {
+                                            {new Date(alert.creation_date).toLocaleDateString(undefined, {
                                                 year: 'numeric',
                                                 month: 'short',
                                                 day: 'numeric'
@@ -667,6 +691,16 @@ const ViewPatientInfo = ({ personId }: Props) => {
                     personId={validPersonId}
                     alertTypes={alertTypes}
                     editAlert={editingAlert}
+                />
+            )}
+
+            {/* WebCeph Modal */}
+            {validPersonId && (
+                <WebCephModal
+                    isOpen={webcephOpen}
+                    onClose={closeWebceph}
+                    personId={validPersonId}
+                    patientInfo={patientInfo}
                 />
             )}
         </div>

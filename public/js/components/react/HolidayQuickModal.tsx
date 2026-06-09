@@ -55,7 +55,7 @@ const HolidayQuickModal = ({
 
     const formatDate = (dateStr: string): string => {
         const d = new Date(dateStr);
-        return d.toLocaleDateString('en-US', {
+        return d.toLocaleDateString(undefined, {
             weekday: 'long',
             year: 'numeric',
             month: 'long',

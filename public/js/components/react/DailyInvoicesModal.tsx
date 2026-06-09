@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
 import * as reports from '@shared/contracts/reports.contract';
 import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters';
@@ -37,10 +38,26 @@ interface DailyInvoicesModalProps {
     onClose: () => void;
 }
 
+/**
+ * Normalize a day value to a YYYY-MM-DD string for the expenses date filter.
+ * The statistics row's `Day` is already a date-only string; this guards against
+ * an ISO-timestamp form as well.
+ */
+const toExpenseDate = (value: string): string => {
+    if (!value) return '';
+    if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${month}-${day}`;
+};
+
 const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) => {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const navigate = useNavigate();
 
     // Extract the date from selectedDate (could be just date string or full day object)
     const dateValue = typeof selectedDate === 'object' && selectedDate?.Day
@@ -49,6 +66,15 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
 
     // Cast for accessing object properties
     const selectedDateObj = typeof selectedDate === 'object' ? selectedDate : null;
+
+    // Jump to the Expenses page pre-filtered to this day + currency.
+    // We intentionally do NOT call onClose(): leaving ?day in the statistics URL is
+    // what lets browser "back" from the expenses page re-open this modal.
+    const goToExpenses = (currency: 'IQD' | 'USD'): void => {
+        const day = toExpenseDate(dateValue);
+        if (!day) return;
+        navigate(`/expenses?startDate=${day}&endDate=${day}&currency=${currency}`);
+    };
 
     useEffect(() => {
         if (dateValue) {
@@ -78,7 +104,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
 
     const formatDate = (dateString: string): string => {
         const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
+        return date.toLocaleDateString(undefined, {
             year: 'numeric',
             month: 'short',
             day: 'numeric'
@@ -87,7 +113,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
 
     const formatTime = (dateString: string): string => {
         const date = new Date(dateString);
-        return date.toLocaleTimeString('en-US', {
+        return date.toLocaleTimeString(undefined, {
             hour: '2-digit',
             minute: '2-digit'
         });
@@ -180,13 +206,27 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                                     </div>
                                     {selectedDateObj?.ExpensesIQD !== undefined && (
                                         <div className={styles.summaryItem}>
-                                            <span className={styles.label}>Expenses (IQD):</span>
+                                            <button
+                                                type="button"
+                                                className={`${styles.label} ${styles.labelLink}`}
+                                                onClick={() => goToExpenses('IQD')}
+                                                title="View IQD expenses for this day"
+                                            >
+                                                Expenses (IQD): <i className="fas fa-external-link-alt" aria-hidden="true"></i>
+                                            </button>
                                             <span className={`${styles.value} ${styles.negative}`}>{formatCurrency(Math.abs(selectedDateObj.ExpensesIQD || 0), 'IQD')}</span>
                                         </div>
                                     )}
                                     {selectedDateObj?.ExpensesUSD !== undefined && (
                                         <div className={styles.summaryItem}>
-                                            <span className={styles.label}>Expenses (USD):</span>
+                                            <button
+                                                type="button"
+                                                className={`${styles.label} ${styles.labelLink}`}
+                                                onClick={() => goToExpenses('USD')}
+                                                title="View USD expenses for this day"
+                                            >
+                                                Expenses (USD): <i className="fas fa-external-link-alt" aria-hidden="true"></i>
+                                            </button>
                                             <span className={`${styles.value} ${styles.negative}`}>{formatCurrency(Math.abs(selectedDateObj.ExpensesUSD || 0), 'USD')}</span>
                                         </div>
                                     )}

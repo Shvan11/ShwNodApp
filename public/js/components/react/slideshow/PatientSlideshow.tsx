@@ -26,6 +26,8 @@ interface GalleryEntry {
   name: string;
   width?: number;
   height?: number;
+  /** File mtime (ms) — appended as `?v=` to bust the cache when a slot is re-rendered. */
+  mtime?: number;
 }
 
 /** Raw shape from GET /api/patients/:id/timepoints (snake_case API). */
@@ -147,7 +149,8 @@ const PatientSlideshow = ({ personId }: Props) => {
       .filter((e): e is GalleryEntry => !!e && !isLogoImage(e.name))
       .map((e) => ({
         name: e.name,
-        url: `/DolImgs/${e.name}`,
+        // Cache-bust with mtime so a re-rendered slot isn't served stale from cache.
+        url: e.mtime ? `/DolImgs/${e.name}?v=${e.mtime}` : `/DolImgs/${e.name}`,
         tp: tp.tpCode,
         tpDescription: tp.tpDescription,
         tpDate: formatDate(tp.tpDateTime),

@@ -324,7 +324,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
     const formatDate = (dateValue: unknown): string => {
         if (!dateValue) return '-';
         const date = parseLocalDate(dateValue as string);
-        return date.toLocaleDateString('en-US', {
+        return date.toLocaleDateString(undefined, {
             year: 'numeric',
             month: 'short',
             day: 'numeric'
@@ -502,7 +502,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
                                         </span>
                                         <span className="appointment-detail">{apt.app_detail}</span>
                                         <span className="appointment-time">
-                                            {apt.app_date ? new Date(apt.app_date).toLocaleTimeString('en-US', {
+                                            {apt.app_date ? new Date(apt.app_date).toLocaleTimeString(undefined, {
                                                 hour: 'numeric',
                                                 minute: '2-digit'
                                             }) : ''}

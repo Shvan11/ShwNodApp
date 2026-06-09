@@ -680,6 +680,33 @@ th.qasaColumn {
     color: var(--error-color);
 }
 
+/* Clickable expense label → navigates to the Expenses page filtered for this day */
+.statisticsInvoiceSummary .summaryItem .labelLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    width: fit-content;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    color: var(--primary-color);
+    transition: color 0.15s ease;
+}
+
+.statisticsInvoiceSummary .summaryItem .labelLink:hover {
+    color: var(--primary-hover);
+    text-decoration: underline;
+}
+
+.statisticsInvoiceSummary .summaryItem .labelLink i {
+    font-size: 0.75rem;
+    opacity: 0.75;
+}
+
 /* Table Wrapper */
 .statisticsTableWrapper {
     margin-bottom: 1rem;

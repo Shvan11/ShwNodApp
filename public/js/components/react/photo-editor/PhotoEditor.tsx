@@ -101,10 +101,10 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
         // without blanking the other (the files route is the sendSuccess envelope,
         // so fetchJSON unwraps it to { entries }).
         const [gallery, files] = await Promise.all([
-          fetchJSON<Array<{ name?: string } | null>>(
+          fetchJSON<Array<{ name?: string; mtime?: number } | null>>(
             `/api/patients/${personId}/gallery/${tpCode}`,
             { schema: patientContract.gallery.response },
-          ).catch(() => [] as Array<{ name?: string } | null>),
+          ).catch(() => [] as Array<{ name?: string; mtime?: number } | null>),
           fetchJSON<{ entries?: Array<{ name: string; relPath: string; type: string }> }>(
             `/api/patients/${personId}/files?path=${encodeURIComponent(folder)}`,
             { schema: fileExplorerContract.list.response },
@@ -119,7 +119,10 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
             const m = name ? /\.(i10|i12|i13|i20|i21|i22|i23|i24)$/.exec(name) : null;
             if (!name || !m) continue;
             views[m[1] as PhotoViewCode] = {
-              savedImageUrl: `/DolImgs/${name}`,
+              // Cache-bust with mtime — same reason as the photos grid: an edited
+              // slot is re-rendered to the SAME /DolImgs filename, so without a
+              // changing URL the re-import page shows the stale pre-edit thumbnail.
+              savedImageUrl: img.mtime ? `/DolImgs/${name}?v=${img.mtime}` : `/DolImgs/${name}`,
               canReEdit: false,
               reEditRelPath: null,
               reEditName: null,

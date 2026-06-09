@@ -36,7 +36,7 @@ const AppointmentsHeader = ({
         if (!dateString) return 'Today';
 
         const date = new Date(dateString + 'T12:00:00'); // Add time to avoid timezone issues
-        return date.toLocaleDateString('en-US', {
+        return date.toLocaleDateString(undefined, {
             weekday: 'long',
             year: 'numeric',
             month: 'long',

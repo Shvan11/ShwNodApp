@@ -4,10 +4,9 @@ import { useToast } from '../../contexts/ToastContext';
 import PhoneInput from './PhoneInput';
 import styles from './EditPatientComponent.module.css';
 import { formatISODate } from '../../core/utils';
-import { fetchJSON, postJSON, putJSON, postFormData, httpErrorMessage, type HttpError } from '@/core/http';
+import { fetchJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { tagOptions as tagOptionsContract } from '@shared/contracts/patient.contract';
 import * as patientContract from '@shared/contracts/patient.contract';
-import * as mediaContract from '@shared/contracts/media.contract';
 import * as lookup from '@shared/contracts/lookup.contract';
 
 interface Props {
@@ -39,17 +38,6 @@ interface Tag {
     tag: string;
 }
 
-interface PhotoType {
-    class: string;
-    name: string;
-}
-
-interface WebcephData {
-    webcephPatientId: string;
-    link: string;
-    createdAt?: string;
-}
-
 // Single source of truth: the patientById contract response (raw `patients`
 // columns + attached alerts). FK ids (gender, address_id, …) and estimated_cost
 // are DB `number`s here — the form-population below coerces them to its `<select>`
@@ -77,12 +65,6 @@ interface FormData {
     tag_id: string;
 }
 
-interface UploadData {
-    recordDate: string;
-    targetClass: string;
-    imageFile: File | null;
-}
-
 const EditPatientComponent = ({ personId }: Props) => {
     const navigate = useNavigate();
     const toast = useToast();
@@ -101,18 +83,6 @@ const EditPatientComponent = ({ personId }: Props) => {
     const [referralSources, setReferralSources] = useState<ReferralSource[]>([]);
     const [patientTypes, setPatientTypes] = useState<PatientType[]>([]);
     const [tags, setTags] = useState<Tag[]>([]);
-
-    // WebCeph integration state
-    const [webcephData, setWebcephData] = useState<WebcephData | null>(null);
-    const [webcephLoading, setWebcephLoading] = useState(false);
-    const [webcephError, setWebcephError] = useState<string | null>(null);
-    const [webcephSuccess, setWebcephSuccess] = useState('');
-    const [photoTypes, setPhotoTypes] = useState<PhotoType[]>([]);
-    const [uploadData, setUploadData] = useState<UploadData>({
-        recordDate: formatISODate(),
-        targetClass: 'lateral_ceph',
-        imageFile: null
-    });
 
     // Form data
     const [formData, setFormData] = useState<FormData>({
@@ -206,155 +176,7 @@ const EditPatientComponent = ({ personId }: Props) => {
     useEffect(() => {
         loadDropdownData();
         loadPatientData();
-        loadWebcephData();
-        loadPhotoTypes();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [personId, loadDropdownData, loadPatientData]);
-
-    // Load WebCeph data for patient
-    const loadWebcephData = async () => {
-        if (!personId) return;
-
-        try {
-            // A hit is `{success:true, data}` → unwrapped to the link object.
-            const link = await fetchJSON<WebcephData>(
-                `/api/webceph/patient-link/${personId}`,
-                { schema: mediaContract.patientLink.response }
-            );
-            setWebcephData(link);
-        } catch (err) {
-            // 404 = this patient has no WebCeph link yet (the common case, not an
-            // error); only surface genuine failures.
-            if ((err as { status?: number }).status !== 404) {
-                console.error('Error loading WebCeph data:', err);
-            }
-        }
-    };
-
-    // Load available photo types
-    const loadPhotoTypes = async () => {
-        try {
-            const photoTypes = await fetchJSON<PhotoType[]>('/api/webceph/photo-types', { schema: mediaContract.photoTypes.response });
-            setPhotoTypes(photoTypes);
-        } catch (err) {
-            console.error('Error loading photo types:', err);
-        }
-    };
-
-    // WebCeph's patient ID is the person_id padded to a 6-char minimum. The SAME
-    // value must be used for both create and upload, or WebCeph reports
-    // "no matching patientid" on upload.
-    const webcephPatientID = patientData ? patientData.person_id.toString().padStart(6, '0') : '';
-
-    // Map gender ID to gender name (WebCeph needs the name, not the local ID)
-    const webcephGenderName = (() => {
-        if (!formData.gender) return '';
-        const gender = genders.find(g => g.id === parseInt(formData.gender));
-        return gender ? gender.name : '';
-    })();
-
-    // WebCeph rejects empty gender/DOB with a cryptic "invalid format" error,
-    // so list what's missing and block the request before anything is sent.
-    const webcephMissingFields = [
-        !webcephGenderName && 'gender',
-        !formData.date_of_birth && 'date of birth',
-    ].filter(Boolean) as string[];
-
-    // Create patient in WebCeph
-    const handleCreateWebcephPatient = async () => {
-        if (!patientData) return;
-
-        if (webcephMissingFields.length > 0) {
-            setWebcephError(
-                `Cannot create in WebCeph: this patient is missing ${webcephMissingFields.join(' and ')}. ` +
-                `Set ${webcephMissingFields.length > 1 ? 'these fields' : 'this field'} and save before creating in WebCeph.`
-            );
-            return;
-        }
-
-        try {
-            setWebcephLoading(true);
-            setWebcephError(null);
-
-            const genderName = webcephGenderName;
-
-            const webcephPatientData = {
-                patientID: webcephPatientID,
-                firstName: formData.first_name || '',
-                lastName: formData.last_name || '',
-                gender: genderName,
-                birthday: formData.date_of_birth || '',
-                race: 'Asian' // Default value
-            };
-
-            const result = await postJSON<{ webcephPatientId: string; link: string; linkId?: string }>(
-                '/api/webceph/create-patient',
-                {
-                    personId: patientData.person_id,
-                    patientData: webcephPatientData
-                },
-                { schema: mediaContract.createPatient.response }
-            );
-
-            setWebcephData({
-                webcephPatientId: result.webcephPatientId,
-                link: result.link,
-                createdAt: new Date().toISOString()
-            });
-
-            setWebcephSuccess('Patient created in WebCeph successfully!');
-            setTimeout(() => setWebcephSuccess(''), 5000);
-        } catch (err) {
-            console.error('Error creating WebCeph patient:', err);
-            setWebcephError(httpErrorMessage(err, 'Failed to create patient in WebCeph'));
-        } finally {
-            setWebcephLoading(false);
-        }
-    };
-
-    // Upload X-ray image to WebCeph
-    const handleUploadImage = async () => {
-        if (!uploadData.imageFile) {
-            setWebcephError('Please select an image file');
-            return;
-        }
-
-        try {
-            setWebcephLoading(true);
-            setWebcephError(null);
-
-            const formDataObj = new FormData();
-            formDataObj.append('image', uploadData.imageFile);
-            formDataObj.append('patient_id', webcephPatientID);
-            formDataObj.append('recordDate', uploadData.recordDate);
-            formDataObj.append('targetClass', uploadData.targetClass);
-
-            const result = await postFormData<{ big?: string; thumbnail?: string; link: string }>(
-                '/api/webceph/upload-image',
-                formDataObj,
-                { schema: mediaContract.uploadImage.response }
-            );
-
-            setWebcephSuccess(`Image uploaded successfully! View at: ${result.link}`);
-            setTimeout(() => setWebcephSuccess(''), 10000);
-
-            // Reset upload form
-            setUploadData({
-                recordDate: formatISODate(),
-                targetClass: 'lateral_ceph',
-                imageFile: null
-            });
-
-            // Clear file input
-            const fileInput = document.getElementById('webceph-image-upload') as HTMLInputElement;
-            if (fileInput) fileInput.value = '';
-        } catch (err) {
-            console.error('Error uploading image:', err);
-            setWebcephError(httpErrorMessage(err, 'Failed to upload image'));
-        } finally {
-            setWebcephLoading(false);
-        }
-    };
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -689,168 +511,6 @@ const EditPatientComponent = ({ personId }: Props) => {
                         onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData({...formData, notes: e.target.value})}
                         rows={3}
                     />
-                </div>
-
-                {/* WebCeph AI X-Ray Analysis Section */}
-                <div className={styles.webcephIntegrationSection}>
-                    <h3 className={styles.webcephSectionHeader}>
-                        <i className={`fas fa-brain ${styles.webcephHeaderIcon}`}></i>
-                        WebCeph AI X-Ray Analysis
-                    </h3>
-
-                    {webcephError && (
-                        <div className={styles.webcephError}>
-                            <div>
-                                <i className="fas fa-exclamation-circle"></i>
-                                {webcephError}
-                            </div>
-                            <button onClick={() => setWebcephError(null)} className={styles.webcephErrorClose}>×</button>
-                        </div>
-                    )}
-
-                    {webcephSuccess && (
-                        <div className={styles.editPatientSuccess}>
-                            <i className="fas fa-check-circle"></i>
-                            {webcephSuccess}
-                        </div>
-                    )}
-
-                    {!webcephData ? (
-                        <div className={styles.webcephCreateCard}>
-                            <i className={`fas fa-user-plus ${styles.webcephCreateIcon}`}></i>
-                            <h4 className={styles.webcephCreateTitle}>
-                                Create Patient in WebCeph
-                            </h4>
-                            <p className={styles.webcephCreateDescription}>
-                                Get AI-powered cephalometric analysis by creating this patient in WebCeph
-                            </p>
-                            <button
-                                type="button"
-                                onClick={handleCreateWebcephPatient}
-                                disabled={webcephLoading || webcephMissingFields.length > 0}
-                                className={styles.webcephBtnSend}
-                            >
-                                {webcephLoading ? (
-                                    <>
-                                        <i className="fas fa-spinner fa-spin"></i>
-                                        Creating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <i className="fas fa-plus-circle"></i>
-                                        Create in WebCeph
-                                    </>
-                                )}
-                            </button>
-                            {webcephMissingFields.length > 0 && (
-                                <p className={styles.webcephCreateDescription}>
-                                    <i className="fas fa-exclamation-triangle"></i>{' '}
-                                    Requires {webcephMissingFields.join(' and ')} — set {webcephMissingFields.length > 1 ? 'them' : 'it'} and save first.
-                                </p>
-                            )}
-                        </div>
-                    ) : (
-                        <div className={styles.webcephStatusContainer}>
-                            {/* Patient Link Card */}
-                            <div className={styles.webcephPatientCreatedCard}>
-                                <div className={styles.webcephCardHeader}>
-                                    <div className={styles.webcephCardTitleGroup}>
-                                        <i className={`fas fa-check-circle ${styles.webcephSuccessIcon}`}></i>
-                                        <span className={styles.webcephCardTitle}>Patient Created in WebCeph</span>
-                                    </div>
-                                    <span className={styles.webcephCardSubtitle}>
-                                        {webcephData.createdAt ? new Date(webcephData.createdAt).toLocaleDateString() : ''}
-                                    </span>
-                                </div>
-                                <div className={styles.webcephInfoSection}>
-                                    <div className={styles.webcephInfoLabel}>WebCeph Patient ID</div>
-                                    <div className={styles.webcephInfoValue}>
-                                        {webcephData.webcephPatientId}
-                                    </div>
-                                </div>
-                                <a
-                                    href={webcephData.link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className={`${styles.webcephBtnSend} ${styles.inlineFlexLink}`}
-                                >
-                                    <i className="fas fa-external-link-alt"></i>
-                                    Open in WebCeph
-                                </a>
-                            </div>
-
-                            {/* Upload X-Ray Card */}
-                            <div className={styles.webcephAnalysisCard}>
-                                <h4 className={styles.webcephAnalysisTitle}>
-                                    <i className={`fas fa-upload ${styles.webcephHeaderIcon}`}></i>
-                                    Upload X-Ray Image
-                                </h4>
-
-                                <div className={styles.webcephFormRow}>
-                                    <div>
-                                        <label className={styles.webcephUploadLabel}>
-                                            Record Date
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={uploadData.recordDate}
-                                            onChange={(e: ChangeEvent<HTMLInputElement>) => setUploadData({...uploadData, recordDate: e.target.value})}
-                                            className={styles.inputHeightConsistent}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className={styles.webcephUploadLabel}>
-                                            Photo Type
-                                        </label>
-                                        <select
-                                            value={uploadData.targetClass}
-                                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setUploadData({...uploadData, targetClass: e.target.value})}
-                                            className={styles.inputHeightConsistent}
-                                        >
-                                            {photoTypes.map(type => (
-                                                <option key={type.class} value={type.class}>{type.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className={styles.webcephUploadSection}>
-                                    <label className={styles.webcephUploadLabel}>
-                                        X-Ray Image
-                                    </label>
-                                    <input
-                                        id="webceph-image-upload"
-                                        type="file"
-                                        accept="image/jpeg,image/png,image/jpg"
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setUploadData({...uploadData, imageFile: e.target.files?.[0] || null})}
-                                        className={styles.webcephFileInputStyled}
-                                    />
-                                    <div className={styles.webcephHelpText}>
-                                        Accepted formats: JPEG, PNG (Max 10MB)
-                                    </div>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={handleUploadImage}
-                                    disabled={webcephLoading || !uploadData.imageFile}
-                                    className={styles.webcephBtnUpload}
-                                >
-                                    {webcephLoading ? (
-                                        <>
-                                            <i className="fas fa-spinner fa-spin"></i>
-                                            Uploading...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <i className="fas fa-cloud-upload-alt"></i>
-                                            Upload to WebCeph
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 <div className={`${styles.modalActions} ${styles.flexEndActions}`}>
