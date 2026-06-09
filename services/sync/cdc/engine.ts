@@ -18,6 +18,7 @@
  *    sink disabled by env (no drainer will run), the circuit breaker on overflow (flags stale →
  *    reload), or the manual kill switch (UPDATE cdc_sink_control SET enabled=false).
  */
+import type { Pool } from 'pg';
 import { getPgPool } from '../../database/kysely.js';
 import { log } from '../../../utils/logger.js';
 import type { SyncSink, EngineOpts } from './types.js';
@@ -41,8 +42,18 @@ export class CdcEngine {
     private readonly opts: EngineOpts
   ) {}
 
+  /**
+   * The pool the change-feed mechanics run against (cdc_sink_control + change_log). Forward/Dolphin
+   * omit `opts.source` → the LOCAL pg pool (their feed is local). The reverse sink supplies the
+   * Supabase reverse-read pool (its feed lives on Supabase). This is NOT where the sink applies a
+   * change — the sink owns its own destination connection(s).
+   */
+  private source(): Pool {
+    return this.opts.source?.() ?? getPgPool();
+  }
+
   private async setControl(enabled: boolean, extra: { stale?: boolean; note?: string } = {}): Promise<void> {
-    await getPgPool().query(
+    await this.source().query(
       `UPDATE cdc_sink_control
           SET enabled = $1, stale = COALESCE($2, stale), note = COALESCE($3, note), updated_at = now()
         WHERE sink = $4`,
@@ -88,12 +99,13 @@ export class CdcEngine {
     if (this.draining || this.stopped || this.breaker) return;
     this.draining = true;
     try {
-      const local = getPgPool();
+      // The change-feed pool: local for forward/dolphin, the Supabase reverse-read pool for reverse.
+      const feed = this.source();
 
       // Breaker first, so it trips even while applies are failing (e.g. no internet).
       const backlog = Number(
         (
-          await local.query<{ n: string }>('SELECT count(*)::text AS n FROM change_log WHERE sink = $1', [
+          await feed.query<{ n: string }>('SELECT count(*)::text AS n FROM change_log WHERE sink = $1', [
             this.sink.name,
           ])
         ).rows[0].n
@@ -106,7 +118,7 @@ export class CdcEngine {
         return;
       }
 
-      const { rows } = await local.query<ChangeRow>(
+      const { rows } = await feed.query<ChangeRow>(
         `SELECT id::text AS id, tbl, pk, op, changed_at::text AS changed_at_text
            FROM change_log
           WHERE sink = $1
@@ -130,7 +142,7 @@ export class CdcEngine {
           if (r.op === 'D') await this.sink.remove(r.tbl, r.pk);
           else await this.sink.upsert(r.tbl, r.pk);
           // Version-guarded delete: skipped (→ reprocessed) if the row was re-touched since we read it.
-          await local.query('DELETE FROM change_log WHERE id = $1 AND changed_at = $2::timestamp', [
+          await feed.query('DELETE FROM change_log WHERE id = $1 AND changed_at = $2::timestamp', [
             r.id,
             r.changed_at_text,
           ]);

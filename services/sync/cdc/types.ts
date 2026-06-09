@@ -6,6 +6,7 @@
  * row, identified by its LOCAL table + primary-key value as text) to its destination; the engine
  * owns all the changelog mechanics (batching, coalescing, version-guarded delete, anti-bloat).
  */
+import type { Pool } from 'pg';
 
 export type CdcOp = 'I' | 'U' | 'D';
 
@@ -27,4 +28,11 @@ export interface EngineOpts {
   intervalMs: number;
   batchSize: number;
   maxBacklog: number;
+  /**
+   * Which pool the change-feed mechanics (cdc_sink_control + change_log: backlog count, batch read,
+   * version-guarded delete) run against. Omitted → the LOCAL pg pool (forward/dolphin: their feed
+   * lives locally). The REVERSE sink passes the Supabase reverse-read pool — its feed lives on
+   * Supabase. NOTE this is the feed pool, NOT where the sink APPLIES changes (the sink owns that).
+   */
+  source?: () => Pool;
 }

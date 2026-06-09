@@ -11,8 +11,7 @@
  */
 import fs from 'fs/promises';
 import path from 'path';
-import config from '../../config/config.js';
-import { createPathResolver } from '../../utils/path-resolver.js';
+import { clinicPath, patientDir } from './clinic-paths.js';
 import { getFileCategory, type FileCategory } from '../../utils/file-mime.js';
 
 // ===========================================
@@ -63,12 +62,11 @@ const MAX_ENTRIES = 5000;
 /** App-managed infra dirs that must never surface in a patient listing. */
 const INFRA_DIRS = new Set(['.trash', '.thumbs', '.uploads']);
 
-const pathResolver = createPathResolver(config.fileSystem.machinePath || '');
 /** Trash root: sibling of the numeric patient folders, same volume. */
-const TRASH_ROOT = pathResolver('clinic1/.trash');
+const TRASH_ROOT = clinicPath('.trash');
 /** Upload staging root: sibling of patient folders, same volume, so the
  *  final rename into a patient folder is atomic + EXDEV-free. */
-const UPLOADS_ROOT = pathResolver('clinic1/.uploads');
+const UPLOADS_ROOT = clinicPath('.uploads');
 
 // ===========================================
 // PATH SAFETY
@@ -80,7 +78,7 @@ export interface SafePath {
 }
 
 function patientRoot(personId: string | number): string {
-  return pathResolver(`clinic1/${personId}`);
+  return patientDir(personId);
 }
 
 function withSep(dir: string): string {

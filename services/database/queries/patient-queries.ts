@@ -13,8 +13,7 @@ import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import * as readline from 'node:readline';
 import { getKysely, withPgTransaction } from '../kysely.js';
-import config from '../../../config/config.js';
-import { createPathResolver } from '../../../utils/path-resolver.js';
+import { patientPath } from '../../files/clinic-paths.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 import { isUniqueViolation } from '../../../utils/pg-errors.js';
@@ -300,11 +299,10 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
  * Retrieves asset information (X-rays and other assets) for a given patient id.
  */
 async function getAssets(pid: number): Promise<PatientAssets> {
-  const pathResolver = createPathResolver(config.fileSystem.machinePath || '');
-  const xrayDir = pathResolver(`clinic1/${pid}/opg`);
-  const assetsDir = pathResolver(`clinic1/${pid}/assets`);
+  const xrayDir = patientPath(pid, 'opg');
+  const assetsDir = patientPath(pid, 'assets');
 
-  const xrays = (await pathExists(xrayDir)) ? await getXrays(xrayDir, pathResolver, pid) : [];
+  const xrays = (await pathExists(xrayDir)) ? await getXrays(xrayDir, pid) : [];
 
   const assets = (await pathExists(assetsDir)) ? await fs.readdir(assetsDir) : [];
 
@@ -316,7 +314,6 @@ async function getAssets(pid: number): Promise<PatientAssets> {
  */
 async function getXrays(
   xrayDir: string,
-  pathResolver: (path: string) => string,
   pid: number
 ): Promise<XrayInfo[]> {
   const allFiles = await fs.readdir(xrayDir);
@@ -331,7 +328,7 @@ async function getXrays(
 
   // The details dir is the same for every xray of this patient, so read it ONCE
   // up front rather than re-running pathExists + readdir inside the per-file map.
-  const parentDetailsDirPath = pathResolver(`clinic1/${pid}/opg/.csi_data/.version_4.4`);
+  const parentDetailsDirPath = patientPath(pid, 'opg/.csi_data/.version_4.4');
   const detailsSubDirs = (await pathExists(parentDetailsDirPath))
     ? await fs.readdir(parentDetailsDirPath)
     : [];
@@ -343,16 +340,18 @@ async function getXrays(
       for (const subDir of detailsSubDirs) {
         if (subDir.endsWith(xrayName)) {
           xray.detailsDirName = subDir;
-          const previewPath = pathResolver(
-            `clinic1/${pid}/opg/.csi_data/.version_4.4/${subDir}/t.png`
+          const previewPath = patientPath(
+            pid,
+            `opg/.csi_data/.version_4.4/${subDir}/t.png`
           );
 
           if (await pathExists(previewPath)) {
             xray.previewImagePartialPath = `/opg/.csi_data/.version_4.4/${subDir}/t.png`;
           }
 
-          const metaFile = pathResolver(
-            `clinic1/${pid}/opg/.csi_data/.version_4.4/${subDir}/meta`
+          const metaFile = patientPath(
+            pid,
+            `opg/.csi_data/.version_4.4/${subDir}/meta`
           );
           xray.date = await extractDate(metaFile);
         }

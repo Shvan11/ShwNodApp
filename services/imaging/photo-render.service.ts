@@ -13,9 +13,8 @@
 import path from 'path';
 import fs from 'fs/promises';
 import sharp from 'sharp';
-import config from '../../config/config.js';
-import { createPathResolver } from '../../utils/path-resolver.js';
 import { getFileCategory } from '../../utils/file-mime.js';
+import { workingFilePath } from '../files/clinic-paths.js';
 import { resolveFileForServe, FileExplorerError } from '../files/file-explorer.service.js';
 import { log } from '../../utils/logger.js';
 
@@ -39,8 +38,6 @@ export interface RenderSlotInput {
   extract?: { left: number; top: number; width: number; height: number };
   output: { width: number; height: number };
 }
-
-const pathResolver = createPathResolver(config.fileSystem.machinePath || '');
 
 // Cap libvips' per-pipeline thread pool (process-wide, set once at import). Its default
 // is one thread per CPU core, which — times the MAX_CONCURRENT pipelines below — pegs
@@ -105,7 +102,7 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
   }
 
   const filename = `${personId}0${tpCode}.${view}`;
-  const destAbs = pathResolver(`working/${filename}`);
+  const destAbs = workingFilePath(filename);
   const tmpPath = `${destAbs}.tmp-${process.pid}-${Date.now()}`;
 
   await acquire();
@@ -252,7 +249,7 @@ export async function deleteWorkingView(personId: number, tpCode: number, view: 
   if (!/^\d+$/.test(String(personId))) throw new FileExplorerError('Invalid patient id', 400);
   if (!/^\d+$/.test(String(tpCode))) throw new FileExplorerError('Invalid timepoint code', 400);
   if (!ALLOWED_VIEWS.has(view)) throw new FileExplorerError(`Invalid view code: ${view}`, 400);
-  const destAbs = pathResolver(`working/${personId}0${tpCode}.${view}`);
+  const destAbs = workingFilePath(`${personId}0${tpCode}.${view}`);
   await fs.rm(destAbs, { force: true });
   log.info('[PhotoEditor] deleted view', { personId, tpCode, view });
 }

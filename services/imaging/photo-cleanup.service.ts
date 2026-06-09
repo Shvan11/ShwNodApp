@@ -10,9 +10,8 @@
  *      file-explorer service; this module only computes its name).
  */
 import fs from 'fs/promises';
-import config from '../../config/config.js';
-import { createPathResolver } from '../../utils/path-resolver.js';
 import { log } from '../../utils/logger.js';
+import { workingFilePath } from '../files/clinic-paths.js';
 
 /** The 8 patient view codes the photo grid renders (logo.png is shared — never touched). */
 const VIEW_CODES = ['10', '12', '13', '20', '21', '22', '23', '24'];
@@ -43,10 +42,9 @@ export async function deleteWorkingFilesForTimepoint(
   personId: number,
   tpCode: number
 ): Promise<void> {
-  const pathResolver = createPathResolver(config.fileSystem.machinePath || '');
   await Promise.all(
     VIEW_CODES.map(async (code) => {
-      const file = pathResolver(`working/${personId}0${tpCode}.i${code}`);
+      const file = workingFilePath(`${personId}0${tpCode}.i${code}`);
       try {
         await fs.rm(file, { force: true });
       } catch (err) {

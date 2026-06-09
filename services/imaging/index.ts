@@ -4,7 +4,7 @@ import fs from 'fs';
 import { execFile, ChildProcess } from 'child_process';
 import config from '../../config/config.js';
 import { imageSizeFromFile } from 'image-size/fromFile';
-import { createPathResolver } from '../../utils/path-resolver.js';
+import { workingFilePath, patientPath } from '../files/clinic-paths.js';
 import { log } from '../../utils/logger.js';
 
 // ===========================================
@@ -27,11 +27,6 @@ export type ImageDimension = {
    */
   mtime: number;
 };
-
-/**
- * Path resolver function type
- */
-type PathResolver = (relativePath: string) => string;
 
 // ===========================================
 // IMAGING FUNCTIONS
@@ -56,13 +51,11 @@ async function getImageSizes(pid: string, tp: string): Promise<(ImageDimension |
     pid + '0' + tp + '.i21',
   ];
 
-  const pathResolver: PathResolver = createPathResolver(config.fileSystem.machinePath || '');
-
   // Use Promise.all to read all images concurrently (non-blocking)
   const results = await Promise.all(
     imegs.map(async (fileName): Promise<ImageDimension | null> => {
       try {
-        const filePath = pathResolver(`working/${fileName}`);
+        const filePath = workingFilePath(fileName);
 
         // imageSizeFromFile is truly async and non-blocking; stat runs alongside it
         // to capture the mtime cache-bust token (see ImageDimension.mtime).
@@ -109,10 +102,9 @@ async function processXrayImage(pid: string, file: string, detailsDir: string): 
     throw new Error('Invalid X-ray details directory');
   }
 
-  const pathResolver: PathResolver = createPathResolver(config.fileSystem.machinePath || '');
-  const source = pathResolver(`clinic1/${pid}/OPG/${file}`);
-  const dir = pathResolver(`clinic1/${pid}/OPGIMG`);
-  const destination = pathResolver(`clinic1/${pid}/OPGIMG/${path.parse(file).name}.png`);
+  const source = patientPath(pid, `OPG/${file}`);
+  const dir = patientPath(pid, 'OPGIMG');
+  const destination = patientPath(pid, `OPGIMG/${path.parse(file).name}.png`);
 
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -186,8 +178,7 @@ function constructArgs(
   pid: string,
   detailsDir: string
 ): string[] {
-  const pathResolver: PathResolver = createPathResolver(config.fileSystem.machinePath || '');
-  const pszip = pathResolver(`clinic1/${pid}/OPG/.csi_data/.version_4.4/${detailsDir}/ps.zip`);
+  const pszip = patientPath(pid, `OPG/.csi_data/.version_4.4/${detailsDir}/ps.zip`);
 
   if (detailsDir && detailsDir !== 'undefined' && fs.existsSync(pszip)) {
     return [source, '-o', destination, '-i', pszip, '-p'];

@@ -11,8 +11,8 @@
 import { Router, type Request, type Response } from 'express';
 import sms from '../../services/messaging/sms.js';
 import { getContacts } from '../../services/authentication/google.js';
-import { createPathResolver } from '../../utils/path-resolver.js';
 import config from '../../config/config.js';
+import { workingFilePath } from '../../services/files/clinic-paths.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 import * as utility from '../../shared/contracts/utility.contract.js';
@@ -124,13 +124,10 @@ router.get('/convert-path', async (req: Request<object, unknown, unknown, PathQu
       return;
     }
 
-    // Create path resolver
-    const pathResolver = createPathResolver(config.fileSystem.machinePath);
-
     // Convert DolImgs path to full file system path
     if (webPath.startsWith('DolImgs/')) {
       const fileName = webPath.replace('DolImgs/', '');
-      const fullPath = pathResolver(`working/${fileName}`);
+      const fullPath = workingFilePath(fileName);
 
       log.info('Path conversion successful:', { webPath, fileName, fullPath });
 

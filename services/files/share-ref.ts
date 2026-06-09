@@ -8,8 +8,7 @@
  */
 import path from 'path';
 import { stat } from 'fs/promises';
-import config from '../../config/config.js';
-import { createPathResolver } from '../../utils/path-resolver.js';
+import { workingDir, workingFilePath } from './clinic-paths.js';
 import { resolveFileForServe, FileExplorerError } from './file-explorer.service.js';
 import { getFileMimeType } from '../../utils/file-mime.js';
 import type { SendFileRef } from '../../shared/contracts/localsend.contract.js';
@@ -47,11 +46,8 @@ async function resolveWorkingImage(ref: SendFileRef): Promise<ResolvedShareFile>
   if (!/^\d+0\d+\.i\d+$/i.test(basename)) {
     throw new FileExplorerError('Invalid image reference', 400);
   }
-  const machinePath = config.fileSystem.machinePath;
-  if (!machinePath) throw new FileExplorerError('Server file path not configured', 500);
-  const resolver = createPathResolver(machinePath);
-  const root = resolver('working');
-  const abs = resolver(`working/${basename}`);
+  const root = workingDir();
+  const abs = workingFilePath(basename);
   // Containment: the resolved path must stay under working/.
   const rel = path.relative(root, abs);
   if (rel.startsWith('..') || path.isAbsolute(rel)) {

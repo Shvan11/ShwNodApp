@@ -11,7 +11,7 @@ import styles from './SupabaseStatusSettings.module.css';
 const POLL_MS = 10_000;
 
 interface SinkStatus {
-    sink: 'failover';
+    sink: 'failover' | 'reverse';
     configured: boolean;
     envEnabled: boolean;
     enabled: boolean;
@@ -39,6 +39,10 @@ const SINK_META: Record<SinkStatus['sink'], { label: string; description: string
     failover: {
         label: 'Database mirror',
         description: 'Raw 1:1 mirror → the single Supabase database (the portal\'s serving source).',
+    },
+    reverse: {
+        label: 'Reverse sync',
+        description: 'Two-way path: web/portal edits on Supabase → applied back to local (last-write-wins).',
     },
 };
 

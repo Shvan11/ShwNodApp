@@ -1,8 +1,9 @@
 /**
  * Read-only access to a patient's rendered "working" view images.
  *
- * The `working/` directory is a FLAT, share-root folder shared by every patient
- * (Dolphin's convention): each rendered view is `{personId}0{tpCode}.{view}`,
+ * The `working/` directory (`clinic1/working/`, beside the per-patient timepoint
+ * folders) is a FLAT folder shared by every patient (Dolphin's convention): each
+ * rendered view is `{personId}0{tpCode}.{view}`,
  * e.g. `688201.i12`. This module lists/serves ONLY the files whose name matches
  * the requesting patient's prefix — it never enumerates the directory to the
  * caller and never accepts a path separator, so it cannot traverse out of
@@ -14,11 +15,8 @@
  */
 import path from 'path';
 import fs from 'fs/promises';
-import config from '../../config/config.js';
-import { createPathResolver } from '../../utils/path-resolver.js';
 import { FileExplorerError, type FileEntry } from './file-explorer.service.js';
-
-const pathResolver = createPathResolver(config.fileSystem.machinePath || '');
+import { workingDir, workingFilePath } from './clinic-paths.js';
 
 /**
  * Working-file name for one patient: `{personId}0{tpCode}.{view}` where view is
@@ -32,7 +30,7 @@ function patientWorkingNameRe(personId: string | number): RegExp {
 export async function listPatientWorkingFiles(personId: string | number): Promise<FileEntry[]> {
   if (!/^\d+$/.test(String(personId))) throw new FileExplorerError('Invalid patient id', 400);
 
-  const dir = pathResolver('working');
+  const dir = workingDir();
   let names: string[];
   try {
     names = await fs.readdir(dir);
@@ -46,7 +44,7 @@ export async function listPatientWorkingFiles(personId: string | number): Promis
       .filter((n) => re.test(n))
       .map(async (name): Promise<FileEntry | null> => {
         try {
-          const st = await fs.stat(pathResolver(`working/${name}`));
+          const st = await fs.stat(workingFilePath(name));
           if (!st.isFile()) return null;
           return {
             name,
@@ -76,7 +74,7 @@ export async function resolveWorkingFile(
     throw new FileExplorerError('Invalid working file', 400);
   }
 
-  const abs = pathResolver(`working/${name}`);
+  const abs = workingFilePath(name);
   try {
     const st = await fs.stat(abs);
     if (!st.isFile()) throw new FileExplorerError('Working file not found', 404);

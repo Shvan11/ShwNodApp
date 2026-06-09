@@ -57,8 +57,9 @@ import { EventEmitter } from 'events';
 // ===== ADDED: Import new infrastructure components =====
 import HealthCheck from './services/monitoring/HealthCheck.js';
 import { testConnection, testConnectionWithRetry, shutdown as shutdownDatabase } from './services/database/index.js';
-import { createPathResolver } from './utils/path-resolver.js';
+import { clinicRoot, workingDir } from './services/files/clinic-paths.js';
 import { startCdc, stopCdc } from './services/sync/cdc/index.js';
+import { teardownSupabasePools } from './services/sync/cdc/supabase-pool.js';
 import { localsendService } from './services/localsend/index.js';
 import ResourceManager from './services/core/ResourceManager.js';
 import { log } from './utils/logger.js';
@@ -258,9 +259,6 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     log.info('📁 Setting up static file serving...');
 
-    // Use path resolver for cross-platform compatibility
-    const pathResolver = createPathResolver(config.fileSystem.machinePath || '');
-
     // NOTE: do NOT mount ./data as static — it holds runtime state/config (and formerly the
     // SQLite session DBs, now migrated to PostgreSQL). Templates under ./data/templates are read
     // via fs.readFile in the receipt service, never served over HTTP.
@@ -348,14 +346,14 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     // ===== MOUNT ROUTES (AFTER AUTHENTICATION) =====
     // PHI imaging static mounts — require auth (patient X-rays / clinic photos)
-    app.use('/DolImgs', express.static(pathResolver('working'), {
+    app.use('/DolImgs', express.static(workingDir(), {
         setHeaders: (res, filePath) => {
             if (/\.i\d+$/i.test(filePath)) {
                 res.setHeader('Content-Type', 'image/jpeg');
             }
         }
     }));
-    app.use('/clinic-assets', express.static(pathResolver('clinic1')));
+    app.use('/clinic-assets', express.static(clinicRoot()));
 
     // Appointments + WhatsApp SSE — mounted under /api so they inherit the
     // auth gate above. Chair-display SSE is the only public SSE route (kiosk
@@ -669,12 +667,21 @@ async function gracefulShutdown(signal: string): Promise<void> {
     log.info('🏥 Stopping health monitoring...');
     HealthCheck.stop();
 
-    // Stop the unified CDC forward sync (all sinks; turns capture OFF).
+    // Stop the unified CDC sync (all sinks — forward, dolphin, reverse; turns capture OFF).
     try {
-      log.info('🛑 Stopping CDC forward sync...');
+      log.info('🛑 Stopping CDC sync...');
       await stopCdc();
     } catch (error) {
       log.warn('⚠️  CDC shutdown error:', { error: (error as Error).message });
+    }
+
+    // End the SHARED Supabase pools AFTER every sink has closed — a single sink.close() must never
+    // end() a shared pool (the other sink may still be draining). Idempotent no-op if neither the
+    // failover nor reverse sink ever opened one.
+    try {
+      await teardownSupabasePools();
+    } catch (error) {
+      log.warn('⚠️  Supabase pool teardown error:', { error: (error as Error).message });
     }
 
     // Stop the LocalSend sender (closes the UDP socket + clears transfers).

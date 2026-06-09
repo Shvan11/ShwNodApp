@@ -6,10 +6,11 @@
 
 import { Router, type Request, type Response } from 'express';
 import pg from 'pg';
+import type { Pool } from 'pg';
 import { z } from 'zod';
 import { log } from '../utils/logger.js';
 import { drainCdcNow } from '../services/sync/cdc/index.js';
-import { stripSslMode } from '../services/sync/cdc/failover-sink.js';
+import { stripSslMode, getReverseReadPool } from '../services/sync/cdc/supabase-pool.js';
 import { getPgPool } from '../services/database/kysely.js';
 import { validate } from '../middleware/validate.js';
 import { promises as fs } from 'fs';
@@ -167,33 +168,58 @@ interface SinkControlRow {
 }
 
 /**
- * Supabase sync status — read-only health view of the single Supabase CDC mirror (sink 'failover').
- * Combines the `cdc_sink_control` flags + `change_log` backlog with a live reachability ping.
+ * Read a sink's runtime control flags + pending backlog from the DB that holds its feed. The forward
+ * 'failover' feed lives LOCAL; the 'reverse' feed lives on Supabase (reverse-read pool). Returns the
+ * control row (or undefined) + the change_log backlog. Never swallows — callers guard the reverse
+ * read so a Supabase outage degrades gracefully instead of 500ing the status endpoint.
+ */
+async function readSinkStatus(
+  pool: Pool,
+  sink: string
+): Promise<{ control: SinkControlRow | undefined; backlog: number }> {
+  const control = (
+    await pool.query<SinkControlRow>(
+      `SELECT sink, enabled, stale, note, updated_at::text AS updated_at
+         FROM cdc_sink_control
+        WHERE sink = $1`,
+      [sink]
+    )
+  ).rows[0];
+  const backlog =
+    (await pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM change_log WHERE sink = $1`, [sink])).rows[0]
+      ?.n ?? 0;
+  return { control, backlog };
+}
+
+/**
+ * Supabase sync status — read-only health view of the two CDC sinks against the single Supabase DB:
+ * 'failover' (local → Supabase mirror; feed local) and 'reverse' (Supabase → local; feed on
+ * Supabase). Combines each `cdc_sink_control` row + `change_log` backlog with one live reachability
+ * ping (both sinks target the same Supabase DB). Always answers 200 — a Supabase outage degrades the
+ * reverse card rather than failing the endpoint.
  * GET /api/sync/supabase-status
  */
 router.get(
   '/api/sync/supabase-status',
   async (_req: Request, res: Response): Promise<void> => {
     try {
-      const local = getPgPool();
+      const configured = !!process.env.SUPABASE_FAILOVER_DB_URL;
 
-      const control = (
-        await local.query<SinkControlRow>(
-          `SELECT sink, enabled, stale, note, updated_at::text AS updated_at
-             FROM cdc_sink_control
-            WHERE sink = 'failover'`
-        )
-      ).rows;
-      const c = control[0];
+      // Forward feed is LOCAL — always readable.
+      const fwd = await readSinkStatus(getPgPool(), 'failover');
 
-      const backlog = (
-        await local.query<{ n: number }>(
-          `SELECT count(*)::int AS n FROM change_log WHERE sink = 'failover'`
-        )
-      ).rows[0]?.n ?? 0;
+      // Reverse feed lives ON Supabase — guard so an outage doesn't fail the whole status read.
+      let rev: { control: SinkControlRow | undefined; backlog: number } = { control: undefined, backlog: 0 };
+      let revError: string | null = null;
+      if (configured) {
+        try {
+          rev = await readSinkStatus(getReverseReadPool(), 'reverse');
+        } catch (e) {
+          revError = (e as Error).message;
+        }
+      }
 
       const ping = await pingFailover();
-      const configured = !!process.env.SUPABASE_FAILOVER_DB_URL;
 
       res.json({
         success: true,
@@ -203,14 +229,27 @@ router.get(
             sink: 'failover',
             configured,
             envEnabled: process.env.FAILOVER_SYNC_ENABLED === 'true', // sync flag set at boot
-            enabled: c?.enabled ?? false, // authoritative runtime capture flag the engine maintains
-            stale: c?.stale ?? false,
-            note: c?.note ?? null,
-            updatedAt: c?.updated_at ?? null,
-            backlog,
+            enabled: fwd.control?.enabled ?? false, // authoritative runtime capture flag the engine maintains
+            stale: fwd.control?.stale ?? false,
+            note: fwd.control?.note ?? null,
+            updatedAt: fwd.control?.updated_at ?? null,
+            backlog: fwd.backlog,
             reachable: configured ? ping.reachable : null,
             latencyMs: configured ? ping.latencyMs : null,
             error: configured ? ping.error : null,
+          },
+          {
+            sink: 'reverse',
+            configured,
+            envEnabled: process.env.REVERSE_SYNC_ENABLED === 'true',
+            enabled: rev.control?.enabled ?? false,
+            stale: rev.control?.stale ?? false,
+            note: rev.control?.note ?? (revError ? `status read failed: ${revError}` : null),
+            updatedAt: rev.control?.updated_at ?? null,
+            backlog: rev.backlog,
+            reachable: configured ? ping.reachable : null,
+            latencyMs: configured ? ping.latencyMs : null,
+            error: configured ? (ping.error ?? revError) : null,
           },
         ],
       });
