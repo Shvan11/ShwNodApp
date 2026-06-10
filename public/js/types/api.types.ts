@@ -6,6 +6,7 @@
  * Aligner-specific types live in `pages/aligner/aligner.types.ts` and are
  * not re-exported from here.
  */
+import type { PhotoViewCode } from '@shared/photo-views';
 
 // =============================================================================
 // PRIMITIVE STRING ALIASES (documentation-only — structurally just `string`)
@@ -109,8 +110,10 @@ export interface UserResponse {
 // PHOTO EDITOR (native photo-session layout manager)
 // =============================================================================
 
-/** The 8 fixed orthodontic view codes (layout slots). */
-export type PhotoViewCode = 'i10' | 'i12' | 'i13' | 'i20' | 'i21' | 'i22' | 'i23' | 'i24';
+/** The 8 fixed orthodontic view codes (layout slots) — single source of truth in
+ *  shared/photo-views.ts. Type-only re-export: this file must stay value-free
+ *  (the `@types/*` alias breaks value exports under Vite). */
+export type { PhotoViewCode };
 
 /**
  * Per-slot render instruction (POST /api/photo-editor/:personId/render). The client
@@ -127,6 +130,12 @@ export interface SlotRenderSpec {
     /** Omit to let the server centre-crop to the view aspect (un-opened slot). */
     extract?: { left: number; top: number; width: number; height: number };
     output: { width: number; height: number };
+    /**
+     * Natural (EXIF-oriented, un-rotated) pixel size of the media the client
+     * cropped against. In "Fast proxy" mode the slot crops a 2048px thumbnail,
+     * so `extract` is in proxy space — the server scales it to source space.
+     */
+    cropSpace?: { width: number; height: number };
 }
 
 /**

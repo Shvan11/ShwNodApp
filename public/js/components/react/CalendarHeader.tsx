@@ -28,6 +28,17 @@ interface CalendarHeaderProps {
     loading: boolean;
     selectedDoctorId: number | null;
     onDoctorChange: (doctorId: number | null) => void;
+    /* Density-zoom (week/day grid only — Month has its own layout). The slider +
+       buttons set how many day-columns N fill the grid; − = fewer days (zoom in,
+       bigger cells), + = more days (zoom out). Fit auto-fills the screen. */
+    showZoom: boolean;
+    dayCount: number;
+    minDayCount: number;
+    maxDayCount: number;
+    onZoomIn: () => void;
+    onZoomOut: () => void;
+    onZoomSlider: (n: number) => void;
+    onZoomFit: () => void;
 }
 
 const viewModes: Array<[ViewMode, string]> = [
@@ -47,7 +58,15 @@ const CalendarHeader = ({
     calendarStats,
     loading,
     selectedDoctorId,
-    onDoctorChange
+    onDoctorChange,
+    showZoom,
+    dayCount,
+    minDayCount,
+    maxDayCount,
+    onZoomIn,
+    onZoomOut,
+    onZoomSlider,
+    onZoomFit
 }: CalendarHeaderProps) => {
     const utilization = calendarStats?.utilizationPercent ?? 0;
 
@@ -133,6 +152,57 @@ const CalendarHeader = ({
                         </button>
                     ))}
                 </div>
+
+                {showZoom && (
+                    <>
+                        <div className="cal-divider" />
+                        <div className="cal-zoom" role="group" aria-label="Calendar zoom">
+                            <button
+                                type="button"
+                                className="cal-zoom-btn"
+                                onClick={onZoomIn}
+                                disabled={loading || dayCount <= minDayCount}
+                                aria-label="Zoom in — fewer days"
+                                title="Fewer days"
+                            >
+                                −
+                            </button>
+                            <input
+                                type="range"
+                                className="cal-zoom-slider"
+                                min={minDayCount}
+                                max={maxDayCount}
+                                value={dayCount}
+                                onChange={e => onZoomSlider(Number(e.target.value))}
+                                disabled={loading}
+                                aria-label="Days shown"
+                                title={`${dayCount} day${dayCount === 1 ? '' : 's'} shown`}
+                            />
+                            <button
+                                type="button"
+                                className="cal-zoom-btn"
+                                onClick={onZoomOut}
+                                disabled={loading || dayCount >= maxDayCount}
+                                aria-label="Zoom out — more days"
+                                title="More days"
+                            >
+                                +
+                            </button>
+                            <span className="cal-zoom-readout">
+                                {dayCount}<span className="cal-zoom-unit">d</span>
+                            </span>
+                            <button
+                                type="button"
+                                className="cal-zoom-fit"
+                                onClick={onZoomFit}
+                                disabled={loading}
+                                title="Fit all time rows on screen"
+                            >
+                                Fit
+                            </button>
+                        </div>
+                    </>
+                )}
 
                 <DoctorFilter
                     selectedDoctorId={selectedDoctorId}

@@ -6,40 +6,23 @@
  * reload it for re-editing — no manifest / DB needed.
  *
  * Convention: `{viewCode}-{originalName}` (code prefix, hyphen, no spaces). Exactly
- * one file is tagged per view; a file carries at most one view tag. The client mirror
- * of `parseViewTag` lives in `public/js/components/react/photo-editor/photoEditorTypes.ts`
- * (`parseOriginalViewTag`) — keep the two regexes in sync.
+ * one file is tagged per view; a file carries at most one view tag. The view codes
+ * + tag regex are the shared single source of truth in `shared/photo-views.ts`
+ * (the client imports the same module via `@shared/photo-views`).
  */
 import fs from 'fs/promises';
 import path from 'path';
+import { parseViewTag, isViewCode, VIEW_TAG_RE } from '../../shared/photo-views.js';
 import { resolveSafe, FileExplorerError } from '../files/file-explorer.service.js';
 import { log } from '../../utils/logger.js';
 
-/** The 8 editable Dolphin view codes (mirrors photoEditorTypes VIEW_CODES on the client). */
-const VIEW_CODES = ['i10', 'i12', 'i13', 'i20', 'i21', 'i22', 'i23', 'i24'] as const;
-type ViewCode = (typeof VIEW_CODES)[number];
-const TAG_RE = /^(i10|i12|i13|i20|i21|i22|i23|i24)-(.+)$/;
-
-export interface ViewTag {
-  view: ViewCode;
-  /** The original filename with the `{view}-` prefix stripped. */
-  original: string;
-}
-
-/** Parse a `{view}-{original}` filename, or null if it carries no view tag. */
-export function parseViewTag(name: string): ViewTag | null {
-  const m = TAG_RE.exec(name);
-  return m ? { view: m[1] as ViewCode, original: m[2] } : null;
-}
+export { parseViewTag } from '../../shared/photo-views.js';
+export type { ViewTag } from '../../shared/photo-views.js';
 
 /** Strip a leading `{view}-` tag (if any) → the clean original basename. */
 function stripTag(name: string): string {
-  const m = TAG_RE.exec(name);
+  const m = VIEW_TAG_RE.exec(name);
   return m ? m[2] : name;
-}
-
-function isViewCode(v: string): v is ViewCode {
-  return (VIEW_CODES as readonly string[]).includes(v);
 }
 
 async function pathExists(p: string): Promise<boolean> {

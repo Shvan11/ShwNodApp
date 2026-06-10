@@ -6,8 +6,8 @@
  * Mounted (flag-gated) by ContentRenderer. The feature flag is checked there; if
  * personId is missing we render a notice.
  */
-import { useEffect, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { useBlocker, useNavigate } from 'react-router-dom';
 import styles from './PhotoEditor.module.css';
 import SlotGrid from './SlotGrid';
 import SlotActions from './SlotActions';
@@ -24,6 +24,8 @@ import {
   type SlotRenderSpec,
 } from './photoEditorTypes';
 import { useToast } from '../../../contexts/ToastContext';
+import sseAppointments from '../../../services/sse-appointments';
+import { watchRenderJob } from '../../../services/photo-render-watch';
 import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '../../../core/http';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as fileExplorerContract from '@shared/contracts/file-explorer.contract';
@@ -58,6 +60,21 @@ const SIDEBAR_MAX = 640;
 const SIDEBAR_DEFAULT = 250;
 const SIDEBAR_KEY = 'pe:sidebarW';
 
+// Editing quality: 'proxy' crops against the 2048px cached server thumbnail
+// (fast, light — the DEFAULT), 'original' loads the full-resolution source.
+// Saved output always renders server-side from the original at native res; the
+// crop rect's pixel space travels with each slot as `cropSpace`, so the two
+// modes save identical photos.
+const QUALITY_KEY = 'pe:editQuality';
+
+function readStoredQuality(): 'proxy' | 'original' {
+  try {
+    return localStorage.getItem(QUALITY_KEY) === 'original' ? 'original' : 'proxy';
+  } catch {
+    return 'proxy';
+  }
+}
+
 const clampWidth = (n: number): number => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, n));
 
 function readStoredWidth(): number | null {
@@ -81,11 +98,57 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
   const [sidebarWidth, setSidebarWidth] = useState<number>(() =>
     clampWidth(readStoredWidth() ?? SIDEBAR_DEFAULT),
   );
+  const [quality, setQuality] = useState<'proxy' | 'original'>(readStoredQuality);
+  const toggleQuality = (): void => {
+    setQuality((q) => {
+      const next = q === 'proxy' ? 'original' : 'proxy';
+      try {
+        localStorage.setItem(QUALITY_KEY, next);
+      } catch {
+        /* ignore persistence failure */
+      }
+      return next;
+    });
+  };
   // Per-view "Remove" confirm (right-click menu) + a bump to refresh the sidebar
   // after an original is untagged server-side.
   const [removeTarget, setRemoveTarget] = useState<PhotoViewCode | null>(null);
   const [removing, setRemoving] = useState(false);
   const [sidebarRefresh, setSidebarRefresh] = useState(0);
+  // Bumped when a background render for THIS timepoint completes, so hydration
+  // re-runs — covers re-opening the editor before a previous save finished
+  // (the first probe then saw pre-save state).
+  const [hydrateBump, setHydrateBump] = useState(0);
+  // Set on a successful save, right before the programmatic navigate — the
+  // unsaved-changes blocker below must let that navigation through.
+  const justSavedRef = useRef(false);
+
+  // Unsaved-changes guard: any slot holding a live edit is hours of framing the
+  // router would silently discard. Block in-app navigation with a confirm modal
+  // (below) and arm the browser's native prompt for reload/close. Hydrated
+  // saved slots have no sourceRelPath, so a freshly opened timepoint is clean.
+  const placedCount = VIEW_CODES.filter((v) => editor.slots[v].sourceRelPath).length;
+  const blocker = useBlocker(() => placedCount > 0 && !justSavedRef.current);
+
+  // A save (or clearing the last slot) while a navigation sits blocked must not
+  // leave a stale confirm modal up.
+  useEffect(() => {
+    if (blocker.state === 'blocked' && (placedCount === 0 || justSavedRef.current)) {
+      blocker.reset();
+    }
+  }, [blocker, placedCount]);
+
+  useEffect(() => {
+    if (placedCount === 0) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent): void => {
+      if (justSavedRef.current) return;
+      e.preventDefault();
+      // Chrome requires returnValue to be set for the prompt to appear.
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [placedCount]);
 
   // On open, hydrate slots that already have a saved crop: show the baked image
   // read-only and, when the source original is still tagged in the folder, enable
@@ -155,9 +218,33 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
     return () => {
       cancelled = true;
     };
-    // editor.hydrate dispatches through a stable reducer dispatch; re-run only per timepoint.
+    // editor.hydrate dispatches through a stable reducer dispatch; re-run only
+    // per timepoint, or when a background render lands (hydrateBump).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personId, tpCode, tpName, tpDate]);
+  }, [personId, tpCode, tpName, tpDate, hydrateBump]);
+
+  // Listen for this timepoint's background-render completion while the editor
+  // is open: re-hydrate (sidebar included — its originals get view-tagged by the
+  // render). HYDRATE skips any slot with a live edit, so late events can't wipe
+  // in-progress framing. Refcounted singleton — same pattern as GridComponent.
+  useEffect(() => {
+    if (!personId) return;
+    const onPhotosRendered = (payload: unknown): void => {
+      const p = payload as { personId?: number | string; tpCode?: number | string; tp_code?: number | string };
+      const pTp = p.tpCode ?? p.tp_code;
+      if (String(p.personId) !== String(personId) || String(pTp) !== String(tpCode)) return;
+      setHydrateBump((n) => n + 1);
+      setSidebarRefresh((n) => n + 1);
+    };
+    void sseAppointments.ensureConnected().catch(() => {
+      /* fall back to the initial one-shot hydration */
+    });
+    sseAppointments.on('photos_rendered', onPhotosRendered);
+    return () => {
+      sseAppointments.off('photos_rendered', onPhotosRendered);
+      sseAppointments.release();
+    };
+  }, [personId, tpCode]);
 
   // Drag the divider to resize the right panel. The sidebar sits on the right, so
   // moving the pointer left widens it. Window-level listeners keep the drag alive if
@@ -210,8 +297,6 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
     return <div className={styles.notice}>No patient selected.</div>;
   }
 
-  const placedCount = VIEW_CODES.filter((v) => editor.slots[v].sourceRelPath).length;
-
   // Originals already dropped into a slot are hidden from the sidebar — a source is
   // "used up" once placed (but never deleted from the folder). Clearing or replacing
   // a slot drops its path from this set, so the photo reappears in the list.
@@ -235,6 +320,9 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
         // Omitted when the slot was never opened — the server centre-crops to the
         // view aspect in that case.
         ...(a ? { extract: { left: a.x, top: a.y, width: a.width, height: a.height } } : {}),
+        // The pixel space the extract rect lives in (proxy thumbnail vs full
+        // original) — the server scales the rect to source space when they differ.
+        ...(s.mediaSize ? { cropSpace: s.mediaSize } : {}),
       });
     }
     if (slots.length === 0) {
@@ -249,7 +337,11 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
       // We navigate straight to the photos grid, which fills in over SSE as the render
       // completes (see GridComponent's photos_rendered handler).
       await postJSON(`/api/photo-editor/${personId}/render`, { tpName, tpDate, slots });
+      // The watchdog toasts the outcome (success/partial/timeout) wherever the
+      // user is by then — the grid itself only refetches.
+      watchRenderJob({ personId, tpCode, slots: slots.length });
       toast.info(`Saving ${slots.length} photo(s) in the background…`);
+      justSavedRef.current = true; // saved — let the navigation below through the blocker
       navigate(`/patient/${personId}/photos/tp${tpCode}`);
     } catch (err) {
       toast.error(`Save failed: ${httpErrorMessage(err, 'unknown error')}`);
@@ -291,6 +383,20 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
           <SlotActions editor={editor} activeView={activeView} />
         </div>
         <div className={styles.rightTools}>
+          <button
+            type="button"
+            className={styles.qualityToggle}
+            onClick={toggleQuality}
+            aria-pressed={quality === 'original'}
+            title={
+              quality === 'proxy'
+                ? 'Editing with fast 2048px previews — click to load full-resolution originals (saved photos are always full resolution)'
+                : 'Editing with full-resolution originals — click for fast previews (saved photos are always full resolution)'
+            }
+          >
+            <i className={`fas ${quality === 'proxy' ? 'fa-bolt' : 'fa-image'}`} aria-hidden="true" />
+            {quality === 'proxy' ? 'Fast preview' : 'Original'}
+          </button>
           <div className={styles.zoomControls} role="group" aria-label="Zoom view">
             <button
               type="button"
@@ -349,6 +455,7 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
             personId={personId}
             editor={editor}
             activeView={activeView}
+            proxyMode={quality === 'proxy'}
             onActivate={setActiveView}
             onRemoveView={setRemoveTarget}
           />
@@ -393,6 +500,25 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
               disabled={removing}
             >
               {removing ? 'Removing…' : 'Remove'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+      <Modal isOpen={blocker.state === 'blocked'} onClose={() => blocker.reset?.()}>
+        <div className={styles.confirm}>
+          <h2 className={styles.confirmTitle}>Leave photo editor?</h2>
+          <p className={styles.confirmText}>
+            {placedCount === 1
+              ? 'A framed photo hasn’t been saved.'
+              : `${placedCount} framed photos haven’t been saved.`}{' '}
+            Leaving discards the framing — the original photos stay in their folder.
+          </p>
+          <div className={styles.confirmActions}>
+            <button type="button" className={styles.confirmCancel} onClick={() => blocker.reset?.()}>
+              Stay
+            </button>
+            <button type="button" className={styles.confirmDanger} onClick={() => blocker.proceed?.()}>
+              Discard &amp; leave
             </button>
           </div>
         </div>

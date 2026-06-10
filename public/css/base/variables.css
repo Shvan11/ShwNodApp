@@ -440,7 +440,13 @@
    Reuses --color-purple-medium (#6d67c6) and --color-teal (#20c997). */
 :root {
     --cal-slot-h: 112px;
-    --cal-grid-time-w: 70px;
+    /* Density-zoom: the Week grid sets --cal-row-h (row height) and
+       --cal-font-scale inline from the day-count N (AppointmentCalendar). Row
+       height couples to N so cells keep the default-week aspect ratio; the time
+       column + grid fonts scale by --cal-font-scale. Defaults = the 6-day week. */
+    --cal-row-h: 112px;
+    --cal-font-scale: 1;
+    --cal-grid-time-w: calc(70px * var(--cal-font-scale, 1));
     --cal-line: oklch(90% 0.005 260);
     --cal-line-2: oklch(82% 0.006 260);
     --cal-ink: oklch(22% 0.014 260);

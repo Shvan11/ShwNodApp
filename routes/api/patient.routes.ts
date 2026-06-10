@@ -623,21 +623,24 @@ router.get(
       // Use 'starts with' pattern if nameStartsWith is true, otherwise 'contains'
       const namePrefix = nameStartsWith ? '' : '%';
 
+      // `col::text ILIKE` (not citext LIKE): same case-insensitive semantics, but it matches the
+      // gin_trgm_ops expression indexes ix_patients_*_trgm — citext's own LIKE operator can't use
+      // them and would seq-scan. Keep cast + operator in lockstep with the index expressions.
       if (patientName.trim()) {
         whereConditions.push(
-          sql`p."patient_name" LIKE ${`${namePrefix}${patientName.trim()}%`}`
+          sql`p."patient_name"::text ILIKE ${`${namePrefix}${patientName.trim()}%`}`
         );
       }
 
       if (firstName.trim()) {
         whereConditions.push(
-          sql`p."first_name" LIKE ${`${namePrefix}${firstName.trim()}%`}`
+          sql`p."first_name"::text ILIKE ${`${namePrefix}${firstName.trim()}%`}`
         );
       }
 
       if (lastName.trim()) {
         whereConditions.push(
-          sql`p."last_name" LIKE ${`${namePrefix}${lastName.trim()}%`}`
+          sql`p."last_name"::text ILIKE ${`${namePrefix}${lastName.trim()}%`}`
         );
       }
 
@@ -647,7 +650,7 @@ router.get(
       if (searchQuery.trim()) {
         const searchPattern = `${namePrefix}${searchQuery.trim()}%`;
         whereConditions.push(
-          sql`(p."phone" LIKE ${searchPattern} OR p."phone2" LIKE ${searchPattern})`
+          sql`(p."phone"::text ILIKE ${searchPattern} OR p."phone2"::text ILIKE ${searchPattern})`
         );
       }
 

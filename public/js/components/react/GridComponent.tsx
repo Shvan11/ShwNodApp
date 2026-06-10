@@ -642,7 +642,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     // photos appear without a manual reload.
     useEffect(() => {
         const onPhotosRendered = (payload: unknown): void => {
-            const p = payload as { personId?: number | string; tpCode?: number | string; tp_code?: number | string; warnings?: number };
+            const p = payload as { personId?: number | string; tpCode?: number | string; tp_code?: number | string };
             if (!personId) return;
             // Tolerate either casing for the timepoint code: the internal emitter is
             // untyped, so a snake_case `tp_code` slipped through historically and
@@ -651,9 +651,9 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             if (String(p.personId) !== String(personId) || String(pTp) !== String(tpCode)) return;
             void loadGalleryImages();
             void loadTimepoints();
-            if (p.warnings && p.warnings > 0) {
-                toast.warning(`${p.warnings} photo(s) had issues while saving.`);
-            }
+            // Outcome toasts (success / warnings / timeout) are owned by the
+            // saving tab's photo-render-watch module — toasting here too would
+            // double-notify when the user is parked on this grid.
         };
         sseAppointments.on('photos_rendered', onPhotosRendered);
         return () => {

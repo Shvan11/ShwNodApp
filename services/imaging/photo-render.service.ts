@@ -9,17 +9,30 @@
  *   autoOrient (EXIF) → flip/flop → rotate(angle) → extract(rect) → resize(fill) → jpeg
  * The client (react-easy-crop) pre-flips the source it crops against, so the
  * `extract` rect arrives in the same flipped+rotated space the server extracts from.
+ *
+ * Execution rearranges that contract algebraically so the flips never touch the
+ * full-resolution image. With D = extract_R(rotate_θ(flip(I))), the conjugation
+ * rotate_θ∘flip = flip∘rotate_θeff (θeff = −θ when exactly ONE flip is active;
+ * θeff = θ for none/both — two flips are a 180° rotation, which commutes) and
+ * extract_R∘flip = flip∘extract_M (M = R mirrored inside the rotated bounding
+ * box) give:  D = flip( extract_M( rotate_θeff(I) ) ).
+ * So pipeline A (rotate→extract→resize, NO flips — the order sharp honours)
+ * produces the OUTPUT-sized region, and a tiny pipeline B flips that result.
+ * This replaced materialising the whole flipped image to a lossless buffer (a
+ * full-res PNG encode/decode per flipped slot — and the occlusal views default
+ * to a flip, so that was the common case).
  */
 import path from 'path';
 import fs from 'fs/promises';
 import sharp from 'sharp';
+import { VIEW_CODES } from '../../shared/photo-views.js';
 import { getFileCategory } from '../../utils/file-mime.js';
 import { workingFilePath } from '../files/clinic-paths.js';
 import { resolveFileForServe, FileExplorerError } from '../files/file-explorer.service.js';
 import { log } from '../../utils/logger.js';
 
 /** The 8 fixed Dolphin view-code slots. Defense-in-depth: only these reach a filename. */
-const ALLOWED_VIEWS = new Set(['i10', 'i12', 'i13', 'i20', 'i21', 'i22', 'i23', 'i24']);
+const ALLOWED_VIEWS = new Set<string>(VIEW_CODES);
 
 /** Cap absurd inputs/outputs (phone photos ~40 MP are well under this). */
 const MAX_INPUT_PIXELS = 300_000_000;
@@ -37,6 +50,13 @@ export interface RenderSlotInput {
   /** Omit → centre cover-crop to the output aspect. */
   extract?: { left: number; top: number; width: number; height: number };
   output: { width: number; height: number };
+  /**
+   * Natural (EXIF-oriented, un-rotated) pixel size of the media the client
+   * cropped against. In "Fast proxy" mode that's the 2048 thumbnail, so the
+   * `extract` rect arrives in proxy space and is scaled up to source space
+   * here. Omitted / equal to the source dims → no scaling (Original mode).
+   */
+  cropSpace?: { width: number; height: number };
 }
 
 // Cap libvips' per-pipeline thread pool (process-wide, set once at import). Its default
@@ -82,7 +102,7 @@ function clampInt(v: number, lo: number, hi: number): number {
  * Returns the written filename.
  */
 export async function renderSlotToWorking(input: RenderSlotInput): Promise<string> {
-  const { personId, tpCode, view, sourceRelPath, flipH, flipV, rotation, extract, output } = input;
+  const { personId, tpCode, view, sourceRelPath, flipH, flipV, rotation, extract, output, cropSpace } = input;
 
   // ── Validation (these values build a filename + drive a decode) ───────────────
   if (!/^\d+$/.test(String(personId))) throw new FileExplorerError('Invalid patient id', 400);
@@ -119,10 +139,11 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
     const rotW = Math.round(Math.abs(w * Math.cos(rad)) + Math.abs(h * Math.sin(rad)));
     const rotH = Math.round(Math.abs(w * Math.sin(rad)) + Math.abs(h * Math.cos(rad)));
 
-    // The requested crop rect, in rotated-image pixel space. With free panning /
-    // zoom-out the client can hand us a rect that runs past the image edges; the
-    // uncovered margins are filled with white below (matching the rotation fill),
-    // so the render is faithful to the editor preview instead of being clamped.
+    // The requested crop rect, in flipped+rotated client pixel space. With free
+    // panning / zoom-out the client can hand us a rect that runs past the image
+    // edges; the uncovered margins are filled with white below (matching the
+    // rotation fill), so the render is faithful to the editor preview instead of
+    // being clamped.
     let R: { left: number; top: number; width: number; height: number };
     if (extract) {
       R = {
@@ -145,6 +166,39 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
       R = { left: Math.round((rotW - width) / 2), top: Math.round((rotH - height) / 2), width, height };
     }
 
+    // Proxy-space rect → source-space rect. MUST run before the mirror below
+    // (the mirror works in full-image rotW/rotH) and before the intersection /
+    // clamp math. The client crops against an EXIF-oriented preview, so cropSpace
+    // compares against the post-orient (w, h); the rect itself lives in ROTATED
+    // space, so the scale factors come from the two rotated bounding boxes.
+    if (extract && cropSpace && (cropSpace.width !== w || cropSpace.height !== h)) {
+      const proxyRotW = Math.round(
+        Math.abs(cropSpace.width * Math.cos(rad)) + Math.abs(cropSpace.height * Math.sin(rad))
+      );
+      const proxyRotH = Math.round(
+        Math.abs(cropSpace.width * Math.sin(rad)) + Math.abs(cropSpace.height * Math.cos(rad))
+      );
+      if (proxyRotW > 0 && proxyRotH > 0) {
+        const scaleX = rotW / proxyRotW;
+        const scaleY = rotH / proxyRotH;
+        R = {
+          left: Math.round(R.left * scaleX),
+          top: Math.round(R.top * scaleY),
+          width: Math.max(1, Math.round(R.width * scaleX)),
+          height: Math.max(1, Math.round(R.height * scaleY)),
+        };
+      }
+    }
+
+    // Move the flips off the full-res image (see the header contract): mirror R
+    // into the UN-flipped rotated space and negate the angle when exactly one
+    // flip is active; a small post-pass (pipeline B below) flips the output-sized
+    // result back. rotW/rotH are unchanged by the negation (|cos|,|sin| are even).
+    const hasFlip = flipH || flipV;
+    const thetaEff = flipH !== flipV ? -rotation : rotation;
+    if (flipH) R.left = rotW - R.left - R.width;
+    if (flipV) R.top = rotH - R.top - R.height;
+
     // Output = the crop's NATIVE pixel size: no upscaling, no downscaling. The extract
     // hands us exactly R.width×R.height source pixels and we write them 1:1, so the saved
     // view keeps the original's full resolution. Only a pathological zoom-out canvas (R
@@ -163,45 +217,29 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
 
     const WHITE = { r: 255, g: 255, b: 255, alpha: 1 };
 
-    // Geometry must be baked in the order the client cropped against:
-    // autoOrient → flip → flop → rotate, and ONLY THEN extract. The client
-    // (SlotCanvas) pre-flips the image onto a canvas and lets react-easy-crop frame
-    // the mirrored result, so the crop rect arrives in flipped+rotated space. But
-    // sharp performs `extract` at a fixed pipeline stage that runs BEFORE flip/flop
-    // (mirroring ignores call order — verified against sharp 0.34: `flip().extract()`
-    // extracts then mirrors). A lone `…flip().extract()` therefore pulls the rect
-    // from the UN-flipped image and mirrors afterwards — the wrong region for any
-    // flipped view. The occlusal Upper/Lower slots default to a vertical flip, so
-    // they were the visible casualty: an off-centre frame saved a mirror-shifted
-    // band that read as "zoomed in". Fix: when a flip is requested, materialise the
-    // flipped/rotated image to a lossless buffer first, so extract operates on
-    // already-mirrored pixels. Un-flipped views keep the single pass — sharp DOES
-    // honour rotate→extract call order, so rotation-only framing is unaffected.
-    let pipeline: ReturnType<typeof sharp>;
-    if (flipV || flipH) {
-      let geom = sharp(sourceAbs, sharpOpts).autoOrient();
-      if (flipV) geom = geom.flip(); // vertical flip
-      if (flipH) geom = geom.flop(); // horizontal mirror
-      if (rotation % 360 !== 0) geom = geom.rotate(rotation, { background: WHITE });
-      // Lossless intermediate — a JPEG round-trip here would stack a second
-      // generation of compression loss before the final encode.
-      const geomBuf = await geom.png().toBuffer();
-      pipeline = sharp(geomBuf, sharpOpts);
-    } else {
-      pipeline = sharp(sourceAbs, sharpOpts).autoOrient();
-      if (rotation % 360 !== 0) pipeline = pipeline.rotate(rotation, { background: WHITE });
-    }
+    // Pipeline A: NO flips, ever — sharp honours rotate→extract call order, but
+    // applies flip/flop at a fixed stage that ignores call order (verified against
+    // sharp 0.34: `flip().extract()` extracts then mirrors — the original occlusal
+    // mis-crop bug). The mirrored rect + θeff above make this single un-flipped
+    // pass produce exactly the mirror image of the desired crop; pipeline B at the
+    // bottom flips the output-sized result back.
+    let pipeline = sharp(sourceAbs, sharpOpts).autoOrient();
+    if (rotation % 360 !== 0) pipeline = pipeline.rotate(thetaEff, { background: WHITE });
 
     let out: ReturnType<typeof sharp>;
+    let needsFlipPass = hasFlip;
     if (iW <= 0 || iH <= 0) {
-      // Rect lies entirely off the image → a blank white slot.
+      // Rect lies entirely off the image → a blank white slot (flip-invariant).
       out = sharp({ create: { width: outW, height: outH, channels: 3, background: WHITE } });
+      needsFlipPass = false;
     } else if (iLeft === R.left && iTop === R.top && iW === R.width && iH === R.height) {
       // Fully in-bounds (the common case) → straight extract + resize, no compositing.
       out = pipeline.extract({ left: iLeft, top: iTop, width: iW, height: iH }).resize(outW, outH, { fit: 'fill' });
     } else {
       // Partly out of bounds → resize just the visible region and lay it onto a white
       // canvas at the matching offset, so the empty margins are preserved 1:1.
+      // (Offsets are computed in the mirrored frame — pipeline B flips the whole
+      // composite, which lands them at the client-space positions.)
       const sx = outW / R.width;
       const sy = outH / R.height;
       const dx = clampInt((iLeft - R.left) * sx, 0, Math.max(0, outW - 1));
@@ -219,7 +257,22 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
     }
 
     await fs.mkdir(path.dirname(destAbs), { recursive: true });
-    await out.jpeg({ quality: 95, mozjpeg: true, chromaSubsampling: '4:4:4' }).toFile(tmpPath);
+    const JPEG_OPTS = { quality: 95, mozjpeg: true, chromaSubsampling: '4:4:4' } as const;
+    if (needsFlipPass) {
+      // Pipeline B: flip the OUTPUT-sized result of pipeline A. Must be a separate
+      // sharp instance — chaining .flip() onto pipeline A (or onto the composite)
+      // would run it at the wrong fixed pipeline stage (the original bug class).
+      // Raw intermediate: zero codec cost, bounded by the output size (≤ MAX_OUTPUT_EDGE).
+      const { data, info } = await out.raw().toBuffer({ resolveWithObject: true });
+      let flipped = sharp(data, {
+        raw: { width: info.width, height: info.height, channels: info.channels },
+      });
+      if (flipV) flipped = flipped.flip();
+      if (flipH) flipped = flipped.flop();
+      await flipped.jpeg(JPEG_OPTS).toFile(tmpPath);
+    } else {
+      await out.jpeg(JPEG_OPTS).toFile(tmpPath);
+    }
     await fs.rename(tmpPath, destAbs);
 
     log.info('[PhotoEditor] rendered view', { personId, tpCode, view, filename });

@@ -15,6 +15,7 @@ import { getHolidaysInRange } from '../services/database/queries/holiday-queries
 import {
   getWeeklyCalendarSlots,
   getCalendarStats,
+  getConfiguredTimeSlots,
   ensureCalendarRange,
   fillCalendar,
 } from '../services/database/queries/calendar-queries.js';
@@ -265,6 +266,106 @@ router.get(
     } catch (error) {
       log.error('❌ Calendar month API error:', error);
       ErrorResponses.internalError(res, 'Failed to fetch monthly calendar data', error as Error);
+    }
+  }
+);
+
+/**
+ * GET /api/calendar/range
+ * Returns week-shaped calendar data for an ARBITRARY span of working days
+ * (start..end inclusive; Fridays excluded by getWeeklyCalendarSlots), plus the
+ * utilisation stats for that span. Powers the density-zoom Week grid, where the
+ * client picks N day-columns and pages the anchor forward. Mirrors /week but with
+ * an explicit range and stats folded in (one round-trip).
+ */
+router.get(
+  '/range',
+  validate({ query: calendar.range.query }),
+  async (
+    req: Request<unknown, unknown, unknown, CalendarQueryParams>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { start, end, doctorId } = req.query as {
+        start: string;
+        end: string;
+        doctorId?: string;
+      };
+
+      const filterMsg = doctorId ? ` (filtered by doctor id: ${doctorId})` : '';
+      log.info(`📅 Fetching calendar range: ${start} to ${end}${filterMsg}`);
+
+      // Read the slot settings in one shot: max-per-slot + the early/late
+      // categories and the "show extended" toggle that decide which rows render.
+      const db = getKysely();
+      const { rows: optionRows } = await sql<{ option_name: string; option_value: string | null }>`
+        SELECT "option_name", "option_value" FROM "options"
+        WHERE "option_name" IN (
+          'MaxAppointmentsPerSlot',
+          'CALENDAR_EARLY_SLOTS',
+          'CALENDAR_LATE_SLOTS',
+          'CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT'
+        )
+      `.execute(db);
+      const optionMap = new Map(optionRows.map((r) => [r.option_name, r.option_value]));
+      const rawMax = optionMap.get('MaxAppointmentsPerSlot');
+      const maxAppointmentsPerSlot = rawMax != null ? parseInt(rawMax, 10) : 3;
+      const parseList = (v: string | null | undefined): string[] =>
+        v ? v.split(',').map((s) => s.trim()).filter(Boolean) : [];
+      const earlySlots = parseList(optionMap.get('CALENDAR_EARLY_SLOTS'));
+      const lateSlots = parseList(optionMap.get('CALENDAR_LATE_SLOTS'));
+      const showExtended = optionMap.get('CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT') === 'true';
+
+      // Ensure the calendar extends far enough ahead to cover the requested span
+      // (the zoom can request several weeks forward).
+      await ensureCalendarRange(90);
+
+      const calendarData = await getWeeklyCalendarSlots(
+        start,
+        end,
+        doctorId ? parseInt(doctorId, 10) : null
+      );
+
+      const holidays = await getHolidaysInRange(start, end);
+      const holidayMap = new Map<string, Holiday>(
+        holidays.map((h) => {
+          const dateStr = String(h.holiday_date).split('T')[0];
+          return [dateStr, h] as [string, Holiday];
+        })
+      );
+
+      const structuredData = transformToCalendarStructure(
+        calendarData,
+        maxAppointmentsPerSlot,
+        holidayMap
+      );
+
+      // The time rows come from the CONFIGURED times (tbltimes) — the live source
+      // of truth — not the materialised calendar data, so deletes/adds reflect
+      // immediately. Early/late rows are hidden unless "show extended" is on.
+      const configuredTimes = await getConfiguredTimeSlots();
+      const hidden = showExtended ? new Set<string>() : new Set([...earlySlots, ...lateSlots]);
+      const timeSlots = configuredTimes.filter((t) => !hidden.has(t));
+
+      const stats = await getCalendarStats(start, end);
+
+      log.info(
+        `✅ Calendar range retrieved: ${structuredData.days.length} days, ${timeSlots.length} time rows, ${holidays.length} holidays`
+      );
+
+      sendData(res, calendar.range.response, {
+        start,
+        end,
+        doctorId: doctorId || null,
+        maxAppointmentsPerSlot,
+        holidays: holidays.length,
+        stats,
+        days: structuredData.days,
+        timeSlots,
+      });
+    } catch (error) {
+      log.error('❌ Calendar range API error:', error);
+      ErrorResponses.internalError(res, 'Failed to fetch calendar range', error as Error);
     }
   }
 );

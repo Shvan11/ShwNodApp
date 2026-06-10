@@ -9,7 +9,7 @@
  */
 
 import { useEffect } from 'react';
-import type { Dispatch, DragEvent, MouseEvent, SetStateAction } from 'react';
+import type { Dispatch, DragEvent, MouseEvent, Ref, SetStateAction } from 'react';
 import { to12Hour, formatTime12 } from '../../utils/formatters';
 import { parseLocalDate } from '../../utils/calendarDate';
 import type {
@@ -55,7 +55,9 @@ const V4_TIME_TINT: Record<string, { row: string; label: string }> = {
     '20:00': { row: 'oklch(96% 0.040 70)',  label: 'oklch(86% 0.082 70)'  },
     '20:30': { row: 'oklch(96% 0.040 208)', label: 'oklch(86% 0.082 208)' }
 };
-const CORE_TIME_SLOTS = Object.keys(V4_TIME_TINT);
+/* The fixed 14 time rows the week/day grid always renders. Exported so the
+   density-zoom Fit can divide the available board height by the row count. */
+export const CORE_TIME_SLOTS = Object.keys(V4_TIME_TINT);
 
 /* Zebra mode — on-the-hour rows tinted, half-hour rows clear (a proper
    every-other-row stripe, since slots strictly alternate :00 / :30). Label
@@ -112,6 +114,9 @@ interface CalendarGridProps {
         newTime: string,
         appt: CalendarAppointment
     ) => void;
+    /* Forwarded onto the scrolling .cal-board so the parent can measure the
+       available height/width for Fit-to-screen zoom. */
+    boardRef?: Ref<HTMLDivElement>;
 }
 
 const extractAppointments = (
@@ -149,7 +154,8 @@ const CalendarGrid = ({
     setDropTarget,
     moreMenu,
     setMoreMenu,
-    onReschedule
+    onReschedule,
+    boardRef
 }: CalendarGridProps) => {
     const { days = [] } = calendarData || {};
 
@@ -182,9 +188,20 @@ const CalendarGrid = ({
         );
     }
 
-    const filteredDays = viewMode === 'day' ? [days[0]] : days;
+    // Render every day the parent fetched — the column count IS the zoom level
+    // (1 for a single day, N for the density-zoom Week). Columns are 1fr so they
+    // always fill the width; row height/fonts scale via --cal-row-h/--cal-font-scale.
+    const filteredDays = days;
     const columnCount = filteredDays.length;
     const gridTemplateColumns = `var(--cal-grid-time-w) repeat(${columnCount}, 1fr)`;
+
+    // The time rows come from the configured slots the server sent (tbltimes —
+    // reflects add/delete live). CORE_TIME_SLOTS is only a fallback for the brief
+    // pre-load window. Zebra tinting + 12h formatting handle any HH:MM.
+    const timeSlots =
+        calendarData.timeSlots && calendarData.timeSlots.length > 0
+            ? calendarData.timeSlots
+            : CORE_TIME_SLOTS;
 
     const getSlotAppointments = (day: CalendarDay, time: string): CalendarAppointment[] => {
         const dayAppts = day.appointments as
@@ -274,7 +291,7 @@ const CalendarGrid = ({
                     onAppointmentClick(appt, day.date, time, e);
                 }}
                 title={`${appt.patientName || 'Scheduled'}${
-                    appt.appDetail ? ` — ${appt.appDetail}` : ''
+                    appt.appDetail ? `\n${appt.appDetail}` : ''
                 }`}
             >
                 <div className="cal-name">{appt.patientName || 'Scheduled'}</div>
@@ -405,7 +422,7 @@ const CalendarGrid = ({
     };
 
     return (
-        <div className="cal-board">
+        <div className="cal-board" ref={boardRef}>
             {/* Day headers */}
             <div className="cal-day-headers" style={{ gridTemplateColumns }}>
                 <div className="cal-time-head">
@@ -413,7 +430,7 @@ const CalendarGrid = ({
                 </div>
                 {filteredDays.map(day => {
                     const holiday = day.isHoliday || false;
-                    const total = CORE_TIME_SLOTS.reduce(
+                    const total = timeSlots.reduce(
                         (sum, t) => sum + getSlotAppointments(day, t).length,
                         0
                     );
@@ -456,7 +473,7 @@ const CalendarGrid = ({
             >
                 {/* Time column */}
                 <div className="cal-time-col">
-                    {CORE_TIME_SLOTS.map(t => {
+                    {timeSlots.map(t => {
                         const tint = tintFor(t);
                         const { hour, minute, meridiem } = to12Hour(t);
                         return (
@@ -494,7 +511,7 @@ const CalendarGrid = ({
                                     </div>
                                 </div>
                             )}
-                            {CORE_TIME_SLOTS.map(time => {
+                            {timeSlots.map(time => {
                                 const tint = tintFor(time);
                                 const appts = holiday
                                     ? []

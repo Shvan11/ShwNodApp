@@ -123,6 +123,26 @@
   cursor: not-allowed;
 }
 
+/* Original / Fast-proxy editing-quality toggle. Same chip styling as the zoom
+   cluster so the topbar reads as one tool row. */
+.qualityToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 4px 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+  color: var(--text-color, #374151);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.qualityToggle:hover {
+  background: var(--background-secondary);
+}
+
 .body {
   display: flex;
   flex: 1 1 auto;

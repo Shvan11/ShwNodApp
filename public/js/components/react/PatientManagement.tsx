@@ -3,7 +3,8 @@ import { useNavigate, useLoaderData } from 'react-router-dom';
 import Select, { MultiValue } from 'react-select';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
-import PatientQuickSearch, { type SelectedPatient, type PatientOption } from './PatientQuickSearch';
+import type { PatientOption } from './PatientQuickSearch';
+import PatientSearchCombobox from './PatientSearchCombobox';
 import PhoneDisplay from './PhoneDisplay';
 import Modal from './Modal';
 import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '@/core/http';
@@ -143,7 +144,6 @@ const PatientManagement = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
     const [deleting, setDeleting] = useState(false);
-    const [showQuickSearch, setShowQuickSearch] = useState(true);
 
     // -- Dropdown Data (from loader, no state needed) --
     const allPatients = loaderData?.allPatients || [];
@@ -396,40 +396,52 @@ const PatientManagement = () => {
         }
     };
 
-    const handleQuickSearchSelect = (patient: SelectedPatient) => navigate(`/patient/${patient.person_id}/works`);
+    const handleJumpToPatient = (personId: number) => navigate(`/patient/${personId}/works`);
 
     return (
         <div className={styles.page}>
             <div className={styles.header}>
                 <h2>Patient Management</h2>
                 <div className={styles.headerActions}>
-                    <button type="button" onClick={() => setShowQuickSearch(!showQuickSearch)} className="btn btn-secondary whitespace-nowrap">
-                        <i className={cn('fas', showQuickSearch ? 'fa-chevron-up' : 'fa-chevron-down', styles.iconGap)}></i>
-                        {showQuickSearch ? 'Hide' : 'Show'} Quick Search
-                    </button>
                     <button type="button" onClick={() => navigate('/patient/new/edit-patient')} className="btn btn-primary">
                         <i className={cn('fas fa-plus', styles.iconGap)}></i> Add New Patient
                     </button>
                 </div>
             </div>
 
-            {showQuickSearch && (
-                <PatientQuickSearch
-                    onSelect={handleQuickSearchSelect}
-                    allPatients={allPatients}
-                    showHeader={true}
-                    layout="horizontal"
-                />
-            )}
-
-            <hr className={styles.sectionDivider} />
-            <div className={styles.searchSectionHeader}><h3><i className="fas fa-search"></i>Advanced Search</h3></div>
+            <div className={styles.searchSectionHeader}>
+                <h3><i className="fas fa-search"></i>Search Patients</h3>
+                <p>Pick a suggestion to open the patient directly, or press Enter / use filters to build the results list below.</p>
+            </div>
 
             <div className={styles.nameSearchGrid}>
-                <div><label>Name (Arabic)</label><input type="text" value={searchPatientName} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchPatientName(e.target.value)} className="form-control text-rtl" dir="rtl"/></div>
+                <div>
+                    <label>Name (Arabic)</label>
+                    <PatientSearchCombobox
+                        value={searchPatientName}
+                        onChange={setSearchPatientName}
+                        onJump={handleJumpToPatient}
+                        onSubmit={() => executeSearch()}
+                        patients={allPatients}
+                        mode="name"
+                        rtl
+                        placeholder="اكتب للبحث..."
+                    />
+                </div>
                 <div><label>First Name</label><input type="text" value={searchFirstName} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchFirstName(e.target.value)} className="form-control"/></div>
                 <div><label>Last Name</label><input type="text" value={searchLastName} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchLastName(e.target.value)} className="form-control"/></div>
-                <div><label>Phone/ID</label><input type="text" value={searchTerm} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && executeSearch()} className="form-control"/></div>
+                <div>
+                    <label>Phone/ID</label>
+                    <PatientSearchCombobox
+                        value={searchTerm}
+                        onChange={setSearchTerm}
+                        onJump={handleJumpToPatient}
+                        onSubmit={() => executeSearch()}
+                        patients={allPatients}
+                        mode="phoneId"
+                        placeholder="Phone or ID..."
+                    />
+                </div>
             </div>
 
             <div className={styles.nameSearchOptions}>

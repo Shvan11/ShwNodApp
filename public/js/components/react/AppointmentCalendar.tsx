@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, type MouseEvent } from 'react';
-import CalendarGrid, { type DropTarget, type MoreMenu } from './CalendarGrid';
+import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties, type MouseEvent } from 'react';
+import CalendarGrid, { CORE_TIME_SLOTS, type DropTarget, type MoreMenu } from './CalendarGrid';
 import CalendarHeader from './CalendarHeader';
 import MonthlyCalendarGrid from './MonthlyCalendarGrid';
 import CalendarContextMenu from './CalendarContextMenu';
@@ -9,7 +9,12 @@ import Modal from './Modal';
 import CalendarLegend from './CalendarLegend';
 import { useToast } from '../../contexts/ToastContext';
 import { useAppointmentDoctors } from '../../hooks/useAppointmentDoctors';
-import { parseLocalDate } from '../../utils/calendarDate';
+import {
+    parseLocalDate,
+    toLocalDateString,
+    getWeekStartSaturday,
+    addWorkingDays
+} from '../../utils/calendarDate';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import * as holiday from '@shared/contracts/holiday.contract';
 import * as calendar from '@shared/contracts/calendar.contract';
@@ -26,6 +31,55 @@ import type {
     AppointmentWarning,
     SaveHolidayData
 } from './calendar.types';
+
+/* ── Density-zoom model ─────────────────────────────────────────────────────
+   A single day-count N drives the Week grid. The grid already lays out
+   `repeat(N, 1fr)` columns from the days array, so zoom = relayout (more/narrower
+   columns) — no transform/CSS-zoom, so text stays crisp and sticky/drag keep
+   working. Row height couples to N as ROW_REF/N (ROW_REF = 112 × 6), which keeps
+   the default-week cell aspect ratio at every N: for board width W, colW/rowH =
+   ((W−T)/N)/(ROW_REF/N) = (W−T)/ROW_REF, independent of N. Zoom out → N↑ → smaller
+   cells, more days, fills the screen, fits all rows; zoom in → N↓ → fewer/bigger
+   days down to one. */
+const N_MIN = 1;
+const N_MAX = 30;
+const N_DEFAULT = 6;
+const ROW_REF = 672; // 112 × 6 — the default-week reference (px)
+const ROW_MIN = 44;
+const ROW_MAX = 132;
+const MIN_COL_W = 90; // px — Fit keeps day columns at least this wide
+const N_STORAGE_KEY = 'cal-day-count';
+const FETCH_DEBOUNCE_MS = 250;
+
+const clampN = (n: number): number => Math.min(N_MAX, Math.max(N_MIN, Math.round(n)));
+
+const rowHForN = (n: number): number =>
+    Math.min(ROW_MAX, Math.max(ROW_MIN, Math.round(ROW_REF / n)));
+
+// Font scales PROPORTIONALLY with row height (no floor) so text shrinks together
+// with the rows instead of overflowing/clipping on heavy zoom-out. The natural
+// minimum (~0.39) comes from the rowH clamp [44,132]; the card padding/gaps scale
+// by the same factor in CSS so the whole card stays proportional.
+const fontScaleForRowH = (h: number): number =>
+    Math.min(1.12, Math.round((h / 112) * 100) / 100);
+
+const readStoredDayCount = (): number => {
+    try {
+        const raw = localStorage.getItem(N_STORAGE_KEY);
+        if (!raw) return N_DEFAULT;
+        const n = Number(raw);
+        return Number.isFinite(n) ? clampN(n) : N_DEFAULT;
+    } catch {
+        return N_DEFAULT;
+    }
+};
+
+const shortDate = (d: string): string =>
+    parseLocalDate(d).toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+    });
 
 interface ContextMenuState {
     position: MenuPosition;
@@ -80,6 +134,14 @@ const AppointmentCalendar = ({
     const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
     const [isMobile, setIsMobile] = useState(false);
 
+    // Density-zoom: the grid window is `dayCount` working days forward from
+    // `anchorDate` (the current week's Saturday at init / on Today).
+    const [anchorDate, setAnchorDate] = useState<string>(() =>
+        toLocalDateString(getWeekStartSaturday(initialDate ?? new Date()))
+    );
+    const [dayCount, setDayCount] = useState<number>(readStoredDayCount);
+    const boardRef = useRef<HTMLDivElement>(null);
+
     // Drag-to-reschedule and "+N more" popover state
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
@@ -97,223 +159,214 @@ const AppointmentCalendar = ({
     // Use external selected slot if provided (for controlled mode)
     const selectedSlot = externalSelectedSlot || internalSelectedSlot;
 
-    // Mobile detection - Force day view on mobile devices
+    // Mobile detection — force a single-day grid on phones.
     useEffect(() => {
         const checkMobile = () => {
             const mobile = window.innerWidth <= 768;
             setIsMobile(mobile);
-
-            // Force day view on mobile
-            if (mobile && viewMode !== 'day') {
-                setViewMode('day');
+            if (mobile) {
+                setViewMode(prev => (prev === 'month' ? prev : 'day'));
+                setDayCount(prev => (prev === 1 ? prev : 1));
             }
         };
-
-        // Check on mount
         checkMobile();
-
-        // Add resize listener
         window.addEventListener('resize', checkMobile);
-
         return () => window.removeEventListener('resize', checkMobile);
-    }, [viewMode]);
-
-    // Utility functions
-    // Week starts on Saturday (day 6)
-    const getWeekStart = (date: Date): Date => {
-        const start = new Date(date);
-        const day = start.getDay();
-        // Calculate days to subtract to get to Saturday
-        const diff = day === 6 ? 0 : (day + 1);
-        start.setDate(start.getDate() - diff);
-        start.setHours(0, 0, 0, 0);
-        return start;
-    };
-
-    const getWeekEnd = (weekStart: Date): Date => {
-        const end = new Date(weekStart);
-        // Week: Sat, Sun, Mon, Tue, Wed, Thu (6 days, excluding Friday)
-        end.setDate(end.getDate() + 5); // Thursday (5 days after Saturday)
-        end.setHours(23, 59, 59, 999);
-        return end;
-    };
+    }, []);
 
     const validateCalendarData = (calendarResult: Partial<CalendarData> | null): CalendarData => {
         if (!calendarResult) {
             return { days: [], timeSlots: [] };
         }
-
         return {
             days: calendarResult.days || [],
             timeSlots: calendarResult.timeSlots || []
         };
     };
 
-    // Computed values
-    const weekStart = useMemo(() => {
-        return getWeekStart(currentDate);
-    }, [currentDate]);
+    // Cell metrics derived from N — applied as CSS vars on the root.
+    const rowH = rowHForN(dayCount);
+    const fontScale = fontScaleForRowH(rowH);
 
-    const weekEnd = useMemo(() => {
-        return getWeekEnd(weekStart);
-    }, [weekStart]);
-
-    const weekDisplayText = useMemo(() => {
-        const start = new Date(weekStart);
-        const end = new Date(weekEnd);
-
-        if (viewMode === 'day') {
-            return currentDate.toLocaleDateString(undefined, {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-            });
-        }
-
-        if (viewMode === 'month') {
-            return currentDate.toLocaleDateString(undefined, {
-                month: 'long',
-                year: 'numeric'
-            });
-        }
-
-        return `Week of ${start.toLocaleDateString(undefined, {
-            month: 'short',
-            day: 'numeric'
-        })} - ${end.toLocaleDateString(undefined, {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        })}`;
-    }, [weekStart, weekEnd, currentDate, viewMode]);
-
-    // Toolbar title — main line (month + year) and sub line (context per view mode)
-    const titleMain = useMemo(
-        () => currentDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-        [currentDate]
+    // The window's last working day (inclusive).
+    const gridEnd = useMemo(
+        () => addWorkingDays(anchorDate, dayCount - 1),
+        [anchorDate, dayCount]
     );
 
+    // Toolbar title — main line (month + year) + sub line (range / single day).
+    const titleMain = useMemo(() => {
+        const base = viewMode === 'month' ? currentDate : parseLocalDate(anchorDate);
+        return base.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    }, [viewMode, currentDate, anchorDate]);
+
     const titleSub = useMemo(() => {
-        if (viewMode === 'day') {
-            return currentDate.toLocaleDateString(undefined, {
+        if (viewMode === 'month') return '';
+        if (dayCount === 1) {
+            return parseLocalDate(anchorDate).toLocaleDateString(undefined, {
                 weekday: 'long',
                 month: 'long',
                 day: 'numeric',
                 year: 'numeric'
             });
         }
-        if (viewMode === 'month') {
-            return '';
-        }
-        // ISO week number
-        const tmp = new Date(weekStart);
-        tmp.setHours(0, 0, 0, 0);
-        tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7));
-        const week1 = new Date(tmp.getFullYear(), 0, 4);
-        const weekNumber =
-            1 +
-            Math.round(
-                ((tmp.getTime() - week1.getTime()) / 86400000 -
-                    3 +
-                    ((week1.getDay() + 6) % 7)) /
-                    7
-            );
-        const fmt = (d: Date) =>
-            d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
-        return `Week ${weekNumber} · ${fmt(weekStart)} – ${fmt(weekEnd)}`;
-    }, [weekStart, weekEnd, currentDate, viewMode]);
+        return `${shortDate(anchorDate)} – ${shortDate(gridEnd)} · ${dayCount} days`;
+    }, [viewMode, dayCount, anchorDate, gridEnd]);
 
-    // API functions
-    const fetchCalendarData = useCallback(async (
-        date: Date,
-        doctorId: number | null = null,
-        viewModeParam: ViewMode = viewMode
-    ) => {
-        setLoading(true);
-        setError(null);
+    const rangeLabel = titleSub || titleMain;
 
-        try {
-            // Format date in local timezone to avoid UTC conversion issues
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const targetDate = `${year}-${month}-${day}`;
+    // ── Data fetching ───────────────────────────────────────────────────────
+    // Grid (day/week/zoom): one round-trip to /range returns days + timeSlots + stats.
+    const fetchGrid = useCallback(
+        async (anchor: string, n: number, doctorId: number | null) => {
+            setLoading(true);
+            setError(null);
+            try {
+                const start = anchor;
+                const end = addWorkingDays(anchor, n - 1);
+                const params = new URLSearchParams({ start, end });
+                if (doctorId) params.append('doctorId', String(doctorId));
 
-            // Build query parameters
-            const calendarParams = new URLSearchParams({ date: targetDate });
-            if (doctorId) {
-                calendarParams.append('doctorId', String(doctorId));
+                const result = await fetchJSON<{
+                    days?: CalendarData['days'];
+                    timeSlots?: string[];
+                    stats?: CalendarStats;
+                }>(`/api/calendar/range?${params}`, { schema: calendar.range.response });
+
+                setCalendarData({ days: result.days ?? [], timeSlots: result.timeSlots ?? [] });
+                setCalendarStats(result.stats ?? null);
+            } catch (err) {
+                console.error('❌ Calendar range fetch error:', err);
+                setError(httpErrorMessage(err, 'Unknown error'));
+                setCalendarData(null);
+                setCalendarStats(null);
+            } finally {
+                setLoading(false);
             }
+        },
+        []
+    );
 
-            // Determine API endpoint based on view mode
-            const endpoint = viewModeParam === 'month'
-                ? `/api/calendar/month?${calendarParams}`
-                : `/api/calendar/week?${calendarParams}`;
-            const dataSchema = viewModeParam === 'month'
-                ? calendar.month.response
-                : calendar.week.response;
+    // Month view keeps its own endpoints (separate summary grid).
+    const fetchMonth = useCallback(
+        async (date: Date, doctorId: number | null) => {
+            setLoading(true);
+            setError(null);
+            try {
+                const targetDate = toLocalDateString(date);
+                const params = new URLSearchParams({ date: targetDate });
+                if (doctorId) params.append('doctorId', String(doctorId));
 
-            // Fetch both calendar data and stats in parallel. Both are required,
-            // so a bare fetchJSON in Promise.all (rejects on the first non-2xx)
-            // matches the old per-response !ok throw. Post-migration the funnel
-            // unwraps each envelope to its payload (`.days`/`.timeSlots`/`.stats`).
-            const [calendarResult, statsResult] = await Promise.all([
-                fetchJSON<Partial<CalendarData>>(endpoint, { schema: dataSchema }),
-                fetchJSON<{ stats?: CalendarStats }>(
-                    `/api/calendar/stats?date=${targetDate}`,
-                    { schema: calendar.stats.response }
-                )
-            ]);
+                const [monthResult, statsResult] = await Promise.all([
+                    fetchJSON<Partial<CalendarData>>(`/api/calendar/month?${params}`, {
+                        schema: calendar.month.response
+                    }),
+                    fetchJSON<{ stats?: CalendarStats }>(
+                        `/api/calendar/stats?date=${targetDate}`,
+                        { schema: calendar.stats.response }
+                    )
+                ]);
 
-            // Validate and set calendar data
-            const validatedCalendarData = validateCalendarData(calendarResult);
-            setCalendarData(validatedCalendarData);
-            setCalendarStats(statsResult.stats ?? null);
+                setCalendarData(validateCalendarData(monthResult));
+                setCalendarStats(statsResult.stats ?? null);
+            } catch (err) {
+                console.error('❌ Calendar month fetch error:', err);
+                setError(httpErrorMessage(err, 'Unknown error'));
+                setCalendarData(null);
+                setCalendarStats(null);
+            } finally {
+                setLoading(false);
+            }
+        },
+        []
+    );
 
-        } catch (err) {
-            console.error('❌ Calendar fetch error:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
-            setCalendarData(null);
-            setCalendarStats(null);
-        } finally {
-            setLoading(false);
-        }
-    }, [viewMode]);
+    // Refetch the active view (used after reschedule/delete/holiday mutations).
+    const refetch = useCallback(
+        () =>
+            viewMode === 'month'
+                ? fetchMonth(currentDate, selectedDoctorId)
+                : fetchGrid(anchorDate, dayCount, selectedDoctorId),
+        [viewMode, currentDate, anchorDate, dayCount, selectedDoctorId, fetchMonth, fetchGrid]
+    );
 
-    // Navigation handlers
-    const navigateWeek = useCallback((direction: 'next' | 'prev') => {
-        const newDate = new Date(currentDate);
-
-        if (viewMode === 'month') {
-            // Navigate by month
-            newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
-        } else if (viewMode === 'day') {
-            // Navigate by day (mobile-friendly)
-            newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
-        } else {
-            // Navigate by week
-            newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
-        }
-
-        setCurrentDate(newDate);
-    }, [currentDate, viewMode]);
+    // ── Navigation ──────────────────────────────────────────────────────────
+    const navigate = useCallback(
+        (direction: 'next' | 'prev') => {
+            if (viewMode === 'month') {
+                setCurrentDate(prev => {
+                    const d = new Date(prev);
+                    d.setMonth(d.getMonth() + (direction === 'next' ? 1 : -1));
+                    return d;
+                });
+                return;
+            }
+            // Page the anchor by exactly the visible span (gap-free, forward-extend).
+            setAnchorDate(prev =>
+                addWorkingDays(prev, direction === 'next' ? dayCount : -dayCount)
+            );
+        },
+        [viewMode, dayCount]
+    );
 
     const goToToday = useCallback(() => {
-        setCurrentDate(new Date());
+        const today = new Date();
+        setCurrentDate(today);
+        setAnchorDate(toLocalDateString(getWeekStartSaturday(today)));
     }, []);
 
-    // Event handlers
-    const handleViewModeChange = useCallback((newViewMode: ViewMode) => {
-        // On mobile, always stay in day view
-        if (isMobile && newViewMode !== 'day') {
-            return;
-        }
+    // Set the column count and keep the segmented control in sync (1 → Day).
+    const applyDayCount = useCallback((next: number) => {
+        const n = clampN(next);
+        setDayCount(n);
+        setViewMode(n === 1 ? 'day' : 'week');
+    }, []);
 
-        setViewMode(newViewMode);
-        // Fetch new data for the new view mode
-        fetchCalendarData(currentDate, selectedDoctorId, newViewMode);
-    }, [currentDate, selectedDoctorId, fetchCalendarData, isMobile]);
+    // Zoom: in = fewer/bigger days, out = more/smaller days.
+    const handleZoomIn = useCallback(() => applyDayCount(dayCount - 1), [applyDayCount, dayCount]);
+    const handleZoomOut = useCallback(() => applyDayCount(dayCount + 1), [applyDayCount, dayCount]);
+    const handleZoomSlider = useCallback((n: number) => applyDayCount(n), [applyDayCount]);
+
+    // Fit: largest cells that still show every configured time row, columns kept
+    // readable. Row count comes from the live time slots (falls back to the
+    // hardcoded set before the first load).
+    const handleZoomFit = useCallback(() => {
+        const board = boardRef.current;
+        if (!board) return;
+        const headers = board.querySelector<HTMLElement>('.cal-day-headers');
+        const headerH = headers?.getBoundingClientRect().height ?? 0;
+        const availH = board.clientHeight - headerH - 4;
+        const timeW =
+            parseFloat(getComputedStyle(board).getPropertyValue('--cal-grid-time-w')) || 70;
+        const availW = board.clientWidth - timeW;
+        if (availH <= 0 || availW <= 0) return;
+        const rowCount = calendarData?.timeSlots?.length || CORE_TIME_SLOTS.length;
+        const byHeight = Math.ceil((rowCount * ROW_REF) / availH);
+        const byWidth = Math.floor(availW / MIN_COL_W);
+        applyDayCount(Math.min(byHeight, byWidth));
+    }, [applyDayCount, calendarData]);
+
+    // ── View mode ───────────────────────────────────────────────────────────
+    const handleViewModeChange = useCallback(
+        (newViewMode: ViewMode) => {
+            if (isMobile && newViewMode !== 'day') return;
+
+            if (newViewMode === 'month') {
+                // Open the month containing the current grid anchor.
+                setCurrentDate(parseLocalDate(anchorDate));
+                setViewMode('month');
+                return;
+            }
+
+            // Leaving month → re-anchor the grid on the visible month.
+            if (viewMode === 'month') {
+                setAnchorDate(toLocalDateString(getWeekStartSaturday(currentDate)));
+            }
+            setViewMode(newViewMode);
+            setDayCount(newViewMode === 'day' ? 1 : N_DEFAULT);
+        },
+        [isMobile, viewMode, currentDate, anchorDate]
+    );
 
     const handleDoctorChange = useCallback((doctorId: number | null) => {
         setSelectedDoctorId(doctorId);
@@ -341,12 +394,12 @@ const AppointmentCalendar = ({
                 });
 
                 toast.success('Appointment rescheduled');
-                await fetchCalendarData(currentDate, selectedDoctorId);
+                await refetch();
             } catch (error) {
                 toast.error(httpErrorMessage(error, 'Failed to reschedule appointment'));
             }
         },
-        [currentDate, selectedDoctorId, fetchCalendarData, toast]
+        [refetch, toast]
     );
 
     const handleSlotClick = useCallback((slot: SlotData, _event: MouseEvent<HTMLDivElement>) => {
@@ -399,8 +452,9 @@ const AppointmentCalendar = ({
 
     // Handler for clicking on a day in monthly view
     const handleDayClick = useCallback((day: CalendarDay) => {
-        // Switch to day view for the selected day
-        setCurrentDate(parseLocalDate(day.date));
+        // Switch to a single-day grid for the selected day
+        setAnchorDate(day.date);
+        setDayCount(1);
         setViewMode('day');
     }, []);
 
@@ -484,11 +538,11 @@ const AppointmentCalendar = ({
             setHolidayModal(null);
 
             // Refresh calendar to show updated holidays
-            await fetchCalendarData(currentDate, selectedDoctorId);
+            await refetch();
         } catch (error) {
             toast.error(httpErrorMessage(error, 'Failed to save holiday'));
         }
-    }, [currentDate, selectedDoctorId, fetchCalendarData, toast]);
+    }, [refetch, toast]);
 
     // Confirm delete holiday
     const handleDeleteHolidayConfirm = useCallback(async () => {
@@ -501,11 +555,11 @@ const AppointmentCalendar = ({
             setDeleteHolidayConfirm(null);
 
             // Refresh calendar
-            await fetchCalendarData(currentDate, selectedDoctorId);
+            await refetch();
         } catch (error) {
             toast.error(httpErrorMessage(error, 'Failed to remove holiday'));
         }
-    }, [deleteHolidayConfirm, currentDate, selectedDoctorId, fetchCalendarData, toast]);
+    }, [deleteHolidayConfirm, refetch, toast]);
 
     // Handler for delete action from context menu
     const handleDeleteRequest = useCallback((appointment: CalendarAppointment) => {
@@ -520,7 +574,7 @@ const AppointmentCalendar = ({
             await deleteJSON(`/api/appointments/${deleteConfirmation.appointment_id}`);
 
             // Refresh calendar data after successful delete
-            await fetchCalendarData(currentDate, selectedDoctorId);
+            await refetch();
 
             // Close delete confirmation modal
             setDeleteConfirmation(null);
@@ -528,7 +582,7 @@ const AppointmentCalendar = ({
             console.error('Error deleting appointment:', error);
             toast.error('Failed to delete appointment: ' + httpErrorMessage(error, 'Unknown error'));
         }
-    }, [deleteConfirmation, currentDate, selectedDoctorId, fetchCalendarData, toast]);
+    }, [deleteConfirmation, refetch, toast]);
 
     // Handler to close context menu
     const handleCloseContextMenu = useCallback(() => {
@@ -536,12 +590,32 @@ const AppointmentCalendar = ({
     }, []);
 
     // Effects
+    // Month fetches immediately; grid fetches are debounced so dragging the zoom
+    // slider through several N values issues one request, not one per step.
     useEffect(() => {
-        fetchCalendarData(currentDate, selectedDoctorId);
-    }, [currentDate, selectedDoctorId, fetchCalendarData]);
+        if (viewMode === 'month') {
+            fetchMonth(currentDate, selectedDoctorId);
+            return;
+        }
+        const t = setTimeout(
+            () => fetchGrid(anchorDate, dayCount, selectedDoctorId),
+            FETCH_DEBOUNCE_MS
+        );
+        return () => clearTimeout(t);
+    }, [viewMode, currentDate, anchorDate, dayCount, selectedDoctorId, fetchGrid, fetchMonth]);
 
-    // Loading state
-    if (loading) {
+    // Persist the zoom (day count) per-browser.
+    useEffect(() => {
+        try {
+            localStorage.setItem(N_STORAGE_KEY, String(dayCount));
+        } catch {
+            // Ignore storage failures (private mode / quota).
+        }
+    }, [dayCount]);
+
+    // Loading state — only the initial load replaces the grid with a spinner;
+    // refetches (nav, zoom, mutations) keep the current grid visible.
+    if (loading && !calendarData) {
         return (
             <div className="appointment-calendar loading">
                 <div className="calendar-loading">
@@ -549,7 +623,7 @@ const AppointmentCalendar = ({
                         <i className="fas fa-spinner fa-spin"></i>
                     </div>
                     <h3>Loading Calendar...</h3>
-                    <p>Fetching appointment data for {weekDisplayText}</p>
+                    <p>Fetching appointment data for {rangeLabel}</p>
                 </div>
             </div>
         );
@@ -566,7 +640,7 @@ const AppointmentCalendar = ({
                     <div className="error-actions">
                         <button
                             className="btn btn-primary"
-                            onClick={() => fetchCalendarData(currentDate)}
+                            onClick={() => refetch()}
                         >
                             <i className="fas fa-refresh"></i>
                             Retry
@@ -586,13 +660,16 @@ const AppointmentCalendar = ({
 
     // Main render
     return (
-        <div className="appointment-calendar">
+        <div
+            className="appointment-calendar"
+            style={{ '--cal-row-h': `${rowH}px`, '--cal-font-scale': fontScale } as CSSProperties}
+        >
             {/* Calendar Header */}
             <CalendarHeader
                 titleMain={titleMain}
                 titleSub={titleSub}
-                onPreviousWeek={() => navigateWeek('prev')}
-                onNextWeek={() => navigateWeek('next')}
+                onPreviousWeek={() => navigate('prev')}
+                onNextWeek={() => navigate('next')}
                 onTodayClick={goToToday}
                 viewMode={viewMode}
                 onViewModeChange={handleViewModeChange}
@@ -600,6 +677,14 @@ const AppointmentCalendar = ({
                 loading={loading}
                 selectedDoctorId={selectedDoctorId}
                 onDoctorChange={handleDoctorChange}
+                showZoom={viewMode !== 'month' && !isMobile}
+                dayCount={dayCount}
+                minDayCount={N_MIN}
+                maxDayCount={N_MAX}
+                onZoomIn={handleZoomIn}
+                onZoomOut={handleZoomOut}
+                onZoomSlider={handleZoomSlider}
+                onZoomFit={handleZoomFit}
             />
 
             {/* Doctor colour legend (week/day views only — month cells aren't tinted) */}
@@ -631,6 +716,7 @@ const AppointmentCalendar = ({
                     moreMenu={moreMenu}
                     setMoreMenu={setMoreMenu}
                     onReschedule={handleReschedule}
+                    boardRef={boardRef}
                 />
             )}
 

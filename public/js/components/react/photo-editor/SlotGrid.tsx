@@ -23,12 +23,14 @@ interface Props {
   personId: number;
   editor: PhotoEditorState;
   activeView: PhotoViewCode | null;
+  /** Crop against 2048px server thumbnails instead of the originals. */
+  proxyMode: boolean;
   onActivate: (view: PhotoViewCode) => void;
   /** Open the per-view delete confirm (right-click → Remove on a saved slot). */
   onRemoveView: (view: PhotoViewCode) => void;
 }
 
-const SlotGrid = ({ personId, editor, activeView, onActivate, onRemoveView }: Props) => {
+const SlotGrid = ({ personId, editor, activeView, proxyMode, onActivate, onRemoveView }: Props) => {
   const [dragOver, setDragOver] = useState<PhotoViewCode | null>(null);
   const [menu, setMenu] = useState<{ view: PhotoViewCode; x: number; y: number } | null>(null);
 
@@ -129,9 +131,11 @@ const SlotGrid = ({ personId, editor, activeView, onActivate, onRemoveView }: Pr
                 personId={personId}
                 slot={slot}
                 active={isActive}
+                proxyMode={proxyMode}
                 onCropChange={(c) => editor.setCrop(view, c)}
                 onZoomChange={(z) => editor.setZoom(view, z)}
                 onCropComplete={(a) => editor.setCropped(view, a)}
+                onMediaLoaded={(s) => editor.setMediaSize(view, s)}
               />
             </div>
             <SlotToolbar

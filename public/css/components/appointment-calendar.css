@@ -235,6 +235,79 @@ body:has(.appointment-calendar) {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
+/* ===== Density-zoom control (week/day grid only) ===== */
+.cal-zoom {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cal-zoom-btn {
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    color: var(--cal-ink-2);
+    border: 1px solid var(--cal-line);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    font-family: inherit;
+}
+
+.cal-zoom-btn:hover:not(:disabled) {
+    background: var(--cal-surface-2);
+    color: var(--cal-purple-ink);
+}
+
+.cal-zoom-slider {
+    width: 96px;
+    height: 4px;
+    cursor: pointer;
+    accent-color: var(--color-purple-medium);
+}
+
+.cal-zoom-readout {
+    min-width: 30px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--cal-ink-2);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.cal-zoom-unit {
+    font-weight: 500;
+    color: var(--cal-ink-3);
+    margin-left: 1px;
+}
+
+.cal-zoom-fit {
+    height: 28px;
+    padding: 0 12px;
+    background: var(--cal-surface-2);
+    color: var(--cal-ink-2);
+    border: 1px solid var(--cal-line);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    font-family: inherit;
+}
+
+.cal-zoom-fit:hover:not(:disabled) {
+    background: white;
+    color: var(--cal-purple-ink);
+    border-color: var(--cal-line-2);
+}
+
+.cal-zoom-btn:disabled,
+.cal-zoom-slider:disabled,
+.cal-zoom-fit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* ===== Doctor colour legend ===== */
 .cal-legend {
     display: flex;
@@ -464,7 +537,7 @@ body:has(.appointment-calendar) {
 }
 
 .cal-time-cell {
-    height: var(--cal-slot-h);
+    height: var(--cal-row-h);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -474,14 +547,14 @@ body:has(.appointment-calendar) {
 }
 
 .cal-time-h {
-    font-size: 1.625rem;
+    font-size: calc(1.625rem * var(--cal-font-scale, 1));
     font-weight: 700;
     color: var(--cal-ink);
     line-height: 1;
 }
 
 .cal-time-m {
-    font-size: 1.0625rem;
+    font-size: calc(1.0625rem * var(--cal-font-scale, 1));
     color: var(--cal-ink-2);
     font-weight: 600;
     line-height: 1;
@@ -489,7 +562,7 @@ body:has(.appointment-calendar) {
 }
 
 .cal-time-ap {
-    font-size: 0.625rem;
+    font-size: calc(0.625rem * var(--cal-font-scale, 1));
     font-weight: 700;
     letter-spacing: 0.08em;
     color: var(--cal-ink-3);
@@ -517,7 +590,7 @@ body:has(.appointment-calendar) {
 /* slot wrapper — fixed height; carries the per-row tint set inline (neutral
    zebra band by default, or the colorful hue band when TINT_MODE='colorful') */
 .cal-slot-wrap {
-    height: var(--cal-slot-h);
+    height: var(--cal-row-h);
     border-bottom: 1px solid rgba(255, 255, 255, 0.6);
     position: relative;
     transition: background 0.12s ease, outline-color 0.12s ease;
@@ -566,8 +639,10 @@ body:has(.appointment-calendar) {
     width: 100%;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 3px;
-    padding: 4px;
+    /* Spacing scales with the zoom (same factor as the fonts) so the card stays
+       proportional and the fixed chrome never crowds the text on zoom-out. */
+    gap: calc(3px * var(--cal-font-scale, 1));
+    padding: calc(4px * var(--cal-font-scale, 1));
     cursor: pointer;
 }
 
@@ -594,12 +669,12 @@ body:has(.appointment-calendar) {
 .cal-lane {
     background: white;
     border: 1px solid var(--cal-line);
-    border-radius: 4px;
-    padding: 4px 8px;
+    border-radius: calc(4px * var(--cal-font-scale, 1));
+    padding: calc(4px * var(--cal-font-scale, 1)) calc(8px * var(--cal-font-scale, 1));
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 1px;
+    gap: calc(1px * var(--cal-font-scale, 1));
     min-width: 0;
     min-height: 0;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
@@ -630,10 +705,13 @@ body:has(.appointment-calendar) {
 }
 
 .cal-name {
-    font-size: 0.8125rem;
+    font-size: calc(0.8125rem * var(--cal-font-scale, 1));
     font-weight: 700;
     color: var(--cal-ink);
-    line-height: 1.2;
+    /* Generous line-height so Arabic ascenders/descenders fit the line box —
+       `overflow: hidden` (for the horizontal ellipsis) would otherwise clip the
+       tops/bottoms of the glyphs, more visibly as the font shrinks on zoom-out. */
+    line-height: 1.45;
     text-align: right;
     direction: rtl;
     white-space: nowrap;
@@ -642,10 +720,10 @@ body:has(.appointment-calendar) {
 }
 
 .cal-proc {
-    font-size: 0.6875rem;
+    font-size: calc(0.6875rem * var(--cal-font-scale, 1));
     font-weight: 500;
     color: var(--cal-ink-2);
-    line-height: 1.15;
+    line-height: 1.4;
     text-align: right;
     direction: rtl;
     white-space: nowrap;
@@ -655,12 +733,12 @@ body:has(.appointment-calendar) {
 
 .cal-slot.count-4 .cal-name,
 .cal-slot.count-many .cal-name {
-    font-size: 0.75rem;
+    font-size: calc(0.75rem * var(--cal-font-scale, 1));
 }
 
 .cal-slot.count-4 .cal-proc,
 .cal-slot.count-many .cal-proc {
-    font-size: 0.625rem;
+    font-size: calc(0.625rem * var(--cal-font-scale, 1));
 }
 
 /* "+N more" cell */
@@ -695,7 +773,7 @@ body:has(.appointment-calendar) {
 }
 
 .cal-more-plus {
-    font-size: 1rem;
+    font-size: calc(1rem * var(--cal-font-scale, 1));
     font-weight: 800;
     line-height: 1;
     font-variant-numeric: tabular-nums;
@@ -703,7 +781,7 @@ body:has(.appointment-calendar) {
 }
 
 .cal-more-label {
-    font-size: 0.5625rem;
+    font-size: calc(0.5625rem * var(--cal-font-scale, 1));
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-weight: 600;
@@ -714,7 +792,7 @@ body:has(.appointment-calendar) {
 /* empty slot — extremely quiet, tap-target only on hover */
 .cal-empty-mark {
     color: transparent;
-    font-size: 1rem;
+    font-size: calc(1rem * var(--cal-font-scale, 1));
     font-weight: 300;
     transition: color 0.12s ease;
 }
@@ -892,7 +970,8 @@ body:has(.appointment-calendar) {
     color: var(--cal-ink);
     text-align: right;
     direction: rtl;
-    line-height: 1.2;
+    /* Room for Arabic glyphs — see .cal-name. */
+    line-height: 1.45;
 }
 
 .cal-popover-proc {
@@ -901,7 +980,7 @@ body:has(.appointment-calendar) {
     text-align: right;
     direction: rtl;
     font-weight: 500;
-    line-height: 1.15;
+    line-height: 1.4;
 }
 
 /* Loading States */

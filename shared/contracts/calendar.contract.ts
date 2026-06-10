@@ -127,6 +127,20 @@ export const month = {
 } as const;
 export type CalendarMonthResponse = z.infer<typeof month.response>;
 
+// GET /api/calendar/range?start=&end=&doctorId= → { days, timeSlots, stats, … }.
+// Powers the density-zoom Week grid: an arbitrary span of working days (Fridays
+// excluded by the query) rendered as N day-columns. Same week-shaped day rows as
+// `week`, with the utilisation `stats` folded in so the grid needs one round-trip.
+export const range = {
+  query: z.object({ start: dateString, end: dateString, doctorId: z.string().optional() }),
+  response: z.looseObject({
+    days: z.array(weekDay),
+    timeSlots: z.array(z.string()),
+    stats: calendarStats,
+  }),
+} as const;
+export type CalendarRangeResponse = z.infer<typeof range.response>;
+
 // GET /api/calendar/stats?date= → { stats }.
 export const stats = {
   query: z.object({ date: dateString }),

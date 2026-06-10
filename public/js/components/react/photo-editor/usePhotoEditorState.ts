@@ -16,6 +16,7 @@ type Action =
   | { type: 'TOGGLE_FLIP_H'; view: PhotoViewCode }
   | { type: 'TOGGLE_FLIP_V'; view: PhotoViewCode }
   | { type: 'SET_CROPPED'; view: PhotoViewCode; area: CropArea }
+  | { type: 'SET_MEDIA_SIZE'; view: PhotoViewCode; size: { width: number; height: number } }
   | { type: 'HYDRATE'; views: Partial<Record<PhotoViewCode, SlotHydration>> };
 
 function reducer(state: SlotMap, action: Action): SlotMap {
@@ -26,6 +27,10 @@ function reducer(state: SlotMap, action: Action): SlotMap {
     for (const v of VIEW_CODES) {
       const h = action.views[v];
       if (!h) continue;
+      // A live edit always wins over (possibly late) hydration — e.g. the SSE
+      // re-hydrate after a background render must not wipe a slot the user has
+      // already started re-framing.
+      if (state[v].sourceRelPath) continue;
       next[v] = {
         ...makeInitialSlot(v),
         savedImageUrl: h.savedImageUrl,
@@ -70,6 +75,11 @@ function reducer(state: SlotMap, action: Action): SlotMap {
       return { ...state, [action.view]: { ...slot, flipV: !slot.flipV } };
     case 'SET_CROPPED':
       return { ...state, [action.view]: { ...slot, croppedAreaPixels: action.area } };
+    case 'SET_MEDIA_SIZE':
+      // Record only — the rect is NOT rescaled here. react-easy-crop re-emits
+      // croppedAreaPixels in the new media space on load (before onMediaLoaded),
+      // so rescaling would double-apply the change.
+      return { ...state, [action.view]: { ...slot, mediaSize: action.size } };
     default:
       return state;
   }
@@ -86,6 +96,7 @@ export interface PhotoEditorState {
   toggleFlipH: (view: PhotoViewCode) => void;
   toggleFlipV: (view: PhotoViewCode) => void;
   setCropped: (view: PhotoViewCode, area: CropArea) => void;
+  setMediaSize: (view: PhotoViewCode, size: { width: number; height: number }) => void;
   hydrate: (views: Partial<Record<PhotoViewCode, SlotHydration>>) => void;
 }
 
@@ -102,6 +113,7 @@ export function usePhotoEditorState(): PhotoEditorState {
     toggleFlipH: (view) => dispatch({ type: 'TOGGLE_FLIP_H', view }),
     toggleFlipV: (view) => dispatch({ type: 'TOGGLE_FLIP_V', view }),
     setCropped: (view, area) => dispatch({ type: 'SET_CROPPED', view, area }),
+    setMediaSize: (view, size) => dispatch({ type: 'SET_MEDIA_SIZE', view, size }),
     hydrate: (views) => dispatch({ type: 'HYDRATE', views }),
   };
 }

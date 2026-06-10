@@ -4,6 +4,7 @@
  * of truth); the slot order matches GridComponent + services/imaging getImageSizes.
  */
 import type { PhotoViewCode, SlotRenderSpec } from '@/types/api.types';
+import { VIEW_CODES, parseViewTag } from '@shared/photo-views';
 import { PHOTO_TYPE_LABELS } from '../slideshow/photoTypes';
 
 export type { PhotoViewCode, SlotRenderSpec };
@@ -18,26 +19,20 @@ export const GRID_CELLS: GridCell[] = [
   'i20', 'i22', 'i21',
 ];
 
-/** The 8 editable view codes. */
-export const VIEW_CODES: PhotoViewCode[] = ['i10', 'i12', 'i13', 'i23', 'i24', 'i20', 'i22', 'i21'];
+/** The 8 editable view codes (shared single source of truth, client/grid order). */
+export { VIEW_CODES };
 
 export function labelForView(view: PhotoViewCode): string {
   return PHOTO_TYPE_LABELS[view] ?? view.toUpperCase();
 }
 
 /**
- * Client mirror of the server's `parseViewTag`
- * (`services/imaging/photo-original-tags.ts`): a timepoint original tagged for a
- * view is named `{viewCode}-{originalName}` (code prefix, hyphen, no spaces). Keep
- * this regex in sync with the server one.
+ * A timepoint original tagged for a view is named `{viewCode}-{originalName}`
+ * (code prefix, hyphen, no spaces). Same parser as the server's
+ * `services/imaging/photo-original-tags.ts` — both sides import
+ * `shared/photo-views.ts`, so the regex can no longer drift.
  */
-const VIEW_TAG_RE = /^(i10|i12|i13|i20|i21|i22|i23|i24)-(.+)$/;
-export function parseOriginalViewTag(
-  name: string,
-): { view: PhotoViewCode; original: string } | null {
-  const m = VIEW_TAG_RE.exec(name);
-  return m ? { view: m[1] as PhotoViewCode, original: m[2] } : null;
-}
+export const parseOriginalViewTag = parseViewTag;
 
 export interface OutputDims {
   width: number;
@@ -149,6 +144,13 @@ export interface SlotState {
   flipH: boolean;
   flipV: boolean;
   croppedAreaPixels: CropArea | null;
+  /**
+   * Natural size of the media the cropper is currently framing (post-EXIF) —
+   * the space `croppedAreaPixels` lives in. react-easy-crop re-emits the crop
+   * rect on every media load BEFORE onMediaLoaded fires, so this pair is always
+   * self-consistent (the proxy/original toggle just reloads the media).
+   */
+  mediaSize: { width: number; height: number } | null;
   /** When set AND sourceRelPath is null, the slot shows this baked crop read-only. */
   savedImageUrl: string | null;
   /** True when a tagged source original still exists to reload for re-editing. */
@@ -179,6 +181,7 @@ export function makeInitialSlot(view: PhotoViewCode): SlotState {
     flipH: false,
     flipV: defaultFlipV(view),
     croppedAreaPixels: null,
+    mediaSize: null,
     savedImageUrl: null,
     canReEdit: false,
     reEditRelPath: null,

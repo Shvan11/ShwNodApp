@@ -37,6 +37,7 @@ import { transliterateNameToEnglish } from '../../services/business/name-transli
 import { renderSlotToWorking, deleteWorkingView } from '../../services/imaging/photo-render.service.js';
 import { tagOriginalForView, untagOriginalForView } from '../../services/imaging/photo-original-tags.js';
 import { timepointFolderName } from '../../services/imaging/photo-cleanup.service.js';
+import { toDateOnly, parseLocalDate } from '../../utils/date.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
@@ -71,6 +72,8 @@ type SlotSpec = {
   rotation?: number;
   extract?: { left: number; top: number; width: number; height: number };
   output?: { width: number; height: number };
+  /** Natural dims of the media the client cropped against (proxy mode); see RenderSlotInput. */
+  cropSpace?: { width: number; height: number };
 };
 
 // --- Boundary schemas ---
@@ -94,26 +97,6 @@ const renderBodySchema = z.object({
 type PrepareBody = photoEditor.PrepareBody;
 type RenderBody = z.infer<typeof renderBodySchema>;
 type DeleteViewBody = photoEditor.DeleteViewBody;
-
-/** Parse 'YYYY-MM-DD' to a LOCAL-midnight Date (pool runs useUTC:false). */
-function parseLocalDate(s: string): Date | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-  if (!m) return null;
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-}
-
-/**
- * → 'YYYY-MM-DD'. PG `date` columns already arrive as 'YYYY-MM-DD' strings at
- * runtime (typed `Date` only by codegen), so pass those through untouched; only
- * real Date objects need formatting (never toISOString — that shifts to UTC).
- */
-function toDateOnly(d: Date | string): string {
-  if (typeof d === 'string') return d.slice(0, 10);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
 
 /**
  * POST /:personId/prepare
@@ -331,6 +314,23 @@ async function processRenderJob(job: RenderJob): Promise<void> {
           continue;
         }
 
+        // cropSpace is advisory (proxy-mode rect scaling): a malformed one is
+        // dropped — the render then treats the rect as full-res — rather than
+        // failing the slot.
+        let cropSpace = slot.cropSpace;
+        if (
+          cropSpace &&
+          !(
+            Number.isInteger(cropSpace.width) &&
+            Number.isInteger(cropSpace.height) &&
+            cropSpace.width >= 16 &&
+            cropSpace.height >= 16
+          )
+        ) {
+          log.warn('[PhotoEditor] dropping malformed cropSpace', { personId, view, cropSpace });
+          cropSpace = undefined;
+        }
+
         const filename = await renderSlotToWorking({
           personId,
           tpCode: tp_code,
@@ -341,6 +341,7 @@ async function processRenderJob(job: RenderJob): Promise<void> {
           rotation: Number(slot.rotation) || 0,
           extract: ex,
           output: op,
+          cropSpace,
         });
 
         const digits = view.slice(1); // 'i10' -> '10'
@@ -401,6 +402,7 @@ async function processRenderJob(job: RenderJob): Promise<void> {
       tpCode: tp_code,
       written: written.length,
       warnings: warnings.length,
+      total: slots.length,
     });
   }
 }

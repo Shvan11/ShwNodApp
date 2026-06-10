@@ -1150,12 +1150,15 @@ export async function searchAlignerPatients(
       .where('wt.id', 'in', [19, 20, 21])
       .where((eb) =>
         eb.or([
-          // citext columns → case-insensitive LIKE, matching Arabic_CI_AS.
-          eb('p.first_name', 'like', like),
-          eb('p.last_name', 'like', like),
-          eb('p.patient_name', 'like', like),
-          eb('p.phone', 'like', like),
-          eb(sql<string>`${eb.ref('p.first_name')} || ' ' || ${eb.ref('p.last_name')}`, 'like', like),
+          // `::text ILIKE` (not citext LIKE): same case-insensitive semantics as Arabic_CI_AS,
+          // but it matches the gin_trgm_ops expression indexes ix_patients_*_trgm — citext's own
+          // LIKE operator can't use them. Every OR branch must stay indexable (BitmapOr), so the
+          // concat branch has its own index (ix_patients_fullname_trgm) on this exact expression.
+          eb(sql<string>`${eb.ref('p.first_name')}::text`, 'ilike', like),
+          eb(sql<string>`${eb.ref('p.last_name')}::text`, 'ilike', like),
+          eb(sql<string>`${eb.ref('p.patient_name')}::text`, 'ilike', like),
+          eb(sql<string>`${eb.ref('p.phone')}::text`, 'ilike', like),
+          eb(sql<string>`${eb.ref('p.first_name')}::text || ' ' || ${eb.ref('p.last_name')}::text`, 'ilike', like),
         ])
       );
 

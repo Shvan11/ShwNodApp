@@ -88,6 +88,19 @@ export async function getWeeklyCalendarSlots(
 }
 
 /**
+ * The configured appointment time slots ('HH:MM'), ascending — the source of
+ * truth for the grid's time rows. Edited in Calendar Times settings (the `times`
+ * table), so add/delete reflects immediately, unlike the materialised `calendar`
+ * table which only changes on regenerate.
+ */
+export async function getConfiguredTimeSlots(): Promise<string[]> {
+  const { rows } = await sql<{ t: string }>`
+    SELECT to_char("my_time", 'HH24:MI') AS t FROM "times" ORDER BY "my_time"
+  `.execute(getKysely());
+  return rows.map((r) => r.t);
+}
+
+/**
  * Utilisation statistics for a week/range. (was: ProcCalendarStatsOptimized)
  */
 export async function getCalendarStats(startDate: string, endDate: string): Promise<CalendarStatsRow> {

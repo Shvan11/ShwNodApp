@@ -85,6 +85,7 @@ function ensureInitialized(emitter: EventEmitter): void {
     tpCode: number | string;
     written?: number;
     warnings?: number;
+    total?: number;
   }): void => {
     if (appointmentsClients.size === 0) return;
     const frame = `event: photos_rendered\ndata: ${JSON.stringify(payload)}\n\n`;

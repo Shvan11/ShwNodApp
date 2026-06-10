@@ -20,8 +20,9 @@ import { FileExplorerError, resolveFileForServe } from './file-explorer.service.
 // which sharp consumer loads first; thumbnails are one-shot disk-cached renders.
 sharp.cache(false);
 
-/** Fixed set so the endpoint can't be driven to generate unbounded sizes. */
-const ALLOWED_WIDTHS = new Set([120, 240, 480]);
+/** Fixed set so the endpoint can't be driven to generate unbounded sizes.
+ *  2048 is the photo editor's "Fast proxy" framing preview (see SlotCanvas). */
+const ALLOWED_WIDTHS = new Set([120, 240, 480, 2048]);
 
 const THUMB_CACHE_DIR =
   process.env.THUMB_CACHE_DIR || path.join(process.cwd(), '.cache', 'thumbs');
@@ -72,7 +73,9 @@ async function renderThumb(
     await sharp(abs)
       .rotate() // honor EXIF orientation (phone-shot clinical photos)
       .resize(width, width, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 70 })
+      // The 2048 editor proxy is used for actual framing decisions, so give it
+      // more headroom than the icon-sized grid thumbs.
+      .webp({ quality: width >= 2048 ? 78 : 70 })
       .toFile(tmpPath);
     await fs.rename(tmpPath, cachePath);
   } catch (err) {

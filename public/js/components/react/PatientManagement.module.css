@@ -37,66 +37,7 @@
 }
 
 /* ===================================
-   QUICK SEARCH SECTION
-   =================================== */
-.quickSearchContainer {
-    margin-bottom: var(--spacing-lg);
-    padding: var(--spacing-lg);
-    background-color: var(--blue-50);
-    border-radius: var(--radius-2xl);
-    border: var(--border-width-medium) solid var(--blue-300);
-}
-
-.quickSearchHeader {
-    display: flex;
-    align-items: center;
-    margin-bottom: var(--spacing-md);
-    gap: var(--spacing-sm);
-}
-
-.quickSearchHeader i {
-    color: var(--blue-300);
-    font-size: var(--font-size-xl);
-}
-
-.quickSearchHeader h3 {
-    margin: 0;
-    color: var(--info-700);
-    font-size: var(--font-size-lg);
-}
-
-.quickSearchDescription {
-    margin: 0 0 var(--spacing-md) 0;
-    color: var(--info-700);
-    font-size: var(--font-size-sm);
-}
-
-.quickSearchGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(var(--grid-min-column-width), 1fr));
-    gap: var(--spacing-md);
-}
-
-/* Quick search field labels */
-.quickSearchField label {
-    display: block;
-    margin-bottom: var(--spacing-sm);
-    font-weight: var(--font-weight-semibold);
-    font-size: var(--font-size-sm);
-    color: var(--gray-700);
-}
-
-/* ===================================
-   SECTION DIVIDER
-   =================================== */
-.sectionDivider {
-    margin: var(--spacing-xl) 0;
-    border: none;
-    border-top: var(--border-width-medium) solid var(--gray-200);
-}
-
-/* ===================================
-   ADVANCED SEARCH SECTION
+   SEARCH SECTION
    =================================== */
 .searchSectionHeader {
     margin-bottom: var(--spacing-md);
@@ -834,7 +775,6 @@
         padding: var(--spacing-md) var(--spacing-lg);
     }
 
-    .quickSearchGrid,
     .nameSearchGrid {
         grid-template-columns: 1fr;
     }
@@ -963,11 +903,6 @@
         font-size: var(--font-size-lg);
     }
 
-    /* Quick search - reduce padding */
-    .quickSearchContainer {
-        padding: var(--spacing-md);
-    }
-
     /* Load more - full width on mobile */
     .loadMoreBtn {
         width: 100%;
@@ -1003,15 +938,7 @@
         padding: var(--spacing-sm) var(--spacing-md);
     }
 
-    .quickSearchHeader h3 {
-        font-size: var(--font-size-base);
-    }
-
     /* Reduce padding in containers for better mobile spacing */
-    .quickSearchContainer {
-        padding: var(--spacing-sm);
-    }
-
     .nameSearchGrid {
         padding: var(--spacing-md);
     }
