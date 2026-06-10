@@ -10,6 +10,7 @@ import path from 'path';
 import { stat } from 'fs/promises';
 import { workingDir, workingFilePath } from './clinic-paths.js';
 import { resolveFileForServe, FileExplorerError } from './file-explorer.service.js';
+import { resolveStagedShare } from './share-stage.js';
 import { getFileMimeType } from '../../utils/file-mime.js';
 import type { SendFileRef } from '../../shared/contracts/localsend.contract.js';
 
@@ -30,6 +31,10 @@ export async function resolveShareRef(ref: SendFileRef): Promise<ResolvedShareFi
       name: ref.displayName || path.basename(abs),
       fileType: getFileMimeType(abs),
     };
+  }
+  if (ref.source === 'staged') {
+    // An ad-hoc image the browser generated and uploaded to the staging dir.
+    return resolveStagedShare(ref.ref, ref.displayName);
   }
   // patient-image — a rendered Dolphin view in the shared working/ dir.
   return resolveWorkingImage(ref);

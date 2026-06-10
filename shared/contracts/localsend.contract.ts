@@ -28,9 +28,13 @@ export const device = z.object({
 });
 export type LocalSendDevice = z.infer<typeof device>;
 
-/** One file the client wants pushed — resolved server-side to a disk path. */
+/**
+ * One file the client wants pushed — resolved server-side to a disk path.
+ * `staged` is an ad-hoc image the browser generated (e.g. the Compare montage)
+ * and uploaded via POST /api/share/stage; `ref` is then the returned token.
+ */
 export const sendFileRef = z.object({
-  source: z.enum(['patient-file', 'patient-image']),
+  source: z.enum(['patient-file', 'patient-image', 'staged']),
   personId: intId,
   ref: z.string().min(1),
   displayName: z.string().optional(),

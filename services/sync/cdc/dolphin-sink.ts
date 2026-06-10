@@ -66,9 +66,9 @@ export async function purgeDolphinPatient(personId: number): Promise<void> {
   const found = await pool
     .request()
     .input('oid', sql.VarChar, String(personId))
-    .query<{ pat_id: string }>('SELECT patID FROM DolphinPlatform.dbo.Patients WHERE patOtherID = @oid');
+    .query<{ patID: string }>('SELECT patID FROM DolphinPlatform.dbo.Patients WHERE patOtherID = @oid');
   if (found.recordset.length === 0) return; // nothing in Dolphin for this patient
-  const patID = found.recordset[0].pat_id;
+  const patID = found.recordset[0].patID;
 
   // Capture the GUIDs first (SELECT, not a DELETE…OUTPUT) — DolphinPlatform.dbo.TimePoints has
   // enabled triggers, and SQL Server forbids an OUTPUT clause without INTO on a triggered table.
@@ -177,9 +177,9 @@ export class DolphinSink implements SyncSink {
     const found = await pool
       .request()
       .input('oid', sql.VarChar, String(personId))
-      .query<{ pat_id: string }>('SELECT patID FROM DolphinPlatform.dbo.Patients WHERE patOtherID = @oid');
+      .query<{ patID: string }>('SELECT patID FROM DolphinPlatform.dbo.Patients WHERE patOtherID = @oid');
     if (found.recordset.length > 0) {
-      const id = found.recordset[0].pat_id;
+      const id = found.recordset[0].patID;
       this.patIdByPerson.set(personId, id);
       return id;
     }
@@ -202,20 +202,19 @@ export class DolphinSink implements SyncSink {
     // patStatusID — so patName/patIndexName/patStatusID/normID/patEntryDate/patNorm must all be set
     // or the row stays invisible in Dolphin's UI. (@fn/@ln bound as '' so SQL string concatenation
     // can't NULL-propagate the name away.)
-    const ins = await pool
+    await pool
       .request()
       .input('oid', sql.VarChar, String(personId))
       .input('fn', sql.VarChar, p.first_name ?? '')
       .input('ln', sql.VarChar, p.last_name ?? '')
       .input('g', sql.Char, gender)
       .input('bd', sql.DateTime, parseLocalDate(p.date_of_birth))
-      .query<{ pat_id: string }>(
+      .query(
         `INSERT INTO DolphinPlatform.dbo.Patients
            (patOtherID, patFirstName, patLastName,
             patName, patIndexName,
             patGender, patBirthdate,
             patStatusID, normID, patEntryDate, patNorm)
-         OUTPUT inserted.pat_id
          VALUES (@oid, @fn, @ln,
             COALESCE(@fn,'') + ' '  + COALESCE(@ln,''),
             COALESCE(@ln,'') + ', ' + COALESCE(@fn,''),
@@ -224,9 +223,16 @@ export class DolphinSink implements SyncSink {
             CAST('6F999E7E-D010-4C44-961B-14C66A322ACF' AS uniqueidentifier),
             GETDATE(), 0)`
       );
-    const id = ins.recordset[0].pat_id;
+    // patID is rowguidcol DEFAULT newid() (server-generated), and Patients has an enabled trigger
+    // (Patients_DTrig) → an OUTPUT clause without INTO is illegal here. Recover the new GUID by
+    // re-selecting on patOtherID (= our person_id, unique per Dolphin patient).
+    const back = await pool
+      .request()
+      .input('oid', sql.VarChar, String(personId))
+      .query<{ patID: string }>('SELECT patID FROM DolphinPlatform.dbo.Patients WHERE patOtherID = @oid');
+    const id = back.recordset[0].patID;
     this.patIdByPerson.set(personId, id);
-    log.info('[cdc:dolphin] created Dolphin patient', { personId, pat_id: id });
+    log.info('[cdc:dolphin] created Dolphin patient', { personId, patID: id });
     return id;
   }
 
@@ -324,11 +330,15 @@ export class DolphinSink implements SyncSink {
       .input('desc', sql.VarChar, tp_description ?? null)
       .input('dt', sql.DateTime, date)
       .query<{ tpID: string }>(
+        // TimePoints has an enabled trigger (Timepoints_DTrig) → OUTPUT without INTO is illegal;
+        // route the new tpID through an OUTPUT…INTO table variable instead.
         `DECLARE @code int = COALESCE(@appcode,
            ISNULL((SELECT MAX(TRY_CAST(tpCode AS int)) + 1 FROM DolphinPlatform.dbo.TimePoints WHERE patID = @pat), 0));
+         DECLARE @new TABLE (tpID uniqueidentifier);
          INSERT INTO DolphinPlatform.dbo.TimePoints (patID, tpCode, tpDescription, tpDateTime)
-         OUTPUT inserted.tpID
-         VALUES (@pat, CAST(@code AS varchar(12)), @desc, @dt);`
+         OUTPUT inserted.tpID INTO @new
+         VALUES (@pat, CAST(@code AS varchar(12)), @desc, @dt);
+         SELECT tpID FROM @new;`
       );
     const id = ins.recordset[0].tpID;
     await this.mapSet(TP, localPk, id);

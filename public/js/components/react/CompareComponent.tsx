@@ -9,9 +9,12 @@ import React, { useState, useEffect, useMemo, useCallback, useRef, ChangeEvent, 
 import { formatISODate } from '../../core/utils';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
-import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import { fetchJSON, postJSON, postFormData, httpErrorMessage } from '@/core/http';
 import * as patientContract from '@shared/contracts/patient.contract';
+import * as shareContract from '@shared/contracts/share.contract';
 import Modal from './Modal';
+import ShareSheet from './share/ShareSheet';
+import type { ShareSource } from './localsend/LocalSendShareModal';
 import styles from './CompareComponent.module.css';
 
 // Empirical: 4249×9798 (~42 MP) fails inside whatsapp-web.js; 2060×2700 (~5.6 MP) preset is offered.
@@ -274,7 +277,19 @@ const CompareComponent = ({ personId, phone }: Props) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const dragRef = useRef<DragState | null>(null);
     const isSharingRef = useRef(false);
+    const [shareSources, setShareSources] = useState<ShareSource[] | null>(null);
+    const [staging, setStaging] = useState(false);
     const canNativeShare = typeof navigator !== 'undefined' && 'share' in navigator && 'canShare' in navigator;
+    // Web Share exists on Windows desktop Chrome/Edge too (it opens the OS share
+    // charm), so feature detection alone can't tell a phone from a desktop. Gate
+    // native share on an actual touch/mobile device; desktop falls through to the
+    // in-app ShareSheet (LocalSend / Telegram), matching the Files page.
+    const isMobileDevice = typeof navigator !== 'undefined'
+        && (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+            || (navigator.maxTouchPoints > 0
+                && typeof window !== 'undefined'
+                && window.matchMedia('(pointer: coarse)').matches));
+    const useNativeShare = canNativeShare && isMobileDevice;
     const [displaySize, setDisplaySize] = useState<{ width: number; height: number }>({ width: 800, height: 600 });
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [, setBoxVersion] = useState(0);
@@ -366,6 +381,44 @@ const CompareComponent = ({ personId, phone }: Props) => {
         } catch (err) {
             toast.error('Failed to share: ' + (err instanceof Error ? err.message : 'Unknown error'));
             isSharingRef.current = false;
+        }
+    };
+
+    // Single share entry point. Mobile → OS share sheet (like the photos page);
+    // desktop → in-app ShareSheet with LocalSend / Telegram (like the Files page).
+    // The transports resolve files by an on-disk path, so the canvas montage is
+    // first uploaded to the staging endpoint and shared by the returned ref.
+    const handleShareClick = async () => {
+        if (!comparison || comparison.images.length < 2) {
+            toast.warning('Select two timepoints and a photo type first');
+            return;
+        }
+        if (useNativeShare) {
+            handleShare();
+            return;
+        }
+        if (!personId) {
+            toast.error('No patient selected');
+            return;
+        }
+        try {
+            setStaging(true);
+            const blob = dataURItoBlob(comparison.toDataURL());
+            const fileName = buildExportFileName();
+            const fd = new FormData();
+            fd.append('image', blob, fileName);
+            fd.append('personId', String(personId));
+            fd.append('displayName', fileName);
+            const staged = await postFormData<shareContract.StageResponse>(
+                '/api/share/stage',
+                fd,
+                { schema: shareContract.stage.response },
+            );
+            setShareSources([{ source: 'staged', personId, ref: staged.ref, displayName: staged.displayName }]);
+        } catch (err) {
+            toast.error(httpErrorMessage(err, 'Failed to prepare the image for sharing'));
+        } finally {
+            setStaging(false);
         }
     };
 
@@ -946,11 +999,18 @@ const CompareComponent = ({ personId, phone }: Props) => {
         loadTimepoints();
     }, [loadTimepoints]);
 
+    // Re-run once the canvas actually mounts. On first render the component sits
+    // behind the `loading && timepoints.length === 0` spinner, so canvasRef is
+    // null and init is skipped. Without `loading`/`timepoints.length` in the deps
+    // the effect never re-runs when the spinner clears and the canvas appears,
+    // leaving `comparison` null forever — loadImages then never fires, so the
+    // canvas stays blank under a misleading "Ready!" banner. The `!comparison`
+    // guard keeps the extra runs idempotent.
     useEffect(() => {
         if (canvasRef.current && !comparison) {
             initializeComparison();
         }
-    }, [comparison, initializeComparison]);
+    }, [comparison, initializeComparison, loading, timepoints.length]);
 
     useEffect(() => {
         if (selectedTimepoints.length === 2 && selectedPhotoType) {
@@ -1422,18 +1482,17 @@ const CompareComponent = ({ personId, phone }: Props) => {
                     className={isFullscreen ? styles.canvasPanelFullscreen : styles.canvasPanel}
                 >
                     <div className={cn(styles.canvasToolbar, slideshowActive && styles.canvasToolbarHidden)}>
-                        {canNativeShare && (
-                            <button
-                                onClick={handleShare}
-                                title="Share comparison"
-                                aria-label="Share comparison"
-                                className={styles.toolbarButton}
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                    <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" />
-                                </svg>
-                            </button>
-                        )}
+                        <button
+                            onClick={handleShareClick}
+                            disabled={!isReady || staging}
+                            title={useNativeShare ? 'Share comparison' : 'Share comparison (LocalSend / Telegram)'}
+                            aria-label="Share comparison"
+                            className={styles.toolbarButton}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" />
+                            </svg>
+                        </button>
                         {(() => {
                             const canSlideshow = selectedTimepoints.length === 2 && availablePhotoTypes.length > 0;
                             return (
@@ -1794,6 +1853,12 @@ const CompareComponent = ({ personId, phone }: Props) => {
                     </div>
                 </div>
             </div>
+
+            <ShareSheet
+                open={!!shareSources}
+                sources={shareSources ?? []}
+                onClose={() => setShareSources(null)}
+            />
 
             <Modal
                 isOpen={showWhatsAppModal}

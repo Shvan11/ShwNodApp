@@ -26,8 +26,9 @@ function normalizePath(dbPath: string): string {
   const isWSL = process.platform === 'linux';
 
   if (isWSL) {
-    if (normalizedPath.startsWith('\\\\CLINIC\\ovideos')) {
-      normalizedPath = normalizedPath.replace('\\\\CLINIC\\ovideos', '/mnt/c/ovideos');
+    // Convert UNC share path \\CLINIC\Clinic1\ to /mnt/c/clinic1/ (see api/video.routes.ts)
+    if (normalizedPath.startsWith('\\\\CLINIC\\Clinic1')) {
+      normalizedPath = normalizedPath.replace('\\\\CLINIC\\Clinic1', '/mnt/c/clinic1');
     } else if (/^[A-Za-z]:\\/.test(normalizedPath)) {
       const driveLetter = normalizedPath.charAt(0).toLowerCase();
       normalizedPath = normalizedPath.replace(/^[A-Za-z]:\\/, `/mnt/${driveLetter}/`);

@@ -81,11 +81,16 @@ const upload = multer({
 type VideoIdParams = videoContract.VideoIdParams;
 
 /**
- * Convert Windows/UNC path from database to WSL-compatible path
+ * Convert the DB-stored absolute video path to a WSL-compatible path.
  *
- * Database path: \\CLINIC\ovideos\filename.mp4
- * Windows local: C:\ovideos\filename.mp4
- * WSL path:      /mnt/c/ovideos/filename.mp4
+ * `VideosPath` now stores a LOCAL path — the ovideos folder was moved under
+ * clinic1 alongside the patient files. Videos stream *through* this server
+ * (`/api/videos/:id/stream`), never opened client-side, so it follows the
+ * "server access is LOCAL, not SMB" rule rather than staying a UNC pointer.
+ *
+ * Database path:   C:\clinic1\ovideos\filename.mp4
+ * UNC (LAN share): \\CLINIC\Clinic1\ovideos\filename.mp4
+ * WSL path:        /mnt/c/clinic1/ovideos/filename.mp4
  */
 function normalizePath(dbPath: string): string {
   let normalizedPath = dbPath;
@@ -94,12 +99,11 @@ function normalizePath(dbPath: string): string {
   const isWSL = process.platform === 'linux';
 
   if (isWSL) {
-    // Convert UNC path \\CLINIC\ovideos\ to /mnt/c/ovideos/
-    // The UNC path starts with two backslashes (\\CLINIC)
-    if (normalizedPath.startsWith('\\\\CLINIC\\ovideos')) {
-      normalizedPath = normalizedPath.replace('\\\\CLINIC\\ovideos', '/mnt/c/ovideos');
+    // Convert UNC share path \\CLINIC\Clinic1\ to /mnt/c/clinic1/
+    if (normalizedPath.startsWith('\\\\CLINIC\\Clinic1')) {
+      normalizedPath = normalizedPath.replace('\\\\CLINIC\\Clinic1', '/mnt/c/clinic1');
     }
-    // Convert Windows path C:\ovideos\ to /mnt/c/ovideos/
+    // Convert Windows path C:\... to /mnt/c/...
     else if (/^[A-Za-z]:\\/.test(normalizedPath)) {
       const driveLetter = normalizedPath.charAt(0).toLowerCase();
       normalizedPath = normalizedPath.replace(/^[A-Za-z]:\\/, `/mnt/${driveLetter}/`);

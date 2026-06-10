@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStandItemByBarcode, useStandSaleMutations } from '../hooks/useStand';
 import type { StandItem } from '../hooks/useStand';
 import BarcodeInput from '../components/stand/BarcodeInput';
@@ -18,6 +19,7 @@ interface CartItem {
 
 export default function StandPOS() {
   const toast = useToast();
+  const navigate = useNavigate();
   const { lookupByBarcode } = useStandItemByBarcode();
   const { createSale, loading: saleLoading } = useStandSaleMutations();
 
@@ -153,9 +155,14 @@ export default function StandPOS() {
                 Change: {formatNumber(lastSale.change)} IQD
               </div>
             )}
-            <button className="btn btn-primary" onClick={() => setLastSale(null)}>
-              New Sale
-            </button>
+            <div className={styles.successActions}>
+              <button className="btn btn-secondary" onClick={() => navigate('/stand')}>
+                Back to Stand
+              </button>
+              <button className="btn btn-primary" onClick={() => setLastSale(null)}>
+                New Sale
+              </button>
+            </div>
         </Modal>
       )}
     </div>

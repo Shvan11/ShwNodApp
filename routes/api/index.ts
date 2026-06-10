@@ -56,6 +56,7 @@ import standRoutes from './stand.routes.js';
 import fileExplorerRoutes from './file-explorer.routes.js';
 import localsendRoutes from './localsend.routes.js';
 import telegramRoutes from './telegram.routes.js';
+import shareRoutes from './share.routes.js';
 import integrationsRoutes from './integrations.routes.js';
 
 // Import template routes (already modular)
@@ -139,6 +140,9 @@ router.use('/localsend', localsendRoutes);
 
 // Telegram — share patient files/images to a contact via Telegram (mounted at /telegram)
 router.use('/telegram', telegramRoutes);
+
+// Share staging — persist browser-generated images so the targets above can send them
+router.use('/share', shareRoutes);
 
 // Integrations — manage external-service auth (Telegram now; WhatsApp/Google later)
 router.use('/integrations', integrationsRoutes);

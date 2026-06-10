@@ -108,6 +108,13 @@
   margin: var(--spacing-md) 0;
 }
 
+.successActions {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: center;
+  margin-top: var(--spacing-md);
+}
+
 @media (max-width: 768px) {
   .posContainer {
     padding: var(--spacing-md);
