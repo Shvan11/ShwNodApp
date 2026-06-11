@@ -188,7 +188,11 @@
     --border-width-thick: 3px;
 
     /* Font settings */
-    --font-primary: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /* 'Noto Sans Arabic' leads the stack but is unicode-range-confined to Arabic
+       glyphs (see css/base/fonts.css) — Latin text still resolves to system-ui.
+       Listed first so Arabic renders in Noto consistently even in the English UI;
+       appended last it would always lose to Segoe UI for shared codepoints. */
+    --font-primary: 'Noto Sans Arabic', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-family-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
     --font-size-xs: 0.75rem;
     /* 12px */

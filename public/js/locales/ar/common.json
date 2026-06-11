@@ -1,0 +1,17 @@
+{
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "appointments": "المواعيد",
+    "search": "بحث"
+  },
+  "theme": {
+    "light": "فاتح",
+    "dark": "داكن",
+    "switchToTitle": "التبديل إلى الوضع {{mode}}",
+    "toggleAria": "الوضع {{current}}. فعّل للتبديل إلى الوضع {{next}}."
+  },
+  "language": {
+    "label": "اللغة",
+    "description": "لغة عرض التطبيق. تُحفظ على هذا الجهاز فقط."
+  }
+}

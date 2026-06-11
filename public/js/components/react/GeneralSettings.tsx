@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import cn from 'classnames';
 import Modal from './Modal';
 import storage from '../../core/storage';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemePreference } from '../../core/theme';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { LANGUAGES, type Language } from '../../core/language';
 import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
 import * as settings from '@shared/contracts/settings.contract';
 import styles from './SettingsSection.module.css';
@@ -14,6 +17,12 @@ const THEME_OPTIONS: ReadonlyArray<{ value: ThemePreference; label: string; icon
     { value: 'dark', label: 'Dark', icon: 'fas fa-moon' },
     { value: 'auto', label: 'Auto (follow system)', icon: 'fas fa-circle-half-stroke' },
 ];
+
+// Languages derived from the registry; own-script names shown deliberately
+// untranslated (a speaker recognizes "العربية", not the word "Arabic").
+const LANGUAGE_OPTIONS: ReadonlyArray<{ value: Language; nativeLabel: string }> = (
+    Object.keys(LANGUAGES) as Language[]
+).map((value) => ({ value, nativeLabel: LANGUAGES[value].nativeLabel }));
 
 interface OptionsMap {
     [key: string]: string;
@@ -37,6 +46,8 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     const [chairIdInput, setChairIdInput] = useState<string>(storage.chairId() ?? '');
     const [chairIdSaved, setChairIdSaved] = useState<string | null>(storage.chairId());
     const { preference: themePreference, setPreference: setThemePreference } = useTheme();
+    const { language, setLanguage } = useLanguage();
+    const { t } = useTranslation('common');
 
     const loadSettings = useCallback(async () => {
         setIsLoading(true);
@@ -312,6 +323,33 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                     </div>
                     <div className={styles.settingDescription}>
                         Light, dark, or follow your device's system setting. Saved on this PC only.
+                    </div>
+                </div>
+
+                <div className={styles.settingGroup}>
+                    <label>{t('language.label')}</label>
+                    <div className={styles.themeRadioGroup} role="radiogroup" aria-label={t('language.label')}>
+                        {LANGUAGE_OPTIONS.map((opt) => (
+                            <label
+                                key={opt.value}
+                                className={cn(
+                                    styles.themeRadioOption,
+                                    language === opt.value && styles.themeRadioOptionActive
+                                )}
+                            >
+                                <input
+                                    type="radio"
+                                    name="language-preference"
+                                    value={opt.value}
+                                    checked={language === opt.value}
+                                    onChange={() => setLanguage(opt.value)}
+                                />
+                                <span>{opt.nativeLabel}</span>
+                            </label>
+                        ))}
+                    </div>
+                    <div className={styles.settingDescription}>
+                        {t('language.description')}
                     </div>
                 </div>
             </section>

@@ -1,0 +1,67 @@
+{
+  "cards": {
+    "calendar": {
+      "title": "Calendar",
+      "description": "View and manage monthly appointments",
+      "linkText": "Open Calendar"
+    },
+    "appointments": {
+      "title": "Today's Appointments",
+      "description": "View today's scheduled appointments",
+      "linkText": "View Appointments"
+    },
+    "searchPatients": {
+      "title": "Search Patients",
+      "description": "Quick search and patient management",
+      "linkText": "Search Patients"
+    },
+    "whatsapp": {
+      "title": "WhatsApp Messages",
+      "description": "Send appointment reminders and follow-ups",
+      "linkText": "Send Messages"
+    },
+    "aligners": {
+      "title": "Aligner Management",
+      "description": "Manage aligner sets and delivery batches",
+      "linkText": "Manage Aligners"
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "System settings and preferences",
+      "linkText": "Open Settings"
+    },
+    "videos": {
+      "title": "Videos",
+      "description": "Educational videos for patients",
+      "linkText": "Watch Videos"
+    },
+    "expenses": {
+      "title": "Expense Management",
+      "description": "Track and manage clinic expenses",
+      "linkText": "Manage Expenses"
+    },
+    "templates": {
+      "title": "Document Templates",
+      "description": "Manage receipts, invoices, and prescription templates",
+      "linkText": "Manage Templates"
+    },
+    "stand": {
+      "title": "Stand / Mini Pharmacy",
+      "description": "Inventory, POS sales, and reports for the retail stand",
+      "linkText": "Open Stand"
+    },
+    "statistics": {
+      "title": "Financial Statistics",
+      "description": "View clinic reports and financial analytics",
+      "linkText": "View Statistics"
+    },
+    "addPatient": {
+      "title": "Add New Patient",
+      "description": "Register a new patient in the system",
+      "linkText": "Add Patient"
+    }
+  },
+  "footer": {
+    "copyright": "© {{year}} Shwan Orthodontics - All Rights Reserved"
+  }
+}

@@ -3,6 +3,7 @@ import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
+import i18next from 'eslint-plugin-i18next';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
@@ -162,6 +163,35 @@ export default [
     files: ['public/js/core/http.ts'],
     rules: {
       'no-restricted-syntax': 'off'
+    }
+  },
+  // i18n ratchet (lock-in): translated surfaces forbid hardcoded user-facing
+  // strings. The `files` list IS the ratchet — every later i18n plan APPENDS its
+  // newly-translated files here, so a raw string sneaking back in fails CI.
+  // `mode: 'jsx-only'` checks JSX text + the user-facing DOM attributes
+  // (placeholder/alt/aria-label/value/title — the plugin's built-in blacklistAttrs;
+  // className/id/aria-hidden/role on DOM tags are auto-allowed). The brand
+  // 'Shwan Orthodontics' stays untranslated, so it's allowed via words.exclude —
+  // which also re-states the plugin's default punctuation/ALL-CAPS excludes, because
+  // the options merge is a shallow `_.defaults` (a provided `words` REPLACES the
+  // default wholesale rather than extending it). These files inherit the tsparser
+  // languageOptions from the frontend block above (their globs are a subset of it).
+  {
+    files: [
+      'public/js/routes/Dashboard.tsx',
+      'public/js/components/react/UniversalHeader.tsx'
+    ],
+    plugins: {
+      i18next
+    },
+    rules: {
+      'i18next/no-literal-string': [
+        'error',
+        {
+          mode: 'jsx-only',
+          words: { exclude: ['[0-9!-/:-@[-`{-~]+', '[A-Z_-]+', 'Shwan Orthodontics'] }
+        }
+      ]
     }
   },
   // JavaScript config/utility files

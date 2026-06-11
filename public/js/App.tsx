@@ -18,6 +18,7 @@
 // Base styles - Design system foundation
 // Two-tier design tokens: primitive (fixed) → semantic (light) → theme-dark
 // (dark overrides, @media screen). Order matters — dark must follow semantic.
+import '../css/base/fonts.css';
 import '../css/base/reset.css';
 import '../css/base/tokens-primitive.css';
 import '../css/base/tokens-semantic.css';

@@ -1,5 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- dir="ltr" is defensive: postcss-rtlcss runs in override mode (LTR rules are
+     unscoped, [dir="rtl"] overrides are appended), so a dir-less page is already
+     inert — this makes the portal's LTR intent explicit regardless. -->
+<html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">

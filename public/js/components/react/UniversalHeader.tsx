@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalState, type UserData } from '../../contexts/GlobalStateContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -52,6 +53,7 @@ interface NavigationItem {
 const UniversalHeader = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { t } = useTranslation('common');
     const { setUser } = useGlobalState();
     const { resolvedTheme, setPreference } = useTheme();
     const nextTheme: ResolvedTheme = resolvedTheme === 'dark' ? 'light' : 'dark';
@@ -203,21 +205,21 @@ const UniversalHeader = () => {
         return [
             {
                 key: 'dashboard',
-                label: 'Dashboard',
+                label: t('nav.dashboard'),
                 icon: 'fas fa-home',
                 onClick: navigateToDashboard,
                 isActive: location.pathname === '/' || location.pathname === '/dashboard'
             },
             {
                 key: 'appointments',
-                label: 'Appointments',
+                label: t('nav.appointments'),
                 icon: 'fas fa-calendar-alt',
                 onClick: navigateToAppointments,
                 isActive: location.pathname.includes('/appointment')
             },
             {
                 key: 'search',
-                label: 'Search',
+                label: t('nav.search'),
                 icon: 'fas fa-search',
                 onClick: navigateToPatientManagement,
                 isActive: location.pathname.includes('/patient-management')
@@ -273,8 +275,11 @@ const UniversalHeader = () => {
                         type="button"
                         className="theme-toggle-btn"
                         onClick={() => setPreference(nextTheme)}
-                        aria-label={`${resolvedTheme === 'dark' ? 'Dark' : 'Light'} mode. Activate to switch to ${nextTheme} mode.`}
-                        title={`Switch to ${nextTheme} mode`}
+                        aria-label={t('theme.toggleAria', {
+                            current: t(`theme.${resolvedTheme}`),
+                            next: t(`theme.${nextTheme}`),
+                        })}
+                        title={t('theme.switchToTitle', { mode: t(`theme.${nextTheme}`) })}
                     >
                         <i className={RESOLVED_ICON[resolvedTheme]} aria-hidden="true" />
                     </button>

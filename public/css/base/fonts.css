@@ -1,0 +1,36 @@
+/**
+ * Self-hosted Arabic webfont — Noto Sans Arabic (Google Fonts, Arabic subset).
+ *
+ * Imported from App.tsx so Vite resolves + content-hashes the woff2 url()s
+ * (publicDir is disabled — entering via CSS url() is the required path; the
+ * files live in public/assets/fonts/ and are NOT statically served).
+ *
+ * The `unicode-range` confines this face to Arabic-script codepoints, so the
+ * browser only downloads it when Arabic glyphs are actually painted and Latin
+ * text keeps resolving down the --font-primary stack to system-ui. That's why
+ * 'Noto Sans Arabic' is listed FIRST in --font-primary (tokens-primitive.css):
+ * unicode-range scoping means it never competes for Latin glyphs, and Arabic
+ * patient names then render in it consistently even while the UI is English.
+ *
+ * font-display: swap — show fallback immediately, swap in Noto when it arrives
+ * (no invisible-text flash).
+ */
+@font-face {
+  font-family: 'Noto Sans Arabic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../../assets/fonts/NotoSansArabic-Regular.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+08A0-08FF, U+FB50-FDFF,
+    U+FE70-FEFF;
+}
+
+@font-face {
+  font-family: 'Noto Sans Arabic';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../../assets/fonts/NotoSansArabic-Bold.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+08A0-08FF, U+FB50-FDFF,
+    U+FE70-FEFF;
+}

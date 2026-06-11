@@ -264,3 +264,19 @@
         transition: transform 0.1s;
     }
 }
+
+/* RTL: the card-footer arrow is a CDN Font Awesome glyph that postcss-rtlcss
+   can't reach, so flip it by hand to point inline-start. postcss-rtlcss DOES
+   auto-flip the hover nudge (transform: translateX(3px) → translateX(-3px)),
+   but that generated rule outranks a bare base flip and would un-mirror the
+   arrow on hover — so the hover state is re-stated here with scaleX(-1) FIRST
+   (translate then happens in the mirrored frame) and placed LAST in the file so
+   it beats the generated override on the source-order tie. These prefixed rules
+   are skipped by postcss-rtlcss (ignorePrefixedRules: true). */
+[dir="rtl"] .cardFooter i {
+    transform: scaleX(-1);
+}
+
+[dir="rtl"] .cardLink:hover .cardFooter i {
+    transform: scaleX(-1) translateX(3px);
+}

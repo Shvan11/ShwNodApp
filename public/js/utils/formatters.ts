@@ -2,6 +2,7 @@
  * Money Formatting Utilities
  * Used application-wide for consistent number formatting with thousands separators
  */
+import { getActiveLanguageMeta } from '../core/language';
 
 /**
  * Format a number with thousands separators
@@ -12,7 +13,10 @@ export const formatNumber = (value: number | string | null | undefined): string 
   if (value === null || value === undefined || value === '') return '';
   const num = parseFloat(String(value));
   if (isNaN(num)) return '';
-  return Math.round(num).toLocaleString('en-US');
+  // numberLocale is 'en-US' for BOTH languages (Latin digits + ',' grouping), so
+  // this is behavior-identical today — but the registry is now the single point
+  // to flip number formatting per-language in future without touching call sites.
+  return Math.round(num).toLocaleString(getActiveLanguageMeta().numberLocale);
 };
 
 /**

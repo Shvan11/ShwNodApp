@@ -7,14 +7,17 @@
     <title>Shwan Orthodontics - Practice Management</title>
 
     <!--
-      Theme FOUC guard — runs BEFORE the inline <style> blocks and the CSS
-      bundles, so the very first paint already has the right data-theme. The
-      stored key is written RAW by core/storage.ts (String(value), not JSON),
-      so we read it back with a plain getItem and no JSON.parse. Keep this in
-      sync with public/js/core/theme.ts (THEME_STORAGE_KEY = 'shwan_theme').
+      Theme + language FOUC guard — runs BEFORE the inline <style> blocks and the
+      CSS bundles, so the very first paint already has the right data-theme AND
+      the right lang/dir (RTL layout never flashes LTR on reload). Both stored
+      keys are written RAW by core/storage.ts (String(value), not JSON), so we
+      read them back with a plain getItem and no JSON.parse. Keep in sync with
+      public/js/core/theme.ts (THEME_STORAGE_KEY = 'shwan_theme') and
+      public/js/core/language.ts (LANGUAGE_STORAGE_KEY = 'shwan_language').
     -->
     <script>
       (function () {
+        // Theme
         var pref = 'auto';
         try { pref = localStorage.getItem('shwan_theme') || 'auto'; } catch (e) {}
         if (pref !== 'light' && pref !== 'dark' && pref !== 'auto') pref = 'light';
@@ -24,6 +27,13 @@
         document.documentElement.setAttribute('data-theme', resolved);
         var meta = document.querySelector('meta[name="theme-color"]');
         if (meta) meta.setAttribute('content', resolved === 'dark' ? '#11151c' : '#667eea');
+
+        // Language — whitelist en|ar (default en), set lang + dir pre-paint.
+        var lang = 'en';
+        try { lang = localStorage.getItem('shwan_language') || 'en'; } catch (e) {}
+        if (lang !== 'en' && lang !== 'ar') lang = 'en';
+        document.documentElement.setAttribute('lang', lang);
+        document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
       })();
     </script>
 

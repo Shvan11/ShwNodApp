@@ -14,6 +14,7 @@ import { Suspense, useState, useCallback } from 'react';
 import { Outlet, ScrollRestoration, Location } from 'react-router-dom';
 import { GlobalStateProvider } from '../contexts/GlobalStateContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
+import { LanguageProvider } from '../contexts/LanguageContext';
 import { ToastProvider } from '../contexts/ToastContext';
 import { PrintQueueProvider, usePrintQueue } from '../contexts/PrintQueueContext';
 import { ConfirmProvider } from '../contexts/ConfirmContext';
@@ -103,15 +104,17 @@ function RootLayoutInner() {
 export function RootLayout() {
   return (
     <ThemeProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <GlobalStateProvider>
-            <PrintQueueProvider>
-              <RootLayoutInner />
-            </PrintQueueProvider>
-          </GlobalStateProvider>
-        </ConfirmProvider>
-      </ToastProvider>
+      <LanguageProvider>
+        <ToastProvider>
+          <ConfirmProvider>
+            <GlobalStateProvider>
+              <PrintQueueProvider>
+                <RootLayoutInner />
+              </PrintQueueProvider>
+            </GlobalStateProvider>
+          </ConfirmProvider>
+        </ToastProvider>
+      </LanguageProvider>
     </ThemeProvider>
   );
 }

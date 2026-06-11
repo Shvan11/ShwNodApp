@@ -1,0 +1,17 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "appointments": "Appointments",
+    "search": "Search"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "switchToTitle": "Switch to {{mode}} mode",
+    "toggleAria": "{{current}} mode. Activate to switch to {{next}} mode."
+  },
+  "language": {
+    "label": "Language",
+    "description": "Display language for this app. Saved on this PC only."
+  }
+}

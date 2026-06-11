@@ -1,22 +1,39 @@
 /* RTL (Right-to-Left) Support - Kurdish/Arabic Language Support */
 
+/*
+ * ⚠️ MIGRATION NOTE (i18n plan): these hand-written [dir="rtl"] rules PREDATE
+ * postcss-rtlcss. Now that <html dir="rtl"> is real and postcss-rtlcss (override
+ * mode) auto-generates physical-property flips (margin/padding/left/right/
+ * text-align/float…) from every base rule, most rules below are redundant — and
+ * a few are actively HARMFUL: a manual `flex-direction: row-reverse` DOUBLE-
+ * reverses a flex row that dir="rtl" already mirrors, flipping it back to LTR.
+ * They are pruned per-surface as each screen is QA'd for Arabic. Only the
+ * Universal Header + Dashboard are QA'd in this plan; every rule below the
+ * header block is still DORMANT and unreviewed — don't rely on it.
+ * postcss-rtlcss skips these prefixed rules (ignorePrefixedRules: true), so they
+ * coexist with the generated overrides without being reprocessed.
+ */
+
 /* Base direction toggle (moved here from the old variables.css). */
 [dir="rtl"] {
     direction: rtl;
 }
 
-/* Universal Header RTL Adjustments */
-[dir="rtl"] .universal-header .header-left {
-    flex-direction: row-reverse;
+/* ── Universal Header (QA'd for RTL in the i18n pilot) ──────────────────────
+   The `.header-left` and `.main-navigation` `flex-direction: row-reverse` rules
+   were DELETED here: both are `display: flex` rows that dir="rtl" already
+   mirrors, so reversing again put them back in LTR order. Font Awesome is CDN
+   CSS (bypasses postcss-rtlcss), so the directional back-arrow is flipped by
+   hand. */
+[dir="rtl"] .universal-header .fa-arrow-left {
+    transform: scaleX(-1);
 }
 
+/* Dormant (predates postcss-rtlcss; the base .logo-section margin is already
+   auto-flipped — kept only until the header is fully pruned in a later plan). */
 [dir="rtl"] .logo-section {
     margin-right: 0;
     margin-left: var(--spacing-xl);
-}
-
-[dir="rtl"] .main-navigation {
-    flex-direction: row-reverse;
 }
 
 /* Drawer/Modal RTL Adjustments */

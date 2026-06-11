@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import AnalogClock from '../components/react/AnalogClock';
 import { VISIBILITY_RESUME_THRESHOLD_MS } from '../constants/sse-liveness';
 import { applyResolvedTheme, getStoredThemePreference, resolveTheme } from '../core/theme';
+import { applyLanguageAttributes, getStoredLanguagePreference } from '../core/language';
 import styles from './ChairDisplay.module.css';
 
 interface ImageEntry {
@@ -54,13 +55,18 @@ const ChairDisplay = () => {
     const esRef = useRef<EventSource | null>(null);
     const hiddenSinceRef = useRef<number | null>(null);
 
-    // The kiosk is pinned to LIGHT regardless of the operator's device theme.
-    // ChairDisplay lives outside RootLayout (no ThemeProvider), but the FOUC
-    // script sets data-theme on <html> on every route — so force light on mount
-    // and restore the stored preference on unmount (navigating back into the app).
+    // The kiosk is pinned to LIGHT + LTR regardless of the operator's device
+    // theme/language. ChairDisplay lives outside RootLayout (no Theme/Language
+    // provider), but the FOUC script sets data-theme + lang/dir on <html> on
+    // every route — so force light + LTR on mount and restore the stored
+    // preferences on unmount (navigating back into the app).
     useLayoutEffect(() => {
         applyResolvedTheme('light');
-        return () => applyResolvedTheme(resolveTheme(getStoredThemePreference()));
+        applyLanguageAttributes('en');
+        return () => {
+            applyResolvedTheme(resolveTheme(getStoredThemePreference()));
+            applyLanguageAttributes(getStoredLanguagePreference());
+        };
     }, []);
 
     useEffect(() => {

@@ -1,19 +1,32 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { MouseEvent } from 'react';
 
 // Dashboard styles - CSS Module
 import styles from './Dashboard.module.css';
 
-interface DashboardCard {
-  title: string;
-  description: string;
-  icon: string;
-  link: string;
-  linkText: string;
-}
+// Presentation-stable card definitions (icon + route). The human-readable
+// strings live in the `dashboard` catalog, keyed by `key`. `as const` keeps each
+// `key` a literal so the t(`dashboard:cards.${card.key}.title`) template-literal
+// keys stay fully compile-checked against the English catalog.
+const DASHBOARD_CARDS = [
+  { key: 'calendar', icon: 'fas fa-calendar-alt', link: '/calendar' },
+  { key: 'appointments', icon: 'fas fa-clock', link: '/appointments' },
+  { key: 'searchPatients', icon: 'fas fa-search', link: '/patient-management' },
+  { key: 'whatsapp', icon: 'fab fa-whatsapp', link: '/send' },
+  { key: 'aligners', icon: 'fas fa-tooth', link: '/aligner' },
+  { key: 'settings', icon: 'fas fa-cog', link: '/settings' },
+  { key: 'videos', icon: 'fas fa-video', link: '/videos' },
+  { key: 'expenses', icon: 'fas fa-money-bill-wave', link: '/expenses' },
+  { key: 'templates', icon: 'fas fa-file-alt', link: '/templates' },
+  { key: 'stand', icon: 'fas fa-store', link: '/stand' },
+  { key: 'statistics', icon: 'fas fa-chart-bar', link: '/statistics' },
+  { key: 'addPatient', icon: 'fas fa-user-plus', link: '/patient/new/add' },
+] as const;
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { t } = useTranslation('dashboard');
 
   const handleCardClick = (e: MouseEvent<HTMLAnchorElement>, link: string) => {
     e.preventDefault();
@@ -45,101 +58,14 @@ export default function Dashboard() {
     }
   };
 
-  const dashboardCards: DashboardCard[] = [
-    {
-      title: 'Calendar',
-      description: 'View and manage monthly appointments',
-      icon: 'fas fa-calendar-alt',
-      link: '/calendar',
-      linkText: 'Open Calendar'
-    },
-    {
-      title: "Today's Appointments",
-      description: "View today's scheduled appointments",
-      icon: 'fas fa-clock',
-      link: '/appointments',
-      linkText: 'View Appointments'
-    },
-    {
-      title: 'Search Patients',
-      description: 'Quick search and patient management',
-      icon: 'fas fa-search',
-      link: '/patient-management',
-      linkText: 'Search Patients'
-    },
-    {
-      title: 'WhatsApp Messages',
-      description: 'Send appointment reminders and follow-ups',
-      icon: 'fab fa-whatsapp',
-      link: '/send',
-      linkText: 'Send Messages'
-    },
-    {
-      title: 'Aligner Management',
-      description: 'Manage aligner sets and delivery batches',
-      icon: 'fas fa-tooth',
-      link: '/aligner',
-      linkText: 'Manage Aligners'
-    },
-    {
-      title: 'Settings',
-      description: 'System settings and preferences',
-      icon: 'fas fa-cog',
-      link: '/settings',
-      linkText: 'Open Settings'
-    },
-    {
-      title: 'Videos',
-      description: 'Educational videos for patients',
-      icon: 'fas fa-video',
-      link: '/videos',
-      linkText: 'Watch Videos'
-    },
-    {
-      title: 'Expense Management',
-      description: 'Track and manage clinic expenses',
-      icon: 'fas fa-money-bill-wave',
-      link: '/expenses',
-      linkText: 'Manage Expenses'
-    },
-    {
-      title: 'Document Templates',
-      description: 'Manage receipts, invoices, and prescription templates',
-      icon: 'fas fa-file-alt',
-      link: '/templates',
-      linkText: 'Manage Templates'
-    },
-    {
-      title: 'Stand / Mini Pharmacy',
-      description: 'Inventory, POS sales, and reports for the retail stand',
-      icon: 'fas fa-store',
-      link: '/stand',
-      linkText: 'Open Stand'
-    },
-    {
-      title: 'Financial Statistics',
-      description: 'View clinic reports and financial analytics',
-      icon: 'fas fa-chart-bar',
-      link: '/statistics',
-      linkText: 'View Statistics'
-    },
-    {
-      title: 'Add New Patient',
-      description: 'Register a new patient in the system',
-      icon: 'fas fa-user-plus',
-      link: '/patient/new/add',
-      linkText: 'Add Patient'
-    }
-  ];
-
   return (
     <div id="app">
       <main className={styles.mainContent}>
         <div className={styles.container}>
           <div className={styles.dashboardGrid}>
-            {dashboardCards.map((card, index) => (
+            {DASHBOARD_CARDS.map((card) => (
               <a
-                key={index}
+                key={card.key}
                 href={card.link}
                 className={styles.cardLink}
                 onClick={(e) => handleCardClick(e, card.link)}
@@ -148,10 +74,10 @@ export default function Dashboard() {
                   <div className={styles.cardIcon}>
                     <i className={card.icon}></i>
                   </div>
-                  <h3>{card.title}</h3>
-                  <p>{card.description}</p>
+                  <h3>{t(`cards.${card.key}.title`)}</h3>
+                  <p>{t(`cards.${card.key}.description`)}</p>
                   <div className={styles.cardFooter}>
-                    <span>{card.linkText}</span>
+                    <span>{t(`cards.${card.key}.linkText`)}</span>
                     <i className="fas fa-arrow-right"></i>
                   </div>
                 </div>
@@ -163,7 +89,7 @@ export default function Dashboard() {
 
       <footer className={styles.footer}>
         <div className={styles.container}>
-          <p>&copy; 2024 Shwan Orthodontics - All Rights Reserved</p>
+          <p>{t('footer.copyright', { year: new Date().getFullYear() })}</p>
         </div>
       </footer>
     </div>
