@@ -8,10 +8,12 @@
  * in index.html reads it back with a plain `localStorage.getItem()` and no
  * JSON.parse, so the boot value and this module must agree on a raw string.
  *
- * Applied as `<html lang>` + `<html dir>`. postcss-rtlcss (override mode) then
- * flips physical CSS automatically once `dir="rtl"` is present; nothing here
- * touches CSS directly. Adding a language = one entry in LANGUAGES + a
- * locales/<code>/ catalog + the FOUC whitelist in index.html.
+ * Applied as `<html lang>` (always the chosen language — for the Arabic webfont
+ * + a11y) + `<html dir>` (ROUTE-SCOPED: RTL only on translated routes, see
+ * RTL_ROUTES). postcss-rtlcss (override mode) then flips physical CSS wherever
+ * `dir="rtl"` is present; nothing here touches CSS directly. Adding a language =
+ * one entry in LANGUAGES + a locales/<code>/ catalog + the FOUC whitelist in
+ * index.html.
  */
 import { getItem, setItem } from './storage';
 
@@ -55,6 +57,31 @@ export const LANGUAGES: Record<Language, LanguageMeta> = {
 export const LANGUAGE_STORAGE_KEY = 'shwan_language';
 export const DEFAULT_LANGUAGE: Language = 'en';
 
+/**
+ * Routes whose content is translated and therefore allowed to flip to RTL.
+ * RTL is **opt-in per route**, never opt-out: postcss-rtlcss emits
+ * `[dir="rtl"] .x` descendant selectors that match via ANY rtl ancestor, so a
+ * nested `dir="ltr"` can't cancel a document-level `dir="rtl"`. The base
+ * therefore stays LTR and each translated screen opts in here — the
+ * layout-direction sibling of the eslint i18next ratchet's file list. When you
+ * translate a screen, add its path (and keep the FOUC route check in
+ * `public/index.html` in sync). An entry matches the path exactly OR as a path
+ * prefix (`<entry>/…`); the root `/` renders the Dashboard so it's matched in
+ * `isRtlRoute`. Currently: Dashboard only.
+ */
+export const RTL_ROUTES: readonly string[] = ['/dashboard'];
+
+/** True if `path` is a translated route that may render RTL. */
+export function isRtlRoute(path: string): boolean {
+  if (path === '/') return true; // root route renders the Dashboard
+  return RTL_ROUTES.some((route) => path === route || path.startsWith(route + '/'));
+}
+
+/** Direction to apply: RTL only when the language is RTL AND the route is translated. */
+export function resolveDirection(lang: Language, path: string): 'ltr' | 'rtl' {
+  return LANGUAGES[lang].dir === 'rtl' && isRtlRoute(path) ? 'rtl' : 'ltr';
+}
+
 const LANGUAGE_CODES = Object.keys(LANGUAGES) as readonly Language[];
 
 export function isLanguage(value: unknown): value is Language {
@@ -79,15 +106,30 @@ export function storeLanguagePreference(lang: Language): void {
 let activeLanguage: Language = getStoredLanguagePreference();
 
 /**
- * Write `lang` + `dir` to <html> and update the module-level active language.
- * The FOUC script in index.html already applied these before first paint, so
+ * Write `lang` (always the chosen language) + `dir` (route-scoped via
+ * resolveDirection) to <html>, and track the active language for the formatters.
+ * When `path` is omitted the current URL path is used — correct for the
+ * language-change / cross-tab / mount callers in LanguageContext. The FOUC
+ * script in index.html already applied the same values before first paint, so
  * the first call from the provider is an idempotent no-op (no layout flash).
  */
-export function applyLanguageAttributes(lang: Language): void {
+export function applyLanguageAttributes(lang: Language, path?: string): void {
   activeLanguage = lang;
   if (typeof document === 'undefined') return;
+  const currentPath = path ?? window.location.pathname;
   document.documentElement.setAttribute('lang', lang);
-  document.documentElement.setAttribute('dir', LANGUAGES[lang].dir);
+  document.documentElement.setAttribute('dir', resolveDirection(lang, currentPath));
+}
+
+/**
+ * Re-apply ONLY `dir` for a new route (language unchanged), using the tracked
+ * active language. Called by the RootLayout route watcher on navigation so that
+ * moving between a translated route (RTL) and an untranslated one (LTR) updates
+ * the document direction without re-running the full language apply.
+ */
+export function applyDirectionForPath(path: string): void {
+  if (typeof document === 'undefined') return;
+  document.documentElement.setAttribute('dir', resolveDirection(activeLanguage, path));
 }
 
 /** Metadata for the currently-applied language — read by the formatters. */

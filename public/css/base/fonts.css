@@ -1,36 +1,103 @@
 /**
- * Self-hosted Arabic webfont — Noto Sans Arabic (Google Fonts, Arabic subset).
+ * Self-hosted Arabic webfonts — configurable per-device (Settings → General).
  *
  * Imported from App.tsx so Vite resolves + content-hashes the woff2 url()s
  * (publicDir is disabled — entering via CSS url() is the required path; the
  * files live in public/assets/fonts/ and are NOT statically served).
  *
- * The `unicode-range` confines this face to Arabic-script codepoints, so the
- * browser only downloads it when Arabic glyphs are actually painted and Latin
- * text keeps resolving down the --font-primary stack to system-ui. That's why
- * 'Noto Sans Arabic' is listed FIRST in --font-primary (tokens-primitive.css):
- * unicode-range scoping means it never competes for Latin glyphs, and Arabic
- * patient names then render in it consistently even while the UI is English.
+ * Every face's `unicode-range` confines it to Arabic-script codepoints, so the
+ * browser only downloads a font when Arabic glyphs are actually painted, and
+ * Latin text keeps resolving down the --font-primary stack to system-ui. Only
+ * ONE family is ever referenced at a time — whichever `--font-arabic` names (see
+ * the `:root[data-arabic-font]` rules at the bottom) — so the other faces are
+ * declared but never downloaded.
  *
- * font-display: swap — show fallback immediately, swap in Noto when it arrives
- * (no invisible-text flash).
+ * The selected family leads --font-primary (tokens-primitive.css) via
+ * `var(--font-arabic)`: unicode-range scoping means it never competes for Latin
+ * glyphs, and Arabic patient names render in it consistently even while the UI
+ * is English.
+ *
+ * font-display: swap — show fallback immediately, swap in the webfont when it
+ * arrives (no invisible-text flash).
+ *
+ * Registry + persistence live in public/js/core/font.ts; the picker is in
+ * GeneralSettings.tsx. Adding a font = woff2 files here + an @font-face pair + a
+ * `:root[data-arabic-font]` rule + a core/font.ts entry + the index.html FOUC
+ * whitelist.
+ *
+ * Shared Arabic unicode-range (Arabic, Supplement, Extended-A, Presentation
+ * Forms-A/B) — repeated per face because @font-face descriptors can't read a
+ * custom property.
  */
+
+/* ── Cairo — modern friendly geometric (default) ───────────────────────── */
+/* Variable font: Google serves one woff2 for the whole weight axis, so the 400
+   and 700 faces point at the same file and the browser instances each weight. */
 @font-face {
-  font-family: 'Noto Sans Arabic';
+  font-family: 'Cairo';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('../../assets/fonts/NotoSansArabic-Regular.woff2') format('woff2');
+  src: url('../../assets/fonts/Cairo-Regular.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+08A0-08FF, U+FB50-FDFF,
+    U+FE70-FEFF;
+}
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../../assets/fonts/Cairo-Bold.woff2') format('woff2');
   unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+08A0-08FF, U+FB50-FDFF,
     U+FE70-FEFF;
 }
 
+/* ── IBM Plex Sans Arabic — professional / technical ───────────────────── */
 @font-face {
-  font-family: 'Noto Sans Arabic';
+  font-family: 'IBM Plex Sans Arabic';
   font-style: normal;
-  font-weight: 700;
+  font-weight: 400;
   font-display: swap;
-  src: url('../../assets/fonts/NotoSansArabic-Bold.woff2') format('woff2');
+  src: url('../../assets/fonts/IBMPlexSansArabic-Regular.woff2') format('woff2');
   unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+08A0-08FF, U+FB50-FDFF,
     U+FE70-FEFF;
 }
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../../assets/fonts/IBMPlexSansArabic-Bold.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+08A0-08FF, U+FB50-FDFF,
+    U+FE70-FEFF;
+}
+
+/* ── Almarai — clean / simple ──────────────────────────────────────────── */
+@font-face {
+  font-family: 'Almarai';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../../assets/fonts/Almarai-Regular.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+08A0-08FF, U+FB50-FDFF,
+    U+FE70-FEFF;
+}
+@font-face {
+  font-family: 'Almarai';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../../assets/fonts/Almarai-Bold.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+08A0-08FF, U+FB50-FDFF,
+    U+FE70-FEFF;
+}
+
+/* ── Selection → --font-arabic ─────────────────────────────────────────────
+   `data-arabic-font` is set on <html> by core/font.ts (and pre-paint by the
+   FOUC script). Each rule points --font-arabic at one family; tokens-primitive
+   feeds it into the head of --font-primary. `:root[data-arabic-font]` (0,2,0)
+   outranks the `:root` default (0,1,0), so the chosen font always wins.
+   Keep these ids in sync with ARABIC_FONTS in core/font.ts. */
+:root[data-arabic-font='cairo']      { --font-arabic: 'Cairo'; }
+:root[data-arabic-font='ibm-plex']   { --font-arabic: 'IBM Plex Sans Arabic'; }
+:root[data-arabic-font='almarai']    { --font-arabic: 'Almarai'; }

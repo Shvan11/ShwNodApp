@@ -6,6 +6,8 @@ interface StatsCardsProps {
     checkedIn?: number;
     absent?: number;
     waiting?: number;
+    /** 'cards' = standalone row (default); 'header' = compact chips embedded in the appointments header bar */
+    variant?: 'cards' | 'header';
 }
 
 interface PrevValues {
@@ -22,7 +24,7 @@ interface PrevValues {
  * Performance: Automatically optimized by React Compiler (React 19).
  * No manual memoization needed - the compiler handles it automatically.
  */
-const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0 }: StatsCardsProps) => {
+const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0, variant = 'cards' }: StatsCardsProps) => {
     const [animatedTotal, setAnimatedTotal] = useState<number>(0);
     const [animatedCheckedIn, setAnimatedCheckedIn] = useState<number>(0);
     const [animatedAbsent, setAnimatedAbsent] = useState<number>(0);
@@ -90,14 +92,19 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0 }: Stats
         };
     }, [total, checkedIn, absent, waiting]);
 
+    const isHeader = variant === 'header';
+    const containerClass = isHeader ? styles.headerContainer : styles.container;
+    // "Total Appointments" is too wide for the inline header chip — trim it there.
+    const totalLabel = isHeader ? 'Total' : 'Total Appointments';
+
     return (
-        <div className={styles.container}>
+        <div className={containerClass}>
             <div className={styles.cardTotal}>
                 <div className={styles.icon}>
                     <i className="fas fa-calendar-check"></i>
                 </div>
                 <div className={styles.content}>
-                    <div className={styles.label}>Total Appointments</div>
+                    <div className={styles.label}>{totalLabel}</div>
                     <div className={styles.value}>{isNaN(animatedTotal) ? 0 : animatedTotal}</div>
                 </div>
             </div>

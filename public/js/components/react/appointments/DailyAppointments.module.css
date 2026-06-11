@@ -9,7 +9,10 @@
     color: var(--gray-800);
     background-color: var(--page-bg);
     width: 100%;
-    overflow-x: hidden;
+    /* clip (not hidden) prevents a horizontal scrollbar WITHOUT making .view a
+       scroll container — hidden forces overflow-y:auto, which would trap the
+       sticky AppointmentsHeader inside .view instead of pinning it to the viewport. */
+    overflow-x: clip;
     /* Subtract the fixed-header offset (--header-height) that #app-container already
        pads; a bare 100vh double-counts the header → phantom page scroll. */
     min-height: calc(100vh - var(--header-height));

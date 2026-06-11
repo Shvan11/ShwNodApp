@@ -28,12 +28,29 @@
         var meta = document.querySelector('meta[name="theme-color"]');
         if (meta) meta.setAttribute('content', resolved === 'dark' ? '#11151c' : '#667eea');
 
-        // Language — whitelist en|ar (default en), set lang + dir pre-paint.
+        // Language — whitelist en|ar (default en), set lang always + dir pre-paint.
+        // dir is RTL only when Arabic AND the current route is translated (route-
+        // scoped RTL — untranslated pages stay LTR even in Arabic). Keep this route
+        // check in sync with RTL_ROUTES / isRtlRoute in public/js/core/language.ts.
         var lang = 'en';
         try { lang = localStorage.getItem('shwan_language') || 'en'; } catch (e) {}
         if (lang !== 'en' && lang !== 'ar') lang = 'en';
         document.documentElement.setAttribute('lang', lang);
-        document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+        var p = location.pathname;
+        var rtlRoute = (p === '/' || p === '/dashboard');
+        document.documentElement.setAttribute('dir', (lang === 'ar' && rtlRoute) ? 'rtl' : 'ltr');
+
+        // Arabic webfont — whitelist the font ids (default cairo), set
+        // data-arabic-font pre-paint so the chosen face is used on first paint
+        // (no font swap flash). The `:root[data-arabic-font]` rules in
+        // css/base/fonts.css map this to --font-arabic. Keep this whitelist in
+        // sync with ARABIC_FONTS in public/js/core/font.ts
+        // (ARABIC_FONT_STORAGE_KEY = 'shwan_arabic_font').
+        var font = 'cairo';
+        try { font = localStorage.getItem('shwan_arabic_font') || 'cairo'; } catch (e) {}
+        var FONTS = { 'cairo': 1, 'ibm-plex': 1, 'almarai': 1 };
+        if (!FONTS[font]) font = 'cairo';
+        document.documentElement.setAttribute('data-arabic-font', font);
       })();
     </script>
 

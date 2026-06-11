@@ -23,6 +23,48 @@
     max-height: 36px;
 }
 
+/* Header variant — compact white chips embedded in the purple appointments header.
+   Reuses the .card colour-coding (left border + icon hue) at a smaller scale. */
+.headerContainer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--spacing-xs);
+    /* Don't grow — stay compact on the left so space-between pins the date
+       control to the right edge. */
+    flex: 0 1 auto;
+    padding: 0;
+    margin: 0;
+    max-width: none;
+}
+
+.headerContainer .card {
+    height: 30px;
+    max-height: 30px;
+    padding: 0.15rem var(--spacing-sm);
+    gap: 0.35rem;
+    border-left-width: 3px;
+}
+
+.headerContainer .card:hover {
+    transform: none;
+    box-shadow: var(--shadow-md);
+}
+
+.headerContainer .icon {
+    width: 18px;
+    height: 18px;
+}
+
+.headerContainer .value {
+    font-size: var(--font-size-base);
+}
+
+.headerContainer .label {
+    font-size: var(--font-size-xs);
+}
+
 .card:hover {
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
@@ -117,6 +159,12 @@
     .container {
         grid-template-columns: repeat(2, 1fr);
         gap: 0.25rem;
+    }
+
+    /* Header chips drop to their own full-width row, left-aligned */
+    .headerContainer {
+        flex: 1 1 100%;
+        justify-content: flex-start;
     }
 }
 

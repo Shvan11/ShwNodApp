@@ -530,3 +530,74 @@
     color: var(--primary-color);
     font-weight: var(--font-weight-semibold);
 }
+
+/* Arabic-font picker — vertical list so the live samples stack and the
+   letterforms can be compared. Each row pairs the (Latin) font name + note with
+   a large Arabic sample rendered in that font. Reuses .themeRadioOptionActive
+   for the selected state. */
+.fontRadioGroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-xs);
+}
+
+.fontRadioOption {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: var(--border-width-medium) solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.fontRadioOption:hover {
+    border-color: var(--primary-color);
+}
+
+.fontRadioOption:focus-within {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.fontRadioOption input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+}
+
+.fontOptionMeta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.fontOptionLabel {
+    font-weight: var(--font-weight-semibold);
+}
+
+.fontOptionNote {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+}
+
+/* The live preview — large so glyph shapes are legible. Its font-family is set
+   inline per option (the only way to render each sample in its own font). */
+.fontOptionSample {
+    font-size: 1.6rem;
+    line-height: 1.3;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

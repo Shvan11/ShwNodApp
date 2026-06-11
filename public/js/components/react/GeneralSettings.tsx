@@ -7,6 +7,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemePreference } from '../../core/theme';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LANGUAGES, type Language } from '../../core/language';
+import { useArabicFont } from '../../contexts/FontContext';
+import { ARABIC_FONTS, type ArabicFont } from '../../core/font';
 import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
 import * as settings from '@shared/contracts/settings.contract';
 import styles from './SettingsSection.module.css';
@@ -23,6 +25,12 @@ const THEME_OPTIONS: ReadonlyArray<{ value: ThemePreference; label: string; icon
 const LANGUAGE_OPTIONS: ReadonlyArray<{ value: Language; nativeLabel: string }> = (
     Object.keys(LANGUAGES) as Language[]
 ).map((value) => ({ value, nativeLabel: LANGUAGES[value].nativeLabel }));
+
+// Arabic webfonts derived from the registry; each option renders a live sample
+// in its own font (font-family applied inline — the only way to preview a face).
+const FONT_OPTIONS: ReadonlyArray<{ value: ArabicFont } & (typeof ARABIC_FONTS)[ArabicFont]> = (
+    Object.keys(ARABIC_FONTS) as ArabicFont[]
+).map((value) => ({ value, ...ARABIC_FONTS[value] }));
 
 interface OptionsMap {
     [key: string]: string;
@@ -47,6 +55,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     const [chairIdSaved, setChairIdSaved] = useState<string | null>(storage.chairId());
     const { preference: themePreference, setPreference: setThemePreference } = useTheme();
     const { language, setLanguage } = useLanguage();
+    const { arabicFont, setArabicFont } = useArabicFont();
     const { t } = useTranslation('common');
 
     const loadSettings = useCallback(async () => {
@@ -350,6 +359,44 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                     </div>
                     <div className={styles.settingDescription}>
                         {t('language.description')}
+                    </div>
+                </div>
+
+                <div className={styles.settingGroup}>
+                    <label>Arabic font</label>
+                    <div className={styles.fontRadioGroup} role="radiogroup" aria-label="Arabic font">
+                        {FONT_OPTIONS.map((opt) => (
+                            <label
+                                key={opt.value}
+                                className={cn(
+                                    styles.fontRadioOption,
+                                    arabicFont === opt.value && styles.themeRadioOptionActive
+                                )}
+                            >
+                                <input
+                                    type="radio"
+                                    name="arabic-font-preference"
+                                    value={opt.value}
+                                    checked={arabicFont === opt.value}
+                                    onChange={() => setArabicFont(opt.value)}
+                                />
+                                <span className={styles.fontOptionMeta}>
+                                    <span className={styles.fontOptionLabel}>{opt.label}</span>
+                                    <span className={styles.fontOptionNote}>{opt.note}</span>
+                                </span>
+                                <span
+                                    className={styles.fontOptionSample}
+                                    style={{ fontFamily: opt.cssFamily }}
+                                    dir="rtl"
+                                    lang="ar"
+                                >
+                                    {opt.sample}
+                                </span>
+                            </label>
+                        ))}
+                    </div>
+                    <div className={styles.settingDescription}>
+                        Font used for Arabic text (patient names, Arabic UI). Saved on this PC only.
                     </div>
                 </div>
             </section>

@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLoaderData, useSearchParams } from 'react-router-dom';
 import AppointmentsHeader from './AppointmentsHeader';
-import StatsCards from './StatsCards';
 import MobileViewToggle, { type ViewType } from './MobileViewToggle';
 import AppointmentsList from './AppointmentsList';
 import type { DailyAppointment } from './AppointmentCard';
@@ -212,20 +211,13 @@ const DailyAppointments = () => {
                 freshness={dataFreshness as FreshnessType}
                 isViewingToday={selectedDate === getTodayDate()}
                 showFlash={showFlash}
+                stats={stats}
             />
 
             {/* Mobile view toggle */}
             <MobileViewToggle
                 activeView={mobileView}
                 onViewChange={setMobileView}
-            />
-
-            {/* Statistics cards */}
-            <StatsCards
-                total={stats.total}
-                checkedIn={stats.checkedIn}
-                absent={stats.absent}
-                waiting={stats.waiting}
             />
 
             {/* Appointments lists */}

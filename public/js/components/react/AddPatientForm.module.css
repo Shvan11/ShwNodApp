@@ -171,8 +171,15 @@
     display: flex;
     gap: var(--spacing-xs);
     margin-bottom: 0;
-    border-bottom: 3px solid var(--gray-200);
+    /* Gray baseline as an inset shadow, NOT a border: lets the active tab's
+       indicator sit flush on it without the `margin-bottom: -3px` overlap hack
+       that overflowed the box. With `overflow-x: auto`, the spec promotes
+       `overflow-y` from visible to auto, so that 3px overflow produced a
+       spurious vertical scrollbar. overflow-y is pinned hidden as a backstop;
+       inset shadows are unaffected by it. */
+    box-shadow: inset 0 -3px 0 var(--gray-200);
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: thin;
     scrollbar-color: var(--primary-color) var(--gray-100);
 }
@@ -197,7 +204,10 @@
     padding: var(--spacing-md) var(--spacing-xl);
     background: transparent;
     border: none;
-    border-bottom: 3px solid transparent;
+    /* Transparent inset shadow placeholder so the active-state color animates
+       smoothly (matching the box-shadow indicator below). No border/negative
+       margin → no vertical overflow. */
+    box-shadow: inset 0 -3px 0 transparent;
     color: var(--text-light);
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-medium);
@@ -207,7 +217,6 @@
     align-items: center;
     gap: var(--spacing-sm);
     position: relative;
-    margin-bottom: -3px;
 }
 
 .tabButton i {
@@ -221,7 +230,7 @@
 
 .tabButtonActive {
     color: var(--primary-color);
-    border-bottom-color: var(--primary-color);
+    box-shadow: inset 0 -3px 0 var(--primary-color);
     font-weight: var(--font-weight-bold);
 }
 

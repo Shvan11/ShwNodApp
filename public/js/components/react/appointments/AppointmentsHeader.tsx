@@ -1,5 +1,6 @@
-import type { ChangeEvent } from 'react';
+import { type ChangeEvent, type MouseEvent } from 'react';
 import ConnectionStatus, { type ConnectionStatusType, type FreshnessType } from './ConnectionStatus';
+import StatsCards from './StatsCards';
 import styles from './AppointmentsHeader.module.css';
 
 interface AppointmentsHeaderProps {
@@ -13,11 +14,18 @@ interface AppointmentsHeaderProps {
     freshness: FreshnessType;
     isViewingToday: boolean;
     showFlash: boolean;
+    stats: {
+        total: number;
+        checkedIn: number;
+        absent: number;
+        waiting: number;
+    };
 }
 
 /**
  * AppointmentsHeader Component
- * Header with title, date picker, refresh button, search box, and connection status
+ * Sticky header with a combined date label/picker, inline stat chips, refresh
+ * button, search box, and connection status.
  */
 const AppointmentsHeader = ({
     selectedDate,
@@ -29,19 +37,15 @@ const AppointmentsHeader = ({
     connectionStatus,
     freshness,
     isViewingToday,
-    showFlash
+    showFlash,
+    stats
 }: AppointmentsHeaderProps) => {
-    // Format date for display
-    const formatDateForDisplay = (dateString: string): string => {
+    // Compact, weekday-prefixed date — e.g. "Sat, 13-6-2026".
+    const formatShortDate = (dateString: string): string => {
         if (!dateString) return 'Today';
-
-        const date = new Date(dateString + 'T12:00:00'); // Add time to avoid timezone issues
-        return date.toLocaleDateString(undefined, {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
+        const date = new Date(dateString + 'T12:00:00'); // noon avoids TZ date-shift
+        const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
+        return `${weekday}, ${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`;
     };
 
     const handleDateInputChange = (e: ChangeEvent<HTMLInputElement>): void => {
@@ -52,30 +56,55 @@ const AppointmentsHeader = ({
         onSearchChange(e.target.value);
     };
 
+    // The visible pill is just chrome; the transparent native date input overlays
+    // it and owns interaction. A plain click on a date input only focuses it, so
+    // pop the calendar explicitly where the browser supports it.
+    const openDatePicker = (e: MouseEvent<HTMLInputElement>): void => {
+        const el = e.currentTarget;
+        if (typeof el.showPicker === 'function') {
+            try { el.showPicker(); } catch { /* unsupported context — focus is enough */ }
+        }
+    };
+
     return (
         <div className={styles.header}>
-            <h1 className={styles.title}>Appointments for {formatDateForDisplay(selectedDate)}</h1>
-            <div className={styles.controls}>
-                <div className={styles.datePickerContainer}>
-                    <div className={styles.datePickerLeft}>
-                        <label htmlFor="date-picker" className={styles.datePickerLabel}>Select Date:</label>
-                        <input
-                            type="date"
-                            id="date-picker"
-                            className={styles.dateInput}
-                            value={selectedDate}
-                            onChange={handleDateInputChange}
-                        />
-                        <button
-                            className={styles.refreshButton}
-                            onClick={onRefresh}
-                            disabled={isRefreshing}
-                            title="Refresh today's appointments"
-                        >
-                            <i className={`fas fa-sync-alt ${isRefreshing ? styles.spinning : ''}`}></i>
-                        </button>
-                    </div>
+            {/* Stats — left */}
+            <StatsCards
+                variant="header"
+                total={stats.total}
+                checkedIn={stats.checkedIn}
+                absent={stats.absent}
+                waiting={stats.waiting}
+            />
+
+            {/* Combined date label + picker (+ refresh) — middle */}
+            <div className={styles.dateGroup}>
+                {/* The label IS the trigger (no separate "Select Date") */}
+                <div className={styles.datePill}>
+                    <i className={`fas fa-calendar-day ${styles.datePillIcon}`} aria-hidden="true"></i>
+                    <span className={styles.datePillText}>{formatShortDate(selectedDate)}</span>
+                    <i className={`fas fa-chevron-down ${styles.datePillCaret}`} aria-hidden="true"></i>
+                    <input
+                        type="date"
+                        aria-label="Select appointment date"
+                        className={styles.datePillInput}
+                        value={selectedDate}
+                        onChange={handleDateInputChange}
+                        onClick={openDatePicker}
+                    />
                 </div>
+                <button
+                    className={styles.refreshButton}
+                    onClick={onRefresh}
+                    disabled={isRefreshing}
+                    title="Jump to today and refresh"
+                >
+                    <i className={`fas fa-sync-alt ${isRefreshing ? styles.spinning : ''}`}></i>
+                </button>
+            </div>
+
+            {/* Search + connection status — right */}
+            <div className={styles.searchGroup}>
                 <div className={styles.searchWrapper}>
                     <i className={`fas fa-search ${styles.searchIcon}`}></i>
                     <input
@@ -95,13 +124,13 @@ const AppointmentsHeader = ({
                         </button>
                     )}
                 </div>
+                <ConnectionStatus
+                    status={connectionStatus}
+                    freshness={freshness}
+                    isViewingToday={isViewingToday}
+                    showFlash={showFlash}
+                />
             </div>
-            <ConnectionStatus
-                status={connectionStatus}
-                freshness={freshness}
-                isViewingToday={isViewingToday}
-                showFlash={showFlash}
-            />
         </div>
     );
 };

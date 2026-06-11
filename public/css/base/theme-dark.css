@@ -214,6 +214,8 @@
         --gradient-primary: linear-gradient(45deg, #1a3b39, #11151c);
         --gradient-secondary: linear-gradient(45deg, #1c3a31, #11151c);
         /* --gradient-accent (teal → purple) stays vivid; not overridden. */
+        /* Appointments sub-header: teal (light) → neutral slate on the dark canvas. */
+        --appointments-header-bg: linear-gradient(135deg, var(--palette-night-500) 0%, var(--palette-night-700) 100%);
 
         /* ===========================================================
            Shadows — same geometry, deeper alpha for the dark canvas

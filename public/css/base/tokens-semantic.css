@@ -91,6 +91,12 @@
     --gradient-secondary: linear-gradient(45deg, #aedfd0, #ffffff);
     --gradient-accent: linear-gradient(45deg, #49a09d, #5f2c82);
 
+    /* Appointments sticky sub-header background. Single source of truth so the bar
+       can be re-skinned in one place (and differentiated from the universal header,
+       which shares the same brand purple). Light = teal; dark theme swaps to a
+       neutral slate (see theme-dark.css). Both keep light chips legible on top. */
+    --appointments-header-bg: linear-gradient(135deg, var(--palette-cyan-500) 0%, var(--palette-cyan-700) 100%);
+
     /* ===============================================================
        Box shadows
        =============================================================== */
