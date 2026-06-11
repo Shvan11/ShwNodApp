@@ -703,6 +703,7 @@ const AppointmentCalendar = ({
                 <CalendarGrid
                     calendarData={calendarData}
                     doctorColors={doctorColors}
+                    hideEmptySlots={selectedDoctorId != null}
                     selectedSlot={selectedSlot}
                     onSlotClick={handleSlotClick}
                     onAppointmentClick={handleAppointmentClick}

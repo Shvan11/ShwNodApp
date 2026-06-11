@@ -6,6 +6,7 @@ import { useMessageCount } from '../hooks/useMessageCount';
 import { useMessageStatus } from '../hooks/useMessageStatus';
 import { useToast } from '../contexts/ToastContext';
 import DateSelector from '../components/whatsapp-send/DateSelector';
+import GroupSettings from '../components/whatsapp-send/GroupSettings';
 import ConnectionStatus from '../components/whatsapp-send/ConnectionStatus';
 import ProgressBar from '../components/whatsapp-send/ProgressBar';
 import ActionButtons from '../components/whatsapp-send/ActionButtons';
@@ -192,6 +193,9 @@ export default function WhatsAppSend() {
           emailConfirm={emailConfirm}
           sendability={sendability}
         />
+
+        {/* Appointment-list-to-group settings */}
+        <GroupSettings />
 
         {/* Status and Action Area */}
         <section className={styles.statusArea}>

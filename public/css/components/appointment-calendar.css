@@ -775,6 +775,14 @@ body:has(.appointment-calendar) {
     color: rgba(0, 0, 0, 0.18);
 }
 
+/* shown when a doctor filter leaves no booked rows in the visible range */
+.cal-empty-filter {
+    padding: var(--spacing-xl);
+    text-align: center;
+    color: var(--cal-ink-3);
+    font-size: var(--font-size-sm);
+}
+
 /* holiday column */
 .cal-day-col.holiday {
     background:

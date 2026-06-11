@@ -57,3 +57,21 @@ export const qr = { response: z.looseObject({}) } as const;
 // GET send-by-date endpoints (`?date=`). Type-only — handlers read `date` directly.
 export const sendByDateQuery = z.object({ date: z.string().optional() });
 export type SendByDateQuery = z.infer<typeof sendByDateQuery>;
+
+// GET + PUT /api/wa/group-settings — config for the daily-appointments PDF posted
+// to the staff WhatsApp group, persisted in the `options` table. UNLIKE the raw
+// apiClient endpoints above, these are consumed through the funnel (fetchJSON /
+// putJSON with `{ schema }`), so the response IS modeled here — a fully closed
+// shape, so plain `z.object` (no long-tail fields to preserve).
+export const groupSettings = {
+  body: z.object({
+    enabled: z.boolean(),
+    groupName: z.string().trim().min(1, 'Group name is required').max(100),
+  }),
+  response: z.object({
+    enabled: z.boolean(),
+    groupName: z.string(),
+  }),
+} as const;
+export type GroupSettingsBody = z.infer<typeof groupSettings.body>;
+export type GroupSettingsResponse = z.infer<typeof groupSettings.response>;

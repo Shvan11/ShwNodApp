@@ -9,10 +9,12 @@ import { messageSessionManager, type MessageLookupResult } from './MessageSessio
 import { type MessageSession } from './MessageSession.js';
 import { log } from '../../utils/logger.js';
 import { PhoneFormatter } from '../../utils/phoneFormatter.js';
+import pdfGenerator from '../pdf/appointment-pdf-generator.js';
+import { getGroupSettings } from './group-settings.js';
 import qrcode from 'qrcode';
 import pkg from 'whatsapp-web.js';
 
-const { Client, LocalAuth } = pkg;
+const { Client, LocalAuth, MessageMedia } = pkg;
 
 // ===========================================
 // TYPES AND INTERFACES
@@ -94,7 +96,8 @@ export interface WhatsAppClient {
   logout(): Promise<void>;
   getState(): Promise<string>;
   getNumberId(number: string): Promise<{ _serialized: string } | null>;
-  sendMessage(chatId: string, content: string | unknown): Promise<{ id: { id: string } }>;
+  sendMessage(chatId: string, content: string | unknown, options?: unknown): Promise<{ id: { id: string } }>;
+  getChats(): Promise<WhatsAppChat[]>;
   getChatById(chatId: string): Promise<{ fetchMessages(options: { limit: number }): Promise<WhatsAppMessage[]> }>;
   pupBrowser?: PuppeteerBrowser;
   pupPage?: PuppeteerPage;
@@ -109,6 +112,15 @@ export interface WhatsAppClient {
 interface WhatsAppMessage {
   id: { id: string };
   ack?: number;
+}
+
+/**
+ * WhatsApp chat interface (partial — only the fields group lookup reads)
+ */
+interface WhatsAppChat {
+  id: { _serialized: string };
+  name: string;
+  isGroup: boolean;
 }
 
 /**
@@ -1460,6 +1472,73 @@ class WhatsAppService extends EventEmitter {
     );
   }
 
+  /**
+   * Generate the daily appointments PDF (the same report the email path builds)
+   * and post it to the staff WhatsApp group named {@link APPOINTMENTS_GROUP_NAME}.
+   *
+   * Best-effort: any failure (PDF gen, group not found, send error) is logged and
+   * swallowed so it can never interrupt the per-patient notification batch.
+   */
+  private async sendAppointmentsPdfToGroup(date: string): Promise<void> {
+    try {
+      // Runtime-configurable from the /send page (persisted in the options table).
+      const { enabled, groupName } = await getGroupSettings();
+      if (!enabled) {
+        log.info('Appointments group PDF disabled in settings — skipping', { date });
+        return;
+      }
+
+      const client = this.clientState.client;
+      if (!client) {
+        log.warn('Skipping appointments group PDF — WhatsApp client unavailable', { date });
+        return;
+      }
+
+      // Reuse the exact PDF report the email notification attaches.
+      const pdfResult = await pdfGenerator.generateAppointmentPDF(date);
+
+      // Locate the target group by exact chat name (no direct name→id lookup in
+      // whatsapp-web.js, so scan the chat list).
+      const chats = await client.getChats();
+      const group = chats.find((chat) => chat.isGroup && chat.name?.trim() === groupName);
+      if (!group) {
+        log.warn('Appointments WhatsApp group not found — skipping group PDF', {
+          date,
+          groupName,
+        });
+        return;
+      }
+
+      const media = new MessageMedia(
+        'application/pdf',
+        pdfResult.buffer.toString('base64'),
+        `appointments-${date}.pdf`
+      );
+
+      const formattedDate = new Date(date).toLocaleDateString('en-GB', {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      });
+      const caption = `Daily Appointments — ${formattedDate}\nTotal: ${pdfResult.appointmentCount}`;
+
+      await client.sendMessage(group.id._serialized, media, { caption });
+
+      log.info('Posted appointments PDF to WhatsApp group', {
+        date,
+        groupName,
+        chatId: group.id._serialized,
+        appointmentCount: pdfResult.appointmentCount,
+      });
+    } catch (error) {
+      log.error('Failed to post appointments PDF to WhatsApp group', {
+        date,
+        error: (error as Error).message,
+      });
+    }
+  }
+
   async send(date: string): Promise<SendResult[] | void> {
     if (!this.isReady()) {
       throw new Error('WhatsApp client not ready to send messages');
@@ -1467,6 +1546,11 @@ class WhatsAppService extends EventEmitter {
 
     return this.circuitBreaker.execute(async () => {
       log.info(`Starting message sending session for date: ${date}`);
+
+      // Post the full appointment list (as PDF) to the staff group. Done once per
+      // batch, before the per-patient loop, so it fires even when no patient
+      // reminders are pending. Best-effort: never let a group failure abort sends.
+      await this.sendAppointmentsPdfToGroup(date);
 
       const session = messageSessionManager.startSession(date, this);
 

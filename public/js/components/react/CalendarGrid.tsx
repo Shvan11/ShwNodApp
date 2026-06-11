@@ -102,6 +102,9 @@ interface CalendarGridProps {
     mode?: CalendarMode;
     viewMode?: ViewMode;
     doctorColors?: Map<number, DoctorColor>;
+    /* When a doctor filter is active the grid goes mostly empty, so collapse it
+       to only the time rows that still hold an appointment in the visible days. */
+    hideEmptySlots?: boolean;
     draggingId: string | null;
     setDraggingId: Dispatch<SetStateAction<string | null>>;
     dropTarget: DropTarget | null;
@@ -148,6 +151,7 @@ const CalendarGrid = ({
     onDayContextMenu,
     viewMode = 'week',
     doctorColors = EMPTY_DOCTOR_COLORS,
+    hideEmptySlots = false,
     draggingId,
     setDraggingId,
     dropTarget,
@@ -209,6 +213,17 @@ const CalendarGrid = ({
             | undefined;
         return validOnly(extractAppointments(dayAppts?.[time]));
     };
+
+    // When the doctor filter is on, drop the time rows that are empty across every
+    // visible day (holidays never count) so the grid collapses to just the booked
+    // rows. Otherwise show the full configured slot list.
+    const visibleTimeSlots = hideEmptySlots
+        ? timeSlots.filter(time =>
+              filteredDays.some(
+                  day => !day.isHoliday && getSlotAppointments(day, time).length > 0
+              )
+          )
+        : timeSlots;
 
     const buildSlotData = (
         day: CalendarDay,
@@ -473,7 +488,7 @@ const CalendarGrid = ({
             >
                 {/* Time column */}
                 <div className="cal-time-col">
-                    {timeSlots.map(t => {
+                    {visibleTimeSlots.map(t => {
                         const tint = tintFor(t);
                         const { hour, minute, meridiem } = to12Hour(t);
                         return (
@@ -511,7 +526,7 @@ const CalendarGrid = ({
                                     </div>
                                 </div>
                             )}
-                            {timeSlots.map(time => {
+                            {visibleTimeSlots.map(time => {
                                 const tint = tintFor(time);
                                 const appts = holiday
                                     ? []
@@ -562,6 +577,12 @@ const CalendarGrid = ({
                     );
                 })}
             </div>
+
+            {hideEmptySlots && visibleTimeSlots.length === 0 && (
+                <div className="cal-empty-filter">
+                    No appointments for the selected doctor in this range.
+                </div>
+            )}
         </div>
     );
 };

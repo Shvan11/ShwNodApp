@@ -212,6 +212,51 @@
   margin-right: 4px;
 }
 
+/* Group Settings panel */
+.groupSettingsFieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.groupSettingsFieldset:disabled {
+  opacity: 0.7;
+}
+
+.groupSettingsLegend {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-color);
+  font-size: 14px;
+  padding: 0;
+  margin-bottom: 16px;
+}
+
+.groupToggleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--text-color);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.groupToggleRow input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--primary-color);
+  cursor: pointer;
+}
+
+.groupSettingsHint {
+  margin: 12px 0 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
 /* Message Count Info States */
 .messageCountInfo {
   background: var(--gray-200);

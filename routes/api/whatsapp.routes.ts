@@ -19,6 +19,7 @@ import path from 'path';
 // Services
 import whatsapp from '../../services/messaging/whatsapp.js';
 import { sendImg_, sendXray_ } from '../../services/messaging/whatsapp-api.js';
+import { getGroupSettings, saveGroupSettings } from '../../services/messaging/group-settings.js';
 import { sendgramfile } from '../../services/messaging/telegram.js';
 import messageState from '../../services/state/messageState.js';
 import stateEvents from '../../services/state/stateEvents.js';
@@ -28,7 +29,7 @@ import { getAppointmentForNotification } from '../../services/database/queries/a
 // Utilities
 import config from '../../config/config.js';
 import PhoneFormatter from '../../utils/phoneFormatter.js';
-import { sendError, ErrorResponses } from '../../utils/error-response.js';
+import { sendData, sendError, ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 import { timeouts } from '../../middleware/timeout.js';
 import { validate } from '../../middleware/validate.js';
@@ -390,6 +391,52 @@ Thank you.`;
       res.json({
         success: false,
         message: 'Internal error'
+      });
+    }
+  }
+);
+
+// ============================================================================
+// APPOINTMENTS GROUP SETTINGS ROUTES
+// ============================================================================
+
+/**
+ * Get the daily-appointments group settings (whether to post the PDF, and the
+ * target group name). Defaults applied for unset options.
+ * GET /group-settings (mounted at /api/wa)
+ */
+router.get('/group-settings', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const settings = await getGroupSettings();
+    sendData(res, waContract.groupSettings.response, settings);
+  } catch (error) {
+    log.error('Failed to load WhatsApp group settings', { error: (error as Error).message });
+    ErrorResponses.internalError(res, 'Failed to load group settings', {
+      error: (error as Error).message
+    });
+  }
+});
+
+/**
+ * Update the daily-appointments group settings.
+ * PUT /group-settings (mounted at /api/wa)
+ * Body: { enabled: boolean, groupName: string }
+ */
+router.put(
+  '/group-settings',
+  validate({ body: waContract.groupSettings.body }),
+  async (
+    req: Request<unknown, unknown, waContract.GroupSettingsBody>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const saved = await saveGroupSettings(req.body);
+      log.info('Updated WhatsApp group settings', saved);
+      sendData(res, waContract.groupSettings.response, saved);
+    } catch (error) {
+      log.error('Failed to save WhatsApp group settings', { error: (error as Error).message });
+      ErrorResponses.internalError(res, 'Failed to save group settings', {
+        error: (error as Error).message
       });
     }
   }

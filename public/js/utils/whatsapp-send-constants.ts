@@ -37,6 +37,7 @@ export const API_ENDPOINTS = {
   MESSAGE_RESET: (date: string): string => `/api/messaging/reset/${date}`,
   MESSAGE_STATUS: (date: string): string => `/api/messaging/status/${date}`,
   WA_SEND: (date: string): string => `/api/wa/send?date=${date}`,
+  WA_GROUP_SETTINGS: '/api/wa/group-settings',
   SEND_EMAIL: (date: string): string => `/api/email/send-appointments?date=${date}`,
 } as const;
 
