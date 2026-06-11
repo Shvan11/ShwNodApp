@@ -63,7 +63,20 @@ $$;
 -- ── 3. Capture trigger (Supabase side): record genuine web/portal edits into change_log('reverse') ─
 -- Same op-code/coalescing logic as local cdc_capture(), but skips forward mirror writes
 -- (origin='failover') and fans out only to sink 'reverse'. TG_ARGV[0] = the table's PK column.
-CREATE OR REPLACE FUNCTION cdc_capture_remote() RETURNS trigger AS $$
+--
+-- SECURITY DEFINER (runs as the function OWNER, which owns change_log + cdc_sink_control): the
+-- trigger writes change_log on behalf of the writing role, but a web/portal writer is NOT the owner
+-- — it is `mirror_rw` (raw web app) or `authenticated` (the aligner portal's RLS-scoped JWT), neither
+-- of which holds INSERT/UPDATE on change_log. Without SECURITY DEFINER such a write would fail
+-- `permission denied for table change_log` and never reach the reverse feed. The function only ever
+-- records a (tbl, pk, op) pointer — no row data — and the actual row write it reacts to is still
+-- governed by that role's RLS + table grants, so this does not widen what a doctor can change.
+-- The origin guard below reads a session GUC, which is privilege-independent, so it is unaffected.
+CREATE OR REPLACE FUNCTION cdc_capture_remote() RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
 DECLARE
   pk_col text := TG_ARGV[0];
   pk_val text;
@@ -91,7 +104,7 @@ BEGIN
 
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- ── 4. Attach BOTH triggers to the reverse set (tables with updated_at, excluding infra) ──────────
 -- The reverse set is discovered by the updated_at column (matches local's captured∧updated_at set,
