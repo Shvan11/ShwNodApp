@@ -1,0 +1,312 @@
+/* TasksBell — header bell + popover. Bell matches the header (white icon); the
+   popover is a surface card on the page. Anchored with logical props for RTL. */
+
+.wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.bellBtn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-white);
+    font-size: var(--font-size-lg);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.bellBtn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.badge {
+    position: absolute;
+    top: 2px;
+    inset-inline-end: 2px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--radius-full);
+    background: var(--primary-color);
+    color: var(--color-white);
+    font-size: 11px;
+    font-weight: var(--font-weight-bold);
+    line-height: 18px;
+    text-align: center;
+}
+
+.badgeSevere {
+    background: var(--error-500);
+    animation: tasksPulse 2s ease-in-out infinite;
+}
+
+@keyframes tasksPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.5); }
+    50% { box-shadow: 0 0 0 5px rgba(220, 53, 69, 0); }
+}
+
+/* Popover — portaled to <body>; position:fixed + top/left set inline from the bell rect
+   (the fixed, overflow:hidden universal-header would clip an in-flow dropdown). */
+.popover {
+    width: 360px;
+    max-width: calc(100vw - 24px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    z-index: var(--z-index-popover);
+    overflow: hidden;
+}
+
+.popHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-light);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-heading);
+}
+
+.popCount {
+    display: inline-block;
+    margin-inline-start: var(--spacing-xs);
+    padding: 0 var(--spacing-sm);
+    border-radius: var(--radius-full);
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.popHeaderActions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.headerIconBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-light);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+}
+
+.headerIconBtn:hover {
+    background: var(--surface-hover);
+    color: var(--text-color);
+}
+
+.newBtn {
+    border: 1px solid var(--primary-color);
+    background: transparent;
+    color: var(--primary-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}
+
+.newBtn:hover {
+    background: var(--primary-color);
+    color: var(--color-white);
+}
+
+/* Assignee filter row (only shown when at least one task is assigned) */
+.filterRow {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-lighter);
+    font-size: var(--font-size-sm);
+}
+
+.filterSelect {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-color);
+    padding: 2px var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}
+
+.list {
+    max-height: min(60vh, 480px);
+    overflow-y: auto;
+}
+
+.empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xl);
+    color: var(--text-lighter);
+}
+
+.empty i {
+    font-size: 1.75rem;
+    color: var(--success-500);
+}
+
+/* Task row */
+.item {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.item:last-child {
+    border-bottom: none;
+}
+
+.sevBar {
+    flex: 0 0 4px;
+    border-radius: var(--radius-full);
+}
+
+.sev1 { background: var(--success-500); }
+.sev2 { background: var(--warning-500); }
+.sev3 { background: var(--error-500); }
+
+.itemBody {
+    flex: 1;
+    min-width: 0;
+}
+
+.itemText {
+    color: var(--text-color);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.itemMeta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-xs);
+}
+
+.patientChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    background: var(--primary-50);
+    color: var(--primary-700);
+    border-radius: var(--radius-full);
+    padding: 2px var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+}
+
+.patientChip:hover {
+    background: var(--primary-100);
+}
+
+.typeTag, .escTag, .age {
+    font-size: var(--font-size-xs);
+    color: var(--text-lighter);
+}
+
+.typeTag {
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    padding: 1px var(--spacing-xs);
+}
+
+.assigneeTag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--primary-50);
+    color: var(--primary-700);
+    border-radius: var(--radius-full);
+    padding: 1px var(--spacing-sm);
+    font-size: var(--font-size-xs);
+}
+
+.escTag {
+    color: var(--warning-700);
+    font-style: italic;
+}
+
+.age {
+    margin-inline-start: auto;
+}
+
+.snoozeRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
+}
+
+.snoozeRow button {
+    border: 1px solid var(--border);
+    background: var(--surface-elevated);
+    border-radius: var(--radius-sm);
+    padding: 2px var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+    color: var(--text-color);
+}
+
+.snoozeRow button:hover {
+    background: var(--surface-hover);
+}
+
+.snoozeRow input {
+    font-size: var(--font-size-xs);
+    padding: 1px var(--spacing-xs);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-color);
+}
+
+/* Per-row action buttons */
+.actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.actions button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-light);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+}
+
+.actions button:hover {
+    background: var(--surface-hover);
+    color: var(--text-color);
+}

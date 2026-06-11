@@ -1,0 +1,236 @@
+/* TasksHistory — completed-tasks review screen. Surface card + simple table. */
+
+.page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: var(--spacing-lg);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    flex-wrap: wrap;
+}
+
+.backBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
+
+.backBtn:hover {
+    background: var(--surface-hover);
+}
+
+.title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin: 0;
+    font-size: var(--font-size-xl);
+    color: var(--text-heading);
+}
+
+.title i {
+    color: var(--primary-color);
+}
+
+.statusSelect {
+    margin-inline-start: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--text-color);
+    padding: var(--spacing-sm) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}
+
+.search {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0 var(--spacing-sm);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--text-lighter);
+}
+
+.search input {
+    border: none;
+    background: transparent;
+    color: var(--text-color);
+    padding: var(--spacing-sm) 0;
+    min-width: 220px;
+    outline: none;
+}
+
+.state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xxl) var(--spacing-xl);
+    color: var(--text-lighter);
+}
+
+.state i {
+    font-size: 1.75rem;
+}
+
+.tableWrap {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+.table th,
+.table td {
+    padding: var(--spacing-md);
+    text-align: start;
+    border-bottom: 1px solid var(--border-light);
+    vertical-align: top;
+}
+
+.table th {
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-semibold);
+    white-space: nowrap;
+    background: var(--surface-muted);
+}
+
+.table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.table tbody tr:hover {
+    background: var(--surface-hover);
+}
+
+.detailsCell {
+    color: var(--text-color);
+    max-width: 360px;
+    overflow-wrap: anywhere;
+}
+
+.muted {
+    color: var(--text-lighter);
+}
+
+.patientLink {
+    border: none;
+    background: transparent;
+    color: var(--primary-700);
+    cursor: pointer;
+    padding: 0;
+    font-size: inherit;
+    text-align: start;
+}
+
+.patientLink:hover {
+    text-decoration: underline;
+}
+
+.sevDot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    margin-inline-end: 4px;
+    vertical-align: middle;
+}
+
+.sev1 { background: var(--success-500); }
+.sev2 { background: var(--warning-500); }
+.sev3 { background: var(--error-500); }
+
+/* Status badge */
+.statusBadge {
+    display: inline-block;
+    padding: 1px var(--spacing-sm);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
+}
+
+.stActive { background: var(--primary-50); color: var(--primary-700); }
+.stSnoozed { background: var(--warning-100); color: var(--warning-700); }
+.stDone { background: var(--success-100); color: var(--success-700); }
+.stDismissed { background: var(--surface-muted); color: var(--text-secondary); }
+
+.actionCell {
+    white-space: nowrap;
+    text-align: end;
+}
+
+.rowActions {
+    display: inline-flex;
+    gap: var(--spacing-sm);
+    justify-content: flex-end;
+}
+
+.doneBtn,
+.plainBtn,
+.deleteBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface-elevated);
+    color: var(--text-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+}
+
+.plainBtn:hover:not(:disabled) {
+    background: var(--surface-hover);
+}
+
+.doneBtn {
+    color: var(--success-700);
+    border-color: var(--success-200);
+}
+
+.doneBtn:hover:not(:disabled) {
+    background: var(--success-500);
+    color: var(--color-white);
+    border-color: var(--success-500);
+}
+
+.deleteBtn {
+    color: var(--error-600);
+    border-color: var(--error-200);
+}
+
+.deleteBtn:hover:not(:disabled) {
+    background: var(--error-500);
+    color: var(--color-white);
+    border-color: var(--error-500);
+}
+
+.doneBtn:disabled,
+.plainBtn:disabled,
+.deleteBtn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}

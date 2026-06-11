@@ -2,7 +2,7 @@
 
 /* Main container */
 .container {
-    background: white;
+    background: var(--surface);
     border-radius: var(--radius-xl);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     border: 1px solid var(--gray-200);
@@ -41,7 +41,7 @@
 /* Add Doctor Button */
 .btnAdd {
     background: var(--primary-color);
-    color: white;
+    color: var(--color-white);
     padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 8px;
@@ -141,7 +141,7 @@
 
 .btnCancel {
     background: var(--secondary-color);
-    color: white;
+    color: var(--color-white);
     padding: 0.75rem 1.5rem;
     border: 1px solid var(--secondary-color);
     border-radius: 8px;
@@ -160,7 +160,7 @@
 
 .btnSave {
     background: var(--primary-color);
-    color: white;
+    color: var(--color-white);
     padding: 0.75rem 1.5rem;
     border: 1px solid var(--primary-color);
     border-radius: 8px;
@@ -191,7 +191,7 @@
 
 .emptyState i {
     font-size: 4rem;
-    color: var(--gray-200);
+    color: var(--text-lighter);
     margin-bottom: 1rem;
 }
 
@@ -386,7 +386,7 @@
 
 .btnRetry {
     background: var(--primary-color);
-    color: white;
+    color: var(--color-white);
     padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 8px;
@@ -455,7 +455,7 @@
         border: 1px solid var(--gray-200);
         border-radius: var(--radius-lg);
         padding: var(--spacing-md);
-        background: white;
+        background: var(--surface);
     }
 
     .table tbody tr:hover {

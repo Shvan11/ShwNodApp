@@ -1,10 +1,10 @@
 /* Settings Tab Navigation - Full Width Modern Header */
 
 .navigation {
-    background: var(--color-white);
+    background: var(--surface);
     box-shadow: var(--shadow-sm);
     position: sticky;
-    top: var(--header-height, 50px);
+    top: var(--header-height);
     z-index: var(--z-index-fixed);
     border-bottom: 1px solid var(--gray-200);
 }
@@ -12,7 +12,7 @@
 .header {
     text-align: center;
     padding: 0.75rem 2rem 0.5rem;
-    background: var(--color-white);
+    background: var(--surface);
     color: var(--text-color);
 }
 
@@ -27,7 +27,7 @@
 /* Tab Buttons Container - No Scrollbar, Responsive Wrapping */
 .buttons {
     display: flex;
-    background: var(--color-white);
+    background: var(--surface);
     border-bottom: 2px solid var(--gray-200);
     overflow-x: visible;
     flex-wrap: wrap;
@@ -46,7 +46,7 @@
     gap: 0.4rem;
     font-size: 0.85rem;
     font-weight: 600;
-    color: var(--gray-500);
+    color: var(--text-secondary);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     white-space: nowrap;
     position: relative;
@@ -73,7 +73,7 @@
 .button.disabled {
     opacity: 0.4;
     cursor: not-allowed;
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 .button.disabled:hover {
@@ -96,7 +96,7 @@
 
 .comingSoonBadge {
     background: var(--warning-400);
-    color: white;
+    color: var(--color-white);
     font-size: 0.7rem;
     padding: 0.15rem 0.4rem;
     border-radius: 10px;
@@ -129,7 +129,7 @@
 
 @media (max-width: 768px) {
     .navigation {
-        top: var(--header-height, 50px);
+        top: var(--header-height);
     }
 
     .header {

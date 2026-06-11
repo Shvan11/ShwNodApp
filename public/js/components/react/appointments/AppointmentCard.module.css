@@ -168,7 +168,7 @@
     align-items: center;
     gap: 0.25rem;
     font-size: var(--font-size-sm);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     line-height: 1;
 }
 
@@ -373,15 +373,15 @@
 /* Seated state - True yellow (seated but not dismissed yet) */
 .statusSeated {
     composes: statusButton;
-    background: linear-gradient(135deg, #FFEB3B 0%, #FDD835 100%);
-    border-color: #F9A825;
+    background: linear-gradient(135deg, var(--status-seated-fill) 0%, var(--status-seated-fill-2) 100%);
+    border-color: var(--status-seated-fill-border);
     cursor: pointer;
-    box-shadow: 0 4px 6px -1px rgba(255, 235, 59, 0.4), 0 2px 4px -1px rgba(255, 235, 59, 0.3);
+    box-shadow: var(--shadow-status-seated);
     opacity: 1;
 }
 
 .statusSeated i {
-    color: #5D4037;
+    color: var(--status-seated-fill-text);
 }
 
 .statusSeated .chairIcon {
@@ -390,18 +390,13 @@
 }
 
 .statusSeated .statusTime {
-    color: #5D4037;
+    color: var(--status-seated-fill-text);
 }
 
 .statusSeated:hover {
     transform: translateY(-2px) scale(1.05);
-    box-shadow: 0 10px 15px -3px rgba(255, 235, 59, 0.5), 0 4px 6px -2px rgba(255, 235, 59, 0.4);
-    background: linear-gradient(135deg, #FFEE58 0%, #FFEB3B 100%);
-}
-
-/* Chair icon special active state */
-.statusChairActive {
-    composes: statusActive;
+    box-shadow: var(--shadow-status-seated-lg);
+    background: linear-gradient(135deg, var(--status-seated-fill-hover) 0%, var(--status-seated-fill) 100%);
 }
 
 /* Disabled state */

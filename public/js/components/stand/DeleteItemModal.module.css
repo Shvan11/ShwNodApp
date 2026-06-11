@@ -39,7 +39,7 @@
 }
 
 .closeBtn {
-  color: var(--gray-400);
+  color: var(--text-lighter);
   font-size: 28px;
   font-weight: var(--font-weight-bold);
   cursor: pointer;

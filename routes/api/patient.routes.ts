@@ -27,8 +27,12 @@ import {
   getAlertsByPersonId,
   createAlert,
   setAlertStatus,
-  updateAlert
+  setAlertSnooze,
+  updateAlert,
+  getAlertAssignedTo
 } from '../../services/database/queries/alert-queries.js';
+import { employeeIsActive } from '../../services/database/queries/employee-queries.js';
+import { notifyTaskAssignment } from '../../services/messaging/task-notify.js';
 import * as imaging from '../../services/imaging/index.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import {
@@ -1271,11 +1275,17 @@ router.post(
   ): Promise<void> => {
     try {
       const personId = parseInt(req.params.personId, 10);
-      const { alertTypeId, alertSeverity, alertDetails } = req.body;
+      const { alertTypeId, alertSeverity, alertDetails, surfaceMode, expiresAt, escalateAt, assignedTo } = req.body;
 
       if (!alertDetails) {
         log.warn('Create alert missing details', { personId });
         ErrorResponses.badRequest(res, 'Alert details are required');
+        return;
+      }
+
+      // Quit employees can't be newly assigned (hidden everywhere but Settings).
+      if (assignedTo != null && !(await employeeIsActive(assignedTo))) {
+        ErrorResponses.badRequest(res, 'Cannot assign to an inactive (quit) employee');
         return;
       }
 
@@ -1284,8 +1294,17 @@ router.post(
         person_id: personId,
         alert_type_id: alertTypeId ? parseInt(String(alertTypeId), 10) : 1,
         alert_severity: alertSeverity ? parseInt(String(alertSeverity), 10) : 2,
-        alert_details: alertDetails
+        alert_details: alertDetails,
+        surface_mode: surfaceMode,
+        expires_at: expiresAt,
+        escalate_at: escalateAt,
+        assigned_to: assignedTo ?? null,
       });
+
+      // Notify the assignee over WhatsApp (fire-and-forget; never blocks/fails the create).
+      if (assignedTo != null) {
+        void notifyTaskAssignment(assignedTo, alertDetails);
+      }
 
       sendSuccess(res, null, 'Alert created successfully', 201);
     } catch (error) {
@@ -1314,17 +1333,11 @@ router.put(
   ): Promise<void> => {
     try {
       const alertId = parseInt(req.params.alertId, 10);
-      const { isActive } = req.body;
+      const { status } = req.body;
 
-      if (typeof isActive !== 'boolean') {
-        log.warn('Update alert status invalid isActive', { alertId, isActive });
-        ErrorResponses.badRequest(res, 'isActive must be a boolean value');
-        return;
-      }
+      await setAlertStatus(alertId, status, req.session.username ?? null);
 
-      await setAlertStatus(alertId, isActive);
-
-      sendSuccess(res, null, `Alert status updated to ${isActive}`);
+      sendSuccess(res, null, `Alert status updated to ${status}`);
     } catch (error) {
       log.error('Error updating alert status:', error);
       ErrorResponses.internalError(
@@ -1351,7 +1364,7 @@ router.put(
   ): Promise<void> => {
     try {
       const alertId = parseInt(req.params.alertId, 10);
-      const { alertTypeId, alertSeverity, alertDetails } = req.body;
+      const { alertTypeId, alertSeverity, alertDetails, surfaceMode, expiresAt, escalateAt, assignedTo } = req.body;
 
       if (isNaN(alertId)) {
         log.warn('Update alert invalid alert id', { alertId: req.params.alertId });
@@ -1365,7 +1378,35 @@ router.put(
         return;
       }
 
-      await updateAlert(alertId, alertTypeId, alertSeverity, alertDetails);
+      // Block re-assigning to a quit employee, but allow KEEPING an existing
+      // assignment to one — we deliberately leave those in place when an
+      // employee quits, so re-saving an already-assigned task must not 400.
+      // `isNewAssignee` also gates the WhatsApp notification: only a genuinely
+      // changed assignee is notified, so a plain edit/re-save doesn't re-ping them.
+      let isNewAssignee = false;
+      if (assignedTo != null) {
+        const current = await getAlertAssignedTo(alertId);
+        isNewAssignee = assignedTo !== current;
+        if (isNewAssignee && !(await employeeIsActive(assignedTo))) {
+          ErrorResponses.badRequest(res, 'Cannot assign to an inactive (quit) employee');
+          return;
+        }
+      }
+
+      await updateAlert(alertId, {
+        alert_type_id: alertTypeId,
+        alert_severity: alertSeverity,
+        alert_details: alertDetails,
+        surface_mode: surfaceMode,
+        expires_at: expiresAt,
+        escalate_at: escalateAt,
+        assigned_to: assignedTo,
+      });
+
+      // Notify a newly-assigned employee over WhatsApp (fire-and-forget).
+      if (isNewAssignee && assignedTo != null) {
+        void notifyTaskAssignment(assignedTo, alertDetails);
+      }
 
       sendSuccess(res, null, 'Alert updated successfully');
     } catch (error) {
@@ -1375,6 +1416,30 @@ router.put(
         'Failed to update alert',
         error as Error
       );
+    }
+  }
+);
+
+/**
+ * Snooze (or un-snooze) an alert in the header
+ * PUT /alerts/:alertId/snooze
+ */
+router.put(
+  '/alerts/:alertId/snooze',
+  authenticate,
+  authorize(['admin', 'secretary', 'doctor']),
+  validate({ params: alertIdParams, body: patientContract.alertSnooze.body }),
+  async (
+    req: Request<{ alertId: string }, unknown, patientContract.AlertSnoozeBody>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const alertId = parseInt(req.params.alertId, 10);
+      await setAlertSnooze(alertId, req.body.snoozedUntil);
+      sendSuccess(res, null, 'Alert snooze updated');
+    } catch (error) {
+      log.error('Error snoozing alert:', error);
+      ErrorResponses.internalError(res, 'Failed to snooze alert', error as Error);
     }
   }
 );

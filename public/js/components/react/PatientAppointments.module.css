@@ -39,7 +39,7 @@
 
 .btnNewAppointment {
     background: var(--primary-color);
-    color: white;
+    color: var(--color-white);
     border: none;
     padding: 0.75rem 1.5rem;
     border-radius: var(--radius-lg);
@@ -70,8 +70,8 @@
 }
 
 .card {
-    background: white;
-    border: 1px solid var(--gray-200);
+    background: var(--surface);
+    border: var(--border-width-thin) solid var(--gray-200);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
     display: flex;
@@ -112,7 +112,7 @@
 }
 
 .card.past .icon {
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 .details {
@@ -130,7 +130,7 @@
 }
 
 .type {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-size: 0.95rem;
 }
 
@@ -163,10 +163,10 @@
 .errorState {
     text-align: center;
     padding: 4rem 2rem;
-    color: var(--gray-500);
-    background: white;
+    color: var(--text-secondary);
+    background: var(--surface);
     border-radius: var(--radius-lg);
-    border: 1px solid var(--gray-200);
+    border: var(--border-width-thin) solid var(--gray-200);
 }
 
 .emptyState i,
@@ -174,7 +174,7 @@
 .errorState i {
     font-size: 4rem;
     margin-bottom: 1rem;
-    color: var(--gray-300);
+    color: var(--text-lighter);
 }
 
 .errorState i {
@@ -194,13 +194,13 @@
 
 .emptyState p {
     margin-bottom: 1.5rem;
-    color: var(--gray-500);
+    color: var(--text-secondary);
 }
 
 /* ==================== MODAL ==================== */
 
 .modalContent {
-    background: white;
+    background: var(--surface);
     padding: 2rem;
     border-radius: var(--radius-xl);
     max-width: 400px;
@@ -236,7 +236,7 @@
 
 .modalContent p {
     margin: 0 0 1.5rem 0;
-    color: var(--gray-600);
+    color: var(--text-secondary);
     line-height: 1.5;
 }
 
@@ -272,7 +272,7 @@
 
 .btnRetry {
     background: var(--primary-color);
-    color: white;
+    color: var(--color-white);
     margin-top: 1rem;
     padding: 0.75rem 1.5rem;
     border: none;

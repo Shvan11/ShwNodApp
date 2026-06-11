@@ -28,7 +28,7 @@
   font-size: var(--font-size-3xl);
   color: var(--text-primary);
   margin-bottom: var(--spacing-md);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .route-error-content p {

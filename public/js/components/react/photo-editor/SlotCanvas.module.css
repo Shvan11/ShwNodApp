@@ -13,7 +13,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--spacing-xs);
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-muted);
 }
 
 .emptyLogo {

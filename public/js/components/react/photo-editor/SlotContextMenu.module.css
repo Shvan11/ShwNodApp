@@ -2,11 +2,11 @@
   position: fixed;
   z-index: var(--z-index-popover);
   min-width: 210px;
-  padding: var(--spacing-xs, 4px);
-  background: var(--background-primary, #fff);
-  border: 1px solid var(--border-color, #e5e7eb);
+  padding: var(--spacing-xs);
+  background: var(--background-primary);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg, 0 10px 25px rgba(0, 0, 0, 0.15));
+  box-shadow: var(--shadow-lg);
 }
 
 .item {
@@ -16,9 +16,9 @@
   width: 100%;
   padding: var(--spacing-sm) var(--spacing-md);
   border: none;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-color, #374151);
+  color: var(--text-color);
   font-size: 0.85rem;
   text-align: left;
   cursor: pointer;
@@ -29,12 +29,12 @@
 }
 
 .item:disabled {
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-muted);
   cursor: default;
 }
 
 .item.danger:not(:disabled) {
-  color: var(--error-color, #dc2626);
+  color: var(--error-color);
 }
 
 .item i {

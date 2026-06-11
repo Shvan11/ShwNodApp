@@ -9,14 +9,14 @@
    ============================================ */
 
 .month-day-cell.holiday {
-    background-color: var(--error-50, #fef2f2);
-    border-color: var(--error-200, #fecaca);
+    background-color: var(--error-50);
+    border-color: var(--error-200);
     cursor: not-allowed;
     opacity: 0.9;
 }
 
 .month-day-cell.holiday:hover {
-    background-color: var(--error-100, #fee2e2);
+    background-color: var(--error-100);
     transform: none; /* Disable hover lift effect */
 }
 
@@ -27,20 +27,20 @@
    ============================================ */
 
 .day-column.holiday {
-    background-color: var(--error-50, #fef2f2);
+    background-color: var(--error-50);
 }
 
 .day-column.holiday .day-header {
-    background-color: var(--error-100, #fee2e2);
-    border-bottom-color: var(--error-200, #fecaca);
+    background-color: var(--error-100);
+    border-bottom-color: var(--error-200);
 }
 
 .day-holiday-badge {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--error-500, #ef4444);
-    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--error-500);
+    font-size: var(--font-size-sm);
     margin-left: auto;
 }
 
@@ -49,13 +49,13 @@
    ============================================ */
 
 .time-slot.holiday {
-    background-color: var(--error-50, #fef2f2);
+    background-color: var(--error-50);
     background-image: repeating-linear-gradient(
         45deg,
         transparent,
         transparent 8px,
-        var(--error-100, #fee2e2) 8px,
-        var(--error-100, #fee2e2) 16px
+        var(--error-100) 8px,
+        var(--error-100) 16px
     );
     cursor: not-allowed;
     pointer-events: none;
@@ -81,42 +81,42 @@
 }
 
 .appointment-warning-modal .warning-header {
-    background-color: var(--warning-100, #fef3c7);
-    border-bottom: 2px solid var(--warning-400, #fbbf24);
-    color: var(--warning-800, #92400e);
+    background-color: var(--warning-100);
+    border-bottom: 2px solid var(--warning-400);
+    color: var(--warning-800);
 }
 
 .appointment-warning-modal .warning-header i {
-    color: var(--warning-600, #d97706);
+    color: var(--warning-600);
 }
 
 .appointment-warning-modal .warning-text {
-    color: var(--warning-700, #b45309);
-    font-weight: 500;
-    margin-bottom: var(--spacing-sm, 0.5rem);
+    color: var(--warning-700);
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--spacing-sm);
 }
 
 .appointment-warning-modal .warning-subtext {
-    color: var(--text-secondary, #6b7280);
-    font-size: var(--font-size-sm, 0.875rem);
-    margin-bottom: var(--spacing-md, 1rem);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-md);
 }
 
 .appointment-warning-modal .appointment-list {
     max-height: 250px;
     overflow-y: auto;
-    border: 1px solid var(--border-color, #e5e7eb);
-    border-radius: var(--radius-md, 0.375rem);
-    background-color: var(--background-secondary, #f9fafb);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background-color: var(--background-secondary);
 }
 
 .appointment-warning-modal .appointment-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--spacing-sm, 0.5rem);
-    padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
-    border-bottom: 1px solid var(--border-light, #f3f4f6);
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid var(--border-light);
 }
 
 .appointment-warning-modal .appointment-item:last-child {
@@ -125,18 +125,18 @@
 
 .appointment-warning-modal .appointment-item.more-items {
     font-style: italic;
-    color: var(--text-muted, #9ca3af);
+    color: var(--text-muted);
     justify-content: center;
 }
 
 .appointment-warning-modal .patient-name {
     display: flex;
     align-items: center;
-    gap: var(--spacing-xs, 0.25rem);
+    gap: var(--spacing-xs);
     margin: 0;
     font-size: var(--font-size-base);
-    font-weight: 500;
-    color: var(--text-primary, #111827);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-primary);
     flex: 1;
 }
 
@@ -147,18 +147,18 @@
 }
 
 .appointment-warning-modal .patient-name i {
-    color: var(--primary-color, #3b82f6);
-    font-size: var(--font-size-xs, 0.75rem);
+    color: var(--primary-color);
+    font-size: var(--font-size-xs);
 }
 
 .appointment-warning-modal .appointment-detail {
-    color: var(--text-secondary, #6b7280);
-    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
 }
 
 .appointment-warning-modal .appointment-time {
-    color: var(--text-muted, #9ca3af);
-    font-size: var(--font-size-sm, 0.875rem);
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
     white-space: nowrap;
 }
 
@@ -172,7 +172,7 @@
 
 .holiday-editor .lookup-table td:first-child + td {
     /* Date column styling */
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 /* Make the date column more prominent */
@@ -191,44 +191,44 @@
 .calendar-day-context-menu .context-menu-header {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm, 0.5rem);
-    padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
-    font-size: var(--font-size-sm, 0.875rem);
-    font-weight: 600;
-    color: var(--text-primary, #111827);
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
-    margin-bottom: var(--spacing-xs, 0.25rem);
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: var(--spacing-xs);
 }
 
 .calendar-day-context-menu .context-menu-header i {
-    color: var(--primary-color, #3b82f6);
+    color: var(--primary-color);
 }
 
 .calendar-day-context-menu .context-menu-info {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm, 0.5rem);
-    padding: var(--spacing-xs, 0.25rem) var(--spacing-md, 1rem);
-    font-size: var(--font-size-sm, 0.875rem);
-    color: var(--text-secondary, #6b7280);
-    background-color: var(--background-secondary, #f9fafb);
-    border-radius: var(--radius-sm, 0.25rem);
-    margin: 0 var(--spacing-xs, 0.25rem) var(--spacing-xs, 0.25rem);
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    background-color: var(--background-secondary);
+    border-radius: var(--radius-sm);
+    margin: 0 var(--spacing-xs) var(--spacing-xs);
 }
 
 .calendar-day-context-menu .context-menu-info.holiday-info {
-    background-color: var(--error-50, #fef2f2);
-    color: var(--error-600, #dc2626);
+    background-color: var(--error-50);
+    color: var(--error-600);
 }
 
 .calendar-day-context-menu .context-menu-info.holiday-info i {
-    color: var(--error-500, #ef4444);
+    color: var(--error-500);
 }
 
 .calendar-day-context-menu .context-menu-info i {
     width: 16px;
     text-align: center;
-    font-size: var(--font-size-xs, 0.75rem);
+    font-size: var(--font-size-xs);
 }
 
 /* ============================================
@@ -238,71 +238,71 @@
 .holiday-quick-modal .modal-header h3 {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm, 0.5rem);
+    gap: var(--spacing-sm);
 }
 
 .holiday-quick-modal .modal-header h3 i {
-    color: var(--error-500, #ef4444);
+    color: var(--error-500);
 }
 
 .holiday-date-display {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm, 0.5rem);
-    padding: var(--spacing-md, 1rem);
-    background-color: var(--background-secondary, #f9fafb);
-    border-radius: var(--radius-md, 0.375rem);
-    border: 1px solid var(--border-color, #e5e7eb);
-    margin-bottom: var(--spacing-md, 1rem);
-    font-weight: 500;
-    color: var(--text-primary, #111827);
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    background-color: var(--background-secondary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    margin-bottom: var(--spacing-md);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-primary);
 }
 
 .holiday-date-display i {
-    color: var(--primary-color, #3b82f6);
+    color: var(--primary-color);
 }
 
 .holiday-warning-banner {
     display: flex;
-    gap: var(--spacing-md, 1rem);
-    padding: var(--spacing-md, 1rem);
-    background-color: var(--warning-50, #fffbeb);
-    border: 1px solid var(--warning-200, #fde68a);
-    border-radius: var(--radius-md, 0.375rem);
-    margin-bottom: var(--spacing-md, 1rem);
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background-color: var(--warning-50);
+    border: 1px solid var(--warning-200);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-md);
 }
 
 .holiday-warning-banner .warning-icon {
     flex-shrink: 0;
-    color: var(--warning-500, #f59e0b);
-    font-size: 1.25rem;
+    color: var(--warning-500);
+    font-size: var(--font-size-xl);
 }
 
 .holiday-warning-banner .warning-content {
     flex: 1;
-    font-size: var(--font-size-sm, 0.875rem);
-    color: var(--warning-800, #92400e);
+    font-size: var(--font-size-sm);
+    color: var(--warning-800);
 }
 
 .holiday-warning-banner .warning-content strong {
-    color: var(--warning-700, #b45309);
+    color: var(--warning-700);
 }
 
 .holiday-warning-banner .warning-note {
-    font-size: var(--font-size-xs, 0.75rem);
-    color: var(--warning-600, #d97706);
-    margin-top: var(--spacing-xs, 0.25rem);
+    font-size: var(--font-size-xs);
+    color: var(--warning-600);
+    margin-top: var(--spacing-xs);
     font-style: italic;
 }
 
 .holiday-warning-banner .warning-appointment {
     display: flex;
     align-items: center;
-    gap: var(--spacing-xs, 0.25rem);
-    font-size: var(--font-size-xs, 0.75rem);
-    color: var(--warning-700, #b45309);
-    margin-top: var(--spacing-xs, 0.25rem);
-    padding-left: var(--spacing-sm, 0.5rem);
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-xs);
+    color: var(--warning-700);
+    margin-top: var(--spacing-xs);
+    padding-left: var(--spacing-sm);
 }
 
 .holiday-warning-banner .warning-appointment i {
@@ -310,11 +310,11 @@
 }
 
 .holiday-warning-banner .warning-more {
-    font-size: var(--font-size-xs, 0.75rem);
-    color: var(--warning-600, #d97706);
+    font-size: var(--font-size-xs);
+    color: var(--warning-600);
     font-style: italic;
-    margin-top: var(--spacing-xs, 0.25rem);
-    padding-left: var(--spacing-sm, 0.5rem);
+    margin-top: var(--spacing-xs);
+    padding-left: var(--spacing-sm);
 }
 
 /* Allow right-click cursor on holiday days */
@@ -332,9 +332,9 @@
     height: 0;
     border-style: solid;
     border-width: 0 0 6px 6px;
-    border-color: transparent transparent var(--gray-200, #e5e7eb) transparent;
+    border-color: transparent transparent var(--gray-200) transparent;
     opacity: 0;
-    transition: opacity var(--transition-fast, 0.15s);
+    transition: opacity var(--transition-fast);
 }
 
 .month-day-cell:not(.other-month):hover::before {

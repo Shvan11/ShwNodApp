@@ -4,7 +4,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
-  background-color: var(--color-white);
+  background-color: var(--surface);
   border: var(--border-width-thin) solid var(--gray-200);
   border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
@@ -42,7 +42,7 @@
 .totalLabel {
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-medium);
-  color: var(--gray-600);
+  color: var(--text-secondary);
 }
 
 .totalAmount {
@@ -94,7 +94,7 @@
 }
 
 .amountInput::placeholder {
-  color: var(--gray-400);
+  color: var(--text-lighter);
   font-weight: var(--font-weight-normal);
 }
 
@@ -107,7 +107,7 @@
   padding: 0 var(--spacing-md);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  color: var(--gray-500);
+  color: var(--text-secondary);
   background-color: var(--gray-100);
   height: var(--input-height);
   display: flex;
@@ -167,7 +167,7 @@
   font-size: var(--font-size-base);
   font-family: var(--font-primary);
   color: var(--text-color);
-  background-color: var(--color-white);
+  background-color: var(--surface);
   border: var(--border-width-thin) solid var(--gray-300);
   border-radius: var(--radius-md);
   outline: none;
@@ -199,7 +199,7 @@
   font-size: var(--font-size-sm);
   font-family: var(--font-primary);
   color: var(--text-color);
-  background-color: var(--color-white);
+  background-color: var(--surface);
   border: var(--border-width-thin) solid var(--gray-300);
   border-radius: var(--radius-md);
   outline: none;
@@ -233,7 +233,7 @@
   height: 1.5rem;
   border: none;
   background: none;
-  color: var(--gray-400);
+  color: var(--text-lighter);
   cursor: pointer;
   border-radius: var(--radius-full);
   transition: color var(--transition-fast), background-color var(--transition-fast);
@@ -264,7 +264,7 @@
   margin: var(--spacing-xs) 0 0;
   padding: 0;
   list-style: none;
-  background-color: var(--color-white);
+  background-color: var(--surface);
   border: var(--border-width-thin) solid var(--gray-200);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
@@ -294,7 +294,7 @@
 
 .patientId {
   font-size: var(--font-size-xs);
-  color: var(--gray-400);
+  color: var(--text-lighter);
 }
 
 /* Note input */
@@ -305,7 +305,7 @@
   font-size: var(--font-size-sm);
   font-family: var(--font-primary);
   color: var(--text-color);
-  background-color: var(--color-white);
+  background-color: var(--surface);
   border: var(--border-width-thin) solid var(--gray-300);
   border-radius: var(--radius-md);
   outline: none;
@@ -350,7 +350,7 @@
 
 .confirmButton:disabled {
   background-color: var(--gray-300);
-  color: var(--gray-500);
+  color: var(--text-secondary);
   cursor: not-allowed;
 }
 

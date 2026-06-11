@@ -1,6 +1,8 @@
 /**
  * Root Layout for Data Router
  * Wraps all routes with:
+ * - ThemeProvider (light/dark/auto — outermost so every consumer + the
+ *   #modal-root portal inherit the documentElement theme vars)
  * - GlobalStateProvider (realtime + patient state)
  * - ToastProvider (notifications)
  * - PrintQueueProvider (multi-batch label printing)
@@ -11,6 +13,7 @@
 import { Suspense, useState, useCallback } from 'react';
 import { Outlet, ScrollRestoration, Location } from 'react-router-dom';
 import { GlobalStateProvider } from '../contexts/GlobalStateContext';
+import { ThemeProvider } from '../contexts/ThemeContext';
 import { ToastProvider } from '../contexts/ToastContext';
 import { PrintQueueProvider, usePrintQueue } from '../contexts/PrintQueueContext';
 import { ConfirmProvider } from '../contexts/ConfirmContext';
@@ -99,15 +102,17 @@ function RootLayoutInner() {
 
 export function RootLayout() {
   return (
-    <ToastProvider>
-      <ConfirmProvider>
-        <GlobalStateProvider>
-          <PrintQueueProvider>
-            <RootLayoutInner />
-          </PrintQueueProvider>
-        </GlobalStateProvider>
-      </ConfirmProvider>
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <ConfirmProvider>
+          <GlobalStateProvider>
+            <PrintQueueProvider>
+              <RootLayoutInner />
+            </PrintQueueProvider>
+          </GlobalStateProvider>
+        </ConfirmProvider>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }
 

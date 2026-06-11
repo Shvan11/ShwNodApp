@@ -1,5 +1,10 @@
 /* RTL (Right-to-Left) Support - Kurdish/Arabic Language Support */
 
+/* Base direction toggle (moved here from the old variables.css). */
+[dir="rtl"] {
+    direction: rtl;
+}
+
 /* Universal Header RTL Adjustments */
 [dir="rtl"] .universal-header .header-left {
     flex-direction: row-reverse;
@@ -7,7 +12,7 @@
 
 [dir="rtl"] .logo-section {
     margin-right: 0;
-    margin-left: 2rem;
+    margin-left: var(--spacing-xl);
 }
 
 [dir="rtl"] .main-navigation {
@@ -64,51 +69,23 @@
 [dir="rtl"] .btn i,
 [dir="rtl"] .nav-btn i {
     margin-right: 0;
-    margin-left: 0.5rem;
+    margin-left: var(--spacing-sm);
 }
-
-/* Card Actions RTL */
 
 /* Breadcrumb RTL */
 [dir="rtl"] .breadcrumb {
     flex-direction: row-reverse;
 }
 
-/* Dropdown Menus RTL */
-
 /* Grid Layouts RTL */
-
 [dir="rtl"] .summary-grid {
     direction: rtl;
 }
 
-/* Flex Reverse for RTL */
-
-/* Border Adjustments for RTL */
-
-/* Toast/Notification RTL */
-[dir="rtl"] .toast-container {
-    right: auto;
-    left: 20px;
-}
-
-[dir="rtl"] .toast {
-    border-left: none;
-    border-right: 4px solid;
-    animation: slideInFromLeft 0.3s ease-out;
-}
-
-@keyframes slideInFromLeft {
-    from {
-        transform: translateX(-400px);
-    }
-    to {
-        transform: translateX(0);
-    }
-}
+/* Toast/Notification RTL lives entirely in components/toast.css (container
+   offset, border flip, slide-in animation) — not duplicated here. */
 
 /* Patient Shell & Navigation RTL */
-
 [dir="rtl"] .sidebar-navigation {
     right: auto;
     left: 0;

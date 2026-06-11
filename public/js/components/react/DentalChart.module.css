@@ -19,7 +19,7 @@
 
 .archLabel {
     text-align: center;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-secondary);
     margin-bottom: var(--spacing-xs);
     font-size: var(--font-size-sm);
@@ -63,7 +63,7 @@
 
 .toothNumber {
     font-size: var(--font-size-xs);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-secondary);
 }
 

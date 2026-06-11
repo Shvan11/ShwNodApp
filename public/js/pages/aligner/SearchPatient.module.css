@@ -19,14 +19,14 @@
     padding: 1rem 1rem 1rem 3rem;
     font-size: 1rem;
     border: 2px solid var(--gray-200);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     transition: all 0.3s ease;
 }
 
 .searchBox input:focus {
     outline: none;
     border-color: var(--blue-300);
-    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 .searchIcon {
@@ -44,7 +44,7 @@
     top: 50%;
     transform: translateY(-50%);
     font-size: 0.85rem;
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 /* Search Results Dropdown */
@@ -53,13 +53,13 @@
     top: calc(100% + 0.5rem);
     left: 0;
     right: 0;
-    background: white;
+    background: var(--surface);
     border: 1px solid var(--gray-200);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     max-height: 400px;
     overflow-y: auto;
-    z-index: 1000;
+    z-index: var(--z-index-dropdown);
 }
 
 .searchResultItem {
@@ -78,14 +78,14 @@
 }
 
 .resultName {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-color);
     margin-bottom: 0.25rem;
 }
 
 .resultNameSecondary {
-    font-weight: 400;
-    color: var(--gray-500);
+    font-weight: var(--font-weight-normal);
+    color: var(--text-secondary);
     margin-left: 0.5rem;
 }
 
@@ -106,7 +106,7 @@
 .searchNoResults {
     padding: 2rem;
     text-align: center;
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 .searchNoResults i {
@@ -123,12 +123,12 @@
 .emptyState {
     text-align: center;
     padding: 4rem 2rem;
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 .emptyState i {
     font-size: 4rem;
-    color: var(--gray-300);
+    color: var(--text-lighter);
     margin-bottom: 1rem;
     display: block;
 }
@@ -139,7 +139,7 @@
 }
 
 .emptyState p {
-    color: var(--gray-400);
+    color: var(--text-lighter);
     margin: 0;
 }
 

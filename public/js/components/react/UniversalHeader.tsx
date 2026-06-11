@@ -1,9 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalState, type UserData } from '../../contexts/GlobalStateContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ResolvedTheme } from '../../core/theme';
 import { fetchJSON } from '@/core/http';
+import TasksBell from './TasksBell';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as authContract from '@shared/contracts/auth.contract';
+
+// Header theme toggle is a simple 2-state Light ⇄ Dark switch driven by the
+// CURRENT resolved theme, so it shows the right state even when the saved
+// preference is 'auto' (follow-system). Clicking commits to an explicit
+// light|dark; the 'auto'/system option lives in Settings → General. The icon
+// shows the active theme (sun = light, moon = dark). Module-scoped for a stable
+// identity across renders.
+const RESOLVED_ICON: Record<ResolvedTheme, string> = {
+    light: 'fas fa-sun',
+    dark: 'fas fa-moon',
+};
 
 interface Patient {
     code: string | number;
@@ -39,6 +53,8 @@ const UniversalHeader = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { setUser } = useGlobalState();
+    const { resolvedTheme, setPreference } = useTheme();
+    const nextTheme: ResolvedTheme = resolvedTheme === 'dark' ? 'light' : 'dark';
 
     const [currentPatient, setCurrentPatient] = useState<Patient | null>(null);
     const [navigationContext, setNavigationContext] = useState<NavigationContext | null>(null);
@@ -249,6 +265,20 @@ const UniversalHeader = () => {
 
                 {/* Header Right - Quick Actions */}
                 <div className="header-right">
+                    {/* App-wide tasks bell */}
+                    <TasksBell />
+
+                    {/* Theme toggle — 2-state Light ⇄ Dark (system default lives in Settings) */}
+                    <button
+                        type="button"
+                        className="theme-toggle-btn"
+                        onClick={() => setPreference(nextTheme)}
+                        aria-label={`${resolvedTheme === 'dark' ? 'Dark' : 'Light'} mode. Activate to switch to ${nextTheme} mode.`}
+                        title={`Switch to ${nextTheme} mode`}
+                    >
+                        <i className={RESOLVED_ICON[resolvedTheme]} aria-hidden="true" />
+                    </button>
+
                     {/* Current User Info */}
                     {currentUser && (
                         <div className="user-info">

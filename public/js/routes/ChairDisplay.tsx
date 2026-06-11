@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AnalogClock from '../components/react/AnalogClock';
 import { VISIBILITY_RESUME_THRESHOLD_MS } from '../constants/sse-liveness';
+import { applyResolvedTheme, getStoredThemePreference, resolveTheme } from '../core/theme';
 import styles from './ChairDisplay.module.css';
 
 interface ImageEntry {
@@ -52,6 +53,15 @@ const ChairDisplay = () => {
     const [patient, setPatient] = useState<PatientPayload | null>(null);
     const esRef = useRef<EventSource | null>(null);
     const hiddenSinceRef = useRef<number | null>(null);
+
+    // The kiosk is pinned to LIGHT regardless of the operator's device theme.
+    // ChairDisplay lives outside RootLayout (no ThemeProvider), but the FOUC
+    // script sets data-theme on <html> on every route — so force light on mount
+    // and restore the stored preference on unmount (navigating back into the app).
+    useLayoutEffect(() => {
+        applyResolvedTheme('light');
+        return () => applyResolvedTheme(resolveTheme(getStoredThemePreference()));
+    }, []);
 
     useEffect(() => {
         if (!chairId) return;

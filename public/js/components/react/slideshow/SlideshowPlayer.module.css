@@ -96,7 +96,7 @@
 
 .pairLabelMain {
   font-size: var(--font-size-base);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .pairLabelSub {
@@ -168,7 +168,7 @@
 
 .captionMain {
   font-size: var(--font-size-lg);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .captionSub {
@@ -278,6 +278,8 @@
   transition: background var(--transition-fast), transform var(--transition-fast);
 }
 
+/* The stage is an always-dark gradient (theme-independent), so the active dot
+   must stay bright — --surface would go dark in dark mode and vanish here. */
 .dotActive {
   background: var(--color-white);
   transform: scale(1.4);

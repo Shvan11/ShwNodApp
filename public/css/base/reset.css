@@ -13,11 +13,11 @@
   body {
     font-family: var(--font-primary);
     font-size: var(--font-size-base);
-    font-weight: normal;
+    font-weight: var(--font-weight-normal);
     min-height: 100%;
     margin: 0;
     padding: 0;
-    line-height: 1.5;
+    line-height: var(--line-height-normal);
     color: var(--text-color);
   }
 
@@ -25,7 +25,7 @@
     margin-top: 0;
     margin-bottom: 0.5rem;
     font-weight: var(--font-weight-bold);
-    line-height: 1.2;
+    line-height: var(--line-height-tight);
   }
 
   h1 { font-size: 2rem; margin-bottom: 1rem; }

@@ -16,9 +16,9 @@
     padding: 0.4rem 0.9rem;
     border-radius: 999px;
     font-size: 0.85rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     letter-spacing: 0.05em;
-    color: var(--primary-color, #007bff);
+    color: var(--primary-color);
     border: 1px solid rgba(0, 0, 0, 0.06);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     z-index: 10;
@@ -31,7 +31,7 @@
     padding: 0.4rem 0.9rem;
     border-radius: 999px;
     font-size: 0.78rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     letter-spacing: 0.04em;
     z-index: 10;
 }
@@ -57,7 +57,7 @@
 
 .notConfigured h1 {
     font-size: clamp(2rem, 5vw, 3.5rem);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     margin-bottom: 1rem;
     color: #6c757d;
 }
@@ -95,15 +95,15 @@
 
 .clinicCaption {
     font-size: clamp(1.5rem, 4vw, 2.4rem);
-    font-weight: 300;
+    font-weight: var(--font-weight-light);
     color: #495057;
     letter-spacing: 0.04em;
     text-align: center;
 }
 
 .clinicCaption strong {
-    color: var(--primary-color, #007bff);
-    font-weight: 600;
+    color: var(--primary-color);
+    font-weight: var(--font-weight-semibold);
 }
 
 .patientView {
@@ -130,7 +130,7 @@
 
 .patientLabel {
     font-size: 0.85rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     text-transform: uppercase;
     letter-spacing: 0.12em;
     color: #6c757d;
@@ -139,7 +139,7 @@
 
 .patientName {
     font-size: clamp(2rem, 4.5vw, 3.2rem);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: #1f2933;
     line-height: 1.1;
     margin: 0;
@@ -186,15 +186,15 @@
     border-radius: 14px;
     padding: 1.25rem 1.5rem;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-    border-left: 4px solid var(--primary-color, #007bff);
+    border-left: 4px solid var(--primary-color);
 }
 
 .visitNoteLabel {
     font-size: 0.78rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: 0.12em;
-    color: var(--primary-color, #007bff);
+    color: var(--primary-color);
     margin-bottom: 0.4rem;
 }
 
@@ -208,8 +208,8 @@
 /* The SP wraps the "Next: …" line in <font color=blue>; renderVisitSummary
    rewrites it to <span class="visit-next"> for safe colored emphasis. */
 .visitNoteContent :global(.visit-next) {
-    color: var(--primary-color, #007bff);
-    font-weight: 600;
+    color: var(--primary-color);
+    font-weight: var(--font-weight-semibold);
 }
 
 @media (max-width: 900px) {

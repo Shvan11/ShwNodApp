@@ -1,4 +1,4 @@
-import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, ChangeEvent, FormEvent } from 'react';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -23,6 +23,7 @@ interface Employee {
     percentage: boolean;
     receive_email: boolean;
     get_appointments: boolean;
+    is_active: boolean;
     sort_order: number | string | null;
     appointment_color: string | null;
 }
@@ -31,9 +32,11 @@ interface FormData {
     employee_name: string;
     position: string;
     email: string;
+    phone: string;
     percentage: boolean;
     receiveEmail: boolean;
     getAppointments: boolean;
+    is_active: boolean;
     sort_order: string;
     appointment_color: string;
 }
@@ -55,13 +58,20 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         employee_name: '',
         position: '',
         email: '',
+        phone: '',
         percentage: false,
         receiveEmail: false,
         getAppointments: false,
+        is_active: true,
         sort_order: '',
         appointment_color: ''
     });
     const [activeTab, setActiveTab] = useState<'basic' | 'other'>('basic');
+    // Right-click menu on the employee name → Edit/Delete without horizontal-
+    // scrolling the wide table to reach the Actions column.
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; employee: Employee } | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
     // Load employees and positions on component mount
     useEffect(() => {
@@ -69,11 +79,32 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         loadPositions();
     }, []);
 
+    // Close the right-click menu on outside-click or Escape (only while open).
+    useEffect(() => {
+        if (!contextMenu) return;
+        const handleOutside = (event: MouseEvent): void => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) closeContextMenu();
+        };
+        const handleEsc = (event: KeyboardEvent): void => {
+            if (event.key === 'Escape') closeContextMenu();
+        };
+        // Defer the outside listener a frame so the opening right-click doesn't close it.
+        const raf = requestAnimationFrame(() => document.addEventListener('mousedown', handleOutside));
+        document.addEventListener('keydown', handleEsc);
+        return () => {
+            cancelAnimationFrame(raf);
+            document.removeEventListener('mousedown', handleOutside);
+            document.removeEventListener('keydown', handleEsc);
+        };
+    }, [contextMenu, closeContextMenu]);
+
     const loadEmployees = async () => {
         try {
             setLoading(true);
             setError(null);
-            const data = await fetchJSON<{ employees?: Employee[] }>('/api/employees', { schema: employeeContract.employees.response });
+            // Settings is the ONLY place quit (inactive) employees appear — they are
+            // hidden everywhere else, so opt back in here to manage them.
+            const data = await fetchJSON<{ employees?: Employee[] }>('/api/employees?includeInactive=true', { schema: employeeContract.employees.response });
             setEmployees(data.employees || []);
         } catch (err) {
             console.error('Error loading employees:', err);
@@ -97,9 +128,11 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             employee_name: '',
             position: '',
             email: '',
+            phone: '',
             percentage: false,
             receiveEmail: false,
             getAppointments: false,
+            is_active: true,
             sort_order: '',
             appointment_color: ''
         });
@@ -113,9 +146,11 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             employee_name: employee.employee_name || '',
             position: String(employee.position || ''),
             email: employee.email || '',
+            phone: employee.phone || '',
             percentage: employee.percentage || false,
             receiveEmail: employee.receive_email || false,
             getAppointments: employee.get_appointments || false,
+            is_active: employee.is_active ?? true,
             sort_order: String(employee.sort_order || ''),
             appointment_color: employee.appointment_color || ''
         });
@@ -129,9 +164,11 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             employee_name: '',
             position: '',
             email: '',
+            phone: '',
             percentage: false,
             receiveEmail: false,
             getAppointments: false,
+            is_active: true,
             sort_order: '',
             appointment_color: ''
         });
@@ -179,10 +216,17 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         const target = e.target;
         const name = target.name;
         const value = target.type === 'checkbox' ? (target as HTMLInputElement).checked : target.value;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        setFormData(prev => {
+            const next = { ...prev, [name]: value };
+            // Marking someone as quit clears their commission / email / appointment
+            // flags (mirrors the server's auto-clear) so the form stays truthful.
+            if (name === 'is_active' && value === false) {
+                next.percentage = false;
+                next.receiveEmail = false;
+                next.getAppointments = false;
+            }
+            return next;
+        });
     };
 
     // Clearing the picker stores no colour, so the doctor falls back to their
@@ -339,6 +383,19 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
 
                                             <div className={styles.formRow}>
                                                 <div className={styles.formGroup}>
+                                                    <label htmlFor="phone">
+                                                        Phone Number
+                                                    </label>
+                                                    <input
+                                                        type="tel"
+                                                        id="phone"
+                                                        name="phone"
+                                                        value={formData.phone}
+                                                        onChange={handleInputChange}
+                                                        placeholder="e.g., 0750 123 4567"
+                                                    />
+                                                </div>
+                                                <div className={styles.formGroup}>
                                                     <label htmlFor="sort_order">
                                                         Sort Order
                                                         <span className={styles.fieldHelp}>
@@ -356,8 +413,25 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                         max="999"
                                                     />
                                                 </div>
-                                                <div className={styles.formGroup}>
-                                                    {/* Empty placeholder for grid alignment */}
+                                            </div>
+
+                                            <div className={styles.checkboxGroup}>
+                                                <div className={styles.checkboxItem}>
+                                                    <label>
+                                                        <input
+                                                            type="checkbox"
+                                                            name="is_active"
+                                                            checked={formData.is_active}
+                                                            onChange={handleInputChange}
+                                                        />
+                                                        <span className={styles.checkboxLabel}>
+                                                            <i className="fas fa-user-check"></i>
+                                                            Currently employed
+                                                            <span className={styles.fieldHelp}>
+                                                                (Uncheck if this employee has left / quit)
+                                                            </span>
+                                                        </span>
+                                                    </label>
                                                 </div>
                                             </div>
                                         </div>
@@ -421,6 +495,11 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                 <div className={styles.formGroup}></div>
                                             </div>
 
+                                            {!formData.is_active && (
+                                                <p className={styles.fieldHelp}>
+                                                    <i className="fas fa-info-circle"></i> This employee is marked as having quit, so email, appointment and commission options are disabled.
+                                                </p>
+                                            )}
                                             <div className={styles.checkboxGroup}>
                                                 <div className={styles.checkboxItem}>
                                                     <label>
@@ -429,6 +508,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                             name="receiveEmail"
                                                             checked={formData.receiveEmail}
                                                             onChange={handleInputChange}
+                                                            disabled={!formData.is_active}
                                                         />
                                                         <span className={styles.checkboxLabel}>
                                                             <i className="fas fa-envelope"></i>
@@ -444,6 +524,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                             name="getAppointments"
                                                             checked={formData.getAppointments}
                                                             onChange={handleInputChange}
+                                                            disabled={!formData.is_active}
                                                         />
                                                         <span className={styles.checkboxLabel}>
                                                             <i className="fas fa-calendar-check"></i>
@@ -459,6 +540,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                             name="percentage"
                                                             checked={formData.percentage}
                                                             onChange={handleInputChange}
+                                                            disabled={!formData.is_active}
                                                         />
                                                         <span className={styles.checkboxLabel}>
                                                             <i className="fas fa-percent"></i>
@@ -498,7 +580,9 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                     <th>ID</th>
                                     <th>Name</th>
                                     <th>Position</th>
+                                    <th>Status</th>
                                     <th>Sort Order</th>
+                                    <th>Phone</th>
                                     <th>Email</th>
                                     <th>Commission</th>
                                     <th>Email Notifications</th>
@@ -511,7 +595,15 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                 {employees.map(employee => (
                                     <tr key={employee.id}>
                                         <td data-label="ID">{employee.id}</td>
-                                        <td data-label="Name" className={styles.employeeName}>
+                                        <td
+                                            data-label="Name"
+                                            className={styles.employeeName}
+                                            onContextMenu={(e) => {
+                                                e.preventDefault();
+                                                setContextMenu({ x: e.clientX, y: e.clientY, employee });
+                                            }}
+                                            title="Right-click for actions"
+                                        >
                                             <i className="fas fa-user"></i>
                                             {employee.employee_name}
                                         </td>
@@ -520,10 +612,33 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                 {getPositionName(employee.position)}
                                             </span>
                                         </td>
+                                        <td data-label="Status">
+                                            {employee.is_active ? (
+                                                <span className={`${styles.badge} ${styles.badgeSuccess}`}>
+                                                    <i className="fas fa-user-check"></i>
+                                                    Active
+                                                </span>
+                                            ) : (
+                                                <span className={`${styles.badge} ${styles.badgeQuit}`}>
+                                                    <i className="fas fa-user-slash"></i>
+                                                    Quit
+                                                </span>
+                                            )}
+                                        </td>
                                         <td data-label="Sort Order">
                                             <span className={styles.sortOrderValue}>
                                                 {employee.sort_order || '—'}
                                             </span>
+                                        </td>
+                                        <td data-label="Phone">
+                                            {employee.phone ? (
+                                                <span className={styles.emailValue}>
+                                                    <i className="fas fa-phone"></i>
+                                                    {employee.phone}
+                                                </span>
+                                            ) : (
+                                                <span className={styles.noEmail}>No phone</span>
+                                            )}
                                         </td>
                                         <td data-label="Email">
                                             {employee.email ? (
@@ -600,6 +715,41 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                     </div>
                 )}
             </div>
+
+            {contextMenu && (
+                <div
+                    ref={menuRef}
+                    className={styles.contextMenu}
+                    style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
+                    role="menu"
+                >
+                    <button
+                        type="button"
+                        role="menuitem"
+                        className={styles.contextMenuItem}
+                        onClick={() => {
+                            handleEdit(contextMenu.employee);
+                            closeContextMenu();
+                        }}
+                    >
+                        <i className="fas fa-edit" aria-hidden="true"></i>
+                        <span>Edit</span>
+                    </button>
+                    <button
+                        type="button"
+                        role="menuitem"
+                        className={`${styles.contextMenuItem} ${styles.contextMenuItemDanger}`}
+                        onClick={() => {
+                            const { id, employee_name } = contextMenu.employee;
+                            closeContextMenu();
+                            handleDelete(id, employee_name);
+                        }}
+                    >
+                        <i className="fas fa-trash" aria-hidden="true"></i>
+                        <span>Delete</span>
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

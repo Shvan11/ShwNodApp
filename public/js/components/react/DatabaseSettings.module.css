@@ -119,13 +119,13 @@
 .settingGroup select:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 .settingGroup input.pendingChange,
 .settingGroup select.pendingChange {
     border-color: var(--warning-color);
-    background: var(--warning-50, #fffbeb);
+    background: var(--warning-50);
 }
 
 .settingDescription {
@@ -180,7 +180,7 @@
 }
 
 .connectionStatus.success {
-    background: var(--success-50, #f0fdf4);
+    background: var(--success-50);
     border-color: var(--success-200);
     color: var(--success-800);
 }
@@ -245,7 +245,7 @@
 
 .btnPrimary {
     background: var(--primary-color);
-    color: white;
+    color: var(--color-white);
 }
 
 .btnPrimary:hover:not(:disabled) {
@@ -256,7 +256,7 @@
 
 .btnSecondary {
     background: var(--secondary-color);
-    color: white;
+    color: var(--color-white);
     border: 1px solid var(--secondary-color);
 }
 
@@ -273,14 +273,14 @@
 }
 
 .btnWarning:hover:not(:disabled) {
-    background: var(--warning-600, #d97706);
+    background: var(--warning-600);
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
 
 .btnInfo {
     background: var(--info-color);
-    color: white;
+    color: var(--color-white);
 }
 
 .btnInfo:hover:not(:disabled) {
@@ -315,10 +315,10 @@
     align-items: center;
     gap: var(--spacing-sm);
     padding: var(--spacing-md);
-    background: var(--warning-50, #fffbeb);
-    border: 1px solid var(--warning-200, #fde68a);
+    background: var(--warning-50);
+    border: 1px solid var(--warning-200);
     border-radius: var(--radius-md);
-    color: var(--warning-800, #92400e);
+    color: var(--warning-800);
     font-size: var(--font-size-sm);
 }
 

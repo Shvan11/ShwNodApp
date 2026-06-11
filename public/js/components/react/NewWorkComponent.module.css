@@ -2,7 +2,7 @@
 /* Standalone form with compact spacing */
 
 .newWorkComponent {
-    background-color: var(--color-white);
+    background-color: var(--surface);
     padding: var(--spacing-sm);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
@@ -31,30 +31,11 @@
     margin-right: var(--spacing-xs);
 }
 
-.newWorkHeader .btnCancel {
-    padding: var(--spacing-xs) var(--spacing-sm);
-    font-size: var(--font-size-sm);
-    background-color: var(--gray-100);
-    color: var(--gray-700);
-    border: var(--border-width-thin) solid var(--gray-300);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.newWorkHeader .btnCancel:hover {
-    background-color: var(--gray-200);
-}
-
-.newWorkHeader .btnCancel i {
-    margin-right: var(--spacing-xs);
-}
-
 /* Loading State */
 .newWorkLoading {
     padding: var(--spacing-lg);
     text-align: center;
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-size: var(--font-size-base);
 }
 
@@ -148,7 +129,7 @@
     font-weight: var(--font-weight-normal);
     line-height: var(--line-height-normal);
     color: var(--text-primary);
-    background-color: var(--color-white);
+    background-color: var(--surface);
     background-clip: padding-box;
     border: var(--border-width-thin) solid var(--gray-300);
     border-radius: var(--radius-md);
@@ -166,7 +147,7 @@
     font-weight: var(--font-weight-normal);
     line-height: var(--line-height-relaxed);
     color: var(--text-primary);
-    background-color: var(--color-white);
+    background-color: var(--surface);
     background-clip: padding-box;
     border: var(--border-width-thin) solid var(--gray-300);
     border-radius: var(--radius-md);
@@ -188,7 +169,7 @@
 /* Placeholder styling */
 .formGroup input::placeholder,
 .formGroup textarea::placeholder {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     opacity: 1;
 }
 
@@ -273,7 +254,7 @@
     padding: var(--spacing-xs) var(--spacing-sm);
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     background: transparent;
     border: none;
     border-bottom: var(--border-width-medium) solid transparent;
@@ -329,34 +310,10 @@
 /* Use classes: .btn .btn-primary, .btn .btn-secondary, etc. */
 
 /* Confirmation Dialog */
-.confirmationDialogOverlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--z-index-modal);
-    animation: fadeIn 0.2s ease-in-out;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
-}
-
 .confirmationDialog {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
     max-width: 500px;
     width: 90%;
     animation: slideIn 0.3s ease-out;
@@ -376,9 +333,9 @@
 
 .confirmationHeader {
     background: linear-gradient(135deg, var(--warning-400) 0%, var(--warning-300) 100%);
-    color: white;
+    color: var(--color-white);
     padding: 1rem 1.25rem;
-    border-radius: 8px 8px 0 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -391,7 +348,7 @@
 .confirmationHeader h3 {
     margin: 0;
     font-size: 1.125rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .confirmationBody {
@@ -406,14 +363,14 @@
 
 .confirmationQuestion {
     margin: 1rem 0 0 0;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--gray-800);
     font-size: 1rem;
 }
 
 .existingWorkDetails {
     background-color: var(--gray-50);
-    border: 1px solid var(--gray-200);
+    border: var(--border-width-thin) solid var(--gray-200);
     border-radius: 6px;
     padding: 1rem;
     margin: 1rem 0;
@@ -422,7 +379,7 @@
 .detailRow {
     display: flex;
     padding: 0.5rem 0;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: var(--border-width-thin) solid var(--gray-200);
     font-size: 0.875rem;
 }
 
@@ -432,9 +389,9 @@
 }
 
 .detailRow strong {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     min-width: 140px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .detailSection h4 {
@@ -454,7 +411,7 @@
 
 .statusCompleted {
     color: var(--success-600);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .confirmationActions {
@@ -489,7 +446,7 @@
 
 .formHint {
     font-size: var(--font-size-xs);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     margin-top: var(--spacing-xs);
 }
 

@@ -4,6 +4,8 @@ import { useSearchParams } from 'react-router-dom';
 import Chart from 'chart.js/auto';
 import DailyInvoicesModal from './DailyInvoicesModal';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
+import { getChartThemeColors } from '../../utils/chartTheme';
+import { useTheme } from '../../contexts/ThemeContext';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
 import * as reports from '@shared/contracts/reports.contract';
 import styles from './StatisticsComponent.module.css';
@@ -74,6 +76,7 @@ const VIEW_MODES = { DAILY: 'daily', MONTHLY: 'monthly', YEARLY: 'yearly' } as c
 type ViewMode = typeof VIEW_MODES[keyof typeof VIEW_MODES];
 
 const StatisticsComponent = () => {
+    const { resolvedTheme } = useTheme();
     const [searchParams, setSearchParams] = useSearchParams();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -299,6 +302,7 @@ const StatisticsComponent = () => {
         // Chart.js renders to canvas — CSS vars must be resolved to hex first.
         const successGreen = getComputedStyle(document.documentElement)
             .getPropertyValue('--success-green').trim() || '#22c55e';
+        const chartColors = getChartThemeColors();
 
         revenueTrendChartInstance.current = new Chart(ctx, {
             type: viewMode === VIEW_MODES.YEARLY ? 'bar' : 'line',
@@ -354,11 +358,13 @@ const StatisticsComponent = () => {
                     y: {
                         beginAtZero: true,
                         ticks: {
+                            color: chartColors.ticks,
                             callback: (value) => '$' + formatNumber(value as number)
                         },
-                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                        grid: { color: chartColors.grid }
                     },
                     x: {
+                        ticks: { color: chartColors.ticks },
                         grid: { display: false }
                     }
                 }
@@ -372,7 +378,7 @@ const StatisticsComponent = () => {
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [statistics, exchangeRate, viewMode, month, year, yearlyData, loadingYearly, multiYearData, loadingMultiYear, yearRangeStart, yearRangeEnd]);
+    }, [statistics, exchangeRate, viewMode, month, year, yearlyData, loadingYearly, multiYearData, loadingMultiYear, yearRangeStart, yearRangeEnd, resolvedTheme]);
 
     // Navigation handlers
     const handlePrevMonth = () => {

@@ -89,7 +89,7 @@
 .formGroup select:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 .formActions {

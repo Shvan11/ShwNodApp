@@ -24,7 +24,8 @@ type StaffMember = {
 
 /**
  * GET /doctors
- * Get all doctors (employees with position = Doctor)
+ * Get all ACTIVE doctors (employees with position = Doctor; quit employees
+ * are hidden — they only appear on the Settings page).
  */
 router.get('/doctors', async (_req: Request, res: Response): Promise<void> => {
   try {
@@ -34,6 +35,7 @@ router.get('/doctors', async (_req: Request, res: Response): Promise<void> => {
       FROM "employees" e
       INNER JOIN "positions" p ON e."position" = p."id"
       WHERE p."position_name" = 'Doctor'
+        AND e."is_active" = true
       ORDER BY e."employee_name"
     `.execute(db);
     sendData(res, staff.doctors.response, doctors);
@@ -45,7 +47,7 @@ router.get('/doctors', async (_req: Request, res: Response): Promise<void> => {
 
 /**
  * GET /operators
- * Get all operators (all employees)
+ * Get all ACTIVE operators (every current employee; quit employees are hidden).
  */
 router.get('/operators', async (_req: Request, res: Response): Promise<void> => {
   try {
@@ -53,6 +55,7 @@ router.get('/operators', async (_req: Request, res: Response): Promise<void> => 
     const { rows: operators } = await sql<StaffMember>`
       SELECT e."id", e."employee_name"
       FROM "employees" e
+      WHERE e."is_active" = true
       ORDER BY e."employee_name"
     `.execute(db);
     sendData(res, staff.operators.response, operators);

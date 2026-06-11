@@ -74,7 +74,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  color: white;
+  color: var(--color-white);
 }
 
 .filterHeaderContent i {
@@ -84,14 +84,14 @@
 .filterHeaderContent h3 {
   margin: 0;
   font-size: 20px;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.5px;
 }
 
 .btnResetInline {
   background: rgba(255, 255, 255, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
+  color: var(--color-white);
   padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
@@ -125,9 +125,9 @@
 }
 
 .modernFilterGroup label {
-  color: white;
+  color: var(--color-white);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -140,20 +140,24 @@
   opacity: 0.9;
 }
 
+/* Fields sit on the fixed purple-gradient card, so they stay theme-independent
+   (fixed light field + fixed dark ink) in both light and dark mode — using a
+   flipping --text-color here turned the text near-white on a near-white field
+   in dark mode. */
 .modernInput {
   background: rgba(255, 255, 255, 0.95);
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 10px;
   padding: 12px 16px;
   font-size: 14px;
-  color: var(--text-color);
+  color: var(--palette-gray-800);
   transition: all 0.3s ease;
   font-family: inherit;
 }
 
 .modernInput:focus {
   outline: none;
-  background: white;
+  background: var(--color-white);
   border-color: var(--success-color);
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
   transform: translateY(-2px);
@@ -170,7 +174,7 @@
   border-radius: 10px;
   padding: 12px 40px 12px 16px;
   font-size: 14px;
-  color: var(--text-color);
+  color: var(--palette-gray-800);
   cursor: pointer;
   transition: all 0.3s ease;
   appearance: none;
@@ -179,7 +183,7 @@
 
 .modernSelect:focus {
   outline: none;
-  background: white;
+  background: var(--color-white);
   border-color: var(--success-color);
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
   transform: translateY(-2px);
@@ -196,7 +200,8 @@
   right: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--text-light);
+  /* Fixed mid-gray to stay legible on the fixed light select field in both themes. */
+  color: var(--palette-gray-500);
   pointer-events: none;
   font-size: 12px;
 }
@@ -218,7 +223,7 @@
   border: none;
   border-radius: 10px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
   transition: all 0.3s ease;
   text-transform: uppercase;
@@ -228,7 +233,7 @@
 
 .btnModernPrimary {
   background: linear-gradient(135deg, var(--success-color) 0%, var(--success-darker) 100%);
-  color: white;
+  color: var(--color-white);
   box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
 }
 
@@ -247,15 +252,15 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--spacing-lg);
-  background-color: var(--background-primary, white);
-  border-bottom: 2px solid var(--border-color, var(--gray-200));
+  background-color: var(--background-primary);
+  border-bottom: 2px solid var(--border-color);
   margin-bottom: var(--spacing-lg);
 }
 
 .expensesPageHeader h1 {
   margin: 0;
   font-size: var(--font-size-3xl);
-  color: var(--text-primary, var(--text-color));
+  color: var(--text-primary);
 }
 
 /* Mobile: smaller header, stacked layout */
@@ -310,8 +315,8 @@
 }
 
 .summaryCard {
-  background: linear-gradient(135deg, var(--primary-color, var(--success-color)) 0%, var(--primary-dark, var(--success-darker)) 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+  color: var(--color-white);
   padding: var(--spacing-lg);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
@@ -350,7 +355,7 @@
 
 .summaryLabel {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   opacity: 0.9;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -370,7 +375,7 @@
 
 /* Table Container */
 .tableContainer {
-  background: var(--background-primary, white);
+  background: var(--background-primary);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   padding: var(--spacing-lg);
@@ -435,15 +440,15 @@
 }
 
 .expensesTable thead {
-  background-color: var(--table-header-bg, var(--gray-100));
-  border-bottom: 2px solid var(--border-color, var(--gray-200));
+  background-color: var(--table-header-bg);
+  border-bottom: 2px solid var(--border-color);
 }
 
 .expensesTable th {
   padding: 12px;
   text-align: left;
-  font-weight: 600;
-  color: var(--text-primary, var(--text-color));
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
   text-transform: uppercase;
   font-size: 12px;
   letter-spacing: 0.5px;
@@ -451,23 +456,23 @@
 }
 
 .expensesTable tbody tr {
-  border-bottom: 1px solid var(--border-color, var(--gray-200));
+  border-bottom: 1px solid var(--border-color);
   transition: background-color 0.2s;
 }
 
 .expensesTable tbody tr:hover {
-  background-color: var(--hover-bg, var(--gray-50));
+  background-color: var(--hover-bg);
 }
 
 .expensesTable td {
   padding: 12px;
-  color: var(--text-secondary, var(--text-light));
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
 .amountCell {
-  font-weight: 600;
-  color: var(--text-primary, var(--text-color));
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }
 
 /* Table currency colors */
@@ -499,14 +504,14 @@
 .loadingState {
   text-align: center;
   padding: 60px 20px;
-  color: var(--text-muted, var(--gray-400));
+  color: var(--text-muted);
 }
 
 .loadingSpinner {
   width: 40px;
   height: 40px;
-  border: 3px solid var(--border-color, var(--gray-200));
-  border-top-color: var(--primary-color, var(--success-color));
+  border: 3px solid var(--border-color);
+  border-top-color: var(--primary-color);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 20px;
@@ -520,7 +525,7 @@
 .emptyState {
   text-align: center;
   padding: 60px 20px;
-  color: var(--text-muted, var(--gray-400));
+  color: var(--text-muted);
   font-size: 16px;
 }
 
@@ -539,12 +544,12 @@
 .errorBanner p {
   margin: 0;
   color: var(--error-600);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 /* Modal Styles */
 .modalContent {
-  background-color: var(--background-primary, white);
+  background-color: var(--background-primary);
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   width: 90%;
@@ -574,17 +579,17 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px;
-  border-bottom: 1px solid var(--border-color, var(--gray-200));
+  border-bottom: 1px solid var(--border-color);
 }
 
 .modalHeader h2 {
   margin: 0;
   font-size: 20px;
-  color: var(--text-primary, var(--text-color));
+  color: var(--text-primary);
 }
 
 .closeBtn {
-  color: var(--gray-400);
+  color: var(--text-lighter);
   font-size: 28px;
   font-weight: bold;
   cursor: pointer;
@@ -604,7 +609,7 @@
 
 .modalFooter {
   padding: 20px;
-  border-top: 1px solid var(--border-color, var(--gray-200));
+  border-top: 1px solid var(--border-color);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -618,8 +623,8 @@
 .formGroup label {
   display: block;
   margin-bottom: 5px;
-  font-weight: 500;
-  color: var(--text-secondary, var(--text-light));
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
   font-size: 14px;
 }
 
@@ -636,7 +641,7 @@
 .formInput {
   width: 100%;
   padding: 10px;
-  border: 1px solid var(--border-color, var(--gray-300));
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   font-size: 14px;
   transition: border-color 0.2s;
@@ -646,7 +651,7 @@
 
 .formInput:focus {
   outline: none;
-  border-color: var(--primary-color, var(--success-color));
+  border-color: var(--primary-color);
   box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
 }
 
@@ -665,13 +670,13 @@
   color: var(--error-color);
   font-size: 12px;
   margin-top: 4px;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 /* Warning Text */
 .warningText {
   color: var(--warning-600);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   margin-bottom: 15px;
   padding: 12px;
   background-color: var(--warning-50);
@@ -750,17 +755,17 @@
     min-width: 85px;
     position: sticky;
     left: 0;
-    background-color: white;
+    background-color: var(--surface);
     z-index: 2;
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
   }
 
   .expensesTable thead th:first-child {
-    background-color: var(--table-header-bg, var(--gray-100));
+    background-color: var(--table-header-bg);
   }
 
   .expensesTable tbody tr:hover td:first-child {
-    background-color: var(--hover-bg, var(--gray-50));
+    background-color: var(--hover-bg);
   }
 
   .noteCell {

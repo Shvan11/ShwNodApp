@@ -25,7 +25,7 @@
     bottom: 0;
     width: 900px;
     max-width: 100%;
-    background: white;
+    background: var(--surface);
     box-shadow: -4px 0 24px rgba(0, 0, 0, 0.2);
     display: flex;
     flex-direction: column;
@@ -42,7 +42,7 @@
     justify-content: space-between;
     align-items: center;
     background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
-    color: white;
+    color: var(--color-white);
     flex-shrink: 0;
     flex-grow: 0;
 }
@@ -55,7 +55,7 @@
 .close-btn {
     background: rgba(255, 255, 255, 0.2);
     border: none;
-    color: white;
+    color: var(--color-white);
     width: 32px;
     height: 32px;
     border-radius: 50%;
@@ -130,7 +130,7 @@
     margin: 0 0 0.7rem 0;
     font-size: 1rem;
     color: var(--text-color);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .form-field {
@@ -140,7 +140,7 @@
 .form-field label {
     display: block;
     margin-bottom: 0.35rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--text-color);
     font-size: 0.875rem;
 }
@@ -212,7 +212,7 @@
 .form-row-three-col .form-field .field-optional-text {
     display: block;
     font-size: 0.75rem;
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
     color: var(--gray-400);
     margin-top: 0.15rem;
 }
@@ -239,7 +239,7 @@
 .form-field-checkbox label {
     margin: 0;
     cursor: pointer;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .error-message {
@@ -274,7 +274,7 @@
 }
 
 .confirm-dialog {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 2rem;
     max-width: 450px;
@@ -309,7 +309,7 @@
 
 .drawer-container .btn-primary {
     background: var(--blue-300);
-    color: white;
+    color: var(--color-white);
 }
 
 .drawer-container .btn-primary:hover {
@@ -332,7 +332,7 @@
 
 .drawer-container .btn-danger {
     background: var(--error-color);
-    color: white;
+    color: var(--color-white);
 }
 
 .drawer-container .btn-danger:hover {
@@ -360,7 +360,7 @@
     border-bottom: 3px solid transparent;
     cursor: pointer;
     font-size: 0.95rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--text-light);
     transition: all 0.2s;
     display: flex;
@@ -375,10 +375,10 @@
 }
 
 .form-tab.active {
-    background: white;
+    background: var(--surface);
     color: var(--blue-300);
     border-bottom-color: var(--blue-300);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .form-tab i {
@@ -462,7 +462,7 @@
     border-radius: 12px;
     padding: 1.5rem;
     margin: 1.5rem;
-    color: white;
+    color: var(--color-white);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
@@ -478,7 +478,7 @@
 .aligner-payment-summary .summary-header h3 {
     margin: 0;
     font-size: 1.5rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
 }
 
 .aligner-payment-summary .set-currency {
@@ -486,7 +486,7 @@
     padding: 0.4rem 1rem;
     border-radius: 20px;
     font-size: 0.9rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .aligner-payment-summary .summary-grid {
@@ -510,7 +510,7 @@
 
 .aligner-payment-summary .summary-item .value {
     font-size: 1.25rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
 }
 
 .aligner-payment-summary .summary-item.highlight {
@@ -544,7 +544,7 @@
 .aligner-payment-form label {
     display: block;
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--gray-700);
     margin-bottom: 0.5rem;
 }
@@ -565,7 +565,7 @@
     border: 2px solid var(--gray-200);
     border-radius: 8px;
     font-size: 1.125rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--gray-900);
     transition: all 0.2s;
 }
@@ -585,7 +585,7 @@
     color: var(--gray-500);
     padding: 0.75rem 1.25rem;
     border-radius: 8px;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: 1rem;
     min-width: 60px;
     text-align: center;
@@ -616,7 +616,7 @@
     color: var(--error-400);
     font-size: 0.75rem;
     margin-top: 0.4rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .balance-preview {
@@ -633,13 +633,13 @@
 
 .balance-preview .preview-label {
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--success-700);
 }
 
 .balance-preview .preview-value {
     font-size: 1.25rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--success-600);
 }
 
@@ -649,11 +649,11 @@
 
 .balance-preview .badge-success {
     background: var(--success-500);
-    color: white;
+    color: var(--color-white);
     padding: 0.35rem 0.875rem;
     border-radius: 12px;
     font-size: 0.75rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -675,13 +675,13 @@
 }
 
 .aligner-payment-drawer .drawer-footer .btn-cancel {
-    background: white;
+    background: var(--surface);
     color: var(--gray-500);
     border: 2px solid var(--gray-200);
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     cursor: pointer;
     transition: all 0.2s;
 }
@@ -693,12 +693,12 @@
 
 .aligner-payment-drawer .drawer-footer .btn-submit {
     background: linear-gradient(135deg, var(--success-500), var(--success-600));
-    color: white;
+    color: var(--color-white);
     border: none;
     padding: 0.75rem 2rem;
     border-radius: 8px;
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -741,12 +741,12 @@
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
-    color: white;
+    color: var(--color-white);
     border: none;
     border-radius: 8px;
     cursor: pointer;
     font-size: 0.95rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     transition: all 0.3s ease;
 }
 
@@ -809,7 +809,7 @@
 }
 
 .note-item {
-    background: white;
+    background: var(--surface);
     border: 1px solid var(--gray-200);
     border-radius: 8px;
     padding: 1rem;
@@ -841,7 +841,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-size: 0.9rem;
 }
 
@@ -900,7 +900,7 @@
 
 .edit-set-btn {
     background: linear-gradient(135deg, var(--blue-300), var(--blue-800));
-    color: white;
+    color: var(--color-white);
     border: none;
     padding: 0.6rem 1.2rem;
     border-radius: 6px;
@@ -909,7 +909,7 @@
     align-items: center;
     gap: 0.5rem;
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     transition: all 0.3s;
     white-space: nowrap;
     box-shadow: 0 2px 8px rgba(0, 115, 230, 0.3);
@@ -1038,7 +1038,7 @@
 
 /* Aligner Set Card */
 .aligner-set-card {
-    background: white;
+    background: var(--surface);
     border: 2px solid var(--gray-200);
     border-radius: 12px;
     padding: 1.5rem;
@@ -1075,7 +1075,7 @@
 /* Activity Banner at top of card */
 .activity-banner {
     background: linear-gradient(135deg, var(--warning-orange) 0%, var(--warning-600) 100%);
-    color: white;
+    color: var(--color-white);
     padding: 0.75rem 1rem;
     border-radius: 8px;
     margin-bottom: 1rem;
@@ -1146,7 +1146,7 @@
 
 .folder-btn {
     background: var(--warning-orange);
-    color: white;
+    color: var(--color-white);
     border: none;
     padding: 0.5rem 1rem;
     border-radius: 6px;
@@ -1171,7 +1171,7 @@
 
 .pdf-btn {
     background: var(--error-pink);
-    color: white;
+    color: var(--color-white);
     border: none;
     padding: 0.5rem 1rem;
     border-radius: 6px;
@@ -1198,23 +1198,23 @@
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
     font-size: 0.8rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
 }
 
 .set-badge.active {
     background: var(--success-color);
-    color: white;
+    color: var(--color-white);
 }
 
 .set-badge.inactive {
     background: var(--gray-400);
-    color: white;
+    color: var(--color-white);
 }
 
 .set-type {
     background: var(--blue-300);
-    color: white;
+    color: var(--color-white);
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
     font-size: 0.85rem;
@@ -1241,7 +1241,7 @@
 
 .set-info-item strong {
     color: var(--text-color);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .set-progress {
@@ -1271,7 +1271,7 @@
 
 .toggle-batches-btn {
     background: var(--blue-300);
-    color: white;
+    color: var(--color-white);
     border: none;
     padding: 0.5rem 1rem;
     border-radius: 6px;
@@ -1301,7 +1301,7 @@
 
 .action-icon-btn.queue-labels {
     background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    color: white;
+    color: var(--color-white);
 }
 
 .action-icon-btn.queue-labels:hover {
@@ -1323,7 +1323,7 @@
 
 .patient-info {
     background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
-    color: white;
+    color: var(--color-white);
     padding: 2rem;
     border-radius: 12px;
     margin-bottom: 2rem;
@@ -1337,8 +1337,8 @@
 .patient-details h2 {
     margin: 0 0 0.5rem 0;
     font-size: 1.8rem;
-    color: white;
-    font-weight: 700;
+    color: var(--color-white);
+    font-weight: var(--font-weight-bold);
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -1504,7 +1504,7 @@
 }
 
 .batch-title {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-color);
     font-size: 1rem;
 }
@@ -1513,27 +1513,27 @@
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
     font-size: 0.8rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .batch-status.delivered {
     background: var(--success-color);
-    color: white;
+    color: var(--color-white);
 }
 
 .batch-status.pending {
     background: var(--warning-orange);
-    color: white;
+    color: var(--color-white);
 }
 
 .batch-status.pending-manufacture {
     background: #00acc1;  /* Cyan 600 */
-    color: white;
+    color: var(--color-white);
 }
 
 .batch-status.pending-delivery {
     background: var(--warning-orange);
-    color: white;
+    color: var(--color-white);
 }
 
 .batch-details {
@@ -1688,7 +1688,7 @@
 
 .video-btn {
     background: var(--error-color);
-    color: white;
+    color: var(--color-white);
     border: none;
     padding: 0.5rem 1rem;
     border-radius: 6px;
@@ -1702,7 +1702,7 @@
 }
 
 .video-btn:hover {
-    background: var(--error-dark, #c62828);
+    background: var(--error-dark);
     transform: translateY(-2px);
     box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
 }
@@ -1713,7 +1713,7 @@
 
 .archform-btn {
     background: #00897b;
-    color: white;
+    color: var(--color-white);
     border: none;
     padding: 0.5rem 1rem;
     border-radius: 6px;
@@ -1757,7 +1757,7 @@
 
 .form-field-checkbox.form-field-checkbox-compact label {
     font-size: 0.85rem;
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
 }
 
 /* ===================================
@@ -1823,7 +1823,7 @@
 .remaining-count {
     margin-left: 1rem;
     font-size: 0.9rem;
-    font-weight: normal;
+    font-weight: var(--font-weight-normal);
     color: var(--gray-500);
 }
 
@@ -1838,7 +1838,7 @@
 /* Optional field helper text */
 .field-optional-text {
     font-size: 0.85rem;
-    font-weight: normal;
+    font-weight: var(--font-weight-normal);
     color: var(--gray-500);
 }
 
@@ -1883,7 +1883,7 @@
 
 .pdf-status-header span {
     color: var(--info-800);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .pdf-status-actions {

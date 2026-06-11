@@ -58,12 +58,12 @@
 }
 
 .dangerBtn {
-  border-color: var(--danger-color, #d9534f);
-  color: var(--danger-color, #d9534f);
+  border-color: var(--danger-color);
+  color: var(--danger-color);
 }
 
 .dangerBtn:hover {
-  background: var(--danger-color, #d9534f);
+  background: var(--danger-color);
   color: var(--color-white);
 }
 
@@ -99,10 +99,10 @@
 }
 
 .card.ok {
-  border-left-color: var(--success-color, #2e7d32);
+  border-left-color: var(--success-color);
 }
 .card.warn {
-  border-left-color: var(--amber-500, #f0ad4e);
+  border-left-color: var(--warning-400);
 }
 .card.off {
   border-left-color: var(--text-muted);
@@ -143,10 +143,10 @@
 }
 
 .badge.ok .dot {
-  background: var(--success-color, #2e7d32);
+  background: var(--success-color);
 }
 .badge.warn .dot {
-  background: var(--amber-500, #f0ad4e);
+  background: var(--warning-400);
 }
 .badge.off .dot {
   background: var(--text-muted);
@@ -197,12 +197,12 @@
 }
 
 .okText {
-  color: var(--success-color, #2e7d32);
+  color: var(--success-color);
   font-weight: 600;
 }
 
 .warnText {
-  color: var(--amber-600, #c77700);
+  color: var(--amber-600);
 }
 
 /* ── Actions / login flow ── */

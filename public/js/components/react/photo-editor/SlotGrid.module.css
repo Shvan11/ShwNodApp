@@ -16,14 +16,14 @@
      why it actually shrinks the slots: a `width`-driven box reflows, whereas
      `zoom` cancels against the cells' own `width:100%`. react-easy-crop and
      drag-drop coordinates are unaffected; Save output is identical. */
-  max-width: calc(100% * var(--pe-zoom, 1));
+  max-width: calc(100% * var(--pe-zoom));
   margin-inline: auto;
 }
 
 .cell {
   display: flex;
   flex-direction: column;
-  border: 2px solid var(--border-color, #e5e7eb);
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-lg);
   overflow: hidden;
   background: var(--background-primary);
@@ -44,12 +44,12 @@
 
 .cellHeader {
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 2px var(--spacing-xs);
   background: var(--background-secondary);
-  color: var(--text-color, #374151);
+  color: var(--text-color);
   text-align: center;
 }
 

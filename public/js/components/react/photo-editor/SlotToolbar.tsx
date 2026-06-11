@@ -18,10 +18,21 @@ const SlotToolbar = ({ hasImage, rotation, onSetRotation }: Props) => {
   // in [-180, 180] (the reducer re-normalises negatives on input).
   const deg = Math.round(rotation);
   const signedDeg = deg > 180 ? deg - 360 : deg;
+  // Nudge buttons step ±1°; the reducer re-normalises so wrap-around is safe.
   return (
     <div className={styles.toolbar}>
       <label className={styles.rotateRow}>
         <i className="fas fa-rotate" aria-hidden="true" title="Fine rotation" />
+        <button
+          type="button"
+          className={styles.nudge}
+          disabled={!hasImage}
+          onClick={() => onSetRotation(deg - 1)}
+          title="Rotate 1° counter-clockwise"
+          aria-label="Rotate 1 degree counter-clockwise"
+        >
+          −1°
+        </button>
         <input
           type="range"
           className={styles.slider}
@@ -33,6 +44,16 @@ const SlotToolbar = ({ hasImage, rotation, onSetRotation }: Props) => {
           onChange={(e) => onSetRotation(Number(e.target.value))}
           aria-label="Fine rotation (degrees, 0 = upright)"
         />
+        <button
+          type="button"
+          className={styles.nudge}
+          disabled={!hasImage}
+          onClick={() => onSetRotation(deg + 1)}
+          title="Rotate 1° clockwise"
+          aria-label="Rotate 1 degree clockwise"
+        >
+          +1°
+        </button>
         <span className={styles.deg}>{signedDeg}°</span>
       </label>
     </div>

@@ -39,7 +39,7 @@
 }
 
 .closeBtn {
-  color: var(--gray-400);
+  color: var(--text-lighter);
   font-size: 28px;
   font-weight: var(--font-weight-bold);
   cursor: pointer;
@@ -220,7 +220,7 @@
   padding: 8px 20px;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  color: var(--white);
+  color: var(--color-white);
   background-color: var(--primary-color);
   border: none;
   border-radius: var(--radius-md);
@@ -271,7 +271,7 @@
   border-radius: 50%;
   border: none;
   background-color: rgba(0, 0, 0, 0.6);
-  color: var(--white);
+  color: var(--color-white);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
@@ -296,7 +296,7 @@
   width: 16px;
   height: 16px;
   border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: var(--white);
+  border-top-color: var(--color-white);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }

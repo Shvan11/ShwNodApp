@@ -1,10 +1,10 @@
 /* ===== EDIT PATIENT FORM STYLES ===== */
 
 .editPatientForm {
-    background: white;
+    background: var(--surface);
     padding: 1.5rem;
     border-radius: 8px;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-card);
 }
 
 /* Compact form rows with tighter spacing */
@@ -45,7 +45,7 @@
     border-radius: 6px;
     font-size: 0.9375rem;
     transition: all 0.2s ease;
-    background: white;
+    background: var(--surface);
 }
 
 .formGroup input:focus,
@@ -53,7 +53,7 @@
 .formGroup textarea:focus {
     outline: none;
     border-color: var(--indigo-500);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 .formGroup textarea {
@@ -92,7 +92,7 @@
 }
 
 .editPatientDescription {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     margin-top: var(--spacing-sm);
     margin-bottom: 0;
 }

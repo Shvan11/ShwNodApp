@@ -1,0 +1,156 @@
+/* TaskFormModal — task-specific form bits (structure reuses global modal/form classes). */
+
+/* Close button — neutral ghost (the global `.modal-close-btn` is only styled under
+   the orange `.alert-modal` scope, which this neutral task modal doesn't use). */
+.closeBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    line-height: 1;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.closeBtn:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+}
+
+/* Body padding + footer layout — global `.modal-body`/`.modal-footer` carry no base
+   rules (only `.alert-modal`-scoped), so style them locally. */
+.body {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+}
+
+.footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--border-light);
+}
+
+.optional {
+    color: var(--text-lighter);
+    font-weight: var(--font-weight-normal);
+    font-size: var(--font-size-sm);
+}
+
+/* Severity selector — green / amber / red, mirroring the patient AlertModal. */
+.severityRow {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.severityOption {
+    cursor: pointer;
+}
+
+.severityOption input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.severityBadge {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    border: 2px solid transparent;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.severityBadge:hover {
+    transform: scale(1.05);
+}
+
+.sev1 { background: var(--success-100); color: var(--success-700); border-color: var(--success-200); }
+.sev2 { background: var(--warning-100); color: var(--warning-700); border-color: var(--warning-200); }
+.sev3 { background: var(--error-100); color: var(--error-700); border-color: var(--error-200); }
+
+.sev1.severityActive { background: var(--success-500); color: var(--color-white); border-color: var(--success-600); }
+.sev2.severityActive { background: var(--warning-500); color: var(--color-white); border-color: var(--warning-600); }
+.sev3.severityActive { background: var(--error-500); color: var(--color-white); border-color: var(--error-600); }
+
+/* Patient picker */
+.picker {
+    position: relative;
+}
+
+.pickerDropdown {
+    position: absolute;
+    top: calc(100% + 2px);
+    inset-inline: 0;
+    margin: 0;
+    padding: var(--spacing-xs);
+    list-style: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: var(--z-index-popover);
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.pickerOption {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.pickerOption:hover {
+    background: var(--surface-hover);
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    color: var(--text-color);
+}
+
+.chipId {
+    color: var(--text-lighter);
+    font-size: var(--font-size-sm);
+}
+
+.chipRemove {
+    border: none;
+    background: transparent;
+    color: var(--text-light);
+    cursor: pointer;
+    font-size: var(--font-size-lg);
+    line-height: 1;
+    padding: 0 var(--spacing-xs);
+}
+
+.chipRemove:hover {
+    color: var(--error-500);
+}
+
+/* Optional date fields side by side */
+.dateGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+}

@@ -51,7 +51,7 @@
     align-items: center;
     gap: var(--spacing-sm);
     font-size: var(--font-size-base);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-secondary);
     margin-bottom: var(--spacing-md);
     padding-bottom: var(--spacing-sm);
@@ -97,19 +97,19 @@
 }
 
 .lookup-accordion-header:hover {
-    background: var(--background-tertiary, #e9ecef);
+    background: var(--background-tertiary);
 }
 
 .lookup-accordion-item.expanded .lookup-accordion-header {
     background: var(--primary-color);
-    color: white;
+    color: var(--color-white);
 }
 
 .accordion-title {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .accordion-title i {
@@ -174,7 +174,7 @@
 .search-box input:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 .search-clear {
@@ -214,7 +214,7 @@
 .lookup-table th {
     padding: var(--spacing-sm) var(--spacing-md);
     text-align: left;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-secondary);
     border-bottom: 2px solid var(--border-color);
     white-space: nowrap;
@@ -275,26 +275,27 @@
 
 .btn-icon.btn-edit {
     background: var(--info-color);
-    color: white;
+    color: var(--color-white);
 }
 
 .btn-icon.btn-edit:hover {
-    background: #138496;
+    background: var(--info-dark);
 }
 
 .btn-icon.btn-delete {
     background: var(--error-color);
-    color: white;
+    color: var(--color-white);
 }
 
 .btn-icon.btn-delete:hover {
-    background: #c82333;
+    background: var(--error-dark);
 }
 
-/* Empty state */
-.empty-row {
+/* Empty state — scoped to the table so it outranks `.lookup-table td`
+   padding without needing !important. */
+.lookup-table .empty-row {
     text-align: center;
-    padding: var(--spacing-xl) !important;
+    padding: var(--spacing-xl);
     color: var(--text-secondary);
 }
 
@@ -315,7 +316,7 @@
 }
 
 .item-count {
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 /* ===================================
@@ -330,15 +331,15 @@
     right: 0;
     bottom: 0;
     background-color: rgba(0, 0, 0, 0.3);
-    z-index: var(--z-index-modal, 1040);
+    z-index: var(--z-index-modal);
 }
 
 /* Editor Popover - positioned next to anchor */
 .lookup-editor-popover {
     position: fixed;
-    z-index: calc(var(--z-index-modal, 1040) + 1);
-    background: var(--background-primary, white);
-    border-radius: var(--radius-lg, 8px);
+    z-index: calc(var(--z-index-modal) + 1);
+    background: var(--background-primary);
+    border-radius: var(--radius-lg);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.1);
     width: 420px;
     max-width: calc(100vw - 24px);
@@ -363,9 +364,9 @@
 /* Delete Confirmation Popover */
 .delete-confirm-popover {
     position: fixed;
-    z-index: calc(var(--z-index-modal, 1040) + 1);
-    background: var(--background-primary, white);
-    border-radius: var(--radius-md, 6px);
+    z-index: calc(var(--z-index-modal) + 1);
+    background: var(--background-primary);
+    border-radius: var(--radius-md);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.1);
     width: 280px;
     animation: popoverSlideIn 0.15s ease-out;
@@ -376,37 +377,37 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--spacing-md, 16px);
-    background: var(--background-secondary, #f8f9fa);
-    border-bottom: 1px solid var(--border-color, #dee2e6);
+    padding: var(--spacing-md);
+    background: var(--background-secondary);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .popover-header h3 {
     margin: 0;
-    font-size: var(--font-size-base, 1rem);
-    font-weight: 600;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm, 8px);
+    gap: var(--spacing-sm);
 }
 
 .popover-header h3 i {
-    color: var(--primary-color, #007bff);
+    color: var(--primary-color);
 }
 
 .delete-confirm-popover .popover-header {
-    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
-    background: var(--error-color, #dc3545);
-    color: white;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--error-color);
+    color: var(--color-white);
 }
 
 .delete-confirm-popover .popover-header i {
-    color: #ffc107;
+    color: var(--warning-color);
 }
 
 .delete-confirm-popover .popover-header span {
-    font-weight: 600;
-    font-size: var(--font-size-sm, 0.875rem);
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-sm);
 }
 
 /* Popover Close Button */
@@ -418,15 +419,15 @@
     height: 28px;
     background: transparent;
     border: none;
-    border-radius: var(--radius-md, 6px);
+    border-radius: var(--radius-md);
     cursor: pointer;
-    color: var(--text-secondary, #6c757d);
+    color: var(--text-secondary);
     transition: all 0.15s ease;
 }
 
 .popover-close:hover {
     background: rgba(0, 0, 0, 0.1);
-    color: var(--text-primary, #212529);
+    color: var(--text-primary);
 }
 
 .popover-close:disabled {
@@ -436,22 +437,22 @@
 
 /* Popover Body */
 .popover-body {
-    padding: var(--spacing-md, 16px);
+    padding: var(--spacing-md);
     overflow-y: auto;
     flex: 1;
 }
 
 .delete-confirm-popover .popover-body {
-    padding: var(--spacing-md, 16px);
+    padding: var(--spacing-md);
 }
 
 .delete-confirm-popover .popover-body p {
     margin: 0;
-    font-size: var(--font-size-sm, 0.875rem);
+    font-size: var(--font-size-sm);
 }
 
 .delete-confirm-popover .popover-body p:first-child {
-    margin-bottom: var(--spacing-xs, 4px);
+    margin-bottom: var(--spacing-xs);
 }
 
 /* Popover Footer / Actions */
@@ -459,10 +460,10 @@
 .popover-actions {
     display: flex;
     justify-content: flex-end;
-    gap: var(--spacing-sm, 8px);
-    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
-    background: var(--background-secondary, #f8f9fa);
-    border-top: 1px solid var(--border-color, #dee2e6);
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--background-secondary);
+    border-top: 1px solid var(--border-color);
 }
 
 /* Form styles within popover */
@@ -477,7 +478,7 @@
 .lookup-editor-popover label {
     display: block;
     margin-bottom: var(--spacing-xs);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     font-size: var(--font-size-sm);
 }
 
@@ -502,7 +503,7 @@
 .lookup-editor-popover textarea:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 .lookup-editor-popover input.input-error,
@@ -540,7 +541,7 @@
     align-items: center;
     gap: var(--spacing-sm);
     cursor: pointer;
-    font-weight: normal;
+    font-weight: var(--font-weight-normal);
 }
 
 .checkbox-label input[type="checkbox"] {
@@ -570,12 +571,12 @@
 
 .btn-danger {
     background: var(--error-color);
-    color: white;
+    color: var(--color-white);
     border: none;
 }
 
 .btn-danger:hover {
-    background: #c82333;
+    background: var(--error-dark);
 }
 
 /* Responsive styles */

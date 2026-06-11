@@ -7,6 +7,7 @@ import PortalAccessCard from './PortalAccessCard';
 import { useToast } from '../../contexts/ToastContext';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
+import { notifyTasksChanged } from '@/services/tasks';
 import * as costPreset from '@shared/contracts/cost-preset.contract';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as lookupContract from '@shared/contracts/lookup.contract';
@@ -22,6 +23,9 @@ interface Alert {
     alert_type_id?: number;
     alert_severity?: number;
     creation_date?: string;
+    surface_mode?: string;
+    expires_at?: string | null;
+    escalate_at?: string | null;
 }
 
 interface PatientInfo {
@@ -244,9 +248,10 @@ const ViewPatientInfo = ({ personId }: Props) => {
     const handleDeleteAlert = async (alertId: number) => {
         try {
             setDeletingAlertId(alertId);
-            await putJSON(`/api/alerts/${alertId}/status`, { isActive: false });
+            await putJSON(`/api/alerts/${alertId}/status`, { status: 'dismissed' });
 
             loadAlerts(); // Reload alerts
+            notifyTasksChanged();
             toast.success('Alert deleted');
         } catch (err) {
             console.error('Error deleting alert:', err);

@@ -10,12 +10,12 @@
 .pageTitle {
     margin-bottom: 2rem;
     padding-bottom: 1rem;
-    border-bottom: 2px solid var(--border-color, var(--gray-200));
+    border-bottom: 2px solid var(--border-color);
 }
 
 .pageTitle h1 {
     font-size: 2rem;
-    color: var(--primary-color, var(--color-dark-blue));
+    color: var(--primary-color);
     display: flex;
     align-items: center;
     gap: 1rem;
@@ -23,7 +23,7 @@
 }
 
 .pageTitle h1 i {
-    color: var(--accent-color, var(--info-color));
+    color: var(--accent-color);
 }
 
 /* Controls Section */
@@ -33,7 +33,7 @@
     align-items: center;
     margin-bottom: 2rem;
     padding: 1.5rem;
-    background-color: white;
+    background-color: var(--surface);
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -51,8 +51,8 @@
 
 .btnNav {
     padding: 0.75rem 1rem;
-    background-color: var(--primary-color, var(--info-color));
-    color: white;
+    background-color: var(--primary-color);
+    color: var(--color-white);
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -61,7 +61,7 @@
 }
 
 .btnNav:hover:not(:disabled) {
-    background-color: var(--primary-dark, var(--info-600));
+    background-color: var(--primary-dark);
     transform: translateY(-2px);
 }
 
@@ -73,7 +73,7 @@
 .formSelect,
 .formInput {
     padding: 0.75rem 1rem;
-    border: 1px solid var(--border-color, var(--gray-300));
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     font-size: 1rem;
     min-width: 120px;
@@ -93,8 +93,8 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1.5rem;
-    background-color: var(--accent-color, var(--success-green));
-    color: white;
+    background-color: var(--accent-color);
+    color: var(--color-white);
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -103,17 +103,13 @@
 }
 
 .btnAction:hover:not(:disabled) {
-    background-color: var(--accent-dark, var(--success-green));
+    background-color: var(--accent-dark);
     transform: translateY(-2px);
 }
 
 .btnAction:disabled {
     opacity: 0.6;
     cursor: not-allowed;
-}
-
-.faSpin {
-    animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
@@ -136,7 +132,7 @@
     width: 50px;
     height: 50px;
     border: 4px solid rgba(0, 0, 0, 0.1);
-    border-top-color: var(--primary-color, var(--info-color));
+    border-top-color: var(--primary-color);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 1rem;
@@ -144,15 +140,15 @@
 
 .errorState i {
     font-size: 3rem;
-    color: var(--danger-color, var(--error-color));
+    color: var(--danger-color);
     margin-bottom: 1rem;
 }
 
 .btnRetry {
     margin-top: 1rem;
     padding: 0.75rem 2rem;
-    background-color: var(--primary-color, var(--info-color));
-    color: white;
+    background-color: var(--primary-color);
+    color: var(--color-white);
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -161,7 +157,7 @@
 }
 
 .btnRetry:hover {
-    background-color: var(--primary-dark, var(--info-600));
+    background-color: var(--primary-dark);
 }
 
 /* Summary Cards */
@@ -173,7 +169,7 @@
 }
 
 .summaryCard {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 1.5rem;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -201,7 +197,7 @@
 .cardHeader h3 {
     margin: 0;
     font-size: 1.1rem;
-    color: var(--text-color, var(--color-dark-blue));
+    color: var(--text-color);
 }
 
 .summaryCard.revenue .cardHeader i {
@@ -236,100 +232,100 @@
 }
 
 .amountRow .currency {
-    font-weight: 600;
-    color: var(--text-secondary, var(--gray-500));
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-secondary);
     font-size: 0.9rem;
 }
 
 .amountRow .amount {
     font-size: 1.2rem;
     font-weight: bold;
-    color: var(--text-color, var(--color-dark-blue));
+    color: var(--text-color);
 }
 
 /* View Mode Selector */
 .viewModeSelector {
     display: flex;
-    gap: var(--spacing-sm, 0.5rem);
-    margin-bottom: var(--spacing-lg, 1.5rem);
-    padding: var(--spacing-sm, 0.5rem);
-    background-color: var(--background-secondary, #f8f9fa);
-    border-radius: var(--radius-lg, 0.5rem);
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-sm);
+    background-color: var(--background-secondary);
+    border-radius: var(--radius-lg);
     width: fit-content;
 }
 
 .viewModeBtn {
-    padding: var(--spacing-sm, 0.5rem) var(--spacing-lg, 1.5rem);
+    padding: var(--spacing-sm) var(--spacing-lg);
     border: none;
     background-color: transparent;
-    color: var(--text-secondary, #6c757d);
-    font-size: var(--font-size-sm, 0.875rem);
-    font-weight: 500;
-    border-radius: var(--radius-md, 0.25rem);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    border-radius: var(--radius-md);
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .viewModeBtn:hover {
-    background-color: var(--background-primary, #ffffff);
-    color: var(--text-primary, #212529);
+    background-color: var(--background-primary);
+    color: var(--text-primary);
 }
 
 .viewModeBtn.active {
-    background-color: var(--primary-color, #007bff);
-    color: white;
-    box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+    background-color: var(--primary-color);
+    color: var(--color-white);
+    box-shadow: var(--shadow-sm);
 }
 
 /* Period Selector for Monthly View */
 .periodSelector {
     display: flex;
     align-items: center;
-    gap: var(--spacing-lg, 1.5rem);
-    padding: var(--spacing-md, 1rem) var(--spacing-lg, 1.5rem);
-    background: linear-gradient(135deg, var(--background-secondary, #f8f9fa) 0%, #e9ecef 100%);
-    border-radius: var(--radius-lg, 0.5rem);
-    margin-bottom: var(--spacing-lg, 1.5rem);
-    border: 1px solid var(--border-color, #dee2e6);
+    gap: var(--spacing-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: linear-gradient(135deg, var(--background-secondary) 0%, var(--surface-muted) 100%);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-lg);
+    border: 1px solid var(--border-color);
     flex-wrap: wrap;
 }
 
 .periodSelectorLabel {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm, 0.5rem);
-    font-weight: 600;
-    color: var(--text-primary, #212529);
+    gap: var(--spacing-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
     white-space: nowrap;
 }
 
 .periodSelectorLabel i {
-    color: var(--primary-color, #007bff);
+    color: var(--primary-color);
     font-size: 1.1rem;
 }
 
 .periodSelectorControls {
     display: flex;
     align-items: center;
-    gap: var(--spacing-md, 1rem);
+    gap: var(--spacing-md);
     flex-wrap: wrap;
 }
 
 .periodSelectorField {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm, 0.5rem);
+    gap: var(--spacing-sm);
 }
 
 .periodSelectorField label {
-    font-size: var(--font-size-sm, 0.875rem);
-    color: var(--text-secondary, #6c757d);
-    font-weight: 500;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
 }
 
 .periodSelectorField .formSelect,
 .periodSelectorField .formInput {
-    padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+    padding: var(--spacing-sm) var(--spacing-md);
     min-width: auto;
 }
 
@@ -340,33 +336,33 @@
 }
 
 .periodSelectorArrow {
-    color: var(--text-secondary, #6c757d);
-    padding: 0 var(--spacing-sm, 0.5rem);
+    color: var(--text-secondary);
+    padding: 0 var(--spacing-sm);
 }
 
 .periodEndDisplay {
-    font-weight: 600;
-    color: var(--primary-color, #007bff);
-    background: var(--background-primary, #ffffff);
-    padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
-    border-radius: var(--radius-md, 0.25rem);
-    border: 1px solid var(--border-color, #dee2e6);
+    font-weight: var(--font-weight-semibold);
+    color: var(--primary-color);
+    background: var(--background-primary);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
 }
 
 .periodSelectorLoading {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm, 0.5rem);
-    color: var(--text-secondary, #6c757d);
-    font-size: var(--font-size-sm, 0.875rem);
+    gap: var(--spacing-sm);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
 }
 
 /* Charts Section */
 .chartsSection {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: var(--spacing-lg, 1.5rem);
-    margin-bottom: var(--spacing-lg, 2rem);
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
 }
 
 /* Single chart layout */
@@ -375,17 +371,17 @@
 }
 
 .chartCard {
-    background: var(--background-primary, white);
-    border-radius: var(--radius-lg, 12px);
-    padding: var(--spacing-lg, 1.5rem);
-    box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.1));
+    background: var(--background-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
 }
 
 /* Chart Controls - View mode selector inside chart card */
 .chartControls {
     display: flex;
     justify-content: center;
-    margin-bottom: var(--spacing-md, 1rem);
+    margin-bottom: var(--spacing-md);
 }
 
 .chartControls .viewModeSelector {
@@ -394,7 +390,7 @@
 
 /* Period selector when inside chart card */
 .chartCard .periodSelector {
-    margin-bottom: var(--spacing-md, 1rem);
+    margin-bottom: var(--spacing-md);
 }
 
 .chartCardFull {
@@ -402,25 +398,25 @@
 }
 
 .chartCard h3 {
-    margin: 0 0 var(--spacing-md, 1rem) 0;
-    color: var(--text-primary, var(--color-dark-blue));
-    font-size: var(--font-size-lg, 1.2rem);
+    margin: 0 0 var(--spacing-md) 0;
+    color: var(--text-primary);
+    font-size: var(--font-size-lg);
 }
 
 .chartContainer {
     position: relative;
     height: 300px;
-    padding: var(--spacing-sm, 0.5rem);
+    padding: var(--spacing-sm);
 }
 
 .chartContainerLarge {
     height: 400px;
-    padding: var(--spacing-md, 1rem);
+    padding: var(--spacing-md);
 }
 
 /* Table Section */
 .tableSection {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 1.5rem;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -429,7 +425,7 @@
 
 .tableSection h3 {
     margin: 0 0 1rem 0;
-    color: var(--text-color, var(--color-dark-blue));
+    color: var(--text-color);
     font-size: 1.2rem;
 }
 
@@ -446,20 +442,20 @@
 }
 
 .dataTable thead {
-    background-color: var(--primary-color, var(--info-color));
-    color: white;
+    background-color: var(--primary-color);
+    color: var(--color-white);
 }
 
 .dataTable th,
 .dataTable td {
     padding: 0.75rem 1rem;
     text-align: left;
-    border-bottom: 1px solid var(--border-color, var(--gray-200));
+    border-bottom: 1px solid var(--border-color);
     white-space: nowrap;
 }
 
 .dataTable th {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     font-size: 0.85rem;
     letter-spacing: 0.5px;
@@ -471,31 +467,31 @@
 }
 
 .dataTable tfoot td {
-    border-top: 2px solid var(--primary-color, var(--info-color));
+    border-top: 2px solid var(--primary-color);
 }
 
 .dataTable .amountCell {
     text-align: right;
     font-family: 'Courier New', monospace;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     white-space: normal;
     word-break: break-word;
     vertical-align: middle;
 }
 
 .amountCell.negative {
-    color: var(--danger-color, var(--error-color));
+    color: var(--danger-color);
 }
 
 .amountCell.grandTotal {
-    color: var(--primary-color, var(--info-color));
+    color: var(--primary-color);
     font-weight: bold;
 }
 
 /* Qasa (Cash Box) Columns - Highlighted for Daily Auditing */
 .qasaColumn {
     background-color: rgba(243, 156, 18, 0.1);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .qasaIqd {
@@ -508,7 +504,7 @@
 
 th.qasaColumn {
     background-color: var(--warning-color);
-    color: white;
+    color: var(--color-white);
 }
 
 .totalRow {
@@ -581,7 +577,7 @@ th.qasaColumn {
 
 /* Modal Container */
 .statisticsModalContainer {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     width: 1200px;
@@ -600,7 +596,7 @@ th.qasaColumn {
     align-items: center;
     padding: 1.5rem 2rem;
     background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
-    color: white;
+    color: var(--color-white);
     flex-shrink: 0;
 }
 
@@ -615,7 +611,7 @@ th.qasaColumn {
 .statisticsModalClose {
     background: rgba(255, 255, 255, 0.2);
     border: none;
-    color: white;
+    color: var(--color-white);
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -661,13 +657,13 @@ th.qasaColumn {
 .statisticsInvoiceSummary .summaryItem .label {
     font-size: 0.9rem;
     color: var(--text-light);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .statisticsInvoiceSummary .summaryItem .value {
     font-size: 1.2rem;
     font-weight: bold;
-    color: var(--color-dark-blue);
+    color: var(--text-heading);
 }
 
 .statisticsInvoiceSummary .summaryItem.highlight {
@@ -721,13 +717,13 @@ th.qasaColumn {
 }
 
 .statisticsInvoicesTable thead {
-    color: white;
+    color: var(--color-white);
 }
 
 .statisticsInvoicesTable th {
     padding: 0.75rem;
     text-align: left;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     background-color: var(--info-color);
     position: sticky;
     top: 0;
@@ -746,12 +742,12 @@ th.qasaColumn {
 
 .statisticsInvoicesTable .invoiceId {
     font-family: 'Courier New', monospace;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--info-color);
 }
 
 .statisticsInvoicesTable .patientName {
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .statisticsInvoicesTable .currencyBadge .badge {
@@ -759,17 +755,17 @@ th.qasaColumn {
     padding: 0.25rem 0.75rem;
     border-radius: 12px;
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .statisticsInvoicesTable .currencyBadge .badge.IQD {
     background: var(--success-green);
-    color: white;
+    color: var(--color-white);
 }
 
 .statisticsInvoicesTable .currencyBadge .badge.USD {
     background: var(--info-color);
-    color: white;
+    color: var(--color-white);
 }
 
 /* Empty State */
@@ -784,12 +780,12 @@ th.qasaColumn {
 
 .emptyState i {
     font-size: 3rem;
-    color: var(--gray-400);
+    color: var(--text-lighter);
     margin-bottom: 1rem;
 }
 
 .emptyState p {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-size: 1.1rem;
 }
 
@@ -805,7 +801,7 @@ th.qasaColumn {
 .statisticsBtnClose {
     padding: 0.75rem 2rem;
     background-color: var(--gray-400);
-    color: white;
+    color: var(--color-white);
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -909,8 +905,8 @@ th.qasaColumn {
     .periodSelector {
         flex-direction: column;
         align-items: stretch;
-        gap: var(--spacing-md, 1rem);
-        padding: var(--spacing-md, 1rem);
+        gap: var(--spacing-md);
+        padding: var(--spacing-md);
     }
 
     .periodSelectorLabel {
@@ -920,18 +916,18 @@ th.qasaColumn {
     .periodSelectorControls {
         flex-direction: column;
         align-items: stretch;
-        gap: var(--spacing-sm, 0.5rem);
+        gap: var(--spacing-sm);
     }
 
     .periodSelectorField {
         flex-direction: column;
         align-items: stretch;
-        gap: var(--spacing-xs, 0.25rem);
+        gap: var(--spacing-xs);
     }
 
     .periodSelectorField > div {
         display: flex;
-        gap: var(--spacing-sm, 0.5rem);
+        gap: var(--spacing-sm);
     }
 
     .periodSelectorField .formSelect,
@@ -941,7 +937,7 @@ th.qasaColumn {
 
     .periodSelectorArrow {
         text-align: center;
-        padding: var(--spacing-xs, 0.25rem) 0;
+        padding: var(--spacing-xs) 0;
     }
 
     .periodEndDisplay {
@@ -976,8 +972,8 @@ th.qasaColumn {
     .dataTable tbody tr {
         display: block;
         margin-bottom: 1rem;
-        background: white;
-        border: 1px solid var(--border-color, var(--gray-200));
+        background: var(--surface);
+        border: 1px solid var(--border-color);
         border-radius: 8px;
         padding: 1rem;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
@@ -1004,27 +1000,27 @@ th.qasaColumn {
 
     .dataTable tbody td::before {
         content: attr(data-label);
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         text-align: left;
         flex-shrink: 0;
         margin-right: 1rem;
-        color: var(--text-secondary, var(--gray-600));
+        color: var(--text-secondary);
         font-size: 0.8125rem;
     }
 
     .dataTable tbody td:first-child {
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         font-size: 1rem;
-        color: var(--primary-color, var(--info-color));
+        color: var(--primary-color);
         padding-bottom: 0.75rem;
         margin-bottom: 0.5rem;
-        border-bottom: 2px solid var(--border-color, var(--gray-200));
+        border-bottom: 2px solid var(--border-color);
     }
 
     .dataTable .amountCell {
         font-family: 'Courier New', monospace;
         font-size: 0.9375rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         white-space: normal;
         word-break: normal;
     }
@@ -1042,7 +1038,7 @@ th.qasaColumn {
     .dataTable tfoot {
         display: block;
         background-color: rgba(52, 152, 219, 0.1);
-        border: 2px solid var(--primary-color, var(--info-color));
+        border: 2px solid var(--primary-color);
         border-radius: 8px;
         padding: 1rem;
         margin-top: 1rem;
@@ -1067,19 +1063,19 @@ th.qasaColumn {
 
     .dataTable tfoot td::before {
         content: attr(data-label);
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         text-align: left;
         margin-right: 1rem;
-        color: var(--primary-color, var(--info-color));
+        color: var(--primary-color);
         font-size: 0.8125rem;
     }
 
     .dataTable tfoot td:first-child {
         font-size: 1.125rem;
-        color: var(--primary-color, var(--info-color));
+        color: var(--primary-color);
         padding-bottom: 0.75rem;
         margin-bottom: 0.5rem;
-        border-bottom: 2px solid var(--primary-color, var(--info-color));
+        border-bottom: 2px solid var(--primary-color);
     }
 
     /* Modal adjustments */
@@ -1138,8 +1134,8 @@ th.qasaColumn {
     .statisticsInvoicesTable tbody tr {
         display: block;
         margin-bottom: 1rem;
-        background: white;
-        border: 1px solid var(--border-color, var(--gray-200));
+        background: var(--surface);
+        border: 1px solid var(--border-color);
         border-radius: 8px;
         padding: 1rem;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
@@ -1160,30 +1156,30 @@ th.qasaColumn {
 
     .statisticsInvoicesTable tbody td::before {
         content: attr(data-label);
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         text-align: left;
         flex-shrink: 0;
         margin-right: 1rem;
-        color: var(--text-secondary, var(--gray-600));
+        color: var(--text-secondary);
         font-size: 0.8125rem;
     }
 
     /* Invoice ID - Header style */
     .statisticsInvoicesTable tbody td.invoiceId {
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
         font-size: 1rem;
         color: var(--info-color);
         padding-bottom: 0.75rem;
         margin-bottom: 0.5rem;
-        border-bottom: 2px solid var(--border-color, var(--gray-200));
+        border-bottom: 2px solid var(--border-color);
         font-family: 'Courier New', monospace;
     }
 
     /* Patient Name - Prominent display */
     .statisticsInvoicesTable tbody td.patientName {
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
         font-size: 0.9375rem;
-        color: var(--text-primary, var(--color-dark-blue));
+        color: var(--text-primary);
     }
 
     /* Currency Badge */
@@ -1195,24 +1191,24 @@ th.qasaColumn {
         padding: 0.375rem 0.875rem;
         border-radius: 16px;
         font-size: 0.8125rem;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
     }
 
     .statisticsInvoicesTable .badge.IQD {
         background: var(--success-green);
-        color: white;
+        color: var(--color-white);
     }
 
     .statisticsInvoicesTable .badge.USD {
         background: var(--info-color);
-        color: white;
+        color: var(--color-white);
     }
 
     /* Amount fields */
     .statisticsInvoicesTable tbody td.amount {
         font-family: 'Courier New', monospace;
         font-size: 0.9375rem;
-        font-weight: 600;
+        font-weight: var(--font-weight-semibold);
     }
 
     /* IQD/USD highlight */
@@ -1235,8 +1231,8 @@ th.qasaColumn {
     }
 
     .statisticsInvoicesTable tbody td.change {
-        color: var(--warning-color, var(--warning-orange));
-        font-weight: 700;
+        color: var(--warning-color);
+        font-weight: var(--font-weight-bold);
     }
 }
 

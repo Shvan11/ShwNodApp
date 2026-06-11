@@ -37,10 +37,6 @@
     font-size: 0.5rem;
 }
 
-.whitespace-nowrap {
-    white-space: nowrap;
-}
-
 .mt-4 {
     margin-top: var(--spacing-xl);
 }
@@ -53,7 +49,7 @@
     align-items: center;
     min-height: 400px;
     font-size: var(--font-size-xl);
-    color: var(--gray-500);
+    color: var(--text-secondary);
 }
 
 .loading-fallback-content {

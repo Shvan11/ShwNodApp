@@ -5,26 +5,26 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   text-align: center;
   white-space: nowrap;
   vertical-align: middle;
   user-select: none;
   border: 1px solid transparent;
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
-  line-height: 1.5;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
   border-radius: var(--radius-md);
   transition: all 0.2s ease-in-out;
   cursor: pointer;
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
   text-decoration: none;
   margin: var(--spacing-xs);
 }
 
 .btn:focus {
   outline: 0;
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+  box-shadow: 0 0 0 3px var(--primary-alpha);
 }
 
 .btn:disabled,
@@ -36,7 +36,7 @@
 
 /* Button Variants */
 .btn-primary {
-  color: #fff;
+  color: var(--color-white);
   background-color: var(--primary-color);
   border-color: var(--primary-color);
 }
@@ -48,7 +48,7 @@
 }
 
 .btn-secondary {
-  color: #fff;
+  color: var(--color-white);
   background-color: var(--secondary-color);
   border-color: var(--secondary-color);
 }
@@ -60,7 +60,7 @@
 }
 
 .btn-success {
-  color: #fff;
+  color: var(--color-white);
   background-color: var(--success-color);
   border-color: var(--success-color);
 }
@@ -72,7 +72,7 @@
 }
 
 .btn-danger {
-  color: #fff;
+  color: var(--color-white);
   background-color: var(--error-color);
   border-color: var(--error-color);
 }
@@ -84,7 +84,9 @@
 }
 
 .btn-warning {
-  color: #212529;
+  /* Warning bg is bright yellow in BOTH themes, so pin a fixed dark ink
+     instead of --text-primary (which flips to near-white in dark mode → unreadable). */
+  color: var(--palette-gray-900);
   background-color: var(--warning-color);
   border-color: var(--warning-color);
 }
@@ -96,7 +98,7 @@
 }
 
 .btn-info {
-  color: #fff;
+  color: var(--color-white);
   background-color: var(--info-color);
   border-color: var(--info-color);
 }
@@ -108,7 +110,7 @@
 }
 
 .btn-light {
-  color: #212529;
+  color: var(--text-primary);
   background-color: var(--gray-100);
   border-color: var(--gray-300);
 }
@@ -169,8 +171,8 @@
 
 /* Button Sizes */
 .btn-sm {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.875rem;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-sm);
   border-radius: var(--radius-sm);
 }
 
@@ -217,7 +219,7 @@
   transition: all 0.2s ease;
   background-color: transparent;
   color: var(--info-color);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-xs);
@@ -232,7 +234,7 @@
 
 .btn-edit:hover {
   background-color: var(--info-color);
-  color: white;
+  color: var(--color-white);
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
 }
@@ -246,7 +248,7 @@
   transition: all 0.2s ease;
   background-color: transparent;
   color: var(--error-color);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-xs);
@@ -261,7 +263,7 @@
 
 .btn-delete:hover {
   background-color: var(--error-color);
-  color: white;
+  color: var(--color-white);
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
 }

@@ -74,7 +74,7 @@
     width: 22px;
     left: 4px;
     bottom: 4px;
-    background-color: white;
+    background-color: var(--surface);
     transition: 0.3s;
     border-radius: 50%;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -94,7 +94,7 @@
 
 /* Add Slot Section */
 .addSlotSection {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 1.5rem;
     border: 1px solid var(--gray-200);
@@ -186,7 +186,7 @@
 }
 
 .slotCategory {
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
     padding: 1.25rem;
     border: 2px solid var(--gray-200);
@@ -201,7 +201,7 @@
 }
 
 .lateCategory {
-    border-left: 4px solid var(--purple-500, #8b5cf6);
+    border-left: 4px solid var(--purple-500);
 }
 
 .categoryHeader {
@@ -226,7 +226,7 @@
 }
 
 .lateCategory .categoryHeader i {
-    color: var(--purple-500, #8b5cf6);
+    color: var(--purple-500);
 }
 
 .categoryCount {
@@ -277,7 +277,7 @@
     font-weight: 500;
     color: var(--text-primary);
     font-family: 'Consolas', 'Monaco', monospace;
-    background: white;
+    background: var(--surface);
 }
 
 .chipActions {

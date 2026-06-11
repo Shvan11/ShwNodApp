@@ -7,6 +7,8 @@ import React, { useRef, useEffect } from 'react';
 import Chart from 'chart.js/auto';
 import type { SalesSummaryRow } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
+import { getChartThemeColors } from '../../utils/chartTheme';
+import { useTheme } from '../../contexts/ThemeContext';
 import styles from './SalesTrendChart.module.css';
 
 interface SalesTrendChartProps {
@@ -22,6 +24,7 @@ function formatShortDate(dateStr: string): string {
 }
 
 const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ data }) => {
+  const { resolvedTheme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart | null>(null);
 
@@ -36,6 +39,7 @@ const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ data }) => {
       chartInstance.current.destroy();
     }
 
+    const chartColors = getChartThemeColors();
     const labels = data.map((row) => formatShortDate(row.sale_date));
     const revenueData = data.map((row) => row.Revenue);
     const profitData = data.map((row) => row.Profit);
@@ -82,6 +86,7 @@ const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ data }) => {
           legend: {
             position: 'top',
             labels: {
+              color: chartColors.legend,
               usePointStyle: true,
               padding: 16,
             },
@@ -103,11 +108,13 @@ const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ data }) => {
           y: {
             beginAtZero: true,
             ticks: {
+              color: chartColors.ticks,
               callback: (value) => formatNumber(value as number),
             },
-            grid: { color: 'rgba(0, 0, 0, 0.05)' },
+            grid: { color: chartColors.grid },
           },
           x: {
+            ticks: { color: chartColors.ticks },
             grid: { display: false },
           },
         },
@@ -120,7 +127,7 @@ const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ data }) => {
         chartInstance.current = null;
       }
     };
-  }, [data]);
+  }, [data, resolvedTheme]);
 
   if (data.length === 0) {
     return null;

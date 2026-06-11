@@ -16,7 +16,7 @@
 .pageHeader h1 {
   margin: 0;
   font-size: var(--font-size-3xl);
-  color: var(--text-primary, var(--text-color));
+  color: var(--text-primary);
 }
 
 .quickActions {
@@ -37,7 +37,7 @@
 }
 
 .panel {
-  background: var(--background-primary, white);
+  background: var(--background-primary);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   padding: var(--spacing-lg);
@@ -53,7 +53,7 @@
 .panelHeader h2 {
   margin: 0;
   font-size: var(--font-size-lg);
-  color: var(--text-primary, var(--text-color));
+  color: var(--text-primary);
 }
 
 .navCards {
@@ -67,11 +67,11 @@
   align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-lg);
-  background: var(--background-primary, white);
+  background: var(--background-primary);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   text-decoration: none;
-  color: var(--text-primary, var(--text-color));
+  color: var(--text-primary);
   transition: transform 0.2s, box-shadow 0.2s;
   cursor: pointer;
   border: none;
@@ -94,7 +94,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 123, 255, 0.1);
+  background: var(--primary-alpha);
   border-radius: var(--radius-md);
 }
 
@@ -106,7 +106,7 @@
 .navCardText p {
   margin: 0;
   font-size: var(--font-size-sm);
-  color: var(--text-secondary, var(--text-light));
+  color: var(--text-secondary);
 }
 
 @media (max-width: 768px) {

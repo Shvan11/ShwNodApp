@@ -5,10 +5,6 @@
     margin: 0;
 }
 
-.formContainer {
-    margin-bottom: 0.375rem;
-}
-
 .header {
     display: flex;
     justify-content: space-between;
@@ -21,7 +17,7 @@
 .header h2 {
     margin: 0;
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--gray-800);
 }
 
@@ -39,7 +35,7 @@
 
 .summaryCard {
     flex: 1;
-    background: white;
+    background: var(--surface);
     padding: 0.375rem 0.5rem;
     border-radius: var(--radius-md);
     border: 1px solid var(--gray-200);
@@ -48,15 +44,15 @@
 .summaryCard h3 {
     font-size: 0.6875rem;
     margin: 0 0 0.125rem 0;
-    color: var(--gray-500);
-    font-weight: 500;
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .summaryValue {
     font-size: 1.125rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--indigo-600);
 }
 
@@ -68,10 +64,10 @@
 }
 
 .card {
-    background-color: white;
+    background-color: var(--surface);
     padding: 0.5rem 0.75rem;
     border-radius: var(--radius-md);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--shadow-sm);
     border: 1px solid var(--gray-200);
 }
 
@@ -88,7 +84,7 @@
     margin: 0 0 0.1875rem 0;
     color: var(--indigo-600);
     font-size: var(--font-size-base);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     line-height: 1.2;
 }
 
@@ -101,7 +97,7 @@
     display: flex;
     gap: 0.5rem;
     font-size: var(--font-size-sm);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     line-height: 1.2;
 }
 
@@ -145,15 +141,15 @@
 
 .wireInfoLabel {
     font-size: var(--font-size-xs);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     margin-bottom: 0.0625rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .wireInfoValue {
     font-size: var(--font-size-sm);
     color: var(--info-700);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     line-height: 1.2;
 }
 
@@ -171,28 +167,33 @@
 }
 
 .treatmentInfoLabel {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--gray-700);
 }
 
 .treatmentInfoValue {
-    color: var(--gray-500);
+    color: var(--text-secondary);
 }
 
-/* Notes Section & Next Visit Section - Merged Styles */
+/* Notes Section & Next Visit Section - Merged Styles.
+   Subtle tint + a colored left-accent reads cleanly in both themes; a flat
+   --warning-100/--info-100 fill turns into a muddy block in dark mode. */
 .notesSection,
 .nextVisitSection {
     padding: 0.375rem 0.5rem;
     border-radius: 3px;
     margin-bottom: 0.25rem;
+    border-left: 3px solid transparent;
 }
 
 .notesSection {
-    background-color: var(--warning-100);
+    background-color: var(--warning-50);
+    border-left-color: var(--warning-400);
 }
 
 .nextVisitSection {
-    background-color: var(--info-100);
+    background-color: var(--info-50);
+    border-left-color: var(--info-500);
 }
 
 .notesSection strong,
@@ -243,7 +244,7 @@
     border-radius: 3px;
     background-color: var(--success-50);
     color: var(--success-700);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     line-height: 1;
 }
 
@@ -277,7 +278,7 @@
 .loading {
     padding: 1rem;
     text-align: center;
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-size: 0.875rem;
 }
 
@@ -292,13 +293,13 @@
 
 .emptyState i {
     font-size: 2rem;
-    color: var(--gray-400);
+    color: var(--text-lighter);
     margin-bottom: 0.5rem;
     display: block;
 }
 
 .emptyState p {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-size: 0.875rem;
     margin: 0;
 }
@@ -310,13 +311,13 @@
     gap: 0.375rem;
     margin-bottom: 0.5rem;
     padding: 0.375rem 0.5rem;
-    background-color: white;
+    background-color: var(--surface);
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
 }
 
 .searchBar i {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-size: 0.8125rem;
 }
 
@@ -333,17 +334,17 @@
 }
 
 .searchInput::placeholder {
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 .searchCount {
     font-size: var(--font-size-xs);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     white-space: nowrap;
 }
 
 .highlight {
-    background-color: var(--warning-200, #fde68a);
+    background-color: var(--warning-200);
     color: inherit;
     padding: 0 2px;
     border-radius: 2px;

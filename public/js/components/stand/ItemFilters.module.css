@@ -54,7 +54,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  color: white;
+  color: var(--color-white);
 }
 
 .filterHeaderContent i {
@@ -71,7 +71,7 @@
 .btnResetInline {
   background: rgba(255, 255, 255, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
+  color: var(--color-white);
   padding: 8px 12px;
   border-radius: var(--radius-lg);
   cursor: pointer;
@@ -106,7 +106,7 @@
 }
 
 .filterGroup label {
-  color: white;
+  color: var(--color-white);
   font-size: 13px;
   font-weight: var(--font-weight-medium);
   display: flex;
@@ -123,7 +123,7 @@
 
 /* Inputs */
 .filterInput {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--surface);
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 10px;
   padding: 12px 16px;
@@ -135,7 +135,7 @@
 
 .filterInput:focus {
   outline: none;
-  background: white;
+  background: var(--surface);
   border-color: var(--success-color);
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
   transform: translateY(-2px);
@@ -147,7 +147,7 @@
 
 .filterSelect {
   width: 100%;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--surface);
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 10px;
   padding: 12px 40px 12px 16px;
@@ -161,7 +161,7 @@
 
 .filterSelect:focus {
   outline: none;
-  background: white;
+  background: var(--surface);
   border-color: var(--success-color);
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
   transform: translateY(-2px);
@@ -189,7 +189,7 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  color: white;
+  color: var(--color-white);
   font-size: var(--font-size-sm);
   cursor: pointer;
 }
@@ -223,7 +223,7 @@
   letter-spacing: var(--letter-spacing-wide);
   white-space: nowrap;
   background: linear-gradient(135deg, var(--success-color) 0%, var(--success-darker) 100%);
-  color: white;
+  color: var(--color-white);
   box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
 }
 

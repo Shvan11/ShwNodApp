@@ -29,9 +29,9 @@
 }
 
 .numeral {
-    fill: var(--primary-color, #007bff);
+    fill: var(--primary-color);
     font-family: 'Georgia', 'Cambria', serif;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-anchor: middle;
     dominant-baseline: central;
 }
@@ -49,13 +49,13 @@
 }
 
 .secondHand {
-    stroke: var(--primary-color, #007bff);
+    stroke: var(--primary-color);
     stroke-width: 1.6;
     stroke-linecap: round;
 }
 
 .cap {
-    fill: var(--primary-color, #007bff);
+    fill: var(--primary-color);
     stroke: rgba(0, 0, 0, 0.4);
     stroke-width: 1;
 }
@@ -68,7 +68,7 @@
     fill: rgba(0, 0, 0, 0.55);
     font-family: 'Inter', system-ui, sans-serif;
     font-size: 0.072em;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     letter-spacing: 0.08em;
     text-anchor: middle;
     text-transform: uppercase;

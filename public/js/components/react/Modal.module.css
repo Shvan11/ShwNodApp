@@ -5,7 +5,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: var(--spacing-md, 1rem);
+    padding: var(--spacing-md);
     z-index: var(--z-index-modal);
     animation: modalOverlayFadeIn 0.18s ease;
 }
@@ -28,10 +28,10 @@
 @layer modal {
     .content {
         box-sizing: border-box;
-        background: var(--background-primary, #fff);
-        color: var(--text-color, inherit);
-        border-radius: var(--radius-lg, 12px);
-        box-shadow: var(--shadow-lg, 0 8px 32px rgba(0, 0, 0, 0.2));
+        background: var(--background-primary);
+        color: var(--text-color);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-lg);
     }
 }
 

@@ -48,7 +48,7 @@
   padding: var(--spacing-sm) var(--spacing-md);
   text-align: left;
   font-weight: var(--font-weight-semibold);
-  color: var(--gray-600);
+  color: var(--text-secondary);
   border-bottom: 2px solid var(--gray-200);
   white-space: nowrap;
   font-size: var(--font-size-xs);
@@ -185,7 +185,7 @@
   flex-direction: column;
   align-items: center;
   padding: var(--spacing-xxl);
-  color: var(--gray-400);
+  color: var(--text-lighter);
 }
 
 .emptyState i {

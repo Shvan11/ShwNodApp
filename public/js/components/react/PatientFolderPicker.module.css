@@ -1,7 +1,7 @@
 .picker {
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--gray-200);
+    border: var(--border-width-thin) solid var(--gray-200);
     border-radius: var(--radius-lg);
     background: var(--gray-50);
     max-height: 340px;
@@ -12,8 +12,8 @@
     align-items: center;
     gap: var(--spacing-sm);
     padding: var(--spacing-sm) var(--spacing-md);
-    border-bottom: 1px solid var(--gray-200);
-    background: var(--white);
+    border-bottom: var(--border-width-thin) solid var(--gray-200);
+    background: var(--surface);
     border-top-left-radius: var(--radius-lg);
     border-top-right-radius: var(--radius-lg);
 }
@@ -25,7 +25,7 @@
     gap: 0.375rem;
     padding: 0.25rem 0.625rem;
     background: var(--gray-100);
-    border: 1px solid var(--gray-300);
+    border: var(--border-width-thin) solid var(--gray-300);
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
     cursor: pointer;
@@ -47,7 +47,7 @@
     gap: 0.375rem;
     min-width: 0;
     font-size: var(--font-size-sm);
-    color: var(--gray-600);
+    color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -60,7 +60,7 @@
     justify-content: center;
     gap: var(--spacing-sm);
     padding: var(--spacing-xl);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
 }
 
@@ -86,8 +86,8 @@
     align-items: center;
     gap: 0.375rem;
     padding: var(--spacing-sm);
-    background: var(--white);
-    border: 1px solid var(--gray-200);
+    background: var(--surface);
+    border: var(--border-width-thin) solid var(--gray-200);
     border-radius: var(--radius-md);
     cursor: pointer;
     text-align: center;
@@ -129,7 +129,7 @@
 
 .fileIcon {
     font-size: 2rem;
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 .check {
@@ -138,7 +138,7 @@
     right: 4px;
     line-height: 1;
     color: var(--indigo-600);
-    background: var(--white);
+    background: var(--surface);
     border-radius: var(--radius-full);
 }
 
@@ -153,5 +153,5 @@
 
 .meta {
     font-size: 0.7rem;
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }

@@ -9,11 +9,11 @@
     flex-direction: column;
     /* #app-container already offsets for the header, so subtract it here instead of
        a bare 100vh (which double-counts and adds a phantom scroll). */
-    min-height: calc(100vh - var(--header-height, 50px));
+    min-height: calc(100vh - var(--header-height));
     background: linear-gradient(
         to bottom,
-        var(--color-white) 0,
-        var(--color-white) 200px,
+        var(--surface) 0,
+        var(--surface) 200px,
         var(--gray-50) 200px
     );
 }
@@ -33,7 +33,7 @@
 .content > :global(*) {
     width: 100%;
     max-width: 1400px;
-    background: white;
+    background: var(--surface);
     border-radius: var(--radius-xl);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     min-height: 500px;
@@ -65,59 +65,20 @@
 .placeholder h3 {
     font-size: 2rem;
     margin-bottom: 0.75rem;
-    color: var(--color-dark-blue);
+    color: var(--text-heading);
     font-weight: 700;
 }
 
 .placeholder p {
     margin-bottom: 1rem;
     font-size: 1.1rem;
-    color: var(--gray-500);
+    color: var(--text-secondary);
 }
 
 .placeholderDescription {
     font-size: 1rem;
-    color: var(--gray-400);
+    color: var(--text-lighter);
     max-width: 500px;
-}
-
-/* Coming Soon Content */
-.comingSoonContent {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4rem 2rem;
-    text-align: center;
-    color: var(--text-secondary);
-}
-
-.comingSoonIcon {
-    font-size: 4rem;
-    color: var(--gray-200);
-    margin-bottom: 1rem;
-}
-
-.comingSoonContent h3 {
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-    color: var(--text-primary);
-}
-
-.comingSoonContent p {
-    margin-bottom: 2rem;
-    font-size: 1rem;
-}
-
-.comingSoonMessage {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: var(--warning-100);
-    padding: 1rem 1.5rem;
-    border-radius: 8px;
-    color: var(--warning-900);
-    font-weight: 500;
 }
 
 /* Responsive Design */
@@ -133,7 +94,7 @@
 
 @media (max-width: 768px) {
     .container {
-        min-height: calc(100vh - var(--header-height, 50px));
+        min-height: calc(100vh - var(--header-height));
     }
 
     .content {
@@ -154,14 +115,6 @@
 
     .placeholder h3 {
         font-size: 1.5rem;
-    }
-
-    .comingSoonContent {
-        padding: 3rem 1.5rem;
-    }
-
-    .comingSoonIcon {
-        font-size: 3rem;
     }
 }
 

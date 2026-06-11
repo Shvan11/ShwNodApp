@@ -2,16 +2,16 @@
     padding: var(--spacing-xl);
     min-width: 320px;
     max-width: 460px;
-    background: white;
+    background: var(--surface);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg, 0 8px 32px rgba(0, 0, 0, 0.2));
+    box-shadow: var(--shadow-lg);
 }
 
 .title {
     margin: 0 0 var(--spacing-md);
     font-size: var(--font-size-xl);
     color: var(--text-primary);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .body {
@@ -21,7 +21,7 @@
 .line {
     margin: 0 0 var(--spacing-xs);
     color: var(--text-secondary);
-    line-height: 1.5;
+    line-height: var(--line-height-normal);
     font-size: var(--font-size-md);
 }
 

@@ -204,7 +204,10 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
           .selectFrom('alerts')
           .select(['alert_id', 'person_id', 'alert_type_id', 'alert_details', 'alert_severity'])
           .where('person_id', '=', PID)
-          .where('is_active', '=', true)
+          .where('status', '=', 'active')
+          .where((w) =>
+            w.or([w('expires_at', 'is', null), w('expires_at', '>=', sql<string>`CURRENT_DATE`)])
+          )
           .orderBy('alert_severity', 'desc')
           .orderBy('creation_date', 'desc')
           .limit(1)
@@ -240,7 +243,10 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
         .selectFrom('alerts')
         .select((e) => e.fn.countAll<number>().as('c'))
         .where('person_id', '=', PID)
-        .where('is_active', '=', true)
+        .where('status', '=', 'active')
+        .where((w) =>
+          w.or([w('expires_at', 'is', null), w('expires_at', '>=', sql<string>`CURRENT_DATE`)])
+        )
         .as('AlertCount'),
       'w.start_date',
       eb.ref('alert.alert_id').as('alert_id'),

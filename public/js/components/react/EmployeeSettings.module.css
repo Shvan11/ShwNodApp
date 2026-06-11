@@ -2,7 +2,7 @@
 
 /* Main container - reuses many styles from AlignerDoctorsSettings */
 .container {
-    background: white;
+    background: var(--surface);
     border-radius: var(--radius-xl);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     border: 1px solid var(--gray-200);
@@ -41,7 +41,7 @@
 /* Add Employee Button */
 .btnAdd {
     background: var(--primary-color);
-    color: white;
+    color: var(--color-white);
     padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 8px;
@@ -336,7 +336,7 @@
 /* Action buttons in modal footer */
 .btnCancel {
     background: var(--secondary-color);
-    color: white;
+    color: var(--color-white);
     padding: 0.75rem 1.5rem;
     border: 1px solid var(--secondary-color);
     border-radius: 8px;
@@ -355,7 +355,7 @@
 
 .btnSave {
     background: var(--primary-color);
-    color: white;
+    color: var(--color-white);
     padding: 0.75rem 1.5rem;
     border: 1px solid var(--primary-color);
     border-radius: 8px;
@@ -386,7 +386,7 @@
 
 .emptyState i {
     font-size: 4rem;
-    color: var(--gray-200);
+    color: var(--text-lighter);
     margin-bottom: 1rem;
 }
 
@@ -450,6 +450,8 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    /* Signals the right-click Edit/Delete menu lives here. */
+    cursor: context-menu;
 }
 
 .employeeName i {
@@ -511,7 +513,54 @@
 
 .badgeMuted {
     background: var(--gray-100);
-    color: var(--gray-500);
+    color: var(--text-secondary);
+}
+
+.badgeQuit {
+    background: var(--warning-100);
+    color: var(--warning-800);
+}
+
+/* Right-click context menu on the employee name — reaches Edit/Delete without
+   horizontal-scrolling the wide table to the Actions column. position:fixed at
+   the cursor so it escapes the table's overflow-x scroll container. */
+.contextMenu {
+    position: fixed;
+    z-index: var(--z-index-popover);
+    min-width: 180px;
+    padding: var(--spacing-xs);
+    background: var(--surface-elevated);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-xl);
+}
+
+.contextMenuItem {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.contextMenuItem:hover {
+    background: var(--gray-100);
+}
+
+.contextMenuItemDanger {
+    color: var(--error-color);
+}
+
+.contextMenuItem i {
+    width: 1rem;
+    text-align: center;
 }
 
 /* Actions column */
@@ -587,7 +636,7 @@
 
 .btnRetry {
     background: var(--primary-color);
-    color: white;
+    color: var(--color-white);
     padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 8px;
@@ -668,7 +717,7 @@
         border: 1px solid var(--gray-200);
         border-radius: var(--radius-lg);
         padding: var(--spacing-md);
-        background: white;
+        background: var(--surface);
     }
 
     .table tbody tr:hover {

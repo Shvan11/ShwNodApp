@@ -1,4 +1,4 @@
-/* Patient file explorer — mobile-first; design tokens from variables.css. */
+/* Patient file explorer — mobile-first; design tokens from tokens-semantic.css. */
 
 .explorer {
   display: flex;
@@ -37,7 +37,7 @@
 }
 .crumbCurrent {
   color: var(--text-color);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 /* ── Toolbar ── */
@@ -164,7 +164,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--spacing-sm);
-  background: var(--primary-alpha, rgba(0, 0, 0, 0.05));
+  background: var(--primary-alpha);
   color: var(--primary-color);
   font-size: var(--font-size-lg);
   pointer-events: none;
@@ -286,7 +286,7 @@
   gap: var(--spacing-sm);
   height: 56px;
   padding: 0 var(--spacing-sm);
-  border-bottom: 1px solid var(--border-light, var(--border-color));
+  border-bottom: 1px solid var(--border-light);
   cursor: pointer;
   box-sizing: border-box;
 }
@@ -324,7 +324,7 @@
 }
 .selectCount {
   font-size: var(--font-size-sm);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--text-color);
 }
 .dangerButton {
@@ -394,7 +394,7 @@
 .previewTitle {
   flex: 1 1 auto;
   font-size: var(--font-size-md);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -459,7 +459,7 @@
   margin: 0;
   overflow: auto;
   text-align: left;
-  font-family: var(--font-mono, monospace);
+  font-family: monospace;
   font-size: var(--font-size-sm);
   white-space: pre-wrap;
   word-break: break-word;
@@ -504,7 +504,7 @@
 .promptInput:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: var(--shadow-focus, 0 0 0 3px var(--primary-alpha, rgba(0, 0, 0, 0.1)));
+  box-shadow: var(--shadow-focus);
 }
 .promptActions {
   display: flex;

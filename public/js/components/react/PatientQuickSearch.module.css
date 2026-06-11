@@ -54,7 +54,7 @@
     justify-content: center;
     gap: var(--spacing-sm);
     padding: var(--spacing-lg);
-    color: var(--gray-600);
+    color: var(--text-secondary);
 }
 
 .loadingState i {
@@ -73,7 +73,7 @@
 :global(.pqs-select__control) {
     border-color: var(--gray-300);
     border-radius: var(--radius-md);
-    background-color: var(--color-white);
+    background-color: var(--surface);
     box-shadow: none;
     transition: all var(--transition-base);
 }
@@ -84,7 +84,7 @@
 
 :global(.pqs-select__control--is-focused) {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 1px var(--primary-color);
+    box-shadow: var(--shadow-focus-strong);
 }
 
 :global(.pqs-select__menu) {
@@ -108,11 +108,11 @@
 }
 
 :global(.pqs-select__placeholder) {
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 :global(.pqs-select__menu-notice--no-options) {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
     padding: var(--spacing-md);
 }

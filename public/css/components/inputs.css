@@ -3,7 +3,7 @@
 /* Required field indicator (asterisk in form labels) */
 .required {
     color: var(--error-500);
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
 }
 
 /* Base Input Style */
@@ -15,7 +15,7 @@
     font-weight: var(--font-weight-normal);
     line-height: var(--line-height-normal);
     color: var(--text-primary);
-    background-color: var(--color-white);
+    background-color: var(--surface);
     background-clip: padding-box;
     border: var(--border-width-thin) solid var(--gray-300);
     border-radius: var(--radius-md);
@@ -26,14 +26,14 @@
 
 .form-control:focus {
     color: var(--text-primary);
-    background-color: var(--color-white);
+    background-color: var(--surface);
     border-color: var(--primary-color);
     outline: 0;
     box-shadow: var(--shadow-focus);
 }
 
 .form-control::placeholder {
-    color: var(--gray-400);
+    color: var(--text-lighter);
     opacity: 1;
 }
 
@@ -47,7 +47,9 @@
 /* Select Input */
 select.form-control {
     appearance: none;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+    /* Mid-gray chevron reads on both the light and dark input surface
+       (background-image data-URIs cannot inherit currentColor). */
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
     background-repeat: no-repeat;
     background-position: right var(--spacing-md) center;
     background-size: 16px 12px;
@@ -105,7 +107,7 @@ textarea.form-control {
     border-width: var(--border-width-thin);
     box-shadow: none;
     transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-    background-color: var(--color-white);
+    background-color: var(--surface);
 }
 
 .pm-select__control:hover {
@@ -129,7 +131,7 @@ textarea.form-control {
 }
 
 .pm-select__placeholder {
-    color: var(--gray-400);
+    color: var(--text-lighter);
     font-size: var(--font-size-base);
 }
 

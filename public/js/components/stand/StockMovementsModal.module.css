@@ -39,7 +39,7 @@
 }
 
 .closeBtn {
-  color: var(--gray-400);
+  color: var(--text-lighter);
   font-size: 28px;
   font-weight: var(--font-weight-bold);
   cursor: pointer;
@@ -168,7 +168,7 @@
 
 .typeDefault {
   background-color: var(--gray-100);
-  color: var(--gray-600);
+  color: var(--text-secondary);
 }
 
 /* Quantity */
@@ -194,7 +194,7 @@
 .loadingState {
   text-align: center;
   padding: 40px 20px;
-  color: var(--gray-400);
+  color: var(--text-lighter);
 }
 
 .loadingSpinner {
@@ -214,7 +214,7 @@
 .emptyState {
   text-align: center;
   padding: 40px 20px;
-  color: var(--gray-400);
+  color: var(--text-lighter);
   font-size: var(--font-size-sm);
 }
 

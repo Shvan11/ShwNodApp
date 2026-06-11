@@ -58,6 +58,7 @@ import localsendRoutes from './localsend.routes.js';
 import telegramRoutes from './telegram.routes.js';
 import shareRoutes from './share.routes.js';
 import integrationsRoutes from './integrations.routes.js';
+import taskRoutes from './task.routes.js';
 
 // Import template routes (already modular)
 import templateRouter from '../template-api.js';
@@ -146,5 +147,8 @@ router.use('/share', shareRoutes);
 
 // Integrations — manage external-service auth (Telegram now; WhatsApp/Google later)
 router.use('/integrations', integrationsRoutes);
+
+// Tasks — the app-wide header surface of the alerts table (/api/tasks)
+router.use('/', taskRoutes);
 
 export default router;

@@ -30,7 +30,7 @@
 .searchBox input:focus {
     outline: none;
     border-color: var(--blue-300);
-    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 .filterIcon {
@@ -49,7 +49,7 @@
     transform: translateY(-50%);
     background: none;
     border: none;
-    color: var(--gray-400);
+    color: var(--text-lighter);
     cursor: pointer;
     padding: 0.5rem;
     font-size: 1rem;
@@ -104,7 +104,7 @@
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
-    color: var(--gray-600);
+    color: var(--text-secondary);
 }
 
 .statsBar strong {
@@ -113,7 +113,7 @@
 
 /* Table Container */
 .tableContainer {
-    background-color: var(--color-white);
+    background-color: var(--surface);
     border-radius: var(--radius-lg);
     overflow: auto;
     max-height: calc(100vh - 200px);
@@ -160,7 +160,7 @@
 }
 
 .table tbody tr:nth-child(odd) {
-    background-color: var(--color-white);
+    background-color: var(--surface);
 }
 
 .table tbody tr:hover {
@@ -171,11 +171,11 @@
 .matchedRow,
 .matchedRow:nth-child(even),
 .matchedRow:nth-child(odd) {
-    background-color: #e8f5e9;
+    background-color: var(--success-50);
 }
 
 .matchedRow:hover {
-    background-color: #c8e6c9;
+    background-color: var(--success-100);
 }
 
 /* Archform name column */
@@ -186,31 +186,8 @@
 
 /* Date column */
 .dateText {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-size: 0.8125rem;
-}
-
-/* Dropdown select */
-.matchSelect {
-    width: 100%;
-    min-width: 240px;
-    padding: 0.5rem 0.75rem;
-    font-size: var(--font-size-sm);
-    border: 2px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    background-color: var(--color-white);
-    cursor: pointer;
-    transition: var(--transition-base);
-}
-
-.matchSelect:focus {
-    outline: none;
-    border-color: var(--blue-300);
-    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
-}
-
-.matchSelect:hover {
-    border-color: var(--gray-300);
 }
 
 /* Action buttons */
@@ -227,7 +204,7 @@
     border-radius: var(--radius-md);
     cursor: pointer;
     background-color: var(--success-color);
-    color: white;
+    color: var(--color-white);
     font-weight: var(--font-weight-semibold);
     transition: var(--transition-base);
     white-space: nowrap;
@@ -248,7 +225,7 @@
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-md);
     cursor: pointer;
-    background-color: var(--color-white);
+    background-color: var(--surface);
     color: var(--error-color);
     font-weight: var(--font-weight-semibold);
     transition: var(--transition-base);
@@ -274,11 +251,11 @@
 .sortIcon {
     margin-left: 0.25rem;
     font-size: 0.7rem;
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 .sortableHeader:hover .sortIcon {
-    color: var(--gray-600);
+    color: var(--text-secondary);
 }
 
 /* Name cell with edit button */
@@ -292,7 +269,7 @@
 .btnEdit {
     background: none;
     border: none;
-    color: var(--gray-400);
+    color: var(--text-lighter);
     cursor: pointer;
     padding: 0.15rem 0.3rem;
     font-size: 0.75rem;
@@ -314,7 +291,7 @@
 .btnAutoRename {
     background: none;
     border: none;
-    color: var(--gray-400);
+    color: var(--text-lighter);
     cursor: pointer;
     padding: 0.15rem 0.3rem;
     font-size: 0.75rem;
@@ -356,7 +333,7 @@
 .editInput:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(0, 115, 230, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 .btnSaveEdit,
@@ -380,7 +357,7 @@
 }
 
 .btnCancelEdit {
-    color: var(--gray-500);
+    color: var(--text-secondary);
 }
 
 .btnCancelEdit:hover {
@@ -401,7 +378,7 @@
     cursor: pointer;
     padding: 0.4rem 0.5rem;
     font-size: var(--font-size-sm);
-    color: var(--gray-400);
+    color: var(--text-lighter);
     transition: var(--transition-base);
 }
 
@@ -419,7 +396,7 @@
     cursor: pointer;
     padding: 0.4rem 0.5rem;
     font-size: var(--font-size-sm);
-    color: var(--gray-400);
+    color: var(--text-lighter);
     transition: var(--transition-base);
 }
 
@@ -446,12 +423,12 @@
 .emptyState {
     text-align: center;
     padding: 4rem 2rem;
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 .emptyState i {
     font-size: 4rem;
-    color: var(--gray-300);
+    color: var(--text-lighter);
     margin-bottom: 1rem;
     display: block;
 }
@@ -486,7 +463,7 @@
 .unavailableState {
     text-align: center;
     padding: 3rem 2rem;
-    color: var(--gray-600);
+    color: var(--text-secondary);
 }
 
 .unavailableState i {
@@ -503,7 +480,7 @@
 
 .unavailableState p {
     margin: 0.5rem 0;
-    color: var(--gray-500);
+    color: var(--text-secondary);
 }
 
 .dbPathCode {
@@ -535,7 +512,7 @@
     margin-top: var(--spacing-md);
     padding: 0.6rem 1.2rem;
     background: var(--primary-color);
-    color: white;
+    color: var(--color-white);
     border: none;
     border-radius: var(--radius-md);
     cursor: pointer;
@@ -595,7 +572,7 @@
     .table tbody tr {
         display: flex;
         flex-direction: column;
-        background: var(--color-white);
+        background: var(--surface);
         border: 1px solid var(--gray-200);
         border-radius: var(--radius-lg);
         padding: var(--spacing-md);
@@ -618,16 +595,12 @@
     .table tbody td::before {
         content: attr(data-label);
         font-weight: var(--font-weight-semibold);
-        color: var(--gray-600);
+        color: var(--text-secondary);
         font-size: 0.75rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         flex-shrink: 0;
         margin-right: var(--spacing-sm);
-    }
-
-    .matchSelect {
-        min-width: 180px;
     }
 
     .actions {
@@ -651,11 +624,6 @@
         margin-bottom: 0.15rem;
     }
 
-    .matchSelect {
-        min-width: 100%;
-        width: 100%;
-    }
-
     .actions {
         width: 100%;
         justify-content: stretch;
@@ -674,10 +642,6 @@
 
     .searchBox input {
         min-height: 48px;
-    }
-
-    .matchSelect {
-        min-height: 44px;
     }
 
     .btnSave, .btnUnmatch, .btnDelete, .btnEditPatient {

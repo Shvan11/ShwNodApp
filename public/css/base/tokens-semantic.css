@@ -1,0 +1,334 @@
+/* ===================================================================
+   tokens-semantic.css — Tier 2: SEMANTIC tokens (LIGHT theme)
+   -------------------------------------------------------------------
+   The light-theme values for every theme-varying token. These are the
+   names component CSS actually consumes (surfaces, text, borders, the
+   full hue scales under their existing names, status pairs, shadows,
+   gradients, calendar colours, and the back-compat aliases).
+
+   The dark theme (theme-dark.css) re-declares the subset of these that
+   should change under `:root[data-theme="dark"]`. Anything not
+   overridden there keeps its light value in dark mode — accepted for a
+   handful of legacy names (--text-dark, --success-dark, …) whose rename
+   is out of scope. Aliases defined as `var(--other)` auto-follow their
+   target when that target is overridden in dark.
+
+   Hue-scale tokens reference the fixed `--palette-*` ramps from
+   tokens-primitive.css so the two tiers stay in sync; structural/brand
+   tokens live entirely in tokens-primitive.css.
+   =================================================================== */
+
+:root {
+    /* Native form controls, scrollbars and the default canvas follow this. */
+    color-scheme: light;
+
+    /* ===============================================================
+       Core brand-interactive colours
+       =============================================================== */
+    --primary-color: #007bff;
+    --primary-hover: #0056b3;
+    --secondary-color: #4CAF50;
+    --accent-color: #55608f;
+
+    --success-color: #28a745;
+    --error-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #17a2b8;
+
+    --primary-light: #66b3ff;
+    --primary-alpha: rgba(0, 123, 255, 0.25);
+    --secondary-hover: #3c9a3f;
+
+    /* ===============================================================
+       Text colours
+       =============================================================== */
+    --text-color: #333333;
+    --text-light: #666666;
+    --text-lighter: #999999;
+    --text-primary: #212529;
+    --text-secondary: #6c757d;
+    --text-heading: var(--color-dark-blue);  /* card/section titles — flips in dark */
+
+    /* ===============================================================
+       Surfaces & backgrounds
+       =============================================================== */
+    --background-color: #f4f4f9;
+    --background-light: #ffffff;
+
+    /* Semantic surface tokens — used by modal content, cards, toasts, lookup
+       editor, route-error, appointment calendar, etc. Map to the white/gray
+       surface scale so `background: var(--background-primary)` resolves to
+       an opaque elevated surface instead of falling back to transparent. */
+    --background-primary: #ffffff;
+    --background-secondary: #f9fafb;
+    --background-tertiary: #f3f4f6;
+
+    --surface: #ffffff;
+    --surface-elevated: #f8f9fa;
+    --surface-hover: #f5f5f5;
+    --surface-muted: #e9ecef;
+    --page-bg: #f4f4f9;
+    /* Page background (alias for bg-color) */
+    --card-bg: #ffffff;
+    /* Card background (alias for surface) */
+    --hover-bg: #f5f5f5;
+    /* Hover background (alias for surface-hover) */
+    --bg-color: #f4f4f9;
+    /* Alias for background-color */
+
+    /* ===============================================================
+       Borders
+       =============================================================== */
+    --border-color: #cccccc;
+    --border: #dee2e6;
+    --border-light: #e9ecef;
+    --border-accent: #e0e7ed;
+
+    /* ===============================================================
+       Gradients
+       =============================================================== */
+    --gradient-primary: linear-gradient(45deg, #9cc4c2, #ffffff);
+    --gradient-secondary: linear-gradient(45deg, #aedfd0, #ffffff);
+    --gradient-accent: linear-gradient(45deg, #49a09d, #5f2c82);
+
+    /* ===============================================================
+       Box shadows
+       =============================================================== */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    --shadow-focus: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    /* Focus outline shadow */
+    --shadow-focus-strong: 0 0 0 1px var(--primary-color);
+    /* Stronger focus outline */
+    --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+    --shadow-medium: 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23);
+    --shadow-heavy: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
+    /* Warning shadows */
+    --shadow-warning-sm: 0 4px 6px -1px rgba(249, 115, 22, 0.3), 0 2px 4px -1px rgba(249, 115, 22, 0.2);
+    --shadow-warning-lg: 0 10px 15px -3px rgba(249, 115, 22, 0.4), 0 4px 6px -2px rgba(249, 115, 22, 0.3);
+
+    /* ===============================================================
+       Extended named colours (status-adjacent, themable)
+       =============================================================== */
+    --neutral-gray: #6c757d;
+    --neutral-gray-dark: #495057;
+    /* Dark neutral gray */
+    --warning-orange: #ff9800;
+    --warning-orange-dark: #e68900;
+    /* Dark warning orange */
+    --error-pink: #E91E63;
+    --error-red: #dc3545;
+    /* Primary error red */
+    --error-red-dark: #bd2130;
+    /* Dark error red */
+    --error-red-light: #ff6b6b;
+    /* Light red for alerts/notifications */
+    --success-darker: #1e7e34;
+    --danger-color: #dc3545;
+    /* Alias for error-color */
+    --pink-100: #fce7f3;
+    --primary-blue: #3b82f6;
+    /* Primary blue (alias for blue-500) */
+    --primary-blue-dark: #1d4ed8;
+    /* Dark primary blue (alias for blue-700) */
+    --primary-blue-light: #93c5fd;
+    /* Light primary blue (alias for blue-300) */
+
+    /* ===============================================================
+       Extended colour scales — mapped 1:1 to the --palette-* ramps
+       =============================================================== */
+
+    /* Gray Scale (Neutral) */
+    --gray-50: var(--palette-gray-50);
+    --gray-100: var(--palette-gray-100);
+    --gray-200: var(--palette-gray-200);
+    --gray-300: var(--palette-gray-300);
+    --gray-400: var(--palette-gray-400);
+    --gray-500: var(--palette-gray-500);
+    --gray-600: var(--palette-gray-600);
+    --gray-700: var(--palette-gray-700);
+    --gray-800: var(--palette-gray-800);
+    --gray-900: var(--palette-gray-900);
+
+    /* Blue Scale */
+    --blue-50: var(--palette-blue-50);
+    --blue-100: var(--palette-blue-100);
+    --blue-200: var(--palette-blue-200);
+    --blue-300: var(--palette-blue-300);
+    --blue-500: var(--palette-blue-500);
+    --blue-600: var(--palette-blue-600);
+    --blue-700: var(--palette-blue-700);
+    --blue-800: var(--palette-blue-800);
+
+    /* Indigo Scale */
+    --indigo-50: var(--palette-indigo-50);
+    --indigo-100: var(--palette-indigo-100);
+    --indigo-200: var(--palette-indigo-200);
+    --indigo-300: var(--palette-indigo-300);
+    --indigo-400: var(--palette-indigo-400);
+    --indigo-500: var(--palette-indigo-500);
+    --indigo-600: var(--palette-indigo-600);
+    --indigo-700: var(--palette-indigo-700);
+
+    /* Success/Green Scale */
+    --success-50: var(--palette-green-50);
+    --success-100: var(--palette-green-100);
+    --success-200: var(--palette-green-200);
+    --success-300: var(--palette-green-300);
+    --success-500: var(--palette-green-500);
+    --success-600: var(--palette-green-600);
+    --success-700: var(--palette-green-700);
+    --success-800: var(--palette-green-800);
+    --success-green: var(--palette-green-500);
+    /* Primary success green (alias for success-500) */
+    --success-green-dark: var(--palette-green-700);
+    /* Dark success green (alias for success-700) */
+
+    /* Error/Red Scale */
+    --error-50: var(--palette-red-50);
+    --error-100: var(--palette-red-100);
+    --error-200: var(--palette-red-200);
+    --error-300: var(--palette-red-300);
+    --error-400: var(--palette-red-400);
+    --error-500: var(--palette-red-500);
+    --error-600: var(--palette-red-600);
+    --error-700: var(--palette-red-700);
+
+    /* Warning/Orange Scale */
+    --warning-50: var(--palette-orange-50);
+    --warning-100: var(--palette-orange-100);
+    --warning-200: var(--palette-orange-200);
+    --warning-300: var(--palette-orange-300);
+    --warning-400: var(--palette-orange-400);
+    --warning-500: var(--palette-orange-500);
+    --warning-600: var(--palette-orange-600);
+    --warning-700: var(--palette-orange-700);
+    --warning-800: var(--palette-orange-800);
+    --warning-900: var(--palette-orange-900);
+
+    /* Info/Cyan Scale */
+    --info-50: var(--palette-cyan-50);
+    --info-100: var(--palette-cyan-100);
+    --info-200: var(--palette-cyan-200);
+    --info-300: var(--palette-cyan-300);
+    --info-500: var(--palette-cyan-500);
+    --info-600: var(--palette-cyan-600);
+    --info-700: var(--palette-cyan-700);
+    --info-800: var(--palette-cyan-800);
+
+    /* ===============================================================
+       Extended state colours (tint / dark pairs)
+       =============================================================== */
+    --success-dark: #1e7e34;
+    --success-light: #d4edda;
+
+    --error-dark: #c82333;
+    --error-light: #f8d7da;
+
+    --warning-dark: #e0a800;
+    --warning-light: #fff3cd;
+
+    --info-dark: #138496;
+    --info-light: #d1ecf1;
+
+    /* ===============================================================
+       Calendar colours
+       =============================================================== */
+    --calendar-today-highlight: #fff9e6;
+    --calendar-weekend-bg: #f0f3f5;
+    --calendar-header-gradient: linear-gradient(to right, #ffffff 0%, #f8f9fa 100%);
+
+    --cal-line: oklch(90% 0.005 260);
+    --cal-line-2: oklch(82% 0.006 260);
+    --cal-ink: oklch(22% 0.014 260);
+    --cal-ink-2: oklch(40% 0.012 260);
+    --cal-ink-3: oklch(58% 0.008 260);
+    --cal-ink-4: oklch(74% 0.006 260);
+    --cal-surface: #ffffff;
+    --cal-surface-2: oklch(97% 0.004 260);
+    --cal-zebra: oklch(96.5% 0.006 260); /* on-the-hour zebra band (week/day grid) */
+    --cal-row-line: rgba(0, 0, 0, 0.09); /* horizontal row separator in zebra mode — bump to widen slot separation */
+    --cal-hol: oklch(58% 0.13 25);
+    --cal-hol-soft: oklch(96% 0.025 25);
+    --cal-purple-ink: #4c44a8;
+
+    /* ===============================================================
+       Appointment status colours (bg / text pairs)
+       =============================================================== */
+    --status-scheduled-bg: #f3f4f6;
+    /* gray-100 */
+    --status-scheduled-text: #6b7280;
+    /* gray-500 */
+    --status-present-bg: #eff6ff;
+    /* blue-50 */
+    --status-present-text: #1d4ed8;
+    /* blue-700 */
+    --status-seated-bg: #fff7ed;
+    /* warning-50 */
+    --status-seated-text: #c2410c;
+    /* warning-700 */
+    --status-dismissed-bg: #f0fdf4;
+    /* success-50 */
+    --status-dismissed-text: #15803d;
+    /* success-700 */
+
+    /* Seated appointment — vivid-yellow FILLED button (distinct from the subtle
+       --status-seated-bg badge above). Like the green/red filled status buttons
+       it stays vivid in dark mode (yellow + dark-brown text reads in both), so
+       these are not overridden in theme-dark.css. */
+    --status-seated-fill: #FFEB3B;
+    --status-seated-fill-2: #FDD835;
+    --status-seated-fill-hover: #FFEE58;
+    --status-seated-fill-border: #F9A825;
+    --status-seated-fill-text: #5D4037;
+    --shadow-status-seated: 0 4px 6px -1px rgba(255, 235, 59, 0.4), 0 2px 4px -1px rgba(255, 235, 59, 0.3);
+    --shadow-status-seated-lg: 0 10px 15px -3px rgba(255, 235, 59, 0.5), 0 4px 6px -2px rgba(255, 235, 59, 0.4);
+
+    /* ===================================================================
+       Component-CSS back-compat tokens
+       These names are referenced from existing component stylesheets but
+       were never canonical here. Defined as aliases pointing at the
+       canonical token so the call sites resolve correctly — and so they
+       auto-follow their target into dark mode.
+       =================================================================== */
+
+    /* Surface aliases */
+    --bg-light: var(--gray-50);
+    --bg-muted: #f5f7fb;
+    --bg-secondary: var(--gray-100);
+    --table-header-bg: var(--gray-100);
+    --white: #ffffff;
+
+    /* Text aliases */
+    --text-dark: var(--text-primary);
+    --text-medium: var(--gray-600);
+    /* Alias the lightest readable text token, NOT raw --gray-400: the gray ramp
+       inverts in dark and --gray-400 → --palette-night-500 (a *border* tone),
+       which is unreadable as text. --text-lighter carries a proper dark override
+       (night-300) so muted text stays legible in both themes. */
+    --text-muted: var(--text-lighter);
+
+    /* Primary scale (blue-tinted; matches existing --blue-* scale) */
+    --primary-50: #eff6ff;
+    --primary-100: #dbeafe;
+    --primary-300: var(--blue-300);
+    --primary-700: var(--blue-700);
+    --primary-dark: var(--primary-hover);
+    --primary-color-dark: var(--primary-hover);
+
+    /* Amber scale (warning-adjacent; used for advisory states) */
+    --amber-50: var(--palette-amber-50);
+    --amber-300: var(--palette-amber-300);
+    --amber-600: var(--palette-amber-600);
+    --amber-800: var(--palette-amber-800);
+
+    /* Purple / accent */
+    --purple-500: #8b5cf6;
+    --accent-dark: var(--success-green);
+
+    /* Misc */
+    --error-alpha: rgba(220, 53, 69, 0.25);
+}

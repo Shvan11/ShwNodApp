@@ -3,7 +3,7 @@
   flex-direction: column;
   padding: 2px var(--spacing-xs);
   background: var(--background-secondary);
-  border-top: 1px solid var(--border-color, #e5e7eb);
+  border-top: 1px solid var(--border-color);
 }
 
 .rotateRow {
@@ -11,18 +11,41 @@
   align-items: center;
   gap: var(--spacing-xs);
   padding: 0 var(--spacing-xs);
-  color: var(--text-muted, #6b7280);
+  color: var(--text-muted);
   font-size: 0.72rem;
 }
 
 .slider {
   flex: 1 1 auto;
   min-width: 0;
-  accent-color: var(--primary-color, #007bff);
+  accent-color: var(--primary-color);
   cursor: pointer;
 }
 
 .slider:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.nudge {
+  flex: 0 0 auto;
+  padding: 1px var(--spacing-xs);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.nudge:hover:not(:disabled) {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.nudge:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }

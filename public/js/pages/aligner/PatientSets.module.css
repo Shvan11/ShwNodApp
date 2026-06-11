@@ -29,7 +29,7 @@
 .errorContainer {
   text-align: center;
   padding: 4rem 2rem;
-  color: var(--gray-400);
+  color: var(--text-lighter);
 }
 
 .errorContainer i {
@@ -51,7 +51,7 @@
   margin-bottom: 0.5rem;
   padding: 0.5rem 0.75rem;
   background: var(--gray-50);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 }
 
 .breadcrumbLink {
@@ -75,9 +75,9 @@
 /* Patient Header */
 .patientInfo {
   background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
-  color: white;
+  color: var(--color-white);
   padding: 2rem;
-  border-radius: 12px;
+  border-radius: var(--radius-2xl);
   margin-bottom: 2rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   overflow: hidden;
@@ -94,13 +94,13 @@
 .patientDetails h2 {
   margin: 0 0 0.5rem 0;
   font-size: 1.8rem;
-  color: white;
-  font-weight: 700;
+  color: var(--color-white);
+  font-weight: var(--font-weight-bold);
 }
 
 .patientSubtitle {
   font-size: 1rem;
-  font-weight: 400;
+  font-weight: var(--font-weight-normal);
   opacity: 0.9;
   margin-left: 0.5rem;
 }
@@ -109,8 +109,8 @@
   display: flex;
   gap: 1.5rem;
   font-size: 0.95rem;
-  color: white;
-  font-weight: 500;
+  color: var(--color-white);
+  font-weight: var(--font-weight-medium);
   flex-wrap: wrap;
 }
 
@@ -157,80 +157,14 @@
 .emptyState {
   text-align: center;
   padding: 4rem 2rem;
-  color: var(--gray-400);
+  color: var(--text-lighter);
 }
 
 .emptyState i {
   font-size: 4rem;
-  color: var(--gray-300);
+  color: var(--text-lighter);
   margin-bottom: 1rem;
   display: block;
-}
-
-/* Success Notification Popup */
-.successNotification {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  color: white;
-  padding: 1rem 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 10000;
-  animation: slideInNotification 0.3s ease-out;
-  font-size: 0.95rem;
-  max-width: 400px;
-}
-
-.successNotification.slideOut {
-  animation: slideOutNotification 0.3s ease-out forwards;
-}
-
-@keyframes slideInNotification {
-  from {
-    opacity: 0;
-    transform: translateX(100%);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slideOutNotification {
-  from {
-    opacity: 1;
-    transform: translateX(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateX(100%);
-  }
-}
-
-.notificationContent {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.notificationIcon {
-  font-size: 1.2rem;
-}
-
-.notificationText {
-  flex: 1;
-}
-
-.notificationTitle {
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-}
-
-.notificationSubtext {
-  font-size: 0.85rem;
-  opacity: 0.9;
 }
 
 /* Upload Progress Overlay */
@@ -248,9 +182,9 @@
 }
 
 .uploadDialog {
-  background: white;
+  background: var(--surface);
   padding: 2rem 3rem;
-  border-radius: 12px;
+  border-radius: var(--radius-2xl);
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
@@ -261,21 +195,21 @@
 .uploadSpinner {
   width: 60px;
   height: 60px;
-  border: 4px solid #e5e7eb;
-  border-top: 4px solid #2563eb;
+  border: 4px solid var(--gray-200);
+  border-top: 4px solid var(--blue-600);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 
 .uploadTitle {
   font-size: 1.25rem;
-  font-weight: 600;
-  color: #1f2937;
+  font-weight: var(--font-weight-semibold);
+  color: var(--gray-800);
 }
 
 .uploadHint {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 /* File System Access Status */
@@ -289,11 +223,11 @@
 }
 
 .fsAccessActive {
-  background: #d1fae5;
+  background: var(--success-100);
 }
 
 .fsAccessInactive {
-  background: #fee2e2;
+  background: var(--error-100);
 }
 
 /* Note Form Actions */

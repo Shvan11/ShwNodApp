@@ -19,7 +19,7 @@
 
 /* Main section container - use when you need a nested box */
 .section {
-    background: white;
+    background: var(--surface);
     border-radius: var(--radius-xl);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     border: 1px solid var(--gray-200);
@@ -134,7 +134,7 @@
 
 .emptyState i {
     font-size: 4rem;
-    color: var(--gray-200);
+    color: var(--text-lighter);
     margin-bottom: 1rem;
 }
 
@@ -253,7 +253,7 @@
 .urlReference {
     display: inline-block;
     padding: 0.5rem 0.75rem;
-    background: var(--gray-100, #f5f5f5);
+    background: var(--gray-100);
     border: 1px solid var(--gray-200);
     border-radius: 6px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -266,9 +266,9 @@
 /* Panel style for the settings info/error modal (shared <Modal> wrapper handles
    the overlay; this is the inner content panel). */
 .infoModal {
-    background: white;
-    border-radius: var(--radius-xl, 12px);
-    box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04));
+    background: var(--surface);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
     width: 100%;
     max-width: 480px;
     max-height: 90vh;
@@ -297,12 +297,12 @@
     gap: 0.75rem;
     padding: 1rem 1.5rem;
     border-top: 1px solid var(--gray-200);
-    background: var(--gray-50, #fafafa);
+    background: var(--gray-50);
 }
 
 .settingDescription code {
     padding: 0.1rem 0.3rem;
-    background: var(--gray-100, #f5f5f5);
+    background: var(--gray-100);
     border-radius: 4px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.85rem;
@@ -315,12 +315,6 @@
 
 .settingGroup.error input {
     border-color: var(--error-400);
-}
-
-.settingError {
-    color: var(--error-400);
-    font-size: 0.85rem;
-    margin-top: 0.25rem;
 }
 
 /* Pending changes styling */
@@ -403,7 +397,7 @@
     padding: 1rem;
     border-radius: 8px;
     border-left: 4px solid;
-    background: white;
+    background: var(--surface);
     width: 100%;
     max-width: 500px;
 }
@@ -483,4 +477,56 @@
     .section h3 {
         font-size: 1.3rem;
     }
+}
+
+/* Theme (appearance) radio group — segmented control in the "This PC" section.
+   The native radio is visually hidden; each <label> is the clickable segment. */
+.themeRadioGroup {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-xs);
+}
+
+.themeRadioOption {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: var(--border-width-medium) solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.themeRadioOption:hover {
+    border-color: var(--primary-color);
+}
+
+.themeRadioOption:focus-within {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.themeRadioOption input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+}
+
+.themeRadioOption i {
+    font-size: var(--icon-size-base);
+}
+
+.themeRadioOptionActive {
+    border-color: var(--primary-color);
+    background: var(--primary-50);
+    color: var(--primary-color);
+    font-weight: var(--font-weight-semibold);
 }

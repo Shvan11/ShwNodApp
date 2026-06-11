@@ -1,0 +1,311 @@
+/* ===================================================================
+   tokens-primitive.css — Tier 1: PRIMITIVE tokens (never theme-varying)
+   -------------------------------------------------------------------
+   This file is the FIXED tier of the two-tier token system. Nothing in
+   here ever changes between light and dark mode. It holds:
+
+     1. The raw colour palette under the `--palette-*` namespace
+        (the underlying hues every semantic token resolves to, PLUS the
+        cool-slate `--palette-night-*` ramp that the dark theme needs).
+     2. Fixed brand / named colours that must keep their identity in
+        BOTH themes (white, black, the header purple gradient, the
+        WhatsApp greens, the rose-pink selection colour, …).
+     3. All structural tokens — spacing, radius, typography, z-index,
+        breakpoints, transitions, container widths, the responsive
+        --header-height, and the structural calendar dimensions.
+
+   Theme-varying tokens (surfaces, text, borders, hue scales under their
+   existing names, status pairs, shadows, gradients, calendar colours)
+   live in tokens-semantic.css (light) and theme-dark.css (dark overrides).
+   =================================================================== */
+
+:root {
+    /* ===============================================================
+       1. RAW PALETTE  (--palette-*)  — fixed reference hues
+       =============================================================== */
+
+    /* Neutral / gray ramp */
+    --palette-gray-50: #f9fafb;
+    --palette-gray-100: #f3f4f6;
+    --palette-gray-200: #e5e7eb;
+    --palette-gray-300: #d1d5db;
+    --palette-gray-400: #9ca3af;
+    --palette-gray-500: #6b7280;
+    --palette-gray-600: #4b5563;
+    --palette-gray-700: #374151;
+    --palette-gray-800: #1f2937;
+    --palette-gray-900: #111827;
+
+    /* Blue ramp */
+    --palette-blue-50: #eff6ff;
+    --palette-blue-100: #dbeafe;
+    --palette-blue-200: #bfdbfe;
+    --palette-blue-300: #93c5fd;
+    --palette-blue-500: #3b82f6;
+    --palette-blue-600: #2563eb;
+    --palette-blue-700: #1d4ed8;
+    --palette-blue-800: #1e40af;
+
+    /* Indigo ramp */
+    --palette-indigo-50: #eef2ff;
+    --palette-indigo-100: #e0e7ff;
+    --palette-indigo-200: #c7d2fe;
+    --palette-indigo-300: #a5b4fc;
+    --palette-indigo-400: #818cf8;
+    --palette-indigo-500: #6366f1;
+    --palette-indigo-600: #4f46e5;
+    --palette-indigo-700: #4338ca;
+
+    /* Green ramp (success) */
+    --palette-green-50: #f0fdf4;
+    --palette-green-100: #dcfce7;
+    --palette-green-200: #bbf7d0;
+    --palette-green-300: #86efac;
+    --palette-green-500: #22c55e;
+    --palette-green-600: #16a34a;
+    --palette-green-700: #15803d;
+    --palette-green-800: #166534;
+
+    /* Red ramp (error) */
+    --palette-red-50: #fef2f2;
+    --palette-red-100: #fee2e2;
+    --palette-red-200: #fecaca;
+    --palette-red-300: #fca5a5;
+    --palette-red-400: #f87171;
+    --palette-red-500: #ef4444;
+    --palette-red-600: #dc2626;
+    --palette-red-700: #b91c1c;
+
+    /* Orange ramp (warning) */
+    --palette-orange-50: #fff7ed;
+    --palette-orange-100: #ffedd5;
+    --palette-orange-200: #fed7aa;
+    --palette-orange-300: #fdba74;
+    --palette-orange-400: #fb923c;
+    --palette-orange-500: #f97316;
+    --palette-orange-600: #ea580c;
+    --palette-orange-700: #c2410c;
+    --palette-orange-800: #9a3412;
+    --palette-orange-900: #7c2d12;
+
+    /* Cyan ramp (info) */
+    --palette-cyan-50: #ecfeff;
+    --palette-cyan-100: #cffafe;
+    --palette-cyan-200: #a5f3fc;
+    --palette-cyan-300: #67e8f9;
+    --palette-cyan-500: #06b6d4;
+    --palette-cyan-600: #0891b2;
+    --palette-cyan-700: #0e7490;
+    --palette-cyan-800: #155e75;
+
+    /* Amber ramp (advisory) */
+    --palette-amber-50: #fffbeb;
+    --palette-amber-300: #fcd34d;
+    --palette-amber-600: #d97706;
+    --palette-amber-800: #92400e;
+
+    /* Night ramp — cool-slate surfaces/text for DARK mode only.
+       Indexed by lightness like the gray ramp (50 = lightest), so the
+       dark theme can invert the gray scale by cross-referencing it
+       (e.g. dark --gray-50 → --palette-night-900). */
+    --palette-night-50: #e2e6ee;   /* primary text on dark */
+    --palette-night-100: #c8cedb;
+    --palette-night-200: #9aa3b2;  /* secondary text on dark */
+    --palette-night-300: #6b7585;
+    --palette-night-400: #4a5365;
+    --palette-night-500: #3a4356;  /* borders on dark */
+    --palette-night-600: #2b3344;
+    --palette-night-700: #222937;  /* elevated surface */
+    --palette-night-800: #1a202b;  /* surface */
+    --palette-night-900: #11151c;  /* page background */
+
+    /* ===============================================================
+       2. FIXED BRAND / NAMED COLOURS  — identical in both themes
+       =============================================================== */
+    --color-white: #ffffff;
+    --color-black: #000000;
+    --black: #000000;
+    /* Alias for color-black */
+    --color-beige: #faebd7;
+    /* antiquewhite */
+    --color-blue-action: #1c87c9;
+    --color-dark-blue: #1e3a8a;
+    --color-yellow: #FFBC00;
+    --color-yellow-border: #FFCB00;
+    --color-yellow-hover: #F0B200;
+    --color-teal: #20c997;
+    --color-dark-slate: #2c3e50;
+    --color-light-slate: #495057;
+    --color-purple-light: #667eea;
+    --color-purple-dark: #764ba2;
+    --color-purple-medium: #6d67c6;
+    --selection-color: #ec4899;
+    /* Rose-pink — semantic "selected" state (calendar day, time slot, future selectables) */
+    --selection-color-rgb: 236, 72, 153;
+    /* RGB tuple for rgba(var(--selection-color-rgb), <alpha>) usage */
+    --whatsapp-green: #25D366;
+    --whatsapp-dark: #128C7E;
+
+    /* ===============================================================
+       3. STRUCTURAL TOKENS  — spacing, radius, type, motion, layout
+       =============================================================== */
+
+    /* Spacing */
+    --spacing-xs: 0.25rem;
+    /* 4px */
+    --spacing-sm: 0.5rem;
+    /* 8px */
+    --spacing-md: 1rem;
+    /* 16px */
+    --spacing-lg: 1.5rem;
+    /* 24px */
+    --spacing-xl: 2rem;
+    /* 32px */
+    --spacing-xxl: 3rem;
+    /* 48px */
+    --spacing-2xl: var(--spacing-xxl);
+
+    /* Border radius */
+    --radius-xs: 0.0625rem;
+    /* 1px */
+    --radius-sm: 0.125rem;
+    /* 2px */
+    --radius-md: 0.25rem;
+    /* 4px */
+    --radius-lg: 0.5rem;
+    /* 8px */
+    --radius-xl: 1rem;
+    /* 16px */
+    --radius-2xl: 0.75rem;
+    /* 12px */
+    --radius-full: 9999px;
+    /* Full round */
+    --border-radius: var(--radius-md);
+
+    /* Border widths */
+    --border-width-thin: 1px;
+    --border-width-medium: 2px;
+    --border-width-thick: 3px;
+
+    /* Font settings */
+    --font-primary: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-family-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+    --font-size-xs: 0.75rem;
+    /* 12px */
+    --font-size-sm: 0.875rem;
+    /* 14px */
+    --font-size-md: 0.95rem;
+    /* 15px */
+    --font-size-base: 1rem;
+    /* 16px */
+    --font-size-lg: 1.125rem;
+    /* 18px */
+    --font-size-xl: 1.25rem;
+    /* 20px */
+    --font-size-2xl: 1.5rem;
+    /* 24px */
+    --font-size-3xl: 1.875rem;
+    /* 30px */
+    --font-size-4xl: 2rem;
+    /* 32px */
+    --font-size-5xl: 3rem;
+    /* 48px */
+    --font-weight-light: 300;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+
+    /* Icon sizes */
+    --icon-size-sm: 1rem;
+    /* 16px */
+    --icon-size-base: 1.125rem;
+    /* 18px */
+    --icon-size-lg: 1.5rem;
+    /* 24px */
+
+    /* Line heights */
+    --line-height-tight: 1.2;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.75;
+    --line-height-loose: 2;
+
+    /* Letter spacing */
+    --letter-spacing-tight: -0.02em;
+    --letter-spacing-normal: 0em;
+    --letter-spacing-wide: 0.05em;
+
+    /* Transitions & Animation */
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+    --easing-ease-in: cubic-bezier(0.4, 0, 1, 1);
+    --easing-ease-out: cubic-bezier(0, 0, 0.2, 1);
+    --easing-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Z-index layers */
+    --z-index-dropdown: 1000;
+    --z-index-sticky: 1020;
+    --z-index-fixed: 1030;
+    --z-index-modal: 1040;
+    --z-index-popover: 1050;
+    --z-index-tooltip: 1060;
+
+    /* Breakpoints for responsive design */
+    --breakpoint-xs: 375px;
+    --breakpoint-sm: 480px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1024px;
+    --breakpoint-xl: 1400px;
+
+    /* Container & Layout Widths */
+    --container-max-width: 1400px;
+    --container-max-width-narrow: 800px;
+    --container-max-width-sm: 500px;
+    --container-max-width-md: 600px;
+    --table-min-width: 600px;
+    --table-min-width-sm: 500px;
+    --grid-min-column-width: 250px;
+    --grid-min-column-width-md: 280px;
+    --grid-min-column-width-lg: 300px;
+
+    /* Viewport units */
+    --viewport-width-full: 100vw;
+    --viewport-height-full: 100vh;
+    --viewport-width-95: 95vw;
+    --viewport-height-90: 90vh;
+
+    /* Input dimensions */
+    --input-height: 3rem;
+    /* 48px - matches React-Select default height */
+    --input-height-sm: 2.5rem;
+    --input-height-lg: 3.5rem;
+
+    /* Layout dimensions */
+    /* Fixed universal-header footprint — single source of truth for: #app-container's
+       top padding (index.html), full-height page shells that subtract it from 100vh,
+       and toast / settings-nav top offsets. Responsive overrides are just below this
+       :root block (the header wraps to more rows as the viewport narrows). */
+    --header-height: 50px;
+
+    /* Calendar week/day-view structural dimensions — uniform 112px slot system.
+       (The calendar COLOUR tokens — --cal-line, --cal-ink, --cal-surface, … — are
+       theme-varying and live in tokens-semantic.css / theme-dark.css.) */
+    --cal-slot-h: 112px;
+    /* Density-zoom: the Week grid sets --cal-row-h (row height) and
+       --cal-font-scale inline from the day-count N (AppointmentCalendar). Row
+       height couples to N so cells keep the default-week aspect ratio; the time
+       column + grid fonts scale by --cal-font-scale. Defaults = the 6-day week. */
+    --cal-row-h: 112px;
+    --cal-font-scale: 1;
+    --cal-grid-time-w: calc(70px * var(--cal-font-scale));
+}
+
+/* Responsive --header-height: the universal header wraps to extra rows as the
+   viewport narrows, so the content offset must grow to match. These mirror the
+   breakpoints #app-container's padding-top used before it was tokenised. */
+@media (max-width: 1024px) { :root { --header-height: 80px; } }
+@media (max-width: 768px)  { :root { --header-height: 110px; } }
+@media (max-width: 640px)  { :root { --header-height: 100px; } }
+@media (max-width: 480px)  { :root { --header-height: 95px; } }
+@media (max-width: 375px)  { :root { --header-height: 90px; } }

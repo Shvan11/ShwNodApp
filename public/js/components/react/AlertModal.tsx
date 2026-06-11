@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { postJSON, putJSON, httpErrorMessage } from '@/core/http';
+import { notifyTasksChanged } from '@/services/tasks';
 import Modal from './Modal';
 
 interface AlertType {
@@ -13,6 +14,9 @@ interface AlertFormData {
     alertTypeId: string;
     alertSeverity: string;
     alertDetails: string;
+    expiresAt: string;
+    escalateAt: string;
+    showInHeader: boolean;
 }
 
 interface FormErrors {
@@ -26,6 +30,9 @@ interface EditAlertData {
     alert_type_id?: number;
     alert_severity?: number;
     alert_details: string;
+    surface_mode?: string;
+    expires_at?: string | null;
+    escalate_at?: string | null;
 }
 
 interface AlertModalProps {
@@ -47,7 +54,10 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
     const [formData, setFormData] = useState<AlertFormData>({
         alertTypeId: '',
         alertSeverity: '2', // Default to Moderate
-        alertDetails: ''
+        alertDetails: '',
+        expiresAt: '',
+        escalateAt: '',
+        showInHeader: false,
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
@@ -60,14 +70,20 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
             setFormData({
                 alertTypeId: editAlert.alert_type_id?.toString() || '',
                 alertSeverity: editAlert.alert_severity?.toString() || '2',
-                alertDetails: editAlert.alert_details || ''
+                alertDetails: editAlert.alert_details || '',
+                expiresAt: editAlert.expires_at || '',
+                escalateAt: editAlert.escalate_at || '',
+                showInHeader: editAlert.surface_mode === 'push',
             });
         } else if (!isOpen) {
             // Reset form when modal closes
             setFormData({
                 alertTypeId: '',
                 alertSeverity: '2',
-                alertDetails: ''
+                alertDetails: '',
+                expiresAt: '',
+                escalateAt: '',
+                showInHeader: false,
             });
             setErrors({});
         }
@@ -123,17 +139,24 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
             const body = {
                 alertTypeId: parseInt(formData.alertTypeId, 10),
                 alertSeverity: parseInt(formData.alertSeverity, 10),
-                alertDetails: formData.alertDetails.trim()
+                alertDetails: formData.alertDetails.trim(),
+                surfaceMode: formData.showInHeader ? 'push' : 'context',
+                expiresAt: formData.expiresAt || '',
+                escalateAt: formData.escalateAt || '',
             };
             await (isEditMode ? putJSON(url, body) : postJSON(url, body));
 
             toast.success(`Alert ${isEditMode ? 'updated' : 'created'} successfully`);
+            notifyTasksChanged();
 
             // Reset form
             setFormData({
                 alertTypeId: '',
                 alertSeverity: '2',
-                alertDetails: ''
+                alertDetails: '',
+                expiresAt: '',
+                escalateAt: '',
+                showInHeader: false,
             });
             setErrors({});
 
@@ -157,7 +180,10 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
         setFormData({
             alertTypeId: '',
             alertSeverity: '2',
-            alertDetails: ''
+            alertDetails: '',
+            expiresAt: '',
+            escalateAt: '',
+            showInHeader: false,
         });
         setErrors({});
         onClose();
@@ -276,6 +302,44 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                             {errors.alertDetails && (
                                 <span className="error-message">{errors.alertDetails}</span>
                             )}
+                        </div>
+
+                        {/* Dual-surface options — when/whether this alert also reaches the header */}
+                        <div className="form-group">
+                            <label className="checkbox-label">
+                                <input
+                                    type="checkbox"
+                                    name="showInHeader"
+                                    checked={formData.showInHeader}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, showInHeader: e.target.checked }))}
+                                    disabled={loading}
+                                />
+                                {' '}Also show in the header Tasks bell
+                            </label>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="escalateAt">Escalate to header on <span className="optional-hint">(optional)</span></label>
+                            <input
+                                type="date"
+                                id="escalateAt"
+                                name="escalateAt"
+                                value={formData.escalateAt}
+                                onChange={handleChange}
+                                disabled={loading}
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="expiresAt">Expires <span className="optional-hint">(optional)</span></label>
+                            <input
+                                type="date"
+                                id="expiresAt"
+                                name="expiresAt"
+                                value={formData.expiresAt}
+                                onChange={handleChange}
+                                disabled={loading}
+                            />
                         </div>
                     </form>
                 </div>

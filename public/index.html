@@ -3,7 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
     <title>Shwan Orthodontics - Practice Management</title>
+
+    <!--
+      Theme FOUC guard — runs BEFORE the inline <style> blocks and the CSS
+      bundles, so the very first paint already has the right data-theme. The
+      stored key is written RAW by core/storage.ts (String(value), not JSON),
+      so we read it back with a plain getItem and no JSON.parse. Keep this in
+      sync with public/js/core/theme.ts (THEME_STORAGE_KEY = 'shwan_theme').
+    -->
+    <script>
+      (function () {
+        var pref = 'auto';
+        try { pref = localStorage.getItem('shwan_theme') || 'auto'; } catch (e) {}
+        if (pref !== 'light' && pref !== 'dark' && pref !== 'auto') pref = 'light';
+        var resolved = pref === 'auto'
+          ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : pref;
+        document.documentElement.setAttribute('data-theme', resolved);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', resolved === 'dark' ? '#11151c' : '#667eea');
+      })();
+    </script>
 
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
@@ -68,6 +90,25 @@
             animation: spin 1s linear infinite;
         }
 
+        /* Dark counterparts for the boot chrome — applied by the FOUC script's
+           data-theme before any CSS bundle loads, so the pre-React paint
+           (page bg + loading spinner) matches the chosen theme, no white flash.
+           Wrapped in @media screen so print preview stays on the light boot. */
+        @media screen {
+            html[data-theme="dark"] body {
+                background-color: #11151c;
+            }
+
+            html[data-theme="dark"] .spa-loading {
+                background-color: #11151c;
+            }
+
+            html[data-theme="dark"] .spa-loading-spinner {
+                border-color: #2b3344;
+                border-top-color: #4dabf7;
+            }
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -89,7 +130,7 @@
         }
 
         /* App container - top padding clears the fixed header. The offset is the
-           responsive --header-height token (defined in css/base/variables.css);
+           responsive --header-height token (defined in css/base/tokens-primitive.css);
            full-height page shells subtract the same token from 100vh so the header
            is never counted twice → no phantom scrollbar. #app-container is React-
            rendered after window load, so variables.css is always present; the 50px
@@ -133,6 +174,21 @@
 
         .error-boundary p {
             color: #666;
+        }
+
+        @media screen {
+            html[data-theme="dark"] .error-boundary {
+                background-color: #2a1416;
+                border-color: #6b2a2f;
+            }
+
+            html[data-theme="dark"] .error-boundary h2 {
+                color: #ff8787;
+            }
+
+            html[data-theme="dark"] .error-boundary p {
+                color: #9aa3b2;
+            }
         }
     </style>
 </head>

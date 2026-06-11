@@ -31,7 +31,7 @@
 .patientFilterBox input:focus {
     outline: none;
     border-color: var(--blue-300);
-    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 .filterIcon {
@@ -50,7 +50,7 @@
     transform: translateY(-50%);
     background: none;
     border: none;
-    color: var(--gray-400);
+    color: var(--text-lighter);
     cursor: pointer;
     padding: 0.5rem;
     font-size: 1rem;
@@ -72,7 +72,7 @@
     font-size: 1rem;
     border: 2px solid var(--gray-200);
     border-radius: var(--radius-lg);
-    background-color: var(--color-white);
+    background-color: var(--surface);
     cursor: pointer;
     transition: var(--transition-base);
 }
@@ -80,7 +80,7 @@
 .doctorFilterSelect:focus {
     outline: none;
     border-color: var(--blue-300);
-    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 .doctorFilterSelect:hover {
@@ -144,7 +144,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: var(--gray-600);
+    color: var(--text-secondary);
 }
 
 .legendDot {
@@ -155,23 +155,23 @@
 }
 
 .legendDot.gray {
-    background-color: #6c757d;
+    background-color: var(--text-secondary);
 }
 
 .legendDot.green {
-    background-color: #28a745;
+    background-color: var(--success-color);
 }
 
 .legendDot.amber {
-    background-color: #e65100;
+    background-color: var(--warning-600);
 }
 
 .legendDot.red {
-    background-color: #dc3545;
+    background-color: var(--error-color);
 }
 
 .legendDot.purple {
-    background-color: #7c3aed;
+    background-color: var(--purple-500);
 }
 
 .inactiveSetsToggle {
@@ -180,7 +180,7 @@
     align-items: center;
     gap: 0.25rem;
     font-size: 0.75rem;
-    color: var(--gray-600);
+    color: var(--text-secondary);
     cursor: pointer;
 }
 
@@ -199,13 +199,13 @@
 }
 
 .infoHidden {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-weight: normal;
 }
 
 /* Table Container */
 .tableContainer {
-    background-color: var(--color-white);
+    background-color: var(--surface);
     border-radius: var(--radius-lg);
     overflow: auto;
     max-height: calc(100vh - 160px);
@@ -250,11 +250,11 @@
 .sortIcon {
     margin-left: 0.25rem;
     font-size: 0.7rem;
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 .sortableHeader:hover .sortIcon {
-    color: var(--gray-600);
+    color: var(--text-secondary);
 }
 
 .table td {
@@ -274,7 +274,7 @@
 }
 
 .table tbody tr:nth-child(odd) {
-    background-color: var(--color-white);
+    background-color: var(--surface);
 }
 
 /* No Batches Row */
@@ -299,13 +299,13 @@
 .completedWorkRow,
 .completedWorkRow:nth-child(even),
 .completedWorkRow:nth-child(odd) {
-    background-color: #e8f5e9;
+    background-color: var(--success-50);
     display: table-row;
     opacity: 0.7;
 }
 
 .completedWorkRow:hover {
-    background-color: #c8e6c9;
+    background-color: var(--success-100);
     opacity: 0.85;
 }
 
@@ -343,20 +343,20 @@
 
 .badgeNoSet {
     background-color: var(--gray-100);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-weight: var(--font-weight-medium);
     font-style: italic;
 }
 
 /* Batch Badge */
 .badgeBatch {
-    background-color: #e8eaf6;
+    background-color: var(--indigo-50);
     color: var(--indigo-700);
 }
 
 .badgeNoBatch {
     background-color: var(--gray-100);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-weight: var(--font-weight-medium);
     font-style: italic;
 }
@@ -364,13 +364,13 @@
 /* Status Badges */
 .badgeNa {
     background-color: var(--gray-100);
-    color: var(--gray-600);
+    color: var(--text-secondary);
     font-weight: var(--font-weight-medium);
 }
 
 .badgePendingMfg {
-    background-color: #fff3e0;
-    color: #e65100;
+    background-color: var(--warning-50);
+    color: var(--warning-700);
 }
 
 /* Next Batch Badges */
@@ -385,31 +385,31 @@
 }
 
 .badgeFinal {
-    background-color: #f3e8ff;
-    color: #7c3aed;
+    background-color: var(--indigo-50);
+    color: var(--purple-500);
     margin-left: 4px;
 }
 
 /* Notes Text */
 .notes {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-size: 0.8125rem;
 }
 
 .notesEmpty {
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 /* Empty State */
 .emptyPatients {
     text-align: center;
     padding: 4rem 2rem;
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 .emptyPatients i {
     font-size: 4rem;
-    color: var(--gray-300);
+    color: var(--text-lighter);
     margin-bottom: 1rem;
     display: block;
 }
@@ -535,7 +535,7 @@
     .table tbody tr {
         display: flex;
         flex-direction: column;
-        background: var(--color-white);
+        background: var(--surface);
         border: 1px solid var(--gray-200);
         border-radius: var(--radius-lg);
         padding: var(--spacing-md);
@@ -554,7 +554,7 @@
     }
 
     .table tbody tr.completedWorkRow {
-        background-color: #e8f5e9;
+        background-color: var(--success-50);
         opacity: 0.8;
     }
 
@@ -573,7 +573,7 @@
     .table tbody td::before {
         content: attr(data-label);
         font-weight: var(--font-weight-semibold);
-        color: var(--gray-600);
+        color: var(--text-secondary);
         font-size: 0.75rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -694,5 +694,5 @@
 }
 
 .legendFlagFinal {
-    color: #7c3aed;
+    color: var(--purple-500);
 }

@@ -37,7 +37,7 @@
     composes: button;
     background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
     border-color: var(--primary-blue);
-    color: white;
+    color: var(--color-white);
 }
 
 .button i {

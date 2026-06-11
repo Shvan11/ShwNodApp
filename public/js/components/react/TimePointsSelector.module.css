@@ -8,9 +8,9 @@
     gap: 0.75rem;
     margin: 0;
     padding: 0.75rem;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
     overflow-x: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--gray-300) var(--gray-100);
@@ -40,7 +40,7 @@
     align-items: stretch;
     background: var(--gray-50);
     border: 2px solid var(--gray-200);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     transition: all 0.2s ease;
     min-width: 200px;
     flex-shrink: 0;
@@ -50,7 +50,7 @@
 .tab:hover {
     border-color: var(--gray-300);
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-md);
 }
 
 /* Clickable navigation area (everything except the kebab). */
@@ -88,7 +88,7 @@
     background: none;
     border: none;
     border-left: 1px solid var(--gray-200);
-    color: var(--gray-400);
+    color: var(--text-lighter);
     font-size: 0.875rem;
     cursor: pointer;
     transition: color 0.15s ease, background 0.15s ease;
@@ -96,7 +96,7 @@
 
 .kebab:hover {
     background: var(--gray-100);
-    color: var(--gray-600);
+    color: var(--text-secondary);
 }
 
 .tabActive .kebab {
@@ -106,13 +106,13 @@
 
 .tabActive .kebab:hover {
     background: rgba(255, 255, 255, 0.15);
-    color: white;
+    color: var(--color-white);
 }
 
 .tabActive {
     background: linear-gradient(135deg, var(--indigo-500) 0%, var(--color-purple-medium) 100%);
     border-color: var(--indigo-600);
-    color: white;
+    color: var(--color-white);
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
@@ -143,26 +143,26 @@
 }
 
 .tabDesc {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-size: 0.875rem;
     color: var(--gray-800);
     white-space: nowrap;
 }
 
 .tabActive .tabDesc {
-    color: white;
+    color: var(--color-white);
 }
 
 .tabDate {
     font-size: 0.75rem;
-    color: var(--gray-500);
+    color: var(--text-secondary);
     white-space: nowrap;
 }
 
 .tabDate::before {
     content: "•";
     margin-right: 0.5rem;
-    color: var(--gray-300);
+    color: var(--text-lighter);
 }
 
 .tabActive .tabDate {

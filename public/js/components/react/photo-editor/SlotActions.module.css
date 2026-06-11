@@ -7,8 +7,8 @@
 
 .target {
   font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-muted, #6b7280);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -20,7 +20,7 @@
   align-items: center;
   gap: 2px;
   padding: 2px;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--background-primary);
 }
@@ -32,9 +32,9 @@
   width: 1.75rem;
   height: 1.75rem;
   border: none;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-color, #374151);
+  color: var(--text-color);
   cursor: pointer;
   font-size: 0.78rem;
   transition: background var(--transition-fast), color var(--transition-fast);
@@ -52,15 +52,15 @@
 
 .active {
   background: var(--primary-color);
-  color: #fff;
+  color: var(--color-white);
 }
 
 .active:hover:not(:disabled) {
-  background: var(--primary-hover, var(--primary-color));
-  color: #fff;
+  background: var(--primary-hover);
+  color: var(--color-white);
 }
 
 .danger:hover:not(:disabled) {
   background: var(--error-color);
-  color: #fff;
+  color: var(--color-white);
 }

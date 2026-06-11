@@ -8,7 +8,7 @@
     margin-bottom: 0.5rem;
     padding: 0.5rem 0.75rem;
     background: var(--gray-50);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     font-size: 0.9rem;
 }
 
@@ -73,14 +73,14 @@
     padding: 1rem 1rem 1rem 3rem;
     font-size: 1rem;
     border: 2px solid var(--gray-200);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     transition: all 0.3s ease;
 }
 
 .patientFilterBox input:focus {
     outline: none;
     border-color: var(--blue-300);
-    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 .filterIcon {
@@ -99,7 +99,7 @@
     transform: translateY(-50%);
     background: none;
     border: none;
-    color: var(--gray-400);
+    color: var(--text-lighter);
     cursor: pointer;
     padding: 0.5rem;
     font-size: 1rem;
@@ -120,9 +120,9 @@
 
 /* Patient Card */
 .patientCard {
-    background: white;
+    background: var(--surface);
     border: 2px solid var(--gray-200);
-    border-radius: 12px;
+    border-radius: var(--radius-2xl);
     padding: 1.5rem;
     cursor: pointer;
     transition: all 0.3s;
@@ -149,7 +149,7 @@
 .patientCardPhoto {
     width: 60px;
     height: 60px;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     background: var(--gray-100);
     display: flex;
@@ -173,7 +173,7 @@
     align-items: center;
     justify-content: center;
     background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
-    color: white;
+    color: var(--color-white);
     font-size: 1.5rem;
 }
 
@@ -198,7 +198,7 @@
 
 .patientCardSubtitle {
     font-size: 0.9rem;
-    color: var(--gray-400);
+    color: var(--text-lighter);
     font-weight: normal;
     margin: 0;
 }
@@ -249,9 +249,9 @@
 /* Activity Banner */
 .activityBanner {
     background: linear-gradient(135deg, var(--warning-orange) 0%, var(--warning-600) 100%);
-    color: white;
+    color: var(--color-white);
     padding: 0.75rem 1rem;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     margin-bottom: 1rem;
     display: flex;
     align-items: center;
@@ -295,12 +295,12 @@
 .emptyPatients {
     text-align: center;
     padding: 4rem 2rem;
-    color: var(--gray-400);
+    color: var(--text-lighter);
 }
 
 .emptyPatients i {
     font-size: 4rem;
-    color: var(--gray-300);
+    color: var(--text-lighter);
     margin-bottom: 1rem;
     display: block;
 }

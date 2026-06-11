@@ -44,6 +44,7 @@ type Employee = {
   percentage: boolean;
   receive_email: boolean;
   get_appointments: boolean;
+  is_active: boolean;
   sort_order: number;
   appointment_color: string | null;
 };
@@ -70,14 +71,23 @@ type EmployeeParams = employee.EmployeeParams;
  * - receive_email: 'true' to filter only employees who receive email notifications
  * - percentage: 'true' to filter only employees with percentage-based compensation
  * - position: position id or name to filter by specific position
+ * - includeInactive: 'true' to ALSO return quit (is_active=false) employees.
+ *   By default they are hidden — only the Settings page opts in. Everywhere else
+ *   (dropdowns, recipient lists) sees active staff only.
  */
 router.get('/employees', validate({ query: employee.employees.query }), async (req: Request<object, object, object, EmployeeQuery>, res: Response): Promise<void> => {
   try {
-    const { getAppointments, receiveEmail, percentage, position } = req.query;
+    const { getAppointments, receiveEmail, percentage, position, includeInactive } = req.query;
     const db = getKysely();
 
     // Build WHERE clause conditions as composable SQL fragments
     const conditions = [];
+
+    // Quit employees are kept for historical purposes but hidden everywhere
+    // except the Settings page, which passes includeInactive=true to manage them.
+    if (includeInactive !== 'true') {
+      conditions.push(sql`e."is_active" = true`);
+    }
 
     if (getAppointments === 'true') {
       conditions.push(sql`e."get_appointments" = true`);
@@ -107,7 +117,7 @@ router.get('/employees', validate({ query: employee.employees.query }), async (r
       : sql``;
 
     const { rows: employees } = await sql<Employee>`
-      SELECT e."id", e."employee_name", e."position", p."position_name", e."email", e."phone", e."percentage", e."receive_email", e."get_appointments", e."sort_order", e."appointment_color"
+      SELECT e."id", e."employee_name", e."position", p."position_name", e."email", e."phone", e."percentage", e."receive_email", e."get_appointments", e."is_active", e."sort_order", e."appointment_color"
       FROM "employees" e
       LEFT JOIN "positions" p ON e."position" = p."id"
       ${whereClause}
@@ -153,7 +163,7 @@ router.get('/positions', async (_req: Request, res: Response): Promise<void> => 
  */
 router.post('/employees', validate({ body: employee.createEmployee.body }), async (req: Request<object, object, employee.EmployeeBody>, res: Response): Promise<void> => {
   try {
-    const { employee_name, position, email, phone, percentage, receiveEmail, getAppointments, sort_order, appointment_color } = req.body;
+    const { employee_name, position, email, phone, percentage, receiveEmail, getAppointments, is_active, sort_order, appointment_color } = req.body;
 
     if (!employee_name || employee_name.trim() === '') {
       ErrorResponses.badRequest(res, 'Employee name is required');
@@ -181,6 +191,8 @@ router.post('/employees', validate({ body: employee.createEmployee.body }), asyn
       percentage: !!percentage,
       receive_email: !!receiveEmail,
       get_appointments: !!getAppointments,
+      // Omitted → active by default (new hires); explicit false marks a quit employee.
+      is_active: is_active === undefined ? true : !!is_active,
       sort_order: sort_order !== undefined ? sort_order : 999,
       appointment_color: appointment_color && appointment_color.trim() !== '' ? appointment_color.trim() : null,
     });
@@ -200,7 +212,7 @@ router.post('/employees', validate({ body: employee.createEmployee.body }), asyn
 router.put('/employees/:id', validate({ params: employee.updateEmployee.params, body: employee.updateEmployee.body }), async (req: Request<EmployeeParams, object, employee.EmployeeBody>, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { employee_name, position, email, phone, percentage, receiveEmail, getAppointments, sort_order, appointment_color } = req.body;
+    const { employee_name, position, email, phone, percentage, receiveEmail, getAppointments, is_active, sort_order, appointment_color } = req.body;
 
     if (!employee_name || employee_name.trim() === '') {
       ErrorResponses.badRequest(res, 'Employee name is required');
@@ -228,6 +240,7 @@ router.put('/employees/:id', validate({ params: employee.updateEmployee.params, 
       percentage: !!percentage,
       receive_email: !!receiveEmail,
       get_appointments: !!getAppointments,
+      is_active: is_active === undefined ? true : !!is_active,
       sort_order: sort_order !== undefined ? sort_order : 999,
       appointment_color: appointment_color && appointment_color.trim() !== '' ? appointment_color.trim() : null,
     });

@@ -3,13 +3,13 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: var(--space-3, 12px);
-  padding: var(--space-3, 12px);
+  gap: 12px;
+  padding: 12px;
   align-content: start;
 }
 
 .count {
   margin-left: auto;
-  font-size: var(--font-size-sm, 0.85rem);
-  color: var(--color-text-secondary, #666);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
 }

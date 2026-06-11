@@ -19,13 +19,13 @@
 }
 
 .modeBtn {
-    background: white;
+    background: var(--surface);
     color: var(--text-light);
     border: 2px solid var(--gray-200);
     padding: 0.75rem 2rem;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     font-size: 1rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
     transition: all 0.3s;
     display: flex;
@@ -40,7 +40,7 @@
 
 .modeBtn.active {
     background: var(--blue-300);
-    color: white;
+    color: var(--color-white);
     border-color: var(--blue-300);
 }
 

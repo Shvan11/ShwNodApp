@@ -7,7 +7,7 @@
     padding: 0.5rem 1rem;
     background-color: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 9999px;
+    border-radius: var(--radius-full);
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
     transition: all 0.3s ease;

@@ -38,10 +38,17 @@ export interface Alerts {
   alert_details: string | null;
   alert_id: Generated<number>;
   alert_severity: number;
-  alert_type_id: number;
+  alert_type_id: number | null;
+  assigned_to: number | null;
+  completed_at: Timestamp | null;
+  completed_by: string | null;
   creation_date: Generated<Timestamp>;
-  is_active: Generated<boolean>;
-  person_id: number;
+  escalate_at: string | null;
+  expires_at: string | null;
+  person_id: number | null;
+  snoozed_until: string | null;
+  status: Generated<string>;
+  surface_mode: Generated<string>;
   updated_at: Timestamp | null;
 }
 
@@ -313,6 +320,7 @@ export interface Employees {
   employee_name: string;
   get_appointments: Generated<boolean>;
   id: Generated<number>;
+  is_active: Generated<boolean>;
   percentage: Generated<boolean>;
   phone: string | null;
   position: number | null;

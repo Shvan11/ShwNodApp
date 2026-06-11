@@ -105,7 +105,7 @@
 .formGroup select:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    box-shadow: var(--shadow-focus);
 }
 
 /* ===================================
@@ -190,7 +190,7 @@
 
 .statusInactive {
     background: var(--gray-200);
-    color: var(--gray-600);
+    color: var(--text-secondary);
 }
 
 /* ===================================
@@ -216,7 +216,7 @@
 
 .btnPrimary {
     background: var(--primary-color);
-    color: white;
+    color: var(--color-white);
 }
 
 .btnPrimary:hover {
@@ -244,7 +244,7 @@
 
 .btnDanger:hover {
     background: var(--error-color);
-    color: white;
+    color: var(--color-white);
 }
 
 .btnSmall {

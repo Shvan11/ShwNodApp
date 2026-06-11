@@ -7,7 +7,7 @@
     /* This page renders INSIDE PatientShell, which #app-container already offsets.
        Fill the shell's content box: 100vh − header − the shell's breadcrumb clearance
        + bottom paddings (2.125 + 0.75 + 0.5rem). A bare 100vh overflowed by ~96px. */
-    height: calc(100vh - var(--header-height, 50px) - 3.375rem);
+    height: calc(100vh - var(--header-height) - 3.375rem);
     background: var(--background-secondary);
 }
 
@@ -57,7 +57,7 @@
 .diagnosisHeaderInfo h1 {
     margin: 0;
     font-size: var(--font-size-2xl);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--text-primary);
     display: flex;
     align-items: center;
@@ -89,18 +89,18 @@
 }
 
 .patientName {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-primary);
 }
 
 .workType {
     color: var(--success-color);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .workId {
     font-family: monospace;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .diagnosisHeaderActions {
@@ -126,7 +126,7 @@
     background: transparent;
     color: var(--text-secondary);
     font-size: var(--font-size-base);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
     border-bottom: 3px solid transparent;
     transition: all 0.2s ease;
@@ -141,7 +141,7 @@
 .diagnosisTabActive {
     color: var(--primary-color);
     border-bottom-color: var(--primary-color);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .diagnosisTab i {
@@ -167,7 +167,7 @@
 .sectionTitle {
     margin: 0 0 var(--spacing-lg) 0;
     font-size: var(--font-size-xl);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-primary);
     border-bottom: 2px solid var(--border-color);
     padding-bottom: var(--spacing-sm);
@@ -192,7 +192,7 @@
 
 .formGroup label {
     font-size: var(--font-size-sm);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -245,14 +245,10 @@
 .cephSection h3 {
     margin: 0 0 var(--spacing-md) 0;
     font-size: var(--font-size-lg);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--accent-color);
     padding-left: var(--spacing-sm);
     border-left: 4px solid var(--accent-color);
-}
-
-.cephGrid {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
 /* ===== FOOTER ACTIONS ===== */
@@ -275,7 +271,7 @@
     border: none;
     border-radius: var(--radius-md);
     font-size: var(--font-size-base);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     cursor: pointer;
     transition: all 0.2s ease;
 }
@@ -432,5 +428,5 @@
 
 .deleteButton {
     background-color: var(--error-color);
-    color: white;
+    color: var(--color-white);
 }

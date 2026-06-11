@@ -175,7 +175,8 @@ class EmailService {
       const { rows: recipients } = await sql<EmployeeRecipient>`
                 SELECT e."id", e."employee_name", e."email"
                 FROM "employees" e
-                WHERE e."receive_email" = true
+                WHERE e."is_active" = true
+                  AND e."receive_email" = true
                   AND e."email" IS NOT NULL
                   AND e."email" != ''
                 ORDER BY e."employee_name"

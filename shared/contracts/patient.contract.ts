@@ -29,7 +29,7 @@
  *    `optionalDateString`/plain string; no `timestampString` needed.
  */
 import { z } from 'zod';
-import { idParams, numericParam, intId, optionalDateString, timestampString } from '../validation.js';
+import { idParams, numericParam, intId, optionalDateString, dateString, timestampString } from '../validation.js';
 
 /** A `<select>`-backed id on the CREATE body: '' (nothing chosen) → undefined (so
  *  the service's `toInt` yields NULL, not 0); a chosen value (form string / number)
@@ -108,15 +108,31 @@ const patientPhoneRow = z.looseObject({
   phone: z.string().nullable(),
 });
 
-/** Alert row. creation_date is a PG `timestamp` → timestampString transform. */
-const alertRow = z.looseObject({
+// Alerts back two surfaces (patient-context flags + header "Tasks"). These enums
+// mirror the DB CHECK constraints (migrations/pg/…_alerts-to-tasks.sql) and are
+// reused by task.contract.ts.
+export const surfaceMode = z.enum(['context', 'push']);
+export const alertStatusEnum = z.enum(['active', 'done', 'dismissed']);
+
+/** Alert row. creation_date is a PG `timestamp` → timestampString transform.
+ *  `alert_type_id`/`AlertTypeName` are nullable since a header task may be
+ *  category-less (left join). The date columns are PG `date` → 'YYYY-MM-DD' strings. */
+export const alertRow = z.looseObject({
   alert_id: z.number(),
-  alert_type_id: z.number(),
-  AlertTypeName: z.string(),
+  alert_type_id: z.number().nullable(),
+  AlertTypeName: z.string().nullable(),
   alert_severity: z.number(),
   alert_details: z.string().nullable(),
   creation_date: timestampString,
-  is_active: z.boolean(),
+  surface_mode: surfaceMode,
+  status: alertStatusEnum,
+  snoozed_until: z.string().nullable(),
+  expires_at: z.string().nullable(),
+  escalate_at: z.string().nullable(),
+  // Assignment (feature #4): owning staff member (FK employees.id) + their joined
+  // name. Both null for unassigned tasks and patient-context alerts.
+  assigned_to: z.number().nullable(),
+  assignee_name: z.string().nullable(),
 });
 
 /** Single patient by id — the raw `patients` columns (getPatientById ⇒ PatientDetails)
@@ -311,22 +327,41 @@ export type EstimatedCostBody = z.infer<typeof estimatedCost.body>;
 // ALERTS
 // ===========================================================================
 
-// Shared body for POST /alerts + PUT /alerts/:alertId. Fully enumerated: the
-// client (AlertModal) sends both ids as parseInt'd numbers, and `updateAlert`
-// requires `number`s — so `alertSeverity` is now an enumerated coerced int
-// alongside `alertTypeId`. Both endpoints sendSuccess(null).
+// Shared body for POST /patients/:id/alerts + PUT /alerts/:alertId (patient-context
+// alerts). Fully enumerated: the client (AlertModal) sends ids as parseInt'd numbers.
+// The optional fields drive the dual-surface behavior: `surfaceMode='push'` also
+// shows the alert in the header; `escalateAt` makes a context alert surface in the
+// header from that day; `expiresAt` auto-hides it everywhere after that day. Both
+// endpoints sendSuccess(null).
 export const alertBody = z.object({
-  alertTypeId: intId,
+  // Optional so a category-less header task can be edited via PUT /api/alerts/:id;
+  // the patient AlertModal still always sends one (client-side required field).
+  alertTypeId: intId.optional(),
   alertSeverity: intId,
   alertDetails: z.string().min(1),
+  surfaceMode: surfaceMode.optional(),
+  expiresAt: optionalDateString,
+  escalateAt: optionalDateString,
+  // Assignment (feature #4) — task edit only. `null` unassigns; omitted leaves the
+  // current assignee untouched (updateAlert writes only the keys provided). The
+  // patient AlertModal omits it, so context alerts stay unassigned.
+  assignedTo: intId.nullable().optional(),
 });
 export type AlertBody = z.infer<typeof alertBody>;
 
-// PUT /api/alerts/:alertId/status — { isActive } (fully enumerated → SSoT).
+// PUT /api/alerts/:alertId/status — { status } (active|done|dismissed). `done`
+// stamps completed_at + completed_by server-side. Replaces the old { isActive }.
 export const alertStatus = {
-  body: z.object({ isActive: z.boolean() }),
+  body: z.object({ status: alertStatusEnum }),
 } as const;
 export type AlertStatusBody = z.infer<typeof alertStatus.body>;
+
+// PUT /api/alerts/:alertId/snooze — header "dead time": hide in the header until
+// `snoozedUntil` (a 'YYYY-MM-DD' date), or null to clear the snooze.
+export const alertSnooze = {
+  body: z.object({ snoozedUntil: dateString.nullable() }),
+} as const;
+export type AlertSnoozeBody = z.infer<typeof alertSnooze.body>;
 
 // ===========================================================================
 // PORTAL (staff-facing)

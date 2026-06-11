@@ -99,11 +99,11 @@
 }
 
 .separator {
-  color: var(--gray-400);
+  color: var(--text-lighter);
 }
 
 .reorderLevel {
-  color: var(--gray-500);
+  color: var(--text-secondary);
 }
 
 .restockBtn {
@@ -134,7 +134,7 @@
   flex-direction: column;
   align-items: center;
   padding: var(--spacing-xl);
-  color: var(--gray-400);
+  color: var(--text-lighter);
 }
 
 .emptyState i {

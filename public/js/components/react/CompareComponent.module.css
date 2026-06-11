@@ -200,7 +200,7 @@
 }
 
 .canvasEl {
-    background-color: var(--color-white);
+    background-color: var(--surface);
     display: block;
     max-width: 600px;
     max-height: 800px;
@@ -210,7 +210,7 @@
 }
 
 .canvasElFullscreen {
-    background-color: var(--color-white);
+    background-color: var(--surface);
     display: block;
     max-width: var(--viewport-width-full);
     max-height: var(--viewport-height-full);
@@ -287,7 +287,7 @@
 .dimensionsLabel {
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-bold);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     margin-bottom: var(--spacing-xs);
 }
 
@@ -344,7 +344,7 @@
     align-items: center;
     justify-content: center;
     font-size: var(--font-size-xs);
-    color: var(--gray-600);
+    color: var(--text-secondary);
 }
 
 .controlsGrid {
@@ -434,7 +434,7 @@
 .stepHint {
     margin: 0 0 var(--spacing-md) 0;
     font-size: var(--font-size-sm);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-style: italic;
 }
 
@@ -464,7 +464,7 @@
     display: block;
     margin-bottom: var(--spacing-sm);
     padding: var(--spacing-sm);
-    background-color: var(--color-white);
+    background-color: var(--surface);
     border: var(--border-width-thin) solid var(--gray-300);
     border-radius: var(--radius-md);
     cursor: pointer;
@@ -479,7 +479,7 @@
     display: block;
     margin-bottom: var(--spacing-xs);
     padding: var(--spacing-xs) var(--spacing-sm);
-    background-color: var(--color-white);
+    background-color: var(--surface);
     border: var(--border-width-thin) solid var(--gray-300);
     border-radius: var(--radius-md);
     cursor: pointer;

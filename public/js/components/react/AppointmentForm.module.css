@@ -12,7 +12,7 @@
     /* Renders INSIDE PatientShell (already header-offset by #app-container). Fill the
        shell content box: 100vh − header − shell breadcrumb clearance + bottom paddings
        (2.125 + 0.75 + 0.5rem). A bare 100vh overflowed by ~96px. */
-    min-height: calc(100vh - var(--header-height, 50px) - 3.375rem);
+    min-height: calc(100vh - var(--header-height) - 3.375rem);
 }
 
 /* Page Header - HIDDEN (using universal header instead) */
@@ -23,7 +23,7 @@
 .pageHeader h1 {
     margin: 0;
     font-size: 24px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -38,7 +38,7 @@
 .closeButton {
     background: rgba(255, 255, 255, 0.2);
     border: none;
-    color: white;
+    color: var(--color-white);
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -67,7 +67,7 @@
 /* ==================== RIGHT COLUMN: FORM ==================== */
 
 .formColumn {
-    background: white;
+    background: var(--surface);
     display: flex;
     flex-direction: column;
     overflow-y: auto;
@@ -85,7 +85,7 @@
 .formHeader h2 {
     margin: 0;
     font-size: 18px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--gray-700);
     display: flex;
     align-items: center;
@@ -124,8 +124,8 @@
 
 .formField label {
     font-size: 13px;
-    font-weight: 600;
-    color: var(--gray-600);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -141,7 +141,7 @@
     border: 2px solid var(--gray-200);
     padding: 12px 14px;
     border-radius: 8px;
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-size: 14px;
     transition: background-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
                 border-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
@@ -152,7 +152,7 @@
     background: var(--success-50);
     border-color: var(--success-color);
     color: var(--gray-700);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 /* Rose flash on slot pick is driven via Web Animations API in
@@ -161,7 +161,7 @@
    without needing !important here. */
 
 .formField select {
-    background: white;
+    background: var(--surface);
     border: 2px solid var(--gray-200);
     padding: 12px 14px;
     border-radius: 8px;
@@ -186,7 +186,7 @@
 .fieldError {
     color: var(--error-500);
     font-size: 12px;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .formActions {

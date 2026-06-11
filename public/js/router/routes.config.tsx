@@ -40,6 +40,7 @@ const Statistics = React.lazy(() => import('../routes/Statistics'));
 const Expenses = React.lazy(() => import('../routes/Expenses'));
 const Videos = React.lazy(() => import('../routes/Videos'));
 const PatientManagement = React.lazy(() => import('../routes/PatientManagement'));
+const TasksHistory = React.lazy(() => import('../routes/TasksHistory'));
 
 // Lazy-loaded route components - Settings & Templates
 const SettingsComponent = React.lazy(() => import('../components/react/SettingsComponent'));
@@ -161,6 +162,16 @@ export const routesConfig: RouteObject[] = [
           </RouteErrorBoundary>
         ),
         loader: patientManagementLoader, // Pre-fetch filter data
+      },
+
+      // Completed-tasks history (the read-back of the alerts done-stamps)
+      {
+        path: '/tasks/history',
+        element: (
+          <RouteErrorBoundary routeName="Completed Tasks">
+            <TasksHistory />
+          </RouteErrorBoundary>
+        ),
       },
 
       // ============================================================

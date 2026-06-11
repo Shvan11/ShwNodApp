@@ -46,7 +46,7 @@
   right: 0;
   bottom: 0;
   width: 30px;
-  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.9));
+  background: linear-gradient(to right, transparent, var(--background-light));
   pointer-events: none;
   opacity: 1;
   transition: opacity var(--transition-base);
@@ -239,7 +239,7 @@
 .loadingState {
   text-align: center;
   padding: 60px 20px;
-  color: var(--gray-400);
+  color: var(--text-lighter);
 }
 
 .loadingSpinner {
@@ -260,7 +260,7 @@
 .emptyState {
   text-align: center;
   padding: 60px 20px;
-  color: var(--gray-400);
+  color: var(--text-lighter);
   font-size: var(--font-size-base);
 }
 
@@ -291,7 +291,7 @@
     min-width: 100px;
     position: sticky;
     left: 0;
-    background-color: white;
+    background-color: var(--surface);
     z-index: 2;
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
   }

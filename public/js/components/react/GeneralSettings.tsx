@@ -2,9 +2,18 @@ import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import cn from 'classnames';
 import Modal from './Modal';
 import storage from '../../core/storage';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemePreference } from '../../core/theme';
 import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
 import * as settings from '@shared/contracts/settings.contract';
 import styles from './SettingsSection.module.css';
+
+// Per-device appearance options, mirrored by the header toggle.
+const THEME_OPTIONS: ReadonlyArray<{ value: ThemePreference; label: string; icon: string }> = [
+    { value: 'light', label: 'Light', icon: 'fas fa-sun' },
+    { value: 'dark', label: 'Dark', icon: 'fas fa-moon' },
+    { value: 'auto', label: 'Auto (follow system)', icon: 'fas fa-circle-half-stroke' },
+];
 
 interface OptionsMap {
     [key: string]: string;
@@ -27,6 +36,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     const [modal, setModal] = useState<ModalState>({ show: false, title: '', message: '' });
     const [chairIdInput, setChairIdInput] = useState<string>(storage.chairId() ?? '');
     const [chairIdSaved, setChairIdSaved] = useState<string | null>(storage.chairId());
+    const { preference: themePreference, setPreference: setThemePreference } = useTheme();
 
     const loadSettings = useCallback(async () => {
         setIsLoading(true);
@@ -274,6 +284,34 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                         {chairIdSaved && (
                             <> This PC's chair URL: <code>{`${origin}/chair-display?chair=${chairIdSaved}`}</code></>
                         )}
+                    </div>
+                </div>
+
+                <div className={styles.settingGroup}>
+                    <label>Appearance</label>
+                    <div className={styles.themeRadioGroup} role="radiogroup" aria-label="Theme">
+                        {THEME_OPTIONS.map((opt) => (
+                            <label
+                                key={opt.value}
+                                className={cn(
+                                    styles.themeRadioOption,
+                                    themePreference === opt.value && styles.themeRadioOptionActive
+                                )}
+                            >
+                                <input
+                                    type="radio"
+                                    name="theme-preference"
+                                    value={opt.value}
+                                    checked={themePreference === opt.value}
+                                    onChange={() => setThemePreference(opt.value)}
+                                />
+                                <i className={opt.icon} aria-hidden="true" />
+                                <span>{opt.label}</span>
+                            </label>
+                        ))}
+                    </div>
+                    <div className={styles.settingDescription}>
+                        Light, dark, or follow your device's system setting. Saved on this PC only.
                     </div>
                 </div>
             </section>

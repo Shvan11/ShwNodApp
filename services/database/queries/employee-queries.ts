@@ -18,6 +18,7 @@ export interface EmployeeWriteData {
   percentage: boolean;
   receive_email: boolean;
   get_appointments: boolean;
+  is_active: boolean;
   sort_order: number;
   appointment_color: string | null;
 }
@@ -32,9 +33,13 @@ export async function createEmployee(data: EmployeeWriteData): Promise<number> {
         position: data.position,
         email: data.email,
         phone: data.phone,
-        percentage: data.percentage,
-        receive_email: data.receive_email,
-        get_appointments: data.get_appointments,
+        // A quit (inactive) employee is no longer a commission / email /
+        // appointment participant — force those flags off regardless of what
+        // was posted, so they vanish from every recipient/dropdown list.
+        percentage: data.is_active && data.percentage,
+        receive_email: data.is_active && data.receive_email,
+        get_appointments: data.is_active && data.get_appointments,
+        is_active: data.is_active,
         sort_order: data.sort_order,
         appointment_color: data.appointment_color,
       })
@@ -66,9 +71,12 @@ export async function updateEmployee(id: number, data: EmployeeWriteData): Promi
         position: data.position,
         email: data.email,
         phone: data.phone,
-        percentage: data.percentage,
-        receive_email: data.receive_email,
-        get_appointments: data.get_appointments,
+        // Marking an employee as quit (is_active=false) auto-clears their
+        // commission / email / appointment flags — see createEmployee.
+        percentage: data.is_active && data.percentage,
+        receive_email: data.is_active && data.receive_email,
+        get_appointments: data.is_active && data.get_appointments,
+        is_active: data.is_active,
         sort_order: data.sort_order,
         appointment_color: data.appointment_color,
       })
@@ -113,4 +121,33 @@ export async function employeeEmailExists(email: string, excludeId?: number): Pr
   if (excludeId !== undefined) q = q.where('id', '!=', excludeId);
   const row = await q.executeTakeFirst();
   return !!row;
+}
+
+/**
+ * Whether an employee exists AND is currently active (not quit). Used to block
+ * NEW task/alert assignments to quit employees — they only live on the Settings
+ * page now, so they must not be selectable as an assignee anywhere else.
+ */
+export async function employeeIsActive(id: number): Promise<boolean> {
+  const row = await getKysely()
+    .selectFrom('employees')
+    .select('id')
+    .where('id', '=', id)
+    .where('is_active', '=', true)
+    .executeTakeFirst();
+  return !!row;
+}
+
+/**
+ * Name + phone of an employee (or undefined if missing). Used to WhatsApp-notify
+ * an employee when a task/alert is assigned to them.
+ */
+export async function getEmployeeContact(
+  id: number
+): Promise<{ employee_name: string; phone: string | null } | undefined> {
+  return getKysely()
+    .selectFrom('employees')
+    .select(['employee_name', 'phone'])
+    .where('id', '=', id)
+    .executeTakeFirst();
 }

@@ -11,15 +11,15 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--spacing-lg);
-  background-color: var(--background-primary, white);
-  border-bottom: 2px solid var(--border-color, var(--gray-200));
+  background-color: var(--background-primary);
+  border-bottom: 2px solid var(--border-color);
   margin-bottom: var(--spacing-lg);
 }
 
 .pageHeader h1 {
   margin: 0;
   font-size: var(--font-size-3xl);
-  color: var(--text-primary, var(--text-color));
+  color: var(--text-primary);
 }
 
 .posLayout {
@@ -36,7 +36,7 @@
 }
 
 .scanSection {
-  background: var(--background-primary, white);
+  background: var(--background-primary);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   padding: var(--spacing-lg);
@@ -73,11 +73,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: var(--z-index-modal, 1040);
+  z-index: var(--z-index-modal);
 }
 
 .successCard {
-  background: white;
+  background: var(--surface);
   border-radius: var(--radius-lg);
   padding: var(--spacing-xl);
   text-align: center;

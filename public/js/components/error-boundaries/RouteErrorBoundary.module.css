@@ -1,23 +1,21 @@
-/*
- * Styles for the per-route error fallback. Literal values (not design tokens)
- * on purpose: the fallback must render even if a variable sheet failed to load.
- */
+/* Styles for the per-route error fallback. Colours come from the themed
+   design tokens (light + dark) — no literal fallbacks. */
 .routeErrorScreen {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: calc(100vh - 50px);
   padding: 40px 20px;
-  background-color: #f8f9fa;
+  background-color: var(--surface-elevated);
 }
 
 .routeErrorContent {
   max-width: 500px;
   text-align: center;
-  background: white;
+  background: var(--surface);
   padding: 50px 40px;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-lg);
 }
 
 .errorIcon {
@@ -26,14 +24,14 @@
 }
 
 .routeErrorContent h2 {
-  color: #dc3545;
+  color: var(--error-color);
   margin-bottom: 15px;
   font-size: 28px;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .routeErrorContent p {
-  color: #666;
+  color: var(--text-light);
   margin-bottom: 15px;
   font-size: 16px;
   line-height: 1.6;
@@ -53,36 +51,36 @@
   border-radius: 6px;
   cursor: pointer;
   font-size: 15px;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   transition: all 0.2s;
 }
 
 .primaryBtn {
-  background-color: #007bff;
-  color: white;
+  background-color: var(--primary-color);
+  color: var(--color-white);
 }
 
 .primaryBtn:hover {
-  background-color: #0056b3;
+  background-color: var(--primary-hover);
   transform: translateY(-1px);
 }
 
 .secondaryBtn {
-  background-color: #28a745;
-  color: white;
+  background-color: var(--success-color);
+  color: var(--color-white);
 }
 
 .secondaryBtn:hover {
-  background-color: #218838;
+  background-color: var(--success-darker);
   transform: translateY(-1px);
 }
 
 .tertiaryBtn {
-  background-color: #6c757d;
-  color: white;
+  background-color: var(--neutral-gray);
+  color: var(--color-white);
 }
 
 .tertiaryBtn:hover {
-  background-color: #545b62;
+  background-color: var(--neutral-gray-dark);
   transform: translateY(-1px);
 }

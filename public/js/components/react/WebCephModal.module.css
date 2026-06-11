@@ -34,7 +34,7 @@
     background: transparent;
     border: none;
     font-size: var(--font-size-lg);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     cursor: pointer;
     width: 32px;
     height: 32px;
@@ -63,7 +63,7 @@
 }
 
 .subtleId {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-weight: var(--font-weight-normal);
 }
 
@@ -104,7 +104,7 @@
 .createCard {
     text-align: center;
     padding: var(--spacing-xl);
-    background: var(--white);
+    background: var(--surface);
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-lg);
 }
@@ -124,7 +124,7 @@
 
 .createDesc {
     margin: 0 0 var(--spacing-lg);
-    color: var(--gray-500);
+    color: var(--text-secondary);
 }
 
 .createWarn {
@@ -159,7 +159,7 @@
 
 .linkDate {
     font-size: var(--font-size-sm);
-    color: var(--gray-500);
+    color: var(--text-secondary);
 }
 
 .linkInfo {
@@ -168,7 +168,7 @@
 
 .linkLabel {
     font-size: var(--font-size-sm);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     margin-bottom: 0.25rem;
 }
 
@@ -181,7 +181,7 @@
 /* ── Upload card ──────────────────────────────────────────────────────────── */
 .uploadCard {
     padding: var(--spacing-lg);
-    background: var(--white);
+    background: var(--surface);
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-lg);
 }
@@ -222,7 +222,7 @@
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-md);
     font-size: var(--font-size-md);
-    background: var(--white);
+    background: var(--surface);
     transition: var(--transition-base);
 }
 
@@ -286,7 +286,7 @@
     flex-shrink: 0;
     background: transparent;
     border: none;
-    color: var(--gray-500);
+    color: var(--text-secondary);
     cursor: pointer;
     padding: 0.25rem 0.5rem;
     border-radius: var(--radius-sm);
@@ -303,13 +303,13 @@
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
-    background: var(--white);
+    background: var(--surface);
 }
 
 .helpText {
     margin-top: var(--spacing-sm);
     font-size: var(--font-size-xs);
-    color: var(--gray-500);
+    color: var(--text-secondary);
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
@@ -331,7 +331,7 @@
 
 .primaryBtn {
     background: linear-gradient(135deg, var(--color-purple-medium), var(--indigo-500));
-    color: var(--white);
+    color: var(--color-white);
 }
 
 .primaryBtn:hover:not(:disabled) {
@@ -344,7 +344,7 @@
     width: 100%;
     margin-top: var(--spacing-lg);
     background: linear-gradient(135deg, var(--warning-400), var(--warning-600));
-    color: var(--white);
+    color: var(--color-white);
 }
 
 .uploadBtn:hover:not(:disabled) {
@@ -363,7 +363,7 @@
 
 .openLink {
     background: var(--success-600);
-    color: var(--white);
+    color: var(--color-white);
 }
 
 .openLink:hover {

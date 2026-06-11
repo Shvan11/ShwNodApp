@@ -7,12 +7,15 @@ import React, { useRef, useEffect } from 'react';
 import Chart from 'chart.js/auto';
 import type { TopItemRow } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
+import { getChartThemeColors } from '../../utils/chartTheme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface TopItemsChartProps {
   data: TopItemRow[];
 }
 
 const TopItemsChart: React.FC<TopItemsChartProps> = ({ data }) => {
+  const { resolvedTheme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart | null>(null);
 
@@ -27,6 +30,7 @@ const TopItemsChart: React.FC<TopItemsChartProps> = ({ data }) => {
       chartInstance.current.destroy();
     }
 
+    const chartColors = getChartThemeColors();
     const labels = data.map((row) => row.item_name);
     const quantities = data.map((row) => row.TotalQuantity);
 
@@ -87,13 +91,15 @@ const TopItemsChart: React.FC<TopItemsChartProps> = ({ data }) => {
           x: {
             beginAtZero: true,
             ticks: {
+              color: chartColors.ticks,
               callback: (value) => formatNumber(value as number),
             },
-            grid: { color: 'rgba(0, 0, 0, 0.05)' },
+            grid: { color: chartColors.grid },
           },
           y: {
             grid: { display: false },
             ticks: {
+              color: chartColors.ticks,
               font: { size: 12 },
             },
           },
@@ -107,7 +113,7 @@ const TopItemsChart: React.FC<TopItemsChartProps> = ({ data }) => {
         chartInstance.current = null;
       }
     };
-  }, [data]);
+  }, [data, resolvedTheme]);
 
   if (data.length === 0) {
     return null;

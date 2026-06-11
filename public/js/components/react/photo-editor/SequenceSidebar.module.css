@@ -1,8 +1,8 @@
 .sidebar {
   /* Width is driven by the draggable divider via --pe-sidebar-w (set on .body in
      PhotoEditor). The .resizer element draws the divider line, so no border-left. */
-  width: var(--pe-sidebar-w, 250px);
-  flex: 0 0 var(--pe-sidebar-w, 250px);
+  width: var(--pe-sidebar-w);
+  flex: 0 0 var(--pe-sidebar-w);
   display: flex;
   flex-direction: column;
   background: var(--background-secondary);
@@ -14,11 +14,11 @@
   flex-direction: column;
   gap: var(--spacing-xs);
   padding: var(--spacing-sm);
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .title {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   font-size: 0.95rem;
 }
 
@@ -34,17 +34,17 @@
   justify-content: center;
   gap: 4px;
   padding: 5px 6px;
-  border: 1px solid var(--border-color, #d1d5db);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--background-primary);
-  color: var(--text-color, #111827);
+  color: var(--text-color);
   font-size: 0.72rem;
   cursor: pointer;
 }
 
 .actionBtn:hover:not(:disabled) {
-  border-color: var(--primary-color, #007bff);
-  color: var(--primary-color, #007bff);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
 }
 
 .actionBtn:disabled {
@@ -59,7 +59,7 @@
 .folderSelect {
   width: 100%;
   padding: 4px;
-  border: 1px solid var(--border-color, #d1d5db);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--background-primary);
   font-size: 0.8rem;
@@ -96,8 +96,8 @@
   object-fit: cover;
   border-radius: var(--radius-md);
   cursor: grab;
-  border: 1px solid var(--border-color, #e5e7eb);
-  background: #fff;
+  border: 1px solid var(--border-color);
+  background: var(--surface);
 }
 
 .thumbImg:active {
@@ -106,7 +106,7 @@
 
 .thumbName {
   font-size: 0.68rem;
-  color: var(--text-muted, #6b7280);
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -114,7 +114,7 @@
 
 .note {
   padding: var(--spacing-md);
-  color: var(--text-muted, #6b7280);
+  color: var(--text-muted);
   font-size: 0.85rem;
   text-align: center;
 }
@@ -122,6 +122,6 @@
 .hint {
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: 0.72rem;
-  color: var(--text-muted, #9ca3af);
-  border-top: 1px solid var(--border-color, #e5e7eb);
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-color);
 }

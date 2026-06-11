@@ -1,73 +1,9 @@
 /* Add Patient Page - Beautiful Form Styling */
 
-/* Main container with improved spacing and centering */
-.addPatientContainer {
-    /* Renders INSIDE PatientShell (already header-offset by #app-container). Fill the
-       shell content box: 100vh − header − shell breadcrumb clearance + bottom paddings
-       (2.125 + 0.75 + 0.5rem). A bare 100vh overflowed by ~96px. */
-    min-height: calc(100vh - var(--header-height, 50px) - 3.375rem);
-    background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-200) 100%);
-    padding: var(--spacing-xl) var(--spacing-md);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-/* Header styling */
-.addPatientHeader {
-    background: linear-gradient(135deg, var(--color-dark-blue) 0%, var(--color-dark-blue) 100%);
-    color: white;
-    padding: var(--spacing-lg) 0;
-    width: 100%;
-    margin-bottom: var(--spacing-xl);
-    box-shadow: var(--shadow-lg);
-}
-
-.addPatientHeader .container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 var(--spacing-md);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.addPatientLogo {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-}
-
-.addPatientLogo img {
-    height: 50px;
-    width: auto;
-}
-
-.addPatientLogo h1 {
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: var(--font-weight-bold);
-}
-
-.addPatientNav {
-    font-size: 0.9rem;
-}
-
-.addPatientNav a {
-    color: white;
-    text-decoration: none;
-    opacity: 0.9;
-    transition: opacity 0.3s ease;
-}
-
-.addPatientNav a:hover {
-    opacity: 1;
-}
-
 /* Form container with beautiful card design - optimized for PC */
 .addPatientFormContainer {
     background: var(--background-light);
-    border-radius: 16px;
+    border-radius: var(--radius-xl);
     padding: var(--spacing-xl);
     box-shadow: var(--shadow-lg);
     width: 100%;
@@ -106,56 +42,12 @@
     font-size: 1.8rem;
 }
 
-/* Main form layout - two columns on desktop */
-.formContent {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: calc(var(--spacing-xl) * 1.5);
-    margin-top: var(--spacing-xl);
-}
-
-/* Form sections for better organization */
-.formSection {
-    margin-bottom: var(--spacing-xl);
-    position: relative;
-}
-
-/* Full width sections that span both columns */
-.formSectionFullWidth {
-    grid-column: 1 / -1;
-}
-
-.formSectionTitle {
-    font-size: 1.2rem;
-    font-weight: var(--font-weight-medium);
-    color: var(--text-color);
-    margin-bottom: var(--spacing-lg);
-    padding-bottom: var(--spacing-sm);
-    border-bottom: 2px solid var(--gray-100);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-
-.formSectionTitle i {
-    color: var(--primary-color);
-    font-size: 1rem;
-}
-
 /* Improved form rows with better alignment */
 .formRow {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: var(--spacing-lg);
     margin-bottom: var(--spacing-lg);
-}
-
-.formRowSingleColumn {
-    grid-template-columns: 1fr;
-}
-
-.formRowThreeColumns {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
 /* Beautiful form groups */
@@ -250,7 +142,7 @@
     width: 20px;
     height: 20px;
     border: 2px solid rgba(255,255,255,0.3);
-    border-top: 2px solid white;
+    border-top: 2px solid var(--color-white);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -430,11 +322,11 @@
 
 .accordionHeaderExpanded {
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
-    color: white;
+    color: var(--color-white);
 }
 
 .accordionHeaderExpanded i {
-    color: white;
+    color: var(--color-white);
 }
 
 .accordionTitle {
@@ -488,10 +380,6 @@
     .addPatientFormContainer {
         max-width: 1000px;
     }
-
-    .formContent {
-        gap: var(--spacing-xl);
-    }
 }
 
 @media (max-width: 992px) {
@@ -513,18 +401,6 @@
     }
 }
 
-@media (max-width: 900px) {
-    /* Switch to single column on tablets */
-    .formContent {
-        grid-template-columns: 1fr;
-        gap: var(--spacing-lg);
-    }
-
-    .formSectionFullWidth {
-        grid-column: 1;
-    }
-}
-
 /* Mobile Breakpoint (768px and below) - Switch to Accordion */
 @media (max-width: 768px) {
     .desktopOnly {
@@ -533,10 +409,6 @@
 
     .mobileOnly {
         display: block;
-    }
-
-    .addPatientContainer {
-        padding: var(--spacing-md);
     }
 
     .addPatientFormContainer {
@@ -548,10 +420,6 @@
     .formRow {
         grid-template-columns: 1fr;
         gap: var(--spacing-md);
-    }
-
-    .formRowThreeColumns {
-        grid-template-columns: 1fr;
     }
 
     .addPatientTitle {
@@ -568,12 +436,6 @@
         width: 100%;
     }
 
-    .addPatientHeader .container {
-        flex-direction: column;
-        gap: var(--spacing-sm);
-        text-align: center;
-    }
-
     .accordionContent .formRow {
         grid-template-columns: 1fr;
     }
@@ -581,19 +443,6 @@
 
 /* Small Mobile (480px and below) */
 @media (max-width: 480px) {
-    .addPatientLogo {
-        flex-direction: column;
-        gap: var(--spacing-sm);
-    }
-
-    .addPatientLogo img {
-        height: 40px;
-    }
-
-    .addPatientLogo h1 {
-        font-size: 1.25rem;
-    }
-
     .addPatientTitle {
         font-size: 1.3rem;
         flex-direction: column;
@@ -615,17 +464,6 @@
     .accordionTitle {
         font-size: var(--font-size-sm);
     }
-}
-
-/* Focus management for accessibility */
-.formControl:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 2px;
-}
-
-/* Enhanced visual hierarchy */
-.formSection:not(:last-child) {
-    margin-bottom: calc(var(--spacing-xl) + var(--spacing-md));
 }
 
 /* Subtle hover effects for better UX */

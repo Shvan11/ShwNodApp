@@ -34,6 +34,10 @@ export const employees = {
     receiveEmail: z.string().optional(),
     percentage: z.string().optional(),
     position: z.string().optional(),
+    // Quit (is_active=false) employees are hidden by DEFAULT — the endpoint
+    // returns active staff only so every dropdown/recipient list excludes them.
+    // Only the Settings management page opts back in with `includeInactive=true`.
+    includeInactive: z.string().optional(),
   }),
   response: z.object({
     employees: z.array(z.looseObject({ id: z.number() })),
@@ -62,6 +66,10 @@ const employeeBody = z.object({
   percentage: z.boolean().optional(),
   receiveEmail: z.boolean().optional(),
   getAppointments: z.boolean().optional(),
+  // Employment status — true = currently employed, false = quit/left. Optional in
+  // the wire shape so a caller that omits it defaults to active (handler maps
+  // undefined → true); the Settings form always sends a real checkbox boolean.
+  is_active: z.boolean().optional(),
   sort_order: z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().optional()).optional(),
   appointment_color: z.string().nullable().optional(),
 });
