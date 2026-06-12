@@ -1,5 +1,6 @@
 import React, { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import WorkCard, { type Work, type WorkStatus } from './WorkCard';
 import PaymentModal from './PaymentModal';
 import TransferWorkModal from './TransferWorkModal';
@@ -17,6 +18,7 @@ import {
 } from '../../config/workTypeConfig';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { invalidateWorkCache } from '@/router/loader-cache';
+import { worksQuery } from '@/query/queries';
 // aliased: the component already has a `paymentHistory` state var (collision)
 import {
     paymentHistory as paymentHistoryContract,
@@ -132,8 +134,14 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const confirm = useConfirm();
     const { user } = useGlobalState();
     const isAdmin = user?.role === 'admin';
-    const [works, setWorks] = useState<Work[]>([]);
-    const [loading, setLoading] = useState(true);
+    // Works list read — the headline gap-fix target. On useQuery so a work
+    // mutation's invalidateQueries(qk.patient.all) refreshes it live (Phase 3).
+    // Loose contract models only { work_id }; the rows carry the full Work shape.
+    const { data: worksData, isLoading: loading, refetch: refetchWorks } = useQuery({
+        ...worksQuery(personId ?? ''),
+        enabled: !!personId,
+    });
+    const works = (worksData ?? []) as unknown as Work[];
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'discontinued'>('all');
     const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -209,7 +217,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     useEffect(() => {
         if (personId) {
-            loadWorks();
             loadPatientInfo();
             checkAppointmentStatus();
             loadTeethOptions();
@@ -286,18 +293,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         }
     };
 
-    const loadWorks = async () => {
-        try {
-            setLoading(true);
-            const data = await fetchJSON<Work[]>(`/api/getworks?code=${personId}`, { schema: workContract.getWorks.response });
-            setWorks(data);
-        } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to fetch works'), 5000);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handleAddWork = () => {
         navigate(`/patient/${personId}/new-work`);
     };
@@ -355,7 +350,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             await postJSON(endpoint, body);
 
             toast.success(successMessage);
-            await loadWorks();
+            await refetchWorks() /* TODO(phase3): replace with query invalidation */;
         } catch (err) {
             toast.error(httpErrorMessage(err, `Failed to ${type} work`), 5000);
         }
@@ -414,7 +409,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             await deleteJSON('/api/deletework', { body: JSON.stringify({ workId: work.work_id }) });
 
             toast.success('Work deleted successfully!');
-            await loadWorks();
+            await refetchWorks() /* TODO(phase3): replace with query invalidation */;
         } catch (err) {
             // A 409 carries a `details.dependencies` breakdown of the blocking records.
             const httpErr = err as HttpError;
@@ -459,7 +454,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         setShowTransferModal(false);
         setWorkToTransfer(null);
         // Refresh works since the work was transferred away
-        loadWorks();
+        refetchWorks() /* TODO(phase3): replace with query invalidation */;
         toast.success('Work transferred successfully to another patient');
     };
 
@@ -1188,7 +1183,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     onClose={() => {
                         setShowPaymentModal(false);
                         setSelectedWorkForPayment(null);
-                        loadWorks();
+                        refetchWorks() /* TODO(phase3): replace with query invalidation */;
                     }}
                     onSuccess={() => {
                         toast.success('Payment added successfully!');
@@ -1287,7 +1282,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                                             invalidateWorkCache(selectedWorkForPayment.work_id); // cached work row carries TotalPaid
                                                                             toast.success('Payment deleted successfully!');
                                                                             loadPaymentHistory(selectedWorkForPayment.work_id);
-                                                                            loadWorks();
+                                                                            refetchWorks() /* TODO(phase3): replace with query invalidation */;
                                                                         } catch (error) {
                                                                             console.error('Error deleting payment:', error);
                                                                             toast.error(`Error deleting payment: ${httpErrorMessage(error, 'Unknown error')}`);

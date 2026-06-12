@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { dailyAppointments, type DailyAppointmentsResponse } from '@shared/contracts/appointment.contract';
+import { qk } from '@/query/keys';
 
 /**
  * Appointment statistics from API
@@ -59,8 +60,9 @@ export interface UseAppointmentsReturn {
 
 const EMPTY_STATS: AppointmentStats = { total: 0, checkedIn: 0, absent: 0, waiting: 0 };
 
-/** Query key for a day's appointments — shared with useAppointmentsSync's SSE invalidation. */
-export const dailyAppointmentsKey = (date: string): [string, string] => ['daily-appointments', date];
+/** Query key for a day's appointments — shared with useAppointmentsSync's SSE
+ *  invalidation. Delegates to the central qk factory (single source of truth). */
+export const dailyAppointmentsKey = (date: string) => qk.appointments.daily(date);
 
 /** Current time as HH:MM:SS (the state-change payload's `time`). */
 function getCurrentTime(): string {

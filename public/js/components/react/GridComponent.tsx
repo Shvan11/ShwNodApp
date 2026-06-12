@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, MouseEvent as ReactMouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { invalidateTimepointsCache } from '@/router/loader-cache';
+import { timepointsQuery } from '@/query/queries';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
 import tpStyles from './TimePointsSelector.module.css';
@@ -68,8 +70,14 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const navigate = useNavigate();
     const toast = useToast();
     const [images, setImages] = useState<GalleryImage[]>([]);
-    const [timepoints, setTimepoints] = useState<Timepoint[]>([]);
-    const [loadingTimepoints, setLoadingTimepoints] = useState(true);
+    // Timepoints read on useQuery (loose contract models only tp_code/date/desc;
+    // rows carry the full Timepoint shape). A timepoint mutation's invalidation
+    // refreshes this live (Phase 3).
+    const { data: timepointsData, isLoading: loadingTimepoints, refetch: refetchTimepoints } = useQuery({
+        ...timepointsQuery(personId ?? ''),
+        enabled: !!personId,
+    });
+    const timepoints = (timepointsData ?? []) as unknown as Timepoint[];
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const lightboxRef = useRef<PhotoSwipeLightbox | null>(null);
@@ -205,24 +213,13 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             });
     };
 
+    // Refetch the timepoints query and return the fresh array (callers that act on
+    // the new list — e.g. after a create/delete — still get it synchronously).
+    // TODO(phase3): post-mutation callers should invalidate the query instead.
     const loadTimepoints = async (): Promise<Timepoint[]> => {
-        // Skip loading if personId is not valid
-        if (!personId) {
-            setLoadingTimepoints(false);
-            return [];
-        }
-
-        try {
-            setLoadingTimepoints(true);
-            const data = await fetchJSON<Timepoint[]>(`/api/patients/${personId}/timepoints`, { schema: patientContract.timepoints.response });
-            setTimepoints(data);
-            return data;
-        } catch (err) {
-            console.error('Error loading timepoints:', err);
-            return [];
-        } finally {
-            setLoadingTimepoints(false);
-        }
+        if (!personId) return [];
+        const { data } = await refetchTimepoints();
+        return (data ?? []) as unknown as Timepoint[];
     };
 
     const loadGalleryImages = async () => {
@@ -610,14 +607,6 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loading, images]);
-
-    // Load timepoints when component mounts
-    useEffect(() => {
-        if (personId) {
-            loadTimepoints();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [personId]);
 
     // Load images when component mounts or dependencies change
     useEffect(() => {

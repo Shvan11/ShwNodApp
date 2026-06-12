@@ -22,6 +22,7 @@ import { useCallback, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, httpErrorMessage } from '@/core/http';
 import * as messaging from '@shared/contracts/messaging.contract';
+import { qk } from '@/query/keys';
 import {
   API_ENDPOINTS,
   MESSAGE_STATUS_TEXT,
@@ -89,8 +90,9 @@ export interface UseMessageStatusReturn {
   escapeHtml: typeof escapeHtml;
 }
 
-/** Query key for a day's WhatsApp message statuses — shared with the SSE status-tick invalidation. */
-export const whatsappMessagesKey = (date: string): [string, string] => ['whatsapp-messages', date];
+/** Query key for a day's WhatsApp message statuses — shared with the SSE
+ *  status-tick invalidation. Delegates to the central qk factory. */
+export const whatsappMessagesKey = (date: string) => qk.whatsapp.messages(date);
 
 const EMPTY_MESSAGES: Message[] = [];
 
