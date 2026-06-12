@@ -52,6 +52,16 @@ const AppointmentsHeader = ({
         onDateChange(e.target.value);
     };
 
+    // Step the selected day by ±1 (noon avoids TZ date-shift).
+    const shiftDay = (delta: number): void => {
+        const base = selectedDate ? new Date(selectedDate + 'T12:00:00') : new Date();
+        base.setDate(base.getDate() + delta);
+        const year = base.getFullYear();
+        const month = String(base.getMonth() + 1).padStart(2, '0');
+        const day = String(base.getDate()).padStart(2, '0');
+        onDateChange(`${year}-${month}-${day}`);
+    };
+
     const handleSearchInputChange = (e: ChangeEvent<HTMLInputElement>): void => {
         onSearchChange(e.target.value);
     };
@@ -77,21 +87,43 @@ const AppointmentsHeader = ({
                 waiting={stats.waiting}
             />
 
-            {/* Combined date label + picker (+ refresh) — middle */}
+            {/* Combined date label + picker (+ day steppers + refresh) — middle */}
             <div className={styles.dateGroup}>
-                {/* The label IS the trigger (no separate "Select Date") */}
-                <div className={styles.datePill}>
-                    <i className={`fas fa-calendar-day ${styles.datePillIcon}`} aria-hidden="true"></i>
-                    <span className={styles.datePillText}>{formatShortDate(selectedDate)}</span>
-                    <i className={`fas fa-chevron-down ${styles.datePillCaret}`} aria-hidden="true"></i>
-                    <input
-                        type="date"
-                        aria-label="Select appointment date"
-                        className={styles.datePillInput}
-                        value={selectedDate}
-                        onChange={handleDateInputChange}
-                        onClick={openDatePicker}
-                    />
+                {/* Chevrons + pill form one cluster; refresh stays a separate
+                    sibling so the mobile space-between row splits cluster | refresh */}
+                <div className={styles.dateNav}>
+                    <button
+                        type="button"
+                        className={styles.dayNavButton}
+                        onClick={() => shiftDay(-1)}
+                        title="Previous day"
+                        aria-label="Previous day"
+                    >
+                        <i className="fas fa-chevron-left"></i>
+                    </button>
+                    {/* The label IS the trigger (no separate "Select Date") */}
+                    <div className={styles.datePill}>
+                        <i className={`fas fa-calendar-day ${styles.datePillIcon}`} aria-hidden="true"></i>
+                        <span className={styles.datePillText}>{formatShortDate(selectedDate)}</span>
+                        <i className={`fas fa-chevron-down ${styles.datePillCaret}`} aria-hidden="true"></i>
+                        <input
+                            type="date"
+                            aria-label="Select appointment date"
+                            className={styles.datePillInput}
+                            value={selectedDate}
+                            onChange={handleDateInputChange}
+                            onClick={openDatePicker}
+                        />
+                    </div>
+                    <button
+                        type="button"
+                        className={styles.dayNavButton}
+                        onClick={() => shiftDay(1)}
+                        title="Next day"
+                        aria-label="Next day"
+                    >
+                        <i className="fas fa-chevron-right"></i>
+                    </button>
                 </div>
                 <button
                     className={styles.refreshButton}

@@ -6,7 +6,7 @@
     font-family: var(--font-primary);
     font-weight: var(--font-weight-normal);
     line-height: var(--line-height-normal);
-    color: var(--gray-800);
+    color: var(--text-primary);
     background-color: var(--page-bg);
     width: 100%;
     /* clip (not hidden) prevents a horizontal scrollbar WITHOUT making .view a
@@ -48,17 +48,6 @@
     margin-right: var(--spacing-sm);
 }
 
-/* Footer */
-.footer {
-    text-align: center;
-    padding: var(--spacing-xl);
-    color: var(--neutral-gray);
-    font-size: var(--font-size-sm);
-    background-color: var(--surface);
-    border-top: 1px solid var(--border-color);
-    margin-top: auto;
-}
-
 /* Responsive */
 @media (max-width: 1024px) {
     .container {
@@ -70,12 +59,5 @@
     .container {
         flex-direction: column;
         gap: var(--spacing-md);
-    }
-}
-
-/* Print styles */
-@media print {
-    .footer {
-        display: none;
     }
 }

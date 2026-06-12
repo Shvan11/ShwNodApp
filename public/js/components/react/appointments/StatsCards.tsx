@@ -10,7 +10,7 @@ interface StatsCardsProps {
     variant?: 'cards' | 'header';
 }
 
-interface PrevValues {
+interface StatValues {
     total: number;
     checkedIn: number;
     absent: number;
@@ -30,16 +30,17 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0, variant
     const [animatedAbsent, setAnimatedAbsent] = useState<number>(0);
     const [animatedWaiting, setAnimatedWaiting] = useState<number>(0);
 
-    const prevValues = useRef<PrevValues>({ total: 0, checkedIn: 0, absent: 0, waiting: 0 });
-    // The value actually on screen right now, so a re-triggered animation
-    // resumes from where the count-up currently is instead of jumping back to
-    // the previous target.
-    const displayed = useRef<PrevValues>({ total: 0, checkedIn: 0, absent: 0, waiting: 0 });
+    // The value actually on screen right now: a re-triggered animation resumes
+    // from here, and the effect guard compares against it. Don't guard on a
+    // "previous props" ref — StrictMode runs setup→cleanup→setup, the cleanup
+    // kills the timers mid-count, and a props-based guard then skips the second
+    // setup, freezing the chips at 0.
+    const displayed = useRef<StatValues>({ total: 0, checkedIn: 0, absent: 0, waiting: 0 });
 
     // Animate value changes
     useEffect(() => {
         const animateValue = (
-            key: keyof PrevValues,
+            key: keyof StatValues,
             setValue: React.Dispatch<React.SetStateAction<number>>,
             end: number,
             duration: number = 300
@@ -67,24 +68,20 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0, variant
 
         const timers: ReturnType<typeof setInterval>[] = [];
 
-        if (prevValues.current.total !== total) {
+        if (displayed.current.total !== total) {
             timers.push(animateValue('total', setAnimatedTotal, total));
-            prevValues.current.total = total;
         }
 
-        if (prevValues.current.checkedIn !== checkedIn) {
+        if (displayed.current.checkedIn !== checkedIn) {
             timers.push(animateValue('checkedIn', setAnimatedCheckedIn, checkedIn));
-            prevValues.current.checkedIn = checkedIn;
         }
 
-        if (prevValues.current.absent !== absent) {
+        if (displayed.current.absent !== absent) {
             timers.push(animateValue('absent', setAnimatedAbsent, absent));
-            prevValues.current.absent = absent;
         }
 
-        if (prevValues.current.waiting !== waiting) {
+        if (displayed.current.waiting !== waiting) {
             timers.push(animateValue('waiting', setAnimatedWaiting, waiting));
-            prevValues.current.waiting = waiting;
         }
 
         return () => {
@@ -119,12 +116,12 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0, variant
                 </div>
             </div>
 
-            <div className={styles.cardAbsent}>
+            <div className={styles.cardRemaining}>
                 <div className={styles.icon}>
-                    <i className="fas fa-user-times"></i>
+                    <i className="fas fa-user-clock"></i>
                 </div>
                 <div className={styles.content}>
-                    <div className={styles.label}>Absent</div>
+                    <div className={styles.label}>Remaining</div>
                     <div className={styles.value}>{isNaN(animatedAbsent) ? 0 : animatedAbsent}</div>
                 </div>
             </div>

@@ -52,7 +52,11 @@ const DailyAppointments = () => {
         loaderData.loadedDate || searchParams.get('date') || getTodayDate()
     );
 
-    const [mobileView, setMobileView] = useState<ViewType>('checked-in');
+    // Before anyone arrives the checked-in list is an empty screen on mobile —
+    // land on whichever list actually has content.
+    const [mobileView, setMobileView] = useState<ViewType>(() =>
+        (loaderData.checkedInAppointments?.length ?? 0) > 0 ? 'checked-in' : 'all'
+    );
     const [showFlash, setShowFlash] = useState<boolean>(false);
     const [searchTerm, setSearchTerm] = useState<string>('');
 
@@ -218,6 +222,8 @@ const DailyAppointments = () => {
             <MobileViewToggle
                 activeView={mobileView}
                 onViewChange={setMobileView}
+                allCount={filteredAllAppointments.length}
+                checkedInCount={filteredCheckedInAppointments.length}
             />
 
             {/* Appointments lists */}
@@ -244,11 +250,6 @@ const DailyAppointments = () => {
                     className={mobileView === 'checked-in' ? 'active-view' : ''}
                 />
             </div>
-
-            {/* Footer */}
-            <footer className={styles.footer}>
-                <p>&copy; 2025 Shwan Orthodontics. All rights reserved.</p>
-            </footer>
 
         </div>
     );

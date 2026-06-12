@@ -236,7 +236,6 @@ const AppointmentCard = ({
             data-status={statusClass}
         >
             <div className={styles.time}>
-                <i className={`fas fa-clock ${styles.timeIcon}`}></i>
                 {appointment.apptime || 'N/A'}
             </div>
 
@@ -248,13 +247,15 @@ const AppointmentCard = ({
                             className={styles.patientLink}
                             onClick={handlePatientClick}
                         >
-                            <i className={`fas fa-user-circle ${styles.patientLinkIcon}`}></i>
                             {appointment.patient_name || 'Unknown'}
                         </a>
                         {appointment.hasActiveAlert && (
                             <i className={`fas fa-bell ${styles.alertIcon}`} title="Patient has an active alert"></i>
                         )}
-                        {appointment.patient_type && (
+                        {/* "Active" is the overwhelming default — badging it on every
+                            row is noise. Only surface the exceptional types (New,
+                            Walk in, …). */}
+                        {appointment.patient_type && appointment.patient_type.toLowerCase() !== 'active' && (
                             <span className={styles.patientTypeBadge}>
                                 <i className="fas fa-tag"></i>
                                 {appointment.patient_type}
@@ -263,7 +264,6 @@ const AppointmentCard = ({
                     </div>
                     {appointment.app_detail && (
                         <div className={styles.appointmentType}>
-                            <i className={`fas fa-stethoscope ${styles.appointmentTypeIcon}`}></i>
                             {appointment.app_detail}
                         </div>
                     )}

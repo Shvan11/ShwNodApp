@@ -13,11 +13,8 @@
     min-height: 3rem;
 }
 
-.card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
-    border-color: var(--primary-blue-light);
-}
+/* No .card:hover — the row is a container, not a control; the name link and
+   workflow buttons carry their own hover affordances. */
 
 /* Waiting patient highlight */
 .waiting {
@@ -62,16 +59,11 @@
     background: linear-gradient(135deg, var(--gray-100) 0%, var(--gray-200) 100%);
     border-radius: var(--radius-sm);
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
     display: flex;
     align-items: center;
     gap: 0.25rem;
-}
-
-.timeIcon {
-    font-size: var(--font-size-xs);
-    opacity: 0.6;
 }
 
 /* Info section */
@@ -100,7 +92,7 @@
 /* Patient name */
 .patientName {
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-800);
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: var(--spacing-xs);
@@ -118,11 +110,6 @@
 
 .patientLink:hover {
     color: var(--primary-blue-dark);
-}
-
-.patientLinkIcon {
-    opacity: 0.6;
-    font-size: 0.875rem;
 }
 
 /* Patient alert icon */
@@ -170,11 +157,6 @@
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
     line-height: 1;
-}
-
-.appointmentTypeIcon {
-    opacity: 0.6;
-    font-size: var(--font-size-xs);
 }
 
 /* Visit notes icon */
@@ -295,7 +277,7 @@
 }
 
 .statusInactive i {
-    color: var(--neutral-gray);
+    color: var(--text-secondary);
 }
 
 .statusInactive .chairIcon {
@@ -313,7 +295,7 @@
 }
 
 .statusInactiveClickable i {
-    color: var(--neutral-gray);
+    color: var(--text-secondary);
 }
 
 .statusInactiveClickable .chairIcon {

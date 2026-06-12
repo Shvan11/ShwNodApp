@@ -34,6 +34,39 @@
     flex-shrink: 0;
 }
 
+/* Chevron day-steppers + pill as one cluster (separate from the refresh
+   button so the mobile space-between row splits cluster | refresh). */
+.dateNav {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.dayNavButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    min-height: 32px;
+    padding: var(--spacing-xs);
+    background-color: var(--surface-elevated);
+    border: none;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.dayNavButton:hover {
+    box-shadow: var(--shadow-md);
+    color: var(--text-primary);
+}
+
+.dayNavButton i {
+    font-size: var(--font-size-sm);
+}
+
 /* Combined date label + picker — the visible pill is the trigger, an invisible
    native <input type="date"> overlays it. */
 .datePill {
@@ -62,12 +95,12 @@
 
 .datePillText {
     font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: var(--font-size-base);
 }
 
 .datePillCaret {
-    color: var(--neutral-gray);
+    color: var(--text-secondary);
     font-size: var(--font-size-xs);
 }
 
@@ -177,7 +210,7 @@
 }
 
 .searchInput::placeholder {
-    color: var(--neutral-gray);
+    color: var(--text-secondary);
 }
 
 .searchIcon {
@@ -185,7 +218,7 @@
     left: var(--spacing-sm);
     top: 50%;
     transform: translateY(-50%);
-    color: var(--neutral-gray);
+    color: var(--text-secondary);
     font-size: var(--font-size-base);
     pointer-events: none;
 }
@@ -197,7 +230,7 @@
     transform: translateY(-50%);
     background: none;
     border: none;
-    color: var(--neutral-gray);
+    color: var(--text-secondary);
     cursor: pointer;
     padding: 0.25rem;
     border-radius: var(--radius-sm);
@@ -210,7 +243,7 @@
 
 .searchClear:hover {
     background-color: rgba(0, 0, 0, 0.1);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 /* Responsive - Tablet & Mobile */
@@ -220,13 +253,22 @@
         gap: var(--spacing-sm);
     }
 
+    /* Two compact rows (the stats chips are hidden at this width):
+       date pill + refresh, then search + connection status. */
+    .dateGroup {
+        flex: 1 1 100%;
+        justify-content: space-between;
+    }
+
     .searchGroup {
+        flex: 1 1 100%;
         gap: var(--spacing-sm);
     }
 
     .searchWrapper {
-        min-width: 140px;
-        max-width: 200px;
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: none;
     }
 
     .searchInput {

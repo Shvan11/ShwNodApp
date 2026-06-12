@@ -80,9 +80,11 @@
     border-left-color: var(--success-green);
 }
 
-.cardAbsent {
+/* "Remaining" = scheduled but not yet arrived — neutral indigo, not error red:
+   every patient counts here all morning, so an alarm colour would cry wolf. */
+.cardRemaining {
     composes: card;
-    border-left-color: var(--error-color);
+    border-left-color: var(--indigo-500);
 }
 
 .cardWaiting {
@@ -111,9 +113,9 @@
     color: var(--success-600);
 }
 
-.cardAbsent .icon {
-    background-color: var(--error-50);
-    color: var(--error-color);
+.cardRemaining .icon {
+    background-color: var(--indigo-50);
+    color: var(--indigo-500);
 }
 
 .cardWaiting .icon {
@@ -132,7 +134,7 @@
 
 .label {
     font-size: var(--font-size-base);
-    color: var(--neutral-gray);
+    color: var(--text-secondary);
     font-weight: var(--font-weight-medium);
     line-height: 1;
     white-space: nowrap;
@@ -142,7 +144,7 @@
 .value {
     font-size: var(--font-size-md);
     font-weight: var(--font-weight-bold);
-    color: var(--gray-800);
+    color: var(--text-primary);
     line-height: 1;
     order: 1;
 }
@@ -161,10 +163,11 @@
         gap: 0.25rem;
     }
 
-    /* Header chips drop to their own full-width row, left-aligned */
+    /* On phones the chips wrapped to two extra header rows and pushed the
+       lists below the fold — hide them; the All/Checked-In view toggle
+       carries the counts there instead. */
     .headerContainer {
-        flex: 1 1 100%;
-        justify-content: flex-start;
+        display: none;
     }
 }
 
