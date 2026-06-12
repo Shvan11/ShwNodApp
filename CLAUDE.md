@@ -132,7 +132,7 @@ Mirrors the theme system's shape. **Languages** live in the `LANGUAGES` registry
 
 **Migrations**: schema is owned by **node-pg-migrate** — `migrations/pg/*.sql` (plain SQL up/down). Kysely is the runtime query builder, **not** the DDL owner. Regenerate `types/db.d.ts` after any schema change.
 
-**Connection** (see `.env`): `localhost:5432`, db `shwan`, role `shwan_app` (Windows service `postgresql-x64-18`).
+**Connection** (see `.env`): `localhost:5432`, db `shwan`, role `shwan_app` (Windows service `postgresql-x64-18`). `PG_HOST`/`DATABASE_URL` are **per-machine** (`.env` is gitignored): use `127.0.0.1` on Windows-native (prod) — NOT the WSL NAT gateway `172.20.0.1`, whose vEthernet adapter drops intermittently and silently kills the CDC sinks; from a WSL dev box `127.0.0.1` is WSL itself, so point at the host gateway IP (or enable WSL2 mirrored networking) instead.
 
 **Sessions live in PostgreSQL** (`express-session` via **`connect-pg-simple`**, wired in `index.ts`). Two tables — `staff_sessions` (cookie `shwan.sid`) and `portal_sessions` (cookie `shwan.portal`) — owned by `migrations/pg` (store runs `createTableIfMissing: false`, never issues DDL) and sharing the `pg` pool via `getPgPool()`. **The only remaining SQLite is `services/archform/archform-db.ts`** — reads the external Archform aligner software's own SQLite file via `better-sqlite3` (intentional, third-party integration).
 

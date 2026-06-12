@@ -184,3 +184,8 @@ data/reverse-sync-state.json
 
 # Archived historical migrations (kept locally for reference, not tracked)
 migrations/archive/
+
+# Playwright artifacts (e2e/.auth holds a live session cookie — never commit)
+e2e/.auth/
+e2e/.results/
+playwright-report/

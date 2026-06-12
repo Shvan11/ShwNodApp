@@ -1,0 +1,4466 @@
+-- Up Migration
+--
+-- ============================================================================
+-- BASELINE SCHEMA  (squash of 20 migrations, 2026-05-29 .. 2026-06-11)
+-- ============================================================================
+-- This single file is a `pg_dump --schema-only` snapshot of the live `shwan`
+-- database, replacing the original 20 incremental migrations. Those originals
+-- are preserved compressed at migrations/pg-archive-20260612.zip.
+--
+-- It is the rebuild-from-scratch source for a FRESH database (test sandbox,
+-- future Linux server). Existing databases (prod, sandbox) have this baseline
+-- marked already-applied in `pgmigrations` and never run it.
+--
+-- LOCAL ONLY: as always, migrations/pg never touched the Supabase mirror.
+-- Mirror DDL parity is maintained out-of-band (see docs/sync-cdc.md).
+--
+-- Trimmed vs raw pg_dump (would break a non-superuser shwan_app rebuild):
+--   * the `extensions` schema + `pg_stat_statements` (non-trusted, superuser-
+--     only, added out-of-band, never migration-owned)
+--   * psql-only \restrict / \unrestrict meta-commands (node-pg-migrate runs
+--     raw SQL via the pg driver, not psql)
+-- Kept: citext + pg_trgm (trusted extensions, app-required, owner-creatable).
+-- ============================================================================
+
+--
+-- PostgreSQL database dump
+--
+
+
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: extensions; Type: SCHEMA; Schema: -; Owner: -
+--
+
+
+
+--
+-- Name: citext; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION citext; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION citext IS 'data type for case-insensitive character strings';
+
+
+--
+-- Name: pg_stat_statements; Type: EXTENSION; Schema: -; Owner: -
+--
+
+
+
+--
+-- Name: EXTENSION pg_stat_statements; Type: COMMENT; Schema: -; Owner: -
+--
+
+
+
+--
+-- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pg_trgm; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
+
+
+--
+-- Name: cdc_capture(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.cdc_capture() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  pk_col text := TG_ARGV[0];
+  pk_val text;
+  v_op   char(1);
+  i      int;
+  s      text;
+BEGIN
+  IF current_setting('app.cdc_origin', true) = 'reverse' THEN
+    RETURN NULL;                                  -- reverse-sync write: do not re-capture
+  END IF;
+
+  IF    TG_OP = 'DELETE' THEN v_op := 'D';
+  ELSIF TG_OP = 'UPDATE' THEN v_op := 'U';
+  ELSE                        v_op := 'I';
+  END IF;
+
+  -- Fan out to each sink named on the trigger, if that sink's capture is enabled. The row's PK is
+  -- extracted lazily on the first enabled sink (at most once), so a write with NO capturing sink
+  -- skips the per-row to_jsonb() entirely.
+  FOR i IN 1 .. (TG_NARGS - 1) LOOP
+    s := TG_ARGV[i];
+    IF EXISTS (SELECT 1 FROM cdc_sink_control c WHERE c.sink = s AND c.enabled) THEN
+      IF pk_val IS NULL THEN
+        pk_val := (to_jsonb(CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END) ->> pk_col);
+        IF pk_val IS NULL THEN
+          RETURN NULL;                            -- no PK value: nothing to capture
+        END IF;
+      END IF;
+      INSERT INTO change_log ("sink", "tbl", "pk", "op", "changed_at")
+      VALUES (s, TG_TABLE_NAME, pk_val, v_op, now())
+      ON CONFLICT ("sink", "tbl", "pk")
+      DO UPDATE SET "op" = EXCLUDED."op", "changed_at" = EXCLUDED."changed_at";
+    END IF;
+  END LOOP;
+
+  RETURN NULL;
+END;
+$$;
+
+
+--
+-- Name: set_updated_at(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.set_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  -- Reverse-sync write: preserve the incoming Supabase updated_at verbatim (LWW keystone).
+  IF current_setting('app.cdc_origin', true) = 'reverse' THEN
+    RETURN NEW;
+  END IF;
+  NEW.updated_at := localtimestamp;
+  RETURN NEW;
+END;
+$$;
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: addresses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.addresses (
+    id integer NOT NULL,
+    zone public.citext,
+    city_id integer,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: addresses_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.addresses ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.addresses_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: alert_types; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.alert_types (
+    alert_type_id integer CONSTRAINT alert_types_alerttypeid_not_null NOT NULL,
+    type_name public.citext CONSTRAINT alert_types_typename_not_null NOT NULL
+);
+
+
+--
+-- Name: alert_types_alert_type_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.alert_types ALTER COLUMN alert_type_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.alert_types_alert_type_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: alerts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.alerts (
+    alert_id integer CONSTRAINT alerts_alertid_not_null NOT NULL,
+    person_id integer,
+    alert_type_id integer,
+    alert_severity integer CONSTRAINT alerts_alertseverity_not_null NOT NULL,
+    alert_details public.citext,
+    creation_date timestamp without time zone DEFAULT LOCALTIMESTAMP CONSTRAINT alerts_creationdate_not_null NOT NULL,
+    updated_at timestamp without time zone,
+    surface_mode text DEFAULT 'context'::text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    snoozed_until date,
+    expires_at date,
+    escalate_at date,
+    completed_at timestamp without time zone,
+    completed_by text,
+    assigned_to integer,
+    CONSTRAINT chk_alerts_context_has_person CHECK (((surface_mode = 'push'::text) OR (person_id IS NOT NULL))),
+    CONSTRAINT chk_alerts_status CHECK ((status = ANY (ARRAY['active'::text, 'done'::text, 'dismissed'::text]))),
+    CONSTRAINT chk_alerts_surface_mode CHECK ((surface_mode = ANY (ARRAY['context'::text, 'push'::text]))),
+    CONSTRAINT chk_alertseverity CHECK ((alert_severity = ANY (ARRAY[1, 2, 3])))
+);
+
+
+--
+-- Name: alerts_alert_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.alerts ALTER COLUMN alert_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.alerts_alert_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: aligner_activity_flags; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.aligner_activity_flags (
+    activity_id integer CONSTRAINT aligner_activity_flags_activityid_not_null NOT NULL,
+    aligner_set_id integer CONSTRAINT aligner_activity_flags_alignersetid_not_null NOT NULL,
+    activity_type public.citext CONSTRAINT aligner_activity_flags_activitytype_not_null NOT NULL,
+    activity_description public.citext CONSTRAINT aligner_activity_flags_activitydescription_not_null NOT NULL,
+    created_at timestamp without time zone DEFAULT LOCALTIMESTAMP,
+    is_read boolean DEFAULT false,
+    read_at timestamp without time zone,
+    related_record_id integer,
+    updated_at timestamp without time zone,
+    CONSTRAINT ck_activitytype CHECK ((activity_type OPERATOR(public.=) ANY (ARRAY['DaysChanged'::public.citext, 'DoctorNote'::public.citext])))
+);
+
+
+--
+-- Name: aligner_activity_flags_activity_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.aligner_activity_flags ALTER COLUMN activity_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.aligner_activity_flags_activity_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: aligner_batches; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.aligner_batches (
+    aligner_batch_id integer CONSTRAINT aligner_batches_alignerbatchid_not_null NOT NULL,
+    aligner_set_id integer CONSTRAINT aligner_batches_alignersetid_not_null NOT NULL,
+    upper_aligner_count integer CONSTRAINT aligner_batches_upperalignercount_not_null NOT NULL,
+    lower_aligner_count integer CONSTRAINT aligner_batches_loweralignercount_not_null NOT NULL,
+    manufacture_date date,
+    delivered_to_patient_date date,
+    notes public.citext,
+    is_active boolean DEFAULT false,
+    batch_sequence integer CONSTRAINT aligner_batches_batchsequence_not_null NOT NULL,
+    upper_aligner_start_sequence integer,
+    lower_aligner_start_sequence integer,
+    upper_aligner_end_sequence integer GENERATED ALWAYS AS (
+CASE
+    WHEN (upper_aligner_start_sequence IS NULL) THEN NULL::integer
+    ELSE ((upper_aligner_start_sequence + upper_aligner_count) - 1)
+END) STORED,
+    lower_aligner_end_sequence integer GENERATED ALWAYS AS (
+CASE
+    WHEN (lower_aligner_start_sequence IS NULL) THEN NULL::integer
+    ELSE ((lower_aligner_start_sequence + lower_aligner_count) - 1)
+END) STORED,
+    days integer,
+    is_last boolean DEFAULT false CONSTRAINT aligner_batches_islast_not_null NOT NULL,
+    creation_date timestamp without time zone DEFAULT LOCALTIMESTAMP CONSTRAINT aligner_batches_creationdate_not_null NOT NULL,
+    has_upper_template boolean DEFAULT false CONSTRAINT aligner_batches_hasuppertemplate_not_null NOT NULL,
+    has_lower_template boolean DEFAULT false CONSTRAINT aligner_batches_haslowertemplate_not_null NOT NULL,
+    validity_period integer GENERATED ALWAYS AS (
+CASE
+    WHEN (days IS NULL) THEN NULL::integer
+    WHEN ((upper_aligner_count -
+    CASE
+        WHEN has_upper_template THEN 1
+        ELSE 0
+    END) >= (lower_aligner_count -
+    CASE
+        WHEN has_lower_template THEN 1
+        ELSE 0
+    END)) THEN ((upper_aligner_count -
+    CASE
+        WHEN has_upper_template THEN 1
+        ELSE 0
+    END) * days)
+    ELSE ((lower_aligner_count -
+    CASE
+        WHEN has_lower_template THEN 1
+        ELSE 0
+    END) * days)
+END) STORED,
+    batch_expiry_date date GENERATED ALWAYS AS ((delivered_to_patient_date +
+CASE
+    WHEN (days IS NULL) THEN NULL::integer
+    WHEN ((upper_aligner_count -
+    CASE
+        WHEN has_upper_template THEN 1
+        ELSE 0
+    END) >= (lower_aligner_count -
+    CASE
+        WHEN has_lower_template THEN 1
+        ELSE 0
+    END)) THEN ((upper_aligner_count -
+    CASE
+        WHEN has_upper_template THEN 1
+        ELSE 0
+    END) * days)
+    ELSE ((lower_aligner_count -
+    CASE
+        WHEN has_lower_template THEN 1
+        ELSE 0
+    END) * days)
+END)) STORED,
+    updated_at timestamp without time zone,
+    CONSTRAINT ck_alignerbatches_active_requires_delivery CHECK (((is_active = false) OR (delivered_to_patient_date IS NOT NULL)))
+);
+
+
+--
+-- Name: aligner_batches_aligner_batch_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.aligner_batches ALTER COLUMN aligner_batch_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.aligner_batches_aligner_batch_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: aligner_doctors; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.aligner_doctors (
+    dr_id integer CONSTRAINT aligner_doctors_drid_not_null NOT NULL,
+    doctor_name public.citext CONSTRAINT aligner_doctors_doctorname_not_null NOT NULL,
+    logo_path public.citext,
+    doctor_email public.citext
+);
+
+
+--
+-- Name: aligner_doctors_dr_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.aligner_doctors ALTER COLUMN dr_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.aligner_doctors_dr_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: aligner_notes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.aligner_notes (
+    note_id integer CONSTRAINT aligner_notes_noteid_not_null NOT NULL,
+    aligner_set_id integer CONSTRAINT aligner_notes_alignersetid_not_null NOT NULL,
+    note_type public.citext CONSTRAINT aligner_notes_notetype_not_null NOT NULL,
+    note_text public.citext CONSTRAINT aligner_notes_notetext_not_null NOT NULL,
+    created_at timestamp without time zone DEFAULT LOCALTIMESTAMP,
+    is_edited boolean DEFAULT false,
+    updated_at timestamp without time zone,
+    is_read boolean DEFAULT true CONSTRAINT aligner_notes_isread_not_null NOT NULL
+);
+
+
+--
+-- Name: aligner_notes_note_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.aligner_notes ALTER COLUMN note_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.aligner_notes_note_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: aligner_sets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.aligner_sets (
+    aligner_set_id integer CONSTRAINT aligner_sets_alignersetid_not_null NOT NULL,
+    work_id integer CONSTRAINT aligner_sets_workid_not_null NOT NULL,
+    upper_aligners_count integer,
+    lower_aligners_count integer,
+    creation_date date,
+    notes public.citext,
+    is_active boolean DEFAULT true,
+    days integer,
+    folder_path public.citext,
+    aligner_dr_id integer CONSTRAINT aligner_sets_alignerdrid_not_null NOT NULL,
+    type public.citext,
+    set_sequence integer,
+    remaining_upper_aligners integer,
+    remaining_lower_aligners integer,
+    set_url public.citext,
+    set_pdf_url public.citext,
+    set_cost numeric(10,2),
+    currency public.citext DEFAULT 'USD'::public.citext,
+    pdf_uploaded_at timestamp without time zone,
+    pdf_uploaded_by public.citext,
+    drive_file_id public.citext,
+    set_video public.citext,
+    archform_id integer,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: aligner_sets_aligner_set_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.aligner_sets ALTER COLUMN aligner_set_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.aligner_sets_aligner_set_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: appointments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.appointments (
+    appointment_id integer CONSTRAINT appointments_appointmentid_not_null NOT NULL,
+    person_id integer CONSTRAINT appointments_personid_not_null NOT NULL,
+    app_detail public.citext,
+    want_notify boolean DEFAULT true,
+    notified boolean DEFAULT false,
+    sms_status public.citext,
+    present time without time zone,
+    seated time without time zone,
+    dismissed time without time zone,
+    app_date timestamp without time zone CONSTRAINT appointments_appdate_not_null NOT NULL,
+    app_day date GENERATED ALWAYS AS ((app_date)::date) STORED,
+    app_cost public.citext,
+    sent_wa boolean,
+    delivered_wa public.citext,
+    want_wa boolean DEFAULT true,
+    wa_message_id public.citext,
+    sms_sid public.citext,
+    app_time time without time zone GENERATED ALWAYS AS ((app_date)::time without time zone) STORED,
+    dr_id integer,
+    updated_at timestamp without time zone,
+    sent_timestamp timestamp without time zone,
+    delivered_timestamp timestamp without time zone,
+    read_timestamp timestamp without time zone
+);
+
+
+--
+-- Name: appointments_appointment_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.appointments ALTER COLUMN appointment_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.appointments_appointment_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: bends; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.bends (
+    bend_id integer NOT NULL,
+    bend public.citext NOT NULL
+);
+
+
+--
+-- Name: bends_bend_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.bends ALTER COLUMN bend_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.bends_bend_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: calendar; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.calendar (
+    app_date timestamp without time zone CONSTRAINT calendar_appdate_not_null NOT NULL
+);
+
+
+--
+-- Name: carried_wires; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.carried_wires (
+    id integer NOT NULL,
+    person_id integer CONSTRAINT carried_wires_personid_not_null NOT NULL,
+    wire_bag public.citext CONSTRAINT carried_wires_wirebag_not_null NOT NULL,
+    wire_slot integer CONSTRAINT carried_wires_wireslot_not_null NOT NULL,
+    wire_id integer NOT NULL,
+    upper_lower public.citext CONSTRAINT carried_wires_upperlower_not_null NOT NULL,
+    addition_date date CONSTRAINT carried_wires_additiondate_not_null NOT NULL,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: carried_wires_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.carried_wires ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.carried_wires_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: cdc_sink_control; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.cdc_sink_control (
+    sink text NOT NULL,
+    enabled boolean DEFAULT false NOT NULL,
+    stale boolean DEFAULT false NOT NULL,
+    note text,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: change_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.change_log (
+    id bigint NOT NULL,
+    sink text NOT NULL,
+    tbl text NOT NULL,
+    pk text NOT NULL,
+    op character(1) NOT NULL,
+    changed_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: change_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.change_log ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.change_log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: cities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.cities (
+    id integer NOT NULL,
+    city public.citext
+);
+
+
+--
+-- Name: cities_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.cities ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.cities_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: details; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.details (
+    id integer NOT NULL,
+    detail public.citext
+);
+
+
+--
+-- Name: details_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.details ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.details_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: diagnoses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.diagnoses (
+    id integer NOT NULL,
+    dx_date timestamp without time zone,
+    work_id integer CONSTRAINT diagnoses_workid_not_null NOT NULL,
+    diagnosis public.citext NOT NULL,
+    treatment_plan public.citext CONSTRAINT diagnoses_treatmentplan_not_null NOT NULL,
+    chief_complain public.citext,
+    f_antero_posterior public.citext,
+    f_vertical public.citext,
+    f_transverse public.citext,
+    f_lip_competence public.citext,
+    f_naso_labial_angle public.citext,
+    f_upper_incisor_show_rest public.citext,
+    f_upper_incisor_show_smile public.citext,
+    i_teeth_present public.citext,
+    i_dental_health public.citext,
+    i_lower_crowding public.citext,
+    i_lower_incisor_inclination public.citext,
+    i_curveof_spee public.citext,
+    i_upper_crowding public.citext,
+    i_upper_incisor_inclination public.citext,
+    o_incisor_relation public.citext,
+    o_overjet public.citext,
+    o_overbite public.citext,
+    o_centerlines public.citext,
+    o_molar_relation public.citext,
+    o_canine_relation public.citext,
+    o_functional_occlusion public.citext,
+    c_sna public.citext,
+    c_snb public.citext,
+    c_anb public.citext,
+    c_sn_mx public.citext,
+    c_wits public.citext,
+    c_fma public.citext,
+    c_mma public.citext,
+    c_uimx public.citext,
+    c_li_md public.citext,
+    c_ui_li public.citext,
+    c_li_a_po public.citext,
+    c_ulip_e public.citext,
+    c_llip_e public.citext,
+    c_naso_lip public.citext,
+    c_tafh public.citext,
+    c_uafh public.citext,
+    c_lafh public.citext,
+    c_percent_lafh public.citext,
+    appliance public.citext,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: diagnoses_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.diagnoses ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.diagnoses_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: document_templates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_templates (
+    template_id integer NOT NULL,
+    template_name public.citext NOT NULL,
+    description public.citext,
+    document_type_id integer NOT NULL,
+    paper_width integer NOT NULL,
+    paper_height integer NOT NULL,
+    paper_orientation public.citext DEFAULT 'portrait'::public.citext,
+    paper_margin_top integer DEFAULT 10,
+    paper_margin_right integer DEFAULT 10,
+    paper_margin_bottom integer DEFAULT 10,
+    paper_margin_left integer DEFAULT 10,
+    background_color public.citext DEFAULT '#FFFFFF'::public.citext,
+    show_grid boolean DEFAULT false,
+    grid_size integer DEFAULT 10,
+    is_default boolean DEFAULT false,
+    is_active boolean DEFAULT true,
+    is_system boolean DEFAULT false,
+    template_version integer DEFAULT 1,
+    parent_template_id integer,
+    created_by public.citext,
+    created_date timestamp without time zone DEFAULT LOCALTIMESTAMP,
+    modified_by public.citext,
+    updated_at timestamp without time zone,
+    last_used_date timestamp without time zone,
+    template_file_path public.citext
+);
+
+
+--
+-- Name: document_templates_template_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_templates ALTER COLUMN template_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.document_templates_template_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: document_types; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_types (
+    type_id integer NOT NULL,
+    type_code public.citext NOT NULL,
+    type_name public.citext NOT NULL,
+    description public.citext,
+    icon public.citext,
+    default_paper_width integer DEFAULT 210,
+    default_paper_height integer DEFAULT 297,
+    default_orientation public.citext DEFAULT 'portrait'::public.citext,
+    is_active boolean DEFAULT true,
+    sort_order integer DEFAULT 0
+);
+
+
+--
+-- Name: document_types_type_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_types ALTER COLUMN type_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.document_types_type_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: dolphin_sync_map; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.dolphin_sync_map (
+    local_table text NOT NULL,
+    local_pk text NOT NULL,
+    dolphin_id uuid NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: elastics; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.elastics (
+    elastic_id integer NOT NULL,
+    elastic public.citext NOT NULL
+);
+
+
+--
+-- Name: elastics_elastic_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.elastics ALTER COLUMN elastic_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.elastics_elastic_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: employees; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.employees (
+    id integer NOT NULL,
+    employee_name public.citext CONSTRAINT employees_employeename_not_null NOT NULL,
+    "position" integer,
+    email public.citext,
+    phone public.citext,
+    percentage boolean DEFAULT false NOT NULL,
+    receive_email boolean DEFAULT false CONSTRAINT employees_receiveemail_not_null NOT NULL,
+    get_appointments boolean DEFAULT false CONSTRAINT employees_getappointments_not_null NOT NULL,
+    sort_order integer DEFAULT 999 CONSTRAINT employees_sortorder_not_null NOT NULL,
+    appointment_color public.citext,
+    updated_at timestamp without time zone,
+    is_active boolean DEFAULT true NOT NULL
+);
+
+
+--
+-- Name: employees_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.employees ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.employees_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: endo; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.endo (
+    id integer NOT NULL,
+    detail_id integer,
+    canal public.citext,
+    refrence_point public.citext,
+    working_length numeric(3,1),
+    curvature public.citext,
+    note public.citext,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: endo_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.endo ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.endo_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: estimated_cost_presets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.estimated_cost_presets (
+    preset_id integer CONSTRAINT estimated_cost_presets_presetid_not_null NOT NULL,
+    amount numeric(18,2) NOT NULL,
+    currency public.citext NOT NULL,
+    display_order integer DEFAULT 0
+);
+
+
+--
+-- Name: estimated_cost_presets_preset_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.estimated_cost_presets ALTER COLUMN preset_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.estimated_cost_presets_preset_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: expense_categories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.expense_categories (
+    category_id integer CONSTRAINT expense_categories_categoryid_not_null NOT NULL,
+    category_name public.citext CONSTRAINT expense_categories_categoryname_not_null NOT NULL
+);
+
+
+--
+-- Name: expense_categories_category_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.expense_categories ALTER COLUMN category_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.expense_categories_category_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: expense_subcategories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.expense_subcategories (
+    subcategory_id integer CONSTRAINT expense_subcategories_subcategoryid_not_null NOT NULL,
+    subcategory_name public.citext CONSTRAINT expense_subcategories_subcategoryname_not_null NOT NULL,
+    category_id integer CONSTRAINT expense_subcategories_categoryid_not_null NOT NULL
+);
+
+
+--
+-- Name: expense_subcategories_subcategory_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.expense_subcategories ALTER COLUMN subcategory_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.expense_subcategories_subcategory_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: expenses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.expenses (
+    id integer NOT NULL,
+    expense_date date CONSTRAINT expenses_expensedate_not_null NOT NULL,
+    amount integer NOT NULL,
+    currency public.citext,
+    note public.citext,
+    category_id integer,
+    subcategory_id integer,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: expenses_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.expenses ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.expenses_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: holidays; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.holidays (
+    holiday_date date CONSTRAINT holidays_holidaydate_not_null NOT NULL,
+    description public.citext,
+    id integer NOT NULL,
+    holiday_name public.citext DEFAULT 'Holiday'::public.citext CONSTRAINT holidays_holidayname_not_null NOT NULL
+);
+
+
+--
+-- Name: holidays_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.holidays ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.holidays_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: image_types; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.image_types (
+    image_type_code character(2) CONSTRAINT image_types_imagetypecode_not_null NOT NULL,
+    description public.citext,
+    dolphin_ityp_id uuid
+);
+
+
+--
+-- Name: implant_manufacturers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.implant_manufacturers (
+    id integer NOT NULL,
+    manufacturer_name public.citext CONSTRAINT implant_manufacturers_manufacturername_not_null NOT NULL
+);
+
+
+--
+-- Name: implant_manufacturers_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.implant_manufacturers ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.implant_manufacturers_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: implants; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.implants (
+    id integer NOT NULL,
+    work_id integer CONSTRAINT implants_workid_not_null NOT NULL,
+    tooth public.citext,
+    implant_length numeric(3,1),
+    implant_diameter numeric(3,1),
+    implant_company public.citext,
+    note public.citext,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: implants_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.implants ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.implants_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: invoices; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.invoices (
+    invoice_id integer CONSTRAINT invoices_invoiceid_not_null NOT NULL,
+    amount_paid integer CONSTRAINT invoices_amountpaid_not_null NOT NULL,
+    date_of_payment date CONSTRAINT invoices_dateofpayment_not_null NOT NULL,
+    work_id integer CONSTRAINT invoices_workid_not_null NOT NULL,
+    sys_start_time timestamp without time zone DEFAULT (now() AT TIME ZONE 'UTC'::text) CONSTRAINT invoices_sysstarttime_not_null NOT NULL,
+    actual_amount integer,
+    actual_cur public.citext,
+    change integer,
+    aligner_set_id integer,
+    usd_received integer DEFAULT 0 CONSTRAINT invoices_usdreceived_not_null NOT NULL,
+    iqd_received integer DEFAULT 0 CONSTRAINT invoices_iqdreceived_not_null NOT NULL,
+    CONSTRAINT chk_invoice_amountpaidpositive CHECK ((amount_paid > 0)),
+    CONSTRAINT chk_invoice_changenonnegative CHECK (((change >= 0) OR (change IS NULL))),
+    CONSTRAINT chk_invoice_iqdnonnegative CHECK ((iqd_received >= 0)),
+    CONSTRAINT chk_invoice_mustreceivecash CHECK (((usd_received > 0) OR (iqd_received > 0))),
+    CONSTRAINT chk_invoice_usdnonnegative CHECK ((usd_received >= 0))
+);
+
+
+--
+-- Name: invoices_invoice_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.invoices ALTER COLUMN invoice_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.invoices_invoice_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: keywords; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.keywords (
+    id integer NOT NULL,
+    key_word public.citext
+);
+
+
+--
+-- Name: keywords_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.keywords ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.keywords_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: message_status_history; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.message_status_history (
+    status_history_id integer CONSTRAINT message_status_history_statushistoryid_not_null NOT NULL,
+    appointment_id integer CONSTRAINT message_status_history_appointmentid_not_null NOT NULL,
+    wa_message_id public.citext CONSTRAINT message_status_history_wamessageid_not_null NOT NULL,
+    status_code integer CONSTRAINT message_status_history_statuscode_not_null NOT NULL,
+    status_text public.citext CONSTRAINT message_status_history_statustext_not_null NOT NULL,
+    "timestamp" timestamp without time zone DEFAULT LOCALTIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: message_status_history_status_history_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.message_status_history ALTER COLUMN status_history_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.message_status_history_status_history_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: numbers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.numbers (
+    my_number integer DEFAULT 0 CONSTRAINT numbers_mynumber_not_null NOT NULL
+);
+
+
+--
+-- Name: old_opg; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.old_opg (
+    id integer NOT NULL,
+    last_name public.citext NOT NULL,
+    first_name public.citext NOT NULL,
+    sex public.citext NOT NULL,
+    birth_date timestamp without time zone,
+    directory public.citext NOT NULL
+);
+
+
+--
+-- Name: options; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.options (
+    option_name public.citext CONSTRAINT options_optionname_not_null NOT NULL,
+    option_value public.citext,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: patient_portal_auth; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.patient_portal_auth (
+    person_id integer CONSTRAINT patient_portal_auth_personid_not_null NOT NULL,
+    pin_hash public.citext CONSTRAINT patient_portal_auth_pinhash_not_null NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    failed_attempts integer DEFAULT 0 CONSTRAINT patient_portal_auth_failedattempts_not_null NOT NULL,
+    locked_until timestamp without time zone,
+    last_login_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT (now() AT TIME ZONE 'UTC'::text) CONSTRAINT patient_portal_auth_createdat_not_null NOT NULL,
+    updated_at timestamp without time zone DEFAULT (now() AT TIME ZONE 'UTC'::text) CONSTRAINT patient_portal_auth_updatedat_not_null NOT NULL
+);
+
+
+--
+-- Name: patient_types; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.patient_types (
+    id integer NOT NULL,
+    patient_type public.citext
+);
+
+
+--
+-- Name: patient_types_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.patient_types ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.patient_types_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: patients; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.patients (
+    person_id integer CONSTRAINT patients_personid_not_null NOT NULL,
+    patient_id public.citext,
+    patient_name public.citext CONSTRAINT patients_patientname_not_null NOT NULL,
+    phone public.citext,
+    first_name public.citext,
+    last_name public.citext,
+    date_of_birth date,
+    gender integer,
+    phone2 public.citext,
+    address_id integer,
+    date_added timestamp without time zone DEFAULT LOCALTIMESTAMP,
+    referral_source_id integer,
+    estimated_cost integer,
+    currency public.citext,
+    patient_type_id integer,
+    notes public.citext,
+    email public.citext,
+    language smallint DEFAULT 0,
+    tag_id integer,
+    country_code public.citext,
+    web_ceph_patient_id public.citext,
+    web_ceph_link public.citext,
+    web_ceph_created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    CONSTRAINT "ssma_cc$patients$gender$validation_rule" CHECK (((gender IS NULL) OR (gender = 1) OR (gender = 2))),
+    CONSTRAINT "ssma_cc$patients$patientid$disallow_zero_length" CHECK ((patient_id OPERATOR(public.<>) ''::public.citext)),
+    CONSTRAINT "ssma_cc$patients$patientname$disallow_zero_length" CHECK ((patient_name OPERATOR(public.<>) ''::public.citext))
+);
+
+
+--
+-- Name: patients_person_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.patients ALTER COLUMN person_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.patients_person_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: pgmigrations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+
+
+--
+-- Name: portal_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.portal_sessions (
+    sid character varying NOT NULL,
+    sess json NOT NULL,
+    expire timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: positions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.positions (
+    id integer NOT NULL,
+    position_name public.citext,
+    CONSTRAINT positions_positionname_check CHECK ((position_name OPERATOR(public.=) ANY (ARRAY['Worker'::public.citext, 'Receptionist'::public.citext, 'Assistant'::public.citext, 'Doctor'::public.citext])))
+);
+
+
+--
+-- Name: positions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.positions ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.positions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: private_photos; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.private_photos (
+    person_id integer CONSTRAINT private_photos_personid_not_null NOT NULL,
+    timepoint_code public.citext CONSTRAINT private_photos_timepointcode_not_null NOT NULL,
+    image_name public.citext CONSTRAINT private_photos_imagename_not_null NOT NULL,
+    marked_by integer,
+    marked_at timestamp without time zone DEFAULT (now() AT TIME ZONE 'UTC'::text) CONSTRAINT private_photos_markedat_not_null NOT NULL,
+    id bigint NOT NULL
+);
+
+
+--
+-- Name: private_photos_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.private_photos ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.private_photos_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: referrals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.referrals (
+    id integer NOT NULL,
+    referral public.citext
+);
+
+
+--
+-- Name: referrals_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.referrals ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.referrals_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: screws; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.screws (
+    id integer NOT NULL,
+    work_id integer DEFAULT 0,
+    person_id integer DEFAULT 0 CONSTRAINT screws_personid_not_null NOT NULL,
+    placement_date timestamp without time zone,
+    "position" public.citext,
+    state public.citext,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: screws_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.screws ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.screws_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: sms; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sms (
+    id integer NOT NULL,
+    date date NOT NULL,
+    sms_sent boolean DEFAULT false CONSTRAINT sms_smssent_not_null NOT NULL,
+    sms_id public.citext,
+    email_sent boolean DEFAULT false CONSTRAINT sms_emailsent_not_null NOT NULL,
+    exchange_rate integer
+);
+
+
+--
+-- Name: sms_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.sms ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.sms_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: staff_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.staff_sessions (
+    sid character varying NOT NULL,
+    sess json NOT NULL,
+    expire timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: stand_categories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stand_categories (
+    category_id integer CONSTRAINT stand_categories_categoryid_not_null NOT NULL,
+    category_name public.citext CONSTRAINT stand_categories_categoryname_not_null NOT NULL,
+    is_active boolean DEFAULT true CONSTRAINT stand_categories_isactive_not_null NOT NULL
+);
+
+
+--
+-- Name: stand_categories_category_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stand_categories ALTER COLUMN category_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.stand_categories_category_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: stand_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stand_items (
+    item_id integer CONSTRAINT stand_items_itemid_not_null NOT NULL,
+    item_name public.citext CONSTRAINT stand_items_itemname_not_null NOT NULL,
+    sku public.citext,
+    barcode public.citext,
+    category_id integer,
+    cost_price integer CONSTRAINT stand_items_costprice_not_null NOT NULL,
+    sell_price integer CONSTRAINT stand_items_sellprice_not_null NOT NULL,
+    current_stock integer DEFAULT 0 CONSTRAINT stand_items_currentstock_not_null NOT NULL,
+    reorder_level integer DEFAULT 5 CONSTRAINT stand_items_reorderlevel_not_null NOT NULL,
+    expiry_date date,
+    unit public.citext,
+    notes public.citext,
+    is_active boolean DEFAULT true CONSTRAINT stand_items_isactive_not_null NOT NULL,
+    date_added timestamp without time zone DEFAULT LOCALTIMESTAMP CONSTRAINT stand_items_dateadded_not_null NOT NULL,
+    updated_at timestamp without time zone,
+    created_by integer,
+    CONSTRAINT ck_standitems_costprice CHECK ((cost_price >= 0)),
+    CONSTRAINT ck_standitems_currentstock CHECK ((current_stock >= 0)),
+    CONSTRAINT ck_standitems_reorderlevel CHECK ((reorder_level >= 0)),
+    CONSTRAINT ck_standitems_sellprice CHECK ((sell_price >= 0))
+);
+
+
+--
+-- Name: stand_items_item_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stand_items ALTER COLUMN item_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.stand_items_item_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: stand_sale_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stand_sale_items (
+    sale_item_id integer CONSTRAINT stand_sale_items_saleitemid_not_null NOT NULL,
+    sale_id integer CONSTRAINT stand_sale_items_saleid_not_null NOT NULL,
+    item_id integer CONSTRAINT stand_sale_items_itemid_not_null NOT NULL,
+    quantity integer NOT NULL,
+    unit_price integer CONSTRAINT stand_sale_items_unitprice_not_null NOT NULL,
+    unit_cost integer CONSTRAINT stand_sale_items_unitcost_not_null NOT NULL,
+    line_total integer CONSTRAINT stand_sale_items_linetotal_not_null NOT NULL,
+    CONSTRAINT ck_standsaleitems_quantity CHECK ((quantity > 0))
+);
+
+
+--
+-- Name: stand_sale_items_sale_item_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stand_sale_items ALTER COLUMN sale_item_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.stand_sale_items_sale_item_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: stand_sales; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stand_sales (
+    sale_id integer CONSTRAINT stand_sales_saleid_not_null NOT NULL,
+    sale_date timestamp without time zone DEFAULT LOCALTIMESTAMP CONSTRAINT stand_sales_saledate_not_null NOT NULL,
+    total_amount integer CONSTRAINT stand_sales_totalamount_not_null NOT NULL,
+    total_cost integer CONSTRAINT stand_sales_totalcost_not_null NOT NULL,
+    total_profit integer CONSTRAINT stand_sales_totalprofit_not_null NOT NULL,
+    amount_paid integer CONSTRAINT stand_sales_amountpaid_not_null NOT NULL,
+    change integer DEFAULT 0 NOT NULL,
+    payment_method public.citext DEFAULT 'cash'::public.citext CONSTRAINT stand_sales_paymentmethod_not_null NOT NULL,
+    customer_note public.citext,
+    person_id integer,
+    cashier_id integer,
+    voided_date timestamp without time zone,
+    voided_by integer,
+    void_reason public.citext,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: stand_sales_sale_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stand_sales ALTER COLUMN sale_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.stand_sales_sale_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: stand_stock_movements; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stand_stock_movements (
+    movement_id integer CONSTRAINT stand_stock_movements_movementid_not_null NOT NULL,
+    item_id integer CONSTRAINT stand_stock_movements_itemid_not_null NOT NULL,
+    movement_type public.citext CONSTRAINT stand_stock_movements_movementtype_not_null NOT NULL,
+    quantity integer NOT NULL,
+    unit_cost integer,
+    total_cost integer,
+    related_sale_id integer,
+    reason public.citext,
+    movement_date timestamp without time zone DEFAULT LOCALTIMESTAMP CONSTRAINT stand_stock_movements_movementdate_not_null NOT NULL,
+    performed_by integer
+);
+
+
+--
+-- Name: stand_stock_movements_movement_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stand_stock_movements ALTER COLUMN movement_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.stand_stock_movements_movement_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: tag_options; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tag_options (
+    id integer NOT NULL,
+    tag public.citext NOT NULL
+);
+
+
+--
+-- Name: tag_options_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.tag_options ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.tag_options_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: time_point_images; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.time_point_images (
+    time_point_image_id integer CONSTRAINT time_point_images_timepointimageid_not_null NOT NULL,
+    time_point_id integer CONSTRAINT time_point_images_timepointid_not_null NOT NULL,
+    person_id integer CONSTRAINT time_point_images_personid_not_null NOT NULL,
+    image_type character(2),
+    image_file public.citext,
+    image_date date,
+    title public.citext,
+    dolphin_tpi_id uuid,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: time_point_images_time_point_image_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.time_point_images ALTER COLUMN time_point_image_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.time_point_images_time_point_image_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: time_points; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.time_points (
+    time_point_id integer CONSTRAINT time_points_timepointid_not_null NOT NULL,
+    person_id integer CONSTRAINT time_points_personid_not_null NOT NULL,
+    tp_code integer CONSTRAINT time_points_tpcode_not_null NOT NULL,
+    tp_description public.citext,
+    tp_date_time date,
+    created_date timestamp without time zone DEFAULT LOCALTIMESTAMP CONSTRAINT time_points_createddate_not_null NOT NULL,
+    dolphin_tp_id uuid,
+    dolphin_pat_id uuid,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: time_points_time_point_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.time_points ALTER COLUMN time_point_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.time_points_time_point_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: times; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.times (
+    time_id integer CONSTRAINT times_timeid_not_null NOT NULL,
+    my_time time without time zone
+);
+
+
+--
+-- Name: times_time_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.times ALTER COLUMN time_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.times_time_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: tooth_numbers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tooth_numbers (
+    id integer NOT NULL,
+    tooth_code public.citext CONSTRAINT tooth_numbers_toothcode_not_null NOT NULL,
+    tooth_name public.citext CONSTRAINT tooth_numbers_toothname_not_null NOT NULL,
+    quadrant public.citext NOT NULL,
+    tooth_number public.citext CONSTRAINT tooth_numbers_toothnumber_not_null NOT NULL,
+    is_permanent boolean DEFAULT true CONSTRAINT tooth_numbers_ispermanent_not_null NOT NULL,
+    sort_order integer CONSTRAINT tooth_numbers_sortorder_not_null NOT NULL
+);
+
+
+--
+-- Name: tooth_numbers_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.tooth_numbers ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.tooth_numbers_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.users (
+    user_id integer CONSTRAINT users_userid_not_null NOT NULL,
+    username public.citext NOT NULL,
+    password_hash public.citext CONSTRAINT users_passwordhash_not_null NOT NULL,
+    full_name public.citext,
+    role public.citext DEFAULT 'user'::public.citext,
+    is_active boolean DEFAULT true,
+    last_login timestamp without time zone,
+    created_at timestamp without time zone DEFAULT LOCALTIMESTAMP,
+    created_by public.citext
+);
+
+
+--
+-- Name: users_user_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.users ALTER COLUMN user_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.users_user_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: video_categories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.video_categories (
+    vid_cat_id integer CONSTRAINT video_categories_vidcatid_not_null NOT NULL,
+    category public.citext
+);
+
+
+--
+-- Name: video_categories_vid_cat_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.video_categories ALTER COLUMN vid_cat_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.video_categories_vid_cat_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: videos; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.videos (
+    id integer NOT NULL,
+    description public.citext NOT NULL,
+    category integer,
+    url public.citext,
+    details public.citext,
+    file_name public.citext,
+    video_extension public.citext
+);
+
+
+--
+-- Name: videos_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.videos ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.videos_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: visits; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.visits (
+    id integer NOT NULL,
+    work_id integer CONSTRAINT visits_workid_not_null NOT NULL,
+    visit_date date CONSTRAINT visits_visitdate_not_null NOT NULL,
+    bracket_change public.citext,
+    wire_bending public.citext,
+    opg boolean DEFAULT false,
+    others public.citext,
+    next_visit public.citext,
+    elastics public.citext,
+    upper_wire_id integer,
+    lower_wire_id integer,
+    p_photo boolean DEFAULT false,
+    i_photo boolean DEFAULT false,
+    f_photo boolean DEFAULT false,
+    appliance_removed boolean DEFAULT false,
+    operator_id integer,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: visits_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.visits ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.visits_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: wait_reasons; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.wait_reasons (
+    id integer NOT NULL,
+    wait_type public.citext
+);
+
+
+--
+-- Name: wait_reasons_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.wait_reasons ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.wait_reasons_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: waiting; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.waiting (
+    id integer NOT NULL,
+    person_id integer CONSTRAINT waiting_personid_not_null NOT NULL,
+    creation_date date NOT NULL,
+    type_id integer
+);
+
+
+--
+-- Name: waiting_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.waiting ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.waiting_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: wires; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.wires (
+    wire_id integer NOT NULL,
+    wire public.citext NOT NULL
+);
+
+
+--
+-- Name: wires_wire_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.wires ALTER COLUMN wire_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.wires_wire_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: work_item_teeth; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.work_item_teeth (
+    id integer NOT NULL,
+    work_item_id integer CONSTRAINT work_item_teeth_workitemid_not_null NOT NULL,
+    tooth_id integer CONSTRAINT work_item_teeth_toothid_not_null NOT NULL
+);
+
+
+--
+-- Name: work_item_teeth_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.work_item_teeth ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.work_item_teeth_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: work_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.work_items (
+    id integer NOT NULL,
+    work_id integer CONSTRAINT work_items_workid_not_null NOT NULL,
+    filling_type public.citext,
+    filling_depth public.citext,
+    canals_no integer,
+    item_cost integer,
+    start_date date,
+    completed_date date,
+    note public.citext,
+    working_length public.citext,
+    implant_length numeric(5,2),
+    implant_diameter numeric(5,2),
+    material public.citext,
+    lab_name public.citext,
+    implant_manufacturer_id integer,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: work_items_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.work_items ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.work_items_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: work_statuses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.work_statuses (
+    status_id smallint CONSTRAINT work_statuses_statusid_not_null NOT NULL,
+    status_name public.citext CONSTRAINT work_statuses_statusname_not_null NOT NULL
+);
+
+
+--
+-- Name: work_types; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.work_types (
+    id integer NOT NULL,
+    work_type public.citext CONSTRAINT work_types_worktype_not_null NOT NULL
+);
+
+
+--
+-- Name: work_types_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.work_types ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.work_types_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: works; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.works (
+    work_id integer CONSTRAINT works_workid_not_null NOT NULL,
+    person_id integer CONSTRAINT works_personid_not_null NOT NULL,
+    total_required integer CONSTRAINT works_totalrequired_not_null NOT NULL,
+    currency public.citext,
+    type_of_work integer CONSTRAINT works_typeofwork_not_null NOT NULL,
+    notes public.citext,
+    addition_date timestamp without time zone DEFAULT LOCALTIMESTAMP,
+    keyword_id_1 integer,
+    keyword_id_2 integer,
+    keyword_id_3 integer,
+    start_date date,
+    debond_date date,
+    f_photo_date date,
+    i_photo_date date,
+    estimated_duration smallint,
+    dr_id integer CONSTRAINT works_drid_not_null NOT NULL,
+    keyword_id_4 integer,
+    notes_date date,
+    keyword_id_5 integer,
+    status smallint DEFAULT 1 NOT NULL,
+    discount integer,
+    discount_date date,
+    discount_reason public.citext,
+    updated_at timestamp without time zone,
+    CONSTRAINT ck_works CHECK ((f_photo_date > i_photo_date)),
+    CONSTRAINT ck_works_cur CHECK (((currency IS NOT NULL) OR (total_required IS NULL))),
+    CONSTRAINT ck_works_deb CHECK ((f_photo_date >= debond_date)),
+    CONSTRAINT ck_works_debiph CHECK ((debond_date > i_photo_date))
+);
+
+
+--
+-- Name: works_work_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.works ALTER COLUMN work_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.works_work_id_seq
+    START WITH 1
+    INCREMENT BY 2
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: addresses addresses$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.addresses
+    ADD CONSTRAINT "addresses$primarykey" PRIMARY KEY (id);
+
+
+--
+-- Name: alert_types alert_types_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alert_types
+    ADD CONSTRAINT alert_types_pkey PRIMARY KEY (alert_type_id);
+
+
+--
+-- Name: alert_types alert_types_typename_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alert_types
+    ADD CONSTRAINT alert_types_typename_key UNIQUE (type_name);
+
+
+--
+-- Name: alerts alerts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alerts
+    ADD CONSTRAINT alerts_pkey PRIMARY KEY (alert_id);
+
+
+--
+-- Name: aligner_activity_flags aligner_activity_flags_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.aligner_activity_flags
+    ADD CONSTRAINT aligner_activity_flags_pkey PRIMARY KEY (activity_id);
+
+
+--
+-- Name: aligner_doctors aligner_doctors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.aligner_doctors
+    ADD CONSTRAINT aligner_doctors_pkey PRIMARY KEY (dr_id);
+
+
+--
+-- Name: aligner_notes aligner_notes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.aligner_notes
+    ADD CONSTRAINT aligner_notes_pkey PRIMARY KEY (note_id);
+
+
+--
+-- Name: bends bends$bends_id; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bends
+    ADD CONSTRAINT "bends$bends_id" PRIMARY KEY (bend_id);
+
+
+--
+-- Name: cdc_sink_control cdc_sink_control_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cdc_sink_control
+    ADD CONSTRAINT cdc_sink_control_pkey PRIMARY KEY (sink);
+
+
+--
+-- Name: change_log change_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.change_log
+    ADD CONSTRAINT change_log_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: change_log change_log_uq; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.change_log
+    ADD CONSTRAINT change_log_uq UNIQUE (sink, tbl, pk);
+
+
+--
+-- Name: cities cities$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cities
+    ADD CONSTRAINT "cities$primarykey" PRIMARY KEY (id);
+
+
+--
+-- Name: details details$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.details
+    ADD CONSTRAINT "details$primarykey" PRIMARY KEY (id);
+
+
+--
+-- Name: diagnoses diagnoses$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diagnoses
+    ADD CONSTRAINT "diagnoses$primarykey" PRIMARY KEY (id);
+
+
+--
+-- Name: document_templates document_templates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_templates
+    ADD CONSTRAINT document_templates_pkey PRIMARY KEY (template_id);
+
+
+--
+-- Name: document_types document_types_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_types
+    ADD CONSTRAINT document_types_pkey PRIMARY KEY (type_id);
+
+
+--
+-- Name: document_types document_types_type_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_types
+    ADD CONSTRAINT document_types_type_code_key UNIQUE (type_code);
+
+
+--
+-- Name: dolphin_sync_map dolphin_sync_map_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dolphin_sync_map
+    ADD CONSTRAINT dolphin_sync_map_pkey PRIMARY KEY (local_table, local_pk);
+
+
+--
+-- Name: elastics elastics$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.elastics
+    ADD CONSTRAINT "elastics$primarykey" PRIMARY KEY (elastic_id);
+
+
+--
+-- Name: estimated_cost_presets estimated_cost_presets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.estimated_cost_presets
+    ADD CONSTRAINT estimated_cost_presets_pkey PRIMARY KEY (preset_id);
+
+
+--
+-- Name: expense_categories expense_categories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expense_categories
+    ADD CONSTRAINT expense_categories_pkey PRIMARY KEY (category_id);
+
+
+--
+-- Name: holidays holidays$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.holidays
+    ADD CONSTRAINT "holidays$primarykey" PRIMARY KEY (holiday_date);
+
+
+--
+-- Name: implant_manufacturers implant_manufacturers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.implant_manufacturers
+    ADD CONSTRAINT implant_manufacturers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: invoices invoices$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoices
+    ADD CONSTRAINT "invoices$primarykey" PRIMARY KEY (invoice_id);
+
+
+--
+-- Name: calendar ix_calender; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.calendar
+    ADD CONSTRAINT ix_calender PRIMARY KEY (app_date);
+
+
+--
+-- Name: keywords keywords$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.keywords
+    ADD CONSTRAINT "keywords$primarykey" PRIMARY KEY (id);
+
+
+--
+-- Name: message_status_history message_status_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_status_history
+    ADD CONSTRAINT message_status_history_pkey PRIMARY KEY (status_history_id);
+
+
+--
+-- Name: numbers numbers$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.numbers
+    ADD CONSTRAINT "numbers$primarykey" PRIMARY KEY (my_number);
+
+
+--
+-- Name: options options$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.options
+    ADD CONSTRAINT "options$primarykey" PRIMARY KEY (option_name);
+
+
+--
+-- Name: patient_portal_auth patient_portal_auth_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.patient_portal_auth
+    ADD CONSTRAINT patient_portal_auth_pkey PRIMARY KEY (person_id);
+
+
+--
+-- Name: patients patients$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.patients
+    ADD CONSTRAINT "patients$primarykey" PRIMARY KEY (person_id);
+
+
+--
+-- Name: private_photos pk_privatephotos_id; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.private_photos
+    ADD CONSTRAINT pk_privatephotos_id PRIMARY KEY (id);
+
+
+--
+-- Name: aligner_batches pk_tblalign_1c222425a57be68e; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.aligner_batches
+    ADD CONSTRAINT pk_tblalign_1c222425a57be68e PRIMARY KEY (aligner_batch_id);
+
+
+--
+-- Name: aligner_sets pk_tblalign_8c6e8fa44f19a436; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.aligner_sets
+    ADD CONSTRAINT pk_tblalign_8c6e8fa44f19a436 PRIMARY KEY (aligner_set_id);
+
+
+--
+-- Name: appointments pk_tblappointments; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.appointments
+    ADD CONSTRAINT pk_tblappointments PRIMARY KEY (appointment_id);
+
+
+--
+-- Name: carried_wires pk_tblcarriedwires; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.carried_wires
+    ADD CONSTRAINT pk_tblcarriedwires PRIMARY KEY (id);
+
+
+--
+-- Name: employees pk_tblemplo_3214ec2785ca47db; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.employees
+    ADD CONSTRAINT pk_tblemplo_3214ec2785ca47db PRIMARY KEY (id);
+
+
+--
+-- Name: endo pk_tblendo; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.endo
+    ADD CONSTRAINT pk_tblendo PRIMARY KEY (id);
+
+
+--
+-- Name: expense_subcategories pk_tblexpen_9c4e707d6c548634; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expense_subcategories
+    ADD CONSTRAINT pk_tblexpen_9c4e707d6c548634 PRIMARY KEY (subcategory_id);
+
+
+--
+-- Name: expenses pk_tblexpenses; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expenses
+    ADD CONSTRAINT pk_tblexpenses PRIMARY KEY (id);
+
+
+--
+-- Name: old_opg pk_tblfiles; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.old_opg
+    ADD CONSTRAINT pk_tblfiles PRIMARY KEY (id);
+
+
+--
+-- Name: image_types pk_tblimagetypes; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.image_types
+    ADD CONSTRAINT pk_tblimagetypes PRIMARY KEY (image_type_code);
+
+
+--
+-- Name: implants pk_tblimplant; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.implants
+    ADD CONSTRAINT pk_tblimplant PRIMARY KEY (id);
+
+
+--
+-- Name: patient_types pk_tblpatienttype; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.patient_types
+    ADD CONSTRAINT pk_tblpatienttype PRIMARY KEY (id);
+
+
+--
+-- Name: tag_options pk_tbltagoptions; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tag_options
+    ADD CONSTRAINT pk_tbltagoptions PRIMARY KEY (id);
+
+
+--
+-- Name: time_point_images pk_tbltimepointimages; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.time_point_images
+    ADD CONSTRAINT pk_tbltimepointimages PRIMARY KEY (time_point_image_id);
+
+
+--
+-- Name: time_points pk_tbltimepoints; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.time_points
+    ADD CONSTRAINT pk_tbltimepoints PRIMARY KEY (time_point_id);
+
+
+--
+-- Name: video_categories pk_tblvidcat; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.video_categories
+    ADD CONSTRAINT pk_tblvidcat PRIMARY KEY (vid_cat_id);
+
+
+--
+-- Name: work_types pk_tblworktype; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_types
+    ADD CONSTRAINT pk_tblworktype PRIMARY KEY (id);
+
+
+--
+-- Name: portal_sessions portal_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.portal_sessions
+    ADD CONSTRAINT portal_sessions_pkey PRIMARY KEY (sid);
+
+
+--
+-- Name: positions positions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.positions
+    ADD CONSTRAINT positions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: referrals referrals$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referrals
+    ADD CONSTRAINT "referrals$primarykey" PRIMARY KEY (id);
+
+
+--
+-- Name: screws screws$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.screws
+    ADD CONSTRAINT "screws$primarykey" PRIMARY KEY (id);
+
+
+--
+-- Name: sms sms$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sms
+    ADD CONSTRAINT "sms$primarykey" PRIMARY KEY (id);
+
+
+--
+-- Name: staff_sessions staff_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_sessions
+    ADD CONSTRAINT staff_sessions_pkey PRIMARY KEY (sid);
+
+
+--
+-- Name: stand_categories stand_categories_categoryname_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_categories
+    ADD CONSTRAINT stand_categories_categoryname_key UNIQUE (category_name);
+
+
+--
+-- Name: stand_categories stand_categories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_categories
+    ADD CONSTRAINT stand_categories_pkey PRIMARY KEY (category_id);
+
+
+--
+-- Name: stand_items stand_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_items
+    ADD CONSTRAINT stand_items_pkey PRIMARY KEY (item_id);
+
+
+--
+-- Name: stand_sale_items stand_sale_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_sale_items
+    ADD CONSTRAINT stand_sale_items_pkey PRIMARY KEY (sale_item_id);
+
+
+--
+-- Name: stand_sales stand_sales_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_sales
+    ADD CONSTRAINT stand_sales_pkey PRIMARY KEY (sale_id);
+
+
+--
+-- Name: stand_stock_movements stand_stock_movements_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_stock_movements
+    ADD CONSTRAINT stand_stock_movements_pkey PRIMARY KEY (movement_id);
+
+
+--
+-- Name: times times$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.times
+    ADD CONSTRAINT "times$primarykey" PRIMARY KEY (time_id);
+
+
+--
+-- Name: tooth_numbers tooth_numbers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tooth_numbers
+    ADD CONSTRAINT tooth_numbers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tooth_numbers tooth_numbers_toothcode_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tooth_numbers
+    ADD CONSTRAINT tooth_numbers_toothcode_key UNIQUE (tooth_code);
+
+
+--
+-- Name: aligner_batches uq_batchsequence_alignersetid; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.aligner_batches
+    ADD CONSTRAINT uq_batchsequence_alignersetid UNIQUE (aligner_set_id, batch_sequence);
+
+
+--
+-- Name: expense_subcategories uq_category_subcategory; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expense_subcategories
+    ADD CONSTRAINT uq_category_subcategory UNIQUE (subcategory_id, category_id);
+
+
+--
+-- Name: expense_subcategories uq_expensesubcat_category_name; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expense_subcategories
+    ADD CONSTRAINT uq_expensesubcat_category_name UNIQUE (category_id, subcategory_name);
+
+
+--
+-- Name: private_photos uq_privatephotos_natural; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.private_photos
+    ADD CONSTRAINT uq_privatephotos_natural UNIQUE (person_id, timepoint_code, image_name);
+
+
+--
+-- Name: aligner_sets uq_setsequence_workid; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.aligner_sets
+    ADD CONSTRAINT uq_setsequence_workid UNIQUE NULLS NOT DISTINCT (work_id, set_sequence);
+
+
+--
+-- Name: sms uq_sms_date; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sms
+    ADD CONSTRAINT uq_sms_date UNIQUE (date);
+
+
+--
+-- Name: time_point_images uq_time_point_images_tp_type; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.time_point_images
+    ADD CONSTRAINT uq_time_point_images_tp_type UNIQUE (time_point_id, image_type);
+
+
+--
+-- Name: work_item_teeth uq_workitemteeth; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_item_teeth
+    ADD CONSTRAINT uq_workitemteeth UNIQUE (work_item_id, tooth_id);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (user_id);
+
+
+--
+-- Name: users users_username_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_username_key UNIQUE (username);
+
+
+--
+-- Name: time_points ux_time_points_person_tpcode; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.time_points
+    ADD CONSTRAINT ux_time_points_person_tpcode UNIQUE (person_id, tp_code);
+
+
+--
+-- Name: videos videos$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.videos
+    ADD CONSTRAINT "videos$primarykey" PRIMARY KEY (id);
+
+
+--
+-- Name: visits visits$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.visits
+    ADD CONSTRAINT "visits$primarykey" PRIMARY KEY (id);
+
+
+--
+-- Name: wait_reasons wait_reasons_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wait_reasons
+    ADD CONSTRAINT wait_reasons_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: waiting waiting_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.waiting
+    ADD CONSTRAINT waiting_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: wires wires$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.wires
+    ADD CONSTRAINT "wires$primarykey" PRIMARY KEY (wire_id);
+
+
+--
+-- Name: work_item_teeth work_item_teeth_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_item_teeth
+    ADD CONSTRAINT work_item_teeth_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: work_items work_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_items
+    ADD CONSTRAINT work_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: work_statuses work_statuses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_statuses
+    ADD CONSTRAINT work_statuses_pkey PRIMARY KEY (status_id);
+
+
+--
+-- Name: works works$primarykey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.works
+    ADD CONSTRAINT "works$primarykey" PRIMARY KEY (work_id);
+
+
+--
+-- Name: addresses$cityid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "addresses$cityid" ON public.addresses USING btree (city_id);
+
+
+--
+-- Name: diagnoses$compindex; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX "diagnoses$compindex" ON public.diagnoses USING btree (id, work_id);
+
+
+--
+-- Name: idx_activity_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_activity_created ON public.aligner_activity_flags USING btree (created_at DESC);
+
+
+--
+-- Name: idx_activity_set_unread; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_activity_set_unread ON public.aligner_activity_flags USING btree (aligner_set_id, is_read);
+
+
+--
+-- Name: idx_alerts_assigned_to; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_alerts_assigned_to ON public.alerts USING btree (assigned_to) WHERE (assigned_to IS NOT NULL);
+
+
+--
+-- Name: idx_change_log_drain; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_change_log_drain ON public.change_log USING btree (sink, changed_at, id);
+
+
+--
+-- Name: idx_portal_sessions_expire; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_portal_sessions_expire ON public.portal_sessions USING btree (expire);
+
+
+--
+-- Name: idx_staff_sessions_expire; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_staff_sessions_expire ON public.staff_sessions USING btree (expire);
+
+
+--
+-- Name: idx_users_isactive; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_users_isactive ON public.users USING btree (is_active);
+
+
+--
+-- Name: ind_uniquedate; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ind_uniquedate ON public.invoices USING btree (date_of_payment, work_id) INCLUDE (amount_paid);
+
+
+--
+-- Name: ix_alignernotes_createdat; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_alignernotes_createdat ON public.aligner_notes USING btree (created_at DESC);
+
+
+--
+-- Name: ix_alignernotes_setid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_alignernotes_setid ON public.aligner_notes USING btree (aligner_set_id);
+
+
+--
+-- Name: ix_appday; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_appday ON public.appointments USING btree (app_day) INCLUDE (appointment_id, present, person_id, app_detail, seated, dismissed, app_cost, app_date, want_notify, notified, sms_status);
+
+
+--
+-- Name: ix_documenttemplates_default; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_documenttemplates_default ON public.document_templates USING btree (is_default, document_type_id);
+
+
+--
+-- Name: ix_documenttemplates_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_documenttemplates_type ON public.document_templates USING btree (document_type_id, is_active);
+
+
+--
+-- Name: ix_estimatedcostpresets_currency; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_estimatedcostpresets_currency ON public.estimated_cost_presets USING btree (currency, display_order);
+
+
+--
+-- Name: ix_expenses_expensedate; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_expenses_expensedate ON public.expenses USING btree (expense_date DESC, id DESC);
+
+
+--
+-- Name: ix_invoices_alignersetid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_invoices_alignersetid ON public.invoices USING btree (aligner_set_id) INCLUDE (amount_paid);
+
+
+--
+-- Name: ix_message_status_history_appointmentid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_message_status_history_appointmentid ON public.message_status_history USING btree (appointment_id);
+
+
+--
+-- Name: ix_name_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ix_name_id ON public.patients USING btree (patient_name) INCLUDE (person_id);
+
+
+--
+-- Name: ix_patients_first_name_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_patients_first_name_trgm ON public.patients USING gin (((first_name)::text) public.gin_trgm_ops);
+
+
+--
+-- Name: ix_patients_fullname_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_patients_fullname_trgm ON public.patients USING gin (((((first_name)::text || ' '::text) || (last_name)::text)) public.gin_trgm_ops);
+
+
+--
+-- Name: ix_patients_last_name_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_patients_last_name_trgm ON public.patients USING gin (((last_name)::text) public.gin_trgm_ops);
+
+
+--
+-- Name: ix_patients_patient_name_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_patients_patient_name_trgm ON public.patients USING gin (((patient_name)::text) public.gin_trgm_ops);
+
+
+--
+-- Name: ix_patients_phone; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_patients_phone ON public.patients USING btree (person_id) INCLUDE (patient_name, phone, patient_id, patient_type_id, estimated_cost, currency);
+
+
+--
+-- Name: ix_patients_phone2_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_patients_phone2_trgm ON public.patients USING gin (((phone2)::text) public.gin_trgm_ops);
+
+
+--
+-- Name: ix_patients_phone_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_patients_phone_trgm ON public.patients USING gin (((phone)::text) public.gin_trgm_ops);
+
+
+--
+-- Name: ix_pid_all; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ix_pid_all ON public.appointments USING btree (person_id, app_date) INCLUDE (appointment_id, app_detail);
+
+
+--
+-- Name: ix_privatephotos_patient_tp; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_privatephotos_patient_tp ON public.private_photos USING btree (person_id, timepoint_code);
+
+
+--
+-- Name: ix_singleapp; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ix_singleapp ON public.appointments USING btree (person_id, app_day);
+
+
+--
+-- Name: ix_standitems_active_expiry; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_standitems_active_expiry ON public.stand_items USING btree (is_active, expiry_date);
+
+
+--
+-- Name: ix_standitems_categoryid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_standitems_categoryid ON public.stand_items USING btree (category_id);
+
+
+--
+-- Name: ix_standsaleitems_itemid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_standsaleitems_itemid ON public.stand_sale_items USING btree (item_id);
+
+
+--
+-- Name: ix_standsaleitems_saleid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_standsaleitems_saleid ON public.stand_sale_items USING btree (sale_id);
+
+
+--
+-- Name: ix_standsales_cashierid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_standsales_cashierid ON public.stand_sales USING btree (cashier_id) WHERE (cashier_id IS NOT NULL);
+
+
+--
+-- Name: ix_standsales_personid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_standsales_personid ON public.stand_sales USING btree (person_id) WHERE (person_id IS NOT NULL);
+
+
+--
+-- Name: ix_standsales_saledate; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_standsales_saledate ON public.stand_sales USING btree (sale_date);
+
+
+--
+-- Name: ix_standstockmovements_itemid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_standstockmovements_itemid ON public.stand_stock_movements USING btree (item_id);
+
+
+--
+-- Name: ix_standstockmovements_movementdate; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_standstockmovements_movementdate ON public.stand_stock_movements USING btree (movement_date);
+
+
+--
+-- Name: ix_standstockmovements_movementtype; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_standstockmovements_movementtype ON public.stand_stock_movements USING btree (movement_type);
+
+
+--
+-- Name: ix_tblalignerbatches_islast; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_tblalignerbatches_islast ON public.aligner_batches USING btree (aligner_set_id, is_last) WHERE is_last;
+
+
+--
+-- Name: ix_tblalignerbatches_oneactiveperset; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ix_tblalignerbatches_oneactiveperset ON public.aligner_batches USING btree (aligner_set_id) WHERE is_active;
+
+
+--
+-- Name: ix_tblalignerbatches_setid_mfgdate_batchid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_tblalignerbatches_setid_mfgdate_batchid ON public.aligner_batches USING btree (aligner_set_id, manufacture_date, aligner_batch_id) INCLUDE (upper_aligner_count, lower_aligner_count, upper_aligner_start_sequence, lower_aligner_start_sequence);
+
+
+--
+-- Name: ix_tblalignersets_oneactiveperwork; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ix_tblalignersets_oneactiveperwork ON public.aligner_sets USING btree (work_id) WHERE is_active;
+
+
+--
+-- Name: ix_tblappointments_appdate_optimized; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_tblappointments_appdate_optimized ON public.appointments USING btree (app_date) INCLUDE (appointment_id, app_detail, dr_id, person_id, present, seated, dismissed, app_cost);
+
+
+--
+-- Name: ix_tblappointments_messageid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_tblappointments_messageid ON public.appointments USING btree (wa_message_id);
+
+
+--
+-- Name: ix_tbltimepoints_person; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_tbltimepoints_person ON public.time_points USING btree (person_id);
+
+
+--
+-- Name: ix_tbltpimages_person; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_tbltpimages_person ON public.time_point_images USING btree (person_id);
+
+
+--
+-- Name: ix_tbltpimages_tp; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_tbltpimages_tp ON public.time_point_images USING btree (time_point_id);
+
+
+--
+-- Name: ix_visits_workid_visitdate; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_visits_workid_visitdate ON public.visits USING btree (work_id, visit_date);
+
+
+--
+-- Name: ix_wid_date_sum; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_wid_date_sum ON public.invoices USING btree (work_id) INCLUDE (amount_paid, date_of_payment);
+
+
+--
+-- Name: ix_workitems_workid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_workitems_workid ON public.work_items USING btree (work_id);
+
+
+--
+-- Name: ix_workitemteeth_toothid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_workitemteeth_toothid ON public.work_item_teeth USING btree (tooth_id);
+
+
+--
+-- Name: ix_workitemteeth_workitemid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_workitemteeth_workitemid ON public.work_item_teeth USING btree (work_item_id);
+
+
+--
+-- Name: ix_works_personid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_works_personid ON public.works USING btree (person_id);
+
+
+--
+-- Name: keywords$keyword; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "keywords$keyword" ON public.keywords USING btree (key_word);
+
+
+--
+-- Name: photo_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX photo_index ON public.visits USING btree (work_id, i_photo) WHERE i_photo;
+
+
+--
+-- Name: photof_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX photof_index ON public.visits USING btree (work_id, f_photo) WHERE f_photo;
+
+
+--
+-- Name: screws$personid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "screws$personid" ON public.screws USING btree (person_id);
+
+
+--
+-- Name: screws$workid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "screws$workid" ON public.screws USING btree (work_id);
+
+
+--
+-- Name: sms$smsid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "sms$smsid" ON public.sms USING btree (sms_id);
+
+
+--
+-- Name: tblDiagnosis$tblworktblDiagnosis; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "tblDiagnosis$tblworktblDiagnosis" ON public.diagnoses USING btree (work_id);
+
+
+--
+-- Name: tblpatients$tblAddresstblpatients; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "tblpatients$tblAddresstblpatients" ON public.patients USING btree (address_id);
+
+
+--
+-- Name: tblpatients$tblGendertblpatients; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "tblpatients$tblGendertblpatients" ON public.patients USING btree (gender);
+
+
+--
+-- Name: unq_tblwork_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX unq_tblwork_active ON public.works USING btree (person_id) WHERE (status = 1);
+
+
+--
+-- Name: ux_standitems_barcode; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_standitems_barcode ON public.stand_items USING btree (barcode) WHERE (barcode IS NOT NULL);
+
+
+--
+-- Name: ux_standitems_sku; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_standitems_sku ON public.stand_items USING btree (sku) WHERE (sku IS NOT NULL);
+
+
+--
+-- Name: visits$lowerwireid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "visits$lowerwireid" ON public.visits USING btree (lower_wire_id);
+
+
+--
+-- Name: visits$upperwireid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "visits$upperwireid" ON public.visits USING btree (upper_wire_id);
+
+
+--
+-- Name: visits$workid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "visits$workid" ON public.visits USING btree (visit_date, work_id);
+
+
+--
+-- Name: works$keywordid1; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "works$keywordid1" ON public.works USING btree (keyword_id_1);
+
+
+--
+-- Name: works$keywordid2; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "works$keywordid2" ON public.works USING btree (keyword_id_2);
+
+
+--
+-- Name: works$keywordid3; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "works$keywordid3" ON public.works USING btree (keyword_id_3);
+
+
+--
+-- Name: addresses trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.addresses FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: alert_types trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.alert_types FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('alert_type_id', 'failover');
+
+
+--
+-- Name: alerts trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.alerts FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('alert_id', 'failover');
+
+
+--
+-- Name: aligner_activity_flags trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.aligner_activity_flags FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('activity_id', 'failover');
+
+
+--
+-- Name: aligner_batches trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.aligner_batches FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('aligner_batch_id', 'failover');
+
+
+--
+-- Name: aligner_doctors trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.aligner_doctors FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('dr_id', 'failover');
+
+
+--
+-- Name: aligner_notes trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.aligner_notes FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('note_id', 'failover');
+
+
+--
+-- Name: aligner_sets trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.aligner_sets FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('aligner_set_id', 'failover');
+
+
+--
+-- Name: appointments trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.appointments FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('appointment_id', 'failover');
+
+
+--
+-- Name: bends trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.bends FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('bend_id', 'failover');
+
+
+--
+-- Name: calendar trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.calendar FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('app_date', 'failover');
+
+
+--
+-- Name: carried_wires trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.carried_wires FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: cities trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.cities FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: details trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.details FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: diagnoses trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.diagnoses FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: document_templates trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.document_templates FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('template_id', 'failover');
+
+
+--
+-- Name: document_types trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.document_types FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('type_id', 'failover');
+
+
+--
+-- Name: elastics trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.elastics FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('elastic_id', 'failover');
+
+
+--
+-- Name: employees trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.employees FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: endo trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.endo FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: estimated_cost_presets trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.estimated_cost_presets FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('preset_id', 'failover');
+
+
+--
+-- Name: expense_categories trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.expense_categories FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('category_id', 'failover');
+
+
+--
+-- Name: expense_subcategories trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.expense_subcategories FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('subcategory_id', 'failover');
+
+
+--
+-- Name: expenses trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.expenses FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: holidays trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.holidays FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('holiday_date', 'failover');
+
+
+--
+-- Name: image_types trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.image_types FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('image_type_code', 'failover');
+
+
+--
+-- Name: implant_manufacturers trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.implant_manufacturers FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: implants trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.implants FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: invoices trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.invoices FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('invoice_id', 'failover');
+
+
+--
+-- Name: keywords trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.keywords FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: message_status_history trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.message_status_history FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('status_history_id', 'failover');
+
+
+--
+-- Name: numbers trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.numbers FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('my_number', 'failover');
+
+
+--
+-- Name: old_opg trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.old_opg FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: options trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.options FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('option_name', 'failover');
+
+
+--
+-- Name: patient_portal_auth trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.patient_portal_auth FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('person_id', 'failover');
+
+
+--
+-- Name: patient_types trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.patient_types FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: patients trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.patients FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('person_id', 'failover');
+
+
+--
+-- Name: positions trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.positions FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: private_photos trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.private_photos FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: referrals trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.referrals FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: screws trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.screws FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: sms trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.sms FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: stand_categories trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.stand_categories FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('category_id', 'failover');
+
+
+--
+-- Name: stand_items trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.stand_items FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('item_id', 'failover');
+
+
+--
+-- Name: stand_sale_items trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.stand_sale_items FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('sale_item_id', 'failover');
+
+
+--
+-- Name: stand_sales trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.stand_sales FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('sale_id', 'failover');
+
+
+--
+-- Name: stand_stock_movements trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.stand_stock_movements FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('movement_id', 'failover');
+
+
+--
+-- Name: tag_options trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.tag_options FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: time_point_images trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.time_point_images FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('time_point_image_id', 'failover', 'dolphin');
+
+
+--
+-- Name: time_points trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.time_points FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('time_point_id', 'failover', 'dolphin');
+
+
+--
+-- Name: times trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.times FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('time_id', 'failover');
+
+
+--
+-- Name: tooth_numbers trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.tooth_numbers FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: users trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('user_id', 'failover');
+
+
+--
+-- Name: video_categories trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.video_categories FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('vid_cat_id', 'failover');
+
+
+--
+-- Name: videos trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.videos FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: visits trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.visits FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: wait_reasons trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.wait_reasons FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: waiting trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.waiting FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: wires trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.wires FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('wire_id', 'failover');
+
+
+--
+-- Name: work_item_teeth trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.work_item_teeth FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: work_items trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.work_items FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: work_statuses trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.work_statuses FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('status_id', 'failover');
+
+
+--
+-- Name: work_types trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.work_types FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('id', 'failover');
+
+
+--
+-- Name: works trg_cdc_capture; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cdc_capture AFTER INSERT OR DELETE OR UPDATE ON public.works FOR EACH ROW EXECUTE FUNCTION public.cdc_capture('work_id', 'failover');
+
+
+--
+-- Name: addresses trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.addresses FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: alerts trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.alerts FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: aligner_activity_flags trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.aligner_activity_flags FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: aligner_batches trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.aligner_batches FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: aligner_notes trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.aligner_notes FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: aligner_sets trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.aligner_sets FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: appointments trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.appointments FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: carried_wires trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.carried_wires FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: diagnoses trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.diagnoses FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: document_templates trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.document_templates FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: employees trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.employees FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: endo trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.endo FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: expenses trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.expenses FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: implants trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.implants FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: options trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.options FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: patient_portal_auth trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.patient_portal_auth FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: patients trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.patients FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: screws trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.screws FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: stand_items trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.stand_items FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: stand_sales trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.stand_sales FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: time_point_images trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.time_point_images FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: time_points trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.time_points FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: visits trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.visits FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: work_items trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.work_items FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: works trg_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at BEFORE INSERT OR UPDATE ON public.works FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: addresses addresses$tbcitiestbladdress; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.addresses
+    ADD CONSTRAINT "addresses$tbcitiestbladdress" FOREIGN KEY (city_id) REFERENCES public.cities(id) ON UPDATE CASCADE;
+
+
+--
+-- Name: appointments appointments$tblpatientstblappointments; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.appointments
+    ADD CONSTRAINT "appointments$tblpatientstblappointments" FOREIGN KEY (person_id) REFERENCES public.patients(person_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: diagnoses diagnoses$tblworktbldiagnosis; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diagnoses
+    ADD CONSTRAINT "diagnoses$tblworktbldiagnosis" FOREIGN KEY (work_id) REFERENCES public.works(work_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: aligner_activity_flags fk_activityflags_alignerset; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.aligner_activity_flags
+    ADD CONSTRAINT fk_activityflags_alignerset FOREIGN KEY (aligner_set_id) REFERENCES public.aligner_sets(aligner_set_id) ON DELETE CASCADE;
+
+
+--
+-- Name: alerts fk_alerts_alerttype; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alerts
+    ADD CONSTRAINT fk_alerts_alerttype FOREIGN KEY (alert_type_id) REFERENCES public.alert_types(alert_type_id);
+
+
+--
+-- Name: alerts fk_alerts_assigned_to; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alerts
+    ADD CONSTRAINT fk_alerts_assigned_to FOREIGN KEY (assigned_to) REFERENCES public.employees(id) ON DELETE SET NULL;
+
+
+--
+-- Name: alerts fk_alerts_patient; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alerts
+    ADD CONSTRAINT fk_alerts_patient FOREIGN KEY (person_id) REFERENCES public.patients(person_id) ON DELETE CASCADE;
+
+
+--
+-- Name: aligner_batches fk_aligner_batches_alignerset; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.aligner_batches
+    ADD CONSTRAINT fk_aligner_batches_alignerset FOREIGN KEY (aligner_set_id) REFERENCES public.aligner_sets(aligner_set_id) ON DELETE CASCADE;
+
+
+--
+-- Name: aligner_notes fk_aligner_notes_alignerset; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.aligner_notes
+    ADD CONSTRAINT fk_aligner_notes_alignerset FOREIGN KEY (aligner_set_id) REFERENCES public.aligner_sets(aligner_set_id) ON DELETE CASCADE;
+
+
+--
+-- Name: aligner_sets fk_aligner_sets_alignerdoctors; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.aligner_sets
+    ADD CONSTRAINT fk_aligner_sets_alignerdoctors FOREIGN KEY (aligner_dr_id) REFERENCES public.aligner_doctors(dr_id);
+
+
+--
+-- Name: aligner_sets fk_aligner_sets_tblwork; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.aligner_sets
+    ADD CONSTRAINT fk_aligner_sets_tblwork FOREIGN KEY (work_id) REFERENCES public.works(work_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: appointments fk_appointments_tbldoctors; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.appointments
+    ADD CONSTRAINT fk_appointments_tbldoctors FOREIGN KEY (dr_id) REFERENCES public.employees(id);
+
+
+--
+-- Name: carried_wires fk_carried_wires_tblpatients; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.carried_wires
+    ADD CONSTRAINT fk_carried_wires_tblpatients FOREIGN KEY (person_id) REFERENCES public.patients(person_id);
+
+
+--
+-- Name: carried_wires fk_carried_wires_tblwires; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.carried_wires
+    ADD CONSTRAINT fk_carried_wires_tblwires FOREIGN KEY (wire_id) REFERENCES public.wires(wire_id);
+
+
+--
+-- Name: document_templates fk_document_templates_parent; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_templates
+    ADD CONSTRAINT fk_document_templates_parent FOREIGN KEY (parent_template_id) REFERENCES public.document_templates(template_id);
+
+
+--
+-- Name: document_templates fk_document_templates_type; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_templates
+    ADD CONSTRAINT fk_document_templates_type FOREIGN KEY (document_type_id) REFERENCES public.document_types(type_id);
+
+
+--
+-- Name: expenses fk_expenses_tblexpensecategories; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expenses
+    ADD CONSTRAINT fk_expenses_tblexpensecategories FOREIGN KEY (category_id) REFERENCES public.expense_categories(category_id);
+
+
+--
+-- Name: expenses fk_expenses_tblexpensesubcategories; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expenses
+    ADD CONSTRAINT fk_expenses_tblexpensesubcategories FOREIGN KEY (subcategory_id) REFERENCES public.expense_subcategories(subcategory_id);
+
+
+--
+-- Name: implants fk_implants_tblwork; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.implants
+    ADD CONSTRAINT fk_implants_tblwork FOREIGN KEY (work_id) REFERENCES public.works(work_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: invoices fk_invoice_alignerset; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoices
+    ADD CONSTRAINT fk_invoice_alignerset FOREIGN KEY (aligner_set_id) REFERENCES public.aligner_sets(aligner_set_id);
+
+
+--
+-- Name: patients fk_patients_tblpatienttype; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.patients
+    ADD CONSTRAINT fk_patients_tblpatienttype FOREIGN KEY (patient_type_id) REFERENCES public.patient_types(id);
+
+
+--
+-- Name: patients fk_patients_tblreferrals; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.patients
+    ADD CONSTRAINT fk_patients_tblreferrals FOREIGN KEY (referral_source_id) REFERENCES public.referrals(id);
+
+
+--
+-- Name: patients fk_patients_tbltagoptions; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.patients
+    ADD CONSTRAINT fk_patients_tbltagoptions FOREIGN KEY (tag_id) REFERENCES public.tag_options(id);
+
+
+--
+-- Name: patient_portal_auth fk_portalauth_patient; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.patient_portal_auth
+    ADD CONSTRAINT fk_portalauth_patient FOREIGN KEY (person_id) REFERENCES public.patients(person_id);
+
+
+--
+-- Name: private_photos fk_privatephotos_patient; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.private_photos
+    ADD CONSTRAINT fk_privatephotos_patient FOREIGN KEY (person_id) REFERENCES public.patients(person_id);
+
+
+--
+-- Name: stand_items fk_stand_items_category; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_items
+    ADD CONSTRAINT fk_stand_items_category FOREIGN KEY (category_id) REFERENCES public.stand_categories(category_id);
+
+
+--
+-- Name: stand_sale_items fk_stand_sale_items_item; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_sale_items
+    ADD CONSTRAINT fk_stand_sale_items_item FOREIGN KEY (item_id) REFERENCES public.stand_items(item_id);
+
+
+--
+-- Name: stand_sale_items fk_stand_sale_items_sale; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_sale_items
+    ADD CONSTRAINT fk_stand_sale_items_sale FOREIGN KEY (sale_id) REFERENCES public.stand_sales(sale_id) ON DELETE CASCADE;
+
+
+--
+-- Name: stand_sales fk_stand_sales_cashier; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_sales
+    ADD CONSTRAINT fk_stand_sales_cashier FOREIGN KEY (cashier_id) REFERENCES public.users(user_id);
+
+
+--
+-- Name: stand_sales fk_stand_sales_person; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_sales
+    ADD CONSTRAINT fk_stand_sales_person FOREIGN KEY (person_id) REFERENCES public.patients(person_id);
+
+
+--
+-- Name: stand_sales fk_stand_sales_voidedby; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_sales
+    ADD CONSTRAINT fk_stand_sales_voidedby FOREIGN KEY (voided_by) REFERENCES public.users(user_id);
+
+
+--
+-- Name: stand_stock_movements fk_stand_stock_movements_item; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_stock_movements
+    ADD CONSTRAINT fk_stand_stock_movements_item FOREIGN KEY (item_id) REFERENCES public.stand_items(item_id);
+
+
+--
+-- Name: stand_stock_movements fk_stand_stock_movements_performedby; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_stock_movements
+    ADD CONSTRAINT fk_stand_stock_movements_performedby FOREIGN KEY (performed_by) REFERENCES public.users(user_id);
+
+
+--
+-- Name: stand_stock_movements fk_stand_stock_movements_relatedsale; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stand_stock_movements
+    ADD CONSTRAINT fk_stand_stock_movements_relatedsale FOREIGN KEY (related_sale_id) REFERENCES public.stand_sales(sale_id);
+
+
+--
+-- Name: expense_subcategories fk_subcategory_category; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expense_subcategories
+    ADD CONSTRAINT fk_subcategory_category FOREIGN KEY (category_id) REFERENCES public.expense_categories(category_id);
+
+
+--
+-- Name: employees fk_tblemploy_posit_5b196b42; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.employees
+    ADD CONSTRAINT fk_tblemploy_posit_5b196b42 FOREIGN KEY ("position") REFERENCES public.positions(id);
+
+
+--
+-- Name: message_status_history fk_tblmessag_appoi_308412f8; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_status_history
+    ADD CONSTRAINT fk_tblmessag_appoi_308412f8 FOREIGN KEY (appointment_id) REFERENCES public.appointments(appointment_id) ON DELETE CASCADE;
+
+
+--
+-- Name: time_point_images fk_tbltpimages_tp; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.time_point_images
+    ADD CONSTRAINT fk_tbltpimages_tp FOREIGN KEY (time_point_id) REFERENCES public.time_points(time_point_id) ON DELETE CASCADE;
+
+
+--
+-- Name: time_points fk_time_points_tblpatients; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.time_points
+    ADD CONSTRAINT fk_time_points_tblpatients FOREIGN KEY (person_id) REFERENCES public.patients(person_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: videos fk_videos_tblvidcat; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.videos
+    ADD CONSTRAINT fk_videos_tblvidcat FOREIGN KEY (category) REFERENCES public.video_categories(vid_cat_id);
+
+
+--
+-- Name: visits fk_visits_tblwires; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.visits
+    ADD CONSTRAINT fk_visits_tblwires FOREIGN KEY (lower_wire_id) REFERENCES public.wires(wire_id);
+
+
+--
+-- Name: waiting fk_waiting_tblpatients; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.waiting
+    ADD CONSTRAINT fk_waiting_tblpatients FOREIGN KEY (person_id) REFERENCES public.patients(person_id);
+
+
+--
+-- Name: waiting fk_waiting_tblwaitreason; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.waiting
+    ADD CONSTRAINT fk_waiting_tblwaitreason FOREIGN KEY (type_id) REFERENCES public.wait_reasons(id);
+
+
+--
+-- Name: works fk_work_status; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.works
+    ADD CONSTRAINT fk_work_status FOREIGN KEY (status) REFERENCES public.work_statuses(status_id);
+
+
+--
+-- Name: work_items fk_workitems_work; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_items
+    ADD CONSTRAINT fk_workitems_work FOREIGN KEY (work_id) REFERENCES public.works(work_id);
+
+
+--
+-- Name: work_item_teeth fk_workitemteeth_tooth; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_item_teeth
+    ADD CONSTRAINT fk_workitemteeth_tooth FOREIGN KEY (tooth_id) REFERENCES public.tooth_numbers(id);
+
+
+--
+-- Name: work_item_teeth fk_workitemteeth_workitem; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.work_item_teeth
+    ADD CONSTRAINT fk_workitemteeth_workitem FOREIGN KEY (work_item_id) REFERENCES public.work_items(id) ON DELETE CASCADE;
+
+
+--
+-- Name: works fk_works_tblemployees; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.works
+    ADD CONSTRAINT fk_works_tblemployees FOREIGN KEY (dr_id) REFERENCES public.employees(id);
+
+
+--
+-- Name: works fk_works_tblkeyword; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.works
+    ADD CONSTRAINT fk_works_tblkeyword FOREIGN KEY (keyword_id_1) REFERENCES public.keywords(id);
+
+
+--
+-- Name: works fk_works_tblkeyword2; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.works
+    ADD CONSTRAINT fk_works_tblkeyword2 FOREIGN KEY (keyword_id_2) REFERENCES public.keywords(id);
+
+
+--
+-- Name: works fk_works_tblkeyword3; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.works
+    ADD CONSTRAINT fk_works_tblkeyword3 FOREIGN KEY (keyword_id_3) REFERENCES public.keywords(id);
+
+
+--
+-- Name: works fk_works_tblkeyword4; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.works
+    ADD CONSTRAINT fk_works_tblkeyword4 FOREIGN KEY (keyword_id_4) REFERENCES public.keywords(id);
+
+
+--
+-- Name: works fk_works_tblkeyword5; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.works
+    ADD CONSTRAINT fk_works_tblkeyword5 FOREIGN KEY (keyword_id_5) REFERENCES public.keywords(id);
+
+
+--
+-- Name: works fk_works_tblpatients; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.works
+    ADD CONSTRAINT fk_works_tblpatients FOREIGN KEY (person_id) REFERENCES public.patients(person_id);
+
+
+--
+-- Name: invoices invoices$tblworktblinvoice; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoices
+    ADD CONSTRAINT "invoices$tblworktblinvoice" FOREIGN KEY (work_id) REFERENCES public.works(work_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: patients patients$tbladdresstblpatients; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.patients
+    ADD CONSTRAINT "patients$tbladdresstblpatients" FOREIGN KEY (address_id) REFERENCES public.addresses(id) ON UPDATE CASCADE;
+
+
+--
+-- Name: screws screws$tblpatientstblscrews; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.screws
+    ADD CONSTRAINT "screws$tblpatientstblscrews" FOREIGN KEY (person_id) REFERENCES public.patients(person_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: screws screws$tblworktblscrews; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.screws
+    ADD CONSTRAINT "screws$tblworktblscrews" FOREIGN KEY (work_id) REFERENCES public.works(work_id);
+
+
+--
+-- Name: visits visits$tblwirestblvisits; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.visits
+    ADD CONSTRAINT "visits$tblwirestblvisits" FOREIGN KEY (upper_wire_id) REFERENCES public.wires(wire_id);
+
+
+--
+-- Name: visits visits$tblworktblvisits; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.visits
+    ADD CONSTRAINT "visits$tblworktblvisits" FOREIGN KEY (work_id) REFERENCES public.works(work_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+
+
+
+--
+-- Reset search_path (the pg_dump preamble pinned it to '' for safe schema
+-- restore). The seed INSERTs below fire CDC triggers whose functions reference
+-- cdc_sink_control / change_log UNQUALIFIED -- they need public on the path,
+-- exactly as in normal production where search_path includes public.
+--
+SET search_path TO public;
+
+--
+-- Seed: control / reference rows a fresh provision needs. Carried verbatim from
+-- the archived migrations (NOT a live data-dump -- `options` also holds secrets
+-- like gram_session, which must never be baked into a committed baseline).
+--
+INSERT INTO public.cdc_sink_control ("sink") VALUES ('failover'), ('dolphin')
+  ON CONFLICT ("sink") DO NOTHING;
+
+INSERT INTO public.options (option_name, option_value) VALUES
+  ('whatsapp_send_to_group', 'true'),
+  ('whatsapp_group_name', 'Shwan Orthodontics')
+  ON CONFLICT (option_name) DO NOTHING;
+
+
+-- Down Migration
+--
+-- Intentionally a no-op. This is a squashed baseline, not a reversible step:
+-- there is no meaningful "down" to a from-scratch schema. To tear down a fresh
+-- database, drop and recreate it (or: DROP SCHEMA public CASCADE; CREATE SCHEMA
+-- public;) outside node-pg-migrate. Running `db:migrate:down` here simply
+-- removes the bookkeeping row without altering the schema.

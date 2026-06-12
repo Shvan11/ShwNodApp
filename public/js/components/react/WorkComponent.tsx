@@ -16,6 +16,7 @@ import {
     FILLING_DEPTH_OPTIONS
 } from '../../config/workTypeConfig';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { invalidateWorkCache } from '@/router/loader-cache';
 // aliased: the component already has a `paymentHistory` state var (collision)
 import {
     paymentHistory as paymentHistoryContract,
@@ -1283,6 +1284,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                                             await deleteJSON(`/api/deleteInvoice/${payment.InvoiceID}`, {
                                                                                 schema: deleteInvoiceContract.response, // Validate the boundary (audit H11)
                                                                             });
+                                                                            invalidateWorkCache(selectedWorkForPayment.work_id); // cached work row carries TotalPaid
                                                                             toast.success('Payment deleted successfully!');
                                                                             loadPaymentHistory(selectedWorkForPayment.work_id);
                                                                             loadWorks();

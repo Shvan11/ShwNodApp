@@ -3,9 +3,26 @@ import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 import i18next from 'eslint-plugin-i18next';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
+
+// Downgrade every ENABLED rule in a preset's rule-map to 'warn' (preserving each
+// rule's options, leaving 'off' rules off). Lets us adopt a whole `recommended`
+// set for VISIBILITY — the React Compiler bailout diagnostics and jsx-a11y —
+// without turning their many `error`-level rules into gate-breaking CI failures
+// on the 120+ pre-existing components. `npm run lint` has no --max-warnings, so
+// warnings surface in output but never fail the gate. Promote per-rule to error
+// once a rule's violations are driven to zero (see exhaustive-deps below).
+const toWarn = (rules) =>
+  Object.fromEntries(
+    Object.entries(rules ?? {}).map(([id, val]) => {
+      const sev = Array.isArray(val) ? val[0] : val;
+      if (sev === 'off' || sev === 0) return [id, val];
+      return [id, Array.isArray(val) ? ['warn', ...val.slice(1)] : 'warn'];
+    })
+  );
 
 export default [
   js.configs.recommended,
@@ -98,7 +115,8 @@ export default [
     plugins: {
       '@typescript-eslint': tseslint,
       'react': react,
-      'react-hooks': reactHooks
+      'react-hooks': reactHooks,
+      'jsx-a11y': jsxA11y
     },
     settings: {
       react: {
@@ -120,8 +138,22 @@ export default [
       'no-undef': 'off',
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
+      // React Hooks + React Compiler diagnostics. eslint-plugin-react-hooks v7's
+      // `recommended-latest` ships the compiler-bailout rules (immutability /
+      // purity / set-state-in-effect / static-components / preserve-manual-
+      // memoization / …) — we rely on the Compiler for memoization but nothing
+      // warned when a component is written in a way it bails on. Surface them as
+      // WARN (the standalone, now-deprecated eslint-plugin-react-compiler is
+      // unnecessary — these ARE its rules). rules-of-hooks + exhaustive-deps are
+      // re-elevated to ERROR below: the repo lints clean (0 exhaustive-deps
+      // warnings today), so ratcheting it to error stops future dep-array drift.
+      ...toWarn(reactHooks.configs.flat['recommended-latest'].rules),
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/exhaustive-deps': 'error',
+      // Accessibility — there was zero a11y linting across 120+ components.
+      // WARN-only (same gate-safety reason); promote per-rule as screens are
+      // cleaned up.
+      ...toWarn(jsxA11y.flatConfigs.recommended.rules),
       // Funnel migration (audit H1): all HTTP must go through core/http.ts so
       // credentials, error-throwing, and success-envelope unwrapping are uniform.
       // ERROR: the H1 funnel is complete (all ~310 sites migrated), so a new bare
@@ -161,6 +193,14 @@ export default [
   // core/http.ts is the one place that legitimately calls fetch() — it IS the wrapper.
   {
     files: ['public/js/core/http.ts'],
+    rules: {
+      'no-restricted-syntax': 'off'
+    }
+  },
+  // Unit tests stub the network and exercise the funnel itself, so the
+  // bare-fetch and schema-on-reads ratchets don't apply inside *.test.ts.
+  {
+    files: ['public/**/*.test.ts', 'public/**/*.test.tsx'],
     rules: {
       'no-restricted-syntax': 'off'
     }

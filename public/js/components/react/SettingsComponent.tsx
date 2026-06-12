@@ -20,6 +20,7 @@ import LookupsSettings from './LookupsSettings';
 import ProtocolHandlersSettings from './ProtocolHandlersSettings';
 import CalendarTimesSettings from './CalendarTimesSettings';
 import SupabaseStatusSettings from './SupabaseStatusSettings';
+import DolphinStatusSettings from './DolphinStatusSettings';
 import IntegrationsSettings from './IntegrationsSettings';
 
 // Types
@@ -63,6 +64,7 @@ const SettingsComponent: React.FC = () => {
         lookups: { hasChanges: false },
         calendarTimes: { hasChanges: false },
         supabaseStatus: { hasChanges: false },
+        dolphinStatus: { hasChanges: false },
         integrations: { hasChanges: false },
         messaging: { hasChanges: false },
         system: { hasChanges: false },
@@ -156,6 +158,13 @@ const SettingsComponent: React.FC = () => {
             icon: 'fas fa-cloud',
             component: SupabaseStatusSettings,
             description: 'Live status of Supabase portal & failover sync'
+        },
+        {
+            id: 'dolphinStatus',
+            label: 'Dolphin Status',
+            icon: 'fas fa-database',
+            component: DolphinStatusSettings,
+            description: 'Live status of the legacy Dolphin Imaging SQL Server sink'
         },
         {
             id: 'integrations',

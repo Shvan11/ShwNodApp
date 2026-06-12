@@ -15,6 +15,7 @@ import type { Template } from './TemplateCard';
 import type { DocumentType, TemplateSubmissionData } from './CreateTemplateModal';
 import type { TemplateStatsData } from './TemplateStats';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { invalidateAllTemplateCaches, invalidateTemplateCache } from '@/router/loader-cache';
 import * as templateContract from '@shared/contracts/template.contract';
 
 function TemplateManagement() {
@@ -95,6 +96,7 @@ function TemplateManagement() {
     const handleCreateTemplate = async (templateData: TemplateSubmissionData) => {
         try {
             const data = await postJSON<{ template_id: number }>('/api/templates', templateData);
+            invalidateTemplateCache();
             setIsCreateModalOpen(false);
             // Navigate to designer
             navigate(`/templates/designer/${data.template_id}`);
@@ -115,6 +117,7 @@ function TemplateManagement() {
 
         try {
             await putJSON(`/api/templates/${templateId}`, { is_default: true, modified_by: 'user' });
+            invalidateAllTemplateCaches(); // the previous default was unset server-side
             await loadAllTemplates();
             toast.success('Template set as default!');
         } catch (err) {
@@ -130,6 +133,7 @@ function TemplateManagement() {
 
         try {
             await deleteJSON(`/api/templates/${templateId}`);
+            invalidateTemplateCache(templateId);
             await loadAllTemplates();
             toast.success('Template deleted successfully!');
         } catch (err) {

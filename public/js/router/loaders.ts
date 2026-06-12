@@ -10,20 +10,13 @@
 
 import type { LoaderFunctionArgs } from 'react-router-dom';
 import { fetchData, fetchJSON, httpErrorMessage, type HttpError, type ResponseSchema } from '@/core/http';
+import { clearLoaderCache, loaderCacheKeys, readLoaderCache, writeLoaderCache } from './loader-cache';
 import { dailyAppointments } from '@shared/contracts/appointment.contract';
 import { patientPhones, patientSearch, tagOptions, typeOptions } from '@shared/contracts/patient.contract';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as workContract from '@shared/contracts/work.contract';
 import * as alignerContract from '@shared/contracts/aligner.contract';
 import * as templateContract from '@shared/contracts/template.contract';
-
-/**
- * Cached data structure
- */
-interface CachedData<T> {
-  data: T;
-  timestamp: number;
-}
 
 /**
  * Tolerate a per-endpoint non-2xx (return an empty array, as the old
@@ -35,39 +28,6 @@ function emptyOnHttpError<U>(p: Promise<U[]>): Promise<U[]> {
     if (typeof (err as HttpError).status === 'number') return [];
     throw err;
   });
-}
-
-/** sessionStorage key prefix + TTL for loader response caching. */
-const LOADER_CACHE_PREFIX = 'loader_cache_';
-const LOADER_CACHE_TTL_MS = 5 * 60 * 1000;
-
-/**
- * Best-effort sweep of expired loader cache entries. Entries are only evicted
- * lazily on a re-read of the same key, so dates/patients/works browsed once
- * otherwise accumulate until they hit the sessionStorage quota. Run on each
- * write to keep the keyspace bounded. Never throws (storage access can fail).
- */
-function pruneExpiredLoaderCache(): void {
-  try {
-    const now = Date.now();
-    const stale: string[] = [];
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i);
-      if (!key || !key.startsWith(LOADER_CACHE_PREFIX)) continue;
-      try {
-        const raw = sessionStorage.getItem(key);
-        const { timestamp } = JSON.parse(raw ?? '{}') as Partial<CachedData<unknown>>;
-        if (typeof timestamp !== 'number' || now - timestamp >= LOADER_CACHE_TTL_MS) {
-          stale.push(key);
-        }
-      } catch {
-        stale.push(key); // unparseable entry — drop it
-      }
-    }
-    for (const key of stale) sessionStorage.removeItem(key);
-  } catch {
-    // sessionStorage unavailable — nothing to prune.
-  }
 }
 
 /**
@@ -162,6 +122,7 @@ export function withAuth<T>(
       // Auth-only verify path: 401 → redirect to login.
       if (httpErr.status === 401) {
         console.warn('[withAuth] 401 Unauthorized - redirecting to login');
+        clearLoaderCache(); // session over — don't leave cached data for the next user
         window.location.href = '/login.html';
         throw new Response('Unauthorized', { status: 401 });
       }
@@ -194,20 +155,8 @@ export async function apiLoader<T = unknown>(
 
   // Check cache first (if enabled)
   if (cache && cacheKey) {
-    const cached = sessionStorage.getItem(`${LOADER_CACHE_PREFIX}${cacheKey}`);
-    if (cached) {
-      try {
-        const { data, timestamp } = JSON.parse(cached) as CachedData<T>;
-        const age = Date.now() - timestamp;
-        if (age < LOADER_CACHE_TTL_MS) {
-          if (import.meta.env.DEV) console.log(`[Loader] Cache hit for ${cacheKey}`);
-          return data;
-        }
-      } catch {
-        // Invalid cache, continue to fetch
-        sessionStorage.removeItem(`${LOADER_CACHE_PREFIX}${cacheKey}`);
-      }
-    }
+    const cached = readLoaderCache<T>(cacheKey);
+    if (cached !== undefined) return cached;
   }
 
   try {
@@ -219,20 +168,7 @@ export async function apiLoader<T = unknown>(
     // Cache response if enabled (best-effort — a large payload can throw
     // QuotaExceededError, which must not fail the route loader).
     if (cache && cacheKey) {
-      // Evict expired entries before writing so the keyspace stays bounded
-      // (and to free room that might otherwise trip the quota below).
-      pruneExpiredLoaderCache();
-      try {
-        sessionStorage.setItem(
-          `${LOADER_CACHE_PREFIX}${cacheKey}`,
-          JSON.stringify({
-            data,
-            timestamp: Date.now(),
-          })
-        );
-      } catch {
-        // Quota exceeded or serialization failed — skip caching this entry.
-      }
+      writeLoaderCache(cacheKey, data);
     }
 
     return data;
@@ -253,6 +189,7 @@ export async function apiLoader<T = unknown>(
     // Note: Global fetch interceptor in index.html also handles this
     if (httpErr.status === 401) {
       console.warn('[Loader] 401 Unauthorized - redirecting to login');
+      clearLoaderCache(); // session over — don't leave cached data for the next user
       window.location.href = '/login.html';
       throw new Response('Unauthorized', { status: 401 });
     }
@@ -297,7 +234,7 @@ export async function patientInfoLoader({
   const data = await apiLoader<PatientData>(`/api/patients/${personId}/info`, {
     signal,
     cache: true,
-    cacheKey: `patient_${personId}`,
+    cacheKey: loaderCacheKeys.patient(personId!),
     schema: patientContract.patientInfo.response,
   });
 
@@ -392,7 +329,7 @@ export async function patientShellLoader({
   const patientPromise = apiLoader<PatientData>(`/api/patients/${personId}/info`, {
     signal,
     cache: true,
-    cacheKey: `patient_${personId}`,
+    cacheKey: loaderCacheKeys.patient(personId!),
     schema: patientContract.patientInfo.response,
   });
 
@@ -402,7 +339,7 @@ export async function patientShellLoader({
     workPromise = apiLoader<WorkData>(`/api/getworkdetails?workId=${effectiveWorkId}`, {
       signal,
       cache: true,
-      cacheKey: `work_${effectiveWorkId}`,
+      cacheKey: loaderCacheKeys.work(effectiveWorkId),
       schema: workContract.getWorkDetails.response,
     });
   }
@@ -413,7 +350,7 @@ export async function patientShellLoader({
     timepointsPromise = apiLoader<TimepointData[]>(`/api/patients/${personId}/timepoints`, {
       signal,
       cache: true,
-      cacheKey: `timepoints_${personId}`,
+      cacheKey: loaderCacheKeys.timepoints(personId!),
       schema: patientContract.timepoints.response,
     });
   }
@@ -468,7 +405,7 @@ export async function alignerDoctorsLoader({
     {
       signal,
       cache: true,
-      cacheKey: 'aligner_doctors',
+      cacheKey: loaderCacheKeys.alignerDoctors(),
       schema: alignerContract.alignerDoctors.response,
     }
   );
@@ -503,7 +440,7 @@ export async function alignerPatientWorkLoader({
   const data = await apiLoader<WorkData>(`/api/getworkdetails?workId=${workId}`, {
     signal,
     cache: true,
-    cacheKey: `work_${workId}`,
+    cacheKey: loaderCacheKeys.work(workId),
     schema: workContract.getWorkDetails.response,
   });
 
@@ -516,7 +453,7 @@ export async function alignerPatientWorkLoader({
   const patientData = await apiLoader<PatientData>(`/api/patients/${data.person_id}/info`, {
     signal,
     cache: true,
-    cacheKey: `patient_${data.person_id}`,
+    cacheKey: loaderCacheKeys.patient(data.person_id),
     schema: patientContract.patientInfo.response,
   });
 
@@ -545,7 +482,7 @@ export async function templateListLoader({
   const data = await apiLoader<{ templates?: TemplateData[] }>('/api/templates', {
     signal,
     cache: true,
-    cacheKey: 'template_list',
+    cacheKey: loaderCacheKeys.templateList(),
     schema: templateContract.getTemplates.response,
   });
 
@@ -580,36 +517,17 @@ export async function templateDesignerLoader({
   const data = await apiLoader<TemplateData>(`/api/templates/${templateId}`, {
     signal,
     cache: true,
-    cacheKey: `template_${templateId}`,
+    cacheKey: loaderCacheKeys.template(templateId),
     schema: templateContract.getTemplate.response,
   });
 
   return { template: data, mode: 'edit' };
 }
 
-/**
- * Clear all loader caches
- * Useful after data mutations or logout
- */
-export function clearLoaderCache(): void {
-  const keys = Object.keys(sessionStorage);
-  keys.forEach((key) => {
-    if (key.startsWith(LOADER_CACHE_PREFIX)) {
-      sessionStorage.removeItem(key);
-    }
-  });
-  if (import.meta.env.DEV) console.log('[Loader] Cache cleared');
-}
-
-/**
- * Clear specific loader cache by key
- *
- * @param cacheKey - Cache key to clear
- */
-export function clearLoaderCacheKey(cacheKey: string): void {
-  sessionStorage.removeItem(`${LOADER_CACHE_PREFIX}${cacheKey}`);
-  if (import.meta.env.DEV) console.log(`[Loader] Cache cleared for ${cacheKey}`);
-}
+// Cache clearing + domain invalidation live in ./loader-cache (re-exported here
+// for existing import sites; mutation components import the invalidate* helpers
+// from '@/router/loader-cache' directly).
+export { clearLoaderCache, clearLoaderCacheKey } from './loader-cache';
 
 /**
  * Select option format for react-select

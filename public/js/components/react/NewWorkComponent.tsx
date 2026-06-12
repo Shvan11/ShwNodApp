@@ -9,6 +9,7 @@ import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { fetchJSON, postJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { invalidateWorkCache } from '@/router/loader-cache';
 import * as workContract from '@shared/contracts/work.contract';
 import * as employee from '@shared/contracts/employee.contract';
 import Modal from './Modal';
@@ -293,6 +294,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     delete updatePayload.discount_date;
                 }
                 result = await putJSON<WorkResponse>('/api/updatework', updatePayload, { schema: workContract.updateWork.response });
+                invalidateWorkCache(workId); // the work-details loader cache is now stale
             } else {
                 // Add new work - use special endpoint if createAsFinished is true
                 // Strip discount fields from creation payload (not supported at creation)
@@ -361,6 +363,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 .catch((finishErr) => {
                     throw new Error(httpErrorMessage(finishErr, 'Failed to finish existing work'));
                 });
+            if (existingWorkData?.workId) invalidateWorkCache(existingWorkData.workId);
 
             // Now add the new work
             const pendingCreation = pendingFormData

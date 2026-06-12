@@ -7,6 +7,7 @@ import PortalAccessCard from './PortalAccessCard';
 import { useToast } from '../../contexts/ToastContext';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
+import { invalidatePatientCache } from '@/router/loader-cache';
 import { notifyTasksChanged } from '@/services/tasks';
 import * as costPreset from '@shared/contracts/cost-preset.contract';
 import * as patientContract from '@shared/contracts/patient.contract';
@@ -279,6 +280,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 estimatedCost: parseCostInput(editingCost.value),
                 currency: editingCost.currency
             });
+            invalidatePatientCache(validPersonId); // estimated_cost lives in the cached info row
 
             toast.success('Cost updated successfully');
             setEditingCost(null);

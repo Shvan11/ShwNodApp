@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import { clearLoaderCache } from '@/router/loader-cache';
 import * as authContract from '@shared/contracts/auth.contract';
 import styles from './UserManagement.module.css';
 
@@ -88,6 +89,8 @@ export default function UserManagement() {
 
     try {
       await postJSON('/api/auth/logout', {});
+      // Drop cached loader data so the next user in this tab can't see it.
+      clearLoaderCache();
       // Logout successful - redirect to login (security-logout exception to React Router nav)
       window.location.href = '/login.html';
     } catch (err) {

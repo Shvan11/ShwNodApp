@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import Chart from 'chart.js/auto';
+import Chart from '../../utils/chartSetup';
 import DailyInvoicesModal from './DailyInvoicesModal';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
 import { getChartThemeColors } from '../../utils/chartTheme';

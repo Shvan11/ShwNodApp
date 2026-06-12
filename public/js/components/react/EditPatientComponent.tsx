@@ -5,6 +5,7 @@ import PhoneInput from './PhoneInput';
 import styles from './EditPatientComponent.module.css';
 import { formatISODate } from '../../core/utils';
 import { fetchJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { invalidatePatientCache } from '@/router/loader-cache';
 import { tagOptions as tagOptionsContract } from '@shared/contracts/patient.contract';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as lookup from '@shared/contracts/lookup.contract';
@@ -200,6 +201,7 @@ const EditPatientComponent = ({ personId }: Props) => {
             setError(null);
 
             await putJSON(`/api/patients/${pid}`, formData);
+            invalidatePatientCache(pid); // the patient-shell loader cache is now stale
 
             setSuccessMessage('Patient updated successfully!');
             toast.success('Patient updated successfully!');

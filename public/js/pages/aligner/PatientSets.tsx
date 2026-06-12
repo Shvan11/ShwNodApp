@@ -34,6 +34,7 @@ import type {
 } from './aligner.types';
 import type { PaymentSaveData } from '@/types/api.types';
 import { fetchJSON, postJSON, putJSON, patchJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
+import { invalidateWorkCache } from '@/router/loader-cache';
 import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './PatientSets.module.css';
 
@@ -415,6 +416,7 @@ const PatientSets: React.FC = () => {
             throw new Error(httpErrorMessage(err, 'Failed to save payment'), { cause: err });
         }
 
+        invalidateWorkCache(patient.workid); // cached work row carries TotalPaid
         toast.success('Payment saved successfully');
         setShowPaymentDrawer(false);
         setCurrentSetForPayment(null);

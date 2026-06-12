@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Editor as GrapesJSEditorType } from 'grapesjs';
 import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import { invalidateTemplateCache } from '@/router/loader-cache';
 import * as templateContract from '@shared/contracts/template.contract';
 
 import styles from './TemplateDesigner.module.css';
@@ -87,6 +88,7 @@ function TemplateDesigner() {
 
             // Send to backend
             await postJSON(`/api/templates/${templateId}/save-html`, { html: completeHtml });
+            invalidateTemplateCache(templateId); // designer loader caches the single template
             toast.success('Template saved successfully!');
         } catch (err) {
             console.error('Error saving template:', err);

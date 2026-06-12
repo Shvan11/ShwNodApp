@@ -15,6 +15,8 @@ import { getPgPool } from '../services/database/kysely.js';
 import { validate } from '../middleware/validate.js';
 import { promises as fs } from 'fs';
 import path from 'path';
+import sql from 'mssql';
+import config from '../config/config.js';
 
 const { Pool: PgPool } = pg;
 
@@ -159,6 +161,43 @@ async function pingFailover(): Promise<PingResult> {
   }
 }
 
+/**
+ * Live reachability check for the legacy Dolphin Imaging SQL Server (the 'dolphin' sink's write
+ * target). Mirrors pingFailover: a one-shot short-timeout mssql connection + `SELECT 1`, then close.
+ * A failed ping is a normal result, never a throw, so the status endpoint always answers 200 even
+ * when the Dolphin server is offline. Builds its own short-lived pool (5 s timeout) rather than the
+ * app's long-lived `getPool()` singleton (30 s connect timeout) so a down server can't stall the poll.
+ */
+async function pingDolphin(): Promise<PingResult> {
+  const db = config.database;
+  if (!db?.server) return { reachable: false, latencyMs: null, error: 'not configured' };
+  const start = Date.now();
+  let cp: sql.ConnectionPool | null = null;
+  try {
+    cp = await new sql.ConnectionPool({
+      server: db.server,
+      database: db.database,
+      user: db.authentication.options.userName,
+      password: db.authentication.options.password,
+      options: {
+        instanceName: db.options.instanceName,
+        encrypt: false,
+        trustServerCertificate: true,
+        useUTC: false,
+      },
+      connectionTimeout: 5000,
+      requestTimeout: 5000,
+      pool: { max: 1, min: 0, idleTimeoutMillis: 1000 },
+    }).connect();
+    await cp.request().query('SELECT 1');
+    return { reachable: true, latencyMs: Date.now() - start, error: null };
+  } catch (e) {
+    return { reachable: false, latencyMs: Date.now() - start, error: (e as Error).message };
+  } finally {
+    if (cp) await cp.close().catch(() => {});
+  }
+}
+
 interface SinkControlRow {
   sink: string;
   enabled: boolean;
@@ -255,6 +294,52 @@ router.get(
       });
     } catch (error) {
       log.error('Supabase status error', { error: (error as Error).message });
+      res.status(500).json({ success: false, error: (error as Error).message });
+    }
+  }
+);
+
+/**
+ * Dolphin sync status — read-only health view of the one-way 'dolphin' sink (native timepoints/images
+ * → the legacy Dolphin Imaging SQL Server). Its feed lives LOCAL (same `cdc_sink_control` /
+ * `change_log` as 'failover'), so the control row + backlog come from the local pool; the live
+ * reachability ping targets the Dolphin mssql server. Always answers 200 — a Dolphin outage degrades
+ * the card (reachable:false) rather than failing the endpoint. Shape matches /supabase-status so the
+ * client card renders identically.
+ * GET /api/sync/dolphin-status
+ */
+router.get(
+  '/api/sync/dolphin-status',
+  async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const configured = !!config.database?.server;
+
+      // Dolphin feed is LOCAL — always readable.
+      const dol = await readSinkStatus(getPgPool(), 'dolphin');
+
+      const ping = configured ? await pingDolphin() : { reachable: false, latencyMs: null, error: 'not configured' };
+
+      res.json({
+        success: true,
+        checkedAt: new Date().toISOString(),
+        sinks: [
+          {
+            sink: 'dolphin',
+            configured,
+            envEnabled: process.env.DOLPHIN_SYNC_ENABLED === 'true', // sync flag set at boot
+            enabled: dol.control?.enabled ?? false, // authoritative runtime capture flag the engine maintains
+            stale: dol.control?.stale ?? false,
+            note: dol.control?.note ?? null,
+            updatedAt: dol.control?.updated_at ?? null,
+            backlog: dol.backlog,
+            reachable: configured ? ping.reachable : null,
+            latencyMs: configured ? ping.latencyMs : null,
+            error: configured ? ping.error : null,
+          },
+        ],
+      });
+    } catch (error) {
+      log.error('Dolphin status error', { error: (error as Error).message });
       res.status(500).json({ success: false, error: (error as Error).message });
     }
   }

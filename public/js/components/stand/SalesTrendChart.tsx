@@ -4,7 +4,7 @@
  * Follows the same useRef + useEffect pattern as StatisticsComponent.
  */
 import React, { useRef, useEffect } from 'react';
-import Chart from 'chart.js/auto';
+import Chart from '../../utils/chartSetup';
 import type { SalesSummaryRow } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
 import { getChartThemeColors } from '../../utils/chartTheme';

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useParams, useSearchParams, Link, useLoaderData } from 'react-router-dom';
+import { useParams, useSearchParams, useLocation, Link, useLoaderData } from 'react-router-dom';
 import Navigation from './Navigation';
 import ContentRenderer from './ContentRenderer';
 import storage from '../../core/storage';
@@ -71,6 +71,48 @@ const PatientShell = () => {
     const allParams = useParams<{ personId?: string; page?: string; workId?: string; '*'?: string }>();
     const { personId, page, workId } = allParams;
     const [searchParams] = useSearchParams();
+    const location = useLocation();
+
+    // --- Scroll-position memory --------------------------------------------
+    // Restore the window scroll for this exact patient sub-path (works/visits/
+    // payments/photos…) so returning via the header's patient button lands
+    // where you left off. These pages scroll the window (min-height layout, no
+    // inner overflow container), so this is just scrollY get/set. Keyed by the
+    // full path incl. query (the active timepoint slot).
+    const scrollStorageKey = `scrollPos:${location.pathname}${location.search}`;
+
+    // Save — throttled to one write per animation frame while scrolling.
+    useEffect(() => {
+        let frame = 0;
+        const onScroll = () => {
+            if (frame) return;
+            frame = requestAnimationFrame(() => {
+                frame = 0;
+                sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
+            });
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        return () => {
+            window.removeEventListener('scroll', onScroll);
+            if (frame) cancelAnimationFrame(frame);
+        };
+    }, [scrollStorageKey]);
+
+    // Restore on path change. Retry across a few frames so late-growing content
+    // (photo grids whose height expands as images decode) still settles onto
+    // the saved offset instead of clamping short. No saved value → top.
+    useEffect(() => {
+        const saved = Number(sessionStorage.getItem(scrollStorageKey)) || 0;
+        let tries = 0;
+        let raf = requestAnimationFrame(function restore() {
+            window.scrollTo(0, saved);
+            if (saved > 0 && ++tries < 8 && Math.abs(window.scrollY - saved) > 2) {
+                raf = requestAnimationFrame(restore);
+            }
+        });
+        return () => cancelAnimationFrame(raf);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.pathname, location.search]);
 
     // Extract tpCode from wildcard path (e.g., "tp1" from /photos/tp1)
     const wildcardPath = allParams['*'] || '';

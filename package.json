@@ -5,7 +5,9 @@
   "main": "index.ts",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "service:install": "node utils/windows-service/cli.js install",
     "service:uninstall": "node utils/windows-service/cli.js uninstall",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
@@ -14,6 +16,7 @@
     "build": "npm run build:client && npm run build:server",
     "prebuild:client": "npm run css:types",
     "build:client": "vite build",
+    "build:analyze": "cross-env ANALYZE=true npm run build:client",
     "build:server": "tsc -p tsconfig.build.json",
     "build:clean": "node -e \"const fs=require('fs');['dist','dist-server'].forEach(d=>{if(fs.existsSync(d))fs.rmSync(d,{recursive:true})})\"",
     "preview": "vite preview",
@@ -25,7 +28,7 @@
     "typecheck:frontend": "tsc --noEmit -p tsconfig.frontend.json",
     "typecheck:all": "npm run typecheck && npm run typecheck:frontend",
     "contracts:check": "node scripts/contracts-dod.mjs",
-    "gate": "npm run typecheck:all && npm run lint && npm run contracts:check -- --strict && npm run build",
+    "gate": "npm run typecheck:all && npm run lint && npm run test && npm run contracts:check -- --strict && npm run build",
     "css:types": "tcm public/js -p \"**/*.module.css\"",
     "css:types:watch": "tcm public/js -p \"**/*.module.css\" --watch",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
@@ -97,6 +100,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.13",
     "@types/classnames": "^2.3.0",
@@ -120,17 +124,21 @@
     "eslint": "^10.4.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-i18next": "^6.1.4",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.6.0",
+    "jsdom": "^29.1.1",
     "kysely-codegen": "^0.20.0",
     "node-pg-migrate": "^8.0.4",
     "playwright": "^1.60.0",
     "postcss-rtlcss": "^6.0.0",
     "prettier": "^3.8.3",
+    "rollup-plugin-visualizer": "^7.0.1",
     "tsx": "^4.22.4",
     "typed-css-modules": "^0.9.1",
     "typescript": "^6.0.3",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "vitest": "^4.1.8"
   }
 }

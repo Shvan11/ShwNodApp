@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { visualizer } from 'rollup-plugin-visualizer'
 import { resolve } from 'path'
 import { realpathSync } from 'fs'
 
@@ -37,13 +38,30 @@ export default defineConfig(({ mode }) => {
           }]
         ]
       }
-    })
-  ],
+    }),
+    // Bundle treemap, opt-in via `npm run build:analyze` (sets ANALYZE=true).
+    // Writes dist/stats.html so we can see what actually ships — e.g. Chart.js
+    // is eagerly imported by the Stand chart components, so it loads even for
+    // users who never open Statistics. No cost on a normal `npm run build`.
+    process.env.ANALYZE === 'true' &&
+      visualizer({
+        filename: resolve(projectRoot, 'dist/stats.html'),
+        template: 'treemap',
+        gzipSize: true,
+        brotliSize: true,
+        open: false, // don't spawn a browser (this host is also prod/headless)
+      }),
+  ].filter(Boolean),
   root: publicRoot,
   publicDir: false, // Disable - Express serves static files in production
   build: {
     outDir: '../dist',
     emptyOutDir: true,
+    // 'hidden' emits .map files for every chunk but omits the
+    // `//# sourceMappingURL=` comment, so browsers don't auto-fetch them and
+    // they aren't advertised — yet a prod error stack can still be un-minified
+    // against the map when debugging. Without this, prod stacks are unreadable.
+    sourcemap: 'hidden',
     rollupOptions: {
       input: {
         // Main staff-facing SPA
@@ -66,8 +84,9 @@ export default defineConfig(({ mode }) => {
               return; // Return undefined to let Rollup handle it as dynamic chunk
             }
 
-            // Chart libraries (used in Statistics route)
-            if (id.includes('chart.js') || id.includes('recharts')) {
+            // Chart library (chart.js) — used only by the lazy Statistics +
+            // Stand Reports routes, so this chunk loads on demand with them.
+            if (id.includes('chart.js')) {
               return 'vendor-charts';
             }
 

@@ -8,6 +8,7 @@ import { formatISODate } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { invalidateWorkCache } from '@/router/loader-cache';
 import {
     workForReceipt as workForReceiptContract,
     exchangeRateForDate as exchangeRateForDateContract,
@@ -743,6 +744,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             const result = await postJSON<AddInvoiceResponse>('/api/addInvoice', invoiceData, {
                 schema: addInvoiceContract.response,
             });
+            invalidateWorkCache(workData!.work_id); // cached work row carries TotalPaid
 
             // Set success state and prepare receipt data with complete work data
             setPaymentSuccess(true);

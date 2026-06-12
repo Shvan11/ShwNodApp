@@ -8,6 +8,7 @@ import PatientSearchCombobox from './PatientSearchCombobox';
 import PhoneDisplay from './PhoneDisplay';
 import Modal from './Modal';
 import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { invalidatePatientCache, invalidateTimepointsCache } from '@/router/loader-cache';
 import { patientSearch as patientSearchContract } from '@shared/contracts/patient.contract';
 import * as appointmentContract from '@shared/contracts/appointment.contract';
 import styles from './PatientManagement.module.css';
@@ -382,6 +383,8 @@ const PatientManagement = () => {
         setDeleting(true);
         try {
             const data = await deleteJSON<{ folderRemoved?: boolean; message?: string }>(`/api/patients/${selectedPatient.person_id}`);
+            invalidatePatientCache(selectedPatient.person_id);
+            invalidateTimepointsCache(selectedPatient.person_id);
             executeSearch();
             setShowDeleteConfirm(false);
             if (data.folderRemoved === false) {

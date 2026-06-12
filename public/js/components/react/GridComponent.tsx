@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, MouseEvent as ReactMouseEvent } fro
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { invalidateTimepointsCache } from '@/router/loader-cache';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
 import tpStyles from './TimePointsSelector.module.css';
@@ -750,6 +751,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         setSavingTp(true);
         try {
             await putJSON(`/api/patients/${personId}/timepoints/${editTp.tpCode}`, fields);
+            invalidateTimepointsCache(personId);
             toast.success('Time point updated');
             setEditTp(null);
             await loadTimepoints();
@@ -767,6 +769,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         setDeletingTp(true);
         try {
             await deleteJSON(`/api/patients/${personId}/timepoints/${removed.tpCode}?scope=${scope}`);
+            invalidateTimepointsCache(personId);
             toast.success(
                 scope === 'cropped'
                     ? 'Cropped photos deleted'
