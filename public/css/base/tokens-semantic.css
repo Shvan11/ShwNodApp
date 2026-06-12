@@ -97,6 +97,13 @@
        neutral slate (see theme-dark.css). Both keep light chips legible on top. */
     --appointments-header-bg: linear-gradient(135deg, var(--palette-cyan-500) 0%, var(--palette-cyan-700) 100%);
 
+    /* Universal header bar. Light = the brand purple-blue gradient; dark theme
+       swaps to a darker, desaturated take on the same hues so the fixed bar
+       doesn't glow on the night canvas (see theme-dark.css). The white text and
+       white-alpha controls in the header stay legible on both. */
+    --header-bg: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
+    --header-border: var(--palette-indigo-500);
+
     /* ===============================================================
        Box shadows
        =============================================================== */

@@ -216,6 +216,11 @@
         /* --gradient-accent (teal → purple) stays vivid; not overridden. */
         /* Appointments sub-header: teal (light) → neutral slate on the dark canvas. */
         --appointments-header-bg: linear-gradient(135deg, var(--palette-night-500) 0%, var(--palette-night-700) 100%);
+        /* Universal header: darkened + desaturated so the fixed bar sits on the
+           night canvas instead of glowing over it; hue pulled to a straight
+           blue→navy sweep (the purple end of the light gradient is dropped). */
+        --header-bg: linear-gradient(135deg, #1f4c8c 0%, #1c3463 100%);
+        --header-border: var(--palette-blue-800);
 
         /* ===========================================================
            Shadows — same geometry, deeper alpha for the dark canvas
