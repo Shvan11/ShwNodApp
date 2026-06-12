@@ -381,6 +381,38 @@
     background: linear-gradient(135deg, var(--status-seated-fill-hover) 0%, var(--status-seated-fill) 100%);
 }
 
+/* All-list check-in: labeled outline button. Outline (not solid) so 20+
+   repetitions stay quiet next to the solid squares that mean completed state;
+   the verb label is what makes the action discoverable. Same height as the
+   status squares so a row doesn't jump when it flips to checked-in. */
+.checkInButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    height: 3rem;
+    padding: 0 var(--spacing-sm);
+    background-color: transparent;
+    border: 2px solid var(--success-600);
+    border-radius: var(--radius-md);
+    color: var(--success-600);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.checkInButton i {
+    font-size: 1rem;
+}
+
+.checkInButton:hover {
+    background: linear-gradient(135deg, var(--success-100) 0%, var(--success-200) 100%);
+    color: var(--success-800);
+    box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.3), 0 2px 4px -1px rgba(34, 197, 94, 0.2);
+}
+
 /* Disabled state */
 .statusButton:disabled {
     cursor: not-allowed;
@@ -431,6 +463,15 @@
         font-size: 1rem;
     }
 
+    .checkInButton {
+        height: 42px;
+        font-size: var(--font-size-xs);
+    }
+
+    .checkInButton i {
+        font-size: 0.875rem;
+    }
+
     .chairIcon {
         width: 18px;
         height: 18px;
@@ -463,6 +504,11 @@
 
     .statusButton i {
         font-size: 0.875rem;
+    }
+
+    .checkInButton {
+        height: 38px;
+        padding: 0 var(--spacing-xs);
     }
 
     .chairIcon {
