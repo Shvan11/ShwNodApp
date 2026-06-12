@@ -5,6 +5,7 @@
  */
 import React, { useState, useEffect, useRef, ChangeEvent, MouseEvent } from 'react';
 import { useParams, useNavigate, useLoaderData } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import type { AlignerPatientWorkLoaderResult } from '../../router/loaders';
 import ConfirmDialog from '../../components/react/ConfirmDialog';
 import SetFormDrawer from '../../components/react/SetFormDrawer';
@@ -34,7 +35,7 @@ import type {
 } from './aligner.types';
 import type { PaymentSaveData } from '@/types/api.types';
 import { fetchJSON, postJSON, putJSON, patchJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
-import { invalidateWorkCache } from '@/router/loader-cache';
+import { qk } from '@/query/keys';
 import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './PatientSets.module.css';
 
@@ -81,6 +82,7 @@ const PatientSets: React.FC = () => {
     const loaderData = useLoaderData() as AlignerPatientWorkLoaderResult;
     const navigate = useNavigate();
     const toast = useToast();
+    const queryClient = useQueryClient();
     const { addToQueue, isInQueue, removeByBatchId } = usePrintQueue();
 
     // Determine if we came from doctor browse or direct search
@@ -416,7 +418,7 @@ const PatientSets: React.FC = () => {
             throw new Error(httpErrorMessage(err, 'Failed to save payment'), { cause: err });
         }
 
-        invalidateWorkCache(patient.workid); // cached work row carries TotalPaid
+        queryClient.invalidateQueries({ queryKey: qk.work.all(patient.workid) });
         toast.success('Payment saved successfully');
         setShowPaymentDrawer(false);
         setCurrentSetForPayment(null);

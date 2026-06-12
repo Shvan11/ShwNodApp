@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import PhotoSessionDialog from './PhotoSessionDialog';
 import AlertModal from './AlertModal';
 import WebCephModal from './WebCephModal';
@@ -8,7 +8,7 @@ import PortalAccessCard from './PortalAccessCard';
 import { useToast } from '../../contexts/ToastContext';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
-import { invalidatePatientCache } from '@/router/loader-cache';
+import { qk } from '@/query/keys';
 import { notifyTasksChanged } from '@/services/tasks';
 import { patientInfoQuery } from '@/query/queries';
 import * as costPreset from '@shared/contracts/cost-preset.contract';
@@ -78,6 +78,7 @@ interface AlertType {
 const ViewPatientInfo = ({ personId }: Props) => {
     const navigate = useNavigate();
     const toast = useToast();
+    const queryClient = useQueryClient();
     const [searchParams, setSearchParams] = useSearchParams();
     // Patient demographics now read from React Query (shared cache key with
     // PatientShell/XraysComponent — one fetch, deduped, live-invalidated). The
@@ -273,12 +274,10 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 estimatedCost: parseCostInput(editingCost.value),
                 currency: editingCost.currency
             });
-            invalidatePatientCache(validPersonId); // estimated_cost lives in the cached info row
+            queryClient.invalidateQueries({ queryKey: qk.patient.all(validPersonId) });
 
             toast.success('Cost updated successfully');
             setEditingCost(null);
-            // TODO(phase3): replace manual refetch with query invalidation
-            refetchPatientInfo(); // Reload to get updated data
         } catch (err) {
             console.error('Error saving cost:', err);
             toast.error(httpErrorMessage(err, 'Failed to save cost'));

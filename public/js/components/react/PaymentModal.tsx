@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent, FocusEvent } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { ApiResponse } from '@/types/api.types';
 import styles from './PaymentModal.module.css';
 import Modal from './Modal';
@@ -8,7 +9,7 @@ import { formatISODate } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import { invalidateWorkCache } from '@/router/loader-cache';
+import { qk } from '@/query/keys';
 import {
     workForReceipt as workForReceiptContract,
     exchangeRateForDate as exchangeRateForDateContract,
@@ -88,6 +89,7 @@ type EntryMode = 'amount' | 'cash';
 const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const toast = useToast();
     const confirm = useConfirm();
+    const queryClient = useQueryClient();
     const [loading, setLoading] = useState(false);
     const [exchangeRate, setExchangeRate] = useState<number | null>(null);
     const [exchangeRateError, setExchangeRateError] = useState(false);
@@ -744,7 +746,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             const result = await postJSON<AddInvoiceResponse>('/api/addInvoice', invoiceData, {
                 schema: addInvoiceContract.response,
             });
-            invalidateWorkCache(workData!.work_id); // cached work row carries TotalPaid
+            queryClient.invalidateQueries({ queryKey: qk.work.all(workData!.work_id) });
 
             // Set success state and prepare receipt data with complete work data
             setPaymentSuccess(true);

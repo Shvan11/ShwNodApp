@@ -376,11 +376,6 @@ export async function templateDesignerLoader({
   return { template: data, mode: 'edit' };
 }
 
-// Cache clearing helpers still live in ./loader-cache (mutation sites import the
-// invalidate* helpers from there directly until Phase 3 removes them). Re-exported
-// here for the few existing import sites.
-export { clearLoaderCache, clearLoaderCacheKey } from './loader-cache';
-
 /**
  * Select option format for react-select
  */

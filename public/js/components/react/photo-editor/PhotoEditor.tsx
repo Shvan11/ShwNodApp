@@ -8,6 +8,7 @@
  */
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { useBlocker, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import styles from './PhotoEditor.module.css';
 import SlotGrid from './SlotGrid';
 import SlotActions from './SlotActions';
@@ -27,7 +28,7 @@ import { useToast } from '../../../contexts/ToastContext';
 import sseAppointments from '../../../services/sse-appointments';
 import { watchRenderJob } from '../../../services/photo-render-watch';
 import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '../../../core/http';
-import { invalidateTimepointsCache } from '../../../router/loader-cache';
+import { qk } from '@/query/keys';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as fileExplorerContract from '@shared/contracts/file-explorer.contract';
 
@@ -90,6 +91,7 @@ function readStoredWidth(): number | null {
 const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
   const toast = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const editor = usePhotoEditorState();
   const [activeView, setActiveView] = useState<PhotoViewCode | null>(null);
   const [saving, setSaving] = useState(false);
@@ -338,7 +340,7 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
       // We navigate straight to the photos grid, which fills in over SSE as the render
       // completes (see GridComponent's photos_rendered handler).
       await postJSON(`/api/photo-editor/${personId}/render`, { tpName, tpDate, slots });
-      invalidateTimepointsCache(personId); // the render may have created a new timepoint
+      queryClient.invalidateQueries({ queryKey: qk.patient.timepoints(personId) }); // the render may have created a new timepoint
       // The watchdog toasts the outcome (success/partial/timeout) wherever the
       // user is by then — the grid itself only refetches.
       watchRenderJob({ personId, tpCode, slots: slots.length });

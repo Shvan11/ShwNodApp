@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, MouseEvent as ReactMouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
-import { invalidateTimepointsCache } from '@/router/loader-cache';
+import { qk } from '@/query/keys';
 import { timepointsQuery } from '@/query/queries';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
@@ -69,6 +69,7 @@ interface CachedShareBlob {
 const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const navigate = useNavigate();
     const toast = useToast();
+    const queryClient = useQueryClient();
     const [images, setImages] = useState<GalleryImage[]>([]);
     // Timepoints read on useQuery (loose contract models only tp_code/date/desc;
     // rows carry the full Timepoint shape). A timepoint mutation's invalidation
@@ -740,7 +741,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         setSavingTp(true);
         try {
             await putJSON(`/api/patients/${personId}/timepoints/${editTp.tpCode}`, fields);
-            invalidateTimepointsCache(personId);
+            queryClient.invalidateQueries({ queryKey: qk.patient.timepoints(personId) });
             toast.success('Time point updated');
             setEditTp(null);
             await loadTimepoints();
@@ -758,7 +759,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         setDeletingTp(true);
         try {
             await deleteJSON(`/api/patients/${personId}/timepoints/${removed.tpCode}?scope=${scope}`);
-            invalidateTimepointsCache(personId);
+            queryClient.invalidateQueries({ queryKey: qk.patient.timepoints(personId) });
             toast.success(
                 scope === 'cropped'
                     ? 'Cropped photos deleted'

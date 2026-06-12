@@ -1,8 +1,8 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
-import { clearLoaderCache } from '@/router/loader-cache';
 import * as authContract from '@shared/contracts/auth.contract';
 import styles from './UserManagement.module.css';
 
@@ -25,6 +25,7 @@ interface Message {
 export default function UserManagement() {
   const toast = useToast();
   const confirm = useConfirm();
+  const queryClient = useQueryClient();
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -89,8 +90,8 @@ export default function UserManagement() {
 
     try {
       await postJSON('/api/auth/logout', {});
-      // Drop cached loader data so the next user in this tab can't see it.
-      clearLoaderCache();
+      // Drop cached query data so the next user in this tab can't see it.
+      queryClient.clear();
       // Logout successful - redirect to login (security-logout exception to React Router nav)
       window.location.href = '/login.html';
     } catch (err) {

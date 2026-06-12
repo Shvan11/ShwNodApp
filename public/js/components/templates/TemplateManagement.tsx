@@ -14,14 +14,16 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import type { Template } from './TemplateCard';
 import type { DocumentType, TemplateSubmissionData } from './CreateTemplateModal';
 import type { TemplateStatsData } from './TemplateStats';
+import { useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
-import { invalidateAllTemplateCaches, invalidateTemplateCache } from '@/router/loader-cache';
+import { qk } from '@/query/keys';
 import * as templateContract from '@shared/contracts/template.contract';
 
 function TemplateManagement() {
     const navigate = useNavigate();
     const toast = useToast();
     const confirm = useConfirm();
+    const queryClient = useQueryClient();
 
     const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);
     const [allTemplates, setAllTemplates] = useState<Template[]>([]);
@@ -96,7 +98,7 @@ function TemplateManagement() {
     const handleCreateTemplate = async (templateData: TemplateSubmissionData) => {
         try {
             const data = await postJSON<{ template_id: number }>('/api/templates', templateData);
-            invalidateTemplateCache();
+            queryClient.invalidateQueries({ queryKey: qk.templates.all() });
             setIsCreateModalOpen(false);
             // Navigate to designer
             navigate(`/templates/designer/${data.template_id}`);
@@ -117,7 +119,7 @@ function TemplateManagement() {
 
         try {
             await putJSON(`/api/templates/${templateId}`, { is_default: true, modified_by: 'user' });
-            invalidateAllTemplateCaches(); // the previous default was unset server-side
+            queryClient.invalidateQueries({ queryKey: qk.templates.all() });
             await loadAllTemplates();
             toast.success('Template set as default!');
         } catch (err) {
@@ -133,7 +135,7 @@ function TemplateManagement() {
 
         try {
             await deleteJSON(`/api/templates/${templateId}`);
-            invalidateTemplateCache(templateId);
+            queryClient.invalidateQueries({ queryKey: qk.templates.all() });
             await loadAllTemplates();
             toast.success('Template deleted successfully!');
         } catch (err) {

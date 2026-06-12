@@ -1,12 +1,12 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import PhoneInput from './PhoneInput';
 import styles from './EditPatientComponent.module.css';
 import { formatISODate } from '../../core/utils';
 import { putJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import { invalidatePatientCache } from '@/router/loader-cache';
+import { qk } from '@/query/keys';
 import {
     patientByIdQuery,
     gendersQuery,
@@ -69,6 +69,7 @@ interface FormData {
 const EditPatientComponent = ({ personId }: Props) => {
     const navigate = useNavigate();
     const toast = useToast();
+    const queryClient = useQueryClient();
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState('');
@@ -80,7 +81,6 @@ const EditPatientComponent = ({ personId }: Props) => {
         data: patientData,
         isLoading: patientLoading,
         error: patientError,
-        refetch: refetchPatient,
     } = useQuery({
         ...patientByIdQuery(personId ?? ''),
         enabled: !!personId,
@@ -192,17 +192,13 @@ const EditPatientComponent = ({ personId }: Props) => {
             setError(null);
 
             await putJSON(`/api/patients/${pid}`, formData);
-            invalidatePatientCache(pid); // the patient-shell loader cache is now stale
+            queryClient.invalidateQueries({ queryKey: qk.patient.all(pid) });
 
             setSuccessMessage('Patient updated successfully!');
             toast.success('Patient updated successfully!');
             setTimeout(() => {
                 setSuccessMessage('');
             }, 3000);
-
-            // Reload patient data to get fresh values (re-runs the read query →
-            // the form-population effect repopulates from the fresh record).
-            await refetchPatient();
         } catch (err) {
             // Duplicate patient name → 409 with code/context in `details` (root kept as a fallback).
             const errorData = (err as HttpError).data as {

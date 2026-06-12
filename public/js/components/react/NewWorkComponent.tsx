@@ -5,12 +5,12 @@
  */
 
 import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { postJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import { invalidateWorkCache } from '@/router/loader-cache';
+import { qk } from '@/query/keys';
 import * as workContract from '@shared/contracts/work.contract';
 import {
     workTypesQuery,
@@ -114,6 +114,7 @@ interface NewWorkComponentProps {
 type TabType = 'basic' | 'dates' | 'keywords';
 
 const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWorkComponentProps) => {
+    const queryClient = useQueryClient();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -294,7 +295,8 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     delete updatePayload.discount_date;
                 }
                 result = await putJSON<WorkResponse>('/api/updatework', updatePayload, { schema: workContract.updateWork.response });
-                invalidateWorkCache(workId); // the work-details loader cache is now stale
+                queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
+                queryClient.invalidateQueries({ queryKey: qk.work.all(workId) });
             } else {
                 // Add new work - use special endpoint if createAsFinished is true
                 // Strip discount fields from creation payload (not supported at creation)
@@ -363,7 +365,10 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 .catch((finishErr) => {
                     throw new Error(httpErrorMessage(finishErr, 'Failed to finish existing work'));
                 });
-            if (existingWorkData?.workId) invalidateWorkCache(existingWorkData.workId);
+            if (existingWorkData?.workId) {
+                queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
+                queryClient.invalidateQueries({ queryKey: qk.work.all(existingWorkData.workId) });
+            }
 
             // Now add the new work
             const pendingCreation = pendingFormData

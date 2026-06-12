@@ -5,9 +5,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Editor as GrapesJSEditorType } from 'grapesjs';
 import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
-import { invalidateTemplateCache } from '@/router/loader-cache';
+import { qk } from '@/query/keys';
 import * as templateContract from '@shared/contracts/template.contract';
 
 import styles from './TemplateDesigner.module.css';
@@ -28,6 +29,7 @@ function TemplateDesigner() {
     const editorRef = useRef<GrapesJSEditorType | null>(null);
     const toast = useToast();
     const confirm = useConfirm();
+    const queryClient = useQueryClient();
 
     const [template, setTemplate] = useState<Template | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -88,7 +90,7 @@ function TemplateDesigner() {
 
             // Send to backend
             await postJSON(`/api/templates/${templateId}/save-html`, { html: completeHtml });
-            invalidateTemplateCache(templateId); // designer loader caches the single template
+            queryClient.invalidateQueries({ queryKey: qk.templates.all() });
             toast.success('Template saved successfully!');
         } catch (err) {
             console.error('Error saving template:', err);

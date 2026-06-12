@@ -7,8 +7,9 @@ import type { PatientOption } from './PatientQuickSearch';
 import PatientSearchCombobox from './PatientSearchCombobox';
 import PhoneDisplay from './PhoneDisplay';
 import Modal from './Modal';
+import { useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '@/core/http';
-import { invalidatePatientCache, invalidateTimepointsCache } from '@/router/loader-cache';
+import { qk } from '@/query/keys';
 import { patientSearch as patientSearchContract } from '@shared/contracts/patient.contract';
 import * as appointmentContract from '@shared/contracts/appointment.contract';
 import styles from './PatientManagement.module.css';
@@ -88,6 +89,7 @@ interface LoaderData {
 const PatientManagement = () => {
     const navigate = useNavigate();
     const toast = useToast();
+    const queryClient = useQueryClient();
     const loaderData = useLoaderData() as LoaderData | undefined;
 
     // --- 1. Synchronous State Initialization ---
@@ -383,8 +385,7 @@ const PatientManagement = () => {
         setDeleting(true);
         try {
             const data = await deleteJSON<{ folderRemoved?: boolean; message?: string }>(`/api/patients/${selectedPatient.person_id}`);
-            invalidatePatientCache(selectedPatient.person_id);
-            invalidateTimepointsCache(selectedPatient.person_id);
+            queryClient.invalidateQueries({ queryKey: qk.patient.all(selectedPatient.person_id) });
             executeSearch();
             setShowDeleteConfirm(false);
             if (data.folderRemoved === false) {

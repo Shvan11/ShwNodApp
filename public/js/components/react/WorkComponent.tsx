@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, type FormEvent, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import WorkCard, { type Work, type WorkStatus } from './WorkCard';
 import PaymentModal from './PaymentModal';
 import TransferWorkModal from './TransferWorkModal';
@@ -17,7 +17,7 @@ import {
     FILLING_DEPTH_OPTIONS
 } from '../../config/workTypeConfig';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import { invalidateWorkCache } from '@/router/loader-cache';
+import { qk } from '@/query/keys';
 import { worksQuery } from '@/query/queries';
 // aliased: the component already has a `paymentHistory` state var (collision)
 import {
@@ -132,12 +132,13 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const navigate = useNavigate();
     const toast = useToast();
     const confirm = useConfirm();
+    const queryClient = useQueryClient();
     const { user } = useGlobalState();
     const isAdmin = user?.role === 'admin';
     // Works list read — the headline gap-fix target. On useQuery so a work
     // mutation's invalidateQueries(qk.patient.all) refreshes it live (Phase 3).
     // Loose contract models only { work_id }; the rows carry the full Work shape.
-    const { data: worksData, isLoading: loading, refetch: refetchWorks } = useQuery({
+    const { data: worksData, isLoading: loading } = useQuery({
         ...worksQuery(personId ?? ''),
         enabled: !!personId,
     });
@@ -350,7 +351,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             await postJSON(endpoint, body);
 
             toast.success(successMessage);
-            await refetchWorks() /* TODO(phase3): replace with query invalidation */;
+            queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
         } catch (err) {
             toast.error(httpErrorMessage(err, `Failed to ${type} work`), 5000);
         }
@@ -409,7 +410,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             await deleteJSON('/api/deletework', { body: JSON.stringify({ workId: work.work_id }) });
 
             toast.success('Work deleted successfully!');
-            await refetchWorks() /* TODO(phase3): replace with query invalidation */;
+            queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
         } catch (err) {
             // A 409 carries a `details.dependencies` breakdown of the blocking records.
             const httpErr = err as HttpError;
@@ -454,7 +455,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         setShowTransferModal(false);
         setWorkToTransfer(null);
         // Refresh works since the work was transferred away
-        refetchWorks() /* TODO(phase3): replace with query invalidation */;
+        queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
         toast.success('Work transferred successfully to another patient');
     };
 
@@ -1183,7 +1184,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     onClose={() => {
                         setShowPaymentModal(false);
                         setSelectedWorkForPayment(null);
-                        refetchWorks() /* TODO(phase3): replace with query invalidation */;
+                        queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
                     }}
                     onSuccess={() => {
                         toast.success('Payment added successfully!');
@@ -1279,10 +1280,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                                             await deleteJSON(`/api/deleteInvoice/${payment.InvoiceID}`, {
                                                                                 schema: deleteInvoiceContract.response, // Validate the boundary (audit H11)
                                                                             });
-                                                                            invalidateWorkCache(selectedWorkForPayment.work_id); // cached work row carries TotalPaid
+                                                                            queryClient.invalidateQueries({ queryKey: qk.work.all(selectedWorkForPayment.work_id) });
                                                                             toast.success('Payment deleted successfully!');
                                                                             loadPaymentHistory(selectedWorkForPayment.work_id);
-                                                                            refetchWorks() /* TODO(phase3): replace with query invalidation */;
+                                                                            queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
                                                                         } catch (error) {
                                                                             console.error('Error deleting payment:', error);
                                                                             toast.error(`Error deleting payment: ${httpErrorMessage(error, 'Unknown error')}`);
