@@ -1,9 +1,11 @@
 // AllSetsList.tsx - Simple list view of all aligner sets from v_allsets
 import React, { useState, useEffect, type ChangeEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
-import { fetchJSON, httpErrorMessage } from '@/core/http';
-import * as alignerContract from '@shared/contracts/aligner.contract';
+import { httpErrorMessage } from '@/core/http';
+import { alignerAllSetsQuery } from '@/query/queries';
+import type * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './AllSetsList.module.css';
 
 // Row shape comes from the shared contract (single source of truth, drift-checked
@@ -18,8 +20,8 @@ type SortDirection = 'asc' | 'desc';
 const AllSetsList: React.FC = () => {
     const navigate = useNavigate();
     const toast = useToast();
-    const [sets, setSets] = useState<AlignerSetView[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
+    const { data, isLoading: loading, error } = useQuery(alignerAllSetsQuery());
+    const sets: AlignerSetView[] = data?.sets ?? [];
     const [filter, setFilter] = useState<string>('');
     const [showOnlyNoNextBatch, setShowOnlyNoNextBatch] = useState<boolean>(false);
     const [showOnlyInLab, setShowOnlyInLab] = useState<boolean>(false);
@@ -30,27 +32,12 @@ const AllSetsList: React.FC = () => {
     const [sortColumn, setSortColumn] = useState<SortColumn>('NextDueDate');
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
+    // Surface a load failure as a toast (preserves the previous on-error UX).
     useEffect(() => {
-        loadAllSets();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    const loadAllSets = async (): Promise<void> => {
-        try {
-            setLoading(true);
-            const data = await fetchJSON<{ sets?: AlignerSetView[] }>(
-                '/api/aligner/all-sets',
-                { schema: alignerContract.allSets.response }
-            );
-
-            setSets(data.sets || []);
-        } catch (error) {
-            console.error('Error loading aligner sets:', error);
+        if (error) {
             toast.error(httpErrorMessage(error, 'Failed to load aligner sets'));
-        } finally {
-            setLoading(false);
         }
-    };
+    }, [error, toast]);
 
     const handlePatientClick = (set: AlignerSetView): void => {
         // Navigate to patient's aligner management page

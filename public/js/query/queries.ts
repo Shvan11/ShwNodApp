@@ -119,6 +119,39 @@ export const alignerDoctorsQuery = () =>
       }),
   });
 
+/** GET /api/aligner/all-sets — every aligner set across doctors. */
+export const alignerAllSetsQuery = () =>
+  queryOptions({
+    queryKey: qk.aligner.allSets(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof alignerContract.allSets.response>>('/api/aligner/all-sets', {
+        signal,
+        schema: alignerContract.allSets.response,
+      }),
+  });
+
+/** GET /api/aligner/patients/all — all aligner patients (all doctors). */
+export const alignerAllPatientsQuery = () =>
+  queryOptions({
+    queryKey: qk.aligner.allPatients(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof alignerContract.allPatients.response>>('/api/aligner/patients/all', {
+        signal,
+        schema: alignerContract.allPatients.response,
+      }),
+  });
+
+/** GET /api/aligner/patients/by-doctor/:doctorId — patients for one doctor. */
+export const alignerPatientsByDoctorQuery = (doctorId: Id) =>
+  queryOptions({
+    queryKey: qk.aligner.patientsByDoctor(doctorId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof alignerContract.patientsByDoctor.response>>(
+        `/api/aligner/patients/by-doctor/${doctorId}`,
+        { signal, schema: alignerContract.patientsByDoctor.response }
+      ),
+  });
+
 // ---------------------------------------------------------------------------
 // Lookups — patient-management filter data
 // ---------------------------------------------------------------------------

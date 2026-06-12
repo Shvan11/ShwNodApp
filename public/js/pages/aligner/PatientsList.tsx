@@ -1,8 +1,13 @@
 // PatientsList.tsx - Show patients for a selected doctor
-import React, { useState, useEffect, ChangeEvent, SyntheticEvent } from 'react';
+import React, { useState, ChangeEvent, SyntheticEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchJSON } from '@/core/http';
-import * as alignerContract from '@shared/contracts/aligner.contract';
+import { useQuery } from '@tanstack/react-query';
+import {
+    alignerDoctorsQuery,
+    alignerAllPatientsQuery,
+    alignerPatientsByDoctorQuery,
+} from '@/query/queries';
+import type { AlignerPatient } from '@shared/contracts/aligner.contract';
 import styles from './PatientsList.module.css';
 
 interface Doctor {
@@ -10,72 +15,40 @@ interface Doctor {
     doctor_name: string;
 }
 
-interface Patient {
-    person_id: number;
-    workid: number;
-    patient_name?: string;
-    first_name?: string;
-    last_name?: string;
-    phone?: string;
-    TotalSets?: number;
-    ActiveSets?: number;
-    UnreadDoctorNotes?: number;
-}
+type Patient = AlignerPatient;
 
 const PatientsList: React.FC = () => {
     const { doctorId } = useParams<{ doctorId: string }>();
     const navigate = useNavigate();
 
-    const [doctor, setDoctor] = useState<Doctor | null>(null);
-    const [patients, setPatients] = useState<Patient[]>([]);
     const [patientFilter, setPatientFilter] = useState<string>('');
-    const [loading, setLoading] = useState<boolean>(true);
 
-    // Load doctor and patients on mount
-    useEffect(() => {
-        loadDoctorAndPatients();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [doctorId]);
+    const isAll = doctorId === 'all';
 
-    const loadDoctorAndPatients = async (): Promise<void> => {
-        try {
-            setLoading(true);
+    // Doctor info — only needed for a specific doctor (the "all" view uses a
+    // synthetic label). Read from the shared doctors list and pick the match.
+    const { data: doctorsData } = useQuery({
+        ...alignerDoctorsQuery(),
+        enabled: !isAll,
+    });
+    const doctor: Doctor | null = isAll
+        ? { dr_id: 'all', doctor_name: 'All Doctors' }
+        : (doctorsData?.doctors.find((d) => d.dr_id === parseInt(doctorId || ''))
+            ?? (doctorsData ? { dr_id: 0, doctor_name: 'Unknown Doctor' } : null));
 
-            // Load doctor info (unless it's "all"). Best-effort: a doctor-lookup
-            // failure must not block the patient list, so it has its own try/catch.
-            if (doctorId !== 'all') {
-                try {
-                    const doctorData = await fetchJSON<{ doctors?: Doctor[] }>(
-                        '/api/aligner/doctors',
-                        { schema: alignerContract.alignerDoctors.response }
-                    );
-                    const foundDoctor = doctorData.doctors?.find((d: Doctor) => d.dr_id === parseInt(doctorId || ''));
-                    setDoctor(foundDoctor || { dr_id: 0, doctor_name: 'Unknown Doctor' });
-                } catch (e) {
-                    console.error('Error loading doctor info:', e);
-                }
-            } else {
-                setDoctor({ dr_id: 'all', doctor_name: 'All Doctors' });
-            }
-
-            // Load patients
-            const url = doctorId === 'all'
-                ? '/api/aligner/patients/all'
-                : `/api/aligner/patients/by-doctor/${doctorId}`;
-
-            const data = await fetchJSON<{ patients?: Patient[] }>(url, {
-                schema: doctorId === 'all'
-                    ? alignerContract.allPatients.response
-                    : alignerContract.patientsByDoctor.response,
-            });
-
-            setPatients(data.patients || []);
-        } catch (error) {
-            console.error('Error loading data:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // Patients — two parameterized reads gated by `enabled`; pick whichever
+    // branch is active for this route.
+    const allPatientsQ = useQuery({
+        ...alignerAllPatientsQuery(),
+        enabled: isAll,
+    });
+    const byDoctorQ = useQuery({
+        ...alignerPatientsByDoctorQuery(doctorId ?? ''),
+        enabled: !isAll && !!doctorId,
+    });
+    const activePatientsQ = isAll ? allPatientsQ : byDoctorQ;
+    const patients: Patient[] = activePatientsQ.data?.patients ?? [];
+    const loading = activePatientsQ.isLoading;
 
     const selectPatient = (patient: Patient): void => {
         navigate(`/aligner/doctor/${doctorId}/patient/${patient.workid}`);

@@ -6,10 +6,12 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, ChangeEvent, FormEvent, CSSProperties } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { formatISODate } from '../../core/utils';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, postJSON, postFormData, httpErrorMessage } from '@/core/http';
+import { timepointsQuery } from '@/query/queries';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as shareContract from '@shared/contracts/share.contract';
 import Modal from './Modal';
@@ -480,47 +482,19 @@ const CompareComponent = ({ personId, phone }: Props) => {
         }
     }, [personId]);
 
-    const loadTimepoints = useCallback(async () => {
-        if (!personId) {
-            setLoading(false);
-            return;
-        }
-
-        try {
-            setLoading(true);
-            const data = await fetchJSON<Timepoint[]>(`/api/patients/${personId}/timepoints`, { schema: patientContract.timepoints.response });
-            setTimepoints(data);
-
-            // Auto-select first and last timepoints (skip tp_code 0)
-            let autoSelected: number[] = [];
-            if (data.length >= 2) {
-                const validTimepoints = data.filter(tp => tp.tp_code > 0);
-
-                if (validTimepoints.length >= 2) {
-                    autoSelected = [validTimepoints[0].tp_code, validTimepoints[validTimepoints.length - 1].tp_code];
-                } else if (validTimepoints.length === 1 && data.length >= 2) {
-                    autoSelected = [data[0].tp_code, data[1].tp_code];
-                }
-            }
-
-            if (autoSelected.length > 0) {
-                setSelectedTimepoints(autoSelected);
-                // Pre-fetch image lists so isPhotoTypeAvailable can correctly disable
-                // photo types missing in either timepoint on initial render.
-                const results = await Promise.all(autoSelected.map(tp => fetchTimepointImages(tp)));
-                setTimepointImages(prev => {
-                    const next = { ...prev };
-                    autoSelected.forEach((tp, i) => { next[tp] = results[i]; });
-                    return next;
-                });
-            }
-        } catch (err) {
-            console.error('Error loading timepoints:', err);
-            toast.error(httpErrorMessage(err, 'Failed to load timepoints'));
-        } finally {
-            setLoading(false);
-        }
-    }, [personId, fetchTimepointImages, toast]);
+    // Timepoint list read — on useQuery. Lazy-gated by `!!personId`, matching the
+    // original `if (!personId) return` guard (the only thing that previously
+    // gated the fetch). Reuses the shared factory + contract schema. No refresh
+    // handler called the old loader, so `refetch` is left unwired (TODO(phase3)
+    // if a live-invalidation trigger is added).
+    const {
+        data: timepointsData,
+        isLoading: timepointsLoading,
+        error: timepointsError,
+    } = useQuery({
+        ...timepointsQuery(personId ?? ''),
+        enabled: !!personId,
+    });
 
     const initializeComparison = useCallback(() => {
         if (!canvasRef.current) return;
@@ -995,9 +969,59 @@ const CompareComponent = ({ personId, phone }: Props) => {
         }
     }, [comparison, selectedTimepoints, selectedPhotoType, personId, toast]);
 
+    // Mirror the query's loading state into the shared `loading` flag (also used
+    // by image-loading) and surface the fetch error as a toast — both side
+    // effects formerly lived inside loadTimepoints' try/finally.
     useEffect(() => {
-        loadTimepoints();
-    }, [loadTimepoints]);
+        setLoading(timepointsLoading);
+    }, [timepointsLoading]);
+
+    useEffect(() => {
+        if (timepointsError) {
+            console.error('Error loading timepoints:', timepointsError);
+            toast.error(httpErrorMessage(timepointsError, 'Failed to load timepoints'));
+        }
+    }, [timepointsError, toast]);
+
+    // Populate timepoints + auto-select first/last (skip tp_code 0) + pre-fetch
+    // their image lists once the query resolves. Loose contract models only key
+    // fields, so cast to the local Timepoint shape. Runs once per personId load
+    // (guarded so re-renders don't clobber a user's manual selection).
+    const autoSelectedRef = useRef<number | null>(null);
+    useEffect(() => {
+        if (!timepointsData) return;
+        const data = timepointsData as unknown as Timepoint[];
+        setTimepoints(data);
+
+        // Only auto-select once per loaded patient.
+        if (autoSelectedRef.current === personId) return;
+        autoSelectedRef.current = personId ?? null;
+
+        let autoSelected: number[] = [];
+        if (data.length >= 2) {
+            const validTimepoints = data.filter(tp => tp.tp_code > 0);
+
+            if (validTimepoints.length >= 2) {
+                autoSelected = [validTimepoints[0].tp_code, validTimepoints[validTimepoints.length - 1].tp_code];
+            } else if (validTimepoints.length === 1 && data.length >= 2) {
+                autoSelected = [data[0].tp_code, data[1].tp_code];
+            }
+        }
+
+        if (autoSelected.length > 0) {
+            setSelectedTimepoints(autoSelected);
+            // Pre-fetch image lists so isPhotoTypeAvailable can correctly disable
+            // photo types missing in either timepoint on initial render.
+            void Promise.all(autoSelected.map(tp => fetchTimepointImages(tp))).then(results => {
+                setTimepointImages(prev => {
+                    const next = { ...prev };
+                    autoSelected.forEach((tp, i) => { next[tp] = results[i]; });
+                    return next;
+                });
+            });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: keyed off the resolved data + personId; fetchTimepointImages is stable per personId
+    }, [timepointsData, personId]);
 
     // Re-run once the canvas actually mounts. On first render the component sits
     // behind the `loading && timepoints.length === 0` spinner, so canvasRef is

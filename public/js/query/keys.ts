@@ -61,6 +61,12 @@ export const qk = {
     doctors: () => ['aligner', 'doctors'] as const,
     /** Parent for a work's aligner data (sets/batches). */
     work: (workId: Id) => ['aligner', 'work', workId] as const,
+    /** GET /api/aligner/all-sets — all sets across doctors. */
+    allSets: () => ['aligner', 'all-sets'] as const,
+    /** GET /api/aligner/patients/all — all aligner patients. */
+    allPatients: () => ['aligner', 'patients', 'all'] as const,
+    /** GET /api/aligner/patients/by-doctor/:doctorId. */
+    patientsByDoctor: (doctorId: Id) => ['aligner', 'patients', 'by-doctor', doctorId] as const,
   },
   /** Lookup/reference data — long-lived, rarely changes. */
   lookups: {

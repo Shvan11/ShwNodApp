@@ -1,44 +1,25 @@
 // DoctorsList.tsx - Select a doctor to browse their patients
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
-import { fetchJSON, httpErrorMessage } from '@/core/http';
-import * as alignerContract from '@shared/contracts/aligner.contract';
+import { httpErrorMessage } from '@/core/http';
+import { alignerDoctorsQuery } from '@/query/queries';
+import type { AlignerDoctor } from '@shared/contracts/aligner.contract';
 import styles from './DoctorsList.module.css';
-
-interface Doctor {
-    dr_id: number;
-    doctor_name: string;
-    UnreadDoctorNotes?: number;
-}
 
 const DoctorsList: React.FC = () => {
     const navigate = useNavigate();
     const toast = useToast();
-    const [doctors, setDoctors] = useState<Doctor[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
+    const { data, isLoading: loading, error } = useQuery(alignerDoctorsQuery());
+    const doctors: AlignerDoctor[] = data?.doctors ?? [];
 
-    // Load doctors on mount
+    // Surface a load failure as a toast (preserves the previous on-error UX).
     useEffect(() => {
-        loadDoctors();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    const loadDoctors = async (): Promise<void> => {
-        try {
-            const data = await fetchJSON<{ doctors?: Doctor[] }>(
-                '/api/aligner/doctors',
-                { schema: alignerContract.alignerDoctors.response }
-            );
-
-            setDoctors(data.doctors || []);
-        } catch (error) {
-            console.error('Error loading doctors:', error);
+        if (error) {
             toast.error(httpErrorMessage(error, 'Failed to load doctors'));
-        } finally {
-            setLoading(false);
         }
-    };
+    }, [error, toast]);
 
     const selectDoctor = (doctor: { dr_id: number | string; doctor_name: string }): void => {
         navigate(`/aligner/doctor/${doctor.dr_id}`);

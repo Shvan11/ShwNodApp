@@ -1,12 +1,12 @@
 import { useState, useEffect, type ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import styles from './Diagnosis.module.css';
 import { formatISODate } from '../core/utils';
 import { fetchJSON, postJSON, deleteJSON } from '@/core/http';
-import { getWorks as getWorksContract } from '@shared/contracts/work.contract';
-import * as patientContract from '@shared/contracts/patient.contract';
+import { patientInfoQuery, worksQuery } from '@/query/queries';
 
 /**
  * Diagnosis Page
@@ -93,13 +93,33 @@ const Diagnosis = () => {
     const toast = useToast();
     const confirm = useConfirm();
 
-    const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [activeTab, setActiveTab] = useState<TabId>('general');
-    const [workInfo, setWorkInfo] = useState<WorkInfo | null>(null);
-    const [patientInfo, setPatientInfo] = useState<PatientInfo | null>(null);
     const [diagnosisExists, setDiagnosisExists] = useState(false);
+    // Diagnosis row read stays raw/schema-less by design (see effect below); its
+    // own loading flag gates the page spinner alongside the two RQ reads.
+    const [diagnosisLoading, setDiagnosisLoading] = useState(true);
+
+    // Patient info + works reads on useQuery (the patientShellLoader prefetched
+    // patientInfo, so it resolves from cache instantly). Loose contracts model
+    // only key fields, so cast each to its concrete local type.
+    const { data: patientData, isLoading: patientLoading } = useQuery({
+        ...patientInfoQuery(personId ?? ''),
+        enabled: !!personId,
+    });
+    const { data: worksData, isLoading: worksLoading } = useQuery({
+        ...worksQuery(personId ?? ''),
+        enabled: !!personId,
+    });
+
+    const patientInfo = (patientData ?? null) as unknown as PatientInfo | null;
+    const works = (worksData ?? null) as unknown as WorkInfo[] | null;
+    const workInfo = works
+        ? works.find(w => w.work_id === parseInt(workId || '0')) ?? null
+        : null;
+
+    const loading = patientLoading || worksLoading || diagnosisLoading;
 
     const [diagnosisData, setDiagnosisData] = useState<DiagnosisData>({
         work_id: parseInt(workId || '0'),
@@ -153,55 +173,35 @@ const Diagnosis = () => {
         c_percent_lafh: ''
     });
 
+    // Diagnosis row read — kept as a standalone raw fetch (patient info + works
+    // now load via useQuery above). `/api/diagnosis/:workId` is DELIBERATELY
+    // schema-less: it returns the row or literal `null` (the "no diagnosis yet"
+    // signal) — not the sendSuccess envelope — so it stays out of the contract
+    // and carries no client schema. Each GET stays independent via .catch(() => null)
+    // (the N14 tolerant mechanic).
     useEffect(() => {
-        loadData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [personId, workId]);
-
-    const loadData = async () => {
-        try {
-            setLoading(true);
-
-            // Load patient info, work info, and diagnosis data in parallel. Each GET is
-            // independent — a failure of one shouldn't blank the others — so each is
-            // wrapped in .catch(() => null) (the N14 tolerant-Promise.all mechanic),
-            // replacing the old per-res.ok guards. /api/diagnosis/:workId returns HTTP 200
-            // with a null body when no diagnosis exists yet (NOT a non-2xx — see audit
-            // N18), so the `if (diagnosis)` null-check still means "new diagnosis".
-            const [patient, works, diagnosis] = await Promise.all([
-                fetchJSON<PatientInfo>(`/api/patients/${personId}/info`, { schema: patientContract.patientInfo.response }).catch(() => null),
-                fetchJSON<WorkInfo[]>(`/api/getworks?code=${personId}`, { schema: getWorksContract.response }).catch(() => null),
-                // Raw, un-enveloped: `/api/diagnosis/:workId` returns the row or literal
-                // `null` (the "no diagnosis yet" signal) — not the sendSuccess envelope —
-                // so it stays out of the contract and carries no client schema by design.
-                // eslint-disable-next-line no-restricted-syntax -- raw literal-null signal; no contract response
-                fetchJSON<Partial<DiagnosisData> | null>(`/api/diagnosis/${workId}`).catch(() => null)
-            ]);
-
-            if (patient) {
-                setPatientInfo(patient);
-            }
-
-            if (works) {
-                const work = works.find(w => w.work_id === parseInt(workId || '0'));
-                setWorkInfo(work || null);
-            }
-
-            if (diagnosis) {
-                // Format date to YYYY-MM-DD for input
-                if (diagnosis.dx_date) {
-                    diagnosis.dx_date = formatISODate(diagnosis.dx_date);
+        let cancelled = false;
+        setDiagnosisLoading(true);
+        // eslint-disable-next-line no-restricted-syntax -- raw literal-null signal; no contract response
+        fetchJSON<Partial<DiagnosisData> | null>(`/api/diagnosis/${workId}`)
+            .catch(() => null)
+            .then(diagnosis => {
+                if (cancelled) return;
+                if (diagnosis) {
+                    // Format date to YYYY-MM-DD for input
+                    if (diagnosis.dx_date) {
+                        diagnosis.dx_date = formatISODate(diagnosis.dx_date);
+                    }
+                    setDiagnosisData(prev => ({ ...prev, ...diagnosis }));
+                    setDiagnosisExists(true);
                 }
-                setDiagnosisData(prev => ({ ...prev, ...diagnosis }));
-                setDiagnosisExists(true);
-            }
-        } catch (err) {
-            console.error('Error loading data:', err);
-            toast.error('Failed to load diagnosis data');
-        } finally {
-            setLoading(false);
-        }
-    };
+            })
+            .finally(() => {
+                if (!cancelled) setDiagnosisLoading(false);
+            });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workId]);
 
     const handleChange = (field: keyof DiagnosisData, value: string) => {
         setDiagnosisData(prev => ({ ...prev, [field]: value }));
