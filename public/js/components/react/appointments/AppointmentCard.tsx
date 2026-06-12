@@ -124,37 +124,23 @@ const AppointmentCard = ({
         if (!appointmentId) return <></>;
 
         if (!showStatus) {
-            // All appointments table — checked-in rows show the solid green
-            // status square; pending rows get a labeled action button (a lone
-            // dimmed icon read as "disabled", hiding the list's primary action).
+            // All appointments table - show only check-in button (gray/dim - not checked in yet)
             const isCheckedIn = status === 'Checked In';
-
-            if (isCheckedIn) {
-                return (
-                    <button
-                        type="button"
-                        className={styles.statusActive}
-                        title="Checked In"
-                    >
-                        <i className="fas fa-user-check"></i>
-                    </button>
-                );
-            }
 
             return (
                 <button
                     type="button"
-                    className={styles.checkInButton}
+                    className={isCheckedIn ? styles.statusActive : styles.statusInactiveClickable}
                     onClick={(e: React.MouseEvent) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (onCheckIn) {
+                        if (!isCheckedIn && onCheckIn) {
                             onCheckIn(appointmentId);
                         }
                     }}
+                    title={isCheckedIn ? "Checked In" : "Click to Check In"}
                 >
                     <i className="fas fa-user-check"></i>
-                    <span>Check in</span>
                 </button>
             );
         } else {
