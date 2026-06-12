@@ -1,4 +1,4 @@
-import React, { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
+import React, { useState, useEffect, useMemo, type FormEvent, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import WorkCard, { type Work, type WorkStatus } from './WorkCard';
@@ -141,7 +141,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         ...worksQuery(personId ?? ''),
         enabled: !!personId,
     });
-    const works = (worksData ?? []) as unknown as Work[];
+    const works = useMemo(() => (worksData ?? []) as unknown as Work[], [worksData]);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'discontinued'>('all');
     const [showDetailsModal, setShowDetailsModal] = useState(false);
