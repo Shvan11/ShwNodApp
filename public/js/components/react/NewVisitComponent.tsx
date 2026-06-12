@@ -306,8 +306,9 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                     {/* Basic Information */}
                     <div className={styles.formRow}>
                     <div className={styles.formGroup}>
-                        <label>Visit Date <span className={styles.required}>*</span></label>
+                        <label htmlFor="new-visit-date">Visit Date <span className={styles.required}>*</span></label>
                         <input
+                            id="new-visit-date"
                             type="date"
                             value={formData.visit_date}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('visit_date', e.target.value)}
@@ -315,8 +316,9 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         />
                     </div>
                     <div className={styles.formGroup}>
-                        <label>Operator</label>
+                        <label htmlFor="new-visit-operator">Operator</label>
                         <select
+                            id="new-visit-operator"
                             value={formData.operator_id}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFieldChange('operator_id', e.target.value)}
                         >
@@ -364,8 +366,9 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                     {/* Wire Information */}
                     <div className={styles.formRow}>
                         <div className={styles.formGroup}>
-                            <label>Upper Wire</label>
+                            <label htmlFor="new-visit-upper-wire">Upper Wire</label>
                             <select
+                                id="new-visit-upper-wire"
                                 value={formData.upper_wire_id}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFieldChange('upper_wire_id', e.target.value)}
                             >
@@ -378,8 +381,9 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                             </select>
                         </div>
                         <div className={styles.formGroup}>
-                            <label>Lower Wire</label>
+                            <label htmlFor="new-visit-lower-wire">Lower Wire</label>
                             <select
+                                id="new-visit-lower-wire"
                                 value={formData.lower_wire_id}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFieldChange('lower_wire_id', e.target.value)}
                             >
@@ -398,8 +402,9 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 <div className={cn(styles.tabContent, { [styles.active]: activeTab === 'treatment' })}>
                     {/* Treatment Details */}
                     <div className={styles.formGroup}>
-                        <label>Bracket Change</label>
+                        <label htmlFor="new-visit-bracket-change">Bracket Change</label>
                         <input
+                            id="new-visit-bracket-change"
                             type="text"
                             value={formData.bracket_change}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('bracket_change', e.target.value)}
@@ -408,8 +413,9 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                     </div>
 
                     <div className={styles.formGroup}>
-                        <label>Wire Bending</label>
+                        <label htmlFor="new-visit-wire-bending">Wire Bending</label>
                         <input
+                            id="new-visit-wire-bending"
                             type="text"
                             value={formData.wire_bending}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('wire_bending', e.target.value)}
@@ -418,8 +424,9 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                     </div>
 
                     <div className={styles.formGroup}>
-                        <label>Elastics</label>
+                        <label htmlFor="new-visit-elastics">Elastics</label>
                         <input
+                            id="new-visit-elastics"
                             type="text"
                             value={formData.elastics}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('elastics', e.target.value)}
@@ -430,14 +437,14 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
 
                 {/* Dental Chart */}
                 <div className={styles.dentalChartSection}>
-                    <label className={styles.chartLabel}>
+                    <span className={styles.chartLabel}>
                         <span>
                             <i className="fas fa-tooth"></i> Select Teeth
                         </span>
                         <span className={styles.chartHint}>
                             <i className="fas fa-arrow-down"></i> Appends to: <strong>{lastFocusedField === 'others' ? 'Other Notes' : 'Next Visit'}</strong>
                         </span>
-                    </label>
+                    </span>
                     <DentalChart onToothClick={handleToothClick} />
                 </div>
 

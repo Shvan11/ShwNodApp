@@ -113,10 +113,10 @@ export default function ItemFilters({ filters, onFilterChange, onApply, onReset 
         </div>
 
         <div className={styles.filterGroup}>
-          <label>
+          <span>
             <i className="fas fa-eye"></i>
             Visibility
-          </label>
+          </span>
           <div className={styles.checkboxGroup}>
             <label className={styles.checkboxLabel}>
               <input

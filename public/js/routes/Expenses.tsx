@@ -105,7 +105,7 @@ export default function Expenses() {
     updateExpense,
     deleteExpense,
     loading: mutationLoading
-  } = useExpenseMutations(refetch);
+  } = useExpenseMutations();
 
   // Handle filter changes (updates local state only, not applied yet)
   const handleFilterChange = (updates: Partial<FiltersState>) => {

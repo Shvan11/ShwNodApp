@@ -13,7 +13,7 @@
 .sectionHeader h2 {
     margin: 0;
     font-size: 1.5rem;
-    color: var(--text-color);
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -21,7 +21,7 @@
 
 .sectionInfo {
     font-size: 0.95rem;
-    color: var(--text-light);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
@@ -92,14 +92,14 @@
 .doctorCard h3 {
     margin: 0;
     font-size: 1.2rem;
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .arrowIcon {
     position: absolute;
     top: 1rem;
     right: 1rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
     font-size: 1.2rem;
     transition: all 0.3s;
 }

@@ -204,7 +204,7 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
                 </div>
 
                 <div className="form-group">
-                    <label>Severity</label>
+                    <span>Severity</span>
                     <div className={styles.severityRow}>
                         {SEVERITIES.map((s) => (
                             <label key={s.value} className={styles.severityOption}>
@@ -255,9 +255,11 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
                                                 key={p.person_id}
                                                 role="option"
                                                 aria-selected={false}
+                                                tabIndex={0}
                                                 className={styles.pickerOption}
                                                 onMouseDown={(e) => e.preventDefault()}
                                                 onClick={() => { setPatient(p); setPickerResults([]); }}
+                                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPatient(p); setPickerResults([]); } }}
                                             >
                                                 <span>{p.patient_name}</span>
                                                 <span className={styles.chipId}>#{p.person_id}</span>

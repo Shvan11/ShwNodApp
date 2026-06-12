@@ -45,7 +45,7 @@
   gap: var(--spacing-sm);
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-  color: var(--gray-900);
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -97,7 +97,7 @@
 
 .closeBtn:hover {
   background: var(--gray-300);
-  color: var(--gray-900);
+  color: var(--text-primary);
 }
 
 /* Body */
@@ -131,7 +131,7 @@
 .itemsTable td {
   padding: var(--spacing-sm) var(--spacing-md);
   border-bottom: 1px solid var(--gray-100);
-  color: var(--gray-800);
+  color: var(--text-primary);
 }
 
 .itemsTable .numericCell {
@@ -176,7 +176,7 @@
 
 .totalsValue {
   font-weight: var(--font-weight-semibold);
-  color: var(--gray-900);
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -193,7 +193,7 @@
 
 .totalHighlight .totalsLabel {
   font-weight: var(--font-weight-semibold);
-  color: var(--gray-800);
+  color: var(--text-primary);
 }
 
 .totalHighlight .totalsValue {
@@ -228,7 +228,7 @@
 .infoValue {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  color: var(--gray-800);
+  color: var(--text-primary);
 }
 
 /* Void reason */
@@ -272,7 +272,7 @@
   padding: var(--spacing-sm) var(--spacing-lg);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  color: var(--gray-700);
+  color: var(--text-secondary);
   background: var(--surface);
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-md);

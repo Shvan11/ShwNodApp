@@ -124,7 +124,7 @@ const WorkCard = ({
     return (
         <div className={cn(styles.card, getCardClass(), isExpanded ? styles.expanded : styles.collapsed)}>
             {/* Minimal Header - Always Visible */}
-            <div className={styles.collapsedHeader} onClick={onToggleExpanded}>
+            <div className={styles.collapsedHeader} role="button" tabIndex={0} onClick={onToggleExpanded} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleExpanded(); } }}>
                 <div className={styles.titleSection}>
                     <div className={styles.title}>
                         <i className={cn('fas', isExpanded ? 'fa-chevron-down' : 'fa-chevron-right', styles.chevronIcon)}></i>

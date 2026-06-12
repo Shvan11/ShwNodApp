@@ -18,7 +18,7 @@
   margin: 0;
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-  color: var(--text-color);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
@@ -48,7 +48,7 @@
 .totalAmount {
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
-  color: var(--text-color);
+  color: var(--text-primary);
 }
 
 /* Form fields */
@@ -62,7 +62,7 @@
 .label {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  color: var(--gray-700);
+  color: var(--text-secondary);
 }
 
 /* Amount paid input */
@@ -89,12 +89,12 @@
   font-size: var(--font-size-lg);
   font-family: var(--font-primary);
   font-weight: var(--font-weight-semibold);
-  color: var(--text-color);
+  color: var(--text-primary);
   background: transparent;
 }
 
 .amountInput::placeholder {
-  color: var(--text-lighter);
+  color: var(--text-muted);
   font-weight: var(--font-weight-normal);
 }
 
@@ -166,7 +166,7 @@
   padding: var(--spacing-sm) var(--spacing-md);
   font-size: var(--font-size-base);
   font-family: var(--font-primary);
-  color: var(--text-color);
+  color: var(--text-primary);
   background-color: var(--surface);
   border: var(--border-width-thin) solid var(--gray-300);
   border-radius: var(--radius-md);
@@ -198,7 +198,7 @@
   padding: var(--spacing-sm) var(--spacing-md);
   font-size: var(--font-size-sm);
   font-family: var(--font-primary);
-  color: var(--text-color);
+  color: var(--text-primary);
   background-color: var(--surface);
   border: var(--border-width-thin) solid var(--gray-300);
   border-radius: var(--radius-md);
@@ -233,7 +233,7 @@
   height: 1.5rem;
   border: none;
   background: none;
-  color: var(--text-lighter);
+  color: var(--text-muted);
   cursor: pointer;
   border-radius: var(--radius-full);
   transition: color var(--transition-fast), background-color var(--transition-fast);
@@ -294,7 +294,7 @@
 
 .patientId {
   font-size: var(--font-size-xs);
-  color: var(--text-lighter);
+  color: var(--text-muted);
 }
 
 /* Note input */
@@ -304,7 +304,7 @@
   padding: var(--spacing-sm) var(--spacing-md);
   font-size: var(--font-size-sm);
   font-family: var(--font-primary);
-  color: var(--text-color);
+  color: var(--text-primary);
   background-color: var(--surface);
   border: var(--border-width-thin) solid var(--gray-300);
   border-radius: var(--radius-md);

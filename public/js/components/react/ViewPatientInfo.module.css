@@ -38,7 +38,7 @@
 
 .patientEmptyIcon {
     font-size: 3rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 /* ===========================================
@@ -72,7 +72,7 @@
     margin: 0 0 var(--spacing-xs) 0;
     font-size: 1.75rem;
     font-weight: 700;
-    color: var(--gray-800);
+    color: var(--text-primary);
 }
 
 .patientSecondaryName {
@@ -123,7 +123,7 @@
     margin: 0;
     font-size: 1.125rem;
     font-weight: 600;
-    color: var(--gray-800);
+    color: var(--text-primary);
 }
 
 .patientAlertsEmpty {
@@ -169,7 +169,7 @@
 }
 
 .patientAlertText {
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .patientAlertDate {
@@ -188,7 +188,7 @@
     padding: var(--spacing-xs);
     background: transparent;
     border: none;
-    color: var(--text-lighter);
+    color: var(--text-muted);
     cursor: pointer;
     transition: color 0.2s ease;
 }
@@ -235,7 +235,7 @@
     padding: var(--spacing-md) var(--spacing-lg);
     font-size: 1.125rem;
     font-weight: 600;
-    color: var(--gray-800);
+    color: var(--text-primary);
     background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-100) 100%);
     border-bottom: 2px solid var(--gray-200);
 }
@@ -269,7 +269,7 @@
 }
 
 .patientInfoValue {
-    color: var(--gray-800);
+    color: var(--text-primary);
     text-align: right;
     flex: 1;
     word-break: break-word;
@@ -303,7 +303,7 @@
     padding: var(--spacing-xs);
     background: transparent;
     border: none;
-    color: var(--text-lighter);
+    color: var(--text-muted);
     cursor: pointer;
     transition: color 0.2s ease;
 }
@@ -363,7 +363,7 @@
     display: flex;
     justify-content: center;
     padding: var(--spacing-sm);
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 .patientCostPresetBtn {
@@ -373,7 +373,7 @@
     border-radius: var(--radius-md);
     font-size: 0.8125rem;
     font-weight: 500;
-    color: var(--gray-700);
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
 }
@@ -398,7 +398,7 @@
 
 .patientNotesContent {
     padding: var(--spacing-lg);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     line-height: 1.6;
     white-space: pre-wrap;
     min-height: 60px;

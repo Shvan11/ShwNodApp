@@ -157,7 +157,7 @@ const PhotosTab = () => {
             >
               <img
                 src={`/DolImgs/${encodeURIComponent(p.name)}`}
-                alt={`Photo ${idx + 1}`}
+                alt=""
                 loading="lazy"
                 className={styles.photoImg}
               />
@@ -167,6 +167,7 @@ const PhotosTab = () => {
       )}
 
       {lightbox !== null && photos && photos[lightbox] && (
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss
         <div
           className={styles.lightbox}
           role="dialog"
@@ -181,6 +182,7 @@ const PhotosTab = () => {
           >
             <i className="fas fa-times" aria-hidden="true" />
           </button>
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss */}
           <img
             src={`/DolImgs/${encodeURIComponent(photos[lightbox].name)}`}
             alt=""

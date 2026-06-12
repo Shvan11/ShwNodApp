@@ -129,7 +129,7 @@
 
 .fileIcon {
     font-size: 2rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 .check {
@@ -145,7 +145,7 @@
 .name {
     width: 100%;
     font-size: var(--font-size-xs);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -153,5 +153,5 @@
 
 .meta {
     font-size: 0.7rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }

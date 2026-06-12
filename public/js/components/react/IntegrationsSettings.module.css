@@ -17,7 +17,7 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  color: var(--text-color);
+  color: var(--text-primary);
 }
 
 .description {
@@ -33,7 +33,7 @@
 .toolBtn {
   border: 1px solid var(--border-color);
   background: var(--background-primary);
-  color: var(--text-color);
+  color: var(--text-primary);
   border-radius: var(--radius-md);
   padding: var(--spacing-sm) var(--spacing-md);
   font-size: var(--font-size-sm);
@@ -121,7 +121,7 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  color: var(--text-color);
+  color: var(--text-primary);
 }
 
 .badge {
@@ -193,7 +193,7 @@
 
 .row dd {
   margin: 0;
-  color: var(--text-color);
+  color: var(--text-primary);
 }
 
 .okText {
@@ -235,7 +235,7 @@
   border-radius: var(--radius-md);
   font-size: var(--font-size-base);
   background: var(--background-primary);
-  color: var(--text-color);
+  color: var(--text-primary);
 }
 
 .loginButtons {

@@ -1,0 +1,271 @@
+/* ===== COMPARE — canvas stage (clinical lightbox) =====
+ *
+ * The stage is deliberately pinned dark in BOTH themes (like an imaging
+ * lightbox / photo-editing viewport) so clinical photos read true — hence the
+ * theme-stable --palette-night-* primitives instead of semantic surfaces.
+ */
+
+.stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-xl);
+    min-height: 560px;
+    overflow: auto;
+    border-radius: var(--radius-xl);
+    border: var(--border-width-thin) solid var(--palette-night-600);
+    background:
+        radial-gradient(ellipse 80% 50% at 50% 0%, color-mix(in srgb, var(--palette-night-500) 40%, transparent), transparent 70%),
+        radial-gradient(color-mix(in srgb, var(--palette-night-300) 14%, transparent) 1px, transparent 1px),
+        linear-gradient(180deg, var(--palette-night-800), var(--palette-night-900));
+    background-size: auto, 22px 22px, auto;
+}
+
+.stageFullscreen {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-lg);
+    overflow: auto;
+    width: 100vw;
+    height: 100vh;
+    border: none;
+    border-radius: 0;
+    background: var(--color-black);
+}
+
+/* --- floating toolbar --- */
+
+.toolbar {
+    position: absolute;
+    top: var(--spacing-md);
+    inset-inline-end: var(--spacing-md);
+    z-index: var(--z-index-sticky);
+    display: flex;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs);
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--palette-night-900) 65%, transparent);
+    border: var(--border-width-thin) solid color-mix(in srgb, var(--color-white) 14%, transparent);
+    backdrop-filter: blur(10px);
+}
+
+.toolbarHidden {
+    display: none;
+}
+
+.toolbarButton {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--palette-gray-200);
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.toolbarButton:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-white) 14%, transparent);
+    color: var(--color-white);
+}
+
+.toolbarButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+/* --- canvas --- */
+
+.canvasShell {
+    position: relative;
+    line-height: 0;
+    max-width: 100%;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    box-shadow: var(--shadow-xl);
+    touch-action: none;
+}
+
+.canvasShellHidden {
+    display: none;
+}
+
+.canvasEl {
+    display: block;
+    background: transparent;
+    max-width: 100%;
+    max-height: min(70vh, 820px);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+.canvasElFullscreen {
+    display: block;
+    background: transparent;
+    max-width: 100vw;
+    max-height: 100vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+/* --- empty state --- */
+
+.empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    max-width: 380px;
+    padding: var(--spacing-xl);
+    text-align: center;
+}
+
+.emptyIcon {
+    color: var(--palette-night-300);
+    margin-bottom: var(--spacing-sm);
+}
+
+.emptyTitle {
+    margin: 0;
+    color: var(--palette-gray-200);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+}
+
+.emptyHint {
+    margin: 0;
+    color: var(--palette-gray-400);
+    font-size: var(--font-size-sm);
+}
+
+/* --- image-loading veil --- */
+
+.loadingVeil {
+    position: absolute;
+    inset: 0;
+    z-index: var(--z-index-sticky);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--palette-night-900) 45%, transparent);
+    backdrop-filter: blur(2px);
+}
+
+.spinner {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-full);
+    border: 3px solid color-mix(in srgb, var(--color-white) 18%, transparent);
+    border-top-color: var(--palette-blue-300);
+    animation: compare-spin 0.8s linear infinite;
+}
+
+@keyframes compare-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* --- dimensions badge --- */
+
+.dimsBadge {
+    position: absolute;
+    bottom: var(--spacing-md);
+    inset-inline-start: var(--spacing-md);
+    z-index: var(--z-index-sticky);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--palette-night-900) 70%, transparent);
+    border: var(--border-width-thin) solid color-mix(in srgb, var(--color-white) 10%, transparent);
+    backdrop-filter: blur(8px);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-xs);
+    color: var(--palette-gray-300);
+    letter-spacing: 0.02em;
+}
+
+/* --- slideshow chrome --- */
+
+.slideshowClose {
+    position: absolute;
+    top: var(--spacing-lg);
+    inset-inline-end: var(--spacing-lg);
+    z-index: var(--z-index-fixed);
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: var(--border-width-thin) solid color-mix(in srgb, var(--color-white) 14%, transparent);
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--palette-night-900) 65%, transparent);
+    backdrop-filter: blur(10px);
+    color: var(--color-white);
+    cursor: pointer;
+}
+
+.slideshowArrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: var(--z-index-fixed);
+    width: 60px;
+    height: 60px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: var(--border-width-thin) solid color-mix(in srgb, var(--color-white) 14%, transparent);
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--palette-night-900) 65%, transparent);
+    backdrop-filter: blur(10px);
+    color: var(--color-white);
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+}
+
+.slideshowArrow:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--palette-night-700) 80%, transparent);
+}
+
+.slideshowArrow:disabled {
+    cursor: not-allowed;
+    opacity: 0.3;
+}
+
+/*rtl:ignore*/
+.slideshowPrev {
+    left: var(--spacing-lg);
+}
+
+/*rtl:ignore*/
+.slideshowNext {
+    right: var(--spacing-lg);
+}
+
+.slideshowCounter {
+    position: absolute;
+    top: var(--spacing-lg);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: var(--z-index-fixed);
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--palette-night-900) 65%, transparent);
+    border: var(--border-width-thin) solid color-mix(in srgb, var(--color-white) 14%, transparent);
+    backdrop-filter: blur(10px);
+    color: var(--color-white);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+}
+
+.slideshowCounterIndex {
+    font-family: var(--font-family-mono);
+    color: var(--palette-gray-300);
+    margin-inline-start: var(--spacing-sm);
+}

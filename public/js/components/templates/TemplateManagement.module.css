@@ -30,7 +30,7 @@
 .headerContent h2 {
     margin: 0 0 0.5rem 0;
     font-size: 1.75rem;
-    color: var(--text-dark);
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -98,7 +98,7 @@
     margin: 0;
     font-size: 2rem;
     font-weight: var(--font-weight-bold);
-    color: var(--text-dark);
+    color: var(--text-primary);
 }
 
 .statContent p {
@@ -140,7 +140,7 @@
 
 .tab:hover {
     background: var(--bg-light);
-    color: var(--text-dark);
+    color: var(--text-primary);
 }
 
 .tabActive {
@@ -198,7 +198,7 @@
 
 .emptyState h3 {
     margin: 0 0 0.5rem 0;
-    color: var(--text-dark);
+    color: var(--text-primary);
     font-size: 1.5rem;
 }
 
@@ -271,7 +271,7 @@
 .templateTitle h4 {
     margin: 0;
     font-size: 1.125rem;
-    color: var(--text-dark);
+    color: var(--text-primary);
     flex: 1;
 }
 
@@ -377,7 +377,7 @@
 .modalHeader h3 {
     margin: 0;
     font-size: 1.25rem;
-    color: var(--text-dark);
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -401,7 +401,7 @@
 
 .modalClose:hover {
     background: var(--bg-light);
-    color: var(--text-dark);
+    color: var(--text-primary);
 }
 
 .modalBody {
@@ -432,7 +432,7 @@
 .formGroup label {
     display: block;
     margin-bottom: 0.5rem;
-    color: var(--text-dark);
+    color: var(--text-primary);
     font-weight: var(--font-weight-medium);
     font-size: 0.875rem;
 }

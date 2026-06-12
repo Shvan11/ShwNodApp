@@ -455,7 +455,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                                     When enabled, early and late time slots are visible by default in the calendar.
                                 </p>
                             </div>
-                            <label className={styles.switch}>
+                            <label className={styles.switch} htmlFor="showExtendedSlots" aria-label="Show early & late slots by default">
                                 <input
                                     type="checkbox"
                                     id="showExtendedSlots"

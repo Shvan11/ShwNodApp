@@ -88,7 +88,7 @@
     background: none;
     border: none;
     border-left: 1px solid var(--gray-200);
-    color: var(--text-lighter);
+    color: var(--text-muted);
     font-size: 0.875rem;
     cursor: pointer;
     transition: color 0.15s ease, background 0.15s ease;
@@ -145,7 +145,7 @@
 .tabDesc {
     font-weight: var(--font-weight-semibold);
     font-size: 0.875rem;
-    color: var(--gray-800);
+    color: var(--text-primary);
     white-space: nowrap;
 }
 
@@ -162,7 +162,7 @@
 .tabDate::before {
     content: "•";
     margin-right: 0.5rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 .tabActive .tabDate {

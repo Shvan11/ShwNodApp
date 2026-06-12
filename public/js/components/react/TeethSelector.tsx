@@ -121,7 +121,10 @@ const TeethSelector = React.memo(({
             <div
                 key={tooth.id}
                 className={cn(styles.tooth, isSelected && styles.toothSelected)}
+                role="button"
+                tabIndex={0}
                 onClick={() => handleToothClick(tooth.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToothClick(tooth.id); } }}
                 title={tooth.tooth_name}
             >
                 {isLower && <span className={styles.toothNumber}>{toothNumber}</span>}

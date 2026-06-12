@@ -449,6 +449,7 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
             below the grid — clears the active slot. Clicks that land on a cell
             (which carries data-slot-cell) keep their own selection; the cell's
             onClick has already run by the time this bubbles up. */}
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss (clears active slot on empty-space click) */}
         <main
           className={styles.gridArea}
           onClick={(e) => {

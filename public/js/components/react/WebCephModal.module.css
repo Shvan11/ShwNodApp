@@ -44,7 +44,7 @@
 
 .closeBtn:hover {
     background: var(--indigo-100);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 /* ── Body ─────────────────────────────────────────────────────────────────── */
@@ -58,7 +58,7 @@
 
 .subtitle {
     margin: 0;
-    color: var(--gray-700);
+    color: var(--text-secondary);
     font-weight: var(--font-weight-semibold);
 }
 
@@ -213,7 +213,7 @@
     margin-bottom: var(--spacing-sm);
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .input {
@@ -276,7 +276,7 @@
     flex: 1;
     min-width: 0;
     font-size: var(--font-size-sm);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -294,7 +294,7 @@
 
 .chipClear:hover {
     background: var(--gray-200);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .fileInput {

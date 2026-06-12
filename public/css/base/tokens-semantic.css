@@ -40,13 +40,15 @@
     --secondary-hover: #3c9a3f;
 
     /* ===============================================================
-       Text colours
+       Text colours — CANONICAL SCALE
+       Three neutral tiers + one heading tier. The former synonyms
+       (--text-color / -light / -lighter / -dark / -medium and the raw
+       --gray-600/700/800/900-as-text) were all folded into these; use
+       ONLY these four for text colour.
        =============================================================== */
-    --text-color: #333333;
-    --text-light: #666666;
-    --text-lighter: #999999;
-    --text-primary: #212529;
-    --text-secondary: #6c757d;
+    --text-primary: #212529;                 /* body / strong text */
+    --text-secondary: #6c757d;               /* secondary text, labels */
+    --text-muted: #999999;                   /* muted / tertiary, placeholders */
     --text-heading: var(--color-dark-blue);  /* card/section titles — flips in dark */
 
     /* ===============================================================
@@ -314,15 +316,6 @@
     --bg-secondary: var(--gray-100);
     --table-header-bg: var(--gray-100);
     --white: #ffffff;
-
-    /* Text aliases */
-    --text-dark: var(--text-primary);
-    --text-medium: var(--gray-600);
-    /* Alias the lightest readable text token, NOT raw --gray-400: the gray ramp
-       inverts in dark and --gray-400 → --palette-night-500 (a *border* tone),
-       which is unreadable as text. --text-lighter carries a proper dark override
-       (night-300) so muted text stays legible in both themes. */
-    --text-muted: var(--text-lighter);
 
     /* Primary scale (blue-tinted; matches existing --blue-* scale) */
     --primary-50: #eff6ff;

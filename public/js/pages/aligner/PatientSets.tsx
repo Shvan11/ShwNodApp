@@ -1274,7 +1274,18 @@ const PatientSets: React.FC = () => {
                                         </div>
                                     )}
 
-                                    <div className="set-header" onClick={() => toggleBatches(set.aligner_set_id)}>
+                                    <div
+                                        className="set-header"
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => toggleBatches(set.aligner_set_id)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                toggleBatches(set.aligner_set_id);
+                                            }
+                                        }}
+                                    >
                                         <div className="set-title">
                                             <h4>
                                                 Set #{set.set_sequence}
@@ -1442,6 +1453,7 @@ const PatientSets: React.FC = () => {
                                                             onChange={(e: ChangeEvent<HTMLInputElement>) => setQuickUrlValue(e.target.value)}
                                                             placeholder="https://..."
                                                             className="url-input-inline"
+                                                            // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                                                             autoFocus
                                                             onClick={(e: MouseEvent) => e.stopPropagation()}
                                                         />
@@ -1499,6 +1511,7 @@ const PatientSets: React.FC = () => {
                                                             onChange={(e: ChangeEvent<HTMLInputElement>) => setQuickPdfUrlValue(e.target.value)}
                                                             placeholder="https://..."
                                                             className="url-input-inline"
+                                                            // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                                                             autoFocus
                                                             onClick={(e: MouseEvent) => e.stopPropagation()}
                                                         />
@@ -1561,6 +1574,7 @@ const PatientSets: React.FC = () => {
                                                             onChange={(e: ChangeEvent<HTMLInputElement>) => setQuickVideoValue(e.target.value)}
                                                             placeholder="https://youtube.com/watch?v=..."
                                                             className="url-input-inline"
+                                                            // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                                                             autoFocus
                                                             onClick={(e: MouseEvent) => e.stopPropagation()}
                                                         />
@@ -1869,7 +1883,10 @@ const PatientSets: React.FC = () => {
                                                                                 <div className="note-header-row">
                                                                                     <div className="note-author-container">
                                                                                         {/* Read/Unread Checkbox */}
-                                                                                        <label className="note-checkbox-label">
+                                                                                        <label
+                                                                                            className="note-checkbox-label"
+                                                                                            aria-label={note.is_read !== false ? 'Mark as unread' : 'Mark as read'}
+                                                                                        >
                                                                                             <input
                                                                                                 type="checkbox"
                                                                                                 checked={note.is_read !== false}

@@ -398,8 +398,9 @@ const Diagnosis = () => {
                         <h2 className={styles.sectionTitle}>General Information</h2>
                         <div className={styles.formGrid}>
                             <div className={styles.formGroup}>
-                                <label>Diagnosis Date</label>
+                                <label htmlFor="dx-date">Diagnosis Date</label>
                                 <input
+                                    id="dx-date"
                                     type="date"
                                     className={styles.formInput}
                                     value={diagnosisData.dx_date}
@@ -408,8 +409,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Appliance</label>
+                                <label htmlFor="dx-appliance">Appliance</label>
                                 <input
+                                    id="dx-appliance"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.appliance || ''}
@@ -419,8 +421,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                                <label>Chief Complaint</label>
+                                <label htmlFor="dx-chief-complain">Chief Complaint</label>
                                 <textarea
+                                    id="dx-chief-complain"
                                     className={styles.formTextarea}
                                     rows={3}
                                     value={diagnosisData.chief_complain || ''}
@@ -430,10 +433,11 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                                <label>
+                                <label htmlFor="dx-diagnosis">
                                     Diagnosis <span className={styles.required}>*</span>
                                 </label>
                                 <textarea
+                                    id="dx-diagnosis"
                                     className={styles.formTextarea}
                                     rows={5}
                                     value={diagnosisData.diagnosis || ''}
@@ -444,10 +448,11 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                                <label>
+                                <label htmlFor="dx-treatment-plan">
                                     Treatment Plan <span className={styles.required}>*</span>
                                 </label>
                                 <textarea
+                                    id="dx-treatment-plan"
                                     className={styles.formTextarea}
                                     rows={5}
                                     value={diagnosisData.treatment_plan || ''}
@@ -466,8 +471,9 @@ const Diagnosis = () => {
                         <h2 className={styles.sectionTitle}>Facial Analysis</h2>
                         <div className={styles.formGrid}>
                             <div className={styles.formGroup}>
-                                <label>Antero-Posterior</label>
+                                <label htmlFor="dx-f-antero-posterior">Antero-Posterior</label>
                                 <input
+                                    id="dx-f-antero-posterior"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.f_antero_posterior || ''}
@@ -477,8 +483,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Vertical</label>
+                                <label htmlFor="dx-f-vertical">Vertical</label>
                                 <input
+                                    id="dx-f-vertical"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.f_vertical || ''}
@@ -488,8 +495,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Transverse</label>
+                                <label htmlFor="dx-f-transverse">Transverse</label>
                                 <input
+                                    id="dx-f-transverse"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.f_transverse || ''}
@@ -499,8 +507,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Lip Competence</label>
+                                <label htmlFor="dx-f-lip-competence">Lip Competence</label>
                                 <input
+                                    id="dx-f-lip-competence"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.f_lip_competence || ''}
@@ -510,8 +519,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Nasolabial Angle</label>
+                                <label htmlFor="dx-f-naso-labial-angle">Nasolabial Angle</label>
                                 <input
+                                    id="dx-f-naso-labial-angle"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.f_naso_labial_angle || ''}
@@ -521,8 +531,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Upper Incisor Show (Rest)</label>
+                                <label htmlFor="dx-f-upper-incisor-show-rest">Upper Incisor Show (Rest)</label>
                                 <input
+                                    id="dx-f-upper-incisor-show-rest"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.f_upper_incisor_show_rest || ''}
@@ -532,8 +543,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Upper Incisor Show (Smile)</label>
+                                <label htmlFor="dx-f-upper-incisor-show-smile">Upper Incisor Show (Smile)</label>
                                 <input
+                                    id="dx-f-upper-incisor-show-smile"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.f_upper_incisor_show_smile || ''}
@@ -551,8 +563,9 @@ const Diagnosis = () => {
                         <h2 className={styles.sectionTitle}>Intraoral Analysis</h2>
                         <div className={styles.formGrid}>
                             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                                <label>Teeth Present</label>
+                                <label htmlFor="dx-i-teeth-present">Teeth Present</label>
                                 <input
+                                    id="dx-i-teeth-present"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.i_teeth_present || ''}
@@ -562,8 +575,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                                <label>Dental Health</label>
+                                <label htmlFor="dx-i-dental-health">Dental Health</label>
                                 <input
+                                    id="dx-i-dental-health"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.i_dental_health || ''}
@@ -573,8 +587,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Upper Crowding</label>
+                                <label htmlFor="dx-i-upper-crowding">Upper Crowding</label>
                                 <input
+                                    id="dx-i-upper-crowding"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.i_upper_crowding || ''}
@@ -584,8 +599,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Upper Incisor Inclination</label>
+                                <label htmlFor="dx-i-upper-incisor-inclination">Upper Incisor Inclination</label>
                                 <input
+                                    id="dx-i-upper-incisor-inclination"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.i_upper_incisor_inclination || ''}
@@ -595,8 +611,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Lower Crowding</label>
+                                <label htmlFor="dx-i-lower-crowding">Lower Crowding</label>
                                 <input
+                                    id="dx-i-lower-crowding"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.i_lower_crowding || ''}
@@ -606,8 +623,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Lower Incisor Inclination</label>
+                                <label htmlFor="dx-i-lower-incisor-inclination">Lower Incisor Inclination</label>
                                 <input
+                                    id="dx-i-lower-incisor-inclination"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.i_lower_incisor_inclination || ''}
@@ -617,8 +635,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                                <label>Curve of Spee</label>
+                                <label htmlFor="dx-i-curveof-spee">Curve of Spee</label>
                                 <input
+                                    id="dx-i-curveof-spee"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.i_curveof_spee || ''}
@@ -636,8 +655,9 @@ const Diagnosis = () => {
                         <h2 className={styles.sectionTitle}>Occlusion Analysis</h2>
                         <div className={styles.formGrid}>
                             <div className={styles.formGroup}>
-                                <label>Incisor Relation</label>
+                                <label htmlFor="dx-o-incisor-relation">Incisor Relation</label>
                                 <input
+                                    id="dx-o-incisor-relation"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.o_incisor_relation || ''}
@@ -647,8 +667,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Overjet</label>
+                                <label htmlFor="dx-o-overjet">Overjet</label>
                                 <input
+                                    id="dx-o-overjet"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.o_overjet || ''}
@@ -658,8 +679,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Overbite</label>
+                                <label htmlFor="dx-o-overbite">Overbite</label>
                                 <input
+                                    id="dx-o-overbite"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.o_overbite || ''}
@@ -669,8 +691,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Centerlines</label>
+                                <label htmlFor="dx-o-centerlines">Centerlines</label>
                                 <input
+                                    id="dx-o-centerlines"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.o_centerlines || ''}
@@ -680,8 +703,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Molar Relation (Right / Left)</label>
+                                <label htmlFor="dx-o-molar-relation">Molar Relation (Right / Left)</label>
                                 <input
+                                    id="dx-o-molar-relation"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.o_molar_relation || ''}
@@ -691,8 +715,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label>Canine Relation (Right / Left)</label>
+                                <label htmlFor="dx-o-canine-relation">Canine Relation (Right / Left)</label>
                                 <input
+                                    id="dx-o-canine-relation"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.o_canine_relation || ''}
@@ -702,8 +727,9 @@ const Diagnosis = () => {
                             </div>
 
                             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                                <label>Functional Occlusion</label>
+                                <label htmlFor="dx-o-functional-occlusion">Functional Occlusion</label>
                                 <input
+                                    id="dx-o-functional-occlusion"
                                     type="text"
                                     className={styles.formInput}
                                     value={diagnosisData.o_functional_occlusion || ''}
@@ -724,8 +750,9 @@ const Diagnosis = () => {
                             <h3>Skeletal Relationships</h3>
                             <div className={styles.formGrid}>
                                 <div className={styles.formGroup}>
-                                    <label>SNA (°)</label>
+                                    <label htmlFor="dx-c-sna">SNA (°)</label>
                                     <input
+                                        id="dx-c-sna"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_sna || ''}
@@ -735,8 +762,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>SNB (°)</label>
+                                    <label htmlFor="dx-c-snb">SNB (°)</label>
                                     <input
+                                        id="dx-c-snb"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_snb || ''}
@@ -746,8 +774,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>ANB (°)</label>
+                                    <label htmlFor="dx-c-anb">ANB (°)</label>
                                     <input
+                                        id="dx-c-anb"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_anb || ''}
@@ -757,8 +786,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>SN-Mx (°)</label>
+                                    <label htmlFor="dx-c-sn-mx">SN-Mx (°)</label>
                                     <input
+                                        id="dx-c-sn-mx"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_sn_mx || ''}
@@ -768,8 +798,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>Wits (mm)</label>
+                                    <label htmlFor="dx-c-wits">Wits (mm)</label>
                                     <input
+                                        id="dx-c-wits"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_wits || ''}
@@ -784,8 +815,9 @@ const Diagnosis = () => {
                             <h3>Vertical Relationships</h3>
                             <div className={styles.formGrid}>
                                 <div className={styles.formGroup}>
-                                    <label>FMA (°)</label>
+                                    <label htmlFor="dx-c-fma">FMA (°)</label>
                                     <input
+                                        id="dx-c-fma"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_fma || ''}
@@ -795,8 +827,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>MMA (°)</label>
+                                    <label htmlFor="dx-c-mma">MMA (°)</label>
                                     <input
+                                        id="dx-c-mma"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_mma || ''}
@@ -806,8 +839,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>TAFH (mm)</label>
+                                    <label htmlFor="dx-c-tafh">TAFH (mm)</label>
                                     <input
+                                        id="dx-c-tafh"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_tafh || ''}
@@ -817,8 +851,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>UAFH (mm)</label>
+                                    <label htmlFor="dx-c-uafh">UAFH (mm)</label>
                                     <input
+                                        id="dx-c-uafh"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_uafh || ''}
@@ -828,8 +863,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>LAFH (mm)</label>
+                                    <label htmlFor="dx-c-lafh">LAFH (mm)</label>
                                     <input
+                                        id="dx-c-lafh"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_lafh || ''}
@@ -839,8 +875,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>LAFH (%)</label>
+                                    <label htmlFor="dx-c-percent-lafh">LAFH (%)</label>
                                     <input
+                                        id="dx-c-percent-lafh"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_percent_lafh || ''}
@@ -855,8 +892,9 @@ const Diagnosis = () => {
                             <h3>Dental Relationships</h3>
                             <div className={styles.formGrid}>
                                 <div className={styles.formGroup}>
-                                    <label>UI-Mx (°)</label>
+                                    <label htmlFor="dx-c-uimx">UI-Mx (°)</label>
                                     <input
+                                        id="dx-c-uimx"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_uimx || ''}
@@ -866,8 +904,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>LI-Md (°)</label>
+                                    <label htmlFor="dx-c-li-md">LI-Md (°)</label>
                                     <input
+                                        id="dx-c-li-md"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_li_md || ''}
@@ -877,8 +916,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>UI-LI (°)</label>
+                                    <label htmlFor="dx-c-ui-li">UI-LI (°)</label>
                                     <input
+                                        id="dx-c-ui-li"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_ui_li || ''}
@@ -888,8 +928,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>LI-APo (mm)</label>
+                                    <label htmlFor="dx-c-li-a-po">LI-APo (mm)</label>
                                     <input
+                                        id="dx-c-li-a-po"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_li_a_po || ''}
@@ -904,8 +945,9 @@ const Diagnosis = () => {
                             <h3>Soft Tissue Analysis</h3>
                             <div className={styles.formGrid}>
                                 <div className={styles.formGroup}>
-                                    <label>ULip-E (mm)</label>
+                                    <label htmlFor="dx-c-ulip-e">ULip-E (mm)</label>
                                     <input
+                                        id="dx-c-ulip-e"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_ulip_e || ''}
@@ -915,8 +957,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>LLip-E (mm)</label>
+                                    <label htmlFor="dx-c-llip-e">LLip-E (mm)</label>
                                     <input
+                                        id="dx-c-llip-e"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_llip_e || ''}
@@ -926,8 +969,9 @@ const Diagnosis = () => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>Nasolabial (°)</label>
+                                    <label htmlFor="dx-c-naso-lip">Nasolabial (°)</label>
                                     <input
+                                        id="dx-c-naso-lip"
                                         type="text"
                                         className={styles.formInput}
                                         value={diagnosisData.c_naso_lip || ''}

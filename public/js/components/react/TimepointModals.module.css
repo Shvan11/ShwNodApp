@@ -27,7 +27,7 @@
     margin: 0;
     font-size: 1.125rem;
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-800);
+    color: var(--text-primary);
 }
 
 .closeBtn {
@@ -41,7 +41,7 @@
 }
 
 .closeBtn:hover {
-    color: var(--gray-800);
+    color: var(--text-primary);
 }
 
 .modalBody {
@@ -60,14 +60,14 @@
 .label {
     font-size: 0.8125rem;
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .input {
     width: 100%;
     padding: 0.5rem 0.625rem;
     font-size: 0.9375rem;
-    color: var(--gray-800);
+    color: var(--text-primary);
     background: var(--gray-50);
     border: 1px solid var(--gray-300);
     border-radius: var(--radius-lg);
@@ -83,7 +83,7 @@
     margin: 0;
     font-size: 0.9375rem;
     line-height: 1.5;
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .consequenceList {
@@ -110,7 +110,7 @@
 }
 
 .consequenceRemoved {
-    color: var(--gray-800);
+    color: var(--text-primary);
 }
 
 .consequenceRemoved i {

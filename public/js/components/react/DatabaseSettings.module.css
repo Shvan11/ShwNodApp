@@ -269,7 +269,7 @@
 
 .btnWarning {
     background: var(--warning-color);
-    color: var(--gray-900);
+    color: var(--text-primary);
 }
 
 .btnWarning:hover:not(:disabled) {

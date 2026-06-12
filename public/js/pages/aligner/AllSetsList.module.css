@@ -39,7 +39,7 @@
     left: 0.75rem;
     top: 50%;
     transform: translateY(-50%);
-    color: var(--text-light);
+    color: var(--text-secondary);
     font-size: 1rem;
 }
 
@@ -50,7 +50,7 @@
     transform: translateY(-50%);
     background: none;
     border: none;
-    color: var(--text-lighter);
+    color: var(--text-muted);
     cursor: pointer;
     padding: 0.5rem;
     font-size: 1rem;
@@ -58,7 +58,7 @@
 }
 
 .clearFilterBtn:hover {
-    color: var(--text-light);
+    color: var(--text-secondary);
 }
 
 /* Doctor Filter Dropdown */
@@ -136,7 +136,7 @@
 
 .legendTitle {
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     margin-right: var(--spacing-sm);
 }
 
@@ -189,13 +189,13 @@
 }
 
 .inactiveSetsToggle:hover {
-    color: var(--gray-800);
+    color: var(--text-primary);
 }
 
 .info {
     font-size: 0.8rem;
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .infoHidden {
@@ -230,7 +230,7 @@
     padding: 0.75rem var(--spacing-sm);
     text-align: left;
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     text-transform: uppercase;
     font-size: var(--font-size-xs);
     letter-spacing: var(--letter-spacing-wide);
@@ -250,7 +250,7 @@
 .sortIcon {
     margin-left: 0.25rem;
     font-size: 0.7rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 .sortableHeader:hover .sortIcon {
@@ -259,7 +259,7 @@
 
 .table td {
     padding: 0.75rem var(--spacing-sm);
-    color: var(--gray-800);
+    color: var(--text-primary);
 }
 
 /* Table Row States */
@@ -321,7 +321,7 @@
 /* Patient Name Cell */
 .patientName {
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-800);
+    color: var(--text-primary);
 }
 
 /* Badge Variants */
@@ -397,32 +397,32 @@
 }
 
 .notesEmpty {
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 /* Empty State */
 .emptyPatients {
     text-align: center;
     padding: 4rem 2rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 .emptyPatients i {
     font-size: 4rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
     margin-bottom: 1rem;
     display: block;
 }
 
 .emptyPatients h3 {
-    color: var(--text-light);
+    color: var(--text-secondary);
     margin-bottom: 0.5rem;
 }
 
 .btnClearFilters {
     margin-top: var(--spacing-md);
     background: rgba(255, 255, 255, 0.2);
-    color: var(--text-light);
+    color: var(--text-secondary);
     border: 1px solid var(--gray-300);
     padding: 0.6rem 1.2rem;
     border-radius: 6px;

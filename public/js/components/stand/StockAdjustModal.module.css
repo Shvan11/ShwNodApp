@@ -39,7 +39,7 @@
 }
 
 .closeBtn {
-  color: var(--text-lighter);
+  color: var(--text-muted);
   font-size: 28px;
   font-weight: var(--font-weight-bold);
   cursor: pointer;
@@ -134,7 +134,7 @@
 .hintText {
   display: block;
   font-size: var(--font-size-xs);
-  color: var(--text-lighter);
+  color: var(--text-muted);
   margin-top: 4px;
 }
 

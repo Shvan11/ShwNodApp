@@ -39,7 +39,7 @@
 }
 
 .closeBtn {
-  color: var(--text-lighter);
+  color: var(--text-muted);
   font-size: 28px;
   font-weight: var(--font-weight-bold);
   cursor: pointer;
@@ -194,7 +194,7 @@
 .loadingState {
   text-align: center;
   padding: 40px 20px;
-  color: var(--text-lighter);
+  color: var(--text-muted);
 }
 
 .loadingSpinner {
@@ -214,7 +214,7 @@
 .emptyState {
   text-align: center;
   padding: 40px 20px;
-  color: var(--text-lighter);
+  color: var(--text-muted);
   font-size: var(--font-size-sm);
 }
 

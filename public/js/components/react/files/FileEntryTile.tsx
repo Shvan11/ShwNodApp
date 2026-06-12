@@ -122,6 +122,7 @@ const FileEntryTile = ({
       </div>
 
       {!selectMode && (
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- click-isolation wrapper (stopPropagation only); inner link/button are natively keyboard-accessible
         <div className={styles.entryActions} onClick={stop}>
           {!isDir && (
             <a

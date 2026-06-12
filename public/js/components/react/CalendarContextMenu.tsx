@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MouseEvent } from 'react';
+import { useEffect, useRef, type SyntheticEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { CalendarAppointment, MenuPosition } from './calendar.types';
 
@@ -52,7 +52,7 @@ const CalendarContextMenu = ({ position, appointment, onClose, onDelete }: Calen
         };
     }, [onClose]);
 
-    const handleEdit = (e: MouseEvent<HTMLDivElement>) => {
+    const handleEdit = (e: SyntheticEvent<HTMLDivElement>) => {
         e.stopPropagation();
         if (appointment.personID && appointment.appointment_id) {
             navigate(`/patient/${appointment.personID}/edit-appointment/${appointment.appointment_id}`, {
@@ -62,7 +62,7 @@ const CalendarContextMenu = ({ position, appointment, onClose, onDelete }: Calen
         onClose();
     };
 
-    const handleDelete = (e: MouseEvent<HTMLDivElement>) => {
+    const handleDelete = (e: SyntheticEvent<HTMLDivElement>) => {
         e.stopPropagation();
         onDelete(appointment);
         onClose();
@@ -77,12 +77,24 @@ const CalendarContextMenu = ({ position, appointment, onClose, onDelete }: Calen
                 top: `${position.y}px`
             }}
         >
-            <div className="context-menu-item" onClick={handleEdit}>
+            <div
+                className="context-menu-item"
+                role="menuitem"
+                tabIndex={0}
+                onClick={handleEdit}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleEdit(e); } }}
+            >
                 <i className="fas fa-edit"></i>
                 <span>Edit Appointment</span>
             </div>
             <div className="context-menu-divider"></div>
-            <div className="context-menu-item context-menu-item-danger" onClick={handleDelete}>
+            <div
+                className="context-menu-item context-menu-item-danger"
+                role="menuitem"
+                tabIndex={0}
+                onClick={handleDelete}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleDelete(e); } }}
+            >
                 <i className="fas fa-trash"></i>
                 <span>Delete Appointment</span>
             </div>

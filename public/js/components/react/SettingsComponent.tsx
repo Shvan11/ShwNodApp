@@ -50,9 +50,13 @@ const SettingsComponent: React.FC = () => {
     const [activeTab, setActiveTab] = useState<string>(tab || 'general');
     const [userRole, setUserRole] = useState<string | null>(null);
 
-    // Ref to hold current activeTab - allows stable callback that reads current value
+    // Ref to hold current activeTab - allows stable callback that reads current value.
+    // Synced in an effect (not during render); the callbacks that read it run after
+    // the commit, so they always see the latest tab.
     const activeTabRef = useRef(activeTab);
-    activeTabRef.current = activeTab;
+    useEffect(() => {
+        activeTabRef.current = activeTab;
+    }, [activeTab]);
     const [tabData, setTabData] = useState<TabDataState>({
         general: { hasChanges: false },
         database: { hasChanges: false },

@@ -985,7 +985,7 @@ body:has(.appointment-calendar) {
 
 .loading-text {
     font-size: var(--font-size-sm);
-    color: var(--text-medium);
+    color: var(--text-secondary);
 }
 
 .loading-spinner-small {
@@ -1171,7 +1171,7 @@ body:has(.appointment-calendar) {
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .context-menu-item:hover {

@@ -296,7 +296,7 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
 
                         {/* Info about recipients */}
                         <div className="form-group">
-                            <label>Email Recipients</label>
+                            <span>Email Recipients</span>
                             <div className="info-box">
                                 <i className="fas fa-info-circle"></i>
                                 <span>

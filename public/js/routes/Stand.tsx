@@ -14,8 +14,8 @@ export default function Stand() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const { kpis, loading: kpisLoading, refetch: refetchKPIs } = useStandDashboardKPIs();
-  const { items: lowStockItems, loading: lowStockLoading, error: lowStockError, refetch: refetchLowStock } = useLowStockItems();
+  const { kpis, loading: kpisLoading } = useStandDashboardKPIs();
+  const { items: lowStockItems, loading: lowStockLoading, error: lowStockError } = useLowStockItems();
   const { items: expiringItems, loading: expiringLoading, error: expiringError } = useExpiringItems(30);
 
   // Surface fetch failures instead of silently showing an empty panel.
@@ -24,10 +24,9 @@ export default function Stand() {
 
   const [restockItem, setRestockItem] = useState<StandItem | null>(null);
 
-  const { restockItem: doRestock } = useStandItemMutations(() => {
-    refetchKPIs();
-    refetchLowStock();
-  });
+  // A restock invalidates qk.stand.all(), so the KPI cards + low-stock panel
+  // (both useQuery-backed) refresh on their own — no manual refetch needed.
+  const { restockItem: doRestock } = useStandItemMutations();
 
   const handleRestock = async (quantity: number, unitCost: number) => {
     if (!restockItem) return;

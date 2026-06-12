@@ -132,7 +132,7 @@
 .patientName {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
+    color: var(--text-primary);
     padding: var(--spacing-xs) var(--spacing-sm);
     background: var(--background-color);
     border-radius: var(--radius-md);
@@ -165,12 +165,12 @@
 
 .itemBatch {
     font-size: var(--font-size-sm);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .itemLabels {
     font-size: var(--font-size-xs);
-    color: var(--text-light);
+    color: var(--text-secondary);
 }
 
 .itemRemove {
@@ -183,7 +183,7 @@
     background: transparent;
     border: none;
     border-radius: var(--radius-md);
-    color: var(--text-lighter);
+    color: var(--text-muted);
     cursor: pointer;
     transition: all 0.15s ease;
     opacity: 0;
@@ -214,7 +214,7 @@
     background: transparent;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    color: var(--text-light);
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
     cursor: pointer;
     transition: all 0.15s ease;

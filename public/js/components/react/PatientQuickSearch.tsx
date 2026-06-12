@@ -229,11 +229,12 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
             )}>
                 {/* Search by Name (Arabic) */}
                 <div className={styles.searchField}>
-                    <label>
+                    <label htmlFor="pqs-search-name">
                         <i className={cn('fas fa-user', styles.iconGap)}></i>
                         Search by Name (Arabic)
                     </label>
                     <AsyncSelect<SelectOption, false>
+                        inputId="pqs-search-name"
                         cacheOptions
                         defaultOptions={false}
                         loadOptions={loadNameOptions}
@@ -242,6 +243,7 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
                         isClearable
                         classNamePrefix="pqs-select"
                         styles={selectStylesRTL}
+                        // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                         autoFocus={autoFocus}
                         noOptionsMessage={({ inputValue }) =>
                             inputValue.length < 2 ? 'Type at least 2 characters...' : 'No patients found'
@@ -251,11 +253,12 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
 
                 {/* Search by Phone */}
                 <div className={styles.searchField}>
-                    <label>
+                    <label htmlFor="pqs-search-phone">
                         <i className={cn('fas fa-phone', styles.iconGap)}></i>
                         Search by Phone
                     </label>
                     <AsyncSelect<SelectOption, false>
+                        inputId="pqs-search-phone"
                         cacheOptions
                         defaultOptions={false}
                         loadOptions={loadPhoneOptions}
@@ -272,11 +275,12 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
 
                 {/* Search by ID */}
                 <div className={styles.searchField}>
-                    <label>
+                    <label htmlFor="pqs-search-id">
                         <i className={cn('fas fa-id-card', styles.iconGap)}></i>
                         Search by ID
                     </label>
                     <AsyncSelect<SelectOption, false>
+                        inputId="pqs-search-id"
                         cacheOptions
                         defaultOptions={false}
                         loadOptions={loadIdOptions}

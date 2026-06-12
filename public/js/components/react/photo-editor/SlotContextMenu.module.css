@@ -18,7 +18,7 @@
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-color);
+  color: var(--text-primary);
   font-size: 0.85rem;
   text-align: left;
   cursor: pointer;

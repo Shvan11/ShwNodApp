@@ -238,7 +238,7 @@
 
 .alert-modal .form-group > label {
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     font-size: 0.875rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -362,7 +362,7 @@
 .modal-content.alert-modal .modal-footer .btn-secondary {
     padding: var(--spacing-sm) var(--spacing-lg);
     background: var(--gray-200);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     border: none;
     border-radius: var(--radius-md);
     font-size: 0.9375rem;

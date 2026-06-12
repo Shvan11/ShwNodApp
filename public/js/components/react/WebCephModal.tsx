@@ -319,8 +319,9 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
 
                             <div className={styles.formRow}>
                                 <div className={styles.field}>
-                                    <label className={styles.label}>Record Date</label>
+                                    <label className={styles.label} htmlFor="webceph-record-date">Record Date</label>
                                     <input
+                                        id="webceph-record-date"
                                         type="date"
                                         value={uploadData.recordDate}
                                         onChange={(e: ChangeEvent<HTMLInputElement>) => setUploadData({ ...uploadData, recordDate: e.target.value })}
@@ -328,8 +329,9 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
                                     />
                                 </div>
                                 <div className={styles.field}>
-                                    <label className={styles.label}>Photo Type</label>
+                                    <label className={styles.label} htmlFor="webceph-photo-type">Photo Type</label>
                                     <select
+                                        id="webceph-photo-type"
                                         value={uploadData.targetClass}
                                         onChange={(e: ChangeEvent<HTMLSelectElement>) => setUploadData({ ...uploadData, targetClass: e.target.value })}
                                         className={styles.input}
@@ -343,7 +345,7 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
 
                             {/* Primary: pick an image already in the patient's server folder */}
                             <div className={styles.sourceBlock}>
-                                <label className={styles.label}>Choose image from the patient folder</label>
+                                <span className={styles.label}>Choose image from the patient folder</span>
                                 {uploadData.selectedFile ? (
                                     <div className={styles.selectedChip}>
                                         <img
@@ -382,7 +384,7 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
 
                             {/* Fallback: upload from this computer */}
                             <div className={styles.sourceBlock}>
-                                <label className={styles.label}>Or upload from this computer</label>
+                                <label className={styles.label} htmlFor="webceph-image-upload">Or upload from this computer</label>
                                 <input
                                     id="webceph-image-upload"
                                     type="file"

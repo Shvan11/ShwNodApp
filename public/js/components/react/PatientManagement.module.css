@@ -46,7 +46,7 @@
 .searchSectionHeader h3 {
     margin: 0;
     font-size: var(--font-size-lg);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .searchSectionHeader h3 i {
@@ -80,7 +80,7 @@
     margin-bottom: var(--spacing-sm);
     font-weight: var(--font-weight-semibold);
     font-size: var(--font-size-sm);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 /* Name search options (toggle for starts with) */
@@ -154,7 +154,7 @@
 
 .emptyState i {
     font-size: var(--font-size-5xl);
-    color: var(--text-lighter);
+    color: var(--text-muted);
     margin-bottom: var(--spacing-md);
 }
 
@@ -164,7 +164,7 @@
 }
 
 .emptyState p {
-    color: var(--text-lighter);
+    color: var(--text-muted);
     margin: 0;
 }
 
@@ -210,7 +210,7 @@
 .summaryValue {
     font-size: var(--font-size-xl);
     font-weight: var(--font-weight-bold);
-    color: var(--gray-900);
+    color: var(--text-primary);
     line-height: var(--line-height-tight);
 }
 
@@ -247,7 +247,7 @@
 }
 
 .sortBtn:hover {
-    color: var(--gray-800);
+    color: var(--text-primary);
 }
 
 .sortBtnActive {
@@ -329,7 +329,7 @@
 .table th {
     padding: var(--spacing-md) var(--spacing-lg);
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
     text-transform: uppercase;
     letter-spacing: var(--letter-spacing-wide);
@@ -351,13 +351,14 @@
 .table td {
     padding: var(--spacing-md) var(--spacing-lg);
     vertical-align: middle;
-    color: var(--gray-800);
+    color: var(--text-primary);
     font-size: var(--font-size-base);
 }
 
 .patientNameLink {
     cursor: pointer;
     color: var(--primary-color);
+    font-weight: bold;
     transition: color var(--transition-base);
 }
 
@@ -414,7 +415,7 @@
     margin: 0;
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-900);
+    color: var(--text-primary);
 }
 
 .deleteModalClose {
@@ -448,7 +449,7 @@
 .deleteModalContent p {
     margin: 0 0 var(--spacing-lg) 0;
     font-size: var(--font-size-base);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .deleteModalContent p.deleteModalWarning {

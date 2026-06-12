@@ -77,7 +77,7 @@
 
 .placeholderDescription {
     font-size: 1rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
     max-width: 500px;
 }
 

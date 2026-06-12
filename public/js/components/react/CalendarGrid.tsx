@@ -294,6 +294,8 @@ const CalendarGrid = ({
         return (
             <div
                 key={index}
+                role="button"
+                tabIndex={0}
                 className={`cal-lane ${span2 ? 'span2' : ''} ${
                     draggingId === dragId ? 'dragging' : ''
                 }`}
@@ -304,6 +306,18 @@ const CalendarGrid = ({
                 onClick={e => {
                     e.stopPropagation();
                     onAppointmentClick(appt, day.date, time, e);
+                }}
+                onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onAppointmentClick(
+                            appt,
+                            day.date,
+                            time,
+                            e as unknown as MouseEvent<HTMLDivElement>
+                        );
+                    }
                 }}
                 title={`${appt.patientName || 'Scheduled'}${
                     appt.appDetail ? `\n${appt.appDetail}` : ''
@@ -381,6 +395,7 @@ const CalendarGrid = ({
     ) => {
         const hidden = appts.slice(3);
         return (
+            // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- container stops mousedown from reaching the click-away dismiss
             <div className="cal-popover" onMouseDown={e => e.stopPropagation()}>
                 <div className="cal-popover-head">
                     <div>
@@ -409,6 +424,8 @@ const CalendarGrid = ({
                         return (
                             <div
                                 key={absIdx}
+                                role="button"
+                                tabIndex={0}
                                 className={`cal-popover-row ${
                                     draggingId === dragId ? 'dragging' : ''
                                 }`}
@@ -420,6 +437,19 @@ const CalendarGrid = ({
                                     e.stopPropagation();
                                     setMoreMenu(null);
                                     onAppointmentClick(appt, day.date, time, e);
+                                }}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setMoreMenu(null);
+                                        onAppointmentClick(
+                                            appt,
+                                            day.date,
+                                            time,
+                                            e as unknown as MouseEvent<HTMLDivElement>
+                                        );
+                                    }
                                 }}
                             >
                                 <div className="cal-popover-name">
@@ -556,6 +586,8 @@ const CalendarGrid = ({
                                     >
                                         {!holiday && (
                                             <div
+                                                role="button"
+                                                tabIndex={0}
                                                 className={`cal-slot count-${
                                                     appts.length === 0
                                                         ? '0'
@@ -564,6 +596,15 @@ const CalendarGrid = ({
                                                           : appts.length
                                                 }`}
                                                 onClick={e => onSlotClick(slotData, e)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.preventDefault();
+                                                        onSlotClick(
+                                                            slotData,
+                                                            e as unknown as MouseEvent<HTMLDivElement>
+                                                        );
+                                                    }
+                                                }}
                                             >
                                                 {renderSlot(day, time, appts)}
                                             </div>

@@ -22,7 +22,7 @@
   margin: 0;
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-  color: var(--text-color);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
@@ -45,14 +45,14 @@
   align-items: center;
   justify-content: center;
   padding: var(--spacing-xxl) var(--spacing-lg);
-  color: var(--text-lighter);
+  color: var(--text-muted);
   text-align: center;
 }
 
 .emptyIcon {
   font-size: var(--font-size-4xl);
   margin-bottom: var(--spacing-md);
-  color: var(--text-lighter);
+  color: var(--text-muted);
 }
 
 .emptyState p {
@@ -64,7 +64,7 @@
 
 .emptyState span {
   font-size: var(--font-size-sm);
-  color: var(--text-lighter);
+  color: var(--text-muted);
 }
 
 /* Items list */
@@ -102,7 +102,7 @@
 .rowName {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  color: var(--text-color);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -137,7 +137,7 @@
   height: 2rem;
   border: none;
   background-color: var(--gray-100);
-  color: var(--text-color);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: var(--font-size-xs);
   transition: background-color var(--transition-fast);
@@ -148,7 +148,7 @@
 }
 
 .stepperButton:disabled {
-  color: var(--text-lighter);
+  color: var(--text-muted);
   cursor: not-allowed;
 }
 
@@ -161,7 +161,7 @@
   border-right: var(--border-width-thin) solid var(--gray-300);
   font-size: var(--font-size-sm);
   font-family: var(--font-primary);
-  color: var(--text-color);
+  color: var(--text-primary);
   outline: none;
   -moz-appearance: textfield;
 }
@@ -175,7 +175,7 @@
 .lineTotal {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  color: var(--text-color);
+  color: var(--text-primary);
   min-width: 5rem;
   text-align: right;
 }
@@ -188,7 +188,7 @@
   height: 2rem;
   border: none;
   background: none;
-  color: var(--text-lighter);
+  color: var(--text-muted);
   cursor: pointer;
   border-radius: var(--radius-md);
   transition: color var(--transition-fast), background-color var(--transition-fast);
@@ -212,7 +212,7 @@
 .totalLabel {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  color: var(--text-color);
+  color: var(--text-primary);
 }
 
 .totalAmount {

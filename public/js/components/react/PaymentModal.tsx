@@ -947,8 +947,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                             {/* Row 1: Currency + Entry Mode + Date */}
                             <div className={styles.paymentRowCompact}>
                                 <div className={styles.paymentField}>
-                                    <label>Payment Currency</label>
+                                    <label htmlFor="payment-currency">Payment Currency</label>
                                     <select
+                                        id="payment-currency"
                                         name="paymentCurrency"
                                         value={formData.paymentCurrency}
                                         onChange={handleInputChange}
@@ -964,7 +965,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                     <label>Entry Mode {isSameCurrencySelection && <span className={styles.lockedBadge}>Locked</span>}</label>
                                     <div className={`${styles.entryModeToggle} ${isSameCurrencySelection ? styles.entryModeDisabled : ''}`}>
                                         <span className={`${styles.toggleLabel} ${entryMode === 'amount' ? styles.toggleLabelActive : ''}`}>Amount</span>
-                                        <label className={styles.entryModeSwitch}>
+                                        <label className={styles.entryModeSwitch} aria-label="Toggle entry mode between amount and cash">
                                             <input
                                                 type="checkbox"
                                                 checked={entryMode === 'cash'}
@@ -978,8 +979,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                 </div>
 
                                 <div className={styles.paymentField}>
-                                    <label>Date</label>
+                                    <label htmlFor="payment-date">Date</label>
                                     <input
+                                        id="payment-date"
                                         type="date"
                                         name="paymentDate"
                                         value={formData.paymentDate}
@@ -1112,8 +1114,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                     /* Mixed Payment - Two smaller fields */
                                     <div className={styles.paymentFieldGroup}>
                                         <div className={styles.paymentField}>
-                                            <label>USD Received</label>
+                                            <label htmlFor="payment-usd-received">USD Received</label>
                                             <input
+                                                id="payment-usd-received"
                                                 type="text"
                                                 value={displayValues.actualUSD}
                                                 onChange={(e) => handleMixedUSDChange(e.target.value)}
@@ -1124,8 +1127,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                             />
                                         </div>
                                         <div className={styles.paymentField}>
-                                            <label>IQD Received</label>
+                                            <label htmlFor="payment-iqd-received">IQD Received</label>
                                             <input
+                                                id="payment-iqd-received"
                                                 type="text"
                                                 value={displayValues.actualIQD}
                                                 onChange={(e) => handleMixedIQDChange(e.target.value)}

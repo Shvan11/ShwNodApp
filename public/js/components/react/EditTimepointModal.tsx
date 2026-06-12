@@ -66,6 +66,7 @@ const EditTimepointModal = ({ isOpen, timepoint, saving, onClose, onSave }: Prop
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="e.g. Initial, Progress, Final"
+                            // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                             autoFocus
                         />
                     </label>

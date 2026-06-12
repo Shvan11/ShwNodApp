@@ -43,12 +43,12 @@ export default function StandReports() {
 
       <div className={styles.filterRow}>
         <div className={styles.filterGroup}>
-          <label>Start Date</label>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+          <label htmlFor="stand-reports-start-date">Start Date</label>
+          <input id="stand-reports-start-date" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
         </div>
         <div className={styles.filterGroup}>
-          <label>End Date</label>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+          <label htmlFor="stand-reports-end-date">End Date</label>
+          <input id="stand-reports-end-date" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
         </div>
       </div>
 

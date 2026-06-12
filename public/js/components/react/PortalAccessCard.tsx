@@ -145,9 +145,22 @@ const PortalAccessCard = ({ personId }: Props) => {
     }
   };
 
+  // A clock used only to re-evaluate the lock against the current time. `Date.now()`
+  // can't be read during render (impure → the badge would never refresh on its own),
+  // so we snapshot it once and schedule a single re-render the moment `lockedUntil`
+  // passes — the "Locked until …" badge then clears itself without a manual refresh.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!status?.lockedUntil) return;
+    const ms = new Date(status.lockedUntil).getTime() - Date.now();
+    if (ms <= 0) return; // already expired — the current snapshot is correct
+    const id = setTimeout(() => setNow(Date.now()), ms);
+    return () => clearTimeout(id);
+  }, [status?.lockedUntil]);
+
   const isLocked =
     !!status?.lockedUntil &&
-    new Date(status.lockedUntil).getTime() > Date.now();
+    new Date(status.lockedUntil).getTime() > now;
 
   return (
     <div className={viewStyles.patientInfoCard}>

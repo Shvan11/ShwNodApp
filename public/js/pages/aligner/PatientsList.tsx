@@ -156,7 +156,10 @@ const PatientsList: React.FC = () => {
                         <div
                             key={patient.person_id}
                             className={`${styles.patientCard} ${patient.UnreadDoctorNotes && patient.UnreadDoctorNotes > 0 ? styles.hasActivity : ''}`}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => selectPatient(patient)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPatient(patient); } }}
                         >
                             {patient.UnreadDoctorNotes && patient.UnreadDoctorNotes > 0 && (
                                 <div className={styles.activityBanner}>

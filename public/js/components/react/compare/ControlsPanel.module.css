@@ -1,0 +1,249 @@
+/* ===== COMPARE — adjust / export rail card ===== */
+
+.card {
+    background: var(--surface);
+    border: var(--border-width-thin) solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-card);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.sectionTitle {
+    margin: 0;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.fieldRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+}
+
+.fieldLabel {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.sizeSelect {
+    flex: 1;
+    min-width: 0;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    background: var(--surface);
+    border: var(--border-width-thin) solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.sizeSelect:focus-visible {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-focus);
+}
+
+/* --- segmented target picker --- */
+
+.segmented {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs);
+    background: var(--surface-muted);
+    border-radius: var(--radius-md);
+}
+
+.segment {
+    border: none;
+    background: transparent;
+    padding: var(--spacing-xs) var(--spacing-xs);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+    white-space: nowrap;
+}
+
+.segment:hover:not(:disabled) {
+    color: var(--text-primary);
+}
+
+.segmentActive {
+    background: var(--surface);
+    color: var(--primary-color);
+    font-weight: var(--font-weight-semibold);
+    box-shadow: var(--shadow-sm);
+}
+
+.segment:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* --- movement pad + transform buttons --- */
+
+.adjustGrid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--spacing-md);
+    align-items: center;
+}
+
+.dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 34px);
+    grid-template-rows: repeat(3, 34px);
+    gap: var(--spacing-xs);
+}
+
+.dpadButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: var(--border-width-thin) solid var(--border);
+    background: var(--surface);
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.dpadButton:hover:not(:disabled) {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.dpadButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+.dpadCenter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+}
+
+.transformColumn {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-xs);
+}
+
+.iconButton {
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    border: var(--border-width-thin) solid var(--border);
+    background: var(--surface);
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: var(--font-size-xs);
+    transition: border-color var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.iconButton:hover:not(:disabled) {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.iconButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+/* pressed state for view toggles (orientation / bisect / logo) */
+.iconButtonActive {
+    background: var(--blue-50);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.viewRow {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-xs);
+}
+
+.resetButton {
+    width: 100%;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    border: var(--border-width-thin) dashed var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.resetButton:hover:not(:disabled) {
+    border-color: var(--error-color);
+    color: var(--error-color);
+}
+
+.resetButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+/* --- export --- */
+
+.exportGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+}
+
+.exportButton {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-xs);
+    border: var(--border-width-thin) solid var(--border);
+    background: var(--surface);
+    color: var(--text-primary);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    transition: border-color var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.exportButton:hover:not(:disabled) {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.exportButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}

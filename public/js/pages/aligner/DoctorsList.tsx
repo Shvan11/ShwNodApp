@@ -58,7 +58,10 @@ const DoctorsList: React.FC = () => {
                 {/* All Doctors Card */}
                 <div
                     className={`${styles.doctorCard} ${styles.allDoctors}`}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => selectDoctor({ dr_id: 'all', doctor_name: 'All Doctors' })}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectDoctor({ dr_id: 'all', doctor_name: 'All Doctors' }); } }}
                 >
                     <i className={`fas fa-users ${styles.doctorIcon}`}></i>
                     <h3>All Doctors</h3>
@@ -71,7 +74,10 @@ const DoctorsList: React.FC = () => {
                     <div
                         key={doctor.dr_id}
                         className={`${styles.doctorCard} ${doctor.UnreadDoctorNotes && doctor.UnreadDoctorNotes > 0 ? styles.hasActivity : ''}`}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => selectDoctor(doctor)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectDoctor(doctor); } }}
                     >
                         {doctor.UnreadDoctorNotes && doctor.UnreadDoctorNotes > 0 && (
                             <div className={styles.activityBanner}>

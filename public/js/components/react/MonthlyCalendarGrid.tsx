@@ -141,7 +141,10 @@ const MonthlyCalendarGrid = ({
                             key={day.date}
                             className={cellClasses}
                             data-month-cell
+                            role="button"
+                            tabIndex={0}
                             onClick={handleClick}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
                             onDoubleClick={handleDoubleClick}
                             onContextMenu={handleContextMenu}
                             title={isHoliday ? day.holidayName : undefined}

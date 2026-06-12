@@ -22,7 +22,7 @@
     margin: 0;
     font-size: 1.15rem;
     font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .closeBtn {
@@ -30,14 +30,14 @@
     border: none;
     padding: 0.5rem;
     cursor: pointer;
-    color: var(--text-light);
+    color: var(--text-secondary);
     font-size: 1.1rem;
     border-radius: 4px;
 }
 
 .closeBtn:hover {
     background: var(--gray-100);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .body {
@@ -49,7 +49,7 @@
 .lead {
     margin: 0 0 1rem 0;
     font-size: 0.9rem;
-    color: var(--text-light);
+    color: var(--text-secondary);
     line-height: 1.5;
 }
 
@@ -64,7 +64,7 @@
 .note {
     padding: 1rem;
     text-align: center;
-    color: var(--text-light);
+    color: var(--text-secondary);
     font-size: 0.9rem;
 }
 
@@ -86,7 +86,7 @@
     border: 1px solid var(--border-color);
     border-radius: 8px;
     background: var(--background-color);
-    color: var(--text-color);
+    color: var(--text-primary);
     cursor: pointer;
     text-align: left;
     font-size: 0.9rem;

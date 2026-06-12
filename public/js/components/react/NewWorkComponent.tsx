@@ -594,8 +594,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 <div className={`${styles.tabContent} ${activeTab === 'basic' ? styles.tabContentActive : ''}`}>
                     <div className={styles.formRow}>
                         <div className={styles.formGroup}>
-                            <label>Work Type <span className={styles.required}>*</span></label>
+                            <label htmlFor="work-type">Work Type <span className={styles.required}>*</span></label>
                             <select
+                                id="work-type"
                                 value={formData.type_of_work}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, type_of_work: e.target.value})}
                                 required
@@ -610,8 +611,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label>Doctor <span className={styles.required}>*</span></label>
+                            <label htmlFor="work-doctor">Doctor <span className={styles.required}>*</span></label>
                             <select
+                                id="work-doctor"
                                 value={formData.dr_id}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, dr_id: e.target.value})}
                                 required
@@ -629,8 +631,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     {workId && (
                         <div className={styles.formRow}>
                             <div className={styles.formGroup}>
-                                <label>Status <span className={styles.required}>*</span></label>
+                                <label htmlFor="work-status">Status <span className={styles.required}>*</span></label>
                                 <select
+                                    id="work-status"
                                     value={formData.status}
                                     onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, status: parseInt(e.target.value)})}
                                     required
@@ -655,8 +658,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
 
                     <div className={styles.formRow}>
                         <div className={styles.formGroup}>
-                            <label>Total Required</label>
+                            <label htmlFor="work-total-required">Total Required</label>
                             <input
+                                id="work-total-required"
                                 type="text"
                                 value={displayValues.total_required}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => {
@@ -674,8 +678,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label>Currency</label>
+                            <label htmlFor="work-currency">Currency</label>
                             <select
+                                id="work-currency"
                                 value={formData.currency}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, currency: e.target.value})}
                             >
@@ -711,7 +716,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         <>
                             <div className={styles.formRow}>
                                 <div className={styles.formGroup}>
-                                    <label>
+                                    <label htmlFor="work-discount">
                                         Discount
                                         {!isAdmin && (
                                             <small className={`${styles.formHint} ${styles.adminHint}`}>
@@ -720,6 +725,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                         )}
                                     </label>
                                     <input
+                                        id="work-discount"
                                         type="text"
                                         value={displayValues.discount}
                                         disabled={!isAdmin}
@@ -744,8 +750,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>Discount Date</label>
+                                    <label htmlFor="work-discount-date">Discount Date</label>
                                     <input
+                                        id="work-discount-date"
                                         type="date"
                                         value={formData.discount_date}
                                         disabled={!isAdmin || formData.discount <= 0}
@@ -760,8 +767,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                             </div>
 
                             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                                <label>Discount Reason <small className={styles.optionalHint}>(optional)</small></label>
+                                <label htmlFor="work-discount-reason">Discount Reason <small className={styles.optionalHint}>(optional)</small></label>
                                 <textarea
+                                    id="work-discount-reason"
                                     value={formData.discount_reason}
                                     onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, discount_reason: e.target.value })}
                                     rows={2}
@@ -774,8 +782,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
 
                     <div className={styles.formRow}>
                         <div className={styles.formGroup}>
-                            <label>Start Date</label>
+                            <label htmlFor="work-start-date">Start Date</label>
                             <input
+                                id="work-start-date"
                                 type="date"
                                 value={formData.start_date}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, start_date: e.target.value})}
@@ -783,8 +792,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label>Estimated Duration (months)</label>
+                            <label htmlFor="work-estimated-duration">Estimated Duration (months)</label>
                             <input
+                                id="work-estimated-duration"
                                 type="number"
                                 value={formData.estimated_duration}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, estimated_duration: e.target.value})}
@@ -795,8 +805,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     </div>
 
                     <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                        <label>Notes</label>
+                        <label htmlFor="work-notes">Notes</label>
                         <textarea
+                            id="work-notes"
                             value={formData.notes}
                             onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData({...formData, notes: e.target.value})}
                             rows={3}
@@ -809,8 +820,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 <div className={`${styles.tabContent} ${activeTab === 'dates' ? styles.tabContentActive : ''}`}>
                     <div className={styles.formRow}>
                         <div className={styles.formGroup}>
-                            <label>Initial Photo Date</label>
+                            <label htmlFor="work-i-photo-date">Initial Photo Date</label>
                             <input
+                                id="work-i-photo-date"
                                 type="date"
                                 value={formData.i_photo_date}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, i_photo_date: e.target.value})}
@@ -818,8 +830,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label>Final Photo Date</label>
+                            <label htmlFor="work-f-photo-date">Final Photo Date</label>
                             <input
+                                id="work-f-photo-date"
                                 type="date"
                                 value={formData.f_photo_date}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, f_photo_date: e.target.value})}
@@ -829,8 +842,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
 
                     <div className={styles.formRow}>
                         <div className={styles.formGroup}>
-                            <label>Debond Date</label>
+                            <label htmlFor="work-debond-date">Debond Date</label>
                             <input
+                                id="work-debond-date"
                                 type="date"
                                 value={formData.debond_date}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, debond_date: e.target.value})}
@@ -838,8 +852,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label>Notes Date</label>
+                            <label htmlFor="work-notes-date">Notes Date</label>
                             <input
+                                id="work-notes-date"
                                 type="date"
                                 value={formData.notes_date}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, notes_date: e.target.value})}

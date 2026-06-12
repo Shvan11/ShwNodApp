@@ -144,7 +144,9 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
     const currency = set?.currency || 'USD';
 
     return (
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss
         <div className="drawer-overlay" onClick={handleClose}>
+            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss */}
             <div className="drawer-container aligner-payment-drawer" onClick={(e) => e.stopPropagation()}>
                 <div className="drawer-header">
                     <h2>Add Payment</h2>
@@ -191,6 +193,7 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
                                     onChange={(e) => handleAmountChange(e.target.value)}
                                     onBlur={() => setDisplayAmount(formData.amount_paid ? formatNumber(formData.amount_paid) : '')}
                                     className={errors.amount_paid ? 'error' : ''}
+                                    // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                                     autoFocus
                                     placeholder="Enter amount"
                                 />

@@ -71,7 +71,7 @@
   left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--text-light);
+  color: var(--text-secondary);
 }
 
 .searchBox input {
@@ -215,7 +215,7 @@
   margin: 0 0 var(--spacing-sm);
   font-size: 16px;
   font-weight: var(--font-weight-semibold);
-  color: var(--text-color);
+  color: var(--text-primary);
   line-height: 1.4;
 }
 
@@ -232,7 +232,7 @@
 .videoDetails {
   margin: 0;
   font-size: 14px;
-  color: var(--text-light);
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -252,7 +252,7 @@
   border: none;
   border-radius: var(--radius-sm);
   background: var(--surface);
-  color: var(--text-light);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
@@ -274,7 +274,7 @@
 .loadingState {
   text-align: center;
   padding: 80px 20px;
-  color: var(--text-light);
+  color: var(--text-secondary);
 }
 
 .loadingSpinner {
@@ -297,7 +297,7 @@
 .emptyState {
   text-align: center;
   padding: 80px 20px;
-  color: var(--text-light);
+  color: var(--text-secondary);
 }
 
 .emptyState i {
@@ -406,14 +406,14 @@
 .modalHeader h2 {
   margin: 0;
   font-size: 20px;
-  color: var(--text-color);
+  color: var(--text-primary);
 }
 
 .closeBtn {
   background: none;
   border: none;
   font-size: 24px;
-  color: var(--text-light);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 4px;
   line-height: 1;
@@ -421,7 +421,7 @@
 }
 
 .closeBtn:hover {
-  color: var(--text-color);
+  color: var(--text-primary);
 }
 
 .modalBody {
@@ -445,7 +445,7 @@
   display: block;
   margin-bottom: 6px;
   font-weight: var(--font-weight-medium);
-  color: var(--text-color);
+  color: var(--text-primary);
   font-size: 14px;
 }
 
@@ -511,7 +511,7 @@ textarea.formInput {
 }
 
 .deleteWarning {
-  color: var(--text-light);
+  color: var(--text-secondary);
   font-size: 14px;
   margin-top: 12px;
 }
@@ -544,7 +544,7 @@ textarea.formInput {
 
 .qrLoading p {
   margin-top: 16px;
-  color: var(--text-light);
+  color: var(--text-secondary);
 }
 
 .qrImage {
@@ -559,7 +559,7 @@ textarea.formInput {
   margin: 0 0 16px;
   font-size: 18px;
   font-weight: var(--font-weight-semibold);
-  color: var(--text-color);
+  color: var(--text-primary);
 }
 
 .shareUrlContainer {
@@ -574,7 +574,7 @@ textarea.formInput {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   font-size: 13px;
-  color: var(--text-light);
+  color: var(--text-secondary);
   background: var(--gray-50);
 }
 
@@ -588,7 +588,7 @@ textarea.formInput {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  color: var(--text-light);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s;
   display: flex;

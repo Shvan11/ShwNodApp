@@ -131,13 +131,35 @@ const CalendarDayContextMenu = ({
                     <div className="context-menu-divider"></div>
 
                     {/* Edit Holiday */}
-                    <div className="context-menu-item" onClick={handleEditHoliday}>
+                    <div
+                        className="context-menu-item"
+                        role="menuitem"
+                        tabIndex={0}
+                        onClick={handleEditHoliday}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleEditHoliday(e as unknown as MouseEvent<HTMLDivElement>);
+                            }
+                        }}
+                    >
                         <i className="fas fa-edit"></i>
                         <span>Edit Holiday</span>
                     </div>
 
                     {/* Remove Holiday */}
-                    <div className="context-menu-item context-menu-item-danger" onClick={handleRemoveHoliday}>
+                    <div
+                        className="context-menu-item context-menu-item-danger"
+                        role="menuitem"
+                        tabIndex={0}
+                        onClick={handleRemoveHoliday}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleRemoveHoliday(e as unknown as MouseEvent<HTMLDivElement>);
+                            }
+                        }}
+                    >
                         <i className="fas fa-trash"></i>
                         <span>Remove Holiday</span>
                     </div>
@@ -155,7 +177,18 @@ const CalendarDayContextMenu = ({
                     <div className="context-menu-divider"></div>
 
                     {/* Add Holiday */}
-                    <div className="context-menu-item" onClick={handleAddHoliday}>
+                    <div
+                        className="context-menu-item"
+                        role="menuitem"
+                        tabIndex={0}
+                        onClick={handleAddHoliday}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleAddHoliday(e as unknown as MouseEvent<HTMLDivElement>);
+                            }
+                        }}
+                    >
                         <i className="fas fa-calendar-times"></i>
                         <span>Mark as Holiday</span>
                     </div>

@@ -16,7 +16,10 @@ const DentalChart = ({ onToothClick }: DentalChartProps) => {
         <div
             key={`${prefix}${number}`}
             className={styles.tooth}
+            role="button"
+            tabIndex={0}
             onClick={() => onToothClick(`${prefix}${number}`)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToothClick(`${prefix}${number}`); } }}
         >
             {isLower && <span className={styles.toothNumber}>{number}</span>}
             <img
@@ -34,7 +37,10 @@ const DentalChart = ({ onToothClick }: DentalChartProps) => {
         <div
             key={`between-${tooth1}-${tooth2}`}
             className={cn(styles.between, isMidline && styles.midline)}
+            role="button"
+            tabIndex={0}
             onClick={() => onToothClick(`Between ${tooth1} and ${tooth2}`)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToothClick(`Between ${tooth1} and ${tooth2}`); } }}
         >
             <div className={styles.betweenIndicator} />
         </div>

@@ -197,7 +197,7 @@
 .cardHeader h3 {
     margin: 0;
     font-size: 1.1rem;
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .summaryCard.revenue .cardHeader i {
@@ -240,7 +240,7 @@
 .amountRow .amount {
     font-size: 1.2rem;
     font-weight: bold;
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 /* View Mode Selector */
@@ -425,7 +425,7 @@
 
 .tableSection h3 {
     margin: 0 0 1rem 0;
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: 1.2rem;
 }
 
@@ -543,7 +543,7 @@ th.qasaColumn {
         font-weight: bold;
         margin-bottom: 1rem;
         padding-bottom: 0.5rem;
-        border-bottom: 2px solid var(--text-color);
+        border-bottom: 2px solid var(--text-primary);
     }
 }
 
@@ -656,7 +656,7 @@ th.qasaColumn {
 
 .statisticsInvoiceSummary .summaryItem .label {
     font-size: 0.9rem;
-    color: var(--text-light);
+    color: var(--text-secondary);
     font-weight: var(--font-weight-medium);
 }
 
@@ -780,7 +780,7 @@ th.qasaColumn {
 
 .emptyState i {
     font-size: 3rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
     margin-bottom: 1rem;
 }
 

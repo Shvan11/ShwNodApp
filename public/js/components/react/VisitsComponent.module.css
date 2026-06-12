@@ -18,7 +18,7 @@
     margin: 0;
     font-size: 1rem;
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-800);
+    color: var(--text-primary);
 }
 
 .controls {
@@ -168,7 +168,7 @@
 
 .treatmentInfoLabel {
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .treatmentInfoValue {
@@ -293,7 +293,7 @@
 
 .emptyState i {
     font-size: 2rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
     margin-bottom: 0.5rem;
     display: block;
 }
@@ -328,13 +328,13 @@
     background: transparent;
     font: inherit;
     font-size: var(--font-size-sm);
-    color: var(--gray-800);
+    color: var(--text-primary);
     padding: 0;
     min-width: 0;
 }
 
 .searchInput::placeholder {
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 .searchCount {

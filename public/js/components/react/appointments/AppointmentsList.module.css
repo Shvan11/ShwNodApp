@@ -18,7 +18,7 @@
     margin: 0 0 var(--spacing-sm) 0;
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-800);
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: var(--spacing-xs);
@@ -42,7 +42,7 @@
 .empty {
     text-align: center;
     padding: var(--spacing-2xl);
-    color: var(--neutral-gray);
+    color: var(--text-secondary);
     font-size: var(--font-size-lg);
     background: var(--card-bg);
     border-radius: var(--radius-lg);

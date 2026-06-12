@@ -356,7 +356,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                         )}
 
                         <div className={styles.formField}>
-                            <label><i className="fas fa-calendar-check"></i> Selected Time</label>
+                            <span><i className="fas fa-calendar-check"></i> Selected Time</span>
                             <div
                                 ref={selectedTimeRef}
                                 className={cn(styles.selectedTime, {

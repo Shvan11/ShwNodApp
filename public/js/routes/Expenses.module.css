@@ -142,7 +142,7 @@
 
 /* Fields sit on the fixed purple-gradient card, so they stay theme-independent
    (fixed light field + fixed dark ink) in both light and dark mode — using a
-   flipping --text-color here turned the text near-white on a near-white field
+   flipping --text-primary here turned the text near-white on a near-white field
    in dark mode. */
 .modernInput {
   background: rgba(255, 255, 255, 0.95);
@@ -589,7 +589,7 @@
 }
 
 .closeBtn {
-  color: var(--text-lighter);
+  color: var(--text-muted);
   font-size: 28px;
   font-weight: bold;
   cursor: pointer;

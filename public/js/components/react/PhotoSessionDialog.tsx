@@ -258,8 +258,9 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                                 </div>
                             </div>
                             <div className={styles.formGroup}>
-                                <label>First Name (English)</label>
+                                <label htmlFor="photo-session-first-name">First Name (English)</label>
                                 <input
+                                    id="photo-session-first-name"
                                     type="text"
                                     value={firstName}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => setFirstName(e.target.value)}
@@ -268,8 +269,9 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                                 />
                             </div>
                             <div className={styles.formGroup}>
-                                <label>Last Name (English)</label>
+                                <label htmlFor="photo-session-last-name">Last Name (English)</label>
                                 <input
+                                    id="photo-session-last-name"
                                     type="text"
                                     value={lastName}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => setLastName(e.target.value)}
@@ -282,8 +284,9 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
 
                     {/* Timepoint Type */}
                     <div className={styles.formGroup}>
-                        <label>Timepoint Type</label>
+                        <label htmlFor="photo-session-timepoint-type">Timepoint Type</label>
                         <select
+                            id="photo-session-timepoint-type"
                             value={timepointType}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setTimepointType(e.target.value)}
                             className={styles.formSelect}
@@ -297,8 +300,9 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
 
                     {/* Date Selection */}
                     <div className={styles.formGroup}>
-                        <label>Photo Date</label>
+                        <label htmlFor="photo-session-date">Photo Date</label>
                         <input
+                            id="photo-session-date"
                             type="date"
                             value={selectedDate}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setSelectedDate(e.target.value)}
@@ -309,7 +313,7 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
 
                     {/* Import folder — the memory-card source reused by "Move from card" in the editor */}
                     <div className={styles.importFolder}>
-                        <label>Import folder</label>
+                        <span>Import folder</span>
                         {importFolder.status === 'unsupported' ? (
                             <p className={styles.iniHint}>Folder import needs Chrome or Edge.</p>
                         ) : (
@@ -385,7 +389,7 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                         <>
                             {appointments.length > 0 && (
                                 <div className={styles.dateList}>
-                                    <label>Recent Appointments</label>
+                                    <span>Recent Appointments</span>
                                     <div className={styles.dateItems}>
                                         {appointments.slice(0, 5).map((appt, idx) => (
                                             <button
@@ -406,7 +410,7 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
 
                             {visits.length > 0 && (
                                 <div className={styles.dateList}>
-                                    <label>Recent Visits</label>
+                                    <span>Recent Visits</span>
                                     <div className={styles.dateItems}>
                                         {visits.slice(0, 5).map((visit, idx) => (
                                             <button

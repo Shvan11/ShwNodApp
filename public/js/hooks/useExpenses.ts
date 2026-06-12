@@ -1,10 +1,26 @@
 /**
  * Custom hooks for Expenses Management
- * Handles all expense-related API calls with proper state management
+ *
+ * Reads are thin wrappers over the React Query `queryOptions` factories in
+ * `query/queries.ts` (shared/deduped cache); mutations write via `core/http`
+ * then invalidate `qk.expenses.all()` so every expense read refreshes —
+ * replacing the old caller-supplied `onSuccess`→`refetch` wiring.
+ *
+ * The entity types below stay frontend-owned (the expense responses predate full
+ * contract modelling); the factories keep these as their return generics while
+ * the contract `.response` still validates the boundary at runtime.
  */
-import { useState, useEffect, useCallback } from 'react';
-import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { useState, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import * as expenseContract from '@shared/contracts/expense.contract';
+import { qk } from '@/query/keys';
+import {
+  expensesQuery,
+  expenseCategoriesQuery,
+  expenseSubcategoriesQuery,
+  expenseSummaryQuery,
+} from '@/query/queries';
 
 /**
  * Expense filters
@@ -90,43 +106,13 @@ export function useExpenses(filters: ExpenseFilters = {}): {
   error: string | null;
   refetch: () => Promise<void>;
 } {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchExpenses = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const queryParams = new URLSearchParams();
-      if (filters.startDate) queryParams.append('startDate', filters.startDate);
-      if (filters.endDate) queryParams.append('endDate', filters.endDate);
-      if (filters.categoryId) queryParams.append('categoryId', String(filters.categoryId));
-      if (filters.subcategoryId) queryParams.append('subcategoryId', String(filters.subcategoryId));
-      if (filters.currency) queryParams.append('currency', filters.currency);
-
-      const data = await fetchJSON<Expense[]>(`/api/expenses?${queryParams}`, { schema: expenseContract.expenseList.response });
-      setExpenses(data);
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to fetch expenses'));
-      console.error('Error fetching expenses:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    filters.startDate,
-    filters.endDate,
-    filters.categoryId,
-    filters.subcategoryId,
-    filters.currency,
-  ]);
-
-  useEffect(() => {
-    fetchExpenses();
-  }, [fetchExpenses]);
-
-  return { expenses, loading, error, refetch: fetchExpenses };
+  const query = useQuery(expensesQuery(filters));
+  return {
+    expenses: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch expenses') : null,
+    refetch: async () => { await query.refetch(); },
+  };
 }
 
 /**
@@ -137,28 +123,12 @@ export function useCategories(): {
   loading: boolean;
   error: string | null;
 } {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        setLoading(true);
-        const data = await fetchJSON<Category[]>('/api/expenses/categories', { schema: expenseContract.expenseCategories.response });
-        setCategories(data);
-      } catch (err) {
-        setError(httpErrorMessage(err, 'Failed to fetch categories'));
-        console.error('Error fetching categories:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCategories();
-  }, []);
-
-  return { categories, loading, error };
+  const query = useQuery(expenseCategoriesQuery());
+  return {
+    categories: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch categories') : null,
+  };
 }
 
 /**
@@ -169,47 +139,25 @@ export function useSubcategories(categoryId: number | string | null | undefined)
   loading: boolean;
   error: string | null;
 } {
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!categoryId) {
-      setSubcategories([]);
-      setError(null);
-      return;
-    }
-
-    const fetchSubcategories = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await fetchJSON<Subcategory[]>(`/api/expenses/subcategories/${categoryId}`, { schema: expenseContract.expenseSubcategories.response });
-        setSubcategories(data);
-      } catch (err) {
-        setError(httpErrorMessage(err, 'Failed to fetch subcategories'));
-        console.error('Error fetching subcategories:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSubcategories();
-  }, [categoryId]);
-
-  return { subcategories, loading, error };
+  const query = useQuery(expenseSubcategoriesQuery(categoryId));
+  return {
+    subcategories: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch subcategories') : null,
+  };
 }
 
 /**
  * Hook for expense mutations (create, update, delete)
  */
-export function useExpenseMutations(onSuccess?: () => void): {
+export function useExpenseMutations(): {
   createExpense: (expenseData: ExpenseData) => Promise<Expense>;
   updateExpense: (id: number, expenseData: ExpenseData) => Promise<Expense>;
   deleteExpense: (id: number) => Promise<void>;
   loading: boolean;
   error: string | null;
 } {
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -220,18 +168,16 @@ export function useExpenseMutations(onSuccess?: () => void): {
         setError(null);
 
         const data = await postJSON<Expense>('/api/expenses', expenseData, { schema: expenseContract.createExpense.response });
-        if (onSuccess) onSuccess();
+        void queryClient.invalidateQueries({ queryKey: qk.expenses.all() });
         return data;
       } catch (err) {
-        const message = httpErrorMessage(err, 'Failed to create expense');
-        setError(message);
-        console.error('Error creating expense:', err);
+        setError(httpErrorMessage(err, 'Failed to create expense'));
         throw err;
       } finally {
         setLoading(false);
       }
     },
-    [onSuccess]
+    [queryClient]
   );
 
   const updateExpense = useCallback(
@@ -241,18 +187,16 @@ export function useExpenseMutations(onSuccess?: () => void): {
         setError(null);
 
         const data = await putJSON<Expense>(`/api/expenses/${id}`, expenseData, { schema: expenseContract.updateExpense.response });
-        if (onSuccess) onSuccess();
+        void queryClient.invalidateQueries({ queryKey: qk.expenses.all() });
         return data;
       } catch (err) {
-        const message = httpErrorMessage(err, 'Failed to update expense');
-        setError(message);
-        console.error('Error updating expense:', err);
+        setError(httpErrorMessage(err, 'Failed to update expense'));
         throw err;
       } finally {
         setLoading(false);
       }
     },
-    [onSuccess]
+    [queryClient]
   );
 
   const deleteExpense = useCallback(
@@ -262,17 +206,15 @@ export function useExpenseMutations(onSuccess?: () => void): {
         setError(null);
 
         await deleteJSON(`/api/expenses/${id}`);
-        if (onSuccess) onSuccess();
+        void queryClient.invalidateQueries({ queryKey: qk.expenses.all() });
       } catch (err) {
-        const message = httpErrorMessage(err, 'Failed to delete expense');
-        setError(message);
-        console.error('Error deleting expense:', err);
+        setError(httpErrorMessage(err, 'Failed to delete expense'));
         throw err;
       } finally {
         setLoading(false);
       }
     },
-    [onSuccess]
+    [queryClient]
   );
 
   return {
@@ -295,39 +237,10 @@ export function useExpenseSummary(
   loading: boolean;
   error: string | null;
 } {
-  const [summary, setSummary] = useState<ExpenseSummary | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Skip API call if required parameters are missing
-    if (!startDate || !endDate) {
-      setSummary(null);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    const fetchSummary = async () => {
-      try {
-        setLoading(true);
-        const queryParams = new URLSearchParams();
-        queryParams.append('startDate', startDate);
-        queryParams.append('endDate', endDate);
-
-        const data = await fetchJSON<ExpenseSummary>(`/api/expenses/summary?${queryParams}`, { schema: expenseContract.expenseSummary.response });
-        setSummary(data);
-        setError(null);
-      } catch (err) {
-        setError(httpErrorMessage(err, 'Failed to fetch summary'));
-        console.error('Error fetching summary:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSummary();
-  }, [startDate, endDate]);
-
-  return { summary, loading, error };
+  const query = useQuery(expenseSummaryQuery(startDate, endDate));
+  return {
+    summary: query.data ?? null,
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch summary') : null,
+  };
 }

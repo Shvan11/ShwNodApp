@@ -50,7 +50,7 @@
   margin: 0;
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-  color: var(--gray-900);
+  color: var(--text-primary);
 }
 
 .closeBtn {
@@ -66,7 +66,7 @@
 
 .closeBtn:hover {
   background-color: var(--gray-200);
-  color: var(--gray-900);
+  color: var(--text-primary);
 }
 
 /* Modal Body */
@@ -103,7 +103,7 @@
 .infoValue {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  color: var(--gray-900);
+  color: var(--text-primary);
 }
 
 /* Search section */
@@ -116,7 +116,7 @@
 .searchLabel {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  color: var(--gray-700);
+  color: var(--text-secondary);
 }
 
 /* Confirm section */
@@ -131,7 +131,7 @@
   margin: 0 0 var(--spacing-md);
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
-  color: var(--gray-900);
+  color: var(--text-primary);
 }
 
 .transferArrow {
@@ -162,13 +162,13 @@
 
 .boxName {
   font-weight: var(--font-weight-semibold);
-  color: var(--gray-900);
+  color: var(--text-primary);
   text-align: center;
 }
 
 .boxId {
   font-size: var(--font-size-xs);
-  color: var(--text-lighter);
+  color: var(--text-muted);
   margin-top: var(--spacing-xs);
 }
 
@@ -278,7 +278,7 @@
 .btnSecondary {
   background: var(--surface);
   border: 1px solid var(--gray-300);
-  color: var(--gray-700);
+  color: var(--text-secondary);
 }
 
 .btnSecondary:hover {

@@ -327,7 +327,9 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
     const doctorsLoaded = doctors && doctors.length > 0;
 
     return (
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss
         <div className="drawer-overlay" onClick={onClose}>
+            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss */}
             <div className="drawer-container" onClick={(e: MouseEvent) => e.stopPropagation()}>
                 <div className="drawer-header">
                     <h2>{set ? 'Edit Aligner Set' : 'Add New Aligner Set'}</h2>
@@ -536,7 +538,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
 
                                         {/* PDF Upload Section */}
                                         <div className="form-field">
-                                            <label>PDF File</label>
+                                            <label htmlFor="set-pdf-file">PDF File</label>
                                             {formData.set_pdf_url ? (
                                                 <div className="pdf-uploaded-status">
                                                     <div className="pdf-status-header">
@@ -581,6 +583,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                         </button>
                                                     )}
                                                     <input
+                                                        id="set-pdf-file"
                                                         type="file"
                                                         accept=".pdf,application/pdf"
                                                         className="pdf-file-input"

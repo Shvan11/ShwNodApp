@@ -162,6 +162,7 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
                                 value={draftValue}
                                 onChange={handleDraftChange}
                                 disabled={saving}
+                                // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                                 autoFocus
                             />
                             <span className={styles.suffix}>IQD</span>

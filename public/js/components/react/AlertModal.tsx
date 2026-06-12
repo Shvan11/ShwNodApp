@@ -241,9 +241,9 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
 
                         {/* Severity */}
                         <div className="form-group">
-                            <label>
+                            <span>
                                 Severity Level <span className="required">*</span>
-                            </label>
+                            </span>
                             <div className="severity-options">
                                 <label className="severity-option">
                                     <input

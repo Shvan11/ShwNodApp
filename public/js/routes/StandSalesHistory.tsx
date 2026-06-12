@@ -44,7 +44,7 @@ export default function StandSalesHistory() {
     setAppliedEnd(endDate);
   };
   const { sale: viewSale, loading: saleLoading } = useStandSale(viewSaleId);
-  const { voidSale } = useStandSaleMutations(refetch);
+  const { voidSale } = useStandSaleMutations();
 
   const handleVoid = (saleId: number) => {
     setVoidSaleId(saleId);
@@ -80,16 +80,18 @@ export default function StandSalesHistory() {
 
       <div className={styles.filterRow}>
         <div className={styles.filterGroup}>
-          <label>Start Date</label>
+          <label htmlFor="sales-history-start-date">Start Date</label>
           <input
+            id="sales-history-start-date"
             type="date"
             value={startDate}
             onChange={e => setStartDate(e.target.value)}
           />
         </div>
         <div className={styles.filterGroup}>
-          <label>End Date</label>
+          <label htmlFor="sales-history-end-date">End Date</label>
           <input
+            id="sales-history-end-date"
             type="date"
             value={endDate}
             onChange={e => setEndDate(e.target.value)}
@@ -135,6 +137,7 @@ export default function StandSalesHistory() {
               value={voidReason}
               onChange={e => setVoidReason(e.target.value)}
               rows={3}
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
               autoFocus
             />
             <div className={styles.voidModalActions}>

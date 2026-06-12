@@ -572,8 +572,9 @@ const LabelPreviewModal = ({
         <div className={styles.right}>
             {/* Arabic Font Selector */}
             <div className={styles.formGroup}>
-                <label>Arabic Font</label>
+                <label htmlFor="label-arabic-font">Arabic Font</label>
                 <select
+                    id="label-arabic-font"
                     value={arabicFont}
                     onChange={(e: ChangeEvent<HTMLSelectElement>) => setArabicFont(e.target.value)}
                     className={styles.fontSelector}
@@ -683,7 +684,10 @@ const LabelPreviewModal = ({
                                                         {/* Batch header - clickable to expand */}
                                                         <div
                                                             className={styles.queueBatchHeader}
+                                                            role="button"
+                                                            tabIndex={0}
                                                             onClick={() => toggleBatchExpansion(batchItem.id)}
+                                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleBatchExpansion(batchItem.id); } }}
                                                         >
                                                             <div className={styles.queueBatchInfo}>
                                                                 <i className={`fas fa-chevron-${isExpanded ? 'down' : 'right'} ${styles.expandIcon}`}></i>
@@ -693,10 +697,11 @@ const LabelPreviewModal = ({
                                                                     <span className={styles.queueBatchDoctor}>{batchItem.doctorName}</span>
                                                                 )}
                                                             </div>
-                                                            <div className={styles.queueBatchActions} onClick={e => e.stopPropagation()}>
+                                                            <div className={styles.queueBatchActions} role="button" tabIndex={0} onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); } }}>
                                                                 <label className={styles.queueLogoToggle} title="Include logo">
                                                                     <input
                                                                         type="checkbox"
+                                                                        aria-label="Include logo"
                                                                         checked={batchItem.includeLogo}
                                                                         onChange={() => toggleQueueBatchLogo(batchItem.id)}
                                                                     />
@@ -791,12 +796,16 @@ const LabelPreviewModal = ({
                                                                                             onKeyDown={handleQueueEditLabelKeyDown}
                                                                                             onBlur={saveQueueLabelEdit}
                                                                                             className={styles.labelEditInput}
+                                                                                            // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                                                                                             autoFocus
                                                                                         />
                                                                                     ) : (
                                                                                         <span
                                                                                             className={styles.labelText}
+                                                                                            role="button"
+                                                                                            tabIndex={0}
                                                                                             onClick={() => startQueueLabelEdit(batchItem.id, idx, label)}
+                                                                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startQueueLabelEdit(batchItem.id, idx, label); } }}
                                                                                             title="Click to edit"
                                                                                         >
                                                                                             {label}
@@ -876,8 +885,9 @@ const LabelPreviewModal = ({
                         <h3>Label Information</h3>
 
                         <div className={styles.formGroup}>
-                            <label>Patient Name</label>
+                            <label htmlFor="label-patient-name">Patient Name</label>
                             <input
+                                id="label-patient-name"
                                 type="text"
                                 value={patientName}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setPatientName(e.target.value)}
@@ -887,8 +897,9 @@ const LabelPreviewModal = ({
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label>Doctor Name</label>
+                            <label htmlFor="label-doctor-name">Doctor Name</label>
                             <input
+                                id="label-doctor-name"
                                 type="text"
                                 value={doctorName}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setDoctorName(e.target.value)}
@@ -909,8 +920,9 @@ const LabelPreviewModal = ({
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label>Source Batch</label>
+                            <label htmlFor="label-source-batch">Source Batch</label>
                             <input
+                                id="label-source-batch"
                                 type="text"
                                 value={`Batch #${batch?.batch_sequence || 'N/A'} (Set #${set?.set_sequence || 'N/A'})`}
                                 disabled
@@ -989,10 +1001,11 @@ const LabelPreviewModal = ({
                                                     onKeyDown={handleEditLabelKeyPress}
                                                     onBlur={saveEditLabel}
                                                     className={styles.labelEditInput}
+                                                    // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                                                     autoFocus
                                                 />
                                             ) : (
-                                                <span className={styles.labelText} onClick={() => startEditLabel(label)} title="Click to edit">
+                                                <span className={styles.labelText} role="button" tabIndex={0} onClick={() => startEditLabel(label)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEditLabel(label); } }} title="Click to edit">
                                                     {label.text}
                                                 </span>
                                             )}

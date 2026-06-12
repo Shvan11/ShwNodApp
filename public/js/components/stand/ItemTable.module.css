@@ -239,7 +239,7 @@
 .loadingState {
   text-align: center;
   padding: 60px 20px;
-  color: var(--text-lighter);
+  color: var(--text-muted);
 }
 
 .loadingSpinner {
@@ -260,7 +260,7 @@
 .emptyState {
   text-align: center;
   padding: 60px 20px;
-  color: var(--text-lighter);
+  color: var(--text-muted);
   font-size: var(--font-size-base);
 }
 

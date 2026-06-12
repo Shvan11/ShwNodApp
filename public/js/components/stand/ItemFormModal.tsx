@@ -582,7 +582,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
               </div>
 
               <div className={styles.formGroup}>
-                <label>Profit</label>
+                <span>Profit</span>
                 <div className={styles.profitDisplay}>
                   <span className={styles.profitLabel}>IQD</span>
                   <span className={`${styles.profitValue} ${profit < 0 ? styles.profitNegative : ''}`}>

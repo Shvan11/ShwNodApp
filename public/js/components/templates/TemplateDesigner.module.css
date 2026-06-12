@@ -39,7 +39,7 @@
     margin: 0;
     font-size: 1.25rem;
     font-weight: var(--font-weight-semibold);
-    color: var(--text-dark);
+    color: var(--text-primary);
 }
 
 .templateInfo {
@@ -105,7 +105,7 @@
 
 .designerError p {
     margin: 0 0 1.5rem 0;
-    color: var(--text-dark);
+    color: var(--text-primary);
     font-size: 1.125rem;
 }
 
@@ -222,7 +222,7 @@
 }
 
 :global(.gjs-two-color) {
-    color: var(--text-dark);
+    color: var(--text-primary);
 }
 
 :global(.gjs-three-bg) {

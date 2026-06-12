@@ -859,7 +859,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 </h4>
                                 <div className={styles.infoGrid}>
                                     <div className={styles.infoItem}>
-                                        <label>Work ID:</label>
+                                        <span>Work ID:</span>
                                         <span className={styles.workId}>{selectedWork.work_id}</span>
                                     </div>
                                 </div>
@@ -974,7 +974,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         <form onSubmit={handleDetailFormSubmit} className={styles.detailForm}>
                             {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('teeth') && (
                                 <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                                    <label>Select Teeth</label>
+                                    <span>Select Teeth</span>
                                     <TeethSelector
                                         teethOptions={teethOptions}
                                         selectedTeethIds={detailFormData.TeethIds}
@@ -992,8 +992,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                             <div className={styles.formRow}>
                                 {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('fillingType') && (
                                     <div className={styles.formGroup}>
-                                        <label>Filling Type</label>
+                                        <label htmlFor="work-detail-filling-type">Filling Type</label>
                                         <select
+                                            id="work-detail-filling-type"
                                             value={detailFormData.filling_type}
                                             onChange={(e) => setDetailFormData({ ...detailFormData, filling_type: e.target.value })}
                                         >
@@ -1007,8 +1008,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
                                 {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('fillingDepth') && (
                                     <div className={styles.formGroup}>
-                                        <label>Filling Depth</label>
+                                        <label htmlFor="work-detail-filling-depth">Filling Depth</label>
                                         <select
+                                            id="work-detail-filling-depth"
                                             value={detailFormData.filling_depth}
                                             onChange={(e) => setDetailFormData({ ...detailFormData, filling_depth: e.target.value })}
                                         >
@@ -1022,8 +1024,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
                                 {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('canalsNo') && (
                                     <div className={styles.formGroup}>
-                                        <label>Number of Canals</label>
+                                        <label htmlFor="work-detail-canals-no">Number of Canals</label>
                                         <input
+                                            id="work-detail-canals-no"
                                             type="number"
                                             value={detailFormData.canals_no}
                                             onChange={(e) => setDetailFormData({ ...detailFormData, canals_no: e.target.value })}
@@ -1036,8 +1039,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
                                 {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('workingLength') && (
                                     <div className={styles.formGroup}>
-                                        <label>Working Length</label>
+                                        <label htmlFor="work-detail-working-length">Working Length</label>
                                         <input
+                                            id="work-detail-working-length"
                                             type="text"
                                             value={detailFormData.working_length}
                                             onChange={(e) => setDetailFormData({ ...detailFormData, working_length: e.target.value })}
@@ -1048,8 +1052,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
                                 {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('implantManufacturer') && (
                                     <div className={styles.formGroup}>
-                                        <label>Manufacturer</label>
+                                        <label htmlFor="work-detail-manufacturer">Manufacturer</label>
                                         <select
+                                            id="work-detail-manufacturer"
                                             value={detailFormData.implant_manufacturer_id}
                                             onChange={(e) => setDetailFormData({ ...detailFormData, implant_manufacturer_id: e.target.value })}
                                         >
@@ -1063,8 +1068,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
                                 {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('implantLength') && (
                                     <div className={styles.formGroup}>
-                                        <label>Implant Length (mm)</label>
+                                        <label htmlFor="work-detail-implant-length">Implant Length (mm)</label>
                                         <input
+                                            id="work-detail-implant-length"
                                             type="number"
                                             step="0.5"
                                             value={detailFormData.implant_length}
@@ -1076,8 +1082,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
                                 {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('implantDiameter') && (
                                     <div className={styles.formGroup}>
-                                        <label>Implant Diameter (mm)</label>
+                                        <label htmlFor="work-detail-implant-diameter">Implant Diameter (mm)</label>
                                         <input
+                                            id="work-detail-implant-diameter"
                                             type="number"
                                             step="0.1"
                                             value={detailFormData.implant_diameter}
@@ -1089,8 +1096,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
                                 {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('material') && (
                                     <div className={styles.formGroup}>
-                                        <label>Material</label>
+                                        <label htmlFor="work-detail-material">Material</label>
                                         <select
+                                            id="work-detail-material"
                                             value={detailFormData.material}
                                             onChange={(e) => setDetailFormData({ ...detailFormData, material: e.target.value })}
                                         >
@@ -1104,8 +1112,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
                                 {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('labName') && (
                                     <div className={styles.formGroup}>
-                                        <label>Lab Name</label>
+                                        <label htmlFor="work-detail-lab-name">Lab Name</label>
                                         <input
+                                            id="work-detail-lab-name"
                                             type="text"
                                             value={detailFormData.lab_name}
                                             onChange={(e) => setDetailFormData({ ...detailFormData, lab_name: e.target.value })}
@@ -1117,8 +1126,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
                             <div className={styles.formRow}>
                                 <div className={styles.formGroup}>
-                                    <label>Start Date</label>
+                                    <label htmlFor="work-detail-start-date">Start Date</label>
                                     <input
+                                        id="work-detail-start-date"
                                         type="date"
                                         value={detailFormData.start_date}
                                         onChange={(e) => setDetailFormData({ ...detailFormData, start_date: e.target.value })}
@@ -1126,8 +1136,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>Completed Date</label>
+                                    <label htmlFor="work-detail-completed-date">Completed Date</label>
                                     <input
+                                        id="work-detail-completed-date"
                                         type="date"
                                         value={detailFormData.completed_date}
                                         onChange={(e) => setDetailFormData({ ...detailFormData, completed_date: e.target.value })}
@@ -1135,8 +1146,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 </div>
 
                                 <div className={styles.formGroup}>
-                                    <label>Item Cost</label>
+                                    <label htmlFor="work-detail-item-cost">Item Cost</label>
                                     <input
+                                        id="work-detail-item-cost"
                                         type="text"
                                         value={displayItemCost}
                                         onChange={(e) => {
@@ -1152,8 +1164,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                             </div>
 
                             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                                <label>Notes</label>
+                                <label htmlFor="work-detail-note">Notes</label>
                                 <textarea
+                                    id="work-detail-note"
                                     value={detailFormData.note}
                                     onChange={(e) => setDetailFormData({ ...detailFormData, note: e.target.value })}
                                     rows={3}

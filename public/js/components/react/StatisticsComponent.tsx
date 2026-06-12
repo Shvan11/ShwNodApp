@@ -590,8 +590,9 @@ const StatisticsComponent = () => {
                                     </div>
                                     <div className={styles.periodSelectorControls}>
                                         <div className={styles.periodSelectorField}>
-                                            <label>From</label>
+                                            <label htmlFor="period-start-month">From</label>
                                             <select
+                                                id="period-start-month"
                                                 value={periodStartMonth}
                                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setPeriodStartMonth(parseInt(e.target.value))}
                                                 className={styles.formSelect}
@@ -613,7 +614,7 @@ const StatisticsComponent = () => {
                                             <i className="fas fa-arrow-right"></i>
                                         </div>
                                         <div className={styles.periodSelectorField}>
-                                            <label>To</label>
+                                            <span>To</span>
                                             <span className={styles.periodEndDisplay}>
                                                 {monthNames[getPeriodEnd().endMonth - 1]} {getPeriodEnd().endYear}
                                             </span>
@@ -636,8 +637,9 @@ const StatisticsComponent = () => {
                                     </div>
                                     <div className={styles.periodSelectorControls}>
                                         <div className={styles.periodSelectorField}>
-                                            <label>From</label>
+                                            <label htmlFor="year-range-start">From</label>
                                             <input
+                                                id="year-range-start"
                                                 type="number"
                                                 value={yearRangeStart}
                                                 onChange={(e: ChangeEvent<HTMLInputElement>) => {
@@ -655,8 +657,9 @@ const StatisticsComponent = () => {
                                             <i className="fas fa-arrow-right"></i>
                                         </div>
                                         <div className={styles.periodSelectorField}>
-                                            <label>To</label>
+                                            <label htmlFor="year-range-end">To</label>
                                             <input
+                                                id="year-range-end"
                                                 type="number"
                                                 value={yearRangeEnd}
                                                 onChange={(e: ChangeEvent<HTMLInputElement>) => {

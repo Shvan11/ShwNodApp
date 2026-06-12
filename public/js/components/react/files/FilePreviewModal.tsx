@@ -130,8 +130,10 @@ const PreviewBody = ({ entry, src, downloadUrl }: BodyProps) => {
     case 'image':
       return <img className={styles.previewImage} src={src} alt={entry.name} />;
     case 'video':
+      // eslint-disable-next-line jsx-a11y/media-has-caption -- user-supplied clinical videos have no caption track
       return <video className={styles.previewMedia} src={src} controls autoPlay />;
     case 'audio':
+      // eslint-disable-next-line jsx-a11y/media-has-caption -- user-supplied clinical videos have no caption track
       return <audio className={styles.previewAudio} src={src} controls autoPlay />;
     case 'pdf':
       return <iframe className={styles.previewFrame} src={src} title={entry.name} />;

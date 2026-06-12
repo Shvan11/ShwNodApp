@@ -39,10 +39,11 @@
 --surface-hover: #f5f5f5
 --background-color: #f4f4f9
 
-/* Text */
---text-color: #333333
---text-light: #666666
---text-secondary: #6c757d
+/* Text — canonical scale (use ONLY these four for text colour) */
+--text-primary: #212529     /* body / strong text */
+--text-secondary: #6c757d   /* secondary text, labels */
+--text-muted: #999999       /* muted / tertiary, placeholders */
+--text-heading: <dark-blue> /* card/section titles — flips in dark */
 
 /* Borders */
 --border-color: #cccccc

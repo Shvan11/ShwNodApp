@@ -83,7 +83,7 @@
 }
 
 .breadcrumbSeparator {
-    color: var(--text-lighter);
+    color: var(--text-muted);
     font-weight: 300;
     font-size: 0.875rem;
 }

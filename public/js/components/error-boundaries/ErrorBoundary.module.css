@@ -30,7 +30,7 @@
 }
 
 .errorBoundaryContent p {
-  color: var(--text-light);
+  color: var(--text-secondary);
   margin-bottom: 20px;
   font-size: 16px;
 }

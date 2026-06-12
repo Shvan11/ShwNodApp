@@ -447,7 +447,10 @@ export default function Videos() {
             <div key={video.id} className={styles.videoCard}>
               <div
                 className={styles.thumbnailWrapper}
+                role="button"
+                tabIndex={0}
                 onClick={() => handlePlayVideo(video)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePlayVideo(video); } }}
               >
                 <img
                   src={`/api/videos/${video.id}/thumbnail`}
@@ -514,6 +517,7 @@ export default function Videos() {
             </button>
           </div>
           <div className={styles.playerBody}>
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption -- user-supplied clinical videos have no caption track */}
             <video
               controls
               autoPlay

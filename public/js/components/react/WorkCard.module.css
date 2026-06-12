@@ -82,7 +82,7 @@
     margin: 0;
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-800);
+    color: var(--text-primary);
 }
 
 /* Status Badge */
@@ -102,7 +102,7 @@
 
 .statusBadgeCompleted {
     background: var(--gray-200);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .statusBadgeDiscontinued {
@@ -179,7 +179,7 @@
     padding: var(--spacing-sm) var(--spacing-md);
     border: none;
     background: var(--surface);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     cursor: pointer;
     font-size: var(--font-size-sm);
     text-align: left;
@@ -280,7 +280,7 @@
 .financialValue {
     font-size: 1rem;
     font-weight: var(--font-weight-bold);
-    color: var(--gray-800);
+    color: var(--text-primary);
 }
 
 .financialValuePaid {
@@ -327,7 +327,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .infoItemFullWidth {

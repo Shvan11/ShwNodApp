@@ -23,9 +23,9 @@ interface CategoryManagerModalProps {
 export default function CategoryManagerModal({ isOpen, onClose }: CategoryManagerModalProps) {
   const toast = useToast();
   const confirm = useConfirm();
-  const { categories, refetch } = useStandCategories();
+  const { categories } = useStandCategories();
   const { createCategory, updateCategory, deleteCategory, loading } =
-    useStandCategoryMutations(refetch);
+    useStandCategoryMutations();
 
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -125,6 +125,7 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
                         className={styles.editInput}
                         value={editingName}
                         onChange={(e) => setEditingName(e.target.value)}
+                        // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                         autoFocus
                         maxLength={100}
                         onKeyDown={(e) => {

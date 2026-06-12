@@ -217,7 +217,7 @@
     margin: 0 0 var(--lpm-space-xs) 0;
     font-size: var(--lpm-font-size-lg);
     font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .formGroup {
@@ -281,7 +281,7 @@ input.inputError {
 
 .checkboxText {
     font-size: var(--lpm-font-size-md);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 /* Original ranges info */
@@ -350,7 +350,7 @@ input.inputError {
     margin: 0;
     font-size: var(--lpm-font-size-lg);
     font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .labelsEditorActions {
@@ -639,7 +639,7 @@ input.inputError {
     margin: 0 0 var(--lpm-space-xs) 0;
     font-size: var(--lpm-font-size-lg);
     font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .positionHint {
@@ -662,7 +662,7 @@ input.inputError {
     background: var(--surface);
     font-size: var(--lpm-font-size-md);
     font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
+    color: var(--text-primary);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -771,7 +771,7 @@ input.inputError {
     border: 1px solid var(--border-color);
     border-radius: var(--lpm-radius-lg);
     background: var(--surface);
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: var(--lpm-font-size-lg);
     font-weight: var(--font-weight-medium);
     cursor: pointer;
@@ -841,7 +841,7 @@ input.inputError {
 .queueBatches h3 {
     font-size: var(--lpm-font-size-xl);
     font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
+    color: var(--text-primary);
     margin: 0 0 var(--lpm-space-xs) 0;
 }
 
@@ -902,7 +902,7 @@ input.inputError {
     border-radius: var(--lpm-radius-xl) var(--lpm-radius-xl) 0 0;
     font-weight: var(--font-weight-semibold);
     font-size: var(--lpm-font-size-lg);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .queuePatientHeader i {
@@ -983,7 +983,7 @@ input.inputError {
 .queueBatchNumber {
     font-weight: var(--font-weight-semibold);
     font-size: var(--lpm-font-size-md);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .queueBatchLabels {
@@ -1091,7 +1091,7 @@ input.inputError {
     border-radius: var(--lpm-radius-sm);
     background: var(--surface);
     border: 1px solid var(--border-color);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 /* Label chip type colors */
@@ -1146,7 +1146,7 @@ input.inputError {
 .editorTitle {
     font-size: var(--lpm-font-size-base);
     font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
+    color: var(--text-primary);
     white-space: nowrap;
 }
 

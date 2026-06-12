@@ -22,7 +22,20 @@ import * as visitContract from '@shared/contracts/visit.contract';
 import * as lookupContract from '@shared/contracts/lookup.contract';
 import * as staffContract from '@shared/contracts/staff.contract';
 import * as employeeContract from '@shared/contracts/employee.contract';
+import * as standContract from '@shared/contracts/stand.contract';
+import * as expenseContract from '@shared/contracts/expense.contract';
 import { qk } from './keys';
+// Type-only (erased at runtime → no import cycle with the hooks below). Stand row
+// types come straight from its contract; the expense hooks predate full response
+// modelling, so their factories keep the hooks' hand-written generics verbatim.
+import type { StandItemFilters, StandSaleFilters } from '@/hooks/useStand';
+import type {
+  Expense,
+  Category,
+  Subcategory,
+  ExpenseSummary,
+  ExpenseFilters,
+} from '@/hooks/useExpenses';
 
 type Id = number | string;
 
@@ -341,4 +354,206 @@ export const employeesQuery = (query = '') =>
         signal,
         schema: employeeContract.employees.response,
       }),
+  });
+
+// ---------------------------------------------------------------------------
+// Stand / mini-pharmacy — row types come from the contract (re-exported by the
+// hook), so z.infer is the SSoT. Gated reads (id/date) bake `enabled` here.
+// ---------------------------------------------------------------------------
+
+/** GET /api/stand/items?… — inventory list (filtered). */
+export const standItemsQuery = (filters: StandItemFilters = {}) =>
+  queryOptions({
+    queryKey: qk.stand.items.list(filters),
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams();
+      if (filters.search) params.append('search', filters.search);
+      if (filters.categoryId) params.append('categoryId', String(filters.categoryId));
+      if (filters.stockStatus) params.append('stockStatus', filters.stockStatus);
+      if (filters.includeInactive) params.append('includeInactive', 'true');
+      return fetchJSON<z.infer<typeof standContract.items.response>>(
+        `/api/stand/items?${params}`,
+        { signal, schema: standContract.items.response }
+      );
+    },
+  });
+
+/** GET /api/stand/categories — category list. */
+export const standCategoriesQuery = () =>
+  queryOptions({
+    queryKey: qk.stand.categories(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof standContract.categories.response>>('/api/stand/categories', {
+        signal,
+        schema: standContract.categories.response,
+      }),
+  });
+
+/** GET /api/stand/dashboard — KPI rollup. */
+export const standDashboardQuery = () =>
+  queryOptions({
+    queryKey: qk.stand.dashboard(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof standContract.dashboard.response>>('/api/stand/dashboard', {
+        signal,
+        schema: standContract.dashboard.response,
+      }),
+  });
+
+/** GET /api/stand/sales?… — sales list (filtered). */
+export const standSalesQuery = (filters: StandSaleFilters = {}) =>
+  queryOptions({
+    queryKey: qk.stand.sales.list(filters),
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams();
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+      if (filters.cashierId) params.append('cashierId', String(filters.cashierId));
+      if (filters.personId) params.append('personId', String(filters.personId));
+      return fetchJSON<z.infer<typeof standContract.sales.response>>(
+        `/api/stand/sales?${params}`,
+        { signal, schema: standContract.sales.response }
+      );
+    },
+  });
+
+/** GET /api/stand/sales/:id — single sale with items (disabled until an id is picked). */
+export const standSaleQuery = (id: number | null) =>
+  queryOptions({
+    queryKey: qk.stand.sales.one(id ?? 0),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof standContract.saleById.response>>(`/api/stand/sales/${id}`, {
+        signal,
+        schema: standContract.saleById.response,
+      }),
+    enabled: id != null,
+  });
+
+/** GET /api/stand/items/low-stock — items at or below reorder level. */
+export const lowStockItemsQuery = () =>
+  queryOptions({
+    queryKey: qk.stand.items.lowStock(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof standContract.itemsLowStock.response>>(
+        '/api/stand/items/low-stock',
+        { signal, schema: standContract.itemsLowStock.response }
+      ),
+  });
+
+/** GET /api/stand/items/expiring?days= — items expiring within `daysAhead`. */
+export const expiringItemsQuery = (daysAhead: number) =>
+  queryOptions({
+    queryKey: qk.stand.items.expiring(daysAhead),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof standContract.itemsExpiring.response>>(
+        `/api/stand/items/expiring?days=${daysAhead}`,
+        { signal, schema: standContract.itemsExpiring.response }
+      ),
+  });
+
+/** GET /api/stand/items/:id/movements — stock-movement ledger (disabled until an item is picked). */
+export const stockMovementsQuery = (itemId: number | null) =>
+  queryOptions({
+    queryKey: qk.stand.items.movements(itemId ?? 0),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof standContract.itemMovements.response>>(
+        `/api/stand/items/${itemId}/movements`,
+        { signal, schema: standContract.itemMovements.response }
+      ),
+    enabled: itemId != null,
+  });
+
+/** GET /api/stand/reports/summary?… — revenue/profit rollup (disabled until both dates set). */
+export const standReportSummaryQuery = (startDate: string | null, endDate: string | null) =>
+  queryOptions({
+    queryKey: qk.stand.reports.summary(startDate ?? '', endDate ?? ''),
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams({ startDate: startDate!, endDate: endDate! });
+      return fetchJSON<z.infer<typeof standContract.reportSummary.response>>(
+        `/api/stand/reports/summary?${params}`,
+        { signal, schema: standContract.reportSummary.response }
+      );
+    },
+    enabled: !!startDate && !!endDate,
+  });
+
+/** GET /api/stand/reports/top-items?… — best sellers (disabled until both dates set). */
+export const topSellingItemsQuery = (
+  startDate: string | null,
+  endDate: string | null,
+  limit: number
+) =>
+  queryOptions({
+    queryKey: qk.stand.reports.topItems(startDate ?? '', endDate ?? '', limit),
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams({ startDate: startDate!, endDate: endDate!, limit: String(limit) });
+      return fetchJSON<z.infer<typeof standContract.reportTopItems.response>>(
+        `/api/stand/reports/top-items?${params}`,
+        { signal, schema: standContract.reportTopItems.response }
+      );
+    },
+    enabled: !!startDate && !!endDate,
+  });
+
+// ---------------------------------------------------------------------------
+// Expenses — the hooks predate full response modelling, so each factory keeps
+// the hook's hand-written return generic (the runtime schema still validates).
+// ---------------------------------------------------------------------------
+
+/** GET /api/expenses?… — filtered expense list. */
+export const expensesQuery = (filters: ExpenseFilters = {}) =>
+  queryOptions({
+    queryKey: qk.expenses.list(filters),
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams();
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+      if (filters.categoryId) params.append('categoryId', String(filters.categoryId));
+      if (filters.subcategoryId) params.append('subcategoryId', String(filters.subcategoryId));
+      if (filters.currency) params.append('currency', filters.currency);
+      return fetchJSON<Expense[]>(`/api/expenses?${params}`, {
+        signal,
+        schema: expenseContract.expenseList.response,
+      });
+    },
+  });
+
+/** GET /api/expenses/categories — expense categories. */
+export const expenseCategoriesQuery = () =>
+  queryOptions({
+    queryKey: qk.expenses.categories(),
+    queryFn: ({ signal }) =>
+      fetchJSON<Category[]>('/api/expenses/categories', {
+        signal,
+        schema: expenseContract.expenseCategories.response,
+      }),
+  });
+
+/** GET /api/expenses/subcategories/:categoryId — subcategories (disabled until a category is picked). */
+export const expenseSubcategoriesQuery = (categoryId: number | string | null | undefined) =>
+  queryOptions({
+    queryKey: qk.expenses.subcategories(categoryId ?? 0),
+    queryFn: ({ signal }) =>
+      fetchJSON<Subcategory[]>(`/api/expenses/subcategories/${categoryId}`, {
+        signal,
+        schema: expenseContract.expenseSubcategories.response,
+      }),
+    enabled: !!categoryId,
+  });
+
+/** GET /api/expenses/summary?… — totals rollup (disabled until both dates set). */
+export const expenseSummaryQuery = (
+  startDate: string | null | undefined,
+  endDate: string | null | undefined
+) =>
+  queryOptions({
+    queryKey: qk.expenses.summary(startDate ?? '', endDate ?? ''),
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams({ startDate: startDate!, endDate: endDate! });
+      return fetchJSON<ExpenseSummary>(`/api/expenses/summary?${params}`, {
+        signal,
+        schema: expenseContract.expenseSummary.response,
+      });
+    },
+    enabled: !!startDate && !!endDate,
   });

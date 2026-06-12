@@ -86,7 +86,7 @@
     margin: 0;
     font-size: 18px;
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -151,7 +151,7 @@
 .selectedTime.hasValue {
     background: var(--success-50);
     border-color: var(--success-color);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     font-weight: var(--font-weight-semibold);
 }
 
@@ -166,7 +166,7 @@
     padding: 12px 14px;
     border-radius: 8px;
     font-size: 14px;
-    color: var(--gray-700);
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s;
     font-family: inherit;

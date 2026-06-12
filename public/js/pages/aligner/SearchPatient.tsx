@@ -99,7 +99,10 @@ const SearchPatient: React.FC = () => {
                                 <div
                                     key={patient.workid}
                                     className={styles.searchResultItem}
+                                    role="button"
+                                    tabIndex={0}
                                     onClick={() => selectPatient(patient)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPatient(patient); } }}
                                 >
                                     <div className={styles.resultName}>
                                         {formatPatientName(patient)}

@@ -93,9 +93,9 @@ const PatientManagement = () => {
     const loaderData = useLoaderData() as LoaderData | undefined;
 
     // --- 1. Synchronous State Initialization ---
-    // We read storage ONCE via a ref/function. By passing this result to useState,
-    // React initializes the state with data available on the very first paint.
-    const savedState = useRef(() => {
+    // We read storage ONCE via an IIFE. By passing this result to the useState
+    // initializers below, React seeds state with data available on the first paint.
+    const savedState = ((): SavedState | null => {
         try {
             const saved = sessionStorage.getItem('pm_search_state');
             if (!saved) return null;
@@ -112,7 +112,7 @@ const PatientManagement = () => {
             sessionStorage.removeItem('pm_search_state');
             return null;
         }
-    }).current();
+    })();
 
     // -- Data State --
     const [patients, setPatients] = useState<Patient[]>(
@@ -420,8 +420,9 @@ const PatientManagement = () => {
 
             <div className={styles.nameSearchGrid}>
                 <div>
-                    <label>Name (Arabic)</label>
+                    <label htmlFor="pm-search-name">Name (Arabic)</label>
                     <PatientSearchCombobox
+                        id="pm-search-name"
                         value={searchPatientName}
                         onChange={setSearchPatientName}
                         onJump={handleJumpToPatient}
@@ -432,11 +433,12 @@ const PatientManagement = () => {
                         placeholder="اكتب للبحث..."
                     />
                 </div>
-                <div><label>First Name</label><input type="text" value={searchFirstName} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchFirstName(e.target.value)} className="form-control"/></div>
-                <div><label>Last Name</label><input type="text" value={searchLastName} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchLastName(e.target.value)} className="form-control"/></div>
+                <div><label htmlFor="pm-search-first-name">First Name</label><input id="pm-search-first-name" type="text" value={searchFirstName} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchFirstName(e.target.value)} className="form-control"/></div>
+                <div><label htmlFor="pm-search-last-name">Last Name</label><input id="pm-search-last-name" type="text" value={searchLastName} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchLastName(e.target.value)} className="form-control"/></div>
                 <div>
-                    <label>Phone/ID</label>
+                    <label htmlFor="pm-search-phone-id">Phone/ID</label>
                     <PatientSearchCombobox
+                        id="pm-search-phone-id"
                         value={searchTerm}
                         onChange={setSearchTerm}
                         onJump={handleJumpToPatient}
@@ -466,7 +468,7 @@ const PatientManagement = () => {
             </div>
 
             <div className={styles.advancedFilters}>
-                <div className={styles.advancedFiltersHeader} onClick={() => setShowFilters(!showFilters)}>
+                <div className={styles.advancedFiltersHeader} role="button" tabIndex={0} onClick={() => setShowFilters(!showFilters)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowFilters(!showFilters); } }}>
                     <h4><i className={cn('fas fa-filter', styles.iconGap)}></i>Filters {(selectedWorkTypes.length + selectedKeywords.length + selectedTags.length + selectedPatientTypes.length + (lastAppointmentFilter ? 1 : 0) + (hasFinalPhotos ? 1 : 0) > 0) && <span className={styles.filterBadge}>{selectedWorkTypes.length + selectedKeywords.length + selectedTags.length + selectedPatientTypes.length + (lastAppointmentFilter ? 1 : 0) + (hasFinalPhotos ? 1 : 0)}</span>}</h4>
                     <i className={`fas fa-chevron-${showFilters ? 'up' : 'down'}`}></i>
                 </div>
@@ -474,8 +476,9 @@ const PatientManagement = () => {
                     <div className={styles.advancedFiltersContent}>
                         <div className={styles.advancedFiltersGrid}>
                             <div className={styles.filterGroup}>
-                                <label>Work Type</label>
+                                <label htmlFor="pm-filter-work-type">Work Type</label>
                                 <Select
+                                    inputId="pm-filter-work-type"
                                     isMulti
                                     options={workTypes}
                                     value={selectedWorkTypes}
@@ -484,8 +487,9 @@ const PatientManagement = () => {
                                 />
                             </div>
                             <div className={styles.filterGroup}>
-                                <label>Keywords</label>
+                                <label htmlFor="pm-filter-keywords">Keywords</label>
                                 <Select
+                                    inputId="pm-filter-keywords"
                                     isMulti
                                     options={keywords}
                                     value={selectedKeywords}
@@ -494,8 +498,9 @@ const PatientManagement = () => {
                                 />
                             </div>
                             <div className={styles.filterGroup}>
-                                <label>Tags</label>
+                                <label htmlFor="pm-filter-tags">Tags</label>
                                 <Select
+                                    inputId="pm-filter-tags"
                                     isMulti
                                     options={tags}
                                     value={selectedTags}
@@ -504,8 +509,9 @@ const PatientManagement = () => {
                                 />
                             </div>
                             <div className={styles.filterGroup}>
-                                <label>Patient Type</label>
+                                <label htmlFor="pm-filter-patient-type">Patient Type</label>
                                 <Select
+                                    inputId="pm-filter-patient-type"
                                     isMulti
                                     options={patientTypes}
                                     value={selectedPatientTypes}
@@ -514,8 +520,9 @@ const PatientManagement = () => {
                                 />
                             </div>
                             <div className={styles.filterGroup}>
-                                <label>Last Appointment</label>
+                                <label htmlFor="pm-filter-last-appointment">Last Appointment</label>
                                 <Select
+                                    inputId="pm-filter-last-appointment"
                                     options={LAST_APPOINTMENT_OPTIONS}
                                     value={LAST_APPOINTMENT_OPTIONS.find(o => o.value === lastAppointmentFilter) || LAST_APPOINTMENT_OPTIONS[0]}
                                     onChange={(option) => setLastAppointmentFilter(option?.value || '')}
@@ -588,13 +595,16 @@ const PatientManagement = () => {
                                 <tr key={p.person_id}>
                                     <td data-label="ID">{p.person_id}</td>
                                     <td data-label="Name">
-                                        <strong
+                                        <span
                                             className={styles.patientNameLink}
+                                            role="button"
+                                            tabIndex={0}
                                             onClick={() => navigate(`/patient/${p.person_id}/works`)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/patient/${p.person_id}/works`); } }}
                                             title="View Patient"
                                         >
                                             {p.patient_name}
-                                        </strong>
+                                        </span>
                                         {p.first_name && <div>{p.first_name} {p.last_name}</div>}
                                     </td>
                                     <td data-label="Phone"><PhoneDisplay phone={p.phone} /> {!p.phone && '-'}</td>

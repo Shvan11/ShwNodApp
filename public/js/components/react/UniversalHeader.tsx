@@ -250,7 +250,7 @@ const UniversalHeader = () => {
             <div className="header-container">
                 {/* Header Left - Logo/Brand */}
                 <div className="header-left">
-                    <div className="logo-section" onClick={() => navigate('/')}>
+                    <div className="logo-section" role="button" tabIndex={0} onClick={() => navigate('/')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/'); } }}>
                         <h1 className="clinic-name">Shwan Orthodontics</h1>
                     </div>
                 </div>

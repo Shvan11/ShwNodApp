@@ -129,7 +129,7 @@
 .form-section h3 {
     margin: 0 0 0.7rem 0;
     font-size: 1rem;
-    color: var(--text-color);
+    color: var(--text-primary);
     font-weight: var(--font-weight-semibold);
 }
 
@@ -141,7 +141,7 @@
     display: block;
     margin-bottom: 0.35rem;
     font-weight: var(--font-weight-medium);
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: 0.875rem;
 }
 
@@ -285,13 +285,13 @@
 
 .confirm-dialog-header h3 {
     margin: 0 0 1rem 0;
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: 1.3rem;
 }
 
 .confirm-dialog-body p {
     margin: 0 0 1.5rem 0;
-    color: var(--text-light);
+    color: var(--text-secondary);
     line-height: 1.5;
 }
 
@@ -323,7 +323,7 @@
 
 .drawer-container .btn-secondary {
     background: var(--gray-200);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .drawer-container .btn-secondary:hover {
@@ -361,7 +361,7 @@
     cursor: pointer;
     font-size: 0.95rem;
     font-weight: var(--font-weight-medium);
-    color: var(--text-light);
+    color: var(--text-secondary);
     transition: all 0.2s;
     display: flex;
     align-items: center;
@@ -545,7 +545,7 @@
     display: block;
     font-size: 0.875rem;
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     margin-bottom: 0.5rem;
 }
 
@@ -566,7 +566,7 @@
     border-radius: 8px;
     font-size: 1.125rem;
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-900);
+    color: var(--text-primary);
     transition: all 0.2s;
 }
 
@@ -597,7 +597,7 @@
     border: 2px solid var(--gray-200);
     border-radius: 8px;
     font-size: 1rem;
-    color: var(--gray-900);
+    color: var(--text-primary);
     transition: all 0.2s;
 }
 
@@ -783,7 +783,7 @@
 .empty-communication {
     text-align: center;
     padding: 2rem 1rem;
-    color: var(--text-light);
+    color: var(--text-secondary);
 }
 
 .empty-communication i {
@@ -859,13 +859,13 @@
 
 .note-date {
     font-size: 0.8rem;
-    color: var(--text-light);
+    color: var(--text-secondary);
 }
 
 .note-text {
     margin: 0;
     line-height: 1.6;
-    color: var(--text-color);
+    color: var(--text-primary);
     white-space: pre-wrap;
     word-wrap: break-word;
 }
@@ -1033,7 +1033,7 @@
 .section-header h3 {
     margin: 0;
     font-size: 1.5rem;
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 /* Aligner Set Card */
@@ -1132,7 +1132,7 @@
 .set-title h4 {
     margin: 0 0 0.5rem 0;
     font-size: 1.3rem;
-    color: var(--text-color);
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -1231,7 +1231,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: var(--text-light);
+    color: var(--text-secondary);
 }
 
 .set-info-item i {
@@ -1240,7 +1240,7 @@
 }
 
 .set-info-item strong {
-    color: var(--text-color);
+    color: var(--text-primary);
     font-weight: var(--font-weight-semibold);
 }
 
@@ -1264,7 +1264,7 @@
 
 .progress-text {
     font-size: 0.9rem;
-    color: var(--text-light);
+    color: var(--text-secondary);
     display: flex;
     justify-content: space-between;
 }
@@ -1450,7 +1450,7 @@
 .batches-container h5 {
     margin: 0 0 1rem 0;
     font-size: 1.1rem;
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .batches-header {
@@ -1505,7 +1505,7 @@
 
 .batch-title {
     font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: 1rem;
 }
 
@@ -1541,7 +1541,7 @@
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 0.75rem;
     font-size: 0.9rem;
-    color: var(--text-light);
+    color: var(--text-secondary);
 }
 
 .batch-detail {
@@ -1593,7 +1593,7 @@
 }
 
 .empty-state h3 {
-    color: var(--text-light);
+    color: var(--text-secondary);
     margin-bottom: 0.5rem;
 }
 
@@ -1929,7 +1929,7 @@
 .pdf-file-hint {
     margin-top: 0.5rem;
     font-size: 0.8rem;
-    color: var(--text-light);
+    color: var(--text-secondary);
 }
 
 /* PDF preview */

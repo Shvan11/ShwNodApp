@@ -166,8 +166,9 @@ export default function AdminUserManagement() {
           <form onSubmit={handleCreateUser}>
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
-                <label>Username *</label>
+                <label htmlFor="create-user-username">Username *</label>
                 <input
+                  id="create-user-username"
                   type="text"
                   value={formData.username}
                   onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, username: e.target.value })}
@@ -175,8 +176,9 @@ export default function AdminUserManagement() {
                 />
               </div>
               <div className={styles.formGroup}>
-                <label>Full Name</label>
+                <label htmlFor="create-user-fullname">Full Name</label>
                 <input
+                  id="create-user-fullname"
                   type="text"
                   value={formData.fullName}
                   onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, fullName: e.target.value })}
@@ -186,8 +188,9 @@ export default function AdminUserManagement() {
 
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
-                <label>Password * (min 6 characters)</label>
+                <label htmlFor="create-user-password">Password * (min 6 characters)</label>
                 <input
+                  id="create-user-password"
                   type="password"
                   value={formData.password}
                   onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, password: e.target.value })}
@@ -196,8 +199,9 @@ export default function AdminUserManagement() {
                 />
               </div>
               <div className={styles.formGroup}>
-                <label>Role *</label>
+                <label htmlFor="create-user-role">Role *</label>
                 <select
+                  id="create-user-role"
                   value={formData.role}
                   onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, role: e.target.value as UserRole })}
                   required
@@ -297,13 +301,15 @@ export default function AdminUserManagement() {
           <h3>Reset Password — {resetTarget.username}</h3>
           <form onSubmit={submitResetPassword}>
             <div className={styles.formGroup}>
-              <label>New Password * (min 6 characters)</label>
+              <label htmlFor="reset-new-password">New Password * (min 6 characters)</label>
               <input
+                id="reset-new-password"
                 type="password"
                 value={newPasswordInput}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setNewPasswordInput(e.target.value)}
                 required
                 minLength={6}
+                // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                 autoFocus
               />
             </div>

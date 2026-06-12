@@ -7,7 +7,7 @@
 .authContainer {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     background: var(--gray-50);
-    color: var(--text-color);
+    color: var(--text-primary);
     line-height: 1.6;
     /* Subtract the fixed-header offset (--header-height) that #app-container pads;
        a bare 100vh double-counts the header → phantom page scroll. */
@@ -87,14 +87,14 @@
     margin: 0 0 0.5rem;
     font-size: 1.4rem;
     font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .statusText p,
 .successContent p,
 .errorContent p {
     margin: 0;
-    color: var(--text-light);
+    color: var(--text-secondary);
     font-size: 0.95rem;
 }
 
@@ -110,12 +110,12 @@
 .qrHeader h2 {
     margin: 0 0 0.5rem;
     font-size: 1.4rem;
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .qrHeader p {
     margin: 0;
-    color: var(--text-light);
+    color: var(--text-secondary);
     font-size: 0.9rem;
 }
 
@@ -147,7 +147,7 @@
     background: var(--surface);
     border: 2px dashed var(--gray-300);
     border-radius: 12px;
-    color: var(--text-light);
+    color: var(--text-secondary);
 }
 
 .qrLoading {
@@ -178,7 +178,7 @@
 
 .qrInstructions li {
     margin-bottom: 0.5rem;
-    color: var(--text-light);
+    color: var(--text-secondary);
 }
 
 /* Success section */
@@ -235,7 +235,7 @@
     justify-content: center;
     gap: 0.5rem;
     font-size: 0.85rem;
-    color: var(--text-light);
+    color: var(--text-secondary);
 }
 
 .connectionIndicator {

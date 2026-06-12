@@ -55,7 +55,7 @@
 
 .patientPhotoFallback {
     font-size: var(--font-size-3xl);
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 .patientInfoDetails {
@@ -80,7 +80,7 @@
     margin: 0;
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-900);
+    color: var(--text-primary);
 }
 
 .patientMetaInfo {
@@ -176,7 +176,7 @@
 .summaryValueInline {
     font-size: var(--font-size-2xl);
     font-weight: var(--font-weight-bold);
-    color: var(--gray-900);
+    color: var(--text-primary);
     line-height: var(--line-height-tight);
 }
 
@@ -263,7 +263,7 @@
 
 .noWorksIcon {
     font-size: 3rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
     margin-bottom: 1rem;
 }
 
@@ -452,13 +452,13 @@
 .detailsTable th {
     background-color: var(--gray-50);
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     font-size: 0.875rem;
 }
 
 .detailsTable td {
     font-size: 0.875rem;
-    color: var(--gray-900);
+    color: var(--text-primary);
 }
 
 .detailsTable tr:hover {
@@ -467,7 +467,7 @@
 
 .noData {
     text-align: center;
-    color: var(--text-lighter);
+    color: var(--text-muted);
     padding: 2rem;
     font-style: italic;
 }
@@ -607,7 +607,7 @@
 
 .paymentSummaryLabel {
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     margin-bottom: 0.25rem;
 }
 

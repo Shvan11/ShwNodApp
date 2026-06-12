@@ -218,7 +218,7 @@ const SendMessage = () => {
         option: (provided, state) => ({
             ...provided,
             backgroundColor: state.isSelected ? 'var(--whatsapp-green)' : state.isFocused ? 'var(--surface-hover)' : 'white',
-            color: state.isSelected ? 'white' : 'var(--text-color)',
+            color: state.isSelected ? 'white' : 'var(--text-primary)',
             padding: '10px 12px'
         }),
         placeholder: (provided, state) => ({

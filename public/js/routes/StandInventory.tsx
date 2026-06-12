@@ -50,7 +50,7 @@ export default function StandInventory() {
     restockItem,
     adjustStock,
     loading: mutationLoading,
-  } = useStandItemMutations(refetch);
+  } = useStandItemMutations();
 
   // Modal state (restored from sessionStorage so camera/refresh doesn't lose work)
   const initialModalState = loadModalState();

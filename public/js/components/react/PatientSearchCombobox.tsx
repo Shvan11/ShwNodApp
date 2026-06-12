@@ -24,6 +24,8 @@ export interface PatientSearchComboboxProps {
     mode: 'name' | 'phoneId';
     rtl?: boolean;
     placeholder?: string;
+    /** id forwarded to the inner input so a sibling <label htmlFor> can associate with it */
+    id?: string;
 }
 
 const MAX_PER_GROUP = 4;
@@ -78,7 +80,8 @@ const PatientSearchCombobox: React.FC<PatientSearchComboboxProps> = ({
     patients,
     mode,
     rtl = false,
-    placeholder
+    placeholder,
+    id
 }) => {
     const [open, setOpen] = useState(false);
     const [highlight, setHighlight] = useState(-1);
@@ -139,6 +142,7 @@ const PatientSearchCombobox: React.FC<PatientSearchComboboxProps> = ({
     return (
         <div className={styles.combobox}>
             <input
+                id={id}
                 type="text"
                 role="combobox"
                 aria-expanded={isOpen}
@@ -165,9 +169,11 @@ const PatientSearchCombobox: React.FC<PatientSearchComboboxProps> = ({
                                 id={`${listboxId}-opt-${i}`}
                                 role="option"
                                 aria-selected={i === highlight}
+                                tabIndex={0}
                                 className={cn(styles.option, i === highlight && styles.optionActive)}
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => { setOpen(false); onJump(m.id); }}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(false); onJump(m.id); } }}
                                 onMouseEnter={() => setHighlight(i)}
                             >
                                 <span className={styles.optionPrimary}>{m.primary}</span>

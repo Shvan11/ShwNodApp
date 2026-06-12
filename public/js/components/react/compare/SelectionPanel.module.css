@@ -1,0 +1,204 @@
+/* ===== COMPARE — timepoint / photo-type selection card ===== */
+
+.card {
+    background: var(--surface);
+    border: var(--border-width-thin) solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-card);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.stepDisabled {
+    opacity: 0.55;
+}
+
+.stepHeader {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.stepNumber {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-full);
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.stepNumberComplete {
+    background: var(--success-color);
+    color: var(--color-white);
+}
+
+.stepHint {
+    margin: 0;
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+}
+
+/* --- timepoint cards --- */
+
+.timepointList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    max-height: 240px;
+    overflow-y: auto;
+    padding-inline-end: var(--spacing-xs);
+}
+
+.timepointRow {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background: var(--surface);
+    border: var(--border-width-thin) solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.timepointRow:hover {
+    border-color: var(--primary-color);
+}
+
+.timepointRowSelected {
+    background: var(--blue-50);
+    border-color: var(--primary-color);
+}
+
+.timepointInput {
+    accent-color: var(--primary-color);
+    flex-shrink: 0;
+}
+
+.timepointText {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.timepointName {
+    color: var(--text-primary);
+    font-weight: var(--font-weight-medium);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.timepointDate {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.orderBadge {
+    flex-shrink: 0;
+    padding: 0 var(--spacing-sm);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.7;
+    background: var(--primary-color);
+    color: var(--color-white);
+}
+
+.orderBadgeAfter {
+    background: var(--success-color);
+}
+
+/* --- photo-type chips --- */
+
+.categoryBlock {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+}
+
+.categoryTitle {
+    margin: 0;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.chipGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-xs);
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: var(--border-width-thin) solid var(--border);
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.chip:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.chipSelected {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: var(--color-white);
+}
+
+.chipSelected:hover {
+    color: var(--color-white);
+}
+
+.chipDisabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    border-style: dashed;
+}
+
+.chipDisabled:hover {
+    border-color: var(--border);
+    color: var(--text-secondary);
+}
+
+.chipInput {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}

@@ -108,7 +108,7 @@
 .formGroup label {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     margin-bottom: 0;
     line-height: var(--line-height-normal);
 }
@@ -357,14 +357,14 @@
 
 .confirmationBody > p {
     margin: 0 0 1rem 0;
-    color: var(--gray-700);
+    color: var(--text-secondary);
     font-size: 0.9375rem;
 }
 
 .confirmationQuestion {
     margin: 1rem 0 0 0;
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-800);
+    color: var(--text-primary);
     font-size: 1rem;
 }
 
@@ -397,7 +397,7 @@
 .detailSection h4 {
     margin: 0.75rem 0 0.5rem 0;
     font-size: 0.9375rem;
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .detailSection h4:first-child {
@@ -430,7 +430,7 @@
     gap: var(--spacing-sm);
     cursor: pointer;
     font-size: var(--font-size-sm);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .checkboxLabel input[type="checkbox"] {

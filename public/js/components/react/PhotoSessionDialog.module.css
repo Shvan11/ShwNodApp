@@ -28,7 +28,7 @@
     margin: 0;
     font-size: 1.25rem;
     font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .closeBtn {
@@ -36,7 +36,7 @@
     border: none;
     padding: 0.5rem;
     cursor: pointer;
-    color: var(--text-light);
+    color: var(--text-secondary);
     font-size: 1.1rem;
     border-radius: 4px;
     transition: background-color 0.2s, color 0.2s;
@@ -44,7 +44,7 @@
 
 .closeBtn:hover {
     background: var(--gray-100);
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 /* Body */
@@ -66,7 +66,7 @@
     display: block;
     margin-bottom: 0.5rem;
     font-weight: var(--font-weight-medium);
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: 0.9rem;
 }
 
@@ -78,7 +78,7 @@
     border: 1px solid var(--border-color);
     border-radius: 6px;
     background: var(--background-color);
-    color: var(--text-color);
+    color: var(--text-primary);
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -94,11 +94,12 @@
     margin-bottom: 1.25rem;
 }
 
-.dateList > label {
+.dateList > label,
+.dateList > span {
     display: block;
     margin-bottom: 0.5rem;
     font-weight: var(--font-weight-medium);
-    color: var(--text-light);
+    color: var(--text-secondary);
     font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -162,7 +163,7 @@
 }
 
 .checkboxLabel span {
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: 0.9rem;
 }
 
@@ -171,11 +172,12 @@
     margin-bottom: 1.25rem;
 }
 
-.importFolder > label {
+.importFolder > label,
+.importFolder > span {
     display: block;
     margin-bottom: 0.5rem;
     font-weight: var(--font-weight-medium);
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: 0.9rem;
 }
 
@@ -188,7 +190,7 @@
 
 .folderName {
     font-size: 0.9rem;
-    color: var(--text-color);
+    color: var(--text-primary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -207,12 +209,12 @@
 .badgeGranted { background: var(--success-light); color: var(--success-dark); }
 .badgePrompt  { background: var(--warning-light); color: var(--warning-dark); }
 .badgeDenied  { background: var(--error-light); color: var(--error-dark); }
-.badgeUnset   { background: var(--gray-100); color: var(--text-light); }
+.badgeUnset   { background: var(--gray-100); color: var(--text-secondary); }
 
 .iniHint {
     margin: 0.5rem 0 0 0;
     font-size: 0.78rem;
-    color: var(--text-light);
+    color: var(--text-secondary);
     line-height: 1.4;
 }
 
@@ -242,7 +244,7 @@
 .loadingPlaceholder {
     padding: 1rem;
     text-align: center;
-    color: var(--text-light);
+    color: var(--text-secondary);
     font-style: italic;
 }
 

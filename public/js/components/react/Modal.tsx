@@ -163,11 +163,13 @@ const Modal = ({
     const contentClass = contentClassName ? `${styles.content} ${contentClassName}` : styles.content;
 
     return createPortal(
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- backdrop click-to-dismiss
         <div
             className={overlayClass}
             onMouseDown={handleOverlayMouseDown}
             onClick={handleOverlayClick}
         >
+            {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- keydown is the dialog focus-trap, not an actionable handler */}
             <div
                 ref={contentRef}
                 className={contentClass}

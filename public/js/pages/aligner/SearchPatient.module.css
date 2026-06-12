@@ -34,7 +34,7 @@
     left: 1rem;
     top: 50%;
     transform: translateY(-50%);
-    color: var(--text-light);
+    color: var(--text-secondary);
     font-size: 1.1rem;
 }
 
@@ -44,7 +44,7 @@
     top: 50%;
     transform: translateY(-50%);
     font-size: 0.85rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 /* Search Results Dropdown */
@@ -79,7 +79,7 @@
 
 .resultName {
     font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
+    color: var(--text-primary);
     margin-bottom: 0.25rem;
 }
 
@@ -93,7 +93,7 @@
     display: flex;
     gap: 1rem;
     font-size: 0.9rem;
-    color: var(--text-light);
+    color: var(--text-secondary);
 }
 
 .resultMeta span {
@@ -106,7 +106,7 @@
 .searchNoResults {
     padding: 2rem;
     text-align: center;
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 .searchNoResults i {
@@ -123,23 +123,23 @@
 .emptyState {
     text-align: center;
     padding: 4rem 2rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 .emptyState i {
     font-size: 4rem;
-    color: var(--text-lighter);
+    color: var(--text-muted);
     margin-bottom: 1rem;
     display: block;
 }
 
 .emptyState h3 {
-    color: var(--text-light);
+    color: var(--text-secondary);
     margin-bottom: 0.5rem;
 }
 
 .emptyState p {
-    color: var(--text-lighter);
+    color: var(--text-muted);
     margin: 0;
 }
 

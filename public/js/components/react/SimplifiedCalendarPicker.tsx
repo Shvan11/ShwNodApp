@@ -322,7 +322,10 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                     [styles.clickable]: canBook,
                     [styles.selected]: isSelected
                 })}
+                role="button"
+                tabIndex={0}
                 onClick={() => canBook && handleSlotClick(slot)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); canBook && handleSlotClick(slot); } }}
             >
                 <div className={styles.slotHeader}>
                     <span className={styles.slotTime}>{slot.time}</span>
@@ -420,7 +423,10 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                                     [styles.hasSlots]: dayInfo.hasAvailability && !dayInfo.isHoliday,
                                     [styles.clickable]: isClickable
                                 })}
+                                role="button"
+                                tabIndex={0}
                                 onClick={() => isClickable && handleDateClick(dayInfo.date)}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); isClickable && handleDateClick(dayInfo.date); } }}
                                 title={tooltip}
                             >
                                 <span className={styles.dayNum}>{dayInfo.day}</span>
@@ -511,7 +517,10 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                                         {hasEmptyExtendedSlots && (
                                             <div
                                                 className={styles.afternoonToggle}
+                                                role="button"
+                                                tabIndex={0}
                                                 onClick={() => setShowAfternoonSlots(!showAfternoonSlots)}
+                                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAfternoonSlots(!showAfternoonSlots); } }}
                                             >
                                                 <div className={styles.afternoonToggleText}>
                                                     <i className="fas fa-clock"></i>

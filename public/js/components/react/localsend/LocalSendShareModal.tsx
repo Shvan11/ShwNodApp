@@ -287,6 +287,7 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
                   placeholder="PIN"
+                  // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                   autoFocus
                 />
                 <button

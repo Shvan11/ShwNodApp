@@ -29,7 +29,7 @@
 .errorContainer {
   text-align: center;
   padding: 4rem 2rem;
-  color: var(--text-lighter);
+  color: var(--text-muted);
 }
 
 .errorContainer i {
@@ -145,24 +145,24 @@
 .sectionHeader h3 {
   margin: 0;
   font-size: 1.5rem;
-  color: var(--text-color);
+  color: var(--text-primary);
 }
 
 .sectionInfo {
   font-size: 0.95rem;
-  color: var(--text-light);
+  color: var(--text-secondary);
 }
 
 /* Empty State */
 .emptyState {
   text-align: center;
   padding: 4rem 2rem;
-  color: var(--text-lighter);
+  color: var(--text-muted);
 }
 
 .emptyState i {
   font-size: 4rem;
-  color: var(--text-lighter);
+  color: var(--text-muted);
   margin-bottom: 1rem;
   display: block;
 }
@@ -204,7 +204,7 @@
 .uploadTitle {
   font-size: 1.25rem;
   font-weight: var(--font-weight-semibold);
-  color: var(--gray-800);
+  color: var(--text-primary);
 }
 
 .uploadHint {

@@ -1,524 +1,139 @@
-/* ===== COMPARE COMPONENT - CSS Module ===== */
+/* ===== COMPARE PAGE — shell, header stepper, layout grid =====
+ * Stage / panel internals live in compare/*.module.css.
+ */
 
-/* --- Layout shell --- */
-
-.container {
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
     padding: var(--spacing-lg);
     max-width: var(--container-max-width);
-    margin: 0 auto;
+    margin-inline: auto;
 }
 
-.mainArea {
+/* --- header + workflow stepper --- */
+
+.header {
     display: flex;
-    gap: var(--spacing-lg);
-    margin-bottom: var(--spacing-lg);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
     flex-wrap: wrap;
 }
 
-/* --- Status banner --- */
+.headingGroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
 
-.statusBanner {
-    padding: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
-    border: var(--border-width-medium) solid;
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-base);
+.heading {
+    margin: 0;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-heading);
+}
+
+.subheading {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.stepper {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.stepChip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-md);
+    border: var(--border-width-thin) solid var(--border);
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
     font-weight: var(--font-weight-medium);
-    text-align: center;
+    white-space: nowrap;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.statusBannerPending {
-    background-color: var(--warning-light);
-    border-color: var(--warning-300);
-    color: var(--amber-800);
+.stepChipCurrent {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    box-shadow: var(--shadow-focus);
 }
 
-.statusBannerReady {
-    background-color: var(--success-light);
+.stepChipDone {
     border-color: var(--success-200);
+    background: var(--success-light);
     color: var(--success-800);
 }
 
-/* --- Canvas panel --- */
-
-.canvasPanel {
-    flex: 1;
-    min-width: 600px;
-    display: flex;
-    justify-content: center;
+.stepIndex {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
     align-items: center;
-    padding: var(--spacing-lg);
-    background-color: var(--background-secondary);
-    border-radius: var(--radius-lg);
-    border: var(--border-width-thin) solid var(--border);
-    overflow: auto;
-    position: relative;
+    justify-content: center;
+    border-radius: var(--radius-full);
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: var(--font-weight-bold);
+    line-height: 1;
 }
 
-.canvasPanelFullscreen {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: var(--spacing-lg);
-    background-color: var(--color-black);
-    border-radius: 0;
-    border: none;
-    overflow: auto;
-    position: relative;
-    width: var(--viewport-width-full);
-    height: var(--viewport-height-full);
+.stepChipCurrent .stepIndex {
+    background: var(--primary-color);
+    color: var(--color-white);
 }
 
-.canvasToolbar {
-    position: absolute;
+.stepChipDone .stepIndex {
+    background: var(--success-color);
+    color: var(--color-white);
+}
+
+.stepConnector {
+    width: 16px;
+    height: var(--border-width-thin);
+    background: var(--border);
+    flex-shrink: 0;
+}
+
+/* --- layout grid --- */
+
+.layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: var(--spacing-lg);
+    align-items: start;
+}
+
+.rail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    position: sticky;
     top: var(--spacing-md);
-    right: var(--spacing-md);
-    z-index: var(--z-index-sticky);
-    display: flex;
-    gap: var(--spacing-sm);
-}
-
-.canvasToolbarHidden {
-    display: none;
-}
-
-.toolbarButton {
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: var(--font-size-sm);
-    line-height: 1;
-    background-color: rgba(0, 0, 0, 0.6);
-    color: var(--color-white);
-    border: none;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.toolbarButton:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-.toolbarButtonLarge {
-    font-size: var(--font-size-lg);
-}
-
-/* --- Slideshow overlay controls --- */
-
-.slideshowClose {
-    position: absolute;
-    top: var(--spacing-lg);
-    right: var(--spacing-lg);
-    z-index: var(--z-index-fixed);
-    width: 44px;
-    height: 44px;
-    font-size: var(--font-size-2xl);
-    line-height: 1;
-    background-color: rgba(0, 0, 0, 0.55);
-    color: var(--color-white);
-    border: none;
-    border-radius: var(--radius-full);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.slideshowArrow {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: var(--z-index-fixed);
-    width: 64px;
-    height: 64px;
-    font-size: var(--font-size-4xl);
-    line-height: 1;
-    background-color: rgba(0, 0, 0, 0.55);
-    color: var(--color-white);
-    border: none;
-    border-radius: var(--radius-full);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.slideshowArrow:disabled {
-    cursor: not-allowed;
-    opacity: 0.3;
-}
-
-.slideshowPrev {
-    left: var(--spacing-lg);
-}
-
-.slideshowNext {
-    right: var(--spacing-lg);
-}
-
-.slideshowCounter {
-    position: absolute;
-    top: var(--spacing-lg);
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: var(--z-index-fixed);
-    padding: var(--spacing-xs) var(--spacing-md);
-    background-color: rgba(0, 0, 0, 0.55);
-    color: var(--color-white);
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    font-family: var(--font-family-mono);
-}
-
-/* --- Canvas + SVG overlay --- */
-
-.canvasWrapper {
-    position: relative;
-    display: inline-block;
-    line-height: 0;
-    border: var(--border-width-thin) solid var(--border-color);
-    border-radius: var(--radius-md);
-    touch-action: none;
-    max-width: 100%;
-    max-height: 100%;
-}
-
-.canvasWrapperFullscreen {
-    position: relative;
-    display: inline-block;
-    line-height: 0;
-    border: none;
-    border-radius: var(--radius-md);
-    touch-action: none;
-    max-width: 100%;
-    max-height: 100%;
-}
-
-.canvasEl {
-    background-color: var(--surface);
-    display: block;
-    max-width: 600px;
-    max-height: 800px;
-    width: auto;
-    height: auto;
-    object-fit: contain;
-}
-
-.canvasElFullscreen {
-    background-color: var(--surface);
-    display: block;
-    max-width: var(--viewport-width-full);
-    max-height: var(--viewport-height-full);
-    width: auto;
-    height: auto;
-    object-fit: contain;
-}
-
-.svgOverlay {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    overflow: visible;
-}
-
-/*
- * Rotate-handle ring. Inline `style={{ '--rotate-dash': ... }}` provides the
- * DPI-scaled dash pattern; without it the hover stroke falls back to a solid
- * line, which is still readable.
- */
-.rotateZone {
-    cursor: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 12 A 7 7 0 1 1 12 5' stroke='white' stroke-width='3.5'/%3E%3Cpath d='M12 2 L12 5 L15 5' stroke='white' stroke-width='3.5'/%3E%3Cpath d='M19 12 A 7 7 0 1 1 12 5' stroke='black' stroke-width='1.6'/%3E%3Cpath d='M12 2 L12 5 L15 5' stroke='black' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E") 12 12, grab;
-}
-
-.rotateZone:hover {
-    stroke: rgba(0, 123, 255, 0.55);
-    stroke-dasharray: var(--rotate-dash);
-}
-
-/* --- Side panels --- */
-
-.sidePanel {
-    background-color: var(--background-primary);
-    border: var(--border-width-thin) solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
-    height: fit-content;
-}
-
-.controlsPanel {
-    width: 280px;
-}
-
-.selectionPanel {
-    width: 320px;
-    max-height: 600px;
+    max-height: calc(100vh - var(--spacing-xl));
     overflow-y: auto;
+    /* breathing room so card shadows / focus rings aren't clipped */
+    padding: var(--spacing-xs);
+    margin: calc(-1 * var(--spacing-xs));
 }
 
-.panelHeading {
-    margin: 0 0 var(--spacing-md) 0;
-    color: var(--gray-700);
-}
+@media (max-width: 1100px) {
+    .layout {
+        grid-template-columns: 1fr;
+    }
 
-.panelHeadingCentered {
-    margin: 0 0 var(--spacing-lg) 0;
-    color: var(--gray-700);
-    text-align: center;
-}
-
-/* --- Controls panel --- */
-
-.dimensionsBox {
-    margin-bottom: var(--spacing-lg);
-    padding: var(--spacing-md);
-    background-color: var(--background-secondary);
-    border: var(--border-width-thin) solid var(--border);
-    border-radius: var(--radius-lg);
-    text-align: center;
-}
-
-.dimensionsLabel {
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-bold);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-xs);
-}
-
-.dimensionsValue {
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-bold);
-    color: var(--gray-700);
-    font-family: var(--font-family-mono);
-}
-
-.controlGroup {
-    margin-bottom: var(--spacing-md);
-}
-
-.controlLabel {
-    display: block;
-    margin-bottom: var(--spacing-xs);
-    font-weight: var(--font-weight-bold);
-}
-
-.controlLabelCentered {
-    display: block;
-    margin-bottom: var(--spacing-sm);
-    font-weight: var(--font-weight-bold);
-    text-align: center;
-}
-
-.movementGrid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--spacing-xs);
-    max-width: 120px;
-    margin: 0 auto;
-}
-
-.movementButton {
-    padding: var(--spacing-sm);
-    font-size: var(--font-size-xl);
-    line-height: 1;
-    background-color: var(--neutral-gray);
-    color: var(--color-white);
-    border: none;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-}
-
-.movementButton:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-.movementCenter {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--font-size-xs);
-    color: var(--text-secondary);
-}
-
-.controlsGrid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--spacing-md);
-}
-
-/*
- * Compare's control-grid buttons override .btn's default vertical margin so
- * the grid gap controls spacing. Without this, .btn's `margin: var(--spacing-xs)`
- * adds extra rows of whitespace inside the 2-column layout.
- */
-.controlButton {
-    margin: 0;
-    padding: var(--spacing-sm);
-    font-size: var(--font-size-xs);
-    line-height: 1;
-}
-
-.controlButtonIcon {
-    margin: 0;
-    padding: var(--spacing-sm);
-    font-size: var(--font-size-xl);
-    line-height: 1;
-}
-
-/* WhatsApp brand-color button — only place we use this specific green */
-.whatsappBrandButton {
-    background-color: var(--whatsapp-green);
-    border-color: var(--whatsapp-green);
-    color: var(--color-white);
-}
-
-.whatsappBrandButton:hover:not(:disabled) {
-    background-color: var(--whatsapp-dark);
-    border-color: var(--whatsapp-dark);
-}
-
-/* --- Selection panel --- */
-
-.stepBox {
-    margin-bottom: var(--spacing-xl);
-    padding: var(--spacing-md);
-    background-color: var(--background-secondary);
-    border-radius: var(--radius-lg);
-    border: var(--border-width-thin) solid var(--border-light);
-}
-
-.stepBoxLast {
-    padding: var(--spacing-md);
-    background-color: var(--background-secondary);
-    border-radius: var(--radius-lg);
-    border: var(--border-width-thin) solid var(--border-light);
-}
-
-.stepBoxDisabled {
-    background-color: var(--gray-100);
-    opacity: 0.6;
-}
-
-.stepHeader {
-    margin: 0 0 var(--spacing-md) 0;
-    color: var(--gray-700);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-
-.stepNumber {
-    background-color: var(--neutral-gray);
-    color: var(--color-white);
-    border-radius: var(--radius-full);
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-bold);
-}
-
-.stepNumberComplete {
-    background-color: var(--success-color);
-}
-
-.stepHint {
-    margin: 0 0 var(--spacing-md) 0;
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    font-style: italic;
-}
-
-.timepointList {
-    max-height: 180px;
-    overflow-y: auto;
-}
-
-.photoTypeList {
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.photoTypeCategory {
-    margin-bottom: var(--spacing-md);
-}
-
-.photoTypeCategoryTitle {
-    margin: 0 0 var(--spacing-sm) 0;
-    text-transform: capitalize;
-    color: var(--gray-700);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-}
-
-.checkboxRow {
-    display: block;
-    margin-bottom: var(--spacing-sm);
-    padding: var(--spacing-sm);
-    background-color: var(--surface);
-    border: var(--border-width-thin) solid var(--gray-300);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    font-size: var(--font-size-sm);
-}
-
-.checkboxRowSelected {
-    background-color: var(--blue-50);
-}
-
-.radioRow {
-    display: block;
-    margin-bottom: var(--spacing-xs);
-    padding: var(--spacing-xs) var(--spacing-sm);
-    background-color: var(--surface);
-    border: var(--border-width-thin) solid var(--gray-300);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    font-size: var(--font-size-sm);
-}
-
-.radioRowSelected {
-    background-color: var(--blue-50);
-}
-
-.radioRowDisabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-.checkboxInput {
-    margin-right: var(--spacing-sm);
-}
-
-.radioInput {
-    margin-right: var(--spacing-xs);
-}
-
-/* --- WhatsApp modal --- */
-
-.modalCard {
-    background-color: var(--background-primary);
-    padding: var(--spacing-xl);
-    border-radius: var(--radius-lg);
-    width: 400px;
-    max-width: 90vw;
-}
-
-.modalActions {
-    display: flex;
-    gap: var(--spacing-md);
-    justify-content: flex-end;
-}
-
-.modalInput {
-    margin-bottom: var(--spacing-lg);
+    .rail {
+        position: static;
+        max-height: none;
+        overflow-y: visible;
+    }
 }

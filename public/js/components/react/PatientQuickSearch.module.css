@@ -40,7 +40,7 @@
     margin-bottom: var(--spacing-sm);
     font-weight: var(--font-weight-semibold);
     font-size: var(--font-size-sm);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .iconGap {
@@ -108,7 +108,7 @@
 }
 
 :global(.pqs-select__placeholder) {
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 :global(.pqs-select__menu-notice--no-options) {

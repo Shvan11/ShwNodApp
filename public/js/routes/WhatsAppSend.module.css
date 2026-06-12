@@ -51,7 +51,7 @@
 
 .pageHeaderArea h2 {
   margin: 0;
-  color: var(--text-color);
+  color: var(--text-primary);
   font-size: 1.8rem;
   flex: 1;
 }
@@ -177,7 +177,7 @@
 
 .dateControls label {
   font-weight: var(--font-weight-semibold);
-  color: var(--text-color);
+  color: var(--text-primary);
   min-width: 80px;
   font-size: 14px;
   flex-shrink: 0;
@@ -225,7 +225,7 @@
 
 .groupSettingsLegend {
   font-weight: var(--font-weight-semibold);
-  color: var(--text-color);
+  color: var(--text-primary);
   font-size: 14px;
   padding: 0;
   margin-bottom: 16px;
@@ -237,7 +237,7 @@
   gap: 10px;
   margin-bottom: 16px;
   font-size: 14px;
-  color: var(--text-color);
+  color: var(--text-primary);
   cursor: pointer;
   line-height: 1.4;
 }
@@ -505,7 +505,7 @@
 
 .messageStatusTable h3 {
   margin: 0 0 16px 0;
-  color: var(--text-color);
+  color: var(--text-primary);
   font-size: 1.25rem;
   font-weight: var(--font-weight-semibold);
 }

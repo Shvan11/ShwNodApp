@@ -412,7 +412,9 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
     if (!isOpen) return null;
 
     return (
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss
         <div className="drawer-overlay" onClick={handleClose}>
+            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss */}
             <div className="drawer-container" onClick={(e: MouseEvent) => e.stopPropagation()}>
                 <div className="drawer-header">
                     <h2>{batch ? 'Edit Batch' : 'Add New Batch'}</h2>
@@ -610,8 +612,9 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                             {batch && batch.creation_date && (
                                 <div className="form-row">
                                     <div className="form-field">
-                                        <label>Created On</label>
+                                        <label htmlFor="batch-created-on">Created On</label>
                                         <input
+                                            id="batch-created-on"
                                             type="text"
                                             value={new Date(batch.creation_date).toLocaleDateString('en-GB', {
                                                 year: 'numeric', month: 'short', day: 'numeric',
@@ -627,7 +630,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                             <div className="form-row form-row-three-col">
                                 {/* Manufacture Date - Read-only with edit */}
                                 <div className="form-field">
-                                    <label>
+                                    <label htmlFor="batch-manufacture-date">
                                         Manufacture Date
                                         <span className="field-optional-text">(when manufacturing completed)</span>
                                     </label>
@@ -635,9 +638,11 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         editingManufactureDate ? (
                                             <div className="date-edit-inline">
                                                 <input
+                                                    id="batch-manufacture-date"
                                                     type="date"
                                                     value={tempManufactureDate}
                                                     onChange={(e: ChangeEvent<HTMLInputElement>) => setTempManufactureDate(e.target.value)}
+                                                    // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                                                     autoFocus
                                                 />
                                                 <button
@@ -660,6 +665,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         ) : (
                                             <div className="date-display-with-actions">
                                                 <input
+                                                    id="batch-manufacture-date"
                                                     type="text"
                                                     value={formatDisplayDate(batch.manufacture_date)}
                                                     readOnly
@@ -693,6 +699,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         )
                                     ) : (
                                         <input
+                                            id="batch-manufacture-date"
                                             type="text"
                                             value="Set after creating batch"
                                             readOnly
@@ -703,7 +710,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
 
                                 {/* Delivery Date - Read-only with edit */}
                                 <div className="form-field">
-                                    <label>
+                                    <label htmlFor="batch-delivered-date">
                                         Delivered Date
                                         <span className="field-optional-text">(when given to patient)</span>
                                     </label>
@@ -711,9 +718,11 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         editingDeliveryDate ? (
                                             <div className="date-edit-inline">
                                                 <input
+                                                    id="batch-delivered-date"
                                                     type="date"
                                                     value={tempDeliveryDate}
                                                     onChange={(e: ChangeEvent<HTMLInputElement>) => setTempDeliveryDate(e.target.value)}
+                                                    // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                                                     autoFocus
                                                 />
                                                 <button
@@ -736,6 +745,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         ) : (
                                             <div className="date-display-with-actions">
                                                 <input
+                                                    id="batch-delivered-date"
                                                     type="text"
                                                     value={formatDisplayDate(batch.delivered_to_patient_date)}
                                                     readOnly
@@ -773,6 +783,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                         )
                                     ) : (
                                         <input
+                                            id="batch-delivered-date"
                                             type="text"
                                             value="Set after creating batch"
                                             readOnly

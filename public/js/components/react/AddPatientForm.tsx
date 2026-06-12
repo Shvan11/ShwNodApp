@@ -229,11 +229,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         <div className={styles.tabContentSection}>
             <div className={styles.formRow}>
                 <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-patient-name">
                         <i className="fas fa-signature"></i>
                         Patient Name (Arabic) <span className={styles.required}>*</span>
                     </label>
                     <input
+                        id="add-patient-name"
                         type="text"
                         name="patientName"
                         value={formData.patientName}
@@ -249,11 +250,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-first-name">
                         <i className="fas fa-user"></i>
                         First Name (English)
                     </label>
                     <input
+                        id="add-first-name"
                         type="text"
                         name="firstName"
                         value={formData.firstName}
@@ -265,11 +267,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                     />
                 </div>
                 <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-last-name">
                         <i className="fas fa-user"></i>
                         Last Name (English)
                     </label>
                     <input
+                        id="add-last-name"
                         type="text"
                         name="lastName"
                         value={formData.lastName}
@@ -284,11 +287,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-country-code">
                         <i className="fas fa-globe"></i>
                         Country Code
                     </label>
                     <input
+                        id="add-country-code"
                         type="text"
                         name="countryCode"
                         value={formData.countryCode}
@@ -299,11 +303,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                     />
                 </div>
                 <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-phone">
                         <i className="fas fa-phone"></i>
                         Primary Phone
                     </label>
                     <PhoneInput
+                        id="add-phone"
                         value={formData.phone}
                         onChange={handlePhoneChange}
                     />
@@ -317,11 +322,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         <div className={styles.tabContentSection}>
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-phone2">
                         <i className="fas fa-phone-alt"></i>
                         Secondary Phone
                     </label>
                     <input
+                        id="add-phone2"
                         type="tel"
                         name="phone2"
                         value={formData.phone2}
@@ -331,11 +337,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                     />
                 </div>
                 <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-email">
                         <i className="fas fa-envelope"></i>
                         Email Address
                     </label>
                     <input
+                        id="add-email"
                         type="email"
                         name="email"
                         value={formData.email}
@@ -354,11 +361,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         <div className={styles.tabContentSection}>
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-date-of-birth">
                         <i className="fas fa-calendar"></i>
                         Date of Birth
                     </label>
                     <input
+                        id="add-date-of-birth"
                         type="date"
                         name="dateOfBirth"
                         value={formData.dateOfBirth}
@@ -367,11 +375,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                     />
                 </div>
                 <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-gender">
                         <i className="fas fa-venus-mars"></i>
                         Gender
                     </label>
                     <select
+                        id="add-gender"
                         name="gender"
                         value={formData.gender}
                         onChange={handleInputChange}
@@ -389,11 +398,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-language">
                         <i className="fas fa-language"></i>
                         Language
                     </label>
                     <select
+                        id="add-language"
                         name="language"
                         value={formData.language}
                         onChange={handleInputChange}
@@ -413,11 +423,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         <div className={styles.tabContentSection}>
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-patient-type">
                         <i className="fas fa-user-tag"></i>
                         Patient Type
                     </label>
                     <select
+                        id="add-patient-type"
                         name="patientTypeID"
                         value={formData.patientTypeID}
                         onChange={handleInputChange}
@@ -432,11 +443,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                     </select>
                 </div>
                 <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-referral-source">
                         <i className="fas fa-handshake"></i>
                         Referral Source
                     </label>
                     <select
+                        id="add-referral-source"
                         name="referralSourceID"
                         value={formData.referralSourceID}
                         onChange={handleInputChange}
@@ -454,11 +466,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-address">
                         <i className="fas fa-map-marker-alt"></i>
                         Address
                     </label>
                     <select
+                        id="add-address"
                         name="addressID"
                         value={formData.addressID}
                         onChange={handleInputChange}
@@ -481,11 +494,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         <div className={styles.tabContentSection}>
             <div className={styles.formRow}>
                 <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-notes">
                         <i className="fas fa-sticky-note"></i>
                         Notes
                     </label>
                     <textarea
+                        id="add-notes"
                         name="notes"
                         value={formData.notes}
                         onChange={handleInputChange}
@@ -499,11 +513,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
             <div className={styles.formRow}>
                 <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
-                    <label className={styles.formLabel}>
+                    <label className={styles.formLabel} htmlFor="add-alerts">
                         <i className="fas fa-exclamation-triangle"></i>
                         Alerts
                     </label>
                     <textarea
+                        id="add-alerts"
                         name="alerts"
                         value={formData.alerts}
                         onChange={handleInputChange}

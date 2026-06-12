@@ -33,7 +33,7 @@
 }
 
 .form-control::placeholder {
-    color: var(--text-lighter);
+    color: var(--text-muted);
     opacity: 1;
 }
 
@@ -131,7 +131,7 @@ textarea.form-control {
 }
 
 .pm-select__placeholder {
-    color: var(--text-lighter);
+    color: var(--text-muted);
     font-size: var(--font-size-base);
 }
 
@@ -212,7 +212,7 @@ textarea.form-control {
 
 .pm-select__clear-indicator:hover,
 .pm-select__dropdown-indicator:hover {
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .pm-select__indicator-separator {

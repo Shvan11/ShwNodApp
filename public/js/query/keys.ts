@@ -87,4 +87,44 @@ export const qk = {
     /** GET /api/employees<query> — keyed by query so param variants don't collide. */
     employees: (query = '') => ['lookups', 'employees', query] as const,
   },
+  /**
+   * Stand / mini-pharmacy. `all()` is the prefix every stand read shares, so a
+   * write that ripples widely (a sale touches stock + KPIs + movements) refreshes
+   * the whole module with one `invalidateQueries({ queryKey: qk.stand.all() })`.
+   * Filter objects ride as a key segment — RQ hashes them stably, so a freshly
+   * built filters object with the same values doesn't refetch.
+   */
+  stand: {
+    all: () => ['stand'] as const,
+    items: {
+      /** Parent — invalidates list / low-stock / expiring / movements. */
+      all: () => ['stand', 'items'] as const,
+      list: (filters: object = {}) => ['stand', 'items', 'list', filters] as const,
+      lowStock: () => ['stand', 'items', 'low-stock'] as const,
+      expiring: (days: number) => ['stand', 'items', 'expiring', days] as const,
+      movements: (itemId: Id) => ['stand', 'items', 'movements', itemId] as const,
+    },
+    categories: () => ['stand', 'categories'] as const,
+    dashboard: () => ['stand', 'dashboard'] as const,
+    sales: {
+      all: () => ['stand', 'sales'] as const,
+      list: (filters: object = {}) => ['stand', 'sales', 'list', filters] as const,
+      one: (id: Id) => ['stand', 'sales', 'one', id] as const,
+    },
+    reports: {
+      summary: (startDate: string, endDate: string) =>
+        ['stand', 'reports', 'summary', startDate, endDate] as const,
+      topItems: (startDate: string, endDate: string, limit: number) =>
+        ['stand', 'reports', 'top-items', startDate, endDate, limit] as const,
+    },
+  },
+  /** Expenses. `all()` is the shared prefix — any expense write invalidates it. */
+  expenses: {
+    all: () => ['expenses'] as const,
+    list: (filters: object = {}) => ['expenses', 'list', filters] as const,
+    categories: () => ['expenses', 'categories'] as const,
+    subcategories: (categoryId: Id) => ['expenses', 'subcategories', categoryId] as const,
+    summary: (startDate: string, endDate: string) =>
+      ['expenses', 'summary', startDate, endDate] as const,
+  },
 } as const;

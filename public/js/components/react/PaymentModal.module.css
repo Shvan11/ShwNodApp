@@ -46,7 +46,7 @@
 .paymentTitleCompact {
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-900);
+    color: var(--text-primary);
     margin: 0;
     display: flex;
     align-items: center;
@@ -110,7 +110,7 @@
 }
 
 .rateDate {
-    color: var(--text-lighter);
+    color: var(--text-muted);
     font-size: var(--font-size-xs);
 }
 
@@ -290,7 +290,7 @@
 
 .locked {
     background: var(--gray-100);
-    color: var(--text-lighter);
+    color: var(--text-muted);
 }
 
 .locked:hover {
@@ -384,7 +384,7 @@
 
 .inputDisabled {
     background: var(--gray-100);
-    color: var(--text-lighter);
+    color: var(--text-muted);
     cursor: not-allowed;
     text-align: center;
 }
@@ -453,7 +453,7 @@
 
 .summaryValue {
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-900);
+    color: var(--text-primary);
 }
 
 .summaryTotal {
@@ -506,7 +506,7 @@
 
 .paymentSuccessCompact h2 {
     font-size: var(--font-size-xl);
-    color: var(--gray-900);
+    color: var(--text-primary);
     margin: 0 0 var(--spacing-xs) 0;
 }
 
@@ -710,7 +710,7 @@
     background: none;
     border: none;
     font-size: 28px;
-    color: var(--text-lighter);
+    color: var(--text-muted);
     cursor: pointer;
     width: 36px;
     height: 36px;
@@ -724,7 +724,7 @@
 
 .modalClose:hover {
     background-color: var(--gray-100);
-    color: var(--gray-700);
+    color: var(--text-secondary);
 }
 
 .summaryGrid {
@@ -758,7 +758,7 @@
     gap: 12px;
     font-size: 16px;
     font-weight: var(--font-weight-semibold);
-    color: var(--gray-900);
+    color: var(--text-primary);
     margin: 0 0 20px 0;
 }
 
@@ -789,7 +789,7 @@
     display: block;
     font-size: 14px;
     font-weight: var(--font-weight-medium);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     margin-bottom: 8px;
 }
 
@@ -802,7 +802,7 @@
     border: 1px solid var(--gray-300);
     border-radius: 6px;
     font-size: 14px;
-    color: var(--gray-900);
+    color: var(--text-primary);
     transition: all 0.2s ease;
     background: var(--surface);
 }
@@ -840,7 +840,7 @@
 }
 
 .toggleLabelActive {
-    color: var(--gray-900);
+    color: var(--text-primary);
     font-weight: var(--font-weight-semibold);
 }
 
@@ -930,7 +930,7 @@
     cursor: pointer;
     font-size: 14px;
     font-weight: var(--font-weight-medium);
-    color: var(--gray-700);
+    color: var(--text-secondary);
     padding: 12px;
     background: var(--surface);
     border: 1px solid var(--gray-300);

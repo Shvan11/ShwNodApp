@@ -51,14 +51,15 @@
         /* back-compat surface alias — flips; brand white is --color-white */
 
         /* ===========================================================
-           Text
+           Text — flattened to ~2 tiers on the dark canvas.
+           Secondary is lifted night-200 (#9aa3b2) → night-50 so it
+           reads near-white like body (breadcrumbs, labels, search were
+           "not white enough"); only the muted tier stays subtly dimmed.
            =========================================================== */
-        --text-color: var(--palette-night-50);
-        --text-light: var(--palette-night-200);
-        --text-lighter: var(--palette-night-300);
-        --text-primary: var(--palette-night-50);
-        --text-secondary: var(--palette-night-200);
-        --text-heading: var(--palette-blue-300);  /* card/section titles → light blue */
+        --text-primary: var(--palette-night-50);    /* #e2e6ee — body */
+        --text-secondary: var(--palette-night-50);  /* = body, near-white */
+        --text-muted: var(--palette-night-100);     /* #c8cedb — subtle */
+        --text-heading: var(--palette-blue-300);    /* card/section titles → light blue */
 
         /* ===========================================================
            Borders

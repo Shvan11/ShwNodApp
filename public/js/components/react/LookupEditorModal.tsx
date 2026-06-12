@@ -349,7 +349,9 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
 
     return createPortal(
         <>
+            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- backdrop click-to-dismiss */}
             <div className="popover-backdrop" onClick={handleBackdropClick} />
+            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- backdrop click-to-dismiss */}
             <div
                 ref={modalRef}
                 className="lookup-editor-popover"

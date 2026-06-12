@@ -284,18 +284,19 @@
     opacity: 0.5;
 }
 
-/* Inactive but clickable */
+/* Inactive but clickable — full opacity + action-green icon: this is an
+   available action. (At 0.5 opacity with a grey icon it read as disabled;
+   truly disabled steps are .statusInactive, which stays dimmed.) */
 .statusInactiveClickable {
     composes: statusButton;
     background-color: transparent;
     border-color: var(--border-color);
     cursor: pointer;
-    opacity: 0.5;
     transition: all var(--transition-base);
 }
 
 .statusInactiveClickable i {
-    color: var(--text-secondary);
+    color: var(--success-600);
 }
 
 .statusInactiveClickable .chairIcon {

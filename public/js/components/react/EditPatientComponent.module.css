@@ -32,7 +32,7 @@
 
 .formGroup label {
     font-weight: 600;
-    color: var(--gray-700);
+    color: var(--text-secondary);
     margin-bottom: 0.375rem;
     font-size: 0.875rem;
 }

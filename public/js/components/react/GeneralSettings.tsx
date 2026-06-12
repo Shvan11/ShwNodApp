@@ -295,7 +295,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                 </div>
 
                 <div className={styles.settingGroup}>
-                    <label>Secondary Display URL</label>
+                    <span>Secondary Display URL</span>
                     <code className={styles.urlReference}>{secondaryDisplayUrl}</code>
                     <div className={styles.settingDescription}>
                         Open this URL in fullscreen on the patient-facing display PC. Replace
@@ -308,7 +308,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                 </div>
 
                 <div className={styles.settingGroup}>
-                    <label>Appearance</label>
+                    <span>Appearance</span>
                     <div className={styles.themeRadioGroup} role="radiogroup" aria-label="Theme">
                         {THEME_OPTIONS.map((opt) => (
                             <label
@@ -363,7 +363,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                 </div>
 
                 <div className={styles.settingGroup}>
-                    <label>Arabic font</label>
+                    <span>Arabic font</span>
                     <div className={styles.fontRadioGroup} role="radiogroup" aria-label="Arabic font">
                         {FONT_OPTIONS.map((opt) => (
                             <label

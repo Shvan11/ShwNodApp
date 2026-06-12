@@ -278,12 +278,16 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
           </span>
         )}
         {showPatientDropdown && (
-          <ul className={styles.patientDropdown}>
+          <ul className={styles.patientDropdown} role="listbox">
             {patientResults.map((p) => (
               <li
                 key={p.person_id}
                 className={styles.patientDropdownItem}
+                role="option"
+                aria-selected={false}
+                tabIndex={0}
                 onClick={() => handlePatientSelect(p)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePatientSelect(p); } }}
               >
                 <span>{p.patient_name}</span>
                 <span className={styles.patientId}>#{p.person_id}</span>

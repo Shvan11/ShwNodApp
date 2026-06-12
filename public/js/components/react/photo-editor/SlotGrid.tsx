@@ -44,7 +44,11 @@ const SlotGrid = ({ personId, editor, activeView, proxyMode, onActivate, onRemov
   // goes stale.
   const gridRef = useRef<HTMLDivElement>(null);
   const latest = useRef({ activeView, slots: editor.slots, setZoom: editor.setZoom });
-  latest.current = { activeView, slots: editor.slots, setZoom: editor.setZoom };
+  // Synced after commit (not during render); the wheel listener fires on user
+  // interaction, so it always reads the latest values.
+  useEffect(() => {
+    latest.current = { activeView, slots: editor.slots, setZoom: editor.setZoom };
+  });
 
   useEffect(() => {
     const el = gridRef.current;
@@ -113,8 +117,11 @@ const SlotGrid = ({ personId, editor, activeView, proxyMode, onActivate, onRemov
             key={view}
             data-slot-cell=""
             data-active={isActive ? 'true' : undefined}
+            role="button"
+            tabIndex={0}
             className={`${styles.cell} ${isActive ? styles.cellActive : ''} ${dragOver === view ? styles.cellDragOver : ''}`}
             onClick={() => onActivate(view)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onActivate(view); } }}
             onContextMenu={(e) => handleContextMenu(e, view)}
             onDragOver={(e) => {
               e.preventDefault();

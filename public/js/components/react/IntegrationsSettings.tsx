@@ -283,6 +283,7 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
                     onKeyDown={(e) => onKey(e, () => void sendCode())}
                     placeholder="+9647XXXXXXXX"
                     inputMode="tel"
+                    // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                     autoFocus
                   />
                 </label>
@@ -308,6 +309,7 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
                     onKeyDown={(e) => onKey(e, () => void submitCode())}
                     placeholder="12345"
                     inputMode="numeric"
+                    // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                     autoFocus
                   />
                 </label>
@@ -333,6 +335,7 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={(e) => onKey(e, () => void submitPassword())}
                     placeholder="Telegram cloud password"
+                    // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                     autoFocus
                   />
                 </label>

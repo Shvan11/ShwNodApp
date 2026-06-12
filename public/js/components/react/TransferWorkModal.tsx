@@ -174,14 +174,15 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
 
               {/* Search section using reusable PatientQuickSearch */}
               <div className={styles.searchSection}>
-                <label className={styles.searchLabel}>
+                <span className={styles.searchLabel}>
                   Search for target patient:
-                </label>
+                </span>
                 <PatientQuickSearch
                     onSelect={handleSelectPatient}
                     excludePatientIds={[work.person_id]}
                     layout="vertical"
                     showHeader={false}
+                    // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                     autoFocus={true}
                 />
                 {loading && (

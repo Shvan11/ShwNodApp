@@ -48,7 +48,7 @@
 }
 
 .optionPrimary {
-    color: var(--gray-900);
+    color: var(--text-primary);
     font-weight: var(--font-weight-medium);
 }
 
@@ -61,6 +61,6 @@
     padding: var(--spacing-xs) var(--spacing-md);
     border-top: var(--border-width-thin) solid var(--gray-100);
     margin-top: var(--spacing-xs);
-    color: var(--text-lighter);
+    color: var(--text-muted);
     font-size: var(--font-size-xs);
 }

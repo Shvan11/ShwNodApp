@@ -313,14 +313,14 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         setMoreActionsExpanded(true);
     };
 
-    const handleCSImagingClick = (e: MouseEvent<HTMLDivElement>) => {
-        e.preventDefault();
+    const handleCSImagingClick = (e?: MouseEvent<HTMLDivElement>) => {
+        e?.preventDefault();
         if (isNewPatient) return;
         handleOpenCSImaging();
     };
 
-    const handleFolderClick = (e: MouseEvent<HTMLDivElement>) => {
-        e.preventDefault();
+    const handleFolderClick = (e?: MouseEvent<HTMLDivElement>) => {
+        e?.preventDefault();
         if (isNewPatient) return;
         if (!patientsFolder) {
             toast.error('Patients folder path is not configured. Please check settings.');
@@ -418,7 +418,10 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                     {/* CS Imaging Button - Outside wrapper */}
                     <div
                         className={`sidebar-nav-item csimaging-item ${isNewPatient ? 'disabled' : ''}`}
+                        role="button"
+                        tabIndex={0}
                         onClick={handleCSImagingClick}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCSImagingClick(); } }}
                         title={isNewPatient ? "Save patient first to access CS Imaging" : "Open CS Imaging Trophy"}
                     >
                         <div className="nav-item-icon">
@@ -430,7 +433,10 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                     {/* Patient Folder Button - Outside wrapper */}
                     <div
                         className={`sidebar-nav-item folder-item ${isNewPatient ? 'disabled' : ''}`}
+                        role="button"
+                        tabIndex={0}
                         onClick={handleFolderClick}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleFolderClick(); } }}
                         title={isNewPatient ? "Save patient first to access folder" : "Open Patient Folder"}
                     >
                         <div className="nav-item-icon">

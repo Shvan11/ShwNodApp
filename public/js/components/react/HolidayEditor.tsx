@@ -109,7 +109,9 @@ const DeleteConfirmPopover = ({ anchorEl, itemName, onCancel, onConfirm }: Delet
 
     return createPortal(
         <>
+            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss */}
             <div className="popover-backdrop" onClick={onCancel} />
+            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss */}
             <div
                 className="delete-confirm-popover"
                 style={{ top: position.top, left: position.left }}

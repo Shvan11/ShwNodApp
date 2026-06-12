@@ -129,6 +129,7 @@ const POSItemSearch: React.FC<POSItemSearchProps> = ({ onSelect }) => {
           autoComplete="off"
           aria-label="Search stand items"
           aria-expanded={showDropdown}
+          aria-controls="pos-item-search-listbox"
           role="combobox"
         />
         {loading && (
@@ -137,14 +138,16 @@ const POSItemSearch: React.FC<POSItemSearchProps> = ({ onSelect }) => {
       </div>
 
       {showDropdown && (
-        <ul className={styles.dropdown} role="listbox">
+        <ul id="pos-item-search-listbox" className={styles.dropdown} role="listbox">
           {results.map((item) => (
             <li
               key={item.item_id}
               className={styles.dropdownItem}
               role="option"
               aria-selected={false}
+              tabIndex={0}
               onClick={() => handleSelect(item)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(item); } }}
             >
               <div className={styles.itemInfo}>
                 <span className={styles.itemName}>{item.item_name}</span>

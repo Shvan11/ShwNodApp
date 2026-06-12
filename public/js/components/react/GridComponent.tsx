@@ -98,8 +98,12 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     // Used both for grid badges and for the PhotoSwipe eye-toggle button.
     const [privateNames, setPrivateNames] = useState<Set<string>>(() => new Set());
     // Ref mirrors privateNames so PhotoSwipe callbacks (outside React) read fresh state.
+    // Synced in an effect (not during render) — the callbacks fire on user
+    // interaction, after the commit, so they always see the latest value.
     const privateNamesRef = useRef<Set<string>>(privateNames);
-    privateNamesRef.current = privateNames;
+    useEffect(() => {
+        privateNamesRef.current = privateNames;
+    }, [privateNames]);
     const componentRef = useRef<HTMLDivElement>(null);
     const isSharingRef = useRef(false);
 

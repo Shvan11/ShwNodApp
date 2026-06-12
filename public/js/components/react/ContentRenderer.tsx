@@ -158,7 +158,6 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                 return (
                     <CompareComponent
                         personId={personId}
-                        phone={params.phone}
                     />
                 );
 

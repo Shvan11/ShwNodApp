@@ -1,10 +1,30 @@
 /**
  * Custom hooks for Stand / Mini-Pharmacy
- * Handles all stand-related API calls with proper state management
+ *
+ * Reads are thin wrappers over the React Query `queryOptions` factories in
+ * `query/queries.ts` — so the cache is shared/deduped across screens and a write
+ * on one screen refreshes every other. Mutations write via `core/http` then
+ * invalidate `qk.stand.all()` (the hierarchical parent that covers items, sales,
+ * categories, dashboard, movements & reports), replacing the old caller-supplied
+ * `onSuccess`→`refetch` wiring.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import * as standContract from '@shared/contracts/stand.contract';
+import { qk } from '@/query/keys';
+import {
+  standItemsQuery,
+  standCategoriesQuery,
+  standDashboardQuery,
+  standSalesQuery,
+  standSaleQuery,
+  lowStockItemsQuery,
+  expiringItemsQuery,
+  stockMovementsQuery,
+  standReportSummaryQuery,
+  topSellingItemsQuery,
+} from '@/query/queries';
 
 // ============================================================================
 // TYPES
@@ -12,10 +32,10 @@ import * as standContract from '@shared/contracts/stand.contract';
 //
 // Response shapes are the single source of truth in the shared contract
 // (shared/contracts/stand.contract.ts), re-exported here so existing component
-// imports (`from '../../hooks/useStand'`) keep resolving unchanged. Each typed
-// read below pairs the contract-inferred generic with `{ schema: …response }`
-// (the generic types it; the schema validates the boundary at runtime — H11).
-// Request/filter shapes stay frontend-owned below.
+// imports (`from '../../hooks/useStand'`) keep resolving unchanged. The reads'
+// `queryOptions` factories (query/queries.ts) pair the contract-inferred type
+// with `{ schema: …response }` (the generic types it; the schema validates the
+// boundary at runtime — H11). Request/filter shapes stay frontend-owned below.
 
 export type {
   StandCategory,
@@ -88,33 +108,13 @@ export function useStandItems(filters: StandItemFilters = {}): {
   error: string | null;
   refetch: () => Promise<void>;
 } {
-  const [items, setItems] = useState<StandItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchItems = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const params = new URLSearchParams();
-      if (filters.search) params.append('search', filters.search);
-      if (filters.categoryId) params.append('categoryId', String(filters.categoryId));
-      if (filters.stockStatus) params.append('stockStatus', filters.stockStatus);
-      if (filters.includeInactive) params.append('includeInactive', 'true');
-
-      const data = await fetchJSON<StandItem[]>(`/api/stand/items?${params}`, { schema: standContract.items.response });
-      setItems(data);
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to fetch items'));
-    } finally {
-      setLoading(false);
-    }
-  }, [filters.search, filters.categoryId, filters.stockStatus, filters.includeInactive]);
-
-  useEffect(() => { fetchItems(); }, [fetchItems]);
-
-  return { items, loading, error, refetch: fetchItems };
+  const query = useQuery(standItemsQuery(filters));
+  return {
+    items: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch items') : null,
+    refetch: async () => { await query.refetch(); },
+  };
 }
 
 export function useStandItemByBarcode(): {
@@ -155,26 +155,13 @@ export function useStandCategories(): {
   error: string | null;
   refetch: () => Promise<void>;
 } {
-  const [categories, setCategories] = useState<StandCategory[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchCategories = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await fetchJSON<StandCategory[]>('/api/stand/categories', { schema: standContract.categories.response });
-      setCategories(data);
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to fetch categories'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchCategories(); }, [fetchCategories]);
-
-  return { categories, loading, error, refetch: fetchCategories };
+  const query = useQuery(standCategoriesQuery());
+  return {
+    categories: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch categories') : null,
+    refetch: async () => { await query.refetch(); },
+  };
 }
 
 // ============================================================================
@@ -187,26 +174,13 @@ export function useStandDashboardKPIs(): {
   error: string | null;
   refetch: () => Promise<void>;
 } {
-  const [kpis, setKpis] = useState<StandDashboardKPIs | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchKPIs = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await fetchJSON<StandDashboardKPIs>('/api/stand/dashboard', { schema: standContract.dashboard.response });
-      setKpis(data);
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to fetch KPIs'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchKPIs(); }, [fetchKPIs]);
-
-  return { kpis, loading, error, refetch: fetchKPIs };
+  const query = useQuery(standDashboardQuery());
+  return {
+    kpis: query.data ?? null,
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch KPIs') : null,
+    refetch: async () => { await query.refetch(); },
+  };
 }
 
 // ============================================================================
@@ -219,33 +193,13 @@ export function useStandSales(filters: StandSaleFilters = {}): {
   error: string | null;
   refetch: () => Promise<void>;
 } {
-  const [sales, setSales] = useState<StandSale[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchSales = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const params = new URLSearchParams();
-      if (filters.startDate) params.append('startDate', filters.startDate);
-      if (filters.endDate) params.append('endDate', filters.endDate);
-      if (filters.cashierId) params.append('cashierId', String(filters.cashierId));
-      if (filters.personId) params.append('personId', String(filters.personId));
-
-      const data = await fetchJSON<StandSale[]>(`/api/stand/sales?${params}`, { schema: standContract.sales.response });
-      setSales(data);
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to fetch sales'));
-    } finally {
-      setLoading(false);
-    }
-  }, [filters.startDate, filters.endDate, filters.cashierId, filters.personId]);
-
-  useEffect(() => { fetchSales(); }, [fetchSales]);
-
-  return { sales, loading, error, refetch: fetchSales };
+  const query = useQuery(standSalesQuery(filters));
+  return {
+    sales: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch sales') : null,
+    refetch: async () => { await query.refetch(); },
+  };
 }
 
 export function useStandSale(id: number | null): {
@@ -253,30 +207,12 @@ export function useStandSale(id: number | null): {
   loading: boolean;
   error: string | null;
 } {
-  const [sale, setSale] = useState<StandSaleWithItems | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!id) { setSale(null); setError(null); return; }
-
-    const fetchSale = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await fetchJSON<StandSaleWithItems>(`/api/stand/sales/${id}`, { schema: standContract.saleById.response });
-        setSale(data);
-      } catch (err) {
-        setError(httpErrorMessage(err, 'Failed to fetch sale'));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSale();
-  }, [id]);
-
-  return { sale, loading, error };
+  const query = useQuery(standSaleQuery(id));
+  return {
+    sale: query.data ?? null,
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch sale') : null,
+  };
 }
 
 // ============================================================================
@@ -289,25 +225,13 @@ export function useLowStockItems(): {
   error: string | null;
   refetch: () => Promise<void>;
 } {
-  const [items, setItems] = useState<StandItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchItems = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      setItems(await fetchJSON<StandItem[]>('/api/stand/items/low-stock', { schema: standContract.itemsLowStock.response }));
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to fetch low-stock items'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchItems(); }, [fetchItems]);
-
-  return { items, loading, error, refetch: fetchItems };
+  const query = useQuery(lowStockItemsQuery());
+  return {
+    items: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch low-stock items') : null,
+    refetch: async () => { await query.refetch(); },
+  };
 }
 
 export function useExpiringItems(daysAhead: number = 30): {
@@ -316,25 +240,13 @@ export function useExpiringItems(daysAhead: number = 30): {
   error: string | null;
   refetch: () => Promise<void>;
 } {
-  const [items, setItems] = useState<StandItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchItems = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      setItems(await fetchJSON<StandItem[]>(`/api/stand/items/expiring?days=${daysAhead}`, { schema: standContract.itemsExpiring.response }));
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to fetch expiring items'));
-    } finally {
-      setLoading(false);
-    }
-  }, [daysAhead]);
-
-  useEffect(() => { fetchItems(); }, [fetchItems]);
-
-  return { items, loading, error, refetch: fetchItems };
+  const query = useQuery(expiringItemsQuery(daysAhead));
+  return {
+    items: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch expiring items') : null,
+    refetch: async () => { await query.refetch(); },
+  };
 }
 
 // ============================================================================
@@ -347,33 +259,20 @@ export function useStockMovements(itemId: number | null): {
   error: string | null;
   refetch: () => Promise<void>;
 } {
-  const [movements, setMovements] = useState<StandStockMovement[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchMovements = useCallback(async () => {
-    if (!itemId) { setMovements([]); setError(null); return; }
-    try {
-      setLoading(true);
-      setError(null);
-      setMovements(await fetchJSON<StandStockMovement[]>(`/api/stand/items/${itemId}/movements`, { schema: standContract.itemMovements.response }));
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to fetch stock movements'));
-    } finally {
-      setLoading(false);
-    }
-  }, [itemId]);
-
-  useEffect(() => { fetchMovements(); }, [fetchMovements]);
-
-  return { movements, loading, error, refetch: fetchMovements };
+  const query = useQuery(stockMovementsQuery(itemId));
+  return {
+    movements: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch stock movements') : null,
+    refetch: async () => { await query.refetch(); },
+  };
 }
 
 // ============================================================================
 // ITEM MUTATIONS
 // ============================================================================
 
-export function useStandItemMutations(onSuccess?: () => void): {
+export function useStandItemMutations(): {
   createItem: (data: StandItemCreateData) => Promise<{ item_id: number }>;
   updateItem: (id: number, data: Partial<StandItemCreateData>) => Promise<void>;
   deleteItem: (id: number) => Promise<void>;
@@ -382,6 +281,7 @@ export function useStandItemMutations(onSuccess?: () => void): {
   loading: boolean;
   error: string | null;
 } {
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -389,52 +289,52 @@ export function useStandItemMutations(onSuccess?: () => void): {
     try {
       setLoading(true); setError(null);
       const result = await postJSON<{ item_id: number }>('/api/stand/items', data, { schema: standContract.createItem.response });
-      onSuccess?.();
+      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
       return result;
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to create item')); throw err;
     } finally { setLoading(false); }
-  }, [onSuccess]);
+  }, [queryClient]);
 
   const updateItem = useCallback(async (id: number, data: Partial<StandItemCreateData>): Promise<void> => {
     try {
       setLoading(true); setError(null);
       await putJSON(`/api/stand/items/${id}`, data);
-      onSuccess?.();
+      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to update item')); throw err;
     } finally { setLoading(false); }
-  }, [onSuccess]);
+  }, [queryClient]);
 
   const deleteItem = useCallback(async (id: number): Promise<void> => {
     try {
       setLoading(true); setError(null);
       await deleteJSON(`/api/stand/items/${id}`);
-      onSuccess?.();
+      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to delete item')); throw err;
     } finally { setLoading(false); }
-  }, [onSuccess]);
+  }, [queryClient]);
 
   const restockItem = useCallback(async (id: number, quantity: number, unitCost: number): Promise<void> => {
     try {
       setLoading(true); setError(null);
       await postJSON(`/api/stand/items/${id}/restock`, { quantity, unitCost });
-      onSuccess?.();
+      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to restock')); throw err;
     } finally { setLoading(false); }
-  }, [onSuccess]);
+  }, [queryClient]);
 
   const adjustStock = useCallback(async (id: number, delta: number, reason: string): Promise<void> => {
     try {
       setLoading(true); setError(null);
       await postJSON(`/api/stand/items/${id}/adjust`, { delta, reason });
-      onSuccess?.();
+      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to adjust stock')); throw err;
     } finally { setLoading(false); }
-  }, [onSuccess]);
+  }, [queryClient]);
 
   return { createItem, updateItem, deleteItem, restockItem, adjustStock, loading, error };
 }
@@ -443,12 +343,13 @@ export function useStandItemMutations(onSuccess?: () => void): {
 // SALE MUTATIONS
 // ============================================================================
 
-export function useStandSaleMutations(onSuccess?: () => void): {
+export function useStandSaleMutations(): {
   createSale: (data: SaleCreateData) => Promise<StandSaleResult>;
   voidSale: (id: number, reason: string) => Promise<void>;
   loading: boolean;
   error: string | null;
 } {
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -456,22 +357,22 @@ export function useStandSaleMutations(onSuccess?: () => void): {
     try {
       setLoading(true); setError(null);
       const result = await postJSON<StandSaleResult>('/api/stand/sales', data, { schema: standContract.createSale.response });
-      onSuccess?.();
+      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
       return result;
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to create sale')); throw err;
     } finally { setLoading(false); }
-  }, [onSuccess]);
+  }, [queryClient]);
 
   const voidSale = useCallback(async (id: number, reason: string): Promise<void> => {
     try {
       setLoading(true); setError(null);
       await postJSON(`/api/stand/sales/${id}/void`, { reason });
-      onSuccess?.();
+      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
     } catch (err) {
       setError(httpErrorMessage(err, 'Failed to void sale')); throw err;
     } finally { setLoading(false); }
-  }, [onSuccess]);
+  }, [queryClient]);
 
   return { createSale, voidSale, loading, error };
 }
@@ -485,33 +386,12 @@ export function useStandReportSummary(startDate: string | null, endDate: string 
   loading: boolean;
   error: string | null;
 } {
-  const [data, setData] = useState<StandReportData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!startDate || !endDate) { setData(null); return; }
-
-    let cancelled = false;
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const params = new URLSearchParams({ startDate, endDate });
-        const json = await fetchJSON<StandReportData>(`/api/stand/reports/summary?${params}`, { schema: standContract.reportSummary.response });
-        if (!cancelled) setData(json);
-      } catch (err) {
-        if (!cancelled) setError(httpErrorMessage(err, 'Failed to fetch report'));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    fetchData();
-    return () => { cancelled = true; };
-  }, [startDate, endDate]);
-
-  return { data, loading, error };
+  const query = useQuery(standReportSummaryQuery(startDate, endDate));
+  return {
+    data: query.data ?? null,
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch report') : null,
+  };
 }
 
 export function useTopSellingItems(startDate: string | null, endDate: string | null, limit: number = 10): {
@@ -519,70 +399,50 @@ export function useTopSellingItems(startDate: string | null, endDate: string | n
   loading: boolean;
   error: string | null;
 } {
-  const [items, setItems] = useState<TopItemRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!startDate || !endDate) { setItems([]); return; }
-
-    let cancelled = false;
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const params = new URLSearchParams({ startDate, endDate, limit: String(limit) });
-        const json = await fetchJSON<TopItemRow[]>(`/api/stand/reports/top-items?${params}`, { schema: standContract.reportTopItems.response });
-        if (!cancelled) setItems(json);
-      } catch (err) {
-        if (!cancelled) setError(httpErrorMessage(err, 'Failed to fetch top-selling items'));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    fetchData();
-    return () => { cancelled = true; };
-  }, [startDate, endDate, limit]);
-
-  return { items, loading, error };
+  const query = useQuery(topSellingItemsQuery(startDate, endDate, limit));
+  return {
+    items: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch top-selling items') : null,
+  };
 }
 
 // ============================================================================
 // CATEGORY MUTATIONS
 // ============================================================================
 
-export function useStandCategoryMutations(onSuccess?: () => void): {
+export function useStandCategoryMutations(): {
   createCategory: (name: string) => Promise<void>;
   updateCategory: (id: number, data: { categoryName?: string }) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
   loading: boolean;
 } {
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
 
   const createCategory = useCallback(async (name: string) => {
     try {
       setLoading(true);
       await postJSON('/api/stand/categories', { name });
-      onSuccess?.();
+      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
     } finally { setLoading(false); }
-  }, [onSuccess]);
+  }, [queryClient]);
 
   const updateCategory = useCallback(async (id: number, data: { categoryName?: string }) => {
     try {
       setLoading(true);
       await putJSON(`/api/stand/categories/${id}`, data);
-      onSuccess?.();
+      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
     } finally { setLoading(false); }
-  }, [onSuccess]);
+  }, [queryClient]);
 
   const deleteCategory = useCallback(async (id: number) => {
     try {
       setLoading(true);
       await deleteJSON(`/api/stand/categories/${id}`);
-      onSuccess?.();
+      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
     } finally { setLoading(false); }
-  }, [onSuccess]);
+  }, [queryClient]);
 
   return { createCategory, updateCategory, deleteCategory, loading };
 }

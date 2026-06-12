@@ -73,7 +73,7 @@
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-color);
+  color: var(--text-primary);
   font-size: 0.8rem;
   cursor: pointer;
 }
@@ -92,7 +92,7 @@
   padding: 0 4px;
   border: none;
   background: transparent;
-  color: var(--text-color);
+  color: var(--text-primary);
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   text-align: center;
@@ -133,7 +133,7 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--background-primary);
-  color: var(--text-color);
+  color: var(--text-primary);
   font-size: 0.8rem;
   cursor: pointer;
   transition: background var(--transition-fast);
@@ -205,7 +205,7 @@
   margin: 0;
   font-size: 1.1rem;
   font-weight: var(--font-weight-bold);
-  color: var(--text-color);
+  color: var(--text-primary);
 }
 
 .confirmText {
@@ -233,7 +233,7 @@
 
 .confirmCancel {
   background: var(--background-secondary);
-  color: var(--text-color);
+  color: var(--text-primary);
 }
 
 .confirmCancel:hover:not(:disabled) {
