@@ -41,32 +41,19 @@ import '../css/components/calendar-holidays.css';
 
 import { StrictMode } from 'react';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { GlobalErrorBoundary } from './components/error-boundaries/GlobalErrorBoundary';
 import routesConfig from './router/routes.config';
+import { queryClient } from './query/client';
 
 // ===================================
 // REACT QUERY (audit M7/M8)
 // ===================================
 //
-// The shared client for component-level server state (the appointments screen
-// is the first migrated surface — useAppointments / useAppointmentsSync). It gives
-// real cache invalidation (SSE → invalidateQueries, fixing the M7 dead
-// cache-key no-op), automatic refetch on key change, request abort, and retry.
-// The per-request timeout (M8) lives one layer down in core/http.ts, so it
-// covers route loaders and direct fetches too — not just RQ-managed queries.
-// Route *loaders* keep using apiLoader/fetchJSON (they run outside React); RQ is
-// layered on top for live component data, per the staged session-4 plan.
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000, // clinic data changes by the minute, not the second
-      gcTime: 5 * 60_000,
-      retry: 2, // transient network/5xx retry (idempotent reads)
-      refetchOnWindowFocus: false, // refetch is driven by SSE + explicit triggers
-    },
-  },
-});
+// The shared TanStack Query client now lives in ./query/client so route loaders
+// (which run outside React) can prefetch into the same cache via loaderQuery.
+// App.tsx just feeds it to the provider below. Defaults (staleTime/gcTime/retry/
+// refetchOnWindowFocus) are documented there.
 
 // ===================================
 // STALE-CHUNK / TRANSIENT-FETCH RECOVERY
