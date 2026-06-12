@@ -5,11 +5,12 @@
  * Form functionality handled by separate NewVisitComponent via routing
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { fetchJSON, deleteJSON, httpErrorMessage } from '@/core/http';
-import * as visitContract from '@shared/contracts/visit.contract';
+import { deleteJSON, httpErrorMessage } from '@/core/http';
+import { visitsByWorkQuery } from '@/query/queries';
 import styles from './VisitsComponent.module.css';
 
 interface Visit {
@@ -74,36 +75,27 @@ const highlight = (text: string | undefined, term: string, markClass: string): R
 const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
     const navigate = useNavigate();
     const confirm = useConfirm();
-    const [visits, setVisits] = useState<Visit[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
-    // Monotonic guard so a slow earlier fetch (e.g. after a workId switch) can't
-    // overwrite the results of a newer one.
-    const loadReqIdRef = useRef(0);
+    // Error raised by the delete mutation / dismissed by the banner's close
+    // button. Kept separate from the query's read error so each can clear
+    // independently. The visitsByWork response is a loose contract array (only
+    // `id` is modeled), so the rows are cast to Visit below.
+    const [actionError, setActionError] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (workId) {
-            loadVisits();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [workId]);
+    // Visit list now reads from React Query (keyed by workId; the monotonic
+    // request guard is handled by RQ's per-key in-flight dedup + cancellation).
+    const { data, isLoading: loading, error: queryError, refetch: refetchVisits } = useQuery({
+        ...visitsByWorkQuery(workId ?? ''),
+        enabled: !!workId,
+    });
 
-    const loadVisits = async () => {
-        const reqId = ++loadReqIdRef.current;
-        try {
-            setLoading(true);
-            const data = await fetchJSON<Visit[]>(`/api/getvisitsbywork?workId=${workId}`, { schema: visitContract.visitsByWork.response });
-            // Sort by visit date descending (most recent first) on a copy, leaving
-            // the fetched array untouched.
-            const sortedData = [...data].sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime());
-            if (reqId === loadReqIdRef.current) setVisits(sortedData);
-        } catch (err) {
-            if (reqId === loadReqIdRef.current) setError(httpErrorMessage(err, 'An error occurred'));
-        } finally {
-            if (reqId === loadReqIdRef.current) setLoading(false);
-        }
-    };
+    // Sort by visit date descending (most recent first) on a copy, leaving the
+    // cached array untouched.
+    const visits = ([...((data ?? []) as unknown as Visit[])]).sort(
+        (a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()
+    );
+
+    const error = actionError ?? (queryError ? httpErrorMessage(queryError, 'An error occurred') : null);
 
     const handleAddVisit = () => {
         navigate(`/patient/${personId}/new-visit?workId=${workId}`);
@@ -118,9 +110,10 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
 
         try {
             await deleteJSON('/api/deletevisitbywork', { body: JSON.stringify({ visitId }) });
-            await loadVisits();
+            // TODO(phase3): replace manual refetch with query invalidation
+            await refetchVisits();
         } catch (err) {
-            setError(httpErrorMessage(err, 'Failed to delete visit'));
+            setActionError(httpErrorMessage(err, 'Failed to delete visit'));
         }
     };
 
@@ -157,7 +150,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
             {error && (
                 <div className={styles.error}>
                     {error}
-                    <button onClick={() => setError(null)} className={styles.errorClose}>×</button>
+                    <button onClick={() => setActionError(null)} className={styles.errorClose}>×</button>
                 </div>
             )}
 

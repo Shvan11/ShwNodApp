@@ -1,14 +1,20 @@
-import { useState, useEffect, useCallback, ChangeEvent, FormEvent } from 'react';
+import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import PhoneInput from './PhoneInput';
 import styles from './EditPatientComponent.module.css';
 import { formatISODate } from '../../core/utils';
-import { fetchJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { putJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { invalidatePatientCache } from '@/router/loader-cache';
-import { tagOptions as tagOptionsContract } from '@shared/contracts/patient.contract';
-import * as patientContract from '@shared/contracts/patient.contract';
-import * as lookup from '@shared/contracts/lookup.contract';
+import {
+    patientByIdQuery,
+    gendersQuery,
+    addressesQuery,
+    referralSourcesQuery,
+    patientTypesQuery,
+    tagOptionsQuery,
+} from '../../query/queries';
 
 interface Props {
     personId?: number | null;  // Validated PersonID from loader (null if invalid)
@@ -39,12 +45,6 @@ interface Tag {
     tag: string;
 }
 
-// Single source of truth: the patientById contract response (raw `patients`
-// columns + attached alerts). FK ids (gender, address_id, …) and estimated_cost
-// are DB `number`s here — the form-population below coerces them to its `<select>`
-// strings. (Replaces a hand-written parallel interface that lied them as strings.)
-type PatientData = patientContract.PatientByIdResponse;
-
 interface FormData {
     person_id: string | number;
     patient_name: string;
@@ -69,21 +69,45 @@ interface FormData {
 const EditPatientComponent = ({ personId }: Props) => {
     const navigate = useNavigate();
     const toast = useToast();
-    const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState('');
-    const [patientData, setPatientData] = useState<PatientData | null>(null);
+
+    // Patient record read — populates the form via the effect below. Each
+    // dropdown read is its own independent query, so one lookup failing can't
+    // blank the others (same tolerance the old per-promise `.catch` gave, free).
+    const {
+        data: patientData,
+        isLoading: patientLoading,
+        error: patientError,
+        refetch: refetchPatient,
+    } = useQuery({
+        ...patientByIdQuery(personId ?? ''),
+        enabled: !!personId,
+    });
+
+    // Dropdown reads — loose contract responses expose the long-tail fields as
+    // unknown, so each `data` is cast to its concrete row type.
+    const { data: gendersData } = useQuery(gendersQuery());
+    const { data: addressesData } = useQuery(addressesQuery());
+    const { data: referralSourcesData } = useQuery(referralSourcesQuery());
+    const { data: patientTypesData } = useQuery(patientTypesQuery());
+    const { data: tagsData } = useQuery(tagOptionsQuery());
+
+    // Loose contracts model only `{ id }`, so the runtime rows (which carry
+    // name/tag) need a double cast through unknown.
+    const genders = (gendersData ?? []) as unknown as Gender[];
+    const addresses = (addressesData ?? []) as unknown as Address[];
+    const referralSources = (referralSourcesData ?? []) as unknown as ReferralSource[];
+    const patientTypes = (patientTypesData ?? []) as unknown as PatientType[];
+    const tags = (tagsData ?? []) as unknown as Tag[];
+
+    // Loading screen shows only while the patient record is in flight (a missing
+    // personId resolves immediately to "not loading").
+    const loading = !!personId && patientLoading;
 
     // Use validated PersonID from loader, fallback to patientData.person_id
     const validPersonId = personId ?? patientData?.person_id ?? null;
-
-    // Dropdown data
-    const [genders, setGenders] = useState<Gender[]>([]);
-    const [addresses, setAddresses] = useState<Address[]>([]);
-    const [referralSources, setReferralSources] = useState<ReferralSource[]>([]);
-    const [patientTypes, setPatientTypes] = useState<PatientType[]>([]);
-    const [tags, setTags] = useState<Tag[]>([]);
 
     // Form data
     const [formData, setFormData] = useState<FormData>({
@@ -107,77 +131,44 @@ const EditPatientComponent = ({ personId }: Props) => {
         tag_id: ''
     });
 
-    const loadDropdownData = useCallback(async () => {
-        try {
-            // Independent dropdowns — each tolerates its own failure (per-promise
-            // .catch) so one bad lookup doesn't blank the rest, matching the old
-            // per-`res.ok` guards.
-            const [gendersData, addressesData, referralsData, typesData, tagsData] = await Promise.all([
-                fetchJSON<Gender[]>('/api/genders', { schema: lookup.genders.response }).catch(() => null),
-                fetchJSON<Address[]>('/api/addresses', { schema: lookup.addresses.response }).catch(() => null),
-                fetchJSON<ReferralSource[]>('/api/referral-sources', { schema: lookup.referralSources.response }).catch(() => null),
-                fetchJSON<PatientType[]>('/api/patient-types', { schema: lookup.patientTypes.response }).catch(() => null),
-                fetchJSON<Tag[]>('/api/patients/tag-options', { schema: tagOptionsContract.response }).catch(() => null)
-            ]);
-
-            if (gendersData) setGenders(gendersData);
-            if (addressesData) setAddresses(addressesData);
-            if (referralsData) setReferralSources(referralsData);
-            if (typesData) setPatientTypes(typesData);
-            if (tagsData) setTags(tagsData);
-        } catch (err) {
-            console.error('Error loading dropdown data:', err);
-        }
-    }, []);
-
-    const loadPatientData = useCallback(async () => {
-        // Use validated personId from loader
-        if (!personId) {
-            setLoading(false);
-            return;
-        }
-
-        try {
-            setLoading(true);
-            const data = await fetchJSON<PatientData>(`/api/patients/${personId}`, { schema: patientContract.patientById.response });
-            setPatientData(data);
-
-            // Populate form
-            setFormData({
-                person_id: data.person_id,
-                patient_name: data.patient_name || '',
-                first_name: data.first_name || '',
-                last_name: data.last_name || '',
-                phone: data.phone || '',
-                phone2: data.phone2 || '',
-                email: data.email || '',
-                date_of_birth: data.date_of_birth ? formatISODate(data.date_of_birth) : '',
-                // FK ids / cost are DB numbers → coerce to the `<select>`/input strings
-                // the form (and the updatePatient body schema) expect. `falsy ? : ''`
-                // keeps NULL → '' (the "nothing chosen" empty option).
-                gender: data.gender ? String(data.gender) : '',
-                address_id: data.address_id ? String(data.address_id) : '',
-                referral_source_id: data.referral_source_id ? String(data.referral_source_id) : '',
-                patient_type_id: data.patient_type_id ? String(data.patient_type_id) : '',
-                notes: data.notes || '',
-                language: (data.language !== null && data.language !== undefined) ? data.language.toString() : '0',
-                country_code: data.country_code || '',
-                estimated_cost: data.estimated_cost ? String(data.estimated_cost) : '',
-                currency: data.currency || 'IQD',
-                tag_id: data.tag_id ? String(data.tag_id) : ''
-            });
-        } catch (err) {
-            console.error('Error loading patient data:', err);
-            setError(httpErrorMessage(err, 'Failed to load patient data'));
-        } finally {
-            setLoading(false);
-        }
-    }, [personId]);
-
+    // Populate the form when the patient record arrives (or is refetched after a
+    // save). Mirrors the old loadPatientData population exactly — same field
+    // coercion (String(...) on FK ids/cost, NULL→'' empty-option, language→'0').
     useEffect(() => {
-        loadDropdownData();
-        loadPatientData();
-    }, [personId, loadDropdownData, loadPatientData]);
+        if (!patientData) return;
+        const data = patientData;
+        setFormData({
+            person_id: data.person_id,
+            patient_name: data.patient_name || '',
+            first_name: data.first_name || '',
+            last_name: data.last_name || '',
+            phone: data.phone || '',
+            phone2: data.phone2 || '',
+            email: data.email || '',
+            date_of_birth: data.date_of_birth ? formatISODate(data.date_of_birth) : '',
+            // FK ids / cost are DB numbers → coerce to the `<select>`/input strings
+            // the form (and the updatePatient body schema) expect. `falsy ? : ''`
+            // keeps NULL → '' (the "nothing chosen" empty option).
+            gender: data.gender ? String(data.gender) : '',
+            address_id: data.address_id ? String(data.address_id) : '',
+            referral_source_id: data.referral_source_id ? String(data.referral_source_id) : '',
+            patient_type_id: data.patient_type_id ? String(data.patient_type_id) : '',
+            notes: data.notes || '',
+            language: (data.language !== null && data.language !== undefined) ? data.language.toString() : '0',
+            country_code: data.country_code || '',
+            estimated_cost: data.estimated_cost ? String(data.estimated_cost) : '',
+            currency: data.currency || 'IQD',
+            tag_id: data.tag_id ? String(data.tag_id) : ''
+        });
+    }, [patientData]);
+
+    // Surface a patient-record load failure in the existing error banner (the
+    // old loadPatientData did setError(...) on its catch).
+    useEffect(() => {
+        if (patientError) {
+            setError(httpErrorMessage(patientError, 'Failed to load patient data'));
+        }
+    }, [patientError]);
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -209,8 +200,9 @@ const EditPatientComponent = ({ personId }: Props) => {
                 setSuccessMessage('');
             }, 3000);
 
-            // Reload patient data to get fresh values
-            await loadPatientData();
+            // Reload patient data to get fresh values (re-runs the read query →
+            // the form-population effect repopulates from the fresh record).
+            await refetchPatient();
         } catch (err) {
             // Duplicate patient name → 409 with code/context in `details` (root kept as a fallback).
             const errorData = (err as HttpError).data as {

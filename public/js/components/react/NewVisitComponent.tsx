@@ -6,10 +6,11 @@
 
 import React, { useState, useEffect, useRef, useCallback, type FormEvent, type ChangeEvent } from 'react';
 import cn from 'classnames';
+import { useQuery } from '@tanstack/react-query';
 import { formatISODate } from '../../core/utils';
-import { fetchJSON, putJSON, postJSON, httpErrorMessage } from '@/core/http';
-import * as staff from '@shared/contracts/staff.contract';
+import { putJSON, postJSON, httpErrorMessage } from '@/core/http';
 import * as visitContract from '@shared/contracts/visit.contract';
+import { wiresQuery, operatorsQuery, latestWiresQuery, visitByIdQuery } from '../../query/queries';
 import DentalChart from './DentalChart';
 import { useToast } from '../../contexts/ToastContext';
 import styles from './NewVisitComponent.module.css';
@@ -84,14 +85,36 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
     const toast = useToast();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [wires, setWires] = useState<Wire[]>([]);
-    const [operators, setOperators] = useState<Operator[]>([]);
-    const [latestWires, setLatestWires] = useState<LatestWires>({
+
+    // Dropdown reads — each its own independent query (one failing can't blank
+    // the others). Loose contract responses expose long-tail fields as unknown,
+    // so `data` is cast to its concrete row type.
+    const { data: wiresData } = useQuery(wiresQuery());
+    const { data: operatorsData } = useQuery(operatorsQuery());
+    const { data: latestWiresData } = useQuery({
+        ...latestWiresQuery(workId ?? ''),
+        enabled: !!workId,
+    });
+
+    const wires = (wiresData ?? []) as unknown as Wire[];
+    const operators = (operatorsData ?? []) as unknown as Operator[];
+    const latestWires: LatestWires = (latestWiresData as LatestWires | undefined) ?? {
         upper_wire_id: null,
         UpperWireName: null,
         lower_wire_id: null,
         LowerWireName: null
+    };
+
+    // Visit record read (edit mode) — populates the form via the effect below.
+    const {
+        data: visitData,
+        isLoading: visitLoading,
+        error: visitError,
+    } = useQuery({
+        ...visitByIdQuery(visitId ?? ''),
+        enabled: !!visitId,
     });
+
     const othersTextareaRef = useRef<HTMLTextAreaElement>(null);
     const nextVisitTextareaRef = useRef<HTMLTextAreaElement>(null);
     const [lastFocusedField, setLastFocusedField] = useState<TextFieldKey>('others');
@@ -117,63 +140,37 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
     });
 
 
-    // Memoized function to load dropdown data
-    const loadDropdownData = useCallback(async () => {
-        try {
-            // Each request is independent (a failed one must not blank the others),
-            // so per-promise .catch keeps Promise.all from rejecting wholesale —
-            // mirrors the old per-response `if (res.ok)` guards.
-            const [wiresData, operatorsData, latestWiresData] = await Promise.all([
-                fetchJSON<Wire[]>('/api/getWires', { schema: visitContract.getWires.response }).catch(() => null),
-                fetchJSON<Operator[]>('/api/operators', { schema: staff.operators.response }).catch(() => null),
-                fetchJSON<LatestWires>(`/api/getlatestwires?workId=${workId}`, { schema: visitContract.latestWires.response }).catch(() => null)
-            ]);
-
-            if (wiresData) setWires(wiresData);
-            if (operatorsData) setOperators(operatorsData);
-            if (latestWiresData) setLatestWires(latestWiresData);
-        } catch (err) {
-            console.error('Error loading dropdown data:', err);
-        }
-    }, [workId]);
-
-    // Memoized function to load visit data
-    const loadVisitData = useCallback(async () => {
-        try {
-            setLoading(true);
-            const visit = await fetchJSON<VisitRow>(`/api/getvisitbyid?visitId=${visitId}`, { schema: visitContract.visitById.response });
-
-            setFormData({
-                work_id: visit.work_id,
-                visit_date: visit.visit_date ? formatISODate(visit.visit_date) : '',
-                upper_wire_id: visit.upper_wire_id || '',
-                lower_wire_id: visit.lower_wire_id || '',
-                bracket_change: visit.bracket_change || '',
-                wire_bending: visit.wire_bending || '',
-                elastics: visit.elastics || '',
-                opg: visit.opg || false,
-                p_photo: visit.p_photo || false,
-                i_photo: visit.i_photo || false,
-                f_photo: visit.f_photo || false,
-                others: visit.others || '',
-                next_visit: visit.next_visit || '',
-                appliance_removed: visit.appliance_removed || false,
-                operator_id: visit.operator_id || ''
-            });
-        } catch (err) {
-            setError(httpErrorMessage(err, 'Failed to fetch visit data'));
-        } finally {
-            setLoading(false);
-        }
-    }, [visitId]);
-
-    // useEffect with proper dependencies
+    // Populate the form when the visit record arrives (edit mode). Mirrors the
+    // old loadVisitData population exactly — same field coercion / falsy→default.
     useEffect(() => {
-        loadDropdownData();
-        if (visitId) {
-            loadVisitData();
+        if (!visitData) return;
+        const visit = visitData as unknown as VisitRow;
+        setFormData({
+            work_id: visit.work_id,
+            visit_date: visit.visit_date ? formatISODate(visit.visit_date) : '',
+            upper_wire_id: visit.upper_wire_id || '',
+            lower_wire_id: visit.lower_wire_id || '',
+            bracket_change: visit.bracket_change || '',
+            wire_bending: visit.wire_bending || '',
+            elastics: visit.elastics || '',
+            opg: visit.opg || false,
+            p_photo: visit.p_photo || false,
+            i_photo: visit.i_photo || false,
+            f_photo: visit.f_photo || false,
+            others: visit.others || '',
+            next_visit: visit.next_visit || '',
+            appliance_removed: visit.appliance_removed || false,
+            operator_id: visit.operator_id || ''
+        });
+    }, [visitData]);
+
+    // Surface a visit-record load failure in the existing error banner (the old
+    // loadVisitData did setError(...) on its catch).
+    useEffect(() => {
+        if (visitError) {
+            setError(httpErrorMessage(visitError, 'Failed to fetch visit data'));
         }
-    }, [loadDropdownData, loadVisitData, visitId]);
+    }, [visitError]);
 
     // Memoized form submit handler
     const handleFormSubmit = useCallback(async (e: FormEvent<HTMLFormElement>) => {
@@ -247,7 +244,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
         setError(null);
     }, []);
 
-    if (loading && visitId) {
+    if (visitLoading && visitId) {
         return (
             <div className={styles.loading}>
                 <i className="fas fa-spinner fa-spin"></i> Loading visit data...

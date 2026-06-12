@@ -18,6 +18,10 @@ import * as patientContract from '@shared/contracts/patient.contract';
 import * as workContract from '@shared/contracts/work.contract';
 import * as templateContract from '@shared/contracts/template.contract';
 import * as alignerContract from '@shared/contracts/aligner.contract';
+import * as visitContract from '@shared/contracts/visit.contract';
+import * as lookupContract from '@shared/contracts/lookup.contract';
+import * as staffContract from '@shared/contracts/staff.contract';
+import * as employeeContract from '@shared/contracts/employee.contract';
 import { qk } from './keys';
 
 type Id = number | string;
@@ -171,5 +175,137 @@ export const typeOptionsQuery = () =>
       fetchJSON<z.infer<typeof patientContract.typeOptions.response>>('/api/patients/type-options', {
         signal,
         schema: patientContract.typeOptions.response,
+      }),
+  });
+
+// ---------------------------------------------------------------------------
+// Work / visits — patient-scoped lists (the headline dedup + gap-fix targets)
+// ---------------------------------------------------------------------------
+
+/** GET /api/getworks?code= — the patient's works list (WorkComponent + Diagnosis). */
+export const worksQuery = (personId: Id) =>
+  queryOptions({
+    queryKey: qk.patient.works(personId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof workContract.getWorks.response>>(`/api/getworks?code=${personId}`, {
+        signal,
+        schema: workContract.getWorks.response,
+      }),
+  });
+
+/** GET /api/getvisitsbywork?workId= — visit list for a work. */
+export const visitsByWorkQuery = (workId: Id) =>
+  queryOptions({
+    queryKey: qk.work.visits(workId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof visitContract.visitsByWork.response>>(
+        `/api/getvisitsbywork?workId=${workId}`,
+        { signal, schema: visitContract.visitsByWork.response }
+      ),
+  });
+
+/** GET /api/getlatestwires?workId= — most-recent wires for a work (new-visit prefill). */
+export const latestWiresQuery = (workId: Id) =>
+  queryOptions({
+    queryKey: qk.work.latestWires(workId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof visitContract.latestWires.response>>(
+        `/api/getlatestwires?workId=${workId}`,
+        { signal, schema: visitContract.latestWires.response }
+      ),
+  });
+
+/** GET /api/getvisitbyid?visitId= — single visit row (edit form). */
+export const visitByIdQuery = (visitId: Id) =>
+  queryOptions({
+    queryKey: qk.visit.byId(visitId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof visitContract.visitById.response>>(
+        `/api/getvisitbyid?visitId=${visitId}`,
+        { signal, schema: visitContract.visitById.response }
+      ),
+  });
+
+// ---------------------------------------------------------------------------
+// Lookups — form dropdown / reference data
+// ---------------------------------------------------------------------------
+
+/** GET /api/getWires — wire options (new-visit form). */
+export const wiresQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.wires(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof visitContract.getWires.response>>('/api/getWires', {
+        signal,
+        schema: visitContract.getWires.response,
+      }),
+  });
+
+/** GET /api/operators — operator options. */
+export const operatorsQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.operators(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof staffContract.operators.response>>('/api/operators', {
+        signal,
+        schema: staffContract.operators.response,
+      }),
+  });
+
+/** GET /api/genders — gender options. */
+export const gendersQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.genders(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof lookupContract.genders.response>>('/api/genders', {
+        signal,
+        schema: lookupContract.genders.response,
+      }),
+  });
+
+/** GET /api/addresses — address/zone options. */
+export const addressesQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.addresses(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof lookupContract.addresses.response>>('/api/addresses', {
+        signal,
+        schema: lookupContract.addresses.response,
+      }),
+  });
+
+/** GET /api/referral-sources — referral-source options. */
+export const referralSourcesQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.referralSources(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof lookupContract.referralSources.response>>('/api/referral-sources', {
+        signal,
+        schema: lookupContract.referralSources.response,
+      }),
+  });
+
+/** GET /api/patient-types — patient-type options (lookup table). */
+export const patientTypesQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.patientTypes(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof lookupContract.patientTypes.response>>('/api/patient-types', {
+        signal,
+        schema: lookupContract.patientTypes.response,
+      }),
+  });
+
+/**
+ * GET /api/employees<query> — staff list. Keyed by the query string so the
+ * ?percentage / ?getAppointments / ?includeInactive variants don't collide.
+ */
+export const employeesQuery = (query = '') =>
+  queryOptions({
+    queryKey: qk.lookups.employees(query),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof employeeContract.employees.response>>(`/api/employees${query}`, {
+        signal,
+        schema: employeeContract.employees.response,
       }),
   });

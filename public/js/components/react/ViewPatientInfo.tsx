@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import PhotoSessionDialog from './PhotoSessionDialog';
 import AlertModal from './AlertModal';
 import WebCephModal from './WebCephModal';
@@ -9,6 +10,7 @@ import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
 import { invalidatePatientCache } from '@/router/loader-cache';
 import { notifyTasksChanged } from '@/services/tasks';
+import { patientInfoQuery } from '@/query/queries';
 import * as costPreset from '@shared/contracts/cost-preset.contract';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as lookupContract from '@shared/contracts/lookup.contract';
@@ -77,9 +79,17 @@ const ViewPatientInfo = ({ personId }: Props) => {
     const navigate = useNavigate();
     const toast = useToast();
     const [searchParams, setSearchParams] = useSearchParams();
-    const [patientInfo, setPatientInfo] = useState<PatientInfo | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    // Patient demographics now read from React Query (shared cache key with
+    // PatientShell/XraysComponent — one fetch, deduped, live-invalidated). The
+    // patientInfo response is a loose contract object; cast to the local
+    // PatientInfo shape the JSX/helpers expect, mirroring the original
+    // fetchJSON<PatientInfo> typing.
+    const { data: patientInfoData, isLoading: loading, error: queryError, refetch: refetchPatientInfo } = useQuery({
+        ...patientInfoQuery(personId ?? ''),
+        enabled: !!personId,
+    });
+    const patientInfo = (patientInfoData ?? null) as PatientInfo | null;
+    const error = queryError ? httpErrorMessage(queryError, 'Unknown error') : null;
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [alertsLoading, setAlertsLoading] = useState(false);
     const [alertTypes, setAlertTypes] = useState<AlertType[]>([]);
@@ -179,24 +189,6 @@ const ViewPatientInfo = ({ personId }: Props) => {
         return value.replace(/[^0-9]/g, '');
     };
 
-    const loadPatientInfo = useCallback(async (signal?: AbortSignal) => {
-        if (!personId) {
-            setLoading(false);
-            return;
-        }
-
-        try {
-            setLoading(true);
-            const data = await fetchJSON<PatientInfo>(`/api/patients/${personId}/info`, { signal, schema: patientContract.patientInfo.response });
-            setPatientInfo(data);
-        } catch (err) {
-            if (err instanceof Error && err.name === 'AbortError') return;
-            setError(httpErrorMessage(err, 'Unknown error'));
-        } finally {
-            setLoading(false);
-        }
-    }, [personId]);
-
     const loadAlerts = useCallback(async (signal?: AbortSignal) => {
         if (!personId) return;
 
@@ -234,12 +226,13 @@ const ViewPatientInfo = ({ personId }: Props) => {
 
     useEffect(() => {
         const controller = new AbortController();
-        loadPatientInfo(controller.signal);
+        // patientInfo is now read via useQuery above; only the not-yet-migrated
+        // reads (alerts, cost presets, alert types) load here.
         loadAlerts(controller.signal);
         loadCostPresets();
         loadAlertTypes();
         return () => controller.abort();
-    }, [personId, loadPatientInfo, loadAlerts, loadCostPresets, loadAlertTypes]);
+    }, [personId, loadAlerts, loadCostPresets, loadAlertTypes]);
 
     // Handle alert modal save - refresh alerts list
     const handleAlertSaved = async () => {
@@ -284,7 +277,8 @@ const ViewPatientInfo = ({ personId }: Props) => {
 
             toast.success('Cost updated successfully');
             setEditingCost(null);
-            loadPatientInfo(); // Reload to get updated data
+            // TODO(phase3): replace manual refetch with query invalidation
+            refetchPatientInfo(); // Reload to get updated data
         } catch (err) {
             console.error('Error saving cost:', err);
             toast.error(httpErrorMessage(err, 'Failed to save cost'));
@@ -332,7 +326,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
             <div className={styles.patientInfoError}>
                 <i className={`fas fa-exclamation-triangle ${styles.patientErrorIcon}`}></i>
                 <p>{error}</p>
-                <button onClick={() => loadPatientInfo()}>Retry</button>
+                <button onClick={() => refetchPatientInfo()}>Retry</button>
             </div>
         );
     }

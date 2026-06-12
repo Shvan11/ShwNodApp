@@ -5,13 +5,19 @@
  */
 
 import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
-import { fetchJSON, postJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { postJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { invalidateWorkCache } from '@/router/loader-cache';
 import * as workContract from '@shared/contracts/work.contract';
-import * as employee from '@shared/contracts/employee.contract';
+import {
+    workTypesQuery,
+    workKeywordsQuery,
+    employeesQuery,
+    worksQuery,
+} from '../../query/queries';
 import Modal from './Modal';
 import styles from './NewWorkComponent.module.css';
 
@@ -110,9 +116,30 @@ type TabType = 'basic' | 'dates' | 'keywords';
 const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWorkComponentProps) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
-    const [keywords, setKeywords] = useState<Keyword[]>([]);
-    const [doctors, setDoctors] = useState<Doctor[]>([]);
+
+    // Dropdown reads — each its own independent query (one failing can't blank
+    // the others). Loose contract responses expose long-tail fields as unknown,
+    // so each `data` is cast to its concrete row type.
+    const { data: workTypesData } = useQuery(workTypesQuery());
+    const { data: keywordsData } = useQuery(workKeywordsQuery());
+    const { data: employeesData } = useQuery(employeesQuery('?percentage=true'));
+
+    const workTypes = (workTypesData ?? []) as unknown as WorkType[];
+    const keywords = (keywordsData ?? []) as unknown as Keyword[];
+    const doctors = (employeesData?.employees ?? []) as unknown as Doctor[];
+
+    // Work record read (edit mode) — fetches the patient's works and the
+    // form-population effect below picks out this workId. Matches the original
+    // /api/getworks?code= + .find logic.
+    const {
+        data: worksData,
+        isLoading: workLoading,
+        error: workError,
+    } = useQuery({
+        ...worksQuery(personId ?? ''),
+        enabled: !!workId && !!personId,
+    });
+
     const [activeTab, setActiveTab] = useState<TabType>('basic');
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [existingWorkData, setExistingWorkData] = useState<ExistingWorkData | null>(null);
@@ -157,14 +184,6 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
     const { user } = useGlobalState();
     const isAdmin = user?.role === 'admin';
 
-    useEffect(() => {
-        loadDropdownData();
-        if (workId) {
-            loadWorkData();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [personId, workId]);
-
     // Auto-format display value when formData changes
     useEffect(() => {
         setDisplayValues(prev => ({
@@ -180,70 +199,51 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
         }));
     }, [formData.discount]);
 
-    const loadDropdownData = async () => {
-        try {
-            // Independent dropdowns — each tolerates its own failure so one bad
-            // lookup doesn't blank the rest, matching the old per-`res.ok` guards.
-            const [types, kw, employeesData] = await Promise.all([
-                fetchJSON<WorkType[]>('/api/getworktypes', { schema: workContract.getWorkTypes.response }).catch(() => null),
-                fetchJSON<Keyword[]>('/api/getworkkeywords', { schema: workContract.getWorkKeywords.response }).catch(() => null),
-                fetchJSON<{ employees?: Doctor[] }>('/api/employees?percentage=true', { schema: employee.employees.response }).catch(() => null)
-            ]);
+    // Populate the form when the works list arrives (edit mode), picking out the
+    // row for this workId. Mirrors the old loadWorkData population exactly — same
+    // nullish-coalescing (preserve 0) and String(...) coercion.
+    useEffect(() => {
+        if (!worksData) return;
+        const works = worksData as unknown as WorkResponse[];
+        const work = works.find(w => w.work_id === workId);
+        if (!work) return;
 
-            if (types) setWorkTypes(types);
-            if (kw) setKeywords(kw);
-            if (employeesData) setDoctors(employeesData.employees || []);
-        } catch (err) {
-            console.error('Error loading dropdown data:', err);
+        const discountDateISO = work.discount_date ? formatISODate(work.discount_date) : '';
+        const discountValue = Number(work.discount ?? 0);
+        setFormData({
+            person_id: String(work.person_id),
+            total_required: work.total_required ?? 0, // Use nullish coalescing to preserve 0
+            currency: work.currency || 'USD',
+            type_of_work: String(work.type_of_work || ''),
+            notes: work.notes || '',
+            status: work.status ?? 1, // Use nullish coalescing to preserve 0 if somehow status is 0
+            start_date: work.start_date ? formatISODate(work.start_date) : '',
+            debond_date: work.debond_date ? formatISODate(work.debond_date) : '',
+            f_photo_date: work.f_photo_date ? formatISODate(work.f_photo_date) : '',
+            i_photo_date: work.i_photo_date ? formatISODate(work.i_photo_date) : '',
+            estimated_duration: String(work.estimated_duration || ''),
+            dr_id: String(work.dr_id || ''),
+            notes_date: work.notes_date ? formatISODate(work.notes_date) : '',
+            keyword_id_1: String(work.keyword_id_1 || ''),
+            keyword_id_2: String(work.keyword_id_2 || ''),
+            keyword_id_3: String(work.keyword_id_3 || ''),
+            keyword_id_4: String(work.keyword_id_4 || ''),
+            keyword_id_5: String(work.keyword_id_5 || ''),
+            discount: discountValue,
+            discount_date: discountDateISO,
+            discount_reason: work.discount_reason || '',
+            createAsFinished: false
+        });
+        setExistingTotalPaid(Number(work.TotalPaid ?? 0));
+    }, [worksData, workId]);
+
+    // Surface a work-record load failure in the existing error banner (the old
+    // loadWorkData did setError(...) on its catch).
+    useEffect(() => {
+        if (workError) {
+            setError(httpErrorMessage(workError, 'Failed to fetch work data'));
         }
-    };
-
-    const loadWorkData = async () => {
-        if (!personId) {
-            setLoading(false);
-            return;
-        }
-
-        try {
-            setLoading(true);
-            const works = await fetchJSON<WorkResponse[]>(`/api/getworks?code=${personId}`, { schema: workContract.getWorks.response });
-            const work = works.find(w => w.work_id === workId);
-
-            if (work) {
-                const discountDateISO = work.discount_date ? formatISODate(work.discount_date) : '';
-                const discountValue = Number(work.discount ?? 0);
-                setFormData({
-                    person_id: String(work.person_id),
-                    total_required: work.total_required ?? 0, // Use nullish coalescing to preserve 0
-                    currency: work.currency || 'USD',
-                    type_of_work: String(work.type_of_work || ''),
-                    notes: work.notes || '',
-                    status: work.status ?? 1, // Use nullish coalescing to preserve 0 if somehow status is 0
-                    start_date: work.start_date ? formatISODate(work.start_date) : '',
-                    debond_date: work.debond_date ? formatISODate(work.debond_date) : '',
-                    f_photo_date: work.f_photo_date ? formatISODate(work.f_photo_date) : '',
-                    i_photo_date: work.i_photo_date ? formatISODate(work.i_photo_date) : '',
-                    estimated_duration: String(work.estimated_duration || ''),
-                    dr_id: String(work.dr_id || ''),
-                    notes_date: work.notes_date ? formatISODate(work.notes_date) : '',
-                    keyword_id_1: String(work.keyword_id_1 || ''),
-                    keyword_id_2: String(work.keyword_id_2 || ''),
-                    keyword_id_3: String(work.keyword_id_3 || ''),
-                    keyword_id_4: String(work.keyword_id_4 || ''),
-                    keyword_id_5: String(work.keyword_id_5 || ''),
-                    discount: discountValue,
-                    discount_date: discountDateISO,
-                    discount_reason: work.discount_reason || '',
-                    createAsFinished: false
-                });
-                setExistingTotalPaid(Number(work.TotalPaid ?? 0));
-            }
-        } catch (err) {
-            setError(httpErrorMessage(err, 'Failed to fetch work data'));
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [workError]);
 
     const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -405,7 +405,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
         setShowFinishedWorkConfirm(false);
     };
 
-    if (loading && workId) {
+    if (workLoading && workId) {
         return (
             <div className={styles.newWorkLoading}>
                 <i className="fas fa-spinner fa-spin"></i> Loading work data...

@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import { useParams, useSearchParams, useLocation, Link, useLoaderData } from 'react-router-dom';
+import { useParams, useSearchParams, useLocation, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import Navigation from './Navigation';
 import ContentRenderer from './ContentRenderer';
 import storage from '../../core/storage';
-import type { PatientShellLoaderResult } from '../../router/loaders';
+import { patientInfoQuery, workDetailsQuery } from '../../query/queries';
 
 /**
  * Fire-and-forget POST to the chair-display endpoint. Uses navigator.sendBeacon
@@ -64,9 +65,6 @@ interface ContentParams {
 }
 
 const PatientShell = () => {
-    // Get pre-loaded data from route loader (validated before render)
-    const loaderData = useLoaderData() as PatientShellLoaderResult;
-
     // React Router hooks
     const allParams = useParams<{ personId?: string; page?: string; workId?: string; '*'?: string }>();
     const { personId, page, workId } = allParams;
@@ -122,12 +120,26 @@ const PatientShell = () => {
     const isDiagnosisRoute = !!workId && window.location.pathname.endsWith('/diagnosis');
     const effectivePage = isDiagnosisRoute ? 'diagnosis' : page;
 
-    // Use loader data - already validated and fetched
-    const patient = loaderData?.patient;
-    const work = loaderData?.work;
-    const isNewPatient = loaderData?.isNew ?? (personId === 'new');
+    // isNew derived from the route param (replaces the loader's `isNew` flag).
+    const isNewPatient = personId === 'new' || isNaN(parseInt(personId || ''));
 
-    // Validated person_id from loader data (null if invalid or new patient)
+    // workId from route or query param (the loader prefetched its details key).
+    const workIdFromQuery = searchParams.get('workId');
+    const effectiveWorkId = workId || workIdFromQuery || null;
+
+    // Read patient + work from React Query — patientShellLoader prefetched these
+    // exact keys, so they resolve instantly from cache (no loading flash). Reads
+    // now invalidate live: a patient/work mutation refreshes the header here.
+    const { data: patient } = useQuery({
+        ...patientInfoQuery(personId ?? ''),
+        enabled: !isNewPatient && !!personId,
+    });
+    const { data: work } = useQuery({
+        ...workDetailsQuery(effectiveWorkId ?? ''),
+        enabled: !!effectiveWorkId,
+    });
+
+    // Validated person_id (null if invalid or new patient)
     const validatedPersonId = (patient?.person_id as number | undefined) ?? null;
 
     // Notify the chair-side public display (if this PC is configured as a chair)
@@ -153,12 +165,8 @@ const PatientShell = () => {
         ? 'New Patient'
         : (patient?.name || patient?.patient_name || `Patient ${personId}`) as string;
 
-    // Work display name from loader data
-    const workTypeName = work?.type_name || '';
-
-    // Fetch work data when workId (from route or query param) changes
-    const workIdFromQuery = searchParams.get('workId');
-    const effectiveWorkId = workId || workIdFromQuery || loaderData?.workId || null;
+    // Work display name (from the work-details query above)
+    const workTypeName = (work?.type_name as string | undefined) || '';
 
     // Extract additional params from URL (convert null to undefined)
     const params: ContentParams = {

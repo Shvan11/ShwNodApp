@@ -36,6 +36,12 @@ export const qk = {
     visits: (workId: Id) => ['work', workId, 'visits'] as const,
     /** GET /api/getworkpayments?workId= — payment history for a work. */
     payments: (workId: Id) => ['work', workId, 'payments'] as const,
+    /** GET /api/getlatestwires?workId= — most-recent wires for a work. */
+    latestWires: (workId: Id) => ['work', workId, 'latest-wires'] as const,
+  },
+  visit: {
+    /** GET /api/getvisitbyid?visitId= — single visit row (edit form). */
+    byId: (visitId: Id) => ['visit', visitId] as const,
   },
   appointments: {
     /** GET /api/getDailyAppointments?AppsDate= — keeps the legacy key shape. */
@@ -72,5 +78,7 @@ export const qk = {
     wires: () => ['lookups', 'wires'] as const,
     operators: () => ['lookups', 'operators'] as const,
     patientPhones: () => ['lookups', 'patient-phones'] as const,
+    /** GET /api/employees<query> — keyed by query so param variants don't collide. */
+    employees: (query = '') => ['lookups', 'employees', query] as const,
   },
 } as const;

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, SyntheticEvent } from 'react';
-import { fetchJSON, httpErrorMessage } from '@/core/http';
-import * as patientContract from '@shared/contracts/patient.contract';
+import React, { SyntheticEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { httpErrorMessage } from '@/core/http';
+import { patientInfoQuery } from '../../query/queries';
 import styles from './XraysComponent.module.css';
 
 interface Props {
@@ -14,35 +15,14 @@ interface Xray {
     previewImagePartialPath?: string;
 }
 
-interface PatientInfo {
-    xrays?: Xray[];
-}
-
 const XraysComponent = ({ personId }: Props) => {
-    const [patientInfo, setPatientInfo] = useState<PatientInfo | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (personId) {
-            loadXrays();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [personId]);
-
-    const loadXrays = async () => {
-        try {
-            setLoading(true);
-
-            const patientData = await fetchJSON<PatientInfo>(`/api/patients/${personId}/info`, { schema: patientContract.patientInfo.response });
-            setPatientInfo(patientData);
-        } catch (err) {
-            console.error('Error loading X-rays:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
-        } finally {
-            setLoading(false);
-        }
-    };
+    // Shares the patientInfoQuery cache key with PatientShell/ViewPatientInfo —
+    // one fetch, deduped. `xrays` is a long-tail field on the loose patientInfo
+    // response, so it reads as unknown and is cast below.
+    const { data: patientInfo, isLoading, error } = useQuery({
+        ...patientInfoQuery(personId ?? ''),
+        enabled: !!personId,
+    });
 
     const buildXrayUrl = (xray: Xray): string =>
         `/api/patients/${personId}/xray?file=${encodeURIComponent(xray.name)}&detailsDir=${encodeURIComponent(xray.detailsDirName ?? '')}`;
@@ -80,7 +60,7 @@ const XraysComponent = ({ personId }: Props) => {
         }
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="loading-spinner">
                 <i className="fas fa-spinner fa-spin"></i>
@@ -93,12 +73,12 @@ const XraysComponent = ({ personId }: Props) => {
         return (
             <div className="error-message">
                 <i className="fas fa-exclamation-triangle"></i>
-                <span>Error: {error}</span>
+                <span>Error: {httpErrorMessage(error, 'Unknown error')}</span>
             </div>
         );
     }
 
-    const xrays = patientInfo?.xrays?.filter(xray => xray.name !== 'PatientInfo.xml') || [];
+    const xrays = ((patientInfo?.xrays as Xray[] | undefined) ?? []).filter(xray => xray.name !== 'PatientInfo.xml');
 
     if (xrays.length === 0) {
         return (
