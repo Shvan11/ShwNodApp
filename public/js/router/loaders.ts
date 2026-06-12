@@ -2,21 +2,27 @@
  * Loader utilities for Data Router
  *
  * These utilities handle:
- * - API fetching with error handling
+ * - Prefetching reads into the shared React Query cache (via loaderQuery) so the
+ *   screen paints instantly from cache when it mounts and calls useQuery
  * - 401 redirect (preserving existing auth pattern)
- * - Response caching (for performance)
  * - Abort controller support (for navigation cancellation)
  */
 
 import type { LoaderFunctionArgs } from 'react-router-dom';
-import { fetchData, fetchJSON, httpErrorMessage, type HttpError, type ResponseSchema } from '@/core/http';
-import { clearLoaderCache, loaderCacheKeys, readLoaderCache, writeLoaderCache } from './loader-cache';
+import { fetchJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { dailyAppointments } from '@shared/contracts/appointment.contract';
 import { patientPhones, patientSearch, tagOptions, typeOptions } from '@shared/contracts/patient.contract';
-import * as patientContract from '@shared/contracts/patient.contract';
 import * as workContract from '@shared/contracts/work.contract';
-import * as alignerContract from '@shared/contracts/aligner.contract';
-import * as templateContract from '@shared/contracts/template.contract';
+import { queryClient } from '../query/client';
+import { loaderQuery } from '../query/loaderQuery';
+import {
+  patientInfoQuery,
+  workDetailsQuery,
+  timepointsQuery,
+  alignerDoctorsQuery,
+  templatesQuery,
+  templateQuery,
+} from '../query/queries';
 
 /**
  * Tolerate a per-endpoint non-2xx (return an empty array, as the old
@@ -28,17 +34,6 @@ function emptyOnHttpError<U>(p: Promise<U[]>): Promise<U[]> {
     if (typeof (err as HttpError).status === 'number') return [];
     throw err;
   });
-}
-
-/**
- * API loader options
- */
-interface ApiLoaderOptions {
-  signal?: AbortSignal;
-  cache?: boolean;
-  cacheKey?: string | null;
-  /** Optional Zod schema to validate the unwrapped response (fail-loud, H11). */
-  schema?: ResponseSchema;
 }
 
 /**
@@ -101,7 +96,7 @@ export function withAuth<T>(
   return async (args: LoaderFunctionArgs): Promise<T | null> => {
     try {
       // If a loader function is provided, execute it
-      // The apiLoader inside will handle 401 redirects automatically
+      // The loaderQuery inside will handle 401 redirects automatically
       if (loaderFn) {
         return await loaderFn(args);
       }
@@ -122,7 +117,7 @@ export function withAuth<T>(
       // Auth-only verify path: 401 → redirect to login.
       if (httpErr.status === 401) {
         console.warn('[withAuth] 401 Unauthorized - redirecting to login');
-        clearLoaderCache(); // session over — don't leave cached data for the next user
+        queryClient.clear(); // session over — don't leave cached data for the next user
         window.location.href = '/login.html';
         throw new Response('Unauthorized', { status: 401 });
       }
@@ -140,74 +135,6 @@ export function withAuth<T>(
 }
 
 /**
- * Base API loader with error handling and 401 redirect
- * Preserves the existing auth interceptor pattern
- *
- * @param url - API endpoint URL
- * @param options - Configuration options
- * @returns API response data
- */
-export async function apiLoader<T = unknown>(
-  url: string,
-  options: ApiLoaderOptions = {}
-): Promise<T> {
-  const { signal, cache = false, cacheKey = null, schema } = options;
-
-  // Check cache first (if enabled)
-  if (cache && cacheKey) {
-    const cached = readLoaderCache<T>(cacheKey);
-    if (cached !== undefined) return cached;
-  }
-
-  try {
-    // fetchData unwraps the success envelope (so flipping a route onto sendSuccess
-    // — audit H4 — is transparent here) and throws an HttpError on non-2xx, which
-    // we re-map below to the Response/401 contract loaders rely on.
-    const data = await fetchData<T>(url, { signal, schema });
-
-    // Cache response if enabled (best-effort — a large payload can throw
-    // QuotaExceededError, which must not fail the route loader).
-    if (cache && cacheKey) {
-      writeLoaderCache(cacheKey, data);
-    }
-
-    return data;
-  } catch (error) {
-    // Re-throw abort errors (navigation cancelled)
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw error;
-    }
-
-    // Re-throw Response errors (will be handled by errorElement)
-    if (error instanceof Response) {
-      throw error;
-    }
-
-    const httpErr = error as HttpError;
-
-    // Handle 401 Unauthorized (preserve existing auth pattern)
-    // Note: Global fetch interceptor in index.html also handles this
-    if (httpErr.status === 401) {
-      console.warn('[Loader] 401 Unauthorized - redirecting to login');
-      clearLoaderCache(); // session over — don't leave cached data for the next user
-      window.location.href = '/login.html';
-      throw new Response('Unauthorized', { status: 401 });
-    }
-
-    // Other HTTP error → Response carrying the status (handled by errorElement)
-    if (typeof httpErr.status === 'number') {
-      throw new Response(`API Error: ${httpErr.response?.statusText || httpErr.status}`, {
-        status: httpErr.status,
-      });
-    }
-
-    // Wrap other errors
-    console.error('[Loader] Error:', error);
-    throw new Response(error instanceof Error ? error.message : 'Unknown error', { status: 500 });
-  }
-}
-
-/**
  * Patient info loader result
  */
 export interface PatientInfoLoaderResult {
@@ -221,23 +148,15 @@ export interface PatientInfoLoaderResult {
  */
 export async function patientInfoLoader({
   params,
-  request,
 }: LoaderFunctionArgs): Promise<PatientInfoLoaderResult> {
   const { personId } = params;
-  const { signal } = request;
 
   // Skip loading for "new" patient (add patient form)
   if (personId === 'new' || isNaN(parseInt(personId || ''))) {
     return { patient: null, isNew: true };
   }
 
-  const data = await apiLoader<PatientData>(`/api/patients/${personId}/info`, {
-    signal,
-    cache: true,
-    cacheKey: loaderCacheKeys.patient(personId!),
-    schema: patientContract.patientInfo.response,
-  });
-
+  const data = (await loaderQuery(patientInfoQuery(personId!))) as PatientData;
   return { patient: data, isNew: false };
 }
 
@@ -257,7 +176,6 @@ export async function workDetailsLoader({
   request,
 }: LoaderFunctionArgs): Promise<WorkDetailsLoaderResult> {
   const { workId } = params;
-  const { signal } = request;
   const url = new URL(request.url);
   const workIdFromQuery = url.searchParams.get('workId');
   const effectiveWorkId = workId || workIdFromQuery;
@@ -266,13 +184,7 @@ export async function workDetailsLoader({
     return { work: null };
   }
 
-  const data = await apiLoader<WorkData>(`/api/getworkdetails?workId=${effectiveWorkId}`, {
-    signal,
-    cache: true,
-    cacheKey: `work_${effectiveWorkId}`,
-    schema: workContract.getWorkDetails.response,
-  });
-
+  const data = (await loaderQuery(workDetailsQuery(effectiveWorkId))) as WorkData;
   return { work: data };
 }
 
@@ -308,7 +220,6 @@ export async function patientShellLoader({
   request,
 }: LoaderFunctionArgs): Promise<PatientShellLoaderResult> {
   const { personId, page, workId } = params;
-  const { signal } = request;
   const url = new URL(request.url);
   const workIdFromQuery = url.searchParams.get('workId');
   const effectiveWorkId = workId || workIdFromQuery;
@@ -326,34 +237,18 @@ export async function patientShellLoader({
   }
 
   // Load patient demographics
-  const patientPromise = apiLoader<PatientData>(`/api/patients/${personId}/info`, {
-    signal,
-    cache: true,
-    cacheKey: loaderCacheKeys.patient(personId!),
-    schema: patientContract.patientInfo.response,
-  });
+  const patientPromise = loaderQuery(patientInfoQuery(personId!));
 
   // Load work details if workId is present
-  let workPromise: Promise<WorkData | null> | null = null;
-  if (effectiveWorkId) {
-    workPromise = apiLoader<WorkData>(`/api/getworkdetails?workId=${effectiveWorkId}`, {
-      signal,
-      cache: true,
-      cacheKey: loaderCacheKeys.work(effectiveWorkId),
-      schema: workContract.getWorkDetails.response,
-    });
-  }
+  const workPromise = effectiveWorkId
+    ? loaderQuery(workDetailsQuery(effectiveWorkId))
+    : Promise.resolve(null);
 
   // Load time points for photos/comparison pages
-  let timepointsPromise: Promise<TimepointData[] | null> | null = null;
-  if (page && (page.startsWith('photos') || page === 'compare' || page === 'xrays')) {
-    timepointsPromise = apiLoader<TimepointData[]>(`/api/patients/${personId}/timepoints`, {
-      signal,
-      cache: true,
-      cacheKey: loaderCacheKeys.timepoints(personId!),
-      schema: patientContract.timepoints.response,
-    });
-  }
+  const timepointsPromise =
+    page && (page.startsWith('photos') || page === 'compare' || page === 'xrays')
+      ? loaderQuery(timepointsQuery(personId!))
+      : Promise.resolve(null);
 
   // Wait for all promises in parallel
   const [patient, work, timepoints] = await Promise.all([
@@ -363,9 +258,9 @@ export async function patientShellLoader({
   ]);
 
   return {
-    patient,
-    work,
-    timepoints: timepoints || [],
+    patient: (patient ?? null) as PatientData | null,
+    work: (work ?? null) as WorkData | null,
+    timepoints: (timepoints ?? []) as TimepointData[],
     isNew: false,
     currentPage: page || 'works',
     workId: effectiveWorkId,
@@ -395,22 +290,9 @@ export interface AlignerDoctorsLoaderResult {
  * Aligner doctors loader
  * Used by aligner management routes
  */
-export async function alignerDoctorsLoader({
-  request,
-}: LoaderFunctionArgs): Promise<AlignerDoctorsLoaderResult> {
-  const { signal } = request;
-
-  const data = await apiLoader<{ doctors?: DoctorData[]; success?: boolean }>(
-    '/api/aligner/doctors',
-    {
-      signal,
-      cache: true,
-      cacheKey: loaderCacheKeys.alignerDoctors(),
-      schema: alignerContract.alignerDoctors.response,
-    }
-  );
-
-  return { doctors: data.doctors || [], success: data.success ?? true };
+export async function alignerDoctorsLoader(): Promise<AlignerDoctorsLoaderResult> {
+  const data = await loaderQuery(alignerDoctorsQuery());
+  return { doctors: (data.doctors ?? []) as DoctorData[], success: true };
 }
 
 /**
@@ -427,39 +309,27 @@ export interface AlignerPatientWorkLoaderResult {
  */
 export async function alignerPatientWorkLoader({
   params,
-  request,
 }: LoaderFunctionArgs): Promise<AlignerPatientWorkLoaderResult> {
   const { workId } = params;
-  const { signal } = request;
 
   // Validate workId before making API calls
   if (!workId || isNaN(parseInt(workId))) {
     throw new Response('Invalid work ID', { status: 400 });
   }
 
-  const data = await apiLoader<WorkData>(`/api/getworkdetails?workId=${workId}`, {
-    signal,
-    cache: true,
-    cacheKey: loaderCacheKeys.work(workId),
-    schema: workContract.getWorkDetails.response,
-  });
+  const work = (await loaderQuery(workDetailsQuery(workId))) as WorkData;
 
   // Validate person_id before fetching patient data
-  if (!data?.person_id) {
+  if (!work?.person_id) {
     throw new Response('Work record has no associated patient', { status: 404 });
   }
 
   // Also load patient info
-  const patientData = await apiLoader<PatientData>(`/api/patients/${data.person_id}/info`, {
-    signal,
-    cache: true,
-    cacheKey: loaderCacheKeys.patient(data.person_id),
-    schema: patientContract.patientInfo.response,
-  });
+  const patient = (await loaderQuery(patientInfoQuery(work.person_id))) as PatientData;
 
   return {
-    work: data,
-    patient: patientData,
+    work,
+    patient,
   };
 }
 
@@ -474,19 +344,9 @@ export interface TemplateListLoaderResult {
  * Template list loader
  * Loads available templates for management page
  */
-export async function templateListLoader({
-  request,
-}: LoaderFunctionArgs): Promise<TemplateListLoaderResult> {
-  const { signal } = request;
-
-  const data = await apiLoader<{ templates?: TemplateData[] }>('/api/templates', {
-    signal,
-    cache: true,
-    cacheKey: loaderCacheKeys.templateList(),
-    schema: templateContract.getTemplates.response,
-  });
-
-  return { templates: data.templates || [] };
+export async function templateListLoader(): Promise<TemplateListLoaderResult> {
+  const data = await loaderQuery(templatesQuery());
+  return { templates: (data ?? []) as TemplateData[] };
 }
 
 /**
@@ -503,10 +363,8 @@ export interface TemplateDesignerLoaderResult {
  */
 export async function templateDesignerLoader({
   params,
-  request,
 }: LoaderFunctionArgs): Promise<TemplateDesignerLoaderResult> {
   const { templateId } = params;
-  const { signal } = request;
 
   // Creating new template
   if (!templateId) {
@@ -514,19 +372,13 @@ export async function templateDesignerLoader({
   }
 
   // Loading existing template
-  const data = await apiLoader<TemplateData>(`/api/templates/${templateId}`, {
-    signal,
-    cache: true,
-    cacheKey: loaderCacheKeys.template(templateId),
-    schema: templateContract.getTemplate.response,
-  });
-
+  const data = (await loaderQuery(templateQuery(templateId))) as TemplateData;
   return { template: data, mode: 'edit' };
 }
 
-// Cache clearing + domain invalidation live in ./loader-cache (re-exported here
-// for existing import sites; mutation components import the invalidate* helpers
-// from '@/router/loader-cache' directly).
+// Cache clearing helpers still live in ./loader-cache (mutation sites import the
+// invalidate* helpers from there directly until Phase 3 removes them). Re-exported
+// here for the few existing import sites.
 export { clearLoaderCache, clearLoaderCacheKey } from './loader-cache';
 
 /**

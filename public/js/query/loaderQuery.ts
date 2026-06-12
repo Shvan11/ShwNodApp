@@ -15,13 +15,16 @@
  * mutation invalidation. `ensureQueryData` still returns cached data instantly
  * within staleTime, so back/forward navigation stays flash-free.
  */
-import type { FetchQueryOptions } from '@tanstack/react-query';
+import type { FetchQueryOptions, QueryKey } from '@tanstack/react-query';
 import type { HttpError } from '@/core/http';
 import { queryClient } from './client';
 
-export async function loaderQuery<TQueryFnData, TData = TQueryFnData>(
-  options: FetchQueryOptions<TQueryFnData, Error, TData>
-): Promise<TData> {
+export async function loaderQuery<
+  TQueryFnData,
+  TError,
+  TData,
+  TQueryKey extends QueryKey,
+>(options: FetchQueryOptions<TQueryFnData, TError, TData, TQueryKey>): Promise<TData> {
   try {
     return await queryClient.ensureQueryData(options);
   } catch (error) {
