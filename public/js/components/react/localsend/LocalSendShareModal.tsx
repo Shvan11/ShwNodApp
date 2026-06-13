@@ -182,11 +182,16 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
     setPendingDevice(null);
   }, []);
 
-  // Surface a completed/declined transfer as a toast.
+  // Surface a settled transfer as a toast; on a full (100%) success, let the
+  // user see the ✓ for a beat, then auto-close (the toast persists as proof).
   useEffect(() => {
     if (!transfer) return;
-    if (transfer.status === 'completed') toast.success(`Sent to ${transfer.deviceAlias}`);
-    else if (transfer.status === 'declined') toast.error(`${transfer.deviceAlias} declined the files`);
+    if (transfer.status === 'completed') {
+      toast.success(`Sent to ${transfer.deviceAlias}`);
+      const handle = window.setTimeout(onClose, 1200);
+      return () => window.clearTimeout(handle);
+    }
+    if (transfer.status === 'declined') toast.error(`${transfer.deviceAlias} declined the files`);
     else if (transfer.status === 'failed') toast.error(transfer.error || 'Transfer failed');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transfer?.status]);

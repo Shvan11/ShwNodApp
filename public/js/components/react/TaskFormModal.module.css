@@ -1,5 +1,22 @@
 /* TaskFormModal — task-specific form bits (structure reuses global modal/form classes). */
 
+/* Dialog shell — cap the height to the viewport and lay the modal out as a flex
+   column so the body (and only the body) scrolls. Without this the global
+   `.modal-content` has no max-height, so on short laptop screens the tall form
+   grows past the viewport and pushes the header + footer (Save button) off-screen
+   with nothing to scroll. The doubled class beats global `.modal-content` (0,1,0)
+   without !important so width/padding/overflow win deterministically. */
+.dialog.dialog {
+    display: flex;
+    flex-direction: column;
+    width: 90%;
+    max-width: 500px;
+    /* Cancel the overlay's own gutter so we use the full short-screen height. */
+    max-height: calc(100dvh - 2 * var(--spacing-md));
+    padding: 0; /* header / body / footer own their padding */
+    overflow: hidden; /* clip rounded corners; the body is the scroll region */
+}
+
 /* Close button — neutral ghost (the global `.modal-close-btn` is only styled under
    the orange `.alert-modal` scope, which this neutral task modal doesn't use). */
 .closeBtn {
@@ -26,11 +43,14 @@
 /* Body padding + footer layout — global `.modal-body`/`.modal-footer` carry no base
    rules (only `.alert-modal`-scoped), so style them locally. */
 .body {
+    flex: 1 1 auto;
+    min-height: 0; /* allow the flex child to shrink below content height so it can scroll */
     padding: var(--spacing-lg);
     overflow-y: auto;
 }
 
 .footer {
+    flex-shrink: 0; /* stay pinned below the scrolling body */
     display: flex;
     justify-content: flex-end;
     align-items: center;

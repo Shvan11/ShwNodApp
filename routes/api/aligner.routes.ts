@@ -242,25 +242,6 @@ router.get(
         parseInt(workId, 10)
       );
 
-      // DEBUG: Log unread activity counts
-      const setsWithUnread = (sets || []).filter(
-        (s) => (s.UnreadActivityCount ?? 0) > 0
-      );
-      if (setsWithUnread.length > 0) {
-        log.info(
-          '🔔 [MAIN APP] Sets with unread doctor notes:',
-          setsWithUnread.map((s) => ({
-            SetID: s.aligner_set_id,
-            UnreadCount: s.UnreadActivityCount
-          }))
-        );
-      } else {
-        log.info(
-          '📭 [MAIN APP] No sets with unread doctor notes for workId:',
-          workId
-        );
-      }
-
       sendData(res, contract.setsByWorkId.response, {
         sets: sets || [],
         count: sets ? sets.length : 0

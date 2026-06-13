@@ -1388,6 +1388,16 @@ const PatientSets: React.FC = () => {
                                         </div>
                                     </div>
 
+                                    {set.notes && (
+                                        <div className="set-notes">
+                                            <i className="fas fa-sticky-note"></i>
+                                            <div className="set-notes-body">
+                                                <span className="set-notes-label">Set Notes</span>
+                                                <p className="set-notes-text">{set.notes}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="set-info">
                                         <div className="set-info-item">
                                             <i className="fas fa-teeth"></i>
@@ -1623,13 +1633,6 @@ const PatientSets: React.FC = () => {
                                             )}
                                         </div>
                                     </div>
-
-                                    {set.notes && (
-                                        <div className="set-info-item">
-                                            <i className="fas fa-sticky-note"></i>
-                                            <span>Notes: {set.notes}</span>
-                                        </div>
-                                    )}
 
                                     <div className="set-progress">
                                         <div className="progress-bar-container">

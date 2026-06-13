@@ -1214,6 +1214,13 @@ body:has(.appointment-calendar) {
     width: 90%;
     box-shadow: var(--shadow-xl);
     animation: slideUp 0.2s ease-out;
+    /* Defensive ceiling: any modal using the bare `.modal-content` (email/delete/
+       holiday-warning) can never grow past the viewport on a short laptop screen.
+       Only engages beyond 90vh, so today's short dialogs are unaffected. Modals
+       that need a pinned header/footer (alert-modal, TaskFormModal `.dialog`)
+       override this with their own flex-column scroll. */
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 @keyframes slideUp {

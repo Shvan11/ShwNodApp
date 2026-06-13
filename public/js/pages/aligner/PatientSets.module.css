@@ -236,3 +236,53 @@
   justify-content: flex-end;
   gap: 0.5rem;
 }
+
+/* Responsive — stack the patient header and its action buttons on mobile */
+@media (max-width: 768px) {
+  .patientInfo {
+    padding: 1.25rem 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .patientHeader {
+    flex-direction: column;
+  }
+
+  .patientDetails h2 {
+    font-size: 1.4rem;
+  }
+
+  .patientSubtitle {
+    display: block;
+    margin-left: 0;
+  }
+
+  .patientMeta {
+    gap: 0.4rem 1rem;
+  }
+
+  /* Edit Patient / Edit Work / Add New Set become full-width, touch-sized */
+  .fsAccessContainer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fsAccessContainer > :global(.btn) {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .fsAccessStatus {
+    flex-wrap: wrap;
+  }
+
+  .sectionHeader {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .setsContainer {
+    margin-top: 1.25rem;
+  }
+}

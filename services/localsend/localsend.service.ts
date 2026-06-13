@@ -11,10 +11,16 @@
  * certs (`rejectUnauthorized:false`, the protocol's LAN-internal design) and
  * needs no cert of its own. It does NOT host a `:53317` HTTP listener.
  *
- * Gated by `config.localsend.enabled` (off by default). Discovery degrades
- * gracefully on `EADDRINUSE` — probe-by-IP still works.
+ * Gated by `config.localsend.enabled` (off by default). To stay reliable on a
+ * multi-homed host (extra/disconnected NICs, a VPN adapter), discovery binds a
+ * socket to EVERY usable IPv4 interface and announces out each one, instead of
+ * trusting the OS to pick a default interface — that lottery can land on a dead
+ * NIC and silently swallow every announce. Interfaces appearing/disappearing are
+ * reconciled on a timer. Per-interface failures (`EADDRINUSE`/`EADDRNOTAVAIL`)
+ * degrade gracefully — the rest keep working and probe-by-IP always works.
  */
 import dgram from 'dgram';
+import os from 'os';
 import crypto from 'crypto';
 import { createReadStream } from 'fs';
 import https from 'https';
@@ -35,6 +41,9 @@ const MULTICAST_PORT = 53317;
 const DEVICE_TTL_MS = 5 * 60 * 1000;
 // We solicit announcements this often while running.
 const ANNOUNCE_INTERVAL_MS = 5 * 1000;
+// Re-scan local interfaces this often so a NIC/VPN/cable coming up or down is
+// picked up without a restart (one cheap os.networkInterfaces() read + diff).
+const INTERFACE_SYNC_MS = 20 * 1000;
 // Bounds the prepare-upload wait — the receiver's Accept dialog can sit open.
 const PREPARE_TIMEOUT_MS = 90 * 1000;
 const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
@@ -82,9 +91,13 @@ interface AnnouncePayload {
 }
 
 class LocalSendService {
-  private socket: dgram.Socket | null = null;
+  // One socket per usable IPv4 interface, keyed by that interface's address, so
+  // discovery never hinges on the OS's default-interface choice (which on a
+  // multi-homed / commercial box can be a disconnected NIC or a VPN adapter).
+  private readonly sockets = new Map<string, dgram.Socket>();
   private announceTimer: NodeJS.Timeout | null = null;
   private pruneTimer: NodeJS.Timeout | null = null;
+  private interfaceTimer: NodeJS.Timeout | null = null;
   private readonly devices = new Map<string, TrackedDevice>();
   private readonly transfers = new Map<string, Transfer>();
   private readonly fingerprint = crypto.randomUUID();
@@ -115,49 +128,113 @@ class LocalSendService {
     if (this.started) return;
     this.started = true;
 
+    this.syncInterfaces();   // bind every usable interface that exists right now
+    this.announce();         // solicit immediately so the picker fills fast
+
+    this.announceTimer = setInterval(() => this.announce(), ANNOUNCE_INTERVAL_MS);
+    this.announceTimer.unref();
+    this.pruneTimer = setInterval(() => this.prune(), DEVICE_TTL_MS);
+    this.pruneTimer.unref();
+    this.interfaceTimer = setInterval(() => this.syncInterfaces(), INTERFACE_SYNC_MS);
+    this.interfaceTimer.unref();
+  }
+
+  /**
+   * Every non-internal IPv4 address on the box — physical NICs AND virtual ones
+   * (e.g. ZeroTier, so devices on a VPN overlay are reachable too). Skips
+   * loopback and 169.254 link-local (APIPA = a NIC with no working link, such as
+   * an unplugged secondary port): those carry no real peers and only ever win the
+   * OS default-interface lottery and black-hole our announces.
+   */
+  private usableInterfaceIps(): string[] {
+    const ips: string[] = [];
+    for (const addrs of Object.values(os.networkInterfaces())) {
+      for (const a of addrs ?? []) {
+        if (a.family !== 'IPv4' || a.internal) continue;
+        if (a.address.startsWith('169.254.')) continue;
+        ips.push(a.address);
+      }
+    }
+    return ips;
+  }
+
+  /** Reconcile our per-interface sockets with the machine's current interfaces. */
+  private syncInterfaces(): void {
+    if (!this.started) return;
+    const desired = new Set(this.usableInterfaceIps());
+
+    // Drop sockets for interfaces that have gone away (cable pulled, VPN down).
+    for (const [ip, sock] of this.sockets) {
+      if (!desired.has(ip)) {
+        try {
+          sock.close();
+        } catch {
+          /* already closing */
+        }
+        this.sockets.delete(ip);
+        log.info('[LocalSend] Interface gone — stopped listening', { ip });
+      }
+    }
+
+    // Bind any interface we are not already listening on.
+    for (const ip of desired) {
+      if (!this.sockets.has(ip)) this.bindInterface(ip);
+    }
+  }
+
+  /** Create + bind one discovery socket pinned to a single interface. */
+  private bindInterface(ip: string): void {
     const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-    this.socket = socket;
 
     socket.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
-        log.warn(
-          '[LocalSend] UDP port in use — multicast discovery disabled (probe-by-IP still works)',
-          { port: this.cfg.port }
-        );
+        log.warn('[LocalSend] UDP port in use on interface — skipping (probe-by-IP still works)', {
+          ip,
+          port: this.cfg.port,
+        });
       } else {
-        log.error('[LocalSend] UDP socket error', { error: err.message });
+        log.warn('[LocalSend] Socket error on interface', { ip, error: err.message });
       }
       try {
         socket.close();
       } catch {
         /* already closing */
       }
-      if (this.socket === socket) this.socket = null;
+      if (this.sockets.get(ip) === socket) this.sockets.delete(ip);
     });
 
-    socket.on('message', (msg, rinfo) => this.onMulticast(msg, rinfo));
+    socket.on('message', (msg, rinfo) => this.onMulticast(msg, rinfo, socket));
+
+    // Register before bind() so the async error/listening handlers see it.
+    this.sockets.set(ip, socket);
 
     socket.bind(this.cfg.port, () => {
       try {
-        socket.addMembership(this.cfg.multicast);
         socket.setMulticastTTL(255);
+        socket.setMulticastInterface(ip);              // pin OUTBOUND announces to this interface
+        socket.addMembership(this.cfg.multicast, ip);  // receive group traffic arriving on it
       } catch (err) {
-        log.warn('[LocalSend] Could not join multicast group', {
+        // A transient / just-removed interface throws EADDRNOTAVAIL; drop it and
+        // let the next syncInterfaces() retry once it has settled.
+        log.warn('[LocalSend] Could not bind interface — will retry', {
+          ip,
           error: (err as Error).message,
         });
+        try {
+          socket.close();
+        } catch {
+          /* already closing */
+        }
+        if (this.sockets.get(ip) === socket) this.sockets.delete(ip);
+        return;
       }
-      log.info('[LocalSend] Discovery listening', {
+      log.info('[LocalSend] Discovery listening on interface', {
+        ip,
         port: this.cfg.port,
         multicast: this.cfg.multicast,
-        alias: this.cfg.alias,
       });
-      this.announce();
+      this.announceFrom(socket);   // greet immediately on a freshly-bound interface
     });
-
-    this.announceTimer = setInterval(() => this.announce(), ANNOUNCE_INTERVAL_MS);
-    this.announceTimer.unref();
-    this.pruneTimer = setInterval(() => this.prune(), DEVICE_TTL_MS);
-    this.pruneTimer.unref();
   }
 
   async gracefulShutdown(): Promise<void> {
@@ -165,18 +242,24 @@ class LocalSendService {
     log.info('[LocalSend] Shutting down…');
     if (this.announceTimer) clearInterval(this.announceTimer);
     if (this.pruneTimer) clearInterval(this.pruneTimer);
+    if (this.interfaceTimer) clearInterval(this.interfaceTimer);
     this.announceTimer = null;
     this.pruneTimer = null;
-    if (this.socket) {
-      await new Promise<void>((resolve) => {
-        try {
-          this.socket!.close(() => resolve());
-        } catch {
-          resolve();
-        }
-      });
-      this.socket = null;
-    }
+    this.interfaceTimer = null;
+
+    const closing = [...this.sockets.values()].map(
+      (sock) =>
+        new Promise<void>((resolve) => {
+          try {
+            sock.close(() => resolve());
+          } catch {
+            resolve();
+          }
+        })
+    );
+    this.sockets.clear();
+    await Promise.all(closing);
+
     for (const t of this.transfers.values()) t.canceled = true;
     this.transfers.clear();
     this.devices.clear();
@@ -185,16 +268,19 @@ class LocalSendService {
 
   // ── Discovery ────────────────────────────────────────────────────────────
 
-  /** Broadcast our presence (announce:true) to solicit replies. */
+  /** Broadcast our presence (announce:true) out every interface to solicit replies. */
   private announce(): void {
-    if (!this.socket) return;
+    for (const socket of this.sockets.values()) this.announceFrom(socket);
+  }
+
+  private announceFrom(socket: dgram.Socket): void {
     const payload = JSON.stringify({ ...this.selfInfo(), announce: true });
-    this.socket.send(payload, this.cfg.port, this.cfg.multicast, (err) => {
+    socket.send(payload, this.cfg.port, this.cfg.multicast, (err) => {
       if (err) log.debug('[LocalSend] announce send failed', { error: err.message });
     });
   }
 
-  private onMulticast(msg: Buffer, rinfo: dgram.RemoteInfo): void {
+  private onMulticast(msg: Buffer, rinfo: dgram.RemoteInfo, socket: dgram.Socket): void {
     let data: AnnouncePayload;
     try {
       data = JSON.parse(msg.toString());
@@ -213,10 +299,10 @@ class LocalSendService {
       protocol: data.protocol === 'http' ? 'http' : 'https',
     });
 
-    // Reply to a solicitation so the peer learns about us too (announce:false).
-    if (data.announce && this.socket) {
+    // Reply to a solicitation on the SAME interface it arrived on (announce:false).
+    if (data.announce) {
       const reply = JSON.stringify({ ...this.selfInfo(), announce: false });
-      this.socket.send(reply, rinfo.port, rinfo.address);
+      socket.send(reply, rinfo.port, rinfo.address);
     }
   }
 

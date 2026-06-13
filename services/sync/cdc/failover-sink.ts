@@ -106,6 +106,25 @@ export class FailoverSink implements SyncSink {
     return this.updatedAtCache.has(table);
   }
 
+  /**
+   * Run a single forward-mirror write with the origin GUC set on the SAME connection, sequentially
+   * before the write. Replaces a pool.on('connect') SET, which raced the acquiring query on a
+   * freshly-connected client (pg "already executing a query" deprecation) and — if the write won the
+   * race — could skip the GUC and leak a reverse echo / updated_at restamp into the mirror. Runtime
+   * `SET` of the custom GUC is pooler-agnostic (the `-c` startup option is not — the Supabase pooler
+   * drops it). SET is session-scoped + idempotent, so re-setting on a reused connection is harmless;
+   * with the GUC live, BOTH Supabase triggers skip the write (no reverse echo, updated_at verbatim).
+   */
+  private async writeTagged(sqlText: string, params: unknown[]): Promise<void> {
+    const client = await this.pool!.connect();
+    try {
+      await client.query("SET app.cdc_origin = 'failover'");
+      await client.query(sqlText, params);
+    } finally {
+      client.release();
+    }
+  }
+
   async upsert(table: string, pk: string): Promise<void> {
     const pkCol = await this.pkFor(table);
     if (!pkCol) {
@@ -144,7 +163,7 @@ export class FailoverSink implements SyncSink {
         ? `ON CONFLICT (${qIdent(pkCol)}) DO UPDATE SET ${setList}`
         : `ON CONFLICT (${qIdent(pkCol)}) DO NOTHING`;
     }
-    await this.pool!.query(
+    await this.writeTagged(
       `INSERT INTO ${qIdent(table)} (${colList}) VALUES (${placeholders}) ${conflict}`,
       cols.map((c) => row[c])
     );
@@ -153,6 +172,6 @@ export class FailoverSink implements SyncSink {
   async remove(table: string, pk: string): Promise<void> {
     const pkCol = await this.pkFor(table);
     if (!pkCol) return;
-    await this.pool!.query(`DELETE FROM ${qIdent(table)} WHERE ${qIdent(pkCol)} = $1`, [pk]);
+    await this.writeTagged(`DELETE FROM ${qIdent(table)} WHERE ${qIdent(pkCol)} = $1`, [pk]);
   }
 }

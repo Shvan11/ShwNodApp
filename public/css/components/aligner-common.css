@@ -2223,3 +2223,314 @@
         opacity: 0.9;
     }
 }
+
+/* ===========================================
+   PATIENTSETS HELPERS
+   Classes referenced by PatientSets.tsx whose definitions were dropped in the
+   CSS consolidation — restored with design tokens only. They style the set-card
+   communication form, note rows, fs-access/payment status, and batch details.
+   =========================================== */
+
+/* Lab → doctor note forms (add + inline edit share one layout) */
+.add-note-section {
+    margin-bottom: 1rem;
+}
+
+.note-form,
+.note-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.note-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 80px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.note-textarea:focus {
+    outline: none;
+    border-color: var(--blue-300);
+    box-shadow: var(--shadow-focus);
+}
+
+.note-textarea-edit {
+    min-height: 64px;
+}
+
+.flex-justify-end {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.days-save-btn {
+    background: var(--blue-300);
+    color: var(--color-white);
+    border: none;
+    padding: 0.4rem 0.9rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+}
+
+.days-save-btn:hover {
+    background: var(--blue-800);
+}
+
+.days-save-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Note header: read-toggle checkbox + author + timestamp on one wrapping row */
+.note-author-container {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.note-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.note-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+/* Read / unread emphasis (paired with .note-author / .note-text) */
+.font-bold {
+    font-weight: var(--font-weight-bold);
+}
+
+.font-normal {
+    font-weight: var(--font-weight-normal);
+}
+
+/* fs-access status icon coloring */
+.status-success {
+    color: var(--success-color);
+}
+
+.status-error {
+    color: var(--error-color);
+}
+
+/* Error-filled button helper (Grant Access; .video-btn already paints itself) */
+.bg-error {
+    background: var(--error-color);
+    color: var(--color-white);
+}
+
+/* Batch detail spanning the full grid width (e.g. notes) */
+.batch-detail-full {
+    grid-column: 1 / -1;
+}
+
+/* Set notes — prominent callout near the top of the card.
+   Intentionally NOT inside a media query: identical on mobile and desktop. */
+.set-notes {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    margin: 0 0 1.25rem;
+    padding: 0.25rem 0 0.25rem 0.9rem;
+    border-left: 5px solid var(--warning-orange);
+}
+
+.set-notes > i {
+    color: var(--warning-orange);
+    font-size: 1.4rem;
+    line-height: 1.4;
+    flex-shrink: 0;
+}
+
+.set-notes-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.set-notes-label {
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--warning-700);
+}
+
+.set-notes-text {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+    color: var(--warning-800);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Payment status pill in the set-info grid (values: Paid / Partial / Unpaid) */
+.payment-status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    background: var(--gray-200);
+    color: var(--text-secondary);
+}
+
+.payment-status-badge.paid {
+    background: var(--success-100);
+    color: var(--success-700);
+}
+
+.payment-status-badge.partial {
+    background: var(--warning-100);
+    color: var(--warning-700);
+}
+
+.payment-status-badge.unpaid {
+    background: var(--error-100);
+    color: var(--error-700);
+}
+
+/* ===========================================
+   SET-CARD RESPONSIVE (PatientSets / aligner sets page)
+   The card display elements (header actions, set-info, batches) never had
+   mobile rules — on small screens the labelled action buttons overflowed.
+   =========================================== */
+
+@media (max-width: 768px) {
+    .aligner-set-card {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    /* Stack the set title above its action buttons */
+    .set-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .set-title h4 {
+        flex-wrap: wrap;
+        font-size: 1.15rem;
+    }
+
+    /* Action buttons wrap to a 2-up touch-friendly grid; the expand toggle
+       (the only full-width button) gets its own row */
+    .set-header-actions {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .set-header-actions > button {
+        flex: 1 1 calc(50% - 0.5rem);
+        margin: 0;                 /* neutralize .btn base margin so the 2-up grid stays even */
+        justify-content: center;
+        min-height: 44px;
+        padding: 0.55rem 0.6rem;   /* uniform across edit-set / folder / .btn-sm variants */
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+
+    .set-header-actions > button.toggle-batches-btn {
+        flex-basis: 100%;
+    }
+
+    /* Collapse the info + batch-detail grids to one column */
+    .set-info,
+    .batch-details {
+        grid-template-columns: 1fr;
+        gap: 0.6rem;
+    }
+
+    /* Let every info row shrink so a long child can't force the grid wide */
+    .set-info-item {
+        min-width: 0;
+    }
+
+    /* Keep the inline URL/PDF/Video rows and batch actions from overflowing */
+    .set-info-item.grid-col-full-flex,
+    .batch-actions {
+        flex-wrap: wrap;
+    }
+
+    /* Wrap long URLs (archform/drive links) — nowrap+ellipsis was dragging the
+       single-column grid out to thousands of px and overflowing the viewport */
+    .url-link {
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .url-input-inline {
+        min-width: 0;
+    }
+}
+
+/* One action button per row on the smallest screens */
+@media (max-width: 480px) {
+    .set-header-actions > button {
+        flex-basis: 100%;
+    }
+}
+
+/* Larger touch targets for the icon-only action buttons */
+@media (hover: none) and (pointer: coarse) {
+    .action-icon-btn {
+        min-width: 40px;
+        min-height: 40px;
+    }
+}
+
+/* ===========================================
+   SET FORM DRAWER (Add/Edit Set modal) — MOBILE
+   The 3-tab bar (multi-word labels) and the double-padded two-column tab
+   content were never adapted for narrow screens.
+   =========================================== */
+@media (max-width: 768px) {
+    /* Stack icon over label so all three tabs fit without clipping/wrapping ugly */
+    .form-tab {
+        flex-direction: column;
+        gap: 0.25rem;
+        padding: 0.6rem 0.25rem;
+        font-size: 0.72rem;
+        line-height: 1.2;
+        text-align: center;
+    }
+
+    .form-tab i {
+        font-size: 1.05rem;
+    }
+
+    /* Tab body keeps a single padding source — drop the nested grid's side padding
+       so inputs aren't squeezed by 1.5rem (tab) + 1.5rem (container) on a phone */
+    .tab-content {
+        padding: 1rem;
+    }
+
+    .tab-content .form-two-column-container {
+        padding: 0.25rem 0 0;
+    }
+}

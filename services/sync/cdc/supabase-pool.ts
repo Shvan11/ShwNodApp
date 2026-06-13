@@ -4,14 +4,15 @@
  * Both sinks talk to the SAME Supabase database (the single mirror) over SUPABASE_FAILOVER_DB_URL,
  * but with different session semantics, so they get two lazily-created module singletons:
  *
- *  - forward-write pool — the `failover` sink's mirror writes. Every connection is tagged
- *    `SET app.cdc_origin = 'failover'`, which makes BOTH Supabase triggers skip the write: the
- *    capture trigger (no `change_log(reverse)` echo) AND the version trigger (the mirrored
- *    `updated_at` travels verbatim instead of being re-stamped). The GUC is free per-write on the
- *    session pooler (port 5432) / a direct connection — which is what the configured URL uses.
- *    Fallback if a TRANSACTION pooler is ever used: drop the connect GUC and wrap each reverse-set
- *    forward upsert in `BEGIN; SET LOCAL app.cdc_origin='failover'; …` (overhead stays on the
- *    Supabase write side, never on the local hot path).
+ *  - forward-write pool — the `failover` sink's mirror writes. Each write sets `app.cdc_origin =
+ *    'failover'` at runtime on its checked-out connection (see FailoverSink.writeTagged), which makes
+ *    BOTH Supabase triggers skip the write: the capture trigger (no `change_log(reverse)` echo) AND
+ *    the version trigger (the mirrored `updated_at` travels verbatim instead of being re-stamped).
+ *    The GUC is NOT set via pool.on('connect') (that query races the acquiring write on the freshly
+ *    connected client — pg "already executing a query" deprecation, and a lost race would skip the
+ *    GUC) nor via the libpq `-c` startup option (the Supabase pooler drops it as an "unrecognized
+ *    configuration parameter"). Runtime SET on the checked-out client is pooler-agnostic; the one
+ *    extra round-trip stays on the Supabase write side, never on the local hot path.
  *
  *  - reverse-read pool — plain (NO origin GUC). The reverse engine drains the Supabase-side
  *    `change_log`/`cdc_sink_control` through it and the reverse sink reads current Supabase rows
@@ -62,14 +63,13 @@ let reverseReadPool: Pool | null = null;
 export function getForwardWritePool(): Pool {
   if (!forwardWritePool) {
     const p = buildSupabasePool(4);
-    // Tag every connection as a forward (failover) write. node-postgres runs a client's query queue
-    // FIFO and the connect handler enqueues this SET before the acquiring caller's first query, so
-    // the GUC is in effect for every mirror write on the connection.
-    p.on('connect', (c) => {
-      c.query("SET app.cdc_origin = 'failover'").catch((e: Error) =>
-        log.error('[cdc:failover] could not set origin GUC on forward-write connection', { error: e.message })
-      );
-    });
+    // The origin GUC is deliberately NOT set here. A pool.on('connect', c => c.query('SET …'))
+    // handler races the acquiring caller's first query on the freshly-connected client: pg-pool
+    // hands the client to the waiting write in the same ready-for-query turn, so the SET and the
+    // write overlap (pg "client already executing a query" deprecation), and a lost race would let
+    // the write skip the GUC. The libpq `-c app.cdc_origin=failover` startup option does not survive
+    // the Supabase pooler either. FailoverSink sets the GUC at runtime on a checked-out client,
+    // sequentially before each write (see FailoverSink.writeTagged).
     p.on('error', (e: Error) => log.error('[cdc:failover] forward-write pool error', { error: e.message }));
     forwardWritePool = p;
   }

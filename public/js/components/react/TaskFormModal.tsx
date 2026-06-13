@@ -176,7 +176,7 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            contentClassName="modal-content"
+            contentClassName={`modal-content ${styles.dialog}`}
             ariaLabelledBy="task-modal-title"
         >
             <div className="modal-header">
