@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback, ChangeEvent, FormEvent } from 'react';
 import cn from 'classnames';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
-import * as employeeContract from '@shared/contracts/employee.contract';
+import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { employeesQuery, positionsQuery } from '@/query/queries';
 import Modal from './Modal';
 import { resolveDoctorColor, DEFAULT_PICKER_HEX, NEUTRAL_PICKER_HEX } from './doctorColors';
 import styles from './EmployeeSettings.module.css';
@@ -48,10 +49,21 @@ interface EmployeeSettingsProps {
 const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSettingsProps) => {
     const toast = useToast();
     const confirm = useConfirm();
-    const [employees, setEmployees] = useState<Employee[]>([]);
-    const [positions, setPositions] = useState<Position[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    // Settings is the ONLY place quit (inactive) employees appear — they are
+    // hidden everywhere else, so opt back in here with ?includeInactive=true.
+    const {
+        data: employeesData,
+        isLoading: loading,
+        isError,
+        error: employeesError,
+        refetch: refetchEmployees,
+    } = useQuery(employeesQuery('?includeInactive=true'));
+    const employees = (employeesData?.employees ?? []) as unknown as Employee[];
+    const error = isError ? httpErrorMessage(employeesError, 'Failed to load employees') : null;
+
+    const { data: positionsData } = useQuery(positionsQuery());
+    const positions = (positionsData?.positions ?? []) as unknown as Position[];
+
     const [editingId, setEditingId] = useState<number | null>(null);
     const [showAddForm, setShowAddForm] = useState(false);
     const [formData, setFormData] = useState<FormData>({
@@ -73,12 +85,6 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
     const menuRef = useRef<HTMLDivElement>(null);
     const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
-    // Load employees and positions on component mount
-    useEffect(() => {
-        loadEmployees();
-        loadPositions();
-    }, []);
-
     // Close the right-click menu on outside-click or Escape (only while open).
     useEffect(() => {
         if (!contextMenu) return;
@@ -97,31 +103,6 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             document.removeEventListener('keydown', handleEsc);
         };
     }, [contextMenu, closeContextMenu]);
-
-    const loadEmployees = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            // Settings is the ONLY place quit (inactive) employees appear — they are
-            // hidden everywhere else, so opt back in here to manage them.
-            const data = await fetchJSON<{ employees?: Employee[] }>('/api/employees?includeInactive=true', { schema: employeeContract.employees.response });
-            setEmployees(data.employees || []);
-        } catch (err) {
-            console.error('Error loading employees:', err);
-            setError(httpErrorMessage(err, 'Failed to load employees'));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadPositions = async () => {
-        try {
-            const data = await fetchJSON<{ positions?: Position[] }>('/api/positions', { schema: employeeContract.positions.response });
-            setPositions(data.positions || []);
-        } catch (err) {
-            console.error('Error loading positions:', err);
-        }
-    };
 
     const handleAdd = () => {
         setFormData({
@@ -186,7 +167,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
 
             await (editingId ? putJSON(url, formData) : postJSON(url, formData));
 
-            await loadEmployees();
+            await refetchEmployees();
             handleCancel();
 
             toast.success(editingId ? 'Employee updated successfully!' : 'Employee added successfully!');
@@ -204,7 +185,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         try {
             await deleteJSON(`/api/employees/${employeeId}`);
 
-            await loadEmployees();
+            await refetchEmployees();
             toast.success('Employee deleted successfully!');
         } catch (err) {
             console.error('Error deleting employee:', err);
@@ -277,7 +258,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                 <div className={styles.errorContainer}>
                     <i className="fas fa-exclamation-triangle"></i>
                     <p>Error: {error}</p>
-                    <button onClick={loadEmployees} className={styles.btnRetry}>
+                    <button onClick={() => refetchEmployees()} className={styles.btnRetry}>
                         <i className="fas fa-redo"></i> Retry
                     </button>
                 </div>

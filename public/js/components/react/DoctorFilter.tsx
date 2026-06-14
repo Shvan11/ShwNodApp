@@ -26,10 +26,6 @@ const DoctorFilter = ({ selectedDoctorId, onDoctorChange, className = '' }: Doct
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        fetchDoctors();
-    }, []);
-
     const fetchDoctors = async () => {
         try {
             setLoading(true);
@@ -51,6 +47,11 @@ const DoctorFilter = ({ selectedDoctorId, onDoctorChange, className = '' }: Doct
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
+        fetchDoctors();
+    }, []);
 
     const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
         const value = event.target.value;

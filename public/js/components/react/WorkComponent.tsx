@@ -18,7 +18,13 @@ import {
 } from '../../config/workTypeConfig';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { qk } from '@/query/keys';
-import { worksQuery } from '@/query/queries';
+import {
+    worksQuery,
+    patientInfoQuery,
+    hasAppointmentQuery,
+    teethQuery,
+    implantManufacturersQuery,
+} from '@/query/queries';
 // aliased: the component already has a `paymentHistory` state var (collision)
 import {
     paymentHistory as paymentHistoryContract,
@@ -26,8 +32,6 @@ import {
     type PaymentHistoryResponse,
 } from '@shared/contracts/payment.contract';
 import * as workContract from '@shared/contracts/work.contract';
-import * as patientContract from '@shared/contracts/patient.contract';
-import * as lookupContract from '@shared/contracts/lookup.contract';
 import * as appointmentContract from '@shared/contracts/appointment.contract';
 import styles from './WorkComponent.module.css';
 
@@ -143,6 +147,28 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         enabled: !!personId,
     });
     const works = useMemo(() => (worksData ?? []) as unknown as Work[], [worksData]);
+
+    // Patient demographics, appointment flag, and the two form lookups — all on
+    // useQuery so they share the cache (patient info is deduped across screens)
+    // and a patient-scoped invalidation refreshes them live.
+    const { data: patientInfoData } = useQuery({
+        ...patientInfoQuery(personId ?? ''),
+        enabled: !!personId,
+    });
+    const patientInfo = (patientInfoData ?? null) as PatientInfo | null;
+
+    const { data: appointmentData, isLoading: loadingAppointment } = useQuery({
+        ...hasAppointmentQuery(personId ?? ''),
+        enabled: !!personId,
+    });
+    const hasNextAppointment = appointmentData?.hasAppointment ?? false;
+
+    const { data: teethData } = useQuery(teethQuery());
+    const teethOptions = (teethData?.teeth ?? []) as unknown as ToothOption[];
+
+    const { data: manufacturersData } = useQuery(implantManufacturersQuery());
+    const implantManufacturers = (manufacturersData ?? []) as unknown as ImplantManufacturer[];
+
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'discontinued'>('all');
     const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -159,16 +185,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryResponse>([]);
     const [loadingPayments, setLoadingPayments] = useState(false);
 
-    // Patient info state
-    const [patientInfo, setPatientInfo] = useState<PatientInfo | null>(null);
-
     // Check-in state
     const [checkingIn, setCheckingIn] = useState(false);
     const [checkedIn, setCheckedIn] = useState(false);
-
-    // Appointment state for no-work receipt button
-    const [hasNextAppointment, setHasNextAppointment] = useState(false);
-    const [loadingAppointment, setLoadingAppointment] = useState(true);
 
     // Expanded works state - track which work IDs are expanded
     const [expandedWorks, setExpandedWorks] = useState<Set<number>>(new Set());
@@ -208,41 +227,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     });
     const [displayItemCost, setDisplayItemCost] = useState('');
 
-    // Teeth options for multi-select
-    const [teethOptions, setTeethOptions] = useState<ToothOption[]>([]);
+    // Teeth multi-select filter toggles (the options themselves come from useQuery above)
     const [showTeethPermanent, setShowTeethPermanent] = useState(true);
     const [showTeethDeciduous, setShowTeethDeciduous] = useState(false);
-
-    // Implant manufacturers for dropdown
-    const [implantManufacturers, setImplantManufacturers] = useState<ImplantManufacturer[]>([]);
-
-    useEffect(() => {
-        if (personId) {
-            loadPatientInfo();
-            checkAppointmentStatus();
-            loadTeethOptions();
-            loadImplantManufacturers();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: these loaders are stable for the lifetime of a given personId
-    }, [personId]);
-
-    const loadTeethOptions = async () => {
-        try {
-            const data = await fetchJSON<{ teeth?: ToothOption[] }>('/api/teeth', { schema: workContract.teeth.response });
-            setTeethOptions(data.teeth || []);
-        } catch (err) {
-            console.error('Error loading teeth options:', err);
-        }
-    };
-
-    const loadImplantManufacturers = async () => {
-        try {
-            const data = await fetchJSON<ImplantManufacturer[]>('/api/implant-manufacturers', { schema: lookupContract.implantManufacturers.response });
-            setImplantManufacturers(data || []);
-        } catch (err) {
-            console.error('Error loading implant manufacturers:', err);
-        }
-    };
 
     // Auto-expand the first active work when works are loaded
     useEffect(() => {
@@ -253,28 +240,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             }
         }
     }, [works]);
-
-    const loadPatientInfo = async () => {
-        try {
-            const data = await fetchJSON<PatientInfo>(`/api/patients/${personId}/info`, { schema: patientContract.patientInfo.response });
-            setPatientInfo(data);
-        } catch (err) {
-            console.error('Error loading patient info:', err);
-        }
-    };
-
-    const checkAppointmentStatus = async () => {
-        try {
-            setLoadingAppointment(true);
-            const data = await fetchJSON<{ hasAppointment: boolean }>(`/api/patients/${personId}/has-appointment`, { schema: patientContract.hasAppointment.response });
-            setHasNextAppointment(data.hasAppointment);
-        } catch (err) {
-            console.error('[WORK-COMPONENT] Error checking appointment status:', err);
-            setHasNextAppointment(false);
-        } finally {
-            setLoadingAppointment(false);
-        }
-    };
 
     const handlePrintNoWorkReceipt = () => {
         if (!hasNextAppointment) {

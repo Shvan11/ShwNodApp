@@ -241,11 +241,11 @@ node scripts/e2e/smoke-aligner.mjs --mobile   # 412×915 (≈ Galaxy S23 Ultra)
 ```
 
 In a script: `import { authedContext, gotoSpa, findHorizontalOverflow, E2E_BASE } from './auth.mjs'` →
-`const { browser, context } = await authedContext({ mobile: true })`. Defaults target the **dev server `http://localhost:5273`** (override via `E2E_BASE`/`E2E_USER`/`E2E_PASS`).
+`const { browser, context } = await authedContext({ mobile: true })`. Defaults target the **dev server `http://localhost:5173`** (override via `E2E_BASE`/`E2E_USER`/`E2E_PASS`).
 
 **Five gotchas the harness already handles — re-read before "fixing" testing:**
 - **Login is rate-limited 15 min/IP** (`routes/auth.ts` loginLimiter). NEVER log in per-run — `auth.mjs` logs in once and caches Playwright `storageState` (`scripts/e2e/.auth-state.json`, gitignored, 20-min TTL). If you somehow hit **HTTP 429**, the in-memory limiter resets on a **dev-server restart**.
-- **Prod (:3000) drops the session cookie over plain http** — express-session `cookie.secure` + trust-proxy only emits Set-Cookie when the request looks HTTPS. The helper always sends `X-Forwarded-Proto: https`. Dev (:5273) is `secure=false`. Prefer testing against **dev** (also gives HMR, so source edits are live without a build).
+- **Prod (:3000) drops the session cookie over plain http** — express-session `cookie.secure` + trust-proxy only emits Set-Cookie when the request looks HTTPS. The helper always sends `X-Forwarded-Proto: https`. Dev (:5173) is `secure=false`. Prefer testing against **dev** (also gives HMR, so source edits are live without a build).
 - **`networkidle` never fires** (the SPA holds open SSE streams) — `gotoSpa()` uses `domcontentloaded` + an explicit `waitForSelector`. Never `waitUntil:'networkidle'`.
 - **The sticky universal header / patient banner intercept clicks** on in-card buttons — click with `{ force: true }`.
 - **For CSS/layout checks don't set `deviceScaleFactor` + `isMobile`** together — it distorts `window.innerWidth`. A plain `viewport` gives true CSS-px widths. Use `findHorizontalOverflow(page)` to catch "looks wide" bugs (an element wider than the viewport).

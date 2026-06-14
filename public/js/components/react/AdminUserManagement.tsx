@@ -55,11 +55,6 @@ export default function AdminUserManagement() {
     role: 'secretary'
   });
 
-  // Load users on mount
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
   const fetchUsers = async () => {
     try {
       // Post-migration the funnel unwraps the envelope to `{ users }`.
@@ -71,6 +66,12 @@ export default function AdminUserManagement() {
       setLoading(false);
     }
   };
+
+  // Load users on mount
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
+    fetchUsers();
+  }, []);
 
   const handleCreateUser = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

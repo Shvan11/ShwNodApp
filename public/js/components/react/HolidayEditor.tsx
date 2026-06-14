@@ -1,12 +1,13 @@
-import { useState, useEffect, useLayoutEffect, useCallback, type MouseEvent } from 'react';
+import { useState, useEffect, useLayoutEffect, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import LookupEditorModal from './LookupEditorModal';
 import Modal from './Modal';
 import { parseLocalDate } from '../../utils/calendarDate';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import * as holiday from '@shared/contracts/holiday.contract';
-import * as lookupAdminContract from '@shared/contracts/lookup-admin.contract';
+import { adminLookupItemsQuery } from '@/query/queries';
 
 interface Column {
     name: string;
@@ -153,8 +154,9 @@ interface HolidayEditorProps {
  */
 const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditorProps) => {
     const toast = useToast();
-    const [items, setItems] = useState<HolidayItem[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { data: itemsData, isLoading: loading, isError, error: itemsError, refetch } =
+        useQuery(adminLookupItemsQuery(tableKey));
+    const items = (itemsData ?? []) as HolidayItem[];
     const [modalOpen, setModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<HolidayItem | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -167,21 +169,10 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
     const [pendingHolidayData, setPendingHolidayData] = useState<Record<string, unknown> | null>(null);
     const [checkingAppointments, setCheckingAppointments] = useState(false);
 
-    const loadItems = useCallback(async () => {
-        try {
-            setLoading(true);
-            const data = await fetchJSON<HolidayItem[]>(`/api/admin/lookups/${tableKey}`, { schema: lookupAdminContract.items.response });
-            setItems(data);
-        } catch (err) {
-            toast.error(httpErrorMessage(err, `Failed to load ${tableName}`));
-        } finally {
-            setLoading(false);
-        }
-    }, [tableKey, tableName, toast]);
-
+    // Surface a load failure once (the list query itself retries transient errors).
     useEffect(() => {
-        loadItems();
-    }, [loadItems]);
+        if (isError) toast.error(httpErrorMessage(itemsError, `Failed to load ${tableName}`));
+    }, [isError, itemsError, tableName, toast]);
 
     const handleAdd = (e: MouseEvent<HTMLButtonElement>) => {
         setEditingItem(null);
@@ -218,7 +209,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
         try {
             await deleteJSON(`/api/admin/lookups/${tableKey}/${itemId}`);
             toast.success('Holiday deleted successfully');
-            loadItems();
+            refetch();
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to delete holiday'));
         } finally {
@@ -292,7 +283,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
             setAnchorEl(null);
             setAppointmentWarning(null);
             setPendingHolidayData(null);
-            loadItems();
+            refetch();
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to save holiday'));
         }

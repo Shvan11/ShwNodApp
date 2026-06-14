@@ -1,0 +1,103 @@
+/* UserMenu — header account pill + popover. The trigger reuses the global
+   `.user-info` pill styles (universal-header.css); this module only normalizes
+   the <button> reset, adds the caret, and styles the popover. The popover is
+   portaled to <body> and positioned fixed off the trigger rect (the fixed,
+   overflow:hidden universal-header would clip an in-flow dropdown). */
+
+.wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+/* Pair with the global `.user-info` class — only declares what a <button> needs
+   that the pill doesn't already set, so there's no cascade fight with the global
+   rule (which owns background/border/color/padding/radius). */
+.trigger {
+    font: inherit;
+    cursor: pointer;
+}
+
+.caret {
+    font-size: var(--font-size-xs);
+    opacity: 0.85;
+    transition: transform 0.18s ease;
+}
+
+.caretOpen {
+    transform: rotate(180deg);
+}
+
+/* Popover surface card */
+.menu {
+    width: 220px;
+    max-width: calc(100vw - 24px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    z-index: var(--z-index-popover);
+    overflow: hidden;
+    padding: var(--spacing-xs) 0;
+}
+
+.identity {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.identityName {
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-heading);
+    font-size: var(--font-size-sm);
+}
+
+.identityRole {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    text-transform: capitalize;
+}
+
+.divider {
+    height: 1px;
+    margin: var(--spacing-xs) 0;
+    background: var(--border-light);
+}
+
+.item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: var(--font-size-sm);
+    text-align: start;
+    cursor: pointer;
+}
+
+.item i {
+    width: 1rem;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.item:hover {
+    background: var(--surface-hover);
+}
+
+.danger {
+    color: var(--error-700);
+}
+
+.danger i {
+    color: var(--error-500);
+}
+
+.danger:hover {
+    background: var(--error-50);
+}

@@ -358,7 +358,20 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                         children: 'a',
                         pswpModule: () => import('photoswipe'),
                         bgOpacity: 0.9,
-                        showHideOpacity: true
+                        showHideOpacity: true,
+                        // The LocalSend share modal opens OVER the still-open lightbox
+                        // (portaled into #modal-root, z-index above pswp). PhotoSwipe's
+                        // default focus trap (trapFocus:true) installs a focusin handler
+                        // that yanks focus back into the lightbox whenever it lands
+                        // outside — which kills typing in the modal's IP / PIN inputs.
+                        // Disable it; Esc/arrow keys are bound to document and still work,
+                        // and the modal carries its own Tab focus-trap.
+                        // Trade-off (accepted): the lightbox itself loses keyboard
+                        // focus-containment (a keyboard user could Tab out to background
+                        // controls), and while the share modal is open arrow/Esc keys can
+                        // still reach the lightbox underneath. Fine for this mouse-driven
+                        // internal tool; the alternative was closing the lightbox on share.
+                        trapFocus: false
                     });
 
                     // Add custom buttons

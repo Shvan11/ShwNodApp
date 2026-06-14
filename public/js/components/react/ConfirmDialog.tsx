@@ -30,7 +30,7 @@ const ConfirmDialog = ({
         : <div className={styles.line}>{message}</div>;
 
     return (
-        <Modal isOpen={isOpen} onClose={onCancel} closeOnBackdropClick={false}>
+        <Modal isOpen={isOpen} onClose={onCancel} closeOnBackdropClick={false} overlayClassName={styles.overlay}>
             <div className={styles.dialog}>
                 <h2 className={styles.title}>{title}</h2>
                 <div className={styles.body}>{messageContent}</div>

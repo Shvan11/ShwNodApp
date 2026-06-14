@@ -14,38 +14,58 @@
 
 type Id = number | string;
 
+/**
+ * Canonicalize an entity id to a string before it becomes a key segment.
+ *
+ * The same patient flows in as a `number` from some call sites (`work.person_id`,
+ * `selectedPatient.person_id`) and as a `string` from others (the `/patient/:id`
+ * URL param that PatientShell/UniversalHeader/ViewPatientInfo/Xrays read). React
+ * Query matches keys by deep equality, so `7 !== '7'` would (a) fork the same
+ * patient into two cache entries and (b) make a number-keyed invalidation miss a
+ * string-keyed read. Coercing here — at the SSoT — means every consumer collapses
+ * onto one entry and `qk.patient.all(id)` prefix-matches regardless of which type
+ * the caller happened to hold.
+ */
+const normId = (id: Id): string => String(id);
+
 export const qk = {
   patient: {
     /** Parent — invalidates info/full/works/timepoints for this patient. */
-    all: (id: Id) => ['patient', id] as const,
+    all: (id: Id) => ['patient', normId(id)] as const,
     /** GET /api/patients/:id/info — demographics (incl. estimated_cost, xrays). */
-    info: (id: Id) => ['patient', id, 'info'] as const,
+    info: (id: Id) => ['patient', normId(id), 'info'] as const,
     /** GET /api/patients/:id — patientById (edit form; a DIFFERENT endpoint). */
-    full: (id: Id) => ['patient', id, 'full'] as const,
+    full: (id: Id) => ['patient', normId(id), 'full'] as const,
     /** GET /api/getworks?code= — the patient's works list. */
-    works: (id: Id) => ['patient', id, 'works'] as const,
+    works: (id: Id) => ['patient', normId(id), 'works'] as const,
     /** GET /api/patients/:id/timepoints — photos/compare/xrays timepoints. */
-    timepoints: (id: Id) => ['patient', id, 'timepoints'] as const,
+    timepoints: (id: Id) => ['patient', normId(id), 'timepoints'] as const,
+    /** GET /api/patients/:id/has-appointment — future-appointment flag. */
+    hasAppointment: (id: Id) => ['patient', normId(id), 'has-appointment'] as const,
   },
   work: {
     /** Parent — invalidates details/visits/payments for this work. */
-    all: (workId: Id) => ['work', workId] as const,
+    all: (workId: Id) => ['work', normId(workId)] as const,
     /** GET /api/getworkdetails?workId= — single work row. */
-    details: (workId: Id) => ['work', workId, 'details'] as const,
+    details: (workId: Id) => ['work', normId(workId), 'details'] as const,
+    /** GET /api/getworkforreceipt/:workId — receipt-enriched work row. */
+    forReceipt: (workId: Id) => ['work', normId(workId), 'for-receipt'] as const,
     /** GET /api/getvisitsbywork?workId= — visit list for a work. */
-    visits: (workId: Id) => ['work', workId, 'visits'] as const,
+    visits: (workId: Id) => ['work', normId(workId), 'visits'] as const,
     /** GET /api/getworkpayments?workId= — payment history for a work. */
-    payments: (workId: Id) => ['work', workId, 'payments'] as const,
+    payments: (workId: Id) => ['work', normId(workId), 'payments'] as const,
     /** GET /api/getlatestwires?workId= — most-recent wires for a work. */
-    latestWires: (workId: Id) => ['work', workId, 'latest-wires'] as const,
+    latestWires: (workId: Id) => ['work', normId(workId), 'latest-wires'] as const,
   },
   visit: {
     /** GET /api/getvisitbyid?visitId= — single visit row (edit form). */
-    byId: (visitId: Id) => ['visit', visitId] as const,
+    byId: (visitId: Id) => ['visit', normId(visitId)] as const,
   },
   appointments: {
     /** GET /api/getDailyAppointments?AppsDate= — keeps the legacy key shape. */
     daily: (date: string) => ['daily-appointments', date] as const,
+    /** GET /api/appointments/:id — single appointment (edit form). */
+    byId: (id: Id) => ['appointments', 'by-id', normId(id)] as const,
   },
   whatsapp: {
     /** WhatsApp message-status table — keeps the legacy key shape. */
@@ -56,6 +76,8 @@ export const qk = {
     all: () => ['templates'] as const,
     list: () => ['templates', 'list'] as const,
     one: (id: Id) => ['templates', 'one', id] as const,
+    /** GET /api/templates/document-types — document-type options. */
+    documentTypes: () => ['templates', 'document-types'] as const,
   },
   aligner: {
     doctors: () => ['aligner', 'doctors'] as const,
@@ -86,6 +108,34 @@ export const qk = {
     patientPhones: () => ['lookups', 'patient-phones'] as const,
     /** GET /api/employees<query> — keyed by query so param variants don't collide. */
     employees: (query = '') => ['lookups', 'employees', query] as const,
+    /** GET /api/positions — employee-position options. */
+    positions: () => ['lookups', 'positions'] as const,
+    /** GET /api/appointment-details — appointment-type options. */
+    appointmentDetails: () => ['lookups', 'appointment-details'] as const,
+  },
+  /** Admin lookup tables — the generic table editor (LookupEditor/HolidayEditor). */
+  adminLookups: {
+    /** GET /api/admin/lookups/:tableKey — one lookup table's rows. */
+    table: (tableKey: string) => ['admin-lookups', tableKey] as const,
+  },
+  /** USD→IQD exchange rates (PaymentModal + ExchangeRatesSettings). */
+  exchangeRates: {
+    all: () => ['exchange-rates'] as const,
+    /** GET /api/getCurrentExchangeRate — today's rate. */
+    current: () => ['exchange-rates', 'current'] as const,
+    /** GET /api/getExchangeRateForDate?date= — rate for one date. */
+    forDate: (date: string) => ['exchange-rates', 'for-date', date] as const,
+    /** GET /api/exchange-rates?from=&to= — rate history in a range. */
+    history: (from: string, to: string) => ['exchange-rates', 'history', from, to] as const,
+  },
+  /** Financial statistics / reports (StatisticsComponent). */
+  reports: {
+    statistics: (month: number, year: number, rate: number) =>
+      ['reports', 'statistics', month, year, rate] as const,
+    yearly: (startMonth: number, startYear: number, rate: number) =>
+      ['reports', 'yearly', startMonth, startYear, rate] as const,
+    multiYear: (startYear: number, endYear: number, rate: number) =>
+      ['reports', 'multi-year', startYear, endYear, rate] as const,
   },
   /**
    * Stand / mini-pharmacy. `all()` is the prefix every stand read shares, so a

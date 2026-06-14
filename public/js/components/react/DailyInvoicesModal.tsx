@@ -76,13 +76,6 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
         navigate(`/expenses?startDate=${day}&endDate=${day}&currency=${currency}`);
     };
 
-    useEffect(() => {
-        if (dateValue) {
-            fetchDailyInvoices();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dateValue]);
-
     const fetchDailyInvoices = async (): Promise<void> => {
         setLoading(true);
         setError(null);
@@ -97,6 +90,14 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (dateValue) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
+            fetchDailyInvoices();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dateValue]);
 
     const formatCurrency = (amount: number, currency: 'IQD' | 'USD'): string => {
         return formatCurrencyUtil(amount, currency);

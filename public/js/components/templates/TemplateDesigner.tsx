@@ -36,21 +36,6 @@ function TemplateDesigner() {
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (templateId) {
-            loadTemplate(templateId);
-        } else {
-            // No template ID means we're creating a new template
-            setIsLoading(false);
-            setTemplate({
-                template_id: null,
-                template_name: 'New Template',
-                template_file_path: null
-            });
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [templateId]);
-
     const loadTemplate = async (id: string) => {
         try {
             setIsLoading(true);
@@ -66,6 +51,23 @@ function TemplateDesigner() {
             setIsLoading(false);
         }
     };
+
+    useEffect(() => {
+        /* eslint-disable react-hooks/set-state-in-effect -- one-shot mount: load the existing template or seed a new one; setState is intentional */
+        if (templateId) {
+            loadTemplate(templateId);
+        } else {
+            // No template ID means we're creating a new template
+            setIsLoading(false);
+            setTemplate({
+                template_id: null,
+                template_name: 'New Template',
+                template_file_path: null
+            });
+        }
+        /* eslint-enable react-hooks/set-state-in-effect */
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [templateId]);
 
     const handleSave = async () => {
         if (!editorRef.current || !templateId) {

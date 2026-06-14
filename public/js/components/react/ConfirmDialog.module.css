@@ -1,3 +1,16 @@
+/*
+ * Confirm dialogs are global "answer me first" prompts that can be opened from
+ * inside higher-stacked surfaces — notably the aligner drawers (.drawer-overlay
+ * z-index 1999 / .drawer-container 2000 in aligner-common.css). The shared Modal
+ * overlay sits at --z-index-modal (1040), which would render the confirm *behind*
+ * the drawer and under its backdrop-filter blur + dark tint ("blurry and behind").
+ * Lift it above the drawer layer, but keep it below the toast layer (2100, see
+ * toast.css) so success/error toasts still surface over the prompt.
+ */
+.overlay {
+    z-index: 2050;
+}
+
 .dialog {
     padding: var(--spacing-xl);
     min-width: 320px;

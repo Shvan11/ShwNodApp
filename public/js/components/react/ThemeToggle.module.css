@@ -1,0 +1,133 @@
+/* ThemeToggle — sliding pill switch in the universal header. Sun (left) and
+   moon (right) sit fixed in a translucent "well"; a white knob slides to the
+   active side, lifting that icon onto it (tinted) while the other stays dim.
+   Lives on the header's colored gradient, so it speaks the header's
+   white-on-translucent idiom rather than the page surface tokens.
+
+   Geometry is variable-driven so a breakpoint only overrides --w / --knob /
+   --icon (and height) — the knob travel and the icon insets are derived from
+   them with calc(), which keeps the sun/moon perfectly centered on the knob at
+   every size:
+     inset  = pad + (knob - icon) / 2
+     travel = w - 2*border - knob - 2*pad                                      */
+.toggle {
+    --w: 60px;
+    --border: 2px;
+    --knob: 24px;
+    --icon: 16px;
+    --pad: 3px;
+
+    position: relative;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    width: var(--w);
+    height: 30px;
+    padding: 0 calc(var(--pad) + (var(--knob) - var(--icon)) / 2);
+    border: var(--border) solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    background: rgba(10, 14, 30, 0.22);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.28);
+    cursor: pointer;
+    transition: background 0.3s ease, border-color 0.3s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.toggle:hover {
+    border-color: rgba(255, 255, 255, 0.45);
+}
+
+.toggle:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 2px;
+}
+
+/* Track hue: a warm-dark well for light mode, a cool navy well for dark —
+   subtle enough to sit cleanly on both the purple and the dark-blue header. */
+.toggle[aria-checked="false"] {
+    background: rgba(60, 38, 8, 0.26);
+}
+
+.toggle[aria-checked="true"] {
+    background: rgba(10, 16, 44, 0.34);
+}
+
+/* Sun / moon — fixed in the track, above the knob. The active one is tinted and
+   rides the white knob; the inactive one is dim white in the well. */
+.icon {
+    position: relative;
+    z-index: 1;
+    width: var(--icon);
+    font-size: calc(var(--icon) - 4px);
+    line-height: 1;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+    pointer-events: none;
+    transition: color 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
+}
+
+.toggle[aria-checked="false"] .sun {
+    color: var(--palette-orange-400);
+    transform: rotate(0deg);
+}
+
+.toggle[aria-checked="true"] .moon {
+    color: var(--palette-indigo-500);
+}
+
+/* Dim the icon that isn't selected a touch further so the active one leads. */
+.toggle[aria-checked="false"] .moon,
+.toggle[aria-checked="true"] .sun {
+    opacity: 0.6;
+}
+
+/* The sliding white knob — behind the icons; travels left (light) → right
+   (dark) with a gentle spring. Glow ring picks up the active hue. */
+.knob {
+    position: absolute;
+    top: 50%;
+    left: var(--pad);
+    width: var(--knob);
+    height: var(--knob);
+    border-radius: 50%;
+    background: var(--color-white);
+    transform: translate(0, -50%);
+    transition: transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+
+.toggle[aria-checked="false"] .knob {
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(251, 146, 60, 0.35);
+}
+
+.toggle[aria-checked="true"] .knob {
+    transform: translate(calc(var(--w) - 2 * var(--border) - var(--knob) - 2 * var(--pad)), -50%);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .knob,
+    .icon {
+        transition: none;
+    }
+}
+
+/* Responsive — only the size vars + height change; calc() keeps the geometry
+   self-consistent (mirrors the header's own .theme-toggle-btn breakpoints). */
+@media (max-width: 640px) {
+    .toggle {
+        --w: 52px;
+        --knob: 20px;
+        --icon: 14px;
+        height: 26px;
+    }
+}
+
+@media (max-width: 480px) {
+    .toggle {
+        --w: 46px;
+        --knob: 18px;
+        --icon: 13px;
+        height: 24px;
+    }
+}

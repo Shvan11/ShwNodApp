@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, MouseEvent } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
-import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
-import * as lookupAdminContract from '@shared/contracts/lookup-admin.contract';
+import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { adminLookupItemsQuery } from '@/query/queries';
 import LookupEditorModal from './LookupEditorModal';
 
 // Types
@@ -143,8 +144,9 @@ const DeleteConfirmPopover: React.FC<DeleteConfirmPopoverProps> = ({ anchorEl, i
  */
 const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, columns, idColumn }) => {
     const toast = useToast();
-    const [items, setItems] = useState<LookupItem[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
+    const { data: itemsData, isLoading: loading, isError, error: itemsError, refetch } =
+        useQuery(adminLookupItemsQuery(tableKey));
+    const items = (itemsData ?? []) as LookupItem[];
     const [modalOpen, setModalOpen] = useState<boolean>(false);
     const [editingItem, setEditingItem] = useState<LookupItem | null>(null);
     const [searchTerm, setSearchTerm] = useState<string>('');
@@ -153,21 +155,10 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
     const [deleteAnchorEl, setDeleteAnchorEl] = useState<HTMLElement | null>(null);
     const addButtonRef = useRef<HTMLButtonElement>(null);
 
-    const loadItems = useCallback(async (): Promise<void> => {
-        try {
-            setLoading(true);
-            const data = await fetchJSON<LookupItem[]>(`/api/admin/lookups/${tableKey}`, { schema: lookupAdminContract.items.response });
-            setItems(data);
-        } catch (err) {
-            toast.error(httpErrorMessage(err, `Failed to load ${tableName}`));
-        } finally {
-            setLoading(false);
-        }
-    }, [tableKey, tableName, toast]);
-
+    // Surface a load failure once (the list query itself retries transient errors).
     useEffect(() => {
-        loadItems();
-    }, [loadItems]);
+        if (isError) toast.error(httpErrorMessage(itemsError, `Failed to load ${tableName}`));
+    }, [isError, itemsError, tableName, toast]);
 
     const handleAdd = (e: MouseEvent<HTMLButtonElement>): void => {
         setEditingItem(null);
@@ -204,7 +195,7 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
         try {
             await deleteJSON(`/api/admin/lookups/${tableKey}/${itemId}`);
             toast.success('Item deleted successfully');
-            loadItems();
+            refetch();
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to delete item'));
         } finally {
@@ -226,7 +217,7 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
             toast.success(isEdit ? 'Item updated successfully' : 'Item created successfully');
             setModalOpen(false);
             setAnchorEl(null);
-            loadItems();
+            refetch();
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to save item'));
         }

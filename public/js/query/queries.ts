@@ -24,6 +24,10 @@ import * as staffContract from '@shared/contracts/staff.contract';
 import * as employeeContract from '@shared/contracts/employee.contract';
 import * as standContract from '@shared/contracts/stand.contract';
 import * as expenseContract from '@shared/contracts/expense.contract';
+import * as appointmentContract from '@shared/contracts/appointment.contract';
+import * as paymentContract from '@shared/contracts/payment.contract';
+import * as reportsContract from '@shared/contracts/reports.contract';
+import * as lookupAdminContract from '@shared/contracts/lookup-admin.contract';
 import { qk } from './keys';
 // Type-only (erased at runtime → no import cycle with the hooks below). Stand row
 // types come straight from its contract; the expense hooks predate full response
@@ -76,6 +80,17 @@ export const timepointsQuery = (id: Id) =>
       ),
   });
 
+/** GET /api/patients/:id/has-appointment — whether the patient has a future appointment. */
+export const hasAppointmentQuery = (id: Id) =>
+  queryOptions({
+    queryKey: qk.patient.hasAppointment(id),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof patientContract.hasAppointment.response>>(
+        `/api/patients/${id}/has-appointment`,
+        { signal, schema: patientContract.hasAppointment.response }
+      ),
+  });
+
 // ---------------------------------------------------------------------------
 // Work
 // ---------------------------------------------------------------------------
@@ -89,6 +104,18 @@ export const workDetailsQuery = (workId: Id) =>
         `/api/getworkdetails?workId=${workId}`,
         { signal, schema: workContract.getWorkDetails.response }
       ),
+  });
+
+/** GET /api/getworkforreceipt/:workId — receipt-enriched work row (disabled until a workId is set). */
+export const workForReceiptQuery = (workId: number | null | undefined) =>
+  queryOptions({
+    queryKey: qk.work.forReceipt(workId ?? 0),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof paymentContract.workForReceipt.response>>(
+        `/api/getworkforreceipt/${workId}`,
+        { signal, schema: paymentContract.workForReceipt.response }
+      ),
+    enabled: workId != null,
   });
 
 // ---------------------------------------------------------------------------
@@ -115,6 +142,17 @@ export const templateQuery = (id: Id) =>
         signal,
         schema: templateContract.getTemplate.response,
       }),
+  });
+
+/** GET /api/templates/document-types — document-type options (template management). */
+export const documentTypesQuery = () =>
+  queryOptions({
+    queryKey: qk.templates.documentTypes(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof templateContract.documentTypes.response>>(
+        '/api/templates/document-types',
+        { signal, schema: templateContract.documentTypes.response }
+      ),
   });
 
 // ---------------------------------------------------------------------------
@@ -342,6 +380,50 @@ export const patientTypesQuery = () =>
       }),
   });
 
+/** GET /api/teeth — teeth options (work-detail teeth selector). */
+export const teethQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.teeth(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof workContract.teeth.response>>('/api/teeth', {
+        signal,
+        schema: workContract.teeth.response,
+      }),
+  });
+
+/** GET /api/implant-manufacturers — implant-manufacturer options. */
+export const implantManufacturersQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.implantManufacturers(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof lookupContract.implantManufacturers.response>>(
+        '/api/implant-manufacturers',
+        { signal, schema: lookupContract.implantManufacturers.response }
+      ),
+  });
+
+/** GET /api/positions — employee-position options. */
+export const positionsQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.positions(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof employeeContract.positions.response>>('/api/positions', {
+        signal,
+        schema: employeeContract.positions.response,
+      }),
+  });
+
+/** GET /api/appointment-details — appointment-type options (appointment forms). */
+export const appointmentDetailsQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.appointmentDetails(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof appointmentContract.appointmentDetails.response>>(
+        '/api/appointment-details',
+        { signal, schema: appointmentContract.appointmentDetails.response }
+      ),
+  });
+
 /**
  * GET /api/employees<query> — staff list. Keyed by the query string so the
  * ?percentage / ?getAppointments / ?includeInactive variants don't collide.
@@ -556,4 +638,114 @@ export const expenseSummaryQuery = (
       });
     },
     enabled: !!startDate && !!endDate,
+  });
+
+// ---------------------------------------------------------------------------
+// Appointments
+// ---------------------------------------------------------------------------
+
+/** GET /api/appointments/:id — single appointment (edit form; disabled until an id is set). */
+export const appointmentByIdQuery = (id: number | string | null | undefined) =>
+  queryOptions({
+    queryKey: qk.appointments.byId(id ?? 0),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof appointmentContract.appointmentById.response>>(
+        `/api/appointments/${id}`,
+        { signal, schema: appointmentContract.appointmentById.response }
+      ),
+    enabled: id != null && id !== '',
+  });
+
+// ---------------------------------------------------------------------------
+// Exchange rates — 404 = "no rate for this date", a normal empty state, so
+// these don't retry (the consumer treats the error as "not set").
+// ---------------------------------------------------------------------------
+
+/** GET /api/getCurrentExchangeRate — today's USD→IQD rate. */
+export const currentExchangeRateQuery = () =>
+  queryOptions({
+    queryKey: qk.exchangeRates.current(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof paymentContract.currentExchangeRate.response>>(
+        '/api/getCurrentExchangeRate',
+        { signal, schema: paymentContract.currentExchangeRate.response }
+      ),
+    retry: false,
+  });
+
+/** GET /api/getExchangeRateForDate?date= — rate for one date. */
+export const exchangeRateForDateQuery = (date: string) =>
+  queryOptions({
+    queryKey: qk.exchangeRates.forDate(date),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof paymentContract.exchangeRateForDate.response>>(
+        `/api/getExchangeRateForDate?date=${date}`,
+        { signal, schema: paymentContract.exchangeRateForDate.response }
+      ),
+    enabled: !!date,
+    retry: false,
+  });
+
+/** GET /api/exchange-rates?from=&to= — rate history in a range. */
+export const exchangeRatesHistoryQuery = (from: string, to: string) =>
+  queryOptions({
+    queryKey: qk.exchangeRates.history(from, to),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof paymentContract.exchangeRates.response>>(
+        `/api/exchange-rates?from=${from}&to=${to}`,
+        { signal, schema: paymentContract.exchangeRates.response }
+      ),
+    enabled: !!from && !!to,
+  });
+
+// ---------------------------------------------------------------------------
+// Reports / statistics
+// ---------------------------------------------------------------------------
+
+/** GET /api/statistics?month=&year=&exchangeRate= — daily breakdown + monthly summary. */
+export const statisticsQuery = (month: number, year: number, exchangeRate: number) =>
+  queryOptions({
+    queryKey: qk.reports.statistics(month, year, exchangeRate),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof reportsContract.statistics.response>>(
+        `/api/statistics?month=${month}&year=${year}&exchangeRate=${exchangeRate}`,
+        { signal, schema: reportsContract.statistics.response }
+      ),
+  });
+
+/** GET /api/statistics/yearly?startMonth=&startYear=&exchangeRate= — 12-month rollup. */
+export const yearlyStatisticsQuery = (startMonth: number, startYear: number, exchangeRate: number) =>
+  queryOptions({
+    queryKey: qk.reports.yearly(startMonth, startYear, exchangeRate),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof reportsContract.yearlyStatistics.response>>(
+        `/api/statistics/yearly?startMonth=${startMonth}&startYear=${startYear}&exchangeRate=${exchangeRate}`,
+        { signal, schema: reportsContract.yearlyStatistics.response }
+      ),
+  });
+
+/** GET /api/statistics/multi-year?startYear=&endYear=&exchangeRate= — multi-year rollup. */
+export const multiYearStatisticsQuery = (startYear: number, endYear: number, exchangeRate: number) =>
+  queryOptions({
+    queryKey: qk.reports.multiYear(startYear, endYear, exchangeRate),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof reportsContract.multiYearStatistics.response>>(
+        `/api/statistics/multi-year?startYear=${startYear}&endYear=${endYear}&exchangeRate=${exchangeRate}`,
+        { signal, schema: reportsContract.multiYearStatistics.response }
+      ),
+  });
+
+// ---------------------------------------------------------------------------
+// Admin lookup tables — the generic table editor (LookupEditor/HolidayEditor).
+// ---------------------------------------------------------------------------
+
+/** GET /api/admin/lookups/:tableKey — one lookup table's rows. */
+export const adminLookupItemsQuery = (tableKey: string) =>
+  queryOptions({
+    queryKey: qk.adminLookups.table(tableKey),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof lookupAdminContract.items.response>>(
+        `/api/admin/lookups/${tableKey}`,
+        { signal, schema: lookupAdminContract.items.response }
+      ),
   });

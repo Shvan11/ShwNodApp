@@ -3,7 +3,7 @@
  * Lists and manages document templates with filtering by document type
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './TemplateManagement.module.css';
 import TemplateCard from './TemplateCard';
@@ -14,10 +14,10 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import type { Template } from './TemplateCard';
 import type { DocumentType, TemplateSubmissionData } from './CreateTemplateModal';
 import type { TemplateStatsData } from './TemplateStats';
-import { useQueryClient } from '@tanstack/react-query';
-import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
-import * as templateContract from '@shared/contracts/template.contract';
+import { documentTypesQuery, templatesQuery } from '@/query/queries';
 
 function TemplateManagement() {
     const navigate = useNavigate();
@@ -25,75 +25,36 @@ function TemplateManagement() {
     const confirm = useConfirm();
     const queryClient = useQueryClient();
 
-    const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);
-    const [allTemplates, setAllTemplates] = useState<Template[]>([]);
+    // Document types + the full template list, both on useQuery. A template
+    // write invalidates qk.templates.all() (a prefix of both keys), so the list
+    // and stats refresh app-wide without a manual reload.
+    const { data: documentTypesData } = useQuery(documentTypesQuery());
+    const documentTypes = (documentTypesData ?? []) as DocumentType[];
+
+    const { data: templatesData, isLoading, isError, refetch } = useQuery(templatesQuery());
+    const allTemplates = useMemo(() => (templatesData ?? []) as Template[], [templatesData]);
+    const error = isError ? 'Failed to load templates' : null;
+
     const [currentDocumentType, setCurrentDocumentType] = useState<number | null>(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
 
-    const [stats, setStats] = useState<TemplateStatsData>({
-        total: 0,
-        active: 0,
-        system: 0,
-        usedToday: 0
-    });
+    // Until the user picks a tab, default to the first document type — derived,
+    // not effect-synced, so there's no setState-on-render.
+    const effectiveDocumentType = currentDocumentType ?? documentTypes[0]?.type_id ?? null;
 
-    useEffect(() => {
-        loadDocumentTypes();
-        loadAllTemplates();
-    }, []);
-
-    useEffect(() => {
-        // Recalculate unconditionally — including when the list becomes empty
-        // (e.g. after deleting the last template) so the stat cards reset to 0.
-        calculateStats();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [allTemplates]);
-
-    useEffect(() => {
-        if (!currentDocumentType && documentTypes.length > 0) {
-            setCurrentDocumentType(documentTypes[0].type_id);
-        }
-    }, [documentTypes, currentDocumentType]);
-
-    const loadDocumentTypes = async () => {
-        try {
-            const data = await fetchJSON<DocumentType[]>('/api/templates/document-types', { schema: templateContract.documentTypes.response });
-            setDocumentTypes(data ?? []);
-        } catch (err) {
-            console.error('Error loading document types:', err);
-            setError('Failed to load document types');
-        }
-    };
-
-    const loadAllTemplates = async () => {
-        try {
-            setIsLoading(true);
-            const data = await fetchJSON<Template[]>('/api/templates', { schema: templateContract.getTemplates.response });
-            setAllTemplates(data ?? []);
-            setError(null);
-        } catch (err) {
-            console.error('Error loading templates:', err);
-            setError('Failed to load templates');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const calculateStats = () => {
-        setStats({
-            total: allTemplates.length,
-            active: allTemplates.filter(t => t.is_active).length,
-            system: allTemplates.filter(t => t.is_system).length,
-            usedToday: allTemplates.filter(t => {
-                if (!t.last_used_date) return false;
-                const lastUsed = new Date(t.last_used_date);
-                const today = new Date();
-                return lastUsed.toDateString() === today.toDateString();
-            }).length
-        });
-    };
+    // Stat cards are pure derived data — recomputed (incl. resetting to 0 when the
+    // list empties) straight from the loaded templates.
+    const stats: TemplateStatsData = useMemo(() => ({
+        total: allTemplates.length,
+        active: allTemplates.filter(t => t.is_active).length,
+        system: allTemplates.filter(t => t.is_system).length,
+        usedToday: allTemplates.filter(t => {
+            if (!t.last_used_date) return false;
+            const lastUsed = new Date(t.last_used_date);
+            const today = new Date();
+            return lastUsed.toDateString() === today.toDateString();
+        }).length
+    }), [allTemplates]);
 
     const handleCreateTemplate = async (templateData: TemplateSubmissionData) => {
         try {
@@ -120,7 +81,6 @@ function TemplateManagement() {
         try {
             await putJSON(`/api/templates/${templateId}`, { is_default: true, modified_by: 'user' });
             queryClient.invalidateQueries({ queryKey: qk.templates.all() });
-            await loadAllTemplates();
             toast.success('Template set as default!');
         } catch (err) {
             console.error('Error setting default:', err);
@@ -136,7 +96,6 @@ function TemplateManagement() {
         try {
             await deleteJSON(`/api/templates/${templateId}`);
             queryClient.invalidateQueries({ queryKey: qk.templates.all() });
-            await loadAllTemplates();
             toast.success('Template deleted successfully!');
         } catch (err) {
             console.error('Error deleting template:', err);
@@ -145,7 +104,7 @@ function TemplateManagement() {
     };
 
     const filteredTemplates = allTemplates.filter(
-        t => t.document_type_id === currentDocumentType
+        t => t.document_type_id === effectiveDocumentType
     );
 
     return (
@@ -181,7 +140,7 @@ function TemplateManagement() {
                             return (
                                 <button
                                     key={docType.type_id}
-                                    className={`${styles.tab} ${currentDocumentType === docType.type_id ? styles.tabActive : ''}`}
+                                    className={`${styles.tab} ${effectiveDocumentType === docType.type_id ? styles.tabActive : ''}`}
                                     onClick={() => setCurrentDocumentType(docType.type_id)}
                                 >
                                     <i className={`fas ${docType.icon}`}></i>
@@ -204,7 +163,7 @@ function TemplateManagement() {
                         <div className={styles.errorState}>
                             <i className="fas fa-exclamation-circle"></i>
                             <p>{error}</p>
-                            <button className="btn btn-primary" onClick={loadAllTemplates}>
+                            <button className="btn btn-primary" onClick={() => refetch()}>
                                 Retry
                             </button>
                         </div>
@@ -241,7 +200,7 @@ function TemplateManagement() {
             {isCreateModalOpen && (
                 <CreateTemplateModal
                     documentTypes={documentTypes}
-                    currentDocumentType={currentDocumentType}
+                    currentDocumentType={effectiveDocumentType}
                     onClose={() => setIsCreateModalOpen(false)}
                     onCreate={handleCreateTemplate}
                     styles={styles}

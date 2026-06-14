@@ -200,7 +200,6 @@ const Diagnosis = () => {
                 if (!cancelled) setDiagnosisLoading(false);
             });
         return () => { cancelled = true; };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [workId]);
 
     const handleChange = (field: keyof DiagnosisData, value: string) => {

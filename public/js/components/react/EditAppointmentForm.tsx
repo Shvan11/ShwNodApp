@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, type ChangeEvent, type FormEvent } from 'react';
 import { useLocation } from 'react-router-dom';
 import cn from 'classnames';
+import { useQuery } from '@tanstack/react-query';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
 import { useToast } from '../../contexts/ToastContext';
-import { fetchJSON, postJSON, putJSON, httpErrorMessage } from '@/core/http';
-import * as appointment from '@shared/contracts/appointment.contract';
-import * as employee from '@shared/contracts/employee.contract';
+import { postJSON, putJSON, httpErrorMessage } from '@/core/http';
+import { employeesQuery, appointmentDetailsQuery, appointmentByIdQuery } from '@/query/queries';
 import styles from './AppointmentForm.module.css';
 
 interface AppointmentFormData {
@@ -65,10 +65,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
         DrID: ''
     });
     const [originalDate, setOriginalDate] = useState<string>('');
-    const [doctors, setDoctors] = useState<Doctor[]>([]);
-    const [details, setDetails] = useState<AppointmentDetail[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
-    const [loadingData, setLoadingData] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [validation, setValidation] = useState<ValidationErrors>({});
     const doctorSelectRef = useRef<HTMLSelectElement>(null);
@@ -77,50 +74,49 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     const selectedTimeRef = useRef<HTMLDivElement>(null);
     const flashAnimRef = useRef<Animation | null>(null);
 
-    // Load appointment data if not passed via state
-    useEffect(() => {
-        if (existingAppointment) {
-            prefillFormData(existingAppointment);
-            setLoadingData(false);
-        } else if (appointmentId) {
-            loadAppointmentData(appointmentId);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [existingAppointment, appointmentId]);
+    // Doctors + appointment-type options, both on useQuery (cached, shared app-wide).
+    const { data: employeesData } = useQuery(employeesQuery('?getAppointments=true'));
+    const doctors = useMemo<Doctor[]>(() => {
+        const list = ((employeesData?.employees ?? []) as unknown as Doctor[]).slice();
+        // "Clinic" floats to the top; everyone else keeps the server's SortOrder.
+        list.sort((a, b) => {
+            if (a.employee_name === 'Clinic') return -1;
+            if (b.employee_name === 'Clinic') return 1;
+            return 0;
+        });
+        return list;
+    }, [employeesData]);
 
-    useEffect(() => {
-        loadDoctors();
-        loadDetails();
-    }, []);
+    const { data: detailsData } = useQuery(appointmentDetailsQuery());
+    const details = (detailsData ?? []) as unknown as AppointmentDetail[];
 
-    useEffect(() => {
-        return () => {
-            flashAnimRef.current?.cancel();
-        };
-    }, []);
+    // Fetch the appointment only when it wasn't handed to us via router state.
+    const {
+        data: appointmentData,
+        isLoading: appointmentLoading,
+        isError: appointmentIsError,
+        error: appointmentError,
+    } = useQuery({
+        ...appointmentByIdQuery(appointmentId),
+        enabled: !existingAppointment && !!appointmentId,
+    });
 
-    const loadAppointmentData = async (id: number | string): Promise<void> => {
-        try {
-            setLoadingData(true);
-            const data = await fetchJSON<{ appointment?: ExistingAppointment }>(
-                `/api/appointments/${id}`,
-                { schema: appointment.appointmentById.response }
-            );
-            if (data.appointment) {
-                prefillFormData(data.appointment);
-            } else {
-                throw new Error('Appointment not found');
-            }
-        } catch (err) {
-            console.error('Error loading appointment:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
-        } finally {
-            setLoadingData(false);
-        }
-    };
+    // The appointment to seed the form from — router state wins, else the fetch.
+    const sourceAppointment: ExistingAppointment | null =
+        existingAppointment ?? (appointmentData?.appointment as ExistingAppointment | undefined) ?? null;
 
-    const prefillFormData = (appointment: ExistingAppointment): void => {
-        const dateTime = new Date(appointment.app_date);
+    // We're still loading only while a fetch is genuinely in flight.
+    const loadingData = !existingAppointment && !!appointmentId && appointmentLoading;
+
+    // Surface either a submit error or an appointment-load failure.
+    const displayError =
+        error ?? (appointmentIsError ? httpErrorMessage(appointmentError, 'Unknown error') : null);
+
+    // Seed the editable form once the source appointment resolves. Declared before
+    // the effect so it isn't "used before declaration"; the setState lives inside
+    // this function (not inline in the effect), so it isn't a cascading effect write.
+    const prefillFormData = (appt: ExistingAppointment): void => {
+        const dateTime = new Date(appt.app_date);
         const year = dateTime.getFullYear();
         const month = String(dateTime.getMonth() + 1).padStart(2, '0');
         const day = String(dateTime.getDate()).padStart(2, '0');
@@ -129,43 +125,26 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
         const datePart = `${year}-${month}-${day}`;
         setFormData({
-            PersonID: appointment.person_id ?? '',
+            PersonID: appt.person_id ?? '',
             AppDate: datePart,
             AppTime: `${hours}:${minutes}`,
-            AppDetail: appointment.app_detail || '',
-            DrID: String(appointment.dr_id || '')
+            AppDetail: appt.app_detail || '',
+            DrID: String(appt.dr_id || '')
         });
         setOriginalDate(datePart);
     };
 
-    const loadDoctors = async (): Promise<void> => {
-        try {
-            // Fetch all employees who can receive appointments (doctors, hygienists, etc.)
-            const data = await fetchJSON<{ employees?: Doctor[] }>('/api/employees?getAppointments=true', { schema: employee.employees.response });
-            const employees: Doctor[] = data?.employees || [];
-            // "Clinic" is the most common assignment, so float it to the top of the
-            // dropdown; everyone else keeps the server's SortOrder (Array.sort is stable).
-            employees.sort((a, b) => {
-                if (a.employee_name === 'Clinic') return -1;
-                if (b.employee_name === 'Clinic') return 1;
-                return 0;
-            });
-            setDoctors(employees);
-        } catch (err) {
-            console.error('Error loading employees:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
+    useEffect(() => {
+        if (sourceAppointment) {
+            prefillFormData(sourceAppointment);
         }
-    };
+    }, [sourceAppointment]);
 
-    const loadDetails = async (): Promise<void> => {
-        try {
-            const data = await fetchJSON<AppointmentDetail[]>('/api/appointment-details', { schema: appointment.appointmentDetails.response });
-            setDetails(data || []);
-        } catch (err) {
-            console.error('Error loading appointment details:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
-        }
-    };
+    useEffect(() => {
+        return () => {
+            flashAnimRef.current?.cancel();
+        };
+    }, []);
 
     const handleInputChange = (e: ChangeEvent<HTMLSelectElement | HTMLInputElement>): void => {
         const { name, value } = e.target;
@@ -348,10 +327,10 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                     </div>
 
                     <form onSubmit={handleSubmit} className={styles.form}>
-                        {error && (
+                        {displayError && (
                             <div className={cn(styles.alert, styles.alertError)}>
                                 <i className="fas fa-exclamation-circle"></i>
-                                <span>{error}</span>
+                                <span>{displayError}</span>
                             </div>
                         )}
 

@@ -30,11 +30,6 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
         logo_path: ''
     });
 
-    // Load doctors on component mount
-    useEffect(() => {
-        loadDoctors();
-    }, []);
-
     const loadDoctors = async () => {
         try {
             setLoading(true);
@@ -48,6 +43,12 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
             setLoading(false);
         }
     };
+
+    // Load doctors on component mount
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
+        loadDoctors();
+    }, []);
 
     const handleAdd = () => {
         setFormData({ doctor_name: '', doctor_email: '', logo_path: '' });

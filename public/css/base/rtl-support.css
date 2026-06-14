@@ -36,13 +36,11 @@
     margin-left: var(--spacing-xl);
 }
 
-/* Drawer/Modal RTL Adjustments */
+/* Drawer/Modal RTL Adjustments — the panel (.drawer-container, Modal's content)
+   pins to the left edge and slides in from the left; the backdrop never slides. */
 [dir="rtl"] .drawer-container {
     right: auto;
     left: 0;
-}
-
-[dir="rtl"] .drawer-overlay {
     animation: slideInLeft 0.3s ease;
 }
 

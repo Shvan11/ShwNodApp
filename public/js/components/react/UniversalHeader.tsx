@@ -1,24 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useGlobalState, type UserData } from '../../contexts/GlobalStateContext';
-import { useTheme } from '../../contexts/ThemeContext';
-import type { ResolvedTheme } from '../../core/theme';
-import { fetchJSON } from '@/core/http';
+import { useQuery } from '@tanstack/react-query';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { patientInfoQuery } from '@/query/queries';
 import TasksBell from './TasksBell';
-import * as patientContract from '@shared/contracts/patient.contract';
-import * as authContract from '@shared/contracts/auth.contract';
-
-// Header theme toggle is a simple 2-state Light ⇄ Dark switch driven by the
-// CURRENT resolved theme, so it shows the right state even when the saved
-// preference is 'auto' (follow-system). Clicking commits to an explicit
-// light|dark; the 'auto'/system option lives in Settings → General. The icon
-// shows the active theme (sun = light, moon = dark). Module-scoped for a stable
-// identity across renders.
-const RESOLVED_ICON: Record<ResolvedTheme, string> = {
-    light: 'fas fa-sun',
-    dark: 'fas fa-moon',
-};
+import ThemeToggle from './ThemeToggle';
+import UserMenu from './UserMenu';
 
 interface Patient {
     code: string | number;
@@ -54,81 +42,33 @@ const UniversalHeader = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { t } = useTranslation('common');
-    const { setUser } = useGlobalState();
-    const { resolvedTheme, setPreference } = useTheme();
-    const nextTheme: ResolvedTheme = resolvedTheme === 'dark' ? 'light' : 'dark';
+    // GlobalState already fetches /api/auth/me and exposes the user, so the
+    // header reads it from there instead of making its own duplicate request.
+    const { user } = useGlobalState();
 
-    const [currentPatient, setCurrentPatient] = useState<Patient | null>(null);
-    const [navigationContext, setNavigationContext] = useState<NavigationContext | null>(null);
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    // Patient code from the URL (/patient/:code/...) — drives the React Query read.
+    const patientCode = location.pathname.match(/\/patient\/(\d+)/)?.[1] ?? null;
 
-    const userControllerRef = useRef<AbortController | null>(null);
-    const patientControllerRef = useRef<AbortController | null>(null);
+    // Patient demographics from the shared React Query cache — the SAME key
+    // PatientShell uses on every patient sub-route, so this resolves from cache
+    // (no duplicate request, flash-free name) and refreshes live whenever a
+    // patient mutation invalidates qk.patient.info.
+    const { data: patient } = useQuery({
+        ...patientInfoQuery(patientCode ?? ''),
+        enabled: patientCode != null,
+    });
 
-    useEffect(() => {
-        userControllerRef.current?.abort();
-        userControllerRef.current = new AbortController();
-        loadCurrentUser(userControllerRef.current.signal);
-        return () => userControllerRef.current?.abort();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    useEffect(() => {
-        patientControllerRef.current?.abort();
-        patientControllerRef.current = new AbortController();
-        loadPatientData(patientControllerRef.current.signal);
-        rememberPatientView();
-        setupNavigationContext();
-        return () => patientControllerRef.current?.abort();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [location.pathname, location.search]);
-
-    const loadPatientData = (signal: AbortSignal) => {
-        const patientCode = extractPatientCodeFromURL();
-
-        if (patientCode) {
-            fetchJSON<{ person_id?: number; patient_name?: string; name?: string; [key: string]: unknown }>(`/api/patients/${patientCode}/info`, { signal, schema: patientContract.patientInfo.response })
-                .then(data => {
-                    // `/info` returns a single patient object (not an array). Map
-                    // it onto the header's {code,name} shape; person_id is the code.
-                    if (data && data.person_id) {
-                        setCurrentPatient({
-                            ...data,
-                            code: data.person_id,
-                            name: data.patient_name ?? data.name ?? '',
-                        });
-                    } else {
-                        setCurrentPatient(null);
-                    }
-                })
-                .catch(error => {
-                    if (error instanceof Error && error.name !== 'AbortError') {
-                        setCurrentPatient(null);
-                    }
-                });
+    // Header view-shapes, derived in render (compiler-memoized).
+    const currentPatient: Patient | null = patient
+        ? { ...patient, code: patient.person_id, name: patient.patient_name ?? '' }
+        : null;
+    const currentUser: User | null = user
+        ? {
+            username: user.username ?? '',
+            role: user.role ?? '',
+            fullName: typeof user.fullName === 'string' ? user.fullName : undefined,
         }
-    };
-
-    const loadCurrentUser = (signal: AbortSignal) => {
-        fetchJSON<{ success?: boolean; user?: User & UserData }>('/api/auth/me', { signal, schema: authContract.me.response })
-            .then(data => {
-                if (data && data.success && data.user) {
-                    setCurrentUser(data.user);
-                    setUser(data.user);
-                }
-            })
-            .catch(error => {
-                if (error instanceof Error && error.name !== 'AbortError') {
-                    // silently ignore — header degrades gracefully
-                }
-            });
-    };
-
-    const extractPatientCodeFromURL = (): string | null => {
-        const path = location.pathname;
-        const patientMatch = path.match(/\/patient\/(\d+)/);
-        return patientMatch ? patientMatch[1] : null;
-    };
+        : null;
 
     // Remember the last patient sub-view (works/photos/diagnosis/visits/payments…)
     // so the header's patient button returns there instead of always jumping to
@@ -137,14 +77,16 @@ const UniversalHeader = () => {
     const patientViewKey = (code: string | number) => `lastPatientView:${code}`;
 
     const rememberPatientView = () => {
-        const code = extractPatientCodeFromURL();
         // Only persist real sub-pages, not the bare /patient/:code redirect shell.
-        if (code && /\/patient\/\d+\/.+/.test(location.pathname)) {
-            sessionStorage.setItem(patientViewKey(code), location.pathname + location.search);
+        if (patientCode && /\/patient\/\d+\/.+/.test(location.pathname)) {
+            sessionStorage.setItem(patientViewKey(patientCode), location.pathname + location.search);
         }
     };
 
-    const setupNavigationContext = () => {
+    // Derived during render (was a setState-in-effect). document.referrer is
+    // constant for the page load; the back button shows when there's a referrer
+    // distinct from the current path.
+    const getNavigationContext = (): NavigationContext => {
         const referrer = document.referrer;
         const currentPath = window.location.pathname;
 
@@ -162,7 +104,7 @@ const UniversalHeader = () => {
             });
         }
 
-        setNavigationContext(context);
+        return context;
     };
 
     const getCurrentPageType = (url: string): string => {
@@ -245,6 +187,18 @@ const UniversalHeader = () => {
         ];
     };
 
+    // Derived in render (compiler-memoized) — declared after its helpers so
+    // there's no temporal-dead-zone access.
+    const navigationContext = getNavigationContext();
+
+    // Persist the last-viewed patient sub-page on navigation (a sessionStorage
+    // side effect). Declared below its helper for the React Compiler's
+    // declare-before-use immutability rule.
+    useEffect(() => {
+        rememberPatientView();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.pathname, location.search]);
+
     return (
         <header className="universal-header">
             <div className="header-container">
@@ -288,30 +242,11 @@ const UniversalHeader = () => {
                     {/* App-wide tasks bell */}
                     <TasksBell />
 
-                    {/* Theme toggle — 2-state Light ⇄ Dark (system default lives in Settings) */}
-                    <button
-                        type="button"
-                        className="theme-toggle-btn"
-                        onClick={() => setPreference(nextTheme)}
-                        aria-label={t('theme.toggleAria', {
-                            current: t(`theme.${resolvedTheme}`),
-                            next: t(`theme.${nextTheme}`),
-                        })}
-                        title={t('theme.switchToTitle', { mode: t(`theme.${nextTheme}`) })}
-                    >
-                        <i className={RESOLVED_ICON[resolvedTheme]} aria-hidden="true" />
-                    </button>
+                    {/* Theme toggle — sliding Light ⇄ Dark pill (system default lives in Settings) */}
+                    <ThemeToggle />
 
-                    {/* Current User Info */}
-                    {currentUser && (
-                        <div className="user-info">
-                            <i className="fas fa-user-circle" />
-                            <div className="user-details">
-                                <span className="user-name">{currentUser.fullName || currentUser.username}</span>
-                                <span className="user-role">{currentUser.role}</span>
-                            </div>
-                        </div>
-                    )}
+                    {/* Current User — click to open account menu (Change password / Log out) */}
+                    {currentUser && <UserMenu user={currentUser} />}
 
                     {/* Back Button */}
                     {navigationContext && navigationContext.breadcrumbs.length > 0 && (

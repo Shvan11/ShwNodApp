@@ -177,10 +177,10 @@
     text-transform: capitalize;
 }
 
-/* Back Button + Theme Toggle — share the white-alpha treatment so they read
-   as one control group against the fixed purple header gradient (both themes). */
-.back-btn,
-.theme-toggle-btn {
+/* Back Button — white-alpha treatment so it reads cleanly against the fixed
+   purple header gradient (both themes). The theme toggle is its own component
+   (ThemeToggle.module.css — a sliding pill). */
+.back-btn {
     background: rgba(255, 255, 255, 0.1);
     border: 2px solid rgba(255, 255, 255, 0.2);
     color: var(--color-white);
@@ -198,17 +198,6 @@
 .back-btn:hover {
     background: rgba(255, 255, 255, 0.2);
     transform: translateX(-2px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-}
-
-.theme-toggle-btn {
-    flex: 0 0 auto;
-    font-size: 1.05rem;
-}
-
-.theme-toggle-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
@@ -361,8 +350,7 @@
         margin-right: 0.25rem;
     }
 
-    .back-btn,
-    .theme-toggle-btn {
+    .back-btn {
         width: 36px;
         height: 36px;
         padding: 0.375rem;
@@ -432,8 +420,7 @@
         display: none;
     }
 
-    .back-btn,
-    .theme-toggle-btn {
+    .back-btn {
         width: 32px;
         height: 32px;
         padding: 0.25rem;
@@ -490,8 +477,7 @@
         display: none;
     }
 
-    .back-btn,
-    .theme-toggle-btn {
+    .back-btn {
         width: 30px;
         height: 30px;
         padding: 0.1875rem;
@@ -526,8 +512,7 @@
         font-size: 0.625rem;
     }
 
-    .back-btn,
-    .theme-toggle-btn {
+    .back-btn {
         width: 28px;
         height: 28px;
         font-size: 0.6875rem;
@@ -536,8 +521,7 @@
 
 /* Focus states for accessibility */
 .nav-btn:focus,
-.back-btn:focus,
-.theme-toggle-btn:focus {
+.back-btn:focus {
     outline: 2px solid rgba(255, 255, 255, 0.5);
     outline-offset: 2px;
 }

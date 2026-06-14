@@ -5,19 +5,23 @@
    DRAWER STYLES
    =========================================== */
 
+/* These drawers render through the shared <Modal> (Modal.tsx): the portal,
+   focus-trap, scroll-lock, Escape/backdrop dismiss, the dark backdrop tint +
+   fade, and the --z-index-modal (1040) layer all come from Modal.module.css.
+   .drawer-overlay is passed as Modal's overlayClassName and only adds the
+   frosted backdrop — backdrop-filter conflicts with no Modal rule, so it wins
+   regardless of stylesheet order. */
 .drawer-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
     -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
-    z-index: 1999;
-    animation: fadeIn 0.3s ease;
 }
 
+/* .drawer-container is Modal's contentClassName — the panel itself. It stays
+   position:fixed (pinned to the right edge, full height) so the overlay's flex
+   centering is irrelevant and no off-scale z-index is needed: it inherits
+   Modal's overlay stacking context, and confirm dialogs / toasts layer above.
+   The unlayered background/shadow/border-radius override Modal's @layer modal
+   surface defaults (square, edge-flush drawer — not a rounded centered card). */
 .drawer-container {
     position: fixed;
     top: 0;
@@ -26,13 +30,12 @@
     width: 900px;
     max-width: 100%;
     background: var(--surface);
+    border-radius: 0;
     box-shadow: -4px 0 24px rgba(0, 0, 0, 0.2);
     display: flex;
     flex-direction: column;
-    animation: slideInRight 0.3s ease;
-    z-index: 2000;
     overflow: hidden;
-    height: 100vh;
+    animation: slideInRight 0.3s ease;
 }
 
 .drawer-header {
@@ -254,54 +257,6 @@
 }
 
 /* ===========================================
-   CONFIRM DIALOG
-   =========================================== */
-
-.confirm-dialog-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
-    animation: fadeIn 0.2s ease;
-}
-
-.confirm-dialog {
-    background: var(--surface);
-    border-radius: 12px;
-    padding: 2rem;
-    max-width: 450px;
-    width: 90%;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-    animation: slideUp 0.3s ease;
-}
-
-.confirm-dialog-header h3 {
-    margin: 0 0 1rem 0;
-    color: var(--text-primary);
-    font-size: 1.3rem;
-}
-
-.confirm-dialog-body p {
-    margin: 0 0 1.5rem 0;
-    color: var(--text-secondary);
-    line-height: 1.5;
-}
-
-.confirm-dialog-footer {
-    display: flex;
-    gap: 1rem;
-    justify-content: flex-end;
-}
-
-/* ===========================================
    BUTTON VARIANTS (Drawer-specific)
    Scoped to .drawer-container so the canonical .btn-* definitions in
    buttons.css remain authoritative everywhere outside aligner drawers.
@@ -423,22 +378,6 @@
 /* ===========================================
    ANIMATIONS
    =========================================== */
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
 
 @keyframes slideInRight {
     from {

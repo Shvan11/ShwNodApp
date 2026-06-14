@@ -8,7 +8,7 @@
  *  2. In PRODUCTION (port 3000) express-session sets a `Secure` cookie and only
  *     emits Set-Cookie when the request looks HTTPS. Over plain http://localhost
  *     no cookie is set → every page redirects to /login.html. We send
- *     `X-Forwarded-Proto: https` so the cookie is issued. (Dev :5273 is secure=false,
+ *     `X-Forwarded-Proto: https` so the cookie is issued. (Dev :5173 is secure=false,
  *     but the header is harmless there, so we always send it.)
  *  3. The SPA holds open SSE connections, so Playwright `networkidle` NEVER fires.
  *     Navigate with `domcontentloaded` + an explicit `waitForSelector`.
@@ -17,7 +17,7 @@
  *  5. For CSS/layout checks do NOT combine `deviceScaleFactor` + `isMobile`; it
  *     distorts `window.innerWidth`. A plain `viewport` gives true CSS-px widths.
  *
- * Default target is the DEV server (Vite :5273) which has HMR + a non-secure cookie.
+ * Default target is the DEV server (Vite :5173) which has HMR + a non-secure cookie.
  * Override with E2E_BASE / E2E_USER / E2E_PASS env vars.
  */
 import { chromium } from 'playwright';
@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const STATE_FILE = path.join(HERE, '.auth-state.json');
 
-export const E2E_BASE = process.env.E2E_BASE || 'http://localhost:5273';
+export const E2E_BASE = process.env.E2E_BASE || 'http://localhost:5173';
 const CREDS = {
   username: process.env.E2E_USER || 'Admin',
   password: process.env.E2E_PASS || 'Yarmok11',

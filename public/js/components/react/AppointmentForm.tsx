@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, type ChangeEvent, type FormEvent } from 'react';
 import cn from 'classnames';
+import { useQuery } from '@tanstack/react-query';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
 import { useToast } from '../../contexts/ToastContext';
-import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import * as appointment from '@shared/contracts/appointment.contract';
-import * as employee from '@shared/contracts/employee.contract';
+import { employeesQuery, appointmentDetailsQuery } from '@/query/queries';
 import styles from './AppointmentForm.module.css';
 
 interface AppointmentFormData {
@@ -62,8 +63,6 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
         AppDetail: '',
         DrID: ''
     });
-    const [doctors, setDoctors] = useState<Doctor[]>([]);
-    const [details, setDetails] = useState<AppointmentDetail[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [validation, setValidation] = useState<ValidationErrors>({});
@@ -73,45 +72,29 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
     const selectedTimeRef = useRef<HTMLDivElement>(null);
     const flashAnimRef = useRef<Animation | null>(null);
 
-    useEffect(() => {
-        loadDoctors();
-        loadDetails();
-    }, []);
+    // Doctors (employees who can receive appointments) + appointment-type options,
+    // both on useQuery so they're cached and shared with the rest of the app.
+    const { data: employeesData } = useQuery(employeesQuery('?getAppointments=true'));
+    // "Clinic" is the most common assignment, so float it to the top of the
+    // dropdown; everyone else keeps the server's SortOrder (Array.sort is stable).
+    const doctors = useMemo<Doctor[]>(() => {
+        const list = ((employeesData?.employees ?? []) as unknown as Doctor[]).slice();
+        list.sort((a, b) => {
+            if (a.employee_name === 'Clinic') return -1;
+            if (b.employee_name === 'Clinic') return 1;
+            return 0;
+        });
+        return list;
+    }, [employeesData]);
+
+    const { data: detailsData } = useQuery(appointmentDetailsQuery());
+    const details = (detailsData ?? []) as unknown as AppointmentDetail[];
 
     useEffect(() => {
         return () => {
             flashAnimRef.current?.cancel();
         };
     }, []);
-
-    const loadDoctors = async (): Promise<void> => {
-        try {
-            // Fetch all employees who can receive appointments (doctors, hygienists, etc.)
-            const data = await fetchJSON<{ employees?: Doctor[] }>('/api/employees?getAppointments=true', { schema: employee.employees.response });
-            const employees: Doctor[] = data?.employees || [];
-            // "Clinic" is the most common assignment, so float it to the top of the
-            // dropdown; everyone else keeps the server's SortOrder (Array.sort is stable).
-            employees.sort((a, b) => {
-                if (a.employee_name === 'Clinic') return -1;
-                if (b.employee_name === 'Clinic') return 1;
-                return 0;
-            });
-            setDoctors(employees);
-        } catch (err) {
-            console.error('Error loading employees:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
-        }
-    };
-
-    const loadDetails = async (): Promise<void> => {
-        try {
-            const data = await fetchJSON<AppointmentDetail[]>('/api/appointment-details', { schema: appointment.appointmentDetails.response });
-            setDetails(data || []);
-        } catch (err) {
-            console.error('Error loading appointment details:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
-        }
-    };
 
     const handleInputChange = (e: ChangeEvent<HTMLSelectElement | HTMLInputElement>): void => {
         const { name, value } = e.target;

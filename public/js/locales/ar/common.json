@@ -13,5 +13,13 @@
   "language": {
     "label": "اللغة",
     "description": "لغة عرض التطبيق. تُحفظ على هذا الجهاز فقط."
+  },
+  "user": {
+    "menuAria": "قائمة الحساب لـ {{name}}",
+    "changePassword": "تغيير كلمة المرور",
+    "logout": "تسجيل الخروج",
+    "logoutConfirm": "هل أنت متأكد أنك تريد تسجيل الخروج؟",
+    "logoutTitle": "تسجيل الخروج",
+    "logoutFailed": "فشل تسجيل الخروج"
   }
 }

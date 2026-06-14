@@ -1,13 +1,9 @@
-import { useState, useEffect, useCallback, ChangeEvent } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 import type { HistoryEntry } from '@/types/api.types';
-import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import {
-    currentExchangeRate as currentExchangeRateContract,
-    exchangeRates as exchangeRatesContract,
-    updateExchangeRate as updateExchangeRateContract,
-    type CurrentExchangeRateResponse,
-    type ExchangeRatesResponse,
-} from '@shared/contracts/payment.contract';
+import { useQuery } from '@tanstack/react-query';
+import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { updateExchangeRate as updateExchangeRateContract } from '@shared/contracts/payment.contract';
+import { currentExchangeRateQuery, exchangeRatesHistoryQuery } from '@/query/queries';
 import { useToast } from '../../contexts/ToastContext';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
 import styles from './ExchangeRatesSettings.module.css';
@@ -29,59 +25,45 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
     const toast = useToast();
     const today = todayIso();
 
-    const [todayRate, setTodayRate] = useState<number | null>(null);
-    const [todayLoading, setTodayLoading] = useState(true);
     const [editing, setEditing] = useState(false);
     const [draftValue, setDraftValue] = useState('');
     const [saving, setSaving] = useState(false);
 
     const [fromDate, setFromDate] = useState<string>(daysAgoIso(90));
     const [toDate, setToDate] = useState<string>(today);
-    const [history, setHistory] = useState<HistoryEntry[]>([]);
-    const [historyLoading, setHistoryLoading] = useState(true);
 
-    const loadTodayRate = useCallback(async () => {
-        try {
-            setTodayLoading(true);
-            const data = await fetchJSON<CurrentExchangeRateResponse>('/api/getCurrentExchangeRate', {
-                schema: currentExchangeRateContract.response,
-            });
-            setTodayRate(data?.exchangeRate || null);
-        } catch (error) {
-            // 404 = no rate recorded for today — a normal empty state, not an error.
-            if ((error as HttpError).status !== 404) {
-                console.error('Error loading today rate:', error);
-                toast.error('Failed to load today\'s exchange rate');
-            }
-            setTodayRate(null);
-        } finally {
-            setTodayLoading(false);
-        }
-    }, [toast]);
+    // Today's rate (404 = "not set today", a normal empty state → no retry/toast)
+    // and the rate history for the selected range, both on useQuery.
+    const {
+        data: todayData,
+        isLoading: todayLoading,
+        isError: todayIsError,
+        error: todayError,
+        refetch: refetchToday,
+    } = useQuery(currentExchangeRateQuery());
+    const todayRate = todayData?.exchangeRate ?? null;
 
-    const loadHistory = useCallback(async (from: string, to: string) => {
-        try {
-            setHistoryLoading(true);
-            const data = await fetchJSON<ExchangeRatesResponse>(`/api/exchange-rates?from=${from}&to=${to}`, {
-                schema: exchangeRatesContract.response,
-            });
-            setHistory(data?.rates ?? []);
-        } catch (error) {
-            console.error('Error loading history:', error);
-            toast.error(httpErrorMessage(error, 'Failed to load exchange rate history'));
-            setHistory([]);
-        } finally {
-            setHistoryLoading(false);
+    const {
+        data: historyData,
+        isLoading: historyLoading,
+        isError: historyIsError,
+        error: historyError,
+        refetch: refetchHistory,
+    } = useQuery(exchangeRatesHistoryQuery(fromDate, toDate));
+    const history = (historyData?.rates ?? []) as HistoryEntry[];
+
+    // A genuine (non-404) failure to load today's rate is worth a toast; a 404 isn't.
+    useEffect(() => {
+        if (todayIsError && (todayError as HttpError | null)?.status !== 404) {
+            toast.error("Failed to load today's exchange rate");
         }
-    }, [toast]);
+    }, [todayIsError, todayError, toast]);
 
     useEffect(() => {
-        loadTodayRate();
-    }, [loadTodayRate]);
-
-    useEffect(() => {
-        loadHistory(fromDate, toDate);
-    }, [fromDate, toDate, loadHistory]);
+        if (historyIsError) {
+            toast.error(httpErrorMessage(historyError, 'Failed to load exchange rate history'));
+        }
+    }, [historyIsError, historyError, toast]);
 
     useEffect(() => {
         onChangesUpdate(editing);
@@ -115,11 +97,11 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
                 schema: updateExchangeRateContract.response,
             });
             toast.success("Today's exchange rate updated");
-            setTodayRate(Math.round(rate));
             setEditing(false);
             setDraftValue('');
+            refetchToday();
             if (toDate >= today && fromDate <= today) {
-                loadHistory(fromDate, toDate);
+                refetchHistory();
             }
         } catch (error) {
             console.error('Error saving rate:', error);

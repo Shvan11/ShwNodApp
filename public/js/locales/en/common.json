@@ -13,5 +13,13 @@
   "language": {
     "label": "Language",
     "description": "Display language for this app. Saved on this PC only."
+  },
+  "user": {
+    "menuAria": "Account menu for {{name}}",
+    "changePassword": "Change password",
+    "logout": "Log out",
+    "logoutConfirm": "Are you sure you want to log out?",
+    "logoutTitle": "Log out",
+    "logoutFailed": "Logout failed"
   }
 }

@@ -46,4 +46,22 @@ describe('qk query-key factory', () => {
     expect(qk.patient.all(1)).not.toEqual(qk.patient.all(2));
     expect(qk.work.all(1)).not.toEqual(qk.work.all(2));
   });
+
+  it('canonicalizes number and string ids to the SAME key (one cache entry, not two)', () => {
+    // The split this guards against: a patient arrives as `number` from
+    // work.person_id / selectedPatient.person_id but as `string` from the
+    // /patient/:id URL param. Both must resolve to the same entry.
+    expect(qk.patient.info(7)).toEqual(qk.patient.info('7'));
+    expect(qk.patient.all(7)).toEqual(qk.patient.all('7'));
+    expect(qk.work.details(5)).toEqual(qk.work.details('5'));
+    expect(qk.visit.byId(9)).toEqual(qk.visit.byId('9'));
+  });
+
+  it('a number-keyed parent invalidation prefix-matches a string-keyed read', () => {
+    // PaymentModal/WorkComponent invalidate qk.work.all(work_id) with a NUMBER;
+    // every work read keys off a STRING (?? '' URL param). The prefix match must
+    // survive the type difference or the invalidation silently misses the cache.
+    expect(isPrefix(qk.work.all(5), qk.work.details('5'))).toBe(true);
+    expect(isPrefix(qk.patient.all(7), qk.patient.info('7'))).toBe(true);
+  });
 });

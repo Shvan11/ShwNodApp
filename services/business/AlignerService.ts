@@ -29,6 +29,8 @@ export type AlignerErrorCode =
   | 'UPPER_ALIGNER_LIMIT_EXCEEDED'
   | 'LOWER_ALIGNER_LIMIT_EXCEEDED'
   | 'BATCH_NOT_DELIVERED'
+  | 'BATCH_NOT_MANUFACTURED'
+  | 'INVALID_DATE_ORDER'
   | 'VALIDATION_ERROR'
   | 'MISSING_DOCTOR_NAME'
   | 'EMAIL_ALREADY_EXISTS'
@@ -571,6 +573,24 @@ function mapBatchUpdateError(message: string): AlignerErrorCode | null {
 }
 
 /**
+ * Map the plain `Error` messages thrown by `aligner-queries.ts#updateBatchStatus`
+ * (MANUFACTURE/DELIVER) onto typed error codes, so the status routes return a
+ * 400 with a clear reason instead of a generic 500. Kept in sync with the throws
+ * in `updateBatchStatus`. Returns null for unrecognised (infrastructure) errors.
+ */
+function mapBatchStatusError(message: string): AlignerErrorCode | null {
+  if (message === 'Aligner batch not found') return 'BATCH_NOT_FOUND';
+  if (message === 'Cannot deliver: batch not yet manufactured')
+    return 'BATCH_NOT_MANUFACTURED';
+  if (
+    message.startsWith('Cannot deliver: delivery date cannot be earlier') ||
+    message.startsWith('Cannot set manufacture date later')
+  )
+    return 'INVALID_DATE_ORDER';
+  return null;
+}
+
+/**
  * Validate and update a batch
  *
  * Business Rules:
@@ -721,7 +741,15 @@ export async function markBatchDelivered(
 
     return result;
   } catch (error) {
-    log.error('Error marking batch as delivered:', { error: error instanceof Error ? error.message : String(error) });
+    // updateBatchStatus throws plain Error()s for business-rule violations;
+    // translate the recognised ones to a typed 400 (see mapBatchStatusError).
+    if (error instanceof AlignerValidationError) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    const errorCode = mapBatchStatusError(message);
+    if (errorCode) {
+      throw new AlignerValidationError(message, errorCode, { batchId: parsedBatchId });
+    }
+    log.error('Error marking batch as delivered:', { error: message });
     throw error;
   }
 }
@@ -758,7 +786,15 @@ export async function markBatchManufactured(
     log.info(`Batch ${parsedBatchId}: ${result.message}`);
     return result;
   } catch (error) {
-    log.error('Error marking batch as manufactured:', { error: error instanceof Error ? error.message : String(error) });
+    // updateBatchStatus throws plain Error()s for business-rule violations;
+    // translate the recognised ones to a typed 400 (see mapBatchStatusError).
+    if (error instanceof AlignerValidationError) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    const errorCode = mapBatchStatusError(message);
+    if (errorCode) {
+      throw new AlignerValidationError(message, errorCode, { batchId: parsedBatchId });
+    }
+    log.error('Error marking batch as manufactured:', { error: message });
     throw error;
   }
 }

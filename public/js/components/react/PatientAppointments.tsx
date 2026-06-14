@@ -30,11 +30,6 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
     const [error, setError] = useState<string | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
-    useEffect(() => {
-        loadAppointments();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [personId]);
-
     const loadAppointments = async (): Promise<void> => {
         try {
             setLoading(true);
@@ -48,6 +43,12 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
+        loadAppointments();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [personId]);
 
     const handleEdit = (appointment: PatientAppointment): void => {
         // Navigate to edit page with appointment data as state

@@ -1958,7 +1958,6 @@ const PatientSets: React.FC = () => {
                     workId={patient.workid}
                     doctors={doctors}
                     allSets={alignerSets}
-                    defaultDoctorId={doctorId}
                     folderPath={editingSet ? generateFolderPath(editingSet) : null}
                 />
             )}

@@ -1572,7 +1572,14 @@ export async function updateBatchStatus(
       if (manufactured && target === null) {
         return { ...base, wasAlreadyManufactured: true, message: 'Batch already manufactured' };
       }
-      await trx.updateTable('aligner_batches').set({ manufacture_date: target ?? today }).where('aligner_batch_id', '=', batchId).execute();      return { ...base, message: manufactured ? 'Manufacture date updated' : 'Batch marked as manufactured' };
+      const newManufactureDate = target ?? today;
+      // A manufacture date later than an existing delivery date is nonsensical —
+      // the batch can't be made after it was handed to the patient. (date columns
+      // are 'YYYY-MM-DD' strings, so lexical compare == chronological compare.)
+      if (batch.delivered_to_patient_date && newManufactureDate > batch.delivered_to_patient_date) {
+        throw new Error('Cannot set manufacture date later than the delivery date');
+      }
+      await trx.updateTable('aligner_batches').set({ manufacture_date: newManufactureDate }).where('aligner_batch_id', '=', batchId).execute();      return { ...base, message: manufactured ? 'Manufacture date updated' : 'Batch marked as manufactured' };
     }
 
     if (action === 'DELIVER') {
@@ -1580,7 +1587,13 @@ export async function updateBatchStatus(
       if (delivered && target === null) {
         return { ...base, wasAlreadyDelivered: true, message: 'Batch already delivered' };
       }
-      await trx.updateTable('aligner_batches').set({ delivered_to_patient_date: target ?? today }).where('aligner_batch_id', '=', batchId).execute();
+      const newDeliveryDate = target ?? today;
+      // Delivery can't predate manufacture — you can't hand over a batch that
+      // wasn't made yet. (manufacture_date is non-null here, enforced above.)
+      if (batch.manufacture_date && newDeliveryDate < batch.manufacture_date) {
+        throw new Error('Cannot deliver: delivery date cannot be earlier than the manufacture date');
+      }
+      await trx.updateTable('aligner_batches').set({ delivered_to_patient_date: newDeliveryDate }).where('aligner_batch_id', '=', batchId).execute();
 
       const maxSeq = await trx
         .selectFrom('aligner_batches')

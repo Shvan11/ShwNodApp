@@ -1,4 +1,5 @@
-import React, { useState, useEffect, ChangeEvent, FormEvent, MouseEvent } from 'react';
+import React, { useState, ChangeEvent, FormEvent } from 'react';
+import Modal from './Modal';
 import { copyToClipboard } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -36,7 +37,6 @@ interface SetFormDrawerProps {
     workId: number;
     doctors?: AlignerDoctorMinimal[];
     allSets?: AlignerSet[];
-    defaultDoctorId?: string | number;
     folderPath?: string | null;
 }
 
@@ -48,25 +48,66 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
     workId,
     doctors,
     allSets = [],
-    defaultDoctorId,
     folderPath
 }) => {
     const toast = useToast();
     const confirm = useConfirm();
-    const [formData, setFormData] = useState<SetFormData>({
-        set_sequence: '',
-        type: '',
-        upper_aligners_count: '',
-        lower_aligners_count: '',
-        days: '',
-        aligner_dr_id: '',
-        set_url: '',
-        set_pdf_url: '',
-        set_video: '',
-        set_cost: '',
-        currency: 'USD',
-        notes: '',
-        is_active: true
+
+    // In add mode, inherit the doctor from the earliest existing set — but only
+    // when that doctor still exists in the dropdown. Used both to seed the form
+    // and to back-fill once the doctors list finishes loading.
+    const computeDefaultDoctor = (): number | string => {
+        if (set || allSets.length === 0) return '';
+        const firstSet = allSets.reduce((min, s) =>
+            (s.set_sequence || Infinity) < (min.set_sequence || Infinity) ? s : min
+        , allSets[0]);
+        if (firstSet.aligner_dr_id && doctors?.some(d => d.dr_id === firstSet.aligner_dr_id)) {
+            return firstSet.aligner_dr_id;
+        }
+        return '';
+    };
+
+    // The drawer is mounted fresh each time it opens (parent renders it only while
+    // open), so the initial form state IS the on-open reset — seed it lazily here
+    // instead of syncing it in an effect.
+    const [formData, setFormData] = useState<SetFormData>(() => {
+        if (set) {
+            // Edit mode — populate from the existing set
+            return {
+                set_sequence: set.set_sequence || '',
+                type: set.type || '',
+                upper_aligners_count: set.upper_aligners_count || '',
+                lower_aligners_count: set.lower_aligners_count || '',
+                days: set.days || '',
+                aligner_dr_id: set.aligner_dr_id || '',
+                set_url: set.set_url || '',
+                set_pdf_url: set.set_pdf_url || '',
+                set_video: set.set_video || '',
+                set_cost: set.set_cost || '',
+                currency: set.currency || 'USD',
+                notes: set.notes || '',
+                is_active: set.is_active !== undefined ? set.is_active : true
+            };
+        }
+        // Add mode — next sequence + inherited doctor
+        const maxSequence = allSets.length > 0
+            ? Math.max(...allSets.map(s => s.set_sequence || 0))
+            : 0;
+        return {
+            set_sequence: maxSequence + 1,
+            type: '',
+            upper_aligners_count: '',
+            lower_aligners_count: '',
+            days: '',
+            aligner_dr_id: computeDefaultDoctor(),
+            set_url: '',
+            set_pdf_url: '',
+            set_video: '',
+            set_cost: '',
+            currency: 'USD',
+            notes: '',
+            is_active: true
+        };
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
@@ -74,7 +115,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
     const [activeTab, setActiveTab] = useState<string>('details');
     const [pdfFile, setPdfFile] = useState<File | null>(null);
     const [deletingPdf, setDeletingPdf] = useState<boolean>(false);
-    const [displaySetCost, setDisplaySetCost] = useState('');
+    const [displaySetCost, setDisplaySetCost] = useState(() => (set?.set_cost ? formatNumber(set.set_cost) : ''));
 
     // Check if an inactive set can be reactivated
     const cannotReactivate = (): boolean => {
@@ -101,70 +142,18 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
         return hasNewerSetWithBatches;
     };
 
-    useEffect(() => {
-        if (isOpen && set) {
-            // Edit mode - populate form
-            setFormData({
-                set_sequence: set.set_sequence || '',
-                type: set.type || '',
-                upper_aligners_count: set.upper_aligners_count || '',
-                lower_aligners_count: set.lower_aligners_count || '',
-                days: set.days || '',
-                aligner_dr_id: set.aligner_dr_id || '',
-                set_url: set.set_url || '',
-                set_pdf_url: set.set_pdf_url || '',
-                set_video: set.set_video || '',
-                set_cost: set.set_cost || '',
-                currency: set.currency || 'USD',
-                notes: set.notes || '',
-                is_active: set.is_active !== undefined ? set.is_active : true
-            });
-            setDisplaySetCost(set.set_cost ? formatNumber(set.set_cost) : '');
-        } else if (isOpen) {
-            // Add mode - reset form with auto-populated values
-
-            // Calculate next SetSequence as max existing sequence + 1
-            const maxSequence = allSets.length > 0
-                ? Math.max(...allSets.map(s => s.set_sequence || 0))
-                : 0;
-            const nextSequence = maxSequence + 1;
-
-            // Determine default doctor ID
-            // Only auto-populate if patient has existing sets (inherit from Set 1)
-            // If no previous sets, leave empty — user must select manually
-            let defaultDoctor: number | string = '';
-            if (allSets.length > 0) {
-                const firstSet = allSets.reduce((min, s) =>
-                    (s.set_sequence || Infinity) < (min.set_sequence || Infinity) ? s : min
-                , allSets[0]);
-                if (firstSet.aligner_dr_id) {
-                    const doctorExists = doctors?.find(d => d.dr_id === firstSet.aligner_dr_id);
-                    if (doctorExists) {
-                        defaultDoctor = firstSet.aligner_dr_id;
-                    }
-                }
-            }
-
-            setFormData({
-                set_sequence: nextSequence,
-                type: '',
-                upper_aligners_count: '',
-                lower_aligners_count: '',
-                days: '',
-                aligner_dr_id: defaultDoctor,
-                set_url: '',
-                set_pdf_url: '',
-                set_video: '',
-                set_cost: '',
-                currency: 'USD',
-                notes: '',
-                is_active: true
-            });
-            setDisplaySetCost('');
+    // In add mode the drawer can open before the doctors list has loaded (the
+    // body shows a spinner until it does). When the list arrives, back-fill the
+    // inherited default once, if the user hasn't already picked one. This is
+    // React's sanctioned render-phase state adjustment — no setState-in-effect.
+    const [doctorsBackfilled, setDoctorsBackfilled] = useState(() => (doctors?.length ?? 0) > 0);
+    if (!doctorsBackfilled && (doctors?.length ?? 0) > 0) {
+        setDoctorsBackfilled(true);
+        if (!set && !formData.aligner_dr_id) {
+            const dflt = computeDefaultDoctor();
+            if (dflt) setFormData(prev => ({ ...prev, aligner_dr_id: dflt }));
         }
-        setErrors({});
-        setPdfFile(null); // Reset PDF file selection
-    }, [isOpen, set, doctors, allSets, defaultDoctorId]);
+    }
 
     const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>): void => {
         const { name, value, type } = e.target;
@@ -321,380 +310,385 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
         }
     };
 
-    if (!isOpen) return null;
+    // Block dismissal (backdrop / X / Escape) while a save is in flight so the
+    // set edit can't be abandoned mid-request.
+    const handleClose = () => {
+        if (!saving) onClose();
+    };
 
     // Check if doctors are loaded
     const doctorsLoaded = doctors && doctors.length > 0;
 
     return (
-        // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss
-        <div className="drawer-overlay" onClick={onClose}>
-            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss */}
-            <div className="drawer-container" onClick={(e: MouseEvent) => e.stopPropagation()}>
-                <div className="drawer-header">
-                    <h2>{set ? 'Edit Aligner Set' : 'Add New Aligner Set'}</h2>
-                    <button className="close-btn" onClick={onClose}>
-                        <i className="fas fa-times"></i>
-                    </button>
-                </div>
-
-                <div className="drawer-body">
-                    {!doctorsLoaded && !set ? (
-                        <div className="drawer-loading-container">
-                            <div className="spinner"></div>
-                            <p>Loading doctors list...</p>
-                        </div>
-                    ) : (
-                        <form onSubmit={handleSubmit} className="drawer-form-flex">
-                            {/* Tab Navigation */}
-                            <div className="form-tabs">
-                                <button
-                                    type="button"
-                                    className={`form-tab ${activeTab === 'details' ? 'active' : ''}`}
-                                    onClick={() => setActiveTab('details')}
-                                >
-                                    <i className="fas fa-teeth"></i>
-                                    <span>Aligner Details</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`form-tab ${activeTab === 'resources' ? 'active' : ''}`}
-                                    onClick={() => setActiveTab('resources')}
-                                >
-                                    <i className="fas fa-link"></i>
-                                    <span>Resources & Payment</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`form-tab ${activeTab === 'settings' ? 'active' : ''}`}
-                                    onClick={() => setActiveTab('settings')}
-                                >
-                                    <i className="fas fa-cog"></i>
-                                    <span>Notes & Settings</span>
-                                </button>
-                            </div>
-
-                            {/* Action Buttons - Top */}
-                            <div className="drawer-footer drawer-footer-top">
-                                <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? (
-                                        <>
-                                            <i className="fas fa-spinner fa-spin"></i> Saving...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <i className="fas fa-save"></i> {set ? 'Update Set' : 'Create Set'}
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-
-                            {/* Tab 1: Aligner Details */}
-                            <div className={`tab-content ${activeTab === 'details' ? 'active' : ''}`}>
-                                <div className="form-two-column-container">
-                                    <div className="form-column">
-                                        <div className="form-field">
-                                            <label htmlFor="SetSequence">
-                                                Set Sequence <span className="required">*</span>
-                                            </label>
-                                            <input
-                                                type="number"
-                                                id="SetSequence"
-                                                name="set_sequence"
-                                                value={formData.set_sequence}
-                                                onChange={handleChange}
-                                                className={errors.set_sequence ? 'error' : ''}
-                                                min="1"
-                                            />
-                                            {errors.set_sequence && (
-                                                <span className="error-message">{errors.set_sequence}</span>
-                                            )}
-                                        </div>
-
-                                        <div className="form-field">
-                                            <label htmlFor="UpperAlignersCount">Upper Aligners</label>
-                                            <input
-                                                type="number"
-                                                id="UpperAlignersCount"
-                                                name="upper_aligners_count"
-                                                value={formData.upper_aligners_count}
-                                                onChange={handleChange}
-                                                min="0"
-                                            />
-                                        </div>
-
-                                        <div className="form-field">
-                                            <label htmlFor="Days">Treatment Days</label>
-                                            <input
-                                                type="number"
-                                                id="Days"
-                                                name="days"
-                                                value={formData.days}
-                                                onChange={handleChange}
-                                                min="0"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="form-column">
-                                        <div className="form-field">
-                                            <label htmlFor="type">Type</label>
-                                            <select
-                                                id="type"
-                                                name="type"
-                                                value={formData.type}
-                                                onChange={handleChange}
-                                            >
-                                                <option value="">Select Type</option>
-                                                <option value="Initial">Initial</option>
-                                                <option value="Refinement">Refinement</option>
-                                                <option value="Revision">Revision</option>
-                                            </select>
-                                        </div>
-
-                                        <div className="form-field">
-                                            <label htmlFor="LowerAlignersCount">Lower Aligners</label>
-                                            <input
-                                                type="number"
-                                                id="LowerAlignersCount"
-                                                name="lower_aligners_count"
-                                                value={formData.lower_aligners_count}
-                                                onChange={handleChange}
-                                                min="0"
-                                            />
-                                        </div>
-
-                                        <div className="form-field">
-                                            <label htmlFor="AlignerDrID">
-                                                Aligner Doctor <span className="required">*</span>
-                                            </label>
-                                            <select
-                                                id="AlignerDrID"
-                                                name="aligner_dr_id"
-                                                value={formData.aligner_dr_id}
-                                                onChange={handleChange}
-                                                className={errors.aligner_dr_id ? 'error' : ''}
-                                            >
-                                                <option value="">Select Doctor</option>
-                                                {doctors && doctors.map(doctor => (
-                                                    <option key={doctor.dr_id} value={doctor.dr_id}>
-                                                        {doctor.doctor_name === 'Admin' ? doctor.doctor_name : `Dr. ${doctor.doctor_name}`}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            {errors.aligner_dr_id && (
-                                                <span className="error-message">{errors.aligner_dr_id}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Tab 2: Resources & Payment */}
-                            <div className={`tab-content ${activeTab === 'resources' ? 'active' : ''}`}>
-                                <div className="form-two-column-container">
-                                    <div className="form-column">
-                                        <div className="form-field">
-                                            <label htmlFor="SetUrl">Set URL</label>
-                                            <input
-                                                type="url"
-                                                id="SetUrl"
-                                                name="set_url"
-                                                value={formData.set_url}
-                                                onChange={handleChange}
-                                                placeholder="https://..."
-                                            />
-                                        </div>
-
-                                        <div className="form-field">
-                                            <label htmlFor="SetPdfUrl">PDF URL (Google Drive)</label>
-                                            <input
-                                                type="url"
-                                                id="SetPdfUrl"
-                                                name="set_pdf_url"
-                                                value={formData.set_pdf_url}
-                                                onChange={handleChange}
-                                                placeholder="https://drive.google.com/..."
-                                            />
-                                        </div>
-
-                                        <div className="form-field">
-                                            <label htmlFor="SetVideo">Case Video URL (YouTube)</label>
-                                            <input
-                                                type="url"
-                                                id="SetVideo"
-                                                name="set_video"
-                                                value={formData.set_video}
-                                                onChange={handleChange}
-                                                placeholder="https://www.youtube.com/watch?v=..."
-                                            />
-                                            <small className="pdf-upload-info">
-                                                Add YouTube unlisted video URL for case explanation
-                                            </small>
-                                        </div>
-
-                                        {/* PDF Upload Section */}
-                                        <div className="form-field">
-                                            <label htmlFor="set-pdf-file">PDF File</label>
-                                            {formData.set_pdf_url ? (
-                                                <div className="pdf-uploaded-status">
-                                                    <div className="pdf-status-header">
-                                                        <i className="fas fa-file-pdf"></i>
-                                                        <span>PDF Uploaded</span>
-                                                    </div>
-                                                    <div className="pdf-status-actions">
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-secondary btn-sm"
-                                                            onClick={() => window.open(formData.set_pdf_url, '_blank')}
-                                                        >
-                                                            <i className="fas fa-external-link-alt"></i> View PDF
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-danger btn-sm"
-                                                            onClick={handlePdfDelete}
-                                                            disabled={deletingPdf}
-                                                        >
-                                                            {deletingPdf ? (
-                                                                <>
-                                                                    <i className="fas fa-spinner fa-spin"></i> Deleting...
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <i className="fas fa-trash"></i> Delete PDF
-                                                                </>
-                                                            )}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div>
-                                                    {folderPath && (
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-secondary pdf-upload-btn-full"
-                                                            onClick={openFolder}
-                                                        >
-                                                            <i className="fas fa-folder-open"></i> Open Patient Folder
-                                                        </button>
-                                                    )}
-                                                    <input
-                                                        id="set-pdf-file"
-                                                        type="file"
-                                                        accept=".pdf,application/pdf"
-                                                        className="pdf-file-input"
-                                                        onClick={handleFileInputClick}
-                                                        onChange={handleFileChange}
-                                                    />
-                                                    {pdfFile && (
-                                                        <div className="pdf-file-selected">
-                                                            <i className="fas fa-check-circle"></i> {pdfFile.name} selected
-                                                        </div>
-                                                    )}
-                                                    <div className="pdf-file-hint">
-                                                        <i className="fas fa-info-circle"></i> The folder path is automatically copied to your clipboard when you click "Choose File". Paste it in the file dialog address bar to navigate to the set folder.
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="form-column">
-                                        <div className="form-field">
-                                            <label htmlFor="SetCost">Set Cost</label>
-                                            <input
-                                                type="text"
-                                                id="SetCost"
-                                                name="set_cost"
-                                                value={displaySetCost}
-                                                onChange={(e) => {
-                                                    const digits = e.target.value.replace(/[^\d]/g, '');
-                                                    const num = parseInt(digits, 10) || 0;
-                                                    setDisplaySetCost(num ? num.toLocaleString('en-US') : '');
-                                                    setFormData(prev => ({ ...prev, set_cost: num }));
-                                                }}
-                                                onBlur={() => setDisplaySetCost(formData.set_cost ? formatNumber(formData.set_cost) : '')}
-                                                placeholder="Enter cost"
-                                            />
-                                        </div>
-
-                                        <div className="form-field">
-                                            <label htmlFor="Currency">Currency</label>
-                                            <select
-                                                id="Currency"
-                                                name="currency"
-                                                value={formData.currency}
-                                                onChange={handleChange}
-                                            >
-                                                <option value="USD">USD</option>
-                                                <option value="IQD">IQD</option>
-                                                <option value="EUR">EUR</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Tab 3: Notes & Settings */}
-                            <div className={`tab-content ${activeTab === 'settings' ? 'active' : ''}`}>
-                                <div className="form-field">
-                                    <label htmlFor="Notes">Notes</label>
-                                    <textarea
-                                        id="Notes"
-                                        name="notes"
-                                        value={formData.notes}
-                                        onChange={handleChange}
-                                        rows={4}
-                                        placeholder="Additional notes..."
-                                    />
-                                </div>
-
-                                <div className="form-field-checkbox">
-                                    {cannotReactivate() ? (
-                                        <div className="warning-message-box">
-                                            <i className="fas fa-info-circle"></i>
-                                            <strong>Old Inactive Set:</strong> This set cannot be reactivated because there are newer sets with batches.
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <input
-                                                type="checkbox"
-                                                id="IsActive"
-                                                name="is_active"
-                                                checked={formData.is_active}
-                                                onChange={handleChange}
-                                            />
-                                            <label htmlFor="IsActive">Active Set</label>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="drawer-footer">
-                                <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? (
-                                        <>
-                                            <i className="fas fa-spinner fa-spin"></i> Saving...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <i className="fas fa-save"></i> {set ? 'Update Set' : 'Create Set'}
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </form>
-                    )}
-                </div>
+        <Modal
+            isOpen={isOpen}
+            onClose={handleClose}
+            overlayClassName="drawer-overlay"
+            contentClassName="drawer-container"
+        >
+            <div className="drawer-header">
+                <h2>{set ? 'Edit Aligner Set' : 'Add New Aligner Set'}</h2>
+                <button className="close-btn" onClick={handleClose}>
+                    <i className="fas fa-times"></i>
+                </button>
             </div>
-        </div>
+
+            <div className="drawer-body">
+                {!doctorsLoaded && !set ? (
+                    <div className="drawer-loading-container">
+                        <div className="spinner"></div>
+                        <p>Loading doctors list...</p>
+                    </div>
+                ) : (
+                    <form onSubmit={handleSubmit} className="drawer-form-flex">
+                        {/* Tab Navigation */}
+                        <div className="form-tabs">
+                            <button
+                                type="button"
+                                className={`form-tab ${activeTab === 'details' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('details')}
+                            >
+                                <i className="fas fa-teeth"></i>
+                                <span>Aligner Details</span>
+                            </button>
+                            <button
+                                type="button"
+                                className={`form-tab ${activeTab === 'resources' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('resources')}
+                            >
+                                <i className="fas fa-link"></i>
+                                <span>Resources & Payment</span>
+                            </button>
+                            <button
+                                type="button"
+                                className={`form-tab ${activeTab === 'settings' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('settings')}
+                            >
+                                <i className="fas fa-cog"></i>
+                                <span>Notes & Settings</span>
+                            </button>
+                        </div>
+
+                        {/* Action Buttons - Top */}
+                        <div className="drawer-footer drawer-footer-top">
+                            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+                                Cancel
+                            </button>
+                            <button type="submit" className="btn btn-primary" disabled={saving}>
+                                {saving ? (
+                                    <>
+                                        <i className="fas fa-spinner fa-spin"></i> Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-save"></i> {set ? 'Update Set' : 'Create Set'}
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* Tab 1: Aligner Details */}
+                        <div className={`tab-content ${activeTab === 'details' ? 'active' : ''}`}>
+                            <div className="form-two-column-container">
+                                <div className="form-column">
+                                    <div className="form-field">
+                                        <label htmlFor="SetSequence">
+                                            Set Sequence <span className="required">*</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            id="SetSequence"
+                                            name="set_sequence"
+                                            value={formData.set_sequence}
+                                            onChange={handleChange}
+                                            className={errors.set_sequence ? 'error' : ''}
+                                            min="1"
+                                        />
+                                        {errors.set_sequence && (
+                                            <span className="error-message">{errors.set_sequence}</span>
+                                        )}
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label htmlFor="UpperAlignersCount">Upper Aligners</label>
+                                        <input
+                                            type="number"
+                                            id="UpperAlignersCount"
+                                            name="upper_aligners_count"
+                                            value={formData.upper_aligners_count}
+                                            onChange={handleChange}
+                                            min="0"
+                                        />
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label htmlFor="Days">Treatment Days</label>
+                                        <input
+                                            type="number"
+                                            id="Days"
+                                            name="days"
+                                            value={formData.days}
+                                            onChange={handleChange}
+                                            min="0"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-column">
+                                    <div className="form-field">
+                                        <label htmlFor="type">Type</label>
+                                        <select
+                                            id="type"
+                                            name="type"
+                                            value={formData.type}
+                                            onChange={handleChange}
+                                        >
+                                            <option value="">Select Type</option>
+                                            <option value="Initial">Initial</option>
+                                            <option value="Refinement">Refinement</option>
+                                            <option value="Revision">Revision</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label htmlFor="LowerAlignersCount">Lower Aligners</label>
+                                        <input
+                                            type="number"
+                                            id="LowerAlignersCount"
+                                            name="lower_aligners_count"
+                                            value={formData.lower_aligners_count}
+                                            onChange={handleChange}
+                                            min="0"
+                                        />
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label htmlFor="AlignerDrID">
+                                            Aligner Doctor <span className="required">*</span>
+                                        </label>
+                                        <select
+                                            id="AlignerDrID"
+                                            name="aligner_dr_id"
+                                            value={formData.aligner_dr_id}
+                                            onChange={handleChange}
+                                            className={errors.aligner_dr_id ? 'error' : ''}
+                                        >
+                                            <option value="">Select Doctor</option>
+                                            {doctors && doctors.map(doctor => (
+                                                <option key={doctor.dr_id} value={doctor.dr_id}>
+                                                    {doctor.doctor_name === 'Admin' ? doctor.doctor_name : `Dr. ${doctor.doctor_name}`}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {errors.aligner_dr_id && (
+                                            <span className="error-message">{errors.aligner_dr_id}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tab 2: Resources & Payment */}
+                        <div className={`tab-content ${activeTab === 'resources' ? 'active' : ''}`}>
+                            <div className="form-two-column-container">
+                                <div className="form-column">
+                                    <div className="form-field">
+                                        <label htmlFor="SetUrl">Set URL</label>
+                                        <input
+                                            type="url"
+                                            id="SetUrl"
+                                            name="set_url"
+                                            value={formData.set_url}
+                                            onChange={handleChange}
+                                            placeholder="https://..."
+                                        />
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label htmlFor="SetPdfUrl">PDF URL (Google Drive)</label>
+                                        <input
+                                            type="url"
+                                            id="SetPdfUrl"
+                                            name="set_pdf_url"
+                                            value={formData.set_pdf_url}
+                                            onChange={handleChange}
+                                            placeholder="https://drive.google.com/..."
+                                        />
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label htmlFor="SetVideo">Case Video URL (YouTube)</label>
+                                        <input
+                                            type="url"
+                                            id="SetVideo"
+                                            name="set_video"
+                                            value={formData.set_video}
+                                            onChange={handleChange}
+                                            placeholder="https://www.youtube.com/watch?v=..."
+                                        />
+                                        <small className="pdf-upload-info">
+                                            Add YouTube unlisted video URL for case explanation
+                                        </small>
+                                    </div>
+
+                                    {/* PDF Upload Section */}
+                                    <div className="form-field">
+                                        <label htmlFor="set-pdf-file">PDF File</label>
+                                        {formData.set_pdf_url ? (
+                                            <div className="pdf-uploaded-status">
+                                                <div className="pdf-status-header">
+                                                    <i className="fas fa-file-pdf"></i>
+                                                    <span>PDF Uploaded</span>
+                                                </div>
+                                                <div className="pdf-status-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary btn-sm"
+                                                        onClick={() => window.open(formData.set_pdf_url, '_blank')}
+                                                    >
+                                                        <i className="fas fa-external-link-alt"></i> View PDF
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-danger btn-sm"
+                                                        onClick={handlePdfDelete}
+                                                        disabled={deletingPdf}
+                                                    >
+                                                        {deletingPdf ? (
+                                                            <>
+                                                                <i className="fas fa-spinner fa-spin"></i> Deleting...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <i className="fas fa-trash"></i> Delete PDF
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                {folderPath && (
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary pdf-upload-btn-full"
+                                                        onClick={openFolder}
+                                                    >
+                                                        <i className="fas fa-folder-open"></i> Open Patient Folder
+                                                    </button>
+                                                )}
+                                                <input
+                                                    id="set-pdf-file"
+                                                    type="file"
+                                                    accept=".pdf,application/pdf"
+                                                    className="pdf-file-input"
+                                                    onClick={handleFileInputClick}
+                                                    onChange={handleFileChange}
+                                                />
+                                                {pdfFile && (
+                                                    <div className="pdf-file-selected">
+                                                        <i className="fas fa-check-circle"></i> {pdfFile.name} selected
+                                                    </div>
+                                                )}
+                                                <div className="pdf-file-hint">
+                                                    <i className="fas fa-info-circle"></i> The folder path is automatically copied to your clipboard when you click "Choose File". Paste it in the file dialog address bar to navigate to the set folder.
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="form-column">
+                                    <div className="form-field">
+                                        <label htmlFor="SetCost">Set Cost</label>
+                                        <input
+                                            type="text"
+                                            id="SetCost"
+                                            name="set_cost"
+                                            value={displaySetCost}
+                                            onChange={(e) => {
+                                                const digits = e.target.value.replace(/[^\d]/g, '');
+                                                const num = parseInt(digits, 10) || 0;
+                                                setDisplaySetCost(num ? num.toLocaleString('en-US') : '');
+                                                setFormData(prev => ({ ...prev, set_cost: num }));
+                                            }}
+                                            onBlur={() => setDisplaySetCost(formData.set_cost ? formatNumber(formData.set_cost) : '')}
+                                            placeholder="Enter cost"
+                                        />
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label htmlFor="Currency">Currency</label>
+                                        <select
+                                            id="Currency"
+                                            name="currency"
+                                            value={formData.currency}
+                                            onChange={handleChange}
+                                        >
+                                            <option value="USD">USD</option>
+                                            <option value="IQD">IQD</option>
+                                            <option value="EUR">EUR</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tab 3: Notes & Settings */}
+                        <div className={`tab-content ${activeTab === 'settings' ? 'active' : ''}`}>
+                            <div className="form-field">
+                                <label htmlFor="Notes">Notes</label>
+                                <textarea
+                                    id="Notes"
+                                    name="notes"
+                                    value={formData.notes}
+                                    onChange={handleChange}
+                                    rows={4}
+                                    placeholder="Additional notes..."
+                                />
+                            </div>
+
+                            <div className="form-field-checkbox">
+                                {cannotReactivate() ? (
+                                    <div className="warning-message-box">
+                                        <i className="fas fa-info-circle"></i>
+                                        <strong>Old Inactive Set:</strong> This set cannot be reactivated because there are newer sets with batches.
+                                    </div>
+                                ) : (
+                                    <>
+                                        <input
+                                            type="checkbox"
+                                            id="IsActive"
+                                            name="is_active"
+                                            checked={formData.is_active}
+                                            onChange={handleChange}
+                                        />
+                                        <label htmlFor="IsActive">Active Set</label>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="drawer-footer">
+                            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+                                Cancel
+                            </button>
+                            <button type="submit" className="btn btn-primary" disabled={saving}>
+                                {saving ? (
+                                    <>
+                                        <i className="fas fa-spinner fa-spin"></i> Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-save"></i> {set ? 'Update Set' : 'Create Set'}
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </div>
+        </Modal>
     );
 };
 

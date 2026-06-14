@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent, FocusEvent } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApiResponse } from '@/types/api.types';
 import styles from './PaymentModal.module.css';
 import Modal from './Modal';
@@ -8,14 +8,12 @@ import { parseFormattedNumber } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { postJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
+import { workForReceiptQuery, exchangeRateForDateQuery } from '@/query/queries';
 import {
-    workForReceipt as workForReceiptContract,
-    exchangeRateForDate as exchangeRateForDateContract,
     updateExchangeRate as updateExchangeRateContract,
     addInvoice as addInvoiceContract,
-    type ExchangeRateForDateResponse,
     type AddInvoiceResponse,
 } from '@shared/contracts/payment.contract';
 
@@ -91,13 +89,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const confirm = useConfirm();
     const queryClient = useQueryClient();
     const [loading, setLoading] = useState(false);
-    const [exchangeRate, setExchangeRate] = useState<number | null>(null);
-    const [exchangeRateError, setExchangeRateError] = useState(false);
     const [showRateInput, setShowRateInput] = useState(false);
     const [newRateValue, setNewRateValue] = useState('');
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
-    const [completeWorkData, setCompleteWorkData] = useState<WorkData | null>(null);
 
     // Entry mode: 'amount' = enter amount first (current), 'cash' = enter cash first (reverse)
     const [entryMode, setEntryMode] = useState<EntryMode>('amount');
@@ -138,26 +133,20 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         isOver: false
     });
 
-    useEffect(() => {
-        // Fetch complete work data from V_Report view
-        const fetchCompleteWorkData = async () => {
-            if (workData && workData.work_id) {
-                try {
-                    // sendSuccess-enveloped → fetchJSON unwraps to the WorkData object.
-                    // Contract response is a loose boundary guard (work_id); the richer
-                    // local WorkData stays the consumer type.
-                    const data = await fetchJSON<WorkData>(`/api/getworkforreceipt/${workData.work_id}`, {
-                        schema: workForReceiptContract.response,
-                    });
-                    setCompleteWorkData(data);
-                } catch (error) {
-                    console.error('Error fetching complete work data:', error);
-                }
-            }
-        };
+    // Receipt-enriched work row + the exchange rate for the payment date, both on
+    // useQuery. The contract response is a loose boundary guard (work_id); the richer
+    // local WorkData stays the consumer type. The rate's expected 404 ("no rate set")
+    // surfaces as `isError`, which drives the inline "Set Rate" prompt — no throw.
+    const { data: completeWorkDataRaw } = useQuery(workForReceiptQuery(workData?.work_id ?? null));
+    const completeWorkData = (completeWorkDataRaw ?? null) as WorkData | null;
 
-        fetchCompleteWorkData();
-    }, [workData]);
+    const {
+        data: rateData,
+        isError: rateIsError,
+        refetch: refetchRate,
+    } = useQuery(exchangeRateForDateQuery(formData.paymentDate));
+    const exchangeRate = rateData?.exchangeRate ?? null;
+    const exchangeRateError = rateIsError || (!!rateData && !rateData.exchangeRate);
 
     useEffect(() => {
         // Only initialize form data if not in payment success mode
@@ -166,12 +155,6 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [workData, paymentSuccess]);
-
-    useEffect(() => {
-        if (formData.paymentDate) {
-            loadExchangeRate(formData.paymentDate);
-        }
-    }, [formData.paymentDate]);
 
     // Recalculate when payment currency or amount changes, or when switching to amount mode
     useEffect(() => {
@@ -208,32 +191,6 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         }));
     }, [newRateValue]);
 
-    const loadExchangeRate = async (date: string) => {
-        try {
-            // Enveloped (sendSuccess) → fetchJSON unwraps to the inner { exchangeRate, date }.
-            const result = await fetchJSON<ExchangeRateForDateResponse>(
-                `/api/getExchangeRateForDate?date=${date}`,
-                { schema: exchangeRateForDateContract.response }
-            );
-
-            if (result?.exchangeRate) {
-                setExchangeRate(result.exchangeRate);
-                setExchangeRateError(false);
-            } else {
-                setExchangeRate(null);
-                setExchangeRateError(true);
-            }
-        } catch (error) {
-            // 404 = no rate set for this date — a normal, expected state that drives the
-            // inline "Set Rate" prompt; only log genuine failures.
-            setExchangeRate(null);
-            setExchangeRateError(true);
-            if ((error as HttpError).status !== 404) {
-                console.error('Error loading exchange rate:', error);
-            }
-        }
-    };
-
     const handleSetExchangeRate = async () => {
         const rate = parseFormattedNumber(newRateValue);
         if (!rate || rate <= 0) {
@@ -249,8 +206,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                 exchangeRate: Math.round(rate)
             }, { schema: updateExchangeRateContract.response });
 
-            setExchangeRate(Math.round(rate));
-            setExchangeRateError(false);
+            // Re-read the rate for this date so the derived `exchangeRate` updates.
+            await refetchRate();
             setShowRateInput(false);
             setNewRateValue('');
         } catch (error) {

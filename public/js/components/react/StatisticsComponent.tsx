@@ -1,13 +1,18 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import Chart from '../../utils/chartSetup';
 import DailyInvoicesModal from './DailyInvoicesModal';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
 import { getChartThemeColors } from '../../utils/chartTheme';
 import { useTheme } from '../../contexts/ThemeContext';
-import { fetchJSON, httpErrorMessage } from '@/core/http';
-import * as reports from '@shared/contracts/reports.contract';
+import { httpErrorMessage } from '@/core/http';
+import {
+    statisticsQuery,
+    yearlyStatisticsQuery,
+    multiYearStatisticsQuery,
+} from '@/query/queries';
 import styles from './StatisticsComponent.module.css';
 
 // Types
@@ -78,13 +83,6 @@ type ViewMode = typeof VIEW_MODES[keyof typeof VIEW_MODES];
 const StatisticsComponent = () => {
     const { resolvedTheme } = useTheme();
     const [searchParams, setSearchParams] = useSearchParams();
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [statistics, setStatistics] = useState<StatisticsData | null>(null);
-    const [yearlyData, setYearlyData] = useState<YearlyData | null>(null); // For monthly view - 12 months of data
-    const [loadingYearly, setLoadingYearly] = useState(false); // Loading state for yearly data
-    const [multiYearData, setMultiYearData] = useState<MultiYearData | null>(null); // For yearly view - multi-year data
-    const [loadingMultiYear, setLoadingMultiYear] = useState(false); // Loading state for multi-year data
     const [month, setMonth] = useState(parseInt(searchParams.get('month') || '') || new Date().getMonth() + 1);
     const [year, setYear] = useState(parseInt(searchParams.get('year') || '') || new Date().getFullYear());
     // For Monthly view: separate start month/year for 12-month period
@@ -94,13 +92,52 @@ const StatisticsComponent = () => {
     const [yearRangeStart, setYearRangeStart] = useState(new Date().getFullYear() - 4);
     const [yearRangeEnd, setYearRangeEnd] = useState(new Date().getFullYear());
     const [exchangeRate] = useState(1450);
+    const [viewMode, setViewMode] = useState<ViewMode>((searchParams.get('view') as ViewMode) || VIEW_MODES.DAILY);
+
+    // Statistics for the selected month — the headline read. `isFetching` drives the
+    // refresh spinner; `keepPreviousData` keeps the last month on screen during a
+    // month change instead of flashing the full-screen spinner.
+    const {
+        data: statisticsData,
+        isFetching: loading,
+        isError,
+        error: statsError,
+        refetch: refetchStatistics,
+    } = useQuery({ ...statisticsQuery(month, year, exchangeRate), placeholderData: keepPreviousData });
+    const statistics = (statisticsData ?? null) as StatisticsData | null;
+    const error = isError ? httpErrorMessage(statsError, 'Failed to fetch statistics') : null;
+
+    // 12-month rollup — only fetched in Monthly view (cleared between fetches, so no
+    // keepPreviousData here).
+    const { data: yearlyDataRaw, isFetching: loadingYearly } = useQuery({
+        ...yearlyStatisticsQuery(periodStartMonth, periodStartYear, exchangeRate),
+        enabled: viewMode === VIEW_MODES.MONTHLY,
+    });
+    const yearlyData = (yearlyDataRaw ?? null) as YearlyData | null;
+
+    // Multi-year rollup — only fetched in Yearly view.
+    const { data: multiYearDataRaw, isFetching: loadingMultiYear } = useQuery({
+        ...multiYearStatisticsQuery(yearRangeStart, yearRangeEnd, exchangeRate),
+        enabled: viewMode === VIEW_MODES.YEARLY,
+    });
+    const multiYearData = (multiYearDataRaw ?? null) as MultiYearData | null;
+
     // Modal open-state lives in the URL (?day=YYYY-MM-DD) so browser back/forward
     // and deep links re-open it; the full row is looked up from the loaded month.
     const selectedDay = searchParams.get('day');
     const selectedDate = selectedDay
         ? statistics?.dailyData.find(d => d.Day === selectedDay) ?? null
         : null;
-    const [viewMode, setViewMode] = useState<ViewMode>((searchParams.get('view') as ViewMode) || VIEW_MODES.DAILY);
+
+    // Keep month/year in the URL (preserving any open ?day modal param).
+    useEffect(() => {
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.set('month', month.toString());
+            next.set('year', year.toString());
+            return next;
+        }, { replace: true });
+    }, [month, year, setSearchParams]);
 
     // Chart reference - single chart for Grand Total (USD)
     const chartRef = useRef<HTMLCanvasElement>(null);
@@ -124,86 +161,6 @@ const StatisticsComponent = () => {
         }
         return { endMonth, endYear };
     };
-
-    // Fetch statistics data
-    const fetchStatistics = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-
-        try {
-            const data = await fetchJSON<StatisticsData>(`/api/statistics?month=${month}&year=${year}&exchangeRate=${exchangeRate}`, { schema: reports.statistics.response });
-            setStatistics(data);
-            // Preserve other params (notably ?day for an open modal) when syncing month/year.
-            setSearchParams(prev => {
-                const next = new URLSearchParams(prev);
-                next.set('month', month.toString());
-                next.set('year', year.toString());
-                return next;
-            }, { replace: true });
-        } catch (err) {
-            setError(httpErrorMessage(err, 'Failed to fetch statistics'));
-            console.error('Error fetching statistics:', err);
-        } finally {
-            setLoading(false);
-        }
-    }, [month, year, exchangeRate, setSearchParams]);
-
-    // Fetch yearly data for monthly view (12-month period)
-    const fetchYearlyData = useCallback(async () => {
-        setLoadingYearly(true);
-        try {
-            const data = await fetchJSON<YearlyData>(`/api/statistics/yearly?startMonth=${periodStartMonth}&startYear=${periodStartYear}&exchangeRate=${exchangeRate}`, { schema: reports.yearlyStatistics.response });
-            setYearlyData(data);
-        } catch (err) {
-            console.error('[Statistics] Error fetching yearly statistics:', err);
-            setYearlyData(null);
-        } finally {
-            setLoadingYearly(false);
-        }
-    }, [periodStartMonth, periodStartYear, exchangeRate]);
-
-    // Fetch multi-year data for yearly view
-    const fetchMultiYearData = useCallback(async () => {
-        setLoadingMultiYear(true);
-        try {
-            const data = await fetchJSON<MultiYearData>(`/api/statistics/multi-year?startYear=${yearRangeStart}&endYear=${yearRangeEnd}&exchangeRate=${exchangeRate}`, { schema: reports.multiYearStatistics.response });
-            setMultiYearData(data);
-        } catch (err) {
-            console.error('[Statistics] Error fetching multi-year statistics:', err);
-            setMultiYearData(null);
-        } finally {
-            setLoadingMultiYear(false);
-        }
-    }, [yearRangeStart, yearRangeEnd, exchangeRate]);
-
-    // Load data on mount and when month/year changes
-    useEffect(() => {
-        fetchStatistics();
-    }, [fetchStatistics]);
-
-    // Fetch yearly data when in monthly view or when period changes
-    useEffect(() => {
-        if (viewMode === VIEW_MODES.MONTHLY) {
-            setYearlyData(null); // Clear previous data before fetching new
-            fetchYearlyData();
-        } else {
-            // Clear yearly data when switching away from monthly view
-            setYearlyData(null);
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [viewMode, periodStartMonth, periodStartYear, exchangeRate]);
-
-    // Fetch multi-year data when in yearly view or when year range changes
-    useEffect(() => {
-        if (viewMode === VIEW_MODES.YEARLY) {
-            setMultiYearData(null); // Clear previous data before fetching new
-            fetchMultiYearData();
-        } else {
-            // Clear multi-year data when switching away from yearly view
-            setMultiYearData(null);
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [viewMode, yearRangeStart, yearRangeEnd, exchangeRate]);
 
     // Helper: Aggregate for monthly view (show all months of the year)
     const aggregateByMonth = (dailyData: DailyData[]): ChartDataItem[] => {
@@ -451,7 +408,7 @@ const StatisticsComponent = () => {
                 <div className={styles.errorState}>
                     <i className="fas fa-exclamation-triangle"></i>
                     <p>{error}</p>
-                    <button className={styles.btnRetry} onClick={fetchStatistics}>Try Again</button>
+                    <button className={styles.btnRetry} onClick={() => refetchStatistics()}>Try Again</button>
                 </div>
             </div>
         );
@@ -498,7 +455,7 @@ const StatisticsComponent = () => {
                     </button>
                 </div>
                 <div className={styles.actions}>
-                    <button onClick={fetchStatistics} className={styles.btnAction} disabled={loading}>
+                    <button onClick={() => refetchStatistics()} className={styles.btnAction} disabled={loading}>
                         <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i> Refresh
                     </button>
                     <button onClick={handlePrint} className={styles.btnAction}>

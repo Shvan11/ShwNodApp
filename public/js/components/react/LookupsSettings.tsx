@@ -58,11 +58,6 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
     const [loading, setLoading] = useState<boolean>(true);
     const [expandedTable, setExpandedTable] = useState<string | null>(null);
 
-    useEffect(() => {
-        loadTableConfigs();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
     const loadTableConfigs = async (): Promise<void> => {
         try {
             setLoading(true);
@@ -81,6 +76,12 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
+        loadTableConfigs();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const toggleTable = (tableKey: string): void => {
         setExpandedTable(expandedTable === tableKey ? null : tableKey);

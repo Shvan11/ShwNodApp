@@ -65,11 +65,6 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
 
-    useEffect(() => {
-        loadPhotoDates();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [personId]);
-
     const loadPhotoDates = async () => {
         try {
             setLoading(true);
@@ -86,6 +81,12 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
+        loadPhotoDates();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [personId]);
 
     const handleDateSelect = (date: Date | string) => {
         // Always parse and use local date components to match the display format
