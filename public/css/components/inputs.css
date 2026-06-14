@@ -151,6 +151,7 @@ textarea.form-control {
     box-shadow: var(--shadow-lg);
     border: var(--border-width-thin) solid var(--gray-200);
     margin-top: var(--spacing-xs);
+    background-color: var(--surface-elevated);
 }
 
 .pm-select__menu-list {
