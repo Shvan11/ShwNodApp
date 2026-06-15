@@ -15,38 +15,6 @@
     animation: slideUp 0.3s ease;
 }
 
-/* Header */
-.header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.header h3 {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-}
-
-.closeBtn {
-    background: none;
-    border: none;
-    padding: 0.5rem;
-    cursor: pointer;
-    color: var(--text-secondary);
-    font-size: 1.1rem;
-    border-radius: 4px;
-    transition: background-color 0.2s, color 0.2s;
-}
-
-.closeBtn:hover {
-    background: var(--gray-100);
-    color: var(--text-primary);
-}
-
 /* Body */
 .body {
     padding: 1.5rem;

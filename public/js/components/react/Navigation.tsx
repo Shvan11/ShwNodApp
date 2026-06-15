@@ -1,16 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { MouseEvent } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import PhotoSessionDialog from './PhotoSessionDialog';
-import { fetchJSON, httpErrorMessage } from '@/core/http';
-import * as patientContract from '@shared/contracts/patient.contract';
-
-interface Timepoint {
-    tp_code: string;
-    tp_description: string;
-    tp_date_time: string;
-}
+import { patientInfoQuery, patientsFolderQuery, timepointsQuery } from '@/query/queries';
 
 interface PatientInfo {
     patient_name?: string;
@@ -22,11 +16,6 @@ interface PatientInfo {
     first_name?: string;
     last_name?: string;
     [key: string]: unknown;
-}
-
-interface CacheEntry {
-    data: Timepoint[];
-    timestamp: number;
 }
 
 interface NavItem {
@@ -44,107 +33,46 @@ interface NavigationProps {
 
 const Navigation = ({ personId, currentPage }: NavigationProps) => {
     const toast = useToast();
-    const { tpCode } = useParams<{ tpCode?: string }>();
-    const [timepoints, setTimepoints] = useState<Timepoint[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [photosExpanded, setPhotosExpanded] = useState(false);
     const [moreActionsExpanded, setMoreActionsExpanded] = useState(false);
-    const photosButtonRef = useRef<HTMLDivElement>(null);
     const moreActionsButtonRef = useRef<HTMLDivElement>(null);
-    const [flyoutPosition, setFlyoutPosition] = useState({ top: 0 });
     const [moreActionsFlyoutPosition, setMoreActionsFlyoutPosition] = useState({ bottom: 0 });
-    const [patientInfo, setPatientInfo] = useState<PatientInfo | null>(null);
-    const [patientsFolder, setPatientsFolder] = useState('');
     const [showNativePhotoEditor, setShowNativePhotoEditor] = useState(false);
     const navigate = useNavigate();
 
     // Check if this is the "new patient" form
     const isNewPatient = personId === 'new';
+    const hasPatient = !!personId && personId !== 'new';
 
-    // Cache for timepoints — held in a ref so updating it doesn't change
-    // loadTimepoints' identity (which would re-fire the load effect → refetch loop).
-    const cacheRef = useRef<Map<string, CacheEntry>>(new Map());
-    const cacheTimeout = 5 * 60 * 1000; // 5 minutes
+    // Patient info reads from React Query (shared, deduped cache).
+    const { data: piData } = useQuery({
+        ...patientInfoQuery(personId ?? ''),
+        enabled: hasPatient,
+    });
+    const patientInfo = (piData ?? null) as PatientInfo | null;
 
-    const loadTimepoints = useCallback(async (personIdParam: string) => {
-        if (!personIdParam || personIdParam === 'new') return;
+    // Timepoint count shown on the Photos button label (shared, deduped cache —
+    // reused by the photos grid). Falls back to a plain "Photos" until loaded.
+    const { data: tpData } = useQuery({
+        ...timepointsQuery(personId ?? ''),
+        enabled: hasPatient,
+    });
+    const photosLabel = tpData
+        ? `${tpData.length} timepoint${tpData.length === 1 ? '' : 's'}`
+        : 'Photos';
 
-        const cacheKey = `patient_${personIdParam}`;
-        const cached = cacheRef.current.get(cacheKey);
-
-        // Check cache first
-        if (cached && (Date.now() - cached.timestamp) < cacheTimeout) {
-            setTimepoints(cached.data);
-            setLoading(false);
-            return;
-        }
-
-        try {
-            setLoading(true);
-
-            const data = await fetchJSON<Timepoint[]>(`/api/patients/${personIdParam}/timepoints`, { schema: patientContract.timepoints.response });
-
-            // Update cache
-            cacheRef.current.set(cacheKey, {
-                data: data,
-                timestamp: Date.now()
-            });
-
-            setTimepoints(data);
-            setError(null);
-        } catch (err) {
-            console.error('Failed to load timepoints:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
-            setTimepoints([]);
-        } finally {
-            setLoading(false);
-        }
-    }, [cacheTimeout]);
-
+    // Patients-folder UNC: prefer the localStorage cache; only hit the API when
+    // it's absent. Persist the fetched value back for next time.
+    const cachedFolder = typeof localStorage !== 'undefined' ? localStorage.getItem('patientsFolder') : null;
+    const { data: folderData } = useQuery({
+        ...patientsFolderQuery(),
+        enabled: !cachedFolder,
+    });
+    const patientsFolder = cachedFolder || folderData?.patientsFolder || '';
     useEffect(() => {
-        // Skip API calls for new patient form
-        if (personId && personId !== 'new') {
-            loadTimepoints(personId);
-            loadPatientInfo(personId);
+        if (!cachedFolder && folderData?.patientsFolder) {
+            localStorage.setItem('patientsFolder', folderData.patientsFolder);
         }
-        loadPatientsFolder();
-    }, [personId, loadTimepoints]);
-
-    const loadPatientsFolder = async () => {
-        try {
-            // Try to get from localStorage first
-            const cached = localStorage.getItem('patientsFolder');
-            if (cached) {
-                setPatientsFolder(cached);
-                return;
-            }
-
-            // If not in cache, fetch from API
-            const data = await fetchJSON<{ patientsFolder?: string }>('/api/settings/patients-folder', { schema: patientContract.patientsFolder.response });
-            const folderPath = data.patientsFolder || '';
-
-            // Store in localStorage for future use
-            if (folderPath) {
-                localStorage.setItem('patientsFolder', folderPath);
-            }
-
-            setPatientsFolder(folderPath);
-        } catch (err) {
-            console.error('Error loading patients folder setting:', err);
-        }
-    };
-
-    const loadPatientInfo = async (personIdParam: string) => {
-        if (!personIdParam || personIdParam === 'new') return;
-
-        try {
-            const data = await fetchJSON<PatientInfo>(`/api/patients/${personIdParam}/info`, { schema: patientContract.patientInfo.response });
-            setPatientInfo(data);
-        } catch (err) {
-            console.error('Error loading patient info:', err);
-        }
-    };
+    }, [cachedFolder, folderData]);
 
     const handleOpenCSImaging = () => {
         try {
@@ -206,11 +134,6 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         }
     };
 
-    const formatDate = (dateTime: string | null | undefined): string => {
-        if (!dateTime) return '';
-        return dateTime.substring(0, 10).split("-").reverse().join("-");
-    };
-
     // Define static navigation items (Photos removed - will be its own expandable section)
     const staticNavItems: NavItem[] = [
         { key: 'works', page: 'works', label: 'Works', icon: 'fas fa-tooth' },
@@ -254,54 +177,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         );
     };
 
-    const renderTimepointItem = (timepoint: Timepoint) => {
-        // Check if this timepoint is currently active
-        const currentTp = tpCode ? tpCode.replace('tp', '') : '0';
-        const isActive = currentTp === timepoint.tp_code;
-
-        return (
-            <Link
-                key={timepoint.tp_code}
-                to={`/patient/${personId}/photos/tp${timepoint.tp_code}`}
-                className={`sidebar-nav-item timepoint-subitem ${isActive ? 'active' : ''}`}
-                onClick={() => setPhotosExpanded(false)}
-            >
-                <div className="nav-item-icon">
-                    <i className="fas fa-circle icon-xs" />
-                </div>
-                <div className="timepoint-content">
-                    <span className="timepoint-description">{timepoint.tp_description}</span>
-                    <span className="timepoint-date">{formatDate(timepoint.tp_date_time)}</span>
-                </div>
-            </Link>
-        );
-    };
-
     const isPhotosPageActive = currentPage === 'photos';
-
-    const handlePhotosMouseEnter = () => {
-        if (isNewPatient) return; // Disable for new patients
-        if (photosButtonRef.current) {
-            const rect = photosButtonRef.current.getBoundingClientRect();
-            const viewportHeight = window.innerHeight;
-            const flyoutMaxHeight = 450; // Photos flyout can be taller (max-height: 500px)
-
-            // Calculate ideal top position (aligned with button)
-            let calculatedTop = rect.top;
-
-            // Check if flyout would extend beyond viewport bottom
-            if (calculatedTop + flyoutMaxHeight > viewportHeight) {
-                // Position flyout above the bottom edge with padding
-                calculatedTop = viewportHeight - flyoutMaxHeight - 20;
-            }
-
-            // Ensure flyout doesn't go above viewport top
-            calculatedTop = Math.max(10, calculatedTop);
-
-            setFlyoutPosition({ top: calculatedTop });
-        }
-        setPhotosExpanded(true);
-    };
 
     const handleMoreActionsMouseEnter = () => {
         if (isNewPatient) return; // Disable for new patients
@@ -344,72 +220,30 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                         })}
                     </div>
 
-                    {/* Photos section with flyout menu for timepoints */}
+                    {/* Photos section — plain nav button (flyout removed) */}
                     <div className="nav-section photos-section">
-                        <div
-                            ref={photosButtonRef}
-                            className="photos-wrapper"
-                            onMouseEnter={handlePhotosMouseEnter}
-                            onMouseLeave={() => setPhotosExpanded(false)}
-                        >
-                            {isNewPatient ? (
-                                <div
-                                    className={`sidebar-nav-item photos-main-btn disabled`}
-                                    title="Save patient first to access photos"
-                                >
-                                    <div className="nav-item-icon">
-                                        <i className="fas fa-images" />
-                                    </div>
-                                    <span className="nav-item-label">Photos</span>
+                        {isNewPatient ? (
+                            <div
+                                className={`sidebar-nav-item photos-main-btn disabled`}
+                                title="Save patient first to access photos"
+                            >
+                                <div className="nav-item-icon">
+                                    <i className="fas fa-images" />
                                 </div>
-                            ) : (
-                                <Link
-                                    to={`/patient/${personId}/photos/tp0`}
-                                    className={`sidebar-nav-item photos-main-btn ${isPhotosPageActive ? 'active' : ''}`}
-                                    title="Photos"
-                                >
-                                    <div className="nav-item-icon">
-                                        <i className="fas fa-images" />
-                                    </div>
-                                    <span className="nav-item-label">Photos</span>
-                                </Link>
-                            )}
-
-                            {/* Flyout menu for timepoints */}
-                            {photosExpanded && (
-                                <div
-                                    className="photos-flyout-menu"
-                                    style={{ top: `${flyoutPosition.top}px` }}
-                                    onMouseEnter={() => setPhotosExpanded(true)}
-                                    onMouseLeave={() => setPhotosExpanded(false)}
-                                >
-                                    <div className="flyout-header">
-                                        <i className="fas fa-images" />
-                                        Photo Sessions
-                                    </div>
-                                    <div className="flyout-content">
-                                        {loading ? (
-                                            <div className="flyout-loading">
-                                                <i className="fas fa-spinner fa-spin" />
-                                                <span>Loading timepoints...</span>
-                                            </div>
-                                        ) : error ? (
-                                            <div className="flyout-error">
-                                                <i className="fas fa-exclamation-triangle" />
-                                                <span>Error loading timepoints</span>
-                                            </div>
-                                        ) : timepoints.length > 0 ? (
-                                            timepoints.map(timepoint => renderTimepointItem(timepoint))
-                                        ) : (
-                                            <div className="flyout-empty">
-                                                <i className="fas fa-info-circle" />
-                                                <span>No photo sessions yet</span>
-                                            </div>
-                                        )}
-                                    </div>
+                                <span className="nav-item-label">Photos</span>
+                            </div>
+                        ) : (
+                            <Link
+                                to={`/patient/${personId}/photos/tp0`}
+                                className={`sidebar-nav-item photos-main-btn ${isPhotosPageActive ? 'active' : ''}`}
+                                title="Photos"
+                            >
+                                <div className="nav-item-icon">
+                                    <i className="fas fa-images" />
                                 </div>
-                            )}
-                        </div>
+                                <span className="nav-item-label">{photosLabel}</span>
+                            </Link>
+                        )}
                     </div>
                 </div>
 

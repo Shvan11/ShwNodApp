@@ -13,6 +13,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { httpErrorMessage } from '@/core/http';
 import Modal from '../react/Modal';
+import ModalHeader from '../react/ModalHeader';
 import styles from './CategoryManagerModal.module.css';
 
 interface CategoryManagerModalProps {
@@ -85,12 +86,11 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
       contentClassName={styles.modalContent}
       ariaLabelledBy="category-manager-modal-title"
     >
-        <div className={styles.modalHeader}>
-          <h2 id="category-manager-modal-title">Manage Categories</h2>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Close modal">
-            &times;
-          </button>
-        </div>
+        <ModalHeader
+          title="Manage Categories"
+          titleId="category-manager-modal-title"
+          onClose={onClose}
+        />
 
         <div className={styles.modalBody}>
           <form className={styles.addForm} onSubmit={handleAdd}>

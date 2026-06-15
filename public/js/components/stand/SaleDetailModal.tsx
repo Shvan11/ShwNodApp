@@ -7,6 +7,7 @@ import React from 'react';
 import type { StandSaleWithItems } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
 import Modal from '../react/Modal';
+import ModalHeader from '../react/ModalHeader';
 import styles from './SaleDetailModal.module.css';
 
 interface SaleDetailModalProps {
@@ -47,15 +48,14 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
       ariaLabelledBy="sale-detail-modal-title"
     >
         {/* Header */}
-        <div className={styles.modalHeader}>
-          <div className={styles.headerInfo}>
-            <h2 id="sale-detail-modal-title" className={styles.headerTitle}>
-              <i className="fas fa-receipt" />
-              Sale #{sale?.sale_id ?? '...'}
-            </h2>
-            <div className={styles.headerMeta}>
-              {sale && <span>{formatDateTime(sale.sale_date)}</span>}
-              {sale && (
+        <ModalHeader
+          titleId="sale-detail-modal-title"
+          icon={<i className="fas fa-receipt" />}
+          title={`Sale #${sale?.sale_id ?? '...'}`}
+          subtitle={
+            sale ? (
+              <span className={styles.headerMeta}>
+                <span>{formatDateTime(sale.sale_date)}</span>
                 <span
                   className={`${styles.statusBadge} ${
                     isVoided ? styles.statusVoided : styles.statusCompleted
@@ -63,18 +63,11 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
                 >
                   {isVoided ? 'Voided' : 'Completed'}
                 </span>
-              )}
-            </div>
-          </div>
-          <button
-            className={styles.closeBtn}
-            onClick={onClose}
-            type="button"
-            aria-label="Close modal"
-          >
-            &times;
-          </button>
-        </div>
+              </span>
+            ) : undefined
+          }
+          onClose={onClose}
+        />
 
         {/* Body */}
         {loading || !sale ? (

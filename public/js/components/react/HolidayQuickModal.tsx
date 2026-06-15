@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type FormEvent, type ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import type { ExistingHoliday, AppointmentWarning, SaveHolidayData } from './calendar.types';
 
 interface HolidayQuickModalProps {
@@ -31,25 +32,40 @@ const HolidayQuickModal = ({
     const [saving, setSaving] = useState(false);
     const [showWarning, setShowWarning] = useState(false);
 
-    // Reset form when modal opens/closes or holiday changes
-    useEffect(() => {
+    // Reset the form when the modal opens or the holiday changes. Done during render
+    // (keyed on open + holiday identity) rather than in an effect, so the React
+    // Compiler can optimize and there's no extra post-paint render.
+    const initKey = isOpen ? String(existingHoliday?.ID ?? 'new') : '';
+    const [initializedKey, setInitializedKey] = useState('');
+    if (initKey !== initializedKey) {
+        setInitializedKey(initKey);
         if (isOpen) {
             setHolidayName(existingHoliday?.HolidayName || '');
             setDescription(existingHoliday?.Description || '');
             setShowWarning(false);
-            // Focus input after modal opens; clear on unmount/close so the timer
-            // can't fire (and focus) after the modal is gone.
-            const timer = setTimeout(() => inputRef.current?.focus(), 100);
-            return () => clearTimeout(timer);
         }
-    }, [isOpen, existingHoliday]);
+    }
 
-    // Show appointment warning if provided
-    useEffect(() => {
+    // Show the appointment warning if one is provided (adjust-during-render rather
+    // than an effect; tracks the previous warning so it only fires on a change —
+    // initialized to null so a warning already present at mount still surfaces,
+    // matching the original effect's mount run).
+    const [prevWarning, setPrevWarning] = useState<AppointmentWarning | null>(null);
+    if (appointmentWarning !== prevWarning) {
+        setPrevWarning(appointmentWarning);
         if (appointmentWarning && appointmentWarning.count > 0) {
             setShowWarning(true);
         }
-    }, [appointmentWarning]);
+    }
+
+    // Focus the input after the modal opens; clear on unmount/close so the timer
+    // can't fire (and focus) after the modal is gone.
+    useEffect(() => {
+        if (isOpen) {
+            const timer = setTimeout(() => inputRef.current?.focus(), 100);
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen]);
 
     if (!date) return null;
 
@@ -92,15 +108,12 @@ const HolidayQuickModal = ({
             overlayClassName="holiday-quick-modal"
             ariaLabelledBy="holiday-quick-modal-title"
         >
-                <div className="modal-header">
-                    <h3 id="holiday-quick-modal-title">
-                        <i className="fas fa-calendar-times"></i>
-                        {existingHoliday ? 'Edit Holiday' : 'Add Holiday'}
-                    </h3>
-                    <button className="modal-close" onClick={onClose} type="button">
-                        <i className="fas fa-times"></i>
-                    </button>
-                </div>
+                <ModalHeader
+                    title={existingHoliday ? 'Edit Holiday' : 'Add Holiday'}
+                    titleId="holiday-quick-modal-title"
+                    icon={<i className="fas fa-calendar-times" />}
+                    onClose={onClose}
+                />
 
                 <form onSubmit={handleSubmit}>
                     <div className="modal-body">

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -7,6 +7,11 @@ import { patientInfoQuery } from '@/query/queries';
 import TasksBell from './TasksBell';
 import ThemeToggle from './ThemeToggle';
 import UserMenu from './UserMenu';
+
+// sessionStorage key for the sticky patient tab — per-tab-session only (survives
+// in-app navigation + a refresh, cleared on tab/browser close, never shared to
+// other tabs). Deliberately NOT localStorage, so it stays temporary.
+const STICKY_PATIENT_KEY = 'stickyPatientTab';
 
 interface Patient {
     code: string | number;
@@ -46,16 +51,41 @@ const UniversalHeader = () => {
     // header reads it from there instead of making its own duplicate request.
     const { user } = useGlobalState();
 
-    // Patient code from the URL (/patient/:code/...) — drives the React Query read.
+    // Patient code from the URL (/patient/:code/...). Tells us whether we're
+    // *currently* on a patient page and drives the last-sub-view persistence.
     const patientCode = location.pathname.match(/\/patient\/(\d+)/)?.[1] ?? null;
+
+    // Sticky patient tab: keep the last-opened patient as a clickable tab even after
+    // navigating away (Dashboard/Appointments/Search), until a different patient is
+    // opened or the user closes it. Seeded from sessionStorage so it survives a
+    // refresh within this tab (but not a browser close / new tab — see STICKY_PATIENT_KEY).
+    const [stickyCode, setStickyCode] = useState<string | null>(
+        () => sessionStorage.getItem(STICKY_PATIENT_KEY)
+    );
+
+    // Opening a patient promotes it to the sticky tab (replacing any previous one).
+    // Render-phase keyed guard — the repo's idiom for "adjust state from a changing
+    // value" (NOT a setState-in-effect); the `!== stickyCode` guard makes it idempotent.
+    if (patientCode && patientCode !== stickyCode) {
+        setStickyCode(patientCode);
+    }
+
+    // True while we're on the represented patient's own page (tab is the active
+    // location indicator). When false the tab is a backgrounded shortcut and shows
+    // a close button.
+    const onPatientRoute = patientCode != null;
+
+    // The patient the tab represents: the one we're viewing, else the sticky one.
+    const activeCode = patientCode ?? stickyCode;
 
     // Patient demographics from the shared React Query cache — the SAME key
     // PatientShell uses on every patient sub-route, so this resolves from cache
-    // (no duplicate request, flash-free name) and refreshes live whenever a
-    // patient mutation invalidates qk.patient.info.
+    // (no duplicate request, flash-free name) and refreshes live whenever a patient
+    // mutation invalidates qk.patient.info. The observer stays subscribed to the
+    // sticky patient after navigating away, so the name persists in the tab.
     const { data: patient } = useQuery({
-        ...patientInfoQuery(patientCode ?? ''),
-        enabled: patientCode != null,
+        ...patientInfoQuery(activeCode ?? ''),
+        enabled: activeCode != null,
     });
 
     // Header view-shapes, derived in render (compiler-memoized).
@@ -123,6 +153,13 @@ const UniversalHeader = () => {
         // payments, photos…) if we've recorded one; otherwise default to photos.
         const lastView = sessionStorage.getItem(patientViewKey(patientCode));
         navigate(lastView ?? `/patient/${patientCode}/photos/tp0`);
+    };
+
+    const closePatientTab = () => {
+        // Forget the sticky patient. Only reachable while backgrounded (no patient
+        // route active), so there's nothing to navigate away from — the tab just
+        // disappears until the next patient is opened.
+        setStickyCode(null);
     };
 
     const navigateBack = () => {
@@ -199,6 +236,16 @@ const UniversalHeader = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.pathname, location.search]);
 
+    // Mirror the sticky patient into sessionStorage so it survives a refresh within
+    // this tab. I/O only (no setState) → doesn't trip react-hooks/set-state-in-effect.
+    useEffect(() => {
+        if (stickyCode) {
+            sessionStorage.setItem(STICKY_PATIENT_KEY, stickyCode);
+        } else {
+            sessionStorage.removeItem(STICKY_PATIENT_KEY);
+        }
+    }, [stickyCode]);
+
     return (
         <header className="universal-header">
             <div className="header-container">
@@ -224,15 +271,31 @@ const UniversalHeader = () => {
                             </button>
                         ))}
 
-                        {/* Current Patient Navigation */}
+                        {/* Current / sticky patient tab — stays put across screens
+                            until another patient is opened or it's closed. Highlighted
+                            (active) while on that patient's page; a backgrounded
+                            shortcut with a close button anywhere else. */}
                         {currentPatient && (
-                            <button
-                                className="nav-btn patient-nav active"
-                                onClick={() => navigateToPatient(currentPatient.code)}
-                            >
-                                <i className="fas fa-user" />
-                                <span>{currentPatient.name}</span>
-                            </button>
+                            <div className="patient-nav-wrap">
+                                <button
+                                    className={`nav-btn patient-nav ${onPatientRoute ? 'active' : ''}`}
+                                    onClick={() => navigateToPatient(currentPatient.code)}
+                                >
+                                    <i className="fas fa-user" />
+                                    <span>{currentPatient.name}</span>
+                                </button>
+                                {!onPatientRoute && (
+                                    <button
+                                        type="button"
+                                        className="patient-nav-close"
+                                        aria-label={t('nav.closePatient')}
+                                        title={t('nav.closePatient')}
+                                        onClick={closePatientTab}
+                                    >
+                                        <i className="fas fa-times" />
+                                    </button>
+                                )}
+                            </div>
                         )}
                     </nav>
                 </div>

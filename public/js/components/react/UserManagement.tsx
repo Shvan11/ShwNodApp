@@ -1,9 +1,9 @@
-import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useState, FormEvent, ChangeEvent } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
-import * as authContract from '@shared/contracts/auth.contract';
+import { postJSON, httpErrorMessage } from '@/core/http';
+import { authMeQuery } from '@/query/queries';
 import styles from './UserManagement.module.css';
 
 interface UserInfo {
@@ -26,27 +26,14 @@ export default function UserManagement() {
   const toast = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const { data: meData } = useQuery(authMeQuery());
+  const me = meData as { success?: boolean; user?: UserInfo } | undefined;
+  const userInfo = me?.user ?? null;
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState<Message>({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
-
-  // Load current user info on mount
-  useEffect(() => {
-    async function fetchUserInfo() {
-      try {
-        const data = await fetchJSON<{ success: boolean; user?: UserInfo }>('/api/auth/me', { schema: authContract.me.response });
-        if (data.success && data.user) {
-          setUserInfo(data.user);
-        }
-      } catch (error) {
-        console.error('Failed to load user info:', error);
-      }
-    }
-    fetchUserInfo();
-  }, []);
 
   const handleChangePassword = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

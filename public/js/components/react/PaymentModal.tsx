@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { ChangeEvent, FormEvent, FocusEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApiResponse } from '@/types/api.types';
 import styles from './PaymentModal.module.css';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import { parseFormattedNumber } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
@@ -84,6 +85,17 @@ type EntryMode = 'amount' | 'cash';
  * Re-renders only when workData, onClose, or onSuccess props change
  * Uses useCallback for event handlers to prevent breaking memoization
  */
+
+// Pure display formatter — module-scoped so every reference (incl. the during-render
+// display formatting below) is lexically after its declaration (react-hooks/immutability).
+const formatNumber = (num: number | string | undefined): string => {
+    const numVal = typeof num === 'string' ? parseFloat(num) : num;
+    if (isNaN(numVal as number) || numVal === null || numVal === undefined) {
+        return '0';
+    }
+    return Math.round(numVal as number).toLocaleString('en-US');
+};
+
 const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const toast = useToast();
     const confirm = useConfirm();
@@ -143,37 +155,135 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const {
         data: rateData,
         isError: rateIsError,
-        refetch: refetchRate,
     } = useQuery(exchangeRateForDateQuery(formData.paymentDate));
     const exchangeRate = rateData?.exchangeRate ?? null;
     const exchangeRateError = rateIsError || (!!rateData && !rateData.exchangeRate);
 
-    useEffect(() => {
+    // The form/balance seed + the two recalculations below were setState-in-effect
+    // cascades; they are now keyed adjust-during-render blocks (matching the display
+    // formatting + rate blocks further down). Each runs the same logic on the same
+    // inputs, but during render — so there is no setState-in-effect / immutability,
+    // and React Compiler can optimise. The blocks form an acyclic cascade
+    // (seed → suggested cash → total/change), each writing only state outside its
+    // own key, so they converge in a couple of render passes.
+
+    // Seed form + balance from the work when the modal opens or the work changes.
+    const [seededInit, setSeededInit] = useState<{ work: WorkData | null; success: boolean }>({ work: null, success: false });
+    if (seededInit.work !== workData || seededInit.success !== paymentSuccess) {
+        setSeededInit({ work: workData, success: paymentSuccess });
         // Only initialize form data if not in payment success mode
         if (workData && !paymentSuccess) {
-            initializeFormData();
+            const remainingBalance = (workData.total_required || 0) - Number(workData.discount ?? 0) - (workData.TotalPaid || 0);
+            const accountCurrency = workData.currency || 'IQD';
+            setCalculations(prev => ({ ...prev, accountCurrency: accountCurrency, remainingBalance: remainingBalance }));
+            setFormData(prev => ({ ...prev, paymentCurrency: accountCurrency, amountToRegister: '' }));
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [workData, paymentSuccess]);
+    }
 
-    // Recalculate when payment currency or amount changes, or when switching to amount mode
-    useEffect(() => {
+    // Recalculate suggested cash when payment currency or amount changes, or when
+    // switching to amount mode.
+    const suggestKey = `${formData.amountToRegister}|${formData.paymentCurrency}|${exchangeRate}|${entryMode}|${calculations.accountCurrency}`;
+    const [seededSuggestKey, setSeededSuggestKey] = useState<string | null>(null);
+    if (suggestKey !== seededSuggestKey) {
+        setSeededSuggestKey(suggestKey);
         if (entryMode === 'amount' && formData.amountToRegister && exchangeRate) {
-            calculateSuggestedCash();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData.amountToRegister, formData.paymentCurrency, exchangeRate, entryMode, calculations.accountCurrency]);
+            const amountToRegister = parseFloat(String(formData.amountToRegister)) || 0;
+            const accountCurrency = calculations.accountCurrency;
+            const paymentCurrency = formData.paymentCurrency;
 
-    // Recalculate when actual cash amounts change
-    useEffect(() => {
+            if (paymentCurrency === 'MIXED') {
+                // For mixed, no suggestion - user must enter manually
+                setCalculations(prev => ({ ...prev, suggestedUSD: 0, suggestedIQD: 0 }));
+            } else {
+                // Single currency payment
+                let suggestedUSD = 0;
+                let suggestedIQD = 0;
+
+                if (paymentCurrency === 'USD') {
+                    if (accountCurrency === 'USD') {
+                        suggestedUSD = amountToRegister;
+                    } else {
+                        // Account is IQD, paying in USD - Round UP to collect more
+                        suggestedUSD = Math.ceil(amountToRegister / exchangeRate);
+                    }
+                } else if (paymentCurrency === 'IQD') {
+                    if (accountCurrency === 'IQD') {
+                        suggestedIQD = amountToRegister;
+                    } else {
+                        // Account is USD, paying in IQD - Round UP to nearest 1000 to collect more
+                        suggestedIQD = Math.ceil(amountToRegister * exchangeRate / 1000) * 1000;
+                    }
+                }
+
+                // Auto-fill suggested amounts ONLY if cash override is not enabled
+                if (!formData.cashOverrideEnabled) {
+                    setFormData(prev => ({ ...prev, actualUSD: suggestedUSD || '', actualIQD: suggestedIQD || '' }));
+                }
+
+                setCalculations(prev => ({ ...prev, suggestedUSD, suggestedIQD }));
+            }
+        }
+    }
+
+    // Recalculate total + change when actual cash amounts change.
+    const totalKey = `${formData.actualUSD}|${formData.actualIQD}|${formData.amountToRegister}|${exchangeRate}|${calculations.accountCurrency}`;
+    const [seededTotalKey, setSeededTotalKey] = useState<string | null>(null);
+    if (totalKey !== seededTotalKey) {
+        setSeededTotalKey(totalKey);
         if (exchangeRate) {
-            calculateTotalAndChange();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData.actualUSD, formData.actualIQD, formData.amountToRegister, exchangeRate, calculations.accountCurrency]);
+            const actualUSD = parseFloat(String(formData.actualUSD)) || 0;
+            const actualIQD = parseFloat(String(formData.actualIQD)) || 0;
+            const amountToRegister = parseFloat(String(formData.amountToRegister)) || 0;
+            const accountCurrency = calculations.accountCurrency;
 
-    // Auto-format display values when formData changes (handles auto-population)
-    useEffect(() => {
+            // Convert total received to account currency - Round DOWN what patient gave (you benefit)
+            let totalInAccountCurrency: number;
+            if (accountCurrency === 'USD') {
+                // Patient gave IQD, convert to USD - Round DOWN
+                const iqdValueInUSD = Math.floor(actualIQD / exchangeRate);
+                totalInAccountCurrency = actualUSD + iqdValueInUSD;
+            } else {
+                // Patient gave USD, convert to IQD - Round DOWN to nearest 1000
+                const usdValueInIQD = Math.floor(actualUSD * exchangeRate / 1000) * 1000;
+                totalInAccountCurrency = usdValueInIQD + actualIQD;
+            }
+
+            // Calculate overpayment
+            const overpayment = totalInAccountCurrency - amountToRegister;
+
+            // Convert overpayment to IQD (change always in IQD) - Round DOWN to nearest 1000 (you give less)
+            let changeInIQD = 0;
+            if (overpayment > 0) {
+                if (accountCurrency === 'USD') {
+                    changeInIQD = Math.floor(overpayment * exchangeRate / 1000) * 1000;
+                } else {
+                    changeInIQD = Math.floor(overpayment / 1000) * 1000;
+                }
+            }
+
+            // Update change only if not manually overridden
+            if (!formData.changeManualOverride) {
+                setFormData(prev => ({ ...prev, change: changeInIQD }));
+            }
+
+            setCalculations(prev => ({
+                ...prev,
+                totalReceived: Math.round(totalInAccountCurrency),
+                calculatedChange: changeInIQD,
+                isShort: totalInAccountCurrency < amountToRegister,
+                isExact: Math.abs(totalInAccountCurrency - amountToRegister) < 0.01,
+                isOver: totalInAccountCurrency > amountToRegister
+            }));
+        }
+    }
+
+    // Auto-format display values when formData changes (handles auto-population) —
+    // done during render (keyed on the formatted fields) so there's no
+    // setState-in-effect. Mirrors the prior effect exactly.
+    const fmtKey = `${formData.amountToRegister}|${formData.actualUSD}|${formData.actualIQD}|${formData.change}`;
+    const [seededFmtKey, setSeededFmtKey] = useState<string | null>(null);
+    if (fmtKey !== seededFmtKey) {
+        setSeededFmtKey(fmtKey);
         setDisplayValues(prev => ({
             ...prev,
             amountToRegister: formatNumber(formData.amountToRegister),
@@ -181,15 +291,17 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             actualIQD: formatNumber(formData.actualIQD),
             change: formatNumber(formData.change)
         }));
-    }, [formData.amountToRegister, formData.actualUSD, formData.actualIQD, formData.change]);
+    }
 
-    // Auto-format exchange rate input
-    useEffect(() => {
+    // Auto-format exchange rate input.
+    const [seededRateValue, setSeededRateValue] = useState<string | null>(null);
+    if (newRateValue !== seededRateValue) {
+        setSeededRateValue(newRateValue);
         setDisplayValues(prev => ({
             ...prev,
             newRateValue: formatNumber(newRateValue)
         }));
-    }, [newRateValue]);
+    }
 
     const handleSetExchangeRate = async () => {
         const rate = parseFormattedNumber(newRateValue);
@@ -206,8 +318,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                 exchangeRate: Math.round(rate)
             }, { schema: updateExchangeRateContract.response });
 
-            // Re-read the rate for this date so the derived `exchangeRate` updates.
-            await refetchRate();
+            // Invalidate the exchange-rate cache so this date's rate (and every other
+            // observer, e.g. ExchangeRatesSettings) refetches and the derived
+            // `exchangeRate` updates. Matches ExchangeRatesSettings' own write path.
+            await queryClient.invalidateQueries({ queryKey: qk.exchangeRates.all() });
             setShowRateInput(false);
             setNewRateValue('');
         } catch (error) {
@@ -218,153 +332,35 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         }
     };
 
-    const initializeFormData = () => {
-        if (!workData) return;
-        const remainingBalance = (workData.total_required || 0) - Number(workData.discount ?? 0) - (workData.TotalPaid || 0);
-        const accountCurrency = workData.currency || 'IQD';
-
-        setCalculations(prev => ({
-            ...prev,
-            accountCurrency: accountCurrency,
-            remainingBalance: remainingBalance
-        }));
-
-        setFormData(prev => ({
-            ...prev,
-            paymentCurrency: accountCurrency, // Default to account currency
-            amountToRegister: ''
-        }));
-    };
-
-    const calculateSuggestedCash = () => {
-        if (!exchangeRate) return;
-
-        const amountToRegister = parseFloat(String(formData.amountToRegister)) || 0;
-        const accountCurrency = calculations.accountCurrency;
-        const paymentCurrency = formData.paymentCurrency;
-
-        if (paymentCurrency === 'MIXED') {
-            // For mixed, no suggestion - user must enter manually
-            setCalculations(prev => ({
-                ...prev,
-                suggestedUSD: 0,
-                suggestedIQD: 0
-            }));
-            return;
-        }
-
-        // Single currency payment
-        let suggestedUSD = 0;
-        let suggestedIQD = 0;
-
-        if (paymentCurrency === 'USD') {
-            if (accountCurrency === 'USD') {
-                suggestedUSD = amountToRegister;
-            } else {
-                // Account is IQD, paying in USD - Round UP to collect more
-                suggestedUSD = Math.ceil(amountToRegister / exchangeRate);
-            }
-        } else if (paymentCurrency === 'IQD') {
-            if (accountCurrency === 'IQD') {
-                suggestedIQD = amountToRegister;
-            } else {
-                // Account is USD, paying in IQD - Round UP to nearest 1000 to collect more
-                suggestedIQD = Math.ceil(amountToRegister * exchangeRate / 1000) * 1000;
-            }
-        }
-
-        // Auto-fill suggested amounts ONLY if cash override is not enabled
-        if (!formData.cashOverrideEnabled) {
-            setFormData(prev => ({
-                ...prev,
-                actualUSD: suggestedUSD || '',
-                actualIQD: suggestedIQD || ''
-            }));
-        }
-
-        setCalculations(prev => ({
-            ...prev,
-            suggestedUSD,
-            suggestedIQD
-        }));
-    };
-
-    const calculateTotalAndChange = () => {
-        if (!exchangeRate) return;
-
-        const actualUSD = parseFloat(String(formData.actualUSD)) || 0;
-        const actualIQD = parseFloat(String(formData.actualIQD)) || 0;
-        const amountToRegister = parseFloat(String(formData.amountToRegister)) || 0;
-        const accountCurrency = calculations.accountCurrency;
-
-        // Convert total received to account currency - Round DOWN what patient gave (you benefit)
-        let totalInAccountCurrency: number;
-        if (accountCurrency === 'USD') {
-            // Patient gave IQD, convert to USD - Round DOWN
-            const iqdValueInUSD = Math.floor(actualIQD / exchangeRate);
-            totalInAccountCurrency = actualUSD + iqdValueInUSD;
-        } else {
-            // Patient gave USD, convert to IQD - Round DOWN to nearest 1000
-            const usdValueInIQD = Math.floor(actualUSD * exchangeRate / 1000) * 1000;
-            totalInAccountCurrency = usdValueInIQD + actualIQD;
-        }
-
-        // Calculate overpayment
-        const overpayment = totalInAccountCurrency - amountToRegister;
-
-        // Convert overpayment to IQD (change always in IQD) - Round DOWN to nearest 1000 (you give less)
-        let changeInIQD = 0;
-        if (overpayment > 0) {
-            if (accountCurrency === 'USD') {
-                changeInIQD = Math.floor(overpayment * exchangeRate / 1000) * 1000;
-            } else {
-                changeInIQD = Math.floor(overpayment / 1000) * 1000;
-            }
-        }
-
-        // Update change only if not manually overridden
-        if (!formData.changeManualOverride) {
-            setFormData(prev => ({
-                ...prev,
-                change: changeInIQD
-            }));
-        }
-
-        setCalculations(prev => ({
-            ...prev,
-            totalReceived: Math.round(totalInAccountCurrency),
-            calculatedChange: changeInIQD,
-            isShort: totalInAccountCurrency < amountToRegister,
-            isExact: Math.abs(totalInAccountCurrency - amountToRegister) < 0.01,
-            isOver: totalInAccountCurrency > amountToRegister
-        }));
-    };
-
     // Reverse mode: Calculate amount to register from cash received when in cash entry mode.
-    // Uses same "benefit from conversion" rounding - round DOWN what patient gave
-    useEffect(() => {
-        if (entryMode !== 'cash' || !exchangeRate) return;
+    // Uses same "benefit from conversion" rounding - round DOWN what patient gave. Keyed
+    // adjust-during-render (not an effect); entryMode gates it so it never competes with
+    // the amount-mode suggested-cash block above (the two are entry-mode-exclusive).
+    const reverseKey = `${formData.actualUSD}|${formData.actualIQD}|${entryMode}|${exchangeRate}|${calculations.accountCurrency}`;
+    const [seededReverseKey, setSeededReverseKey] = useState<string | null>(null);
+    if (reverseKey !== seededReverseKey) {
+        setSeededReverseKey(reverseKey);
+        if (entryMode === 'cash' && exchangeRate) {
+            const actualUSD = parseFloat(String(formData.actualUSD)) || 0;
+            const actualIQD = parseFloat(String(formData.actualIQD)) || 0;
+            const accountCurrency = calculations.accountCurrency;
 
-        const actualUSD = parseFloat(String(formData.actualUSD)) || 0;
-        const actualIQD = parseFloat(String(formData.actualIQD)) || 0;
-        const accountCurrency = calculations.accountCurrency;
+            if (actualUSD === 0 && actualIQD === 0) {
+                setFormData(prev => ({ ...prev, amountToRegister: '' }));
+            } else {
+                let amountToRegister: number;
+                if (accountCurrency === 'USD') {
+                    const iqdValueInUSD = Math.floor(actualIQD / exchangeRate);
+                    amountToRegister = actualUSD + iqdValueInUSD;
+                } else {
+                    const usdValueInIQD = Math.floor(actualUSD * exchangeRate / 1000) * 1000;
+                    amountToRegister = usdValueInIQD + actualIQD;
+                }
 
-        if (actualUSD === 0 && actualIQD === 0) {
-            setFormData(prev => ({ ...prev, amountToRegister: '' }));
-            return;
+                setFormData(prev => ({ ...prev, amountToRegister: amountToRegister }));
+            }
         }
-
-        let amountToRegister: number;
-        if (accountCurrency === 'USD') {
-            const iqdValueInUSD = Math.floor(actualIQD / exchangeRate);
-            amountToRegister = actualUSD + iqdValueInUSD;
-        } else {
-            const usdValueInIQD = Math.floor(actualUSD * exchangeRate / 1000) * 1000;
-            amountToRegister = usdValueInIQD + actualIQD;
-        }
-
-        setFormData(prev => ({ ...prev, amountToRegister }));
-    }, [formData.actualUSD, formData.actualIQD, entryMode, exchangeRate, calculations.accountCurrency]);
+    }
 
     // Smart calculation for mixed payments
     const handleMixedUSDChange = (value: string) => {
@@ -573,7 +569,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         setFormData(prev => ({ ...prev, actualUSD: usd }));
         setDisplayValues(prev => ({ ...prev, actualUSD: value }));
 
-        // Change will be auto-calculated by calculateTotalAndChange useEffect
+        // Change will be auto-calculated by the total/change render block
     };
 
     // Handle entry mode toggle change (always locks mode after manual toggle)
@@ -586,7 +582,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         if (newMode === 'cash') {
             // Switching to cash mode
             // Clear amount (auto-calculated in cash mode), keep cash values
-            // useEffect will recalculate amount from cash
+            // the reverse-mode render block will recalculate amount from cash
             setFormData(prev => ({
                 ...prev,
                 amountToRegister: '',
@@ -603,7 +599,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         } else {
             // Switching to amount mode
             // Clear cash (auto-calculated in amount mode), keep amount value
-            // useEffect will recalculate cash from amount
+            // the suggested-cash render block will recalculate cash from amount
             setFormData(prev => ({
                 ...prev,
                 actualUSD: '',
@@ -794,14 +790,6 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         return `${Math.round(numAmount as number).toLocaleString('en-US')} ${currency}`;
     };
 
-    const formatNumber = (num: number | string | undefined): string => {
-        const numVal = typeof num === 'string' ? parseFloat(num) : num;
-        if (isNaN(numVal as number) || numVal === null || numVal === undefined) {
-            return '0';
-        }
-        return Math.round(numVal as number).toLocaleString('en-US');
-    };
-
     if (!workData) return null;
 
     // Whether the amount field currently equals the full remaining balance
@@ -836,20 +824,16 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             onClose={paymentSuccess ? handleCloseAfterSuccess : onClose}
             contentClassName={`${styles.modalContent} ${styles.invoiceModal} ${styles.paymentModalCompact}`}
         >
-                <button className={styles.modalClose} onClick={paymentSuccess ? handleCloseAfterSuccess : onClose}>×</button>
-
                 {!paymentSuccess ? (
                     <>
                         {/* Compact Header with Balance Info */}
-                        <div className={styles.paymentHeaderCompact}>
-                            <div className={styles.paymentHeaderLeft}>
-                                <h2 className={styles.paymentTitleCompact}>
-                                    <i className="fas fa-credit-card"></i>
-                                    Add Payment
-                                </h2>
-                                <span className={styles.paymentWorkType}>{workData.type_name || `Work #${workData.work_id}`}</span>
-                            </div>
-                            <div className={styles.paymentHeaderRight}>
+                        <ModalHeader
+                            dense
+                            title="Add Payment"
+                            icon={<i className="fas fa-credit-card" />}
+                            subtitle={workData.type_name || `Work #${workData.work_id}`}
+                            onClose={onClose}
+                            actions={
                                 <div className={styles.paymentBalanceBadge}>
                                     <span className={styles.balanceLabel}>Balance</span>
                                     <span className={styles.balanceAmount}>{formatCurrency(calculations.remainingBalance, calculations.accountCurrency)}</span>
@@ -859,8 +843,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                         </span>
                                     )}
                                 </div>
-                            </div>
-                        </div>
+                            }
+                        />
 
                         {/* Exchange Rate - Compact Inline */}
                         {exchangeRateError && !exchangeRate ? (
@@ -1176,7 +1160,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                     </>
                 ) : (
                     /* Payment Success State - Compact */
-                    <div className={styles.paymentSuccessCompact}>
+                    <>
+                        <button className={styles.modalClose} onClick={handleCloseAfterSuccess} aria-label="Close">×</button>
+                        <div className={styles.paymentSuccessCompact}>
                         <div className={styles.successIcon}>
                             <i className="fas fa-check-circle"></i>
                         </div>
@@ -1192,7 +1178,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                 Done
                             </button>
                         </div>
-                    </div>
+                        </div>
+                    </>
                 )}
         </Modal>
     );

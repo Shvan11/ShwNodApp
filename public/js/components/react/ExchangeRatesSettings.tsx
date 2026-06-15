@@ -1,8 +1,9 @@
 import { useState, useEffect, ChangeEvent } from 'react';
 import type { HistoryEntry } from '@/types/api.types';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { updateExchangeRate as updateExchangeRateContract } from '@shared/contracts/payment.contract';
+import { qk } from '@/query/keys';
 import { currentExchangeRateQuery, exchangeRatesHistoryQuery } from '@/query/queries';
 import { useToast } from '../../contexts/ToastContext';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
@@ -23,6 +24,7 @@ const daysAgoIso = (days: number): string => {
 
 const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) => {
     const toast = useToast();
+    const queryClient = useQueryClient();
     const today = todayIso();
 
     const [editing, setEditing] = useState(false);
@@ -39,7 +41,6 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
         isLoading: todayLoading,
         isError: todayIsError,
         error: todayError,
-        refetch: refetchToday,
     } = useQuery(currentExchangeRateQuery());
     const todayRate = todayData?.exchangeRate ?? null;
 
@@ -48,7 +49,6 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
         isLoading: historyLoading,
         isError: historyIsError,
         error: historyError,
-        refetch: refetchHistory,
     } = useQuery(exchangeRatesHistoryQuery(fromDate, toDate));
     const history = (historyData?.rates ?? []) as HistoryEntry[];
 
@@ -99,10 +99,10 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
             toast.success("Today's exchange rate updated");
             setEditing(false);
             setDraftValue('');
-            refetchToday();
-            if (toDate >= today && fromDate <= today) {
-                refetchHistory();
-            }
+            // qk.exchangeRates.all() is the prefix over today's rate + the history
+            // range (and PaymentModal's rate reads), so one invalidation refreshes
+            // every exchange-rate observer app-wide.
+            queryClient.invalidateQueries({ queryKey: qk.exchangeRates.all() });
         } catch (error) {
             console.error('Error saving rate:', error);
             toast.error(httpErrorMessage(error, 'Failed to update exchange rate'));

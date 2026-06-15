@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, ChangeEvent } from 'react';
+import { useState, ChangeEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import PhotoSessionDialog from './PhotoSessionDialog';
@@ -7,13 +7,10 @@ import WebCephModal from './WebCephModal';
 import PortalAccessCard from './PortalAccessCard';
 import { useToast } from '../../contexts/ToastContext';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
-import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
+import { putJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
 import { notifyTasksChanged } from '@/services/tasks';
-import { patientInfoQuery } from '@/query/queries';
-import * as costPreset from '@shared/contracts/cost-preset.contract';
-import * as patientContract from '@shared/contracts/patient.contract';
-import * as lookupContract from '@shared/contracts/lookup.contract';
+import { patientInfoQuery, patientAlertsQuery, costPresetsQuery, alertTypesQuery } from '@/query/queries';
 import styles from './ViewPatientInfo.module.css';
 
 interface Props {
@@ -91,9 +88,17 @@ const ViewPatientInfo = ({ personId }: Props) => {
     });
     const patientInfo = (patientInfoData ?? null) as PatientInfo | null;
     const error = queryError ? httpErrorMessage(queryError, 'Unknown error') : null;
-    const [alerts, setAlerts] = useState<Alert[]>([]);
-    const [alertsLoading, setAlertsLoading] = useState(false);
-    const [alertTypes, setAlertTypes] = useState<AlertType[]>([]);
+    // Alerts, cost presets, and alert types now read from React Query (shared,
+    // deduped, live-invalidated). Casts mirror the original fetchJSON typings.
+    const { data: alertsData, isLoading: alertsLoading } = useQuery({
+        ...patientAlertsQuery(personId ?? ''),
+        enabled: !!personId,
+    });
+    const alerts = (alertsData ?? []) as Alert[];
+    const { data: alertTypesData } = useQuery(alertTypesQuery());
+    const alertTypes: AlertType[] = alertTypesData ?? [];
+    const { data: costPresetsData, isLoading: presetsLoading } = useQuery(costPresetsQuery());
+    const costPresets: CostPreset[] = costPresetsData ?? [];
     const [showAlertModal, setShowAlertModal] = useState(false);
     const [deletingAlertId, setDeletingAlertId] = useState<number | null>(null);
     const [showPhotoSessionDialog, setShowPhotoSessionDialog] = useState(false);
@@ -102,8 +107,9 @@ const ViewPatientInfo = ({ personId }: Props) => {
     // Cost editing state
     const [editingCost, setEditingCost] = useState<EditingCostState | null>(null);
     const [savingCost, setSavingCost] = useState(false);
-    const [costPresets, setCostPresets] = useState<CostPreset[]>([]);
-    const [presetsLoading, setPresetsLoading] = useState(false);
+
+    const reloadAlerts = () =>
+        queryClient.invalidateQueries({ queryKey: qk.patient.alerts(personId ?? '') });
 
     // Use validated PersonID from loader, fallback to patientInfo.person_id
     const validPersonId = personId ?? patientInfo?.person_id ?? null;
@@ -190,54 +196,9 @@ const ViewPatientInfo = ({ personId }: Props) => {
         return value.replace(/[^0-9]/g, '');
     };
 
-    const loadAlerts = useCallback(async (signal?: AbortSignal) => {
-        if (!personId) return;
-
-        try {
-            setAlertsLoading(true);
-            const data = await fetchJSON<Alert[]>(`/api/patients/${personId}/alerts`, { signal, schema: patientContract.alerts.response });
-            setAlerts(data);
-        } catch (err) {
-            if (err instanceof Error && err.name === 'AbortError') return;
-        } finally {
-            setAlertsLoading(false);
-        }
-    }, [personId]);
-
-    const loadCostPresets = useCallback(async () => {
-        try {
-            setPresetsLoading(true);
-            const data = await fetchJSON<CostPreset[]>('/api/settings/cost-presets', { schema: costPreset.getPresets.response });
-            setCostPresets(data);
-        } catch (err) {
-            console.error('Error loading cost presets:', err);
-        } finally {
-            setPresetsLoading(false);
-        }
-    }, []);
-
-    const loadAlertTypes = useCallback(async () => {
-        try {
-            const data = await fetchJSON<AlertType[]>('/api/alert-types', { schema: lookupContract.alertTypes.response });
-            setAlertTypes(data);
-        } catch (err) {
-            console.error('Error loading alert types:', err);
-        }
-    }, []);
-
-    useEffect(() => {
-        const controller = new AbortController();
-        // patientInfo is now read via useQuery above; only the not-yet-migrated
-        // reads (alerts, cost presets, alert types) load here.
-        loadAlerts(controller.signal);
-        loadCostPresets();
-        loadAlertTypes();
-        return () => controller.abort();
-    }, [personId, loadAlerts, loadCostPresets, loadAlertTypes]);
-
     // Handle alert modal save - refresh alerts list
     const handleAlertSaved = async () => {
-        await loadAlerts();
+        await reloadAlerts();
     };
 
     const handleDeleteAlert = async (alertId: number) => {
@@ -245,7 +206,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
             setDeletingAlertId(alertId);
             await putJSON(`/api/alerts/${alertId}/status`, { status: 'dismissed' });
 
-            loadAlerts(); // Reload alerts
+            reloadAlerts(); // Reload alerts
             notifyTasksChanged();
             toast.success('Alert deleted');
         } catch (err) {

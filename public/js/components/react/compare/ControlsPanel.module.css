@@ -183,7 +183,7 @@
 
 .viewRow {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: var(--spacing-xs);
 }
 
@@ -246,4 +246,55 @@
 .exportButton:disabled {
     cursor: not-allowed;
     opacity: 0.4;
+}
+
+/* --- crop edge-trim toggle --- */
+
+.cropToggle {
+    width: 100%;
+    height: 34px;
+    margin-top: var(--spacing-xs);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    border: var(--border-width-thin) solid var(--border);
+    background: var(--surface);
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    transition: border-color var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.cropToggle:hover:not(:disabled) {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.cropToggle:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+.cropToggleActive,
+.cropToggleActive:hover:not(:disabled) {
+    background: var(--blue-50);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    font-weight: var(--font-weight-semibold);
+}
+
+.cropHint {
+    margin: var(--spacing-xs) 0 0;
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.cropNudgeRow {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-xs);
 }

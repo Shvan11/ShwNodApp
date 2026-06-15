@@ -28,6 +28,29 @@ import { idParams } from '../validation.js';
 // branch) — so a numeric query schema would 400 the name form. Validate only
 // that they are strings (closes the boundary); the handler owns the semantics.
 // ---------------------------------------------------------------------------
+// One staff row — every column the GET /employees SELECT projects (id +
+// employee_name + the joined position_name + the editable fields). Closed
+// `z.object` (not `looseObject`): the SELECT list is fully enumerated here, so
+// there is no long-tail field to preserve, and a closed row gives `z.infer` a
+// clean type with no index signature — which both keeps the server `sendData`
+// source (the DB-typed row array) assignable AND lets every read site drop its
+// `as unknown as Doctor[]`/`Employee[]` cast and use `EmployeeRow` directly.
+const employeeRow = z.object({
+  id: z.number(),
+  employee_name: z.string(),
+  position: z.number().nullable(),
+  position_name: z.string().nullable(),
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+  percentage: z.boolean(),
+  receive_email: z.boolean(),
+  get_appointments: z.boolean(),
+  is_active: z.boolean(),
+  sort_order: z.number(),
+  appointment_color: z.string().nullable(),
+});
+export type EmployeeRow = z.infer<typeof employeeRow>;
+
 export const employees = {
   query: z.object({
     getAppointments: z.string().optional(),
@@ -40,15 +63,24 @@ export const employees = {
     includeInactive: z.string().optional(),
   }),
   response: z.object({
-    employees: z.array(z.looseObject({ id: z.number() })),
+    employees: z.array(employeeRow),
   }),
 } as const;
 export type EmployeesResponse = z.infer<typeof employees.response>;
 
 // GET /api/positions → { positions: position[] }.
+// GET /positions row — the two columns the SELECT projects. `position_name` is
+// nullable in the DB (positions.position_name), so the read sites get the honest
+// `string | null` instead of an `as unknown as Position[]` cast over it.
+const positionRow = z.object({
+  id: z.number(),
+  position_name: z.string().nullable(),
+});
+export type PositionRow = z.infer<typeof positionRow>;
+
 export const positions = {
   response: z.object({
-    positions: z.array(z.looseObject({ id: z.number() })),
+    positions: z.array(positionRow),
   }),
 } as const;
 export type PositionsResponse = z.infer<typeof positions.response>;

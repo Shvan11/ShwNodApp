@@ -395,20 +395,6 @@
   max-width: 450px;
 }
 
-.modalHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.modalHeader h2 {
-  margin: 0;
-  font-size: 20px;
-  color: var(--text-primary);
-}
-
 .closeBtn {
   background: none;
   border: none;
@@ -627,10 +613,6 @@ textarea.formInput {
     max-width: 100%;
     margin: 10px;
     max-height: calc(100vh - 20px);
-  }
-
-  .modalHeader h2 {
-    font-size: 18px;
   }
 
   .qrModal {

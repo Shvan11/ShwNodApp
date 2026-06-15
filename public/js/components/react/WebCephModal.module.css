@@ -8,45 +8,6 @@
     overflow: hidden;
 }
 
-/* ── Header ───────────────────────────────────────────────────────────────── */
-.header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md) var(--spacing-lg);
-    background: linear-gradient(135deg, var(--indigo-100) 0%, var(--indigo-50) 100%);
-    border-bottom: 1px solid var(--indigo-200);
-}
-
-.headerTitle {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-bold);
-    color: var(--indigo-700);
-}
-
-.closeBtn {
-    flex-shrink: 0;
-    background: transparent;
-    border: none;
-    font-size: var(--font-size-lg);
-    color: var(--text-secondary);
-    cursor: pointer;
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-full);
-    transition: var(--transition-base);
-}
-
-.closeBtn:hover {
-    background: var(--indigo-100);
-    color: var(--text-secondary);
-}
-
 /* ── Body ─────────────────────────────────────────────────────────────────── */
 .body {
     padding: var(--spacing-lg);

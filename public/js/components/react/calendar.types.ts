@@ -18,11 +18,13 @@ export interface LegendDoctor {
     color: DoctorColor | null; // null = neutral (no tint), e.g. the "Clinic" bucket
 }
 
-// Appointment displayed in calendar slots
+// Appointment displayed in calendar slots.
+// `patientName`/`appDetail` are `| null` to match the contract's `appointmentInfo`
+// (shared/contracts/calendar.contract.ts) so the response rows assign in cast-free.
 export interface CalendarAppointment {
     appointment_id?: number | string;
-    patientName?: string;
-    appDetail?: string;
+    patientName?: string | null;
+    appDetail?: string | null;
     personID?: number | null;
     drID?: number | null;
     time?: string;
@@ -44,9 +46,11 @@ export interface CalendarDay {
     dayOfWeek?: number;
     appointmentCount?: number;
     isHoliday?: boolean;
-    holidayId?: number;
-    holidayName?: string;
-    holidayDescription?: string;
+    // `| null` mirrors the contract's weekDay/monthDay holiday columns
+    // (shared/contracts/calendar.contract.ts) so the response rows assign in cast-free.
+    holidayId?: number | null;
+    holidayName?: string | null;
+    holidayDescription?: string | null;
     // Appointments can be a record keyed by time slot OR an array
     appointments?: CalendarAppointment[] | Record<string, CalendarSlotInfo | CalendarAppointment[]>;
 }

@@ -4,7 +4,7 @@
  * Compact, space-efficient form with keyword management
  */
 
-import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
+import { useState, type FormEvent, type ChangeEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
@@ -19,6 +19,7 @@ import {
     worksQuery,
 } from '../../query/queries';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import styles from './NewWorkComponent.module.css';
 
 interface WorkType {
@@ -28,7 +29,7 @@ interface WorkType {
 
 interface Keyword {
     id: number;
-    key_word: string;
+    key_word: string | null; // keywords.key_word is nullable; rendered directly
 }
 
 interface Doctor {
@@ -125,9 +126,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
     const { data: keywordsData } = useQuery(workKeywordsQuery());
     const { data: employeesData } = useQuery(employeesQuery('?percentage=true'));
 
-    const workTypes = (workTypesData ?? []) as unknown as WorkType[];
-    const keywords = (keywordsData ?? []) as unknown as Keyword[];
-    const doctors = (employeesData?.employees ?? []) as unknown as Doctor[];
+    const workTypes: WorkType[] = workTypesData ?? [];
+    const keywords: Keyword[] = keywordsData ?? [];
+    const doctors: Doctor[] = employeesData?.employees ?? [];
 
     // Work record read (edit mode) — fetches the patient's works and the
     // form-population effect below picks out this workId. Matches the original
@@ -185,66 +186,76 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
     const { user } = useGlobalState();
     const isAdmin = user?.role === 'admin';
 
-    // Auto-format display value when formData changes
-    useEffect(() => {
+    // Auto-format the display value when the matching formData field changes — done
+    // during render (keyed on the field) so there's no setState-in-effect.
+    const [fmtTotalRequired, setFmtTotalRequired] = useState(formData.total_required);
+    if (fmtTotalRequired !== formData.total_required) {
+        setFmtTotalRequired(formData.total_required);
         setDisplayValues(prev => ({
             ...prev,
             total_required: formatNumber(formData.total_required)
         }));
-    }, [formData.total_required]);
+    }
 
-    useEffect(() => {
+    const [fmtDiscount, setFmtDiscount] = useState(formData.discount);
+    if (fmtDiscount !== formData.discount) {
+        setFmtDiscount(formData.discount);
         setDisplayValues(prev => ({
             ...prev,
             discount: formData.discount ? formatNumber(formData.discount) : ''
         }));
-    }, [formData.discount]);
+    }
 
-    // Populate the form when the works list arrives (edit mode), picking out the
-    // row for this workId. Mirrors the old loadWorkData population exactly — same
-    // nullish-coalescing (preserve 0) and String(...) coercion.
-    useEffect(() => {
-        if (!worksData) return;
-        const works = worksData as unknown as WorkResponse[];
-        const work = works.find(w => w.work_id === workId);
-        if (!work) return;
-
-        const discountDateISO = work.discount_date ? formatISODate(work.discount_date) : '';
-        const discountValue = Number(work.discount ?? 0);
-        setFormData({
-            person_id: String(work.person_id),
-            total_required: work.total_required ?? 0, // Use nullish coalescing to preserve 0
-            currency: work.currency || 'USD',
-            type_of_work: String(work.type_of_work || ''),
-            notes: work.notes || '',
-            status: work.status ?? 1, // Use nullish coalescing to preserve 0 if somehow status is 0
-            start_date: work.start_date ? formatISODate(work.start_date) : '',
-            debond_date: work.debond_date ? formatISODate(work.debond_date) : '',
-            f_photo_date: work.f_photo_date ? formatISODate(work.f_photo_date) : '',
-            i_photo_date: work.i_photo_date ? formatISODate(work.i_photo_date) : '',
-            estimated_duration: String(work.estimated_duration || ''),
-            dr_id: String(work.dr_id || ''),
-            notes_date: work.notes_date ? formatISODate(work.notes_date) : '',
-            keyword_id_1: String(work.keyword_id_1 || ''),
-            keyword_id_2: String(work.keyword_id_2 || ''),
-            keyword_id_3: String(work.keyword_id_3 || ''),
-            keyword_id_4: String(work.keyword_id_4 || ''),
-            keyword_id_5: String(work.keyword_id_5 || ''),
-            discount: discountValue,
-            discount_date: discountDateISO,
-            discount_reason: work.discount_reason || '',
-            createAsFinished: false
-        });
-        setExistingTotalPaid(Number(work.TotalPaid ?? 0));
-    }, [worksData, workId]);
+    // Populate the form when the works list arrives (edit mode), picking out the row
+    // for this workId — keyed on (worksData, workId) so it re-seeds on refetch.
+    // Mirrors the old loadWorkData population exactly — same nullish-coalescing
+    // (preserve 0) and String(...) coercion.
+    const [seededWork, setSeededWork] = useState<{ data: unknown; id: number | null }>({ data: null, id: null });
+    if (seededWork.data !== worksData || seededWork.id !== workId) {
+        setSeededWork({ data: worksData, id: workId });
+        // worksData is the contracted WorkRow[]; the field reads below are all
+        // null-safe (?? / || / ?:), so it's used directly — no cast.
+        const work = worksData?.find(w => w.work_id === workId);
+        if (work) {
+            const discountDateISO = work.discount_date ? formatISODate(work.discount_date) : '';
+            const discountValue = Number(work.discount ?? 0);
+            setFormData({
+                person_id: String(work.person_id),
+                total_required: work.total_required ?? 0, // Use nullish coalescing to preserve 0
+                currency: work.currency || 'USD',
+                type_of_work: String(work.type_of_work || ''),
+                notes: work.notes || '',
+                status: work.status ?? 1, // Use nullish coalescing to preserve 0 if somehow status is 0
+                start_date: work.start_date ? formatISODate(work.start_date) : '',
+                debond_date: work.debond_date ? formatISODate(work.debond_date) : '',
+                f_photo_date: work.f_photo_date ? formatISODate(work.f_photo_date) : '',
+                i_photo_date: work.i_photo_date ? formatISODate(work.i_photo_date) : '',
+                estimated_duration: String(work.estimated_duration || ''),
+                dr_id: String(work.dr_id || ''),
+                notes_date: work.notes_date ? formatISODate(work.notes_date) : '',
+                keyword_id_1: String(work.keyword_id_1 || ''),
+                keyword_id_2: String(work.keyword_id_2 || ''),
+                keyword_id_3: String(work.keyword_id_3 || ''),
+                keyword_id_4: String(work.keyword_id_4 || ''),
+                keyword_id_5: String(work.keyword_id_5 || ''),
+                discount: discountValue,
+                discount_date: discountDateISO,
+                discount_reason: work.discount_reason || '',
+                createAsFinished: false
+            });
+            setExistingTotalPaid(Number(work.TotalPaid ?? 0));
+        }
+    }
 
     // Surface a work-record load failure in the existing error banner (the old
-    // loadWorkData did setError(...) on its catch).
-    useEffect(() => {
+    // loadWorkData did setError(...) on its catch), once per error transition.
+    const [prevWorkError, setPrevWorkError] = useState(workError);
+    if (workError !== prevWorkError) {
+        setPrevWorkError(workError);
         if (workError) {
             setError(httpErrorMessage(workError, 'Failed to fetch work data'));
         }
-    }, [workError]);
+    }
 
     const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -308,6 +319,11 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     ? workContract.addWorkWithInvoice.response
                     : workContract.addWork.response;
                 result = await postJSON<WorkResponse>(endpoint, creationData, { schema });
+                // Refresh the patient's works list (+ info/timepoints) so the new
+                // work shows immediately on navigating back — without this the
+                // still-fresh cache (30s staleTime) serves the stale list until a
+                // hard refresh. Mirrors the update/finish-existing branches.
+                queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
             }
 
             if (onSave) {
@@ -382,6 +398,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 .catch((addErr) => {
                     throw new Error(httpErrorMessage(addErr, 'Failed to add new work'));
                 });
+            // Refresh again after the new work lands so the works list reflects it
+            // immediately on navigating back (the earlier invalidate ran before this add).
+            queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
             if (onSave) {
                 onSave(result);
             }
@@ -443,11 +462,15 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     closeOnBackdropClick={!loading}
                     closeOnEscape={!loading}
                     contentClassName={styles.confirmationDialog}
+                    ariaLabelledBy="duplicate-work-title"
                 >
-                        <div className={styles.confirmationHeader}>
-                            <i className="fas fa-exclamation-triangle"></i>
-                            <h3>Active Work Already Exists</h3>
-                        </div>
+                        <ModalHeader
+                            title="Active Work Already Exists"
+                            titleId="duplicate-work-title"
+                            icon={<i className="fas fa-exclamation-triangle" />}
+                            variant="warning"
+                            onClose={loading ? undefined : handleCancelConfirmation}
+                        />
                         <div className={styles.confirmationBody}>
                             <p>This patient already has an active work record:</p>
                             <div className={styles.existingWorkDetails}>
@@ -495,11 +518,15 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     closeOnBackdropClick={!loading}
                     closeOnEscape={!loading}
                     contentClassName={styles.confirmationDialog}
+                    ariaLabelledBy="finished-work-title"
                 >
-                        <div className={styles.confirmationHeader}>
-                            <i className="fas fa-check-circle"></i>
-                            <h3>Confirm Completed Work Creation</h3>
-                        </div>
+                        <ModalHeader
+                            title="Confirm Completed Work Creation"
+                            titleId="finished-work-title"
+                            icon={<i className="fas fa-check-circle" />}
+                            variant="success"
+                            onClose={loading ? undefined : handleCancelFinishedWork}
+                        />
                         <div className={styles.confirmationBody}>
                             <p>You are about to create:</p>
                             <div className={styles.existingWorkDetails}>

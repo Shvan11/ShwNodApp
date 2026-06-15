@@ -55,7 +55,10 @@ export interface UseWhatsAppSyncReturn {
 export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
   const { whatsappClientReady: clientReady } = useGlobalState();
 
-  const [connectionStatus, setConnectionStatus] = useState<UIState>(UI_STATES.DISCONNECTED);
+  // Starts CONNECTING: the mount effect always opens the SSE stream immediately,
+  // so this is the true first-paint state (and keeps that setState out of the
+  // effect body — react-hooks/set-state-in-effect).
+  const [connectionStatus, setConnectionStatus] = useState<UIState>(UI_STATES.CONNECTING);
   const [sendingProgress, setSendingProgress] = useState<SendingProgress>({
     started: false,
     finished: false,
@@ -170,7 +173,6 @@ export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
     sseWhatsapp.on('whatsapp_sending_progress', handleSendingProgress);
     sseWhatsapp.on('whatsapp_sending_finished', handleSendingFinished);
 
-    setConnectionStatus(UI_STATES.CONNECTING);
     sseWhatsapp
       .ensureConnected()
       .then(() => {

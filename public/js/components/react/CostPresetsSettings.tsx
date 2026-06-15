@@ -1,8 +1,10 @@
-import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import { useState, ChangeEvent, FormEvent } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
-import * as costPreset from '@shared/contracts/cost-preset.contract';
+import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { costPresetsQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import styles from './CostPresetsSettings.module.css';
 
 type Currency = 'IQD' | 'USD' | 'EUR';
@@ -23,8 +25,9 @@ interface FormData {
 const CostPresetsSettings = () => {
     const toast = useToast();
     const confirm = useConfirm();
-    const [presets, setPresets] = useState<CostPreset[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
+    const { data, isLoading: loading } = useQuery(costPresetsQuery());
+    const presets: CostPreset[] = data ?? [];
     const [activeCurrency, setActiveCurrency] = useState<Currency>('IQD');
     const [editingPreset, setEditingPreset] = useState<CostPreset | null>(null);
     const [formData, setFormData] = useState<FormData>({
@@ -34,24 +37,8 @@ const CostPresetsSettings = () => {
     });
     const [displayAmount, setDisplayAmount] = useState('');
 
-    // Load presets
-    const loadPresets = async () => {
-        try {
-            setLoading(true);
-            const data = await fetchJSON<CostPreset[]>('/api/settings/cost-presets', { schema: costPreset.getPresets.response });
-            setPresets(data);
-        } catch (error) {
-            console.error('Error loading presets:', error);
-            toast.error(httpErrorMessage(error, 'Failed to load cost presets'));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        loadPresets();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    // Refresh the shared cost-presets cache after a write.
+    const reloadPresets = () => queryClient.invalidateQueries({ queryKey: qk.lookups.costPresets() });
 
     // Filter presets by currency
     const filteredPresets = presets.filter(p => p.currency === activeCurrency);
@@ -81,7 +68,7 @@ const CostPresetsSettings = () => {
             toast.success('Preset created successfully');
             setFormData({ amount: '', currency: activeCurrency, displayOrder: 0 });
             setDisplayAmount('');
-            loadPresets();
+            reloadPresets();
         } catch (error) {
             console.error('Error creating preset:', error);
             toast.error(httpErrorMessage(error, 'Failed to create preset'));
@@ -121,7 +108,7 @@ const CostPresetsSettings = () => {
             setEditingPreset(null);
             setFormData({ amount: '', currency: activeCurrency, displayOrder: 0 });
             setDisplayAmount('');
-            loadPresets();
+            reloadPresets();
         } catch (error) {
             console.error('Error updating preset:', error);
             toast.error(httpErrorMessage(error, 'Failed to update preset'));
@@ -138,7 +125,7 @@ const CostPresetsSettings = () => {
             await deleteJSON(`/api/settings/cost-presets/${preset_id}`);
 
             toast.success('Preset deleted successfully');
-            loadPresets();
+            reloadPresets();
         } catch (error) {
             console.error('Error deleting preset:', error);
             toast.error(httpErrorMessage(error, 'Failed to delete preset'));

@@ -9,8 +9,8 @@
 
 import React, { useRef, CSSProperties } from 'react';
 import type { ComparisonEngine, EngineSnapshot } from './ComparisonEngine';
-import { applyTransform, getContainerRect, getDrawSize, getImageCorners } from './geometry';
-import type { DragState, ImageKey, ImageRect, Point } from './types';
+import { applyTransform, getContainerRect, getCropRect, getDrawSize, getImageCorners } from './geometry';
+import type { CropSide, DragState, ImageKey, ImageRect, Point } from './types';
 import { IMG_INDEX_FOR_KEY, KEY_FOR_TOOL, TOOL_FOR_KEY } from './types';
 import styles from './CompareOverlay.module.css';
 
@@ -24,6 +24,7 @@ interface Props {
 
 const STROKE = 'rgba(0, 123, 255, 0.95)';
 const CLOSE_STROKE = 'rgba(220, 53, 69, 0.95)';
+const CROP_STROKE = 'rgba(255, 176, 32, 0.97)';
 const ALL_KEYS: ImageKey[] = ['img1', 'img2', 'logo'];
 
 const CompareOverlay = ({ engine, snap, canvasEl, displayWidth }: Props) => {
@@ -110,6 +111,43 @@ const CompareOverlay = ({ engine, snap, canvasEl, displayWidth }: Props) => {
         window.addEventListener('pointercancel', onUp, { signal: ctrl.signal });
     };
 
+    // Drag a single crop margin inward/outward. Insets are stored as container
+    // fractions; the opposite margin is held back so a sliver always remains.
+    const startCropDrag = (e: React.PointerEvent, side: CropSide, key: ImageKey) => {
+        const cont = getRectForKey(key);
+        if (!cont || cont.w === 0 || cont.h === 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const startCrop = engine.getCrop(key);
+        const pointerId = e.pointerId;
+        const ctrl = new AbortController();
+        const MIN_KEEP = 0.05;
+
+        const onMove = (ev: PointerEvent) => {
+            if (ev.pointerId !== pointerId) return;
+            const cur = clientToCanvas(ev.clientX, ev.clientY);
+            const next = { ...startCrop };
+            if (side === 'left') {
+                next.left = Math.min(Math.max(0, (cur.x - cont.x) / cont.w), 1 - startCrop.right - MIN_KEEP);
+            } else if (side === 'right') {
+                next.right = Math.min(Math.max(0, (cont.x + cont.w - cur.x) / cont.w), 1 - startCrop.left - MIN_KEEP);
+            } else if (side === 'top') {
+                next.top = Math.min(Math.max(0, (cur.y - cont.y) / cont.h), 1 - startCrop.bottom - MIN_KEEP);
+            } else {
+                next.bottom = Math.min(Math.max(0, (cont.y + cont.h - cur.y) / cont.h), 1 - startCrop.top - MIN_KEEP);
+            }
+            engine.setCrop(key, next);
+        };
+        const onUp = (ev: PointerEvent) => {
+            if (ev.pointerId !== pointerId) return;
+            ctrl.abort();
+        };
+
+        window.addEventListener('pointermove', onMove, { signal: ctrl.signal });
+        window.addEventListener('pointerup', onUp, { signal: ctrl.signal });
+        window.addEventListener('pointercancel', onUp, { signal: ctrl.signal });
+    };
+
     const dpi = snap.canvasWidth / Math.max(1, displayWidth);
     const handlePx = 10 * dpi;
     const rotPx = 30 * dpi;
@@ -172,9 +210,119 @@ const CompareOverlay = ({ engine, snap, canvasEl, displayWidth }: Props) => {
                             style={{ cursor: 'pointer' }}
                             onPointerDown={(e) => {
                                 engine.setSelectedImage(TOOL_FOR_KEY[key]);
-                                startDrag(e, 'translate', key);
+                                // In crop mode a click only switches target; the user then
+                                // grabs the margin handles instead of translate-dragging.
+                                if (!snap.cropMode) startDrag(e, 'translate', key);
                             }}
                         />
+                    );
+                }
+
+                if (snap.cropMode && (key === 'img1' || key === 'img2')) {
+                    const crop = snap.crop[key];
+                    const cont = g.rect;
+                    const cr = getCropRect(cont, crop);
+                    const midX = cr.x + cr.w / 2;
+                    const midY = cr.y + cr.h / 2;
+                    const barLong = handlePx * 3.4;
+                    const barThick = handlePx * 1.1;
+                    const resetSide = (s: CropSide) => engine.setCrop(key, { ...crop, [s]: 0 });
+                    return (
+                        <g key={key}>
+                            {/* Capture clicks inside the slot so cropping never deselects. */}
+                            <rect
+                                x={cont.x}
+                                y={cont.y}
+                                width={cont.w}
+                                height={cont.h}
+                                fill="transparent"
+                                pointerEvents="all"
+                                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            />
+                            {/* Faint full-slot bounds for reference. */}
+                            <rect
+                                x={cont.x}
+                                y={cont.y}
+                                width={cont.w}
+                                height={cont.h}
+                                fill="none"
+                                stroke="rgba(255, 255, 255, 0.35)"
+                                strokeWidth={strokeW}
+                                strokeDasharray={`${dashOn} ${dashOff}`}
+                                pointerEvents="none"
+                            />
+                            {/* The kept region. */}
+                            <rect
+                                x={cr.x}
+                                y={cr.y}
+                                width={cr.w}
+                                height={cr.h}
+                                fill="none"
+                                stroke={CROP_STROKE}
+                                strokeWidth={strokeW * 1.4}
+                                pointerEvents="none"
+                            />
+                            <rect
+                                className={styles.cropHandle}
+                                x={midX - barLong / 2}
+                                y={cr.y - barThick / 2}
+                                width={barLong}
+                                height={barThick}
+                                rx={barThick / 2}
+                                fill={CROP_STROKE}
+                                stroke="white"
+                                strokeWidth={strokeW * 0.5}
+                                pointerEvents="all"
+                                style={{ cursor: 'ns-resize' }}
+                                onPointerDown={(e) => startCropDrag(e, 'top', key)}
+                                onDoubleClick={() => resetSide('top')}
+                            />
+                            <rect
+                                className={styles.cropHandle}
+                                x={midX - barLong / 2}
+                                y={cr.y + cr.h - barThick / 2}
+                                width={barLong}
+                                height={barThick}
+                                rx={barThick / 2}
+                                fill={CROP_STROKE}
+                                stroke="white"
+                                strokeWidth={strokeW * 0.5}
+                                pointerEvents="all"
+                                style={{ cursor: 'ns-resize' }}
+                                onPointerDown={(e) => startCropDrag(e, 'bottom', key)}
+                                onDoubleClick={() => resetSide('bottom')}
+                            />
+                            <rect
+                                className={styles.cropHandle}
+                                x={cr.x - barThick / 2}
+                                y={midY - barLong / 2}
+                                width={barThick}
+                                height={barLong}
+                                rx={barThick / 2}
+                                fill={CROP_STROKE}
+                                stroke="white"
+                                strokeWidth={strokeW * 0.5}
+                                pointerEvents="all"
+                                style={{ cursor: 'ew-resize' }}
+                                onPointerDown={(e) => startCropDrag(e, 'left', key)}
+                                onDoubleClick={() => resetSide('left')}
+                            />
+                            <rect
+                                className={styles.cropHandle}
+                                x={cr.x + cr.w - barThick / 2}
+                                y={midY - barLong / 2}
+                                width={barThick}
+                                height={barLong}
+                                rx={barThick / 2}
+                                fill={CROP_STROKE}
+                                stroke="white"
+                                strokeWidth={strokeW * 0.5}
+                                pointerEvents="all"
+                                style={{ cursor: 'ew-resize' }}
+                                onPointerDown={(e) => startCropDrag(e, 'right', key)}
+                                onDoubleClick={() => resetSide('right')}
+                            />
+                        </g>
                     );
                 }
 

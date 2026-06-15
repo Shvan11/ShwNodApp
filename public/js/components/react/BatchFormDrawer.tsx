@@ -1,5 +1,6 @@
 import React, { useState, useMemo, ChangeEvent, FormEvent, MouseEvent } from 'react';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import type { AlignerBatch, AlignerSetForBatch } from '../../pages/aligner/aligner.types';
@@ -370,13 +371,13 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             onClose={handleClose}
             overlayClassName="drawer-overlay"
             contentClassName="drawer-container"
+            ariaLabelledBy="batch-form-drawer-title"
         >
-            <div className="drawer-header">
-                <h2>{batch ? 'Edit Batch' : 'Add New Batch'}</h2>
-                <button className="close-btn" onClick={handleClose}>
-                    <i className="fas fa-times"></i>
-                </button>
-            </div>
+            <ModalHeader
+                title={batch ? 'Edit Batch' : 'Add New Batch'}
+                titleId="batch-form-drawer-title"
+                onClose={handleClose}
+            />
 
             <div className="drawer-body">
                 <form onSubmit={handleSubmit} className="drawer-form-flex">

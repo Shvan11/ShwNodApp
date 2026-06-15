@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
-import * as settings from '@shared/contracts/settings.contract';
-import * as lookupAdminContract from '@shared/contracts/lookup-admin.contract';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { adminLookupItemsQuery, optionQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import * as calendarContract from '@shared/contracts/calendar.contract';
 import styles from './CalendarTimesSettings.module.css';
 import sectionStyles from './SettingsSection.module.css';
@@ -65,7 +66,6 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
     const [originalShowExtendedDefault, setOriginalShowExtendedDefault] = useState(false);
 
     // UI state
-    const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isRegenerating, setIsRegenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -96,53 +96,76 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
         };
     }, [allTimes, earlySlots, lateSlots]);
 
-    // Load all settings
-    const loadSettings = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
+    const queryClient = useQueryClient();
 
-        try {
-            // Fetch time slots from database
-            const timesData = await fetchJSON<TimeSlot[]>('/api/admin/lookups/tbltimes', { schema: lookupAdminContract.items.response });
-            setAllTimeSlots(timesData);
+    // Four parallel reads: the editable time-slot list + three option rows.
+    // /api/options/:name 404s when an option is unset; optionQuery already
+    // swallows 404→null, so a missing one falls back to its default below
+    // (the rows are seeded today — audit N12/N20; the 404 path is defensive).
+    const timesQuery = useQuery(adminLookupItemsQuery('tbltimes'));
+    const earlyQuery = useQuery(optionQuery('CALENDAR_EARLY_SLOTS'));
+    const lateQuery = useQuery(optionQuery('CALENDAR_LATE_SLOTS'));
+    const toggleQuery = useQuery(optionQuery('CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT'));
 
-            // /api/options/:name 404s when an option is unset; each GET is tolerant
-            // (.catch → null) so a missing one falls back to its default without
-            // failing the whole settings load. The rows are seeded today (verified —
-            // audit N12/N20), so the 404 path is defensive, not the norm.
-            // Fetch early slots option
-            const earlyData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_EARLY_SLOTS', { schema: settings.getOptionByName.response }).catch(() => null);
-            const earlySlotsArr = earlyData?.value
-                ? earlyData.value.split(',').filter(Boolean)
-                : ['12:00', '12:30', '13:00', '13:30']; // Default
-            setEarlySlots(earlySlotsArr);
-            setOriginalEarlySlots(earlySlotsArr);
+    const isLoadingData =
+        timesQuery.isLoading || earlyQuery.isLoading || lateQuery.isLoading || toggleQuery.isLoading;
+    const hasLoadError =
+        timesQuery.isError || earlyQuery.isError || lateQuery.isError || toggleQuery.isError;
+    // Loading is purely the combined query state — derived, no effect/setState.
+    const isLoading = isLoadingData;
 
-            // Fetch late slots option
-            const lateData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_LATE_SLOTS', { schema: settings.getOptionByName.response }).catch(() => null);
-            const lateSlotsArr = lateData?.value
-                ? lateData.value.split(',').filter(Boolean)
-                : ['21:00', '21:30', '22:00', '22:30']; // Default
-            setLateSlots(lateSlotsArr);
-            setOriginalLateSlots(lateSlotsArr);
+    // Seed the editable state from the queries during render, keyed on each query's
+    // result reference — re-seeds when an add/delete/save invalidates a query, with
+    // no setState-in-effect. The time-slot list and the category assignments are
+    // seeded independently so optimistic category edits survive a `tbltimes` refresh.
+    const [seededTimes, setSeededTimes] = useState<unknown>(null);
+    if (timesQuery.data && timesQuery.data !== seededTimes) {
+        setSeededTimes(timesQuery.data);
+        // adminLookupItemsQuery is the generic per-table lookup feed (its rows vary
+        // by table, so the contract is intentionally `unknown[]`); for 'tbltimes' the
+        // rows are TimeSlot — a single assertion off the already-`unknown[]` data.
+        setAllTimeSlots(timesQuery.data as TimeSlot[]);
+    }
 
-            // Fetch default toggle setting
-            const toggleData = await fetchJSON<OptionResponse>('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT', { schema: settings.getOptionByName.response }).catch(() => null);
-            const toggleValue = toggleData?.value === 'true';
-            setShowExtendedSlotsDefault(toggleValue);
-            setOriginalShowExtendedDefault(toggleValue);
+    const [seededEarly, setSeededEarly] = useState<unknown>(null);
+    if (earlyQuery.data !== seededEarly) {
+        setSeededEarly(earlyQuery.data);
+        const earlyData = earlyQuery.data as OptionResponse | null | undefined;
+        const earlySlotsArr = earlyData?.value
+            ? earlyData.value.split(',').filter(Boolean)
+            : ['12:00', '12:30', '13:00', '13:30']; // Default
+        setEarlySlots(earlySlotsArr);
+        setOriginalEarlySlots(earlySlotsArr);
+    }
 
-        } catch (err) {
-            console.error('Error loading calendar times settings:', err);
+    const [seededLate, setSeededLate] = useState<unknown>(null);
+    if (lateQuery.data !== seededLate) {
+        setSeededLate(lateQuery.data);
+        const lateData = lateQuery.data as OptionResponse | null | undefined;
+        const lateSlotsArr = lateData?.value
+            ? lateData.value.split(',').filter(Boolean)
+            : ['21:00', '21:30', '22:00', '22:30']; // Default
+        setLateSlots(lateSlotsArr);
+        setOriginalLateSlots(lateSlotsArr);
+    }
+
+    const [seededToggle, setSeededToggle] = useState<unknown>(null);
+    if (toggleQuery.data !== seededToggle) {
+        setSeededToggle(toggleQuery.data);
+        const toggleData = toggleQuery.data as OptionResponse | null | undefined;
+        const toggleValue = toggleData?.value === 'true';
+        setShowExtendedSlotsDefault(toggleValue);
+        setOriginalShowExtendedDefault(toggleValue);
+    }
+
+    // Surface a load failure once per error transition.
+    const [prevHasLoadError, setPrevHasLoadError] = useState(hasLoadError);
+    if (hasLoadError !== prevHasLoadError) {
+        setPrevHasLoadError(hasLoadError);
+        if (hasLoadError) {
             setError('Failed to load settings. Please try again.');
-        } finally {
-            setIsLoading(false);
         }
-    }, []);
-
-    useEffect(() => {
-        loadSettings();
-    }, [loadSettings]);
+    }
 
     // Check for changes
     const hasChanges = useMemo(() => {
@@ -213,8 +236,8 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                 setLateSlots(prev => [...prev, timeStr]);
             }
 
-            // Reload time slots
-            await loadSettings();
+            // Reload time slots (re-seeds the list via its query effect)
+            await queryClient.invalidateQueries({ queryKey: qk.adminLookups.table('tbltimes') });
 
             // Clear inputs
             setNewTimeHour('');
@@ -248,8 +271,8 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             setEarlySlots(prev => prev.filter(t => t !== timeStr));
             setLateSlots(prev => prev.filter(t => t !== timeStr));
 
-            // Reload time slots
-            await loadSettings();
+            // Reload time slots (re-seeds the list via its query effect)
+            await queryClient.invalidateQueries({ queryKey: qk.adminLookups.table('tbltimes') });
 
             setDeleteConfirm(null);
             setSuccessMessage(`Deleted time slot ${timeStr}`);
@@ -278,10 +301,15 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             await putJSON('/api/options/CALENDAR_LATE_SLOTS', { value: sortTimes(lateSlots).join(',') });
             await putJSON('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT', { value: showExtendedSlotsDefault.toString() });
 
-            // Update original values
+            // Update original values (baseline for change detection)
             setOriginalEarlySlots([...earlySlots]);
             setOriginalLateSlots([...lateSlots]);
             setOriginalShowExtendedDefault(showExtendedSlotsDefault);
+
+            // Refresh the cached option rows to match what was just saved.
+            queryClient.invalidateQueries({ queryKey: qk.settings.option('CALENDAR_EARLY_SLOTS') });
+            queryClient.invalidateQueries({ queryKey: qk.settings.option('CALENDAR_LATE_SLOTS') });
+            queryClient.invalidateQueries({ queryKey: qk.settings.option('CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT') });
 
             setSuccessMessage('Settings saved successfully!');
             setTimeout(() => setSuccessMessage(null), 3000);

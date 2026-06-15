@@ -7,6 +7,7 @@ import type { PatientOption } from './PatientQuickSearch';
 import PatientSearchCombobox from './PatientSearchCombobox';
 import PhoneDisplay from './PhoneDisplay';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
@@ -114,6 +115,11 @@ const PatientManagement = () => {
         }
     })();
 
+    // URL Params (deep-linking) have priority over saved storage. Read ONCE here
+    // (stable across the mount) and fold into the state/ref initializers below, so
+    // there's no mount effect mutating state/refs after the first paint.
+    const urlSearchParam = new URLSearchParams(window.location.search).get('search') || '';
+
     // -- Data State --
     const [patients, setPatients] = useState<Patient[]>(
         Array.isArray(savedState?.patients) ? savedState.patients : []
@@ -126,7 +132,7 @@ const PatientManagement = () => {
     const [loadingMore, setLoadingMore] = useState(false);
 
     // -- Search Inputs --
-    const [searchPatientName, setSearchPatientName] = useState(savedState?.searchPatientName || '');
+    const [searchPatientName, setSearchPatientName] = useState(urlSearchParam || savedState?.searchPatientName || '');
     const [searchFirstName, setSearchFirstName] = useState(savedState?.searchFirstName || '');
     const [searchLastName, setSearchLastName] = useState(savedState?.searchLastName || '');
     const [searchTerm, setSearchTerm] = useState(savedState?.searchTerm || '');
@@ -158,19 +164,10 @@ const PatientManagement = () => {
     // -- Refs --
     const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
-    // Flag to skip the initial auto-search if we just restored valid data
-    const isRestoring = useRef(!!savedState);
-
-    // --- 2. URL Param Handling ---
-    useEffect(() => {
-        // Handle URL Params (Deep linking has priority over Storage)
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlSearch = urlParams.get('search');
-        if (urlSearch) {
-            setSearchPatientName(urlSearch);
-            isRestoring.current = false; // Force auto-search for URL param
-        }
-    }, []);
+    // Flag to skip the initial auto-search if we just restored valid data. A URL
+    // `?search=` deep-link takes priority over restore and forces a fresh search,
+    // so it suppresses the restore flag.
+    const isRestoring = useRef(!!savedState && !urlSearchParam);
 
     // --- 3. Persistence Logic ---
     // Save state whenever relevant data changes
@@ -656,10 +653,12 @@ const PatientManagement = () => {
             >
                 {selectedPatient && (
                     <>
-                        <div className={styles.deleteModalHeader}>
-                            <h3 id="patient-delete-modal-title">Confirm Delete</h3>
-                            <button onClick={() => setShowDeleteConfirm(false)} className={styles.deleteModalClose}>×</button>
-                        </div>
+                        <ModalHeader
+                            variant="danger"
+                            title="Confirm Delete"
+                            titleId="patient-delete-modal-title"
+                            onClose={() => setShowDeleteConfirm(false)}
+                        />
                         <div className={styles.deleteModalContent}>
                             <p>Are you sure you want to delete <strong>{selectedPatient.patient_name}</strong>?</p>
                             <p className={styles.deleteModalWarning}>

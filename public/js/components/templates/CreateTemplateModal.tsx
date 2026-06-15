@@ -5,6 +5,7 @@
 
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import Modal from '../react/Modal';
+import ModalHeader from '../react/ModalHeader';
 
 interface DocumentType {
     type_id: number;
@@ -91,12 +92,12 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
             contentClassName={styles.modalDialog}
             ariaLabelledBy="create-template-modal-title"
         >
-                <div className={styles.modalHeader}>
-                    <h3 id="create-template-modal-title">
-                        <i className="fas fa-plus"></i> Create New Template
-                    </h3>
-                    <button className={styles.modalClose} onClick={onClose}>×</button>
-                </div>
+                <ModalHeader
+                    titleId="create-template-modal-title"
+                    icon={<i className="fas fa-plus" />}
+                    title="Create New Template"
+                    onClose={onClose}
+                />
                 <form onSubmit={handleSubmit}>
                     <div className={styles.modalBody}>
                         <div className={styles.formGroup}>

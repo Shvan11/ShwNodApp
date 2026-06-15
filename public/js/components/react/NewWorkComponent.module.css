@@ -331,26 +331,6 @@
     }
 }
 
-.confirmationHeader {
-    background: linear-gradient(135deg, var(--warning-400) 0%, var(--warning-300) 100%);
-    color: var(--color-white);
-    padding: 1rem 1.25rem;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.confirmationHeader i {
-    font-size: 1.5rem;
-}
-
-.confirmationHeader h3 {
-    margin: 0;
-    font-size: 1.125rem;
-    font-weight: var(--font-weight-semibold);
-}
-
 .confirmationBody {
     padding: 1.5rem 1.25rem;
 }

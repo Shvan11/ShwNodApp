@@ -7,11 +7,14 @@
  * (`renameEntry`), and the timepoint folder must live at the patient root, so a nested folder
  * couldn't become the root timepoint folder anyway.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Modal from '../Modal';
+import ModalHeader from '../ModalHeader';
 import { useToast } from '@/contexts/ToastContext';
-import { fetchJSON, postJSON, type HttpError } from '@/core/http';
-import * as fileExplorerContract from '@shared/contracts/file-explorer.contract';
+import { postJSON, type HttpError } from '@/core/http';
+import { patientFilesQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import type { FileListing, FileEntry } from '@/types/api.types';
 import styles from './RenameFolderModal.module.css';
 
@@ -26,37 +29,26 @@ interface Props {
 
 const RenameFolderModal = ({ personId, targetName, onClose, onRenamed }: Props) => {
   const toast = useToast();
-  const [folders, setFolders] = useState<FileEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Top-level patient folders (path=''), minus the timepoint folder if it already exists.
+  const { data, isLoading: loading, isError } = useQuery(patientFilesQuery(personId, ''));
+  const folders = useMemo<FileEntry[]>(() => {
+    const listing = data as FileListing | undefined;
+    return (listing?.entries ?? []).filter((e) => e.type === 'dir' && e.name !== targetName);
+  }, [data, targetName]);
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    fetchJSON<FileListing>(`/api/patients/${personId}/files?path=`, { schema: fileExplorerContract.list.response })
-      .then((listing) => {
-        if (cancelled) return;
-        // Top-level folders only, minus the timepoint folder itself if it already exists.
-        const dirs = (listing?.entries ?? []).filter((e) => e.type === 'dir' && e.name !== targetName);
-        setFolders(dirs);
-      })
-      .catch(() => {
-        if (!cancelled) toast.error('Failed to load folders');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [personId, targetName, toast]);
+    if (isError) toast.error('Failed to load folders');
+  }, [isError, toast]);
 
   const handleRename = async (): Promise<void> => {
     if (!selected || busy) return;
     setBusy(true);
     try {
       await postJSON(`/api/patients/${personId}/files/rename`, { path: selected, newName: targetName });
+      void queryClient.invalidateQueries({ queryKey: qk.patient.files(personId, '') });
       toast.success(`Renamed “${selected}” to “${targetName}”`);
       onRenamed(targetName);
     } catch (err) {
@@ -71,13 +63,8 @@ const RenameFolderModal = ({ personId, targetName, onClose, onRenamed }: Props) 
   };
 
   return (
-    <Modal isOpen onClose={onClose} contentClassName={styles.dialog}>
-      <div className={styles.header}>
-        <h3>Rename a folder to this timepoint</h3>
-        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
-          <i className="fas fa-times" aria-hidden="true" />
-        </button>
-      </div>
+    <Modal isOpen onClose={onClose} contentClassName={styles.dialog} ariaLabelledBy="rename-folder-title">
+      <ModalHeader title="Rename a folder to this timepoint" titleId="rename-folder-title" onClose={onClose} />
 
       <div className={styles.body}>
         <p className={styles.lead}>

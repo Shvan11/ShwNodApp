@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
-import { createTask, fetchAssignableStaff, notifyTasksChanged, type StaffOption, type TaskRow } from '@/services/tasks';
+import { alertTypesQuery, employeesQuery } from '@/query/queries';
+import { createTask, notifyTasksChanged, type StaffOption, type TaskRow } from '@/services/tasks';
 import * as patientContract from '@shared/contracts/patient.contract';
-import * as lookupContract from '@shared/contracts/lookup.contract';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import styles from './TaskFormModal.module.css';
 
 interface AlertType {
@@ -51,27 +53,25 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
     const [snoozedUntil, setSnoozedUntil] = useState('');
     const [patient, setPatient] = useState<PatientPick | null>(null);
     const [loading, setLoading] = useState(false);
-    const [alertTypes, setAlertTypes] = useState<AlertType[]>([]);
-    const [staff, setStaff] = useState<StaffOption[]>([]);
+
+    // Alert-type dropdown + assignable-staff picker — loaded when the modal is open.
+    const { data: alertTypesData } = useQuery({ ...alertTypesQuery(), enabled: isOpen });
+    const alertTypes: AlertType[] = alertTypesData ?? [];
+    const { data: employeesData } = useQuery({ ...employeesQuery(), enabled: isOpen });
+    const staff: StaffOption[] = employeesData?.employees ?? [];
 
     // Patient typeahead state (create mode only)
     const [pickerQuery, setPickerQuery] = useState('');
     const [pickerResults, setPickerResults] = useState<PatientPick[]>([]);
     const searchAbortRef = useRef<AbortController | null>(null);
 
-    // Load alert types + assignable staff once when first opened.
-    useEffect(() => {
-        if (!isOpen) return;
-        fetchJSON<AlertType[]>('/api/alert-types', { schema: lookupContract.alertTypes.response })
-            .then(setAlertTypes)
-            .catch(() => { /* dropdown just stays empty */ });
-        fetchAssignableStaff()
-            .then(setStaff)
-            .catch(() => { /* picker just stays empty */ });
-    }, [isOpen]);
-
-    // Populate (edit) or reset (close) the form.
-    useEffect(() => {
+    // Populate (edit) or reset (close) the form. Done during render (keyed on open +
+    // edit-target identity) rather than in an effect, so the React Compiler can
+    // optimize and there's no extra post-paint render.
+    const initKey = isOpen ? String(editTask?.alert_id ?? 'new') : '';
+    const [initializedKey, setInitializedKey] = useState('');
+    if (initKey !== initializedKey) {
+        setInitializedKey(initKey);
         if (isOpen && editTask) {
             setDetails(editTask.alert_details ?? '');
             setSeverity(String(editTask.alert_severity ?? 2));
@@ -97,14 +97,23 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
             setPickerQuery('');
             setPickerResults([]);
         }
-    }, [isOpen, editTask]);
+    }
+
+    // When there's no active search (edit mode, empty query, or a patient already
+    // picked), the results must be empty. Cleared during render rather than in the
+    // search effect, so the effect's only job is the debounced fetch.
+    const searchInactive = isEdit || !pickerQuery.trim() || !!patient;
+    const [prevSearchInactive, setPrevSearchInactive] = useState(searchInactive);
+    if (searchInactive !== prevSearchInactive) {
+        setPrevSearchInactive(searchInactive);
+        if (searchInactive) setPickerResults([]);
+    }
 
     // Debounced patient search: numeric → resolve by id, text → search by name.
     useEffect(() => {
         if (isEdit) return;
         const q = pickerQuery.trim();
         if (!q || patient) {
-            setPickerResults([]);
             return;
         }
         const handle = setTimeout(() => {
@@ -179,15 +188,12 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
             contentClassName={`modal-content ${styles.dialog}`}
             ariaLabelledBy="task-modal-title"
         >
-            <div className="modal-header">
-                <h3 id="task-modal-title">
-                    <i className="fas fa-bell" />
-                    {isEdit ? ' Edit Task' : ' New Task'}
-                </h3>
-                <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
-                    &times;
-                </button>
-            </div>
+            <ModalHeader
+                titleId="task-modal-title"
+                icon={<i className="fas fa-bell" />}
+                title={isEdit ? 'Edit Task' : 'New Task'}
+                onClose={onClose}
+            />
 
             <div className={`modal-body ${styles.body}`}>
                 <div className="form-group">

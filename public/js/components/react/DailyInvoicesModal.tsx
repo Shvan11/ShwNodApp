@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchJSON, httpErrorMessage } from '@/core/http';
-import * as reports from '@shared/contracts/reports.contract';
+import { useQuery } from '@tanstack/react-query';
+import { httpErrorMessage } from '@/core/http';
+import { dailyInvoicesQuery } from '@/query/queries';
 import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import styles from './StatisticsComponent.module.css';
 
 interface Invoice {
@@ -54,9 +55,6 @@ const toExpenseDate = (value: string): string => {
 };
 
 const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) => {
-    const [invoices, setInvoices] = useState<Invoice[]>([]);
-    const [loading, setLoading] = useState<boolean>(false);
-    const [error, setError] = useState<string | null>(null);
     const navigate = useNavigate();
 
     // Extract the date from selectedDate (could be just date string or full day object)
@@ -67,6 +65,11 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
     // Cast for accessing object properties
     const selectedDateObj = typeof selectedDate === 'object' ? selectedDate : null;
 
+    // Invoices for the chosen day (factory is gated on a truthy date).
+    const { data, isLoading: loading, error: queryError, refetch } = useQuery(dailyInvoicesQuery(dateValue));
+    const invoices = (data?.invoices ?? []) as Invoice[];
+    const error = queryError ? httpErrorMessage(queryError, 'Failed to fetch daily invoices') : null;
+
     // Jump to the Expenses page pre-filtered to this day + currency.
     // We intentionally do NOT call onClose(): leaving ?day in the statistics URL is
     // what lets browser "back" from the expenses page re-open this modal.
@@ -75,29 +78,6 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
         if (!day) return;
         navigate(`/expenses?startDate=${day}&endDate=${day}&currency=${currency}`);
     };
-
-    const fetchDailyInvoices = async (): Promise<void> => {
-        setLoading(true);
-        setError(null);
-
-        try {
-            const data = await fetchJSON<{ invoices?: Invoice[] }>(`/api/daily-invoices?date=${dateValue}`, { schema: reports.dailyInvoices.response });
-            setInvoices(data.invoices ?? []);
-        } catch (err) {
-            setError(httpErrorMessage(err, 'Failed to fetch daily invoices'));
-            console.error('Error fetching daily invoices:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (dateValue) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
-            fetchDailyInvoices();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dateValue]);
 
     const formatCurrency = (amount: number, currency: 'IQD' | 'USD'): string => {
         return formatCurrencyUtil(amount, currency);
@@ -152,17 +132,15 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
             onClose={onClose}
             overlayClassName={styles.statisticsModalOverlay}
             contentClassName={styles.statisticsModalContainer}
+            ariaLabelledBy="daily-invoices-modal-title"
         >
-                {/* Modal Header */}
-                <div className={styles.statisticsModalHeader}>
-                    <h2>
-                        <i className="fas fa-file-invoice-dollar"></i>
-                        Daily Invoices - {formatDate(dateValue)}
-                    </h2>
-                    <button className={styles.statisticsModalClose} onClick={onClose}>
-                        <i className="fas fa-times"></i>
-                    </button>
-                </div>
+                <ModalHeader
+                    variant="info"
+                    titleId="daily-invoices-modal-title"
+                    icon={<i className="fas fa-file-invoice-dollar" />}
+                    title={`Daily Invoices - ${formatDate(dateValue)}`}
+                    onClose={onClose}
+                />
 
                 {/* Modal Content */}
                 <div className={styles.statisticsModalBody}>
@@ -177,7 +155,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                         <div className={styles.errorState}>
                             <i className="fas fa-exclamation-triangle"></i>
                             <p>{error}</p>
-                            <button onClick={fetchDailyInvoices}>Retry</button>
+                            <button onClick={() => void refetch()}>Retry</button>
                         </div>
                     )}
 

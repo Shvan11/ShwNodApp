@@ -124,6 +124,42 @@
     border-color: rgba(255, 255, 255, 0.1);
 }
 
+/* Sticky patient tab — the patient pill, plus a close ("forget this patient")
+   chip shown once the tab is backgrounded (we've navigated off that patient's page). */
+.patient-nav-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.patient-nav-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    padding: 0;
+    color: var(--color-white);
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    flex-shrink: 0;
+}
+
+.patient-nav-close:hover {
+    background: var(--danger-color);
+    border-color: var(--danger-color);
+    transform: translateY(-1px);
+}
+
+.patient-nav-close i {
+    font-size: 0.75rem;
+}
+
 /* Header Right Section */
 .header-right {
     display: flex;

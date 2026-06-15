@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { postJSON, putJSON, httpErrorMessage } from '@/core/http';
 import { notifyTasksChanged } from '@/services/tasks';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 
 interface AlertType {
     alert_type_id: number;
@@ -64,8 +65,13 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
 
     const isEditMode = !!editAlert;
 
-    // Populate form when editing
-    useEffect(() => {
+    // Populate (edit) or reset (close) the form. Done during render (keyed on open +
+    // edit-target identity) rather than in an effect, so the React Compiler can
+    // optimize and there's no extra post-paint render.
+    const initKey = isOpen ? String(editAlert?.alert_id ?? 'new') : '';
+    const [initializedKey, setInitializedKey] = useState('');
+    if (initKey !== initializedKey) {
+        setInitializedKey(initKey);
         if (editAlert && isOpen) {
             setFormData({
                 alertTypeId: editAlert.alert_type_id?.toString() || '',
@@ -75,6 +81,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                 escalateAt: editAlert.escalate_at || '',
                 showInHeader: editAlert.surface_mode === 'push',
             });
+            setErrors({});
         } else if (!isOpen) {
             // Reset form when modal closes
             setFormData({
@@ -87,7 +94,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
             });
             setErrors({});
         }
-    }, [editAlert, isOpen]);
+    }
 
     // Handle form field changes
     const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -197,20 +204,14 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
             contentClassName="modal-content alert-modal"
             ariaLabelledBy="alert-modal-title"
         >
-                <div className="modal-header">
-                    <h3 id="alert-modal-title">
-                        <i className="fas fa-exclamation-triangle"></i>
-                        {isEditMode ? 'Edit Alert' : 'Add New Alert'}
-                    </h3>
-                    <button
-                        type="button"
-                        className="modal-close-btn"
-                        onClick={handleCancel}
-                        aria-label="Close modal"
-                    >
-                        &times;
-                    </button>
-                </div>
+                <ModalHeader
+                    variant="warning"
+                    titleId="alert-modal-title"
+                    icon={<i className="fas fa-exclamation-triangle" />}
+                    title={isEditMode ? 'Edit Alert' : 'Add New Alert'}
+                    onClose={handleCancel}
+                    closeLabel="Close modal"
+                />
 
                 <div className="modal-body">
                     <form className="alert-form">

@@ -236,8 +236,8 @@ const CalendarGrid = ({
         appointments: appts,
         slotStatus: appts.length > 0 ? 'booked' : 'available',
         appointment_id: appts.length > 0 ? appts[0].appointment_id : undefined,
-        appDetail: appts.length > 0 ? appts[0].appDetail : undefined,
-        patientName: appts.length > 0 ? appts[0].patientName : undefined
+        appDetail: appts.length > 0 ? appts[0].appDetail ?? undefined : undefined,
+        patientName: appts.length > 0 ? appts[0].patientName ?? undefined : undefined
     });
 
     const handleLaneDragStart =

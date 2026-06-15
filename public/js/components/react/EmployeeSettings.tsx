@@ -1,33 +1,20 @@
 import { useState, useEffect, useRef, useCallback, ChangeEvent, FormEvent } from 'react';
 import cn from 'classnames';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { qk } from '@/query/keys';
 import { employeesQuery, positionsQuery } from '@/query/queries';
+import type { EmployeeRow } from '@shared/contracts/employee.contract';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import { resolveDoctorColor, DEFAULT_PICKER_HEX, NEUTRAL_PICKER_HEX } from './doctorColors';
 import styles from './EmployeeSettings.module.css';
 
-interface Position {
-    id: number;
-    position_name: string;
-}
-
-interface Employee {
-    id: number;
-    employee_name: string;
-    position: number | string;
-    position_name: string | null;
-    email: string | null;
-    phone: string | null;
-    percentage: boolean;
-    receive_email: boolean;
-    get_appointments: boolean;
-    is_active: boolean;
-    sort_order: number | string | null;
-    appointment_color: string | null;
-}
+// Row shapes are owned by the employee contract (the single source of truth for
+// the GET /employees and /positions payloads) — no parallel hand-written copy.
+type Employee = EmployeeRow;
 
 interface FormData {
     employee_name: string;
@@ -49,6 +36,7 @@ interface EmployeeSettingsProps {
 const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSettingsProps) => {
     const toast = useToast();
     const confirm = useConfirm();
+    const queryClient = useQueryClient();
     // Settings is the ONLY place quit (inactive) employees appear — they are
     // hidden everywhere else, so opt back in here with ?includeInactive=true.
     const {
@@ -58,11 +46,11 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         error: employeesError,
         refetch: refetchEmployees,
     } = useQuery(employeesQuery('?includeInactive=true'));
-    const employees = (employeesData?.employees ?? []) as unknown as Employee[];
+    const employees = employeesData?.employees ?? [];
     const error = isError ? httpErrorMessage(employeesError, 'Failed to load employees') : null;
 
     const { data: positionsData } = useQuery(positionsQuery());
-    const positions = (positionsData?.positions ?? []) as unknown as Position[];
+    const positions = positionsData?.positions ?? [];
 
     const [editingId, setEditingId] = useState<number | null>(null);
     const [showAddForm, setShowAddForm] = useState(false);
@@ -167,7 +155,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
 
             await (editingId ? putJSON(url, formData) : postJSON(url, formData));
 
-            await refetchEmployees();
+            await queryClient.invalidateQueries({ queryKey: qk.lookups.employees('?includeInactive=true') });
             handleCancel();
 
             toast.success(editingId ? 'Employee updated successfully!' : 'Employee added successfully!');
@@ -185,7 +173,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         try {
             await deleteJSON(`/api/employees/${employeeId}`);
 
-            await refetchEmployees();
+            await queryClient.invalidateQueries({ queryKey: qk.lookups.employees('?includeInactive=true') });
             toast.success('Employee deleted successfully!');
         } catch (err) {
             console.error('Error deleting employee:', err);
@@ -216,9 +204,9 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         setFormData(prev => ({ ...prev, appointment_color: '' }));
     };
 
-    const getPositionName = (positionId: number | string): string => {
+    const getPositionName = (positionId: number | string | null): string => {
         const pos = positions.find(p => p.id === Number(positionId));
-        return pos ? pos.position_name : 'Unknown';
+        return pos?.position_name ?? 'Unknown';
     };
 
     // Effective calendar swatch for the table (only meaningful for doctors who
@@ -294,15 +282,12 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                 contentClassName={styles.modal}
                 ariaLabelledBy="employee-modal-title"
             >
-                <div className={styles.modalHeader}>
-                    <h3 id="employee-modal-title">
-                        <i className={editingId ? 'fas fa-edit' : 'fas fa-plus'}></i>
-                        {editingId ? 'Edit Employee' : 'Add New Employee'}
-                    </h3>
-                    <button className={styles.modalClose} onClick={handleCancel} aria-label="Close">
-                        <i className="fas fa-times"></i>
-                    </button>
-                </div>
+                <ModalHeader
+                    titleId="employee-modal-title"
+                    icon={<i className={editingId ? 'fas fa-edit' : 'fas fa-plus'} />}
+                    title={editingId ? 'Edit Employee' : 'Add New Employee'}
+                    onClose={handleCancel}
+                />
                 <form onSubmit={handleSubmit}>
                             <div className={styles.modalBody}>
                                 <div className={styles.tabs}>

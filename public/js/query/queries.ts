@@ -28,7 +28,23 @@ import * as appointmentContract from '@shared/contracts/appointment.contract';
 import * as paymentContract from '@shared/contracts/payment.contract';
 import * as reportsContract from '@shared/contracts/reports.contract';
 import * as lookupAdminContract from '@shared/contracts/lookup-admin.contract';
+import * as costPresetContract from '@shared/contracts/cost-preset.contract';
+import * as authContract from '@shared/contracts/auth.contract';
+import * as userManagementContract from '@shared/contracts/user-management.contract';
+import * as emailApiContract from '@shared/contracts/email-api.contract';
+import * as settingsContract from '@shared/contracts/settings.contract';
+import * as telegramContract from '@shared/contracts/telegram.contract';
+import * as integrationsContract from '@shared/contracts/integrations.contract';
+import * as utilityContract from '@shared/contracts/utility.contract';
+import * as taskContract from '@shared/contracts/task.contract';
+import * as videoContract from '@shared/contracts/video.contract';
+import * as mediaContract from '@shared/contracts/media.contract';
+import * as fileExplorerContract from '@shared/contracts/file-explorer.contract';
+import * as calendarContract from '@shared/contracts/calendar.contract';
+import * as whatsappContract from '@shared/contracts/whatsapp.contract';
+import * as photoEditorContract from '@shared/contracts/photo-editor.contract';
 import { qk } from './keys';
+import type { HttpError } from '@/core/http';
 // Type-only (erased at runtime → no import cycle with the hooks below). Stand row
 // types come straight from its contract; the expense hooks predate full response
 // modelling, so their factories keep the hooks' hand-written generics verbatim.
@@ -748,4 +764,612 @@ export const adminLookupItemsQuery = (tableKey: string) =>
         `/api/admin/lookups/${tableKey}`,
         { signal, schema: lookupAdminContract.items.response }
       ),
+  });
+
+/** GET /api/admin/lookups/tables — the editable-table config list. */
+export const adminLookupTablesQuery = () =>
+  queryOptions({
+    queryKey: qk.adminLookups.tables(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof lookupAdminContract.tables.response>>('/api/admin/lookups/tables', {
+        signal,
+        schema: lookupAdminContract.tables.response,
+      }),
+  });
+
+// ---------------------------------------------------------------------------
+// Patient-scoped reads (alerts / portal / appointments / gallery / files)
+// ---------------------------------------------------------------------------
+
+/** GET /api/patients/search?q= — basic name/phone/id search (disabled until a term is typed). */
+export const patientSearchQuery = (query: string) =>
+  queryOptions({
+    queryKey: qk.patient.search(query),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof patientContract.patientSearch.response>>(
+        `/api/patients/search?q=${encodeURIComponent(query)}`,
+        { signal, schema: patientContract.patientSearch.response }
+      ),
+    enabled: query.trim().length > 0,
+  });
+
+/** GET /api/patients/:id/alerts — the patient's alerts list. */
+export const patientAlertsQuery = (id: Id) =>
+  queryOptions({
+    queryKey: qk.patient.alerts(id),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof patientContract.alerts.response>>(`/api/patients/${id}/alerts`, {
+        signal,
+        schema: patientContract.alerts.response,
+      }),
+  });
+
+/** GET /api/patients/:id/portal — portal-access status. */
+export const portalStatusQuery = (id: Id) =>
+  queryOptions({
+    queryKey: qk.patient.portal(id),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof patientContract.portalStatus.response>>(`/api/patients/${id}/portal`, {
+        signal,
+        schema: patientContract.portalStatus.response,
+      }),
+  });
+
+/** GET /api/patient-appointments/:id — the patient's appointment list. */
+export const patientAppointmentsQuery = (id: Id) =>
+  queryOptions({
+    queryKey: qk.patient.appointments(id),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof appointmentContract.patientAppointments.response>>(
+        `/api/patient-appointments/${id}`,
+        { signal, schema: appointmentContract.patientAppointments.response }
+      ),
+  });
+
+/** GET /api/patients/:id/gallery/:tpCode — one timepoint's gallery images. */
+export const galleryQuery = (id: Id, tpCode: Id) =>
+  queryOptions({
+    queryKey: qk.patient.gallery(id, tpCode),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof patientContract.gallery.response>>(
+        `/api/patients/${id}/gallery/${tpCode}`,
+        { signal, schema: patientContract.gallery.response }
+      ),
+  });
+
+/** GET /api/patients/:id/timepoints/:tpCode/images — one timepoint's compare images. */
+export const timepointImagesQuery = (id: Id, tpCode: Id) =>
+  queryOptions({
+    queryKey: qk.patient.timepointImages(id, tpCode),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof patientContract.timepointImages.response>>(
+        `/api/patients/${id}/timepoints/${tpCode}/images`,
+        { signal, schema: patientContract.timepointImages.response }
+      ),
+  });
+
+/** GET /api/patients/:id/files?path=&flat= — patient file-explorer listing for a folder. */
+export const patientFilesQuery = (id: Id, path = '', flat = false) =>
+  queryOptions({
+    queryKey: qk.patient.files(id, path, flat),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof fileExplorerContract.list.response>>(
+        `/api/patients/${id}/files?path=${encodeURIComponent(path)}${flat ? '&flat=1' : ''}`,
+        { signal, schema: fileExplorerContract.list.response }
+      ),
+  });
+
+/** GET /api/patients/:id/working-files — working-files listing. */
+export const workingFilesQuery = (id: Id) =>
+  queryOptions({
+    queryKey: qk.patient.workingFiles(id),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof fileExplorerContract.workingFiles.response>>(
+        `/api/patients/${id}/working-files`,
+        { signal, schema: fileExplorerContract.workingFiles.response }
+      ),
+  });
+
+/** GET /api/photo-editor/:id/photo-dates — appointment/visit dates for the photo-session picker. */
+export const photoDatesQuery = (id: Id) =>
+  queryOptions({
+    queryKey: qk.patient.photoDates(id),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof photoEditorContract.photoDates.response>>(
+        `/api/photo-editor/${id}/photo-dates`,
+        { signal, schema: photoEditorContract.photoDates.response }
+      ),
+  });
+
+/** GET /api/patients/:id/photos/visibility — per-photo private-flag list (photo grid). */
+export const photoVisibilityQuery = (id: Id) =>
+  queryOptions({
+    queryKey: qk.patient.photoVisibility(id),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof patientContract.photoVisibilityList.response>>(
+        `/api/patients/${id}/photos/visibility`,
+        { signal, schema: patientContract.photoVisibilityList.response }
+      ),
+  });
+
+/** GET /api/settings/patients-folder — the configured client-facing patients folder UNC. */
+export const patientsFolderQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.patientsFolder(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof patientContract.patientsFolder.response>>(
+        '/api/settings/patients-folder',
+        { signal, schema: patientContract.patientsFolder.response }
+      ),
+  });
+
+// ---------------------------------------------------------------------------
+// Lookups — doctors / cost-presets / alert-types / google contacts
+// ---------------------------------------------------------------------------
+
+/** GET /api/doctors — doctor options (appointment/calendar filters). */
+export const doctorsQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.doctors(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof staffContract.doctors.response>>('/api/doctors', {
+        signal,
+        schema: staffContract.doctors.response,
+      }),
+  });
+
+/** GET /api/settings/cost-presets — estimated-cost preset chips. */
+export const costPresetsQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.costPresets(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof costPresetContract.getPresets.response>>('/api/settings/cost-presets', {
+        signal,
+        schema: costPresetContract.getPresets.response,
+      }),
+  });
+
+/** GET /api/alert-types — alert-type options. */
+export const alertTypesQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.alertTypes(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof lookupContract.alertTypes.response>>('/api/alert-types', {
+        signal,
+        schema: lookupContract.alertTypes.response,
+      }),
+  });
+
+/** GET /api/google?source= — Google contact list (a messaging recipient source). */
+export const googleContactsQuery = (source: string) =>
+  queryOptions({
+    queryKey: qk.lookups.googleContacts(source),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof utilityContract.google.response>>(
+        `/api/google?source=${encodeURIComponent(source)}`,
+        { signal, schema: utilityContract.google.response }
+      ),
+    enabled: !!source,
+  });
+
+// ---------------------------------------------------------------------------
+// Work — detail rows / payment history / transfer preview
+// ---------------------------------------------------------------------------
+
+/** GET /api/getworkdetailslist?workId= — the work's detail (procedure) rows. */
+export const workDetailsListQuery = (workId: Id) =>
+  queryOptions({
+    queryKey: qk.work.detailsList(workId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof workContract.getWorkDetailsList.response>>(
+        `/api/getworkdetailslist?workId=${workId}`,
+        { signal, schema: workContract.getWorkDetailsList.response }
+      ),
+  });
+
+/** GET /api/getpaymenthistory?workId= — payment + invoice history for a work. */
+export const paymentHistoryQuery = (workId: Id) =>
+  queryOptions({
+    queryKey: qk.work.payments(workId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof paymentContract.paymentHistory.response>>(
+        `/api/getpaymenthistory?workId=${workId}`,
+        { signal, schema: paymentContract.paymentHistory.response }
+      ),
+  });
+
+/** GET /api/work/:workId/transfer-preview — transfer impact preview (disabled until opened). */
+export const transferPreviewQuery = (workId: number | null | undefined) =>
+  queryOptions({
+    queryKey: qk.work.transferPreview(workId ?? 0),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof workContract.transferPreview.response>>(
+        `/api/work/${workId}/transfer-preview`,
+        { signal, schema: workContract.transferPreview.response }
+      ),
+    enabled: workId != null,
+  });
+
+/**
+ * GET /api/diagnosis/:workId — the work's diagnosis row, or `null` when none.
+ * DELIBERATELY schema-less: the endpoint returns the row or literal `null` (the
+ * "no diagnosis yet" signal), not the sendSuccess envelope, so it carries no
+ * contract response. Tolerant like the legacy `.catch(() => null)` read — any
+ * failure resolves to `null` and the read doesn't retry.
+ */
+export const diagnosisQuery = (workId: Id) =>
+  queryOptions({
+    queryKey: qk.work.diagnosis(workId),
+    queryFn: async ({ signal }) => {
+      try {
+        // eslint-disable-next-line no-restricted-syntax -- raw literal-null signal; no contract response
+        return await fetchJSON<Record<string, unknown> | null>(`/api/diagnosis/${workId}`, {
+          signal,
+        });
+      } catch {
+        return null;
+      }
+    },
+    retry: false,
+  });
+
+// ---------------------------------------------------------------------------
+// Aligner — admin doctors / archform / search
+// ---------------------------------------------------------------------------
+
+/** GET /api/aligner-doctors — the admin aligner-doctors list (a different endpoint from doctors()). */
+export const alignerDoctorsAdminQuery = () =>
+  queryOptions({
+    queryKey: qk.aligner.doctorsAdmin(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof alignerContract.doctorsList.response>>('/api/aligner-doctors', {
+        signal,
+        schema: alignerContract.doctorsList.response,
+      }),
+  });
+
+/** GET /api/aligner/archform/patients — unmatched Archform patients. */
+export const archformPatientsQuery = () =>
+  queryOptions({
+    queryKey: qk.aligner.archformPatients(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof alignerContract.archformPatients.response>>(
+        '/api/aligner/archform/patients',
+        { signal, schema: alignerContract.archformPatients.response }
+      ),
+  });
+
+/** GET /api/aligner/archform/matches — aligner sets available to match. */
+export const archformMatchesQuery = () =>
+  queryOptions({
+    queryKey: qk.aligner.archformMatches(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof alignerContract.archformMatches.response>>(
+        '/api/aligner/archform/matches',
+        { signal, schema: alignerContract.archformMatches.response }
+      ),
+  });
+
+/** GET /api/aligner/patients?search= — aligner patient search (disabled until a query is typed). */
+export const alignerPatientSearchQuery = (query: string) =>
+  queryOptions({
+    queryKey: qk.aligner.search(query),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof alignerContract.searchAlignerPatients.response>>(
+        `/api/aligner/patients?search=${encodeURIComponent(query)}`,
+        { signal, schema: alignerContract.searchAlignerPatients.response }
+      ),
+    enabled: query.trim().length > 0,
+  });
+
+// ---------------------------------------------------------------------------
+// Auth / users / tasks
+// ---------------------------------------------------------------------------
+
+/** GET /api/auth/me — the authenticated user's identity. */
+export const authMeQuery = () =>
+  queryOptions({
+    queryKey: qk.auth.me(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof authContract.me.response>>('/api/auth/me', {
+        signal,
+        schema: authContract.me.response,
+      }),
+  });
+
+/** GET /api/users — the application user list (admin). */
+export const usersListQuery = () =>
+  queryOptions({
+    queryKey: qk.users.list(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof userManagementContract.usersList.response>>('/api/users', {
+        signal,
+        schema: userManagementContract.usersList.response,
+      }),
+  });
+
+/** GET /api/tasks — open app-wide tasks (header Tasks surface). */
+export const tasksQuery = () =>
+  queryOptions({
+    queryKey: qk.tasks.list(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof taskContract.tasks.response>>('/api/tasks', {
+        signal,
+        schema: taskContract.tasks.response,
+      }),
+  });
+
+/** GET /api/tasks/history — completed/dismissed task history. */
+export const tasksHistoryQuery = () =>
+  queryOptions({
+    queryKey: qk.tasks.history(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof taskContract.tasksHistory.response>>('/api/tasks/history', {
+        signal,
+        schema: taskContract.tasksHistory.response,
+      }),
+  });
+
+// ---------------------------------------------------------------------------
+// Settings — options / email + database config / status polls
+// ---------------------------------------------------------------------------
+
+/** GET /api/options — every option row (General settings). */
+export const allOptionsQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.options(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof settingsContract.getOptions.response>>('/api/options', {
+        signal,
+        schema: settingsContract.getOptions.response,
+      }),
+  });
+
+/**
+ * GET /api/options/:name — one named option row. A missing option is a normal
+ * empty state (the legacy reads did `.catch(() => null)`), so a 404 resolves to
+ * `null` rather than erroring, and the read doesn't retry.
+ */
+export const optionQuery = (name: string) =>
+  queryOptions({
+    queryKey: qk.settings.option(name),
+    queryFn: async ({ signal }) => {
+      try {
+        return await fetchJSON<z.infer<typeof settingsContract.getOptionByName.response>>(
+          `/api/options/${name}`,
+          { signal, schema: settingsContract.getOptionByName.response }
+        );
+      } catch (err) {
+        if ((err as HttpError).status === 404) return null;
+        throw err;
+      }
+    },
+    retry: false,
+  });
+
+/** GET /api/email/config — SMTP configuration. */
+export const emailConfigQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.emailConfig(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof emailApiContract.config.response>>('/api/email/config', {
+        signal,
+        schema: emailApiContract.config.response,
+      }),
+  });
+
+/** GET /api/config/database — the active database connection config. */
+export const databaseConfigQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.databaseConfig(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof settingsContract.getDatabaseConfig.response>>('/api/config/database', {
+        signal,
+        schema: settingsContract.getDatabaseConfig.response,
+      }),
+  });
+
+/** GET /api/telegram/status — Telegram bot status. */
+export const telegramStatusQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.telegramStatus(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof telegramContract.status.response>>('/api/telegram/status', {
+        signal,
+        schema: telegramContract.status.response,
+      }),
+  });
+
+/** GET /api/integrations/telegram/status — Telegram MTProto integration status. */
+export const integrationsTelegramStatusQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.integrationsTelegramStatus(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof integrationsContract.telegramStatus.response>>(
+        '/api/integrations/telegram/status',
+        { signal, schema: integrationsContract.telegramStatus.response }
+      ),
+  });
+
+/** GET /api/wa/group-settings — WhatsApp daily-list group posting config. */
+export const whatsappGroupSettingsQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.whatsappGroupSettings(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof whatsappContract.groupSettings.response>>('/api/wa/group-settings', {
+        signal,
+        schema: whatsappContract.groupSettings.response,
+      }),
+  });
+
+/**
+ * Sync/CDC status polls — single out-of-surface endpoints in sync-webhook.ts,
+ * read raw (no contract schema), mirroring the prior component fetches. Poll
+ * cadence + freshness are owned by the consuming component's `refetchInterval`.
+ */
+export interface SyncSinkStatusResponse {
+  success: boolean;
+  checkedAt?: string;
+  sinks?: unknown[];
+  error?: string;
+}
+
+/** GET /api/sync/supabase-status — failover/reverse sink health. */
+export const supabaseStatusQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.supabaseStatus(),
+    // eslint-disable-next-line no-restricted-syntax -- raw out-of-surface sync status read (no contract)
+    queryFn: ({ signal }) => fetchJSON<SyncSinkStatusResponse>('/api/sync/supabase-status', { signal }),
+  });
+
+/** GET /api/sync/dolphin-status — Dolphin sink health. */
+export const dolphinStatusQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.dolphinStatus(),
+    // eslint-disable-next-line no-restricted-syntax -- raw out-of-surface sync status read (no contract)
+    queryFn: ({ signal }) => fetchJSON<SyncSinkStatusResponse>('/api/sync/dolphin-status', { signal }),
+  });
+
+// ---------------------------------------------------------------------------
+// Reports / media / videos / calendar / expenses
+// ---------------------------------------------------------------------------
+
+/** GET /api/daily-invoices?date= — invoices issued on one date. */
+export const dailyInvoicesQuery = (date: string) =>
+  queryOptions({
+    queryKey: qk.dailyInvoices(date),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof reportsContract.dailyInvoices.response>>(
+        `/api/daily-invoices?date=${date}`,
+        { signal, schema: reportsContract.dailyInvoices.response }
+      ),
+    enabled: !!date,
+  });
+
+/** GET /api/webceph/photo-types — photo-type taxonomy (WebCeph upload picker). */
+export const photoTypesQuery = () =>
+  queryOptions({
+    queryKey: qk.media.photoTypes(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof mediaContract.photoTypes.response>>('/api/webceph/photo-types', {
+        signal,
+        schema: mediaContract.photoTypes.response,
+      }),
+  });
+
+/**
+ * GET /api/webceph/patient-link/:personId — the WebCeph link row, or `null` when
+ * the patient has no link yet (a 404 — the common case, not an error). The
+ * contract response is deliberately loose (`z.unknown()` — variable API fields),
+ * so the consumer casts to its concrete `WebcephData` shape.
+ */
+export const webcephLinkQuery = (personId: Id) =>
+  queryOptions({
+    queryKey: qk.media.webcephLink(personId),
+    queryFn: async ({ signal }) => {
+      try {
+        return await fetchJSON<z.infer<typeof mediaContract.patientLink.response>>(
+          `/api/webceph/patient-link/${personId}`,
+          { signal, schema: mediaContract.patientLink.response }
+        );
+      } catch (err) {
+        if ((err as HttpError).status === 404) return null;
+        throw err;
+      }
+    },
+  });
+
+/** GET /api/videos — educational video list. */
+export const videosQuery = () =>
+  queryOptions({
+    queryKey: qk.videos.list(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof videoContract.list.response>>('/api/videos', {
+        signal,
+        schema: videoContract.list.response,
+      }),
+  });
+
+/** GET /api/videos/categories — video category list. */
+export const videoCategoriesQuery = () =>
+  queryOptions({
+    queryKey: qk.videos.categories(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof videoContract.categories.response>>('/api/videos/categories', {
+        signal,
+        schema: videoContract.categories.response,
+      }),
+  });
+
+/** GET /api/expenses/:id — single expense (edit form; disabled until an id is set). */
+export const expenseByIdQuery = (id: number | string | null | undefined) =>
+  queryOptions({
+    queryKey: qk.expenses.byId(id ?? 0),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof expenseContract.expenseById.response>>(`/api/expenses/${id}`, {
+        signal,
+        schema: expenseContract.expenseById.response,
+      }),
+    enabled: id != null && id !== '',
+  });
+
+/** GET /api/calendar/range?start=&end=&doctorId= — grid (day/week/zoom) window. */
+export const calendarRangeQuery = (start: string, end: string, doctorId: number | null) =>
+  queryOptions({
+    queryKey: qk.calendar.range(start, end, doctorId ?? 0),
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams({ start, end });
+      if (doctorId) params.append('doctorId', String(doctorId));
+      return fetchJSON<z.infer<typeof calendarContract.range.response>>(
+        `/api/calendar/range?${params}`,
+        { signal, schema: calendarContract.range.response }
+      );
+    },
+    enabled: !!start && !!end,
+  });
+
+/** GET /api/calendar/month?date=&doctorId= — month grid (keyed by the query string). */
+export const calendarMonthQuery = (params: string) =>
+  queryOptions({
+    queryKey: qk.calendar.month(params),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof calendarContract.month.response>>(`/api/calendar/month?${params}`, {
+        signal,
+        schema: calendarContract.month.response,
+      }),
+  });
+
+/** GET /api/calendar/stats?date= — month KPI rollup (keyed by the query string). */
+export const calendarStatsQuery = (params: string) =>
+  queryOptions({
+    queryKey: qk.calendar.stats(params),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof calendarContract.stats.response>>(`/api/calendar/stats?${params}`, {
+        signal,
+        schema: calendarContract.stats.response,
+      }),
+  });
+
+/** GET /api/calendar/month-availability?startDate=&endDate= — per-day availability map. */
+export const monthAvailabilityQuery = (startDate: string, endDate: string) =>
+  queryOptions({
+    queryKey: qk.calendar.availability(0, 0, `${startDate}_${endDate}`),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof calendarContract.monthAvailability.response>>(
+        `/api/calendar/month-availability?startDate=${startDate}&endDate=${endDate}`,
+        { signal, schema: calendarContract.monthAvailability.response }
+      ),
+    enabled: !!startDate && !!endDate,
+  });
+
+/** GET /api/calendar/available-slots?date= — bookable slots for one day. */
+export const availableSlotsQuery = (date: string) =>
+  queryOptions({
+    queryKey: qk.calendar.slots(date, 'all'),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof calendarContract.availableSlots.response>>(
+        `/api/calendar/available-slots?date=${date}`,
+        { signal, schema: calendarContract.availableSlots.response }
+      ),
+    enabled: !!date,
   });

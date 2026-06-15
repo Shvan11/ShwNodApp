@@ -6,6 +6,7 @@ import type { StandItem, StandStockMovement } from '../../hooks/useStand';
 import { useStockMovements } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
 import Modal from '../react/Modal';
+import ModalHeader from '../react/ModalHeader';
 import styles from './StockMovementsModal.module.css';
 
 interface StockMovementsModalProps {
@@ -93,12 +94,11 @@ export default function StockMovementsModal({ isOpen, item, onClose }: StockMove
       contentClassName={styles.modalContent}
       ariaLabelledBy="stock-movements-modal-title"
     >
-        <div className={styles.modalHeader}>
-          <h2 id="stock-movements-modal-title">Stock Movements</h2>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Close modal">
-            &times;
-          </button>
-        </div>
+        <ModalHeader
+          title="Stock Movements"
+          titleId="stock-movements-modal-title"
+          onClose={onClose}
+        />
 
         <div className={styles.modalBody}>
           <div className={styles.itemInfo}>

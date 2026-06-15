@@ -17,29 +17,6 @@
     overflow: hidden; /* clip rounded corners; the body is the scroll region */
 }
 
-/* Close button — neutral ghost (the global `.modal-close-btn` is only styled under
-   the orange `.alert-modal` scope, which this neutral task modal doesn't use). */
-.closeBtn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: none;
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: 1.5rem;
-    line-height: 1;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: background 0.2s ease, color 0.2s ease;
-}
-
-.closeBtn:hover {
-    background: var(--surface-hover);
-    color: var(--text-primary);
-}
-
 /* Body padding + footer layout — global `.modal-body`/`.modal-footer` carry no base
    rules (only `.alert-modal`-scoped), so style them locally. */
 .body {

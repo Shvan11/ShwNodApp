@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { FormEvent, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Select, { SingleValue, StylesConfig } from 'react-select';
+import { useQuery } from '@tanstack/react-query';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
-import { fetchJSON, postFormData, httpErrorMessage } from '@/core/http';
-import { patientPhones } from '@shared/contracts/patient.contract';
-import * as utilityContract from '@shared/contracts/utility.contract';
+import { postFormData, httpErrorMessage } from '@/core/http';
+import { patientPhonesQuery, googleContactsQuery } from '@/query/queries';
 
 interface ContactData {
     id?: string | number;
@@ -34,65 +34,59 @@ const SendMessage = () => {
     // Use global state for WhatsApp client status
     const { whatsappClientReady } = useGlobalState();
 
-    const [filePath, setFilePath] = useState('');
-    const [pathsArray, setPathsArray] = useState<string[]>([]);
+    // Seed from the ?file= URL param once on mount (lazy initializers, so there's no
+    // setState-in-effect just to read the launch URL).
+    const [filePath, setFilePath] = useState(() => {
+        const fileParam = new URLSearchParams(window.location.search).get('file');
+        return fileParam ? decodeURIComponent(fileParam) : '';
+    });
+    const [pathsArray] = useState<string[]>(() => {
+        const fileParam = new URLSearchParams(window.location.search).get('file');
+        return fileParam ? decodeURIComponent(fileParam).split(',') : [];
+    });
     const [selectedSource, setSelectedSource] = useState('pat');
-    const [contactOptions, setContactOptions] = useState<ContactOption[]>([]);
     const [selectedContact, setSelectedContact] = useState<ContactOption | null>(null);
     const [phoneNumber, setPhoneNumber] = useState('');
     const [program, setProgram] = useState('WhatsApp');
     const [statusMessage, setStatusMessage] = useState('');
     const [statusType, setStatusType] = useState<StatusType>('');
 
-    // Initialize component
-    useEffect(() => {
-        // Parse URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const fileParam = urlParams.get('file');
-        if (fileParam) {
-            const decodedPath = decodeURIComponent(fileParam);
-            setFilePath(decodedPath);
-            setPathsArray(decodedPath.split(','));
+    // Contacts come from one of two sources depending on the selector: the
+    // patients' phone book (`pat`) or a Google contact group (`shw`/`cli`). Only
+    // the active source fetches; the other stays disabled.
+    const phonesResult = useQuery({ ...patientPhonesQuery(), enabled: selectedSource === 'pat' });
+    const googleResult = useQuery({
+        ...googleContactsQuery(selectedSource),
+        enabled: selectedSource !== 'pat',
+    });
+    const activeResult = selectedSource === 'pat' ? phonesResult : googleResult;
+    const contactsArray = (activeResult.data ?? []) as ContactData[];
+    const contactOptions: ContactOption[] = contactsArray.map(contact => ({
+        value: contact.id || contact.phone,
+        label: `${contact.name || contact.text} - ${contact.phone}`,
+        phone: contact.phone,
+        name: contact.name || contact.text || '',
+        contactData: contact
+    }));
+
+    // Surface a contact-load failure with the existing status banner, once per error
+    // transition. The setters are called directly (the later-declared showMessage
+    // would trip react-hooks/immutability); type is 'error' so the success-only
+    // auto-clear timer in showMessage doesn't apply.
+    const [prevContactsError, setPrevContactsError] = useState(activeResult.isError);
+    if (activeResult.isError !== prevContactsError) {
+        setPrevContactsError(activeResult.isError);
+        if (activeResult.isError) {
+            setStatusMessage(`Failed to load contacts: ${httpErrorMessage(activeResult.error, 'Unknown error')}`);
+            setStatusType('error');
         }
-
-        // Load contacts
-        loadContacts('pat');
-
-        // No cleanup needed - useWhatsAppSync hook handles SSE lifecycle
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    // Load contacts based on source
-    const loadContacts = async (source: string) => {
-        try {
-            const data = source === 'pat'
-                ? await fetchJSON<ContactData[]>('/api/patients/phones', { schema: patientPhones.response })
-                : await fetchJSON<ContactData[]>(`/api/google?source=${encodeURIComponent(source)}`, { schema: utilityContract.google.response });
-
-            const contactsArray: ContactData[] = Array.isArray(data) ? data : [];
-
-            // Convert to React-Select format
-            const options: ContactOption[] = contactsArray.map(contact => ({
-                value: contact.id || contact.phone,
-                label: `${contact.name || contact.text} - ${contact.phone}`,
-                phone: contact.phone,
-                name: contact.name || contact.text || '',
-                contactData: contact
-            }));
-            setContactOptions(options);
-        } catch (error) {
-            console.error('Error loading contacts:', error);
-            showMessage(`Failed to load contacts: ${httpErrorMessage(error, 'Unknown error')}`, 'error');
-            setContactOptions([]);
-        }
-    };
+    }
 
     // Handle source change
     const handleSourceChange = (newSource: string) => {
         setSelectedSource(newSource);
         setSelectedContact(null);
         setPhoneNumber('');
-        loadContacts(newSource);
     };
 
     // Handle contact selection with React-Select

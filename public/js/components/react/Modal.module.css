@@ -39,3 +39,24 @@
     from { opacity: 0; }
     to { opacity: 1; }
 }
+
+/*
+ * Drag affordance. The shared ModalHeader marks itself [data-modal-drag-handle];
+ * grabbing it on a draggable (non-drawer, non-mobile) modal moves the dialog.
+ * Interactive controls inside the header keep their own cursor. Hidden on touch /
+ * small screens where dragging is disabled in Modal.tsx.
+ */
+@media (min-width: 769px) and (pointer: fine) {
+    .content[data-draggable] :global([data-modal-drag-handle]) {
+        cursor: move;
+    }
+
+    .content[data-draggable] :global([data-modal-drag-handle]) a,
+    .content[data-draggable] :global([data-modal-drag-handle]) button,
+    .content[data-draggable] :global([data-modal-drag-handle]) input,
+    .content[data-draggable] :global([data-modal-drag-handle]) select,
+    .content[data-draggable] :global([data-modal-drag-handle]) textarea,
+    .content[data-draggable] :global([data-modal-drag-handle]) label {
+        cursor: revert;
+    }
+}

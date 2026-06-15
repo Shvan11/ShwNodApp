@@ -85,16 +85,25 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
     [toast]
   );
 
-  // Reset + initial load whenever the modal opens.
+  // Reset the picker + kick off the LAN device scan whenever the modal opens.
+  // Adjust-during-render keyed on the open state so a fresh open re-seeds the
+  // fields (and starts the scan) once, without a setState-in-effect bailout.
+  const [openedKey, setOpenedKey] = useState(open);
+  if (open !== openedKey) {
+    setOpenedKey(open);
+    if (open) {
+      setTransfer(null);
+      setPendingDevice(null);
+      setPin('');
+      setIp('');
+      void loadDevices(true);
+    }
+  }
+
+  // Clear any stale transfer id on open (ref writes belong outside render).
   useEffect(() => {
-    if (!open) return;
-    transferIdRef.current = null;
-    setTransfer(null);
-    setPendingDevice(null);
-    setPin('');
-    setIp('');
-    void loadDevices(true);
-  }, [open, loadDevices]);
+    if (open) transferIdRef.current = null;
+  }, [open]);
 
   // Poll the active transfer ~every second until it settles.
   useEffect(() => {

@@ -2,11 +2,12 @@
  * StockAdjustModal Component
  * Modal for adjusting stock with a delta value and required reason
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import type { StandItem } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
 import Modal from '../react/Modal';
+import ModalHeader from '../react/ModalHeader';
 import styles from './StockAdjustModal.module.css';
 
 interface StockAdjustModalProps {
@@ -27,13 +28,19 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
+  // Reset the form when the modal opens. Done during render (keyed on open) rather
+  // than in an effect, so the React Compiler can optimize and there's no extra
+  // post-paint render.
+  const initKey = isOpen ? 'open' : '';
+  const [initializedKey, setInitializedKey] = useState('');
+  if (initKey !== initializedKey) {
+    setInitializedKey(initKey);
     if (isOpen) {
       setDelta(0);
       setReason('');
       setErrors({});
     }
-  }, [isOpen]);
+  }
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -85,12 +92,11 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
       contentClassName={styles.modalContent}
       ariaLabelledBy="stock-adjust-modal-title"
     >
-        <div className={styles.modalHeader}>
-          <h2 id="stock-adjust-modal-title">Adjust Stock</h2>
-          <button className={styles.closeBtn} onClick={handleClose} aria-label="Close modal">
-            &times;
-          </button>
-        </div>
+        <ModalHeader
+          title="Adjust Stock"
+          titleId="stock-adjust-modal-title"
+          onClose={handleClose}
+        />
 
         <form onSubmit={handleSubmit}>
           <div className={styles.modalBody}>

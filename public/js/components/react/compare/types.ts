@@ -42,6 +42,28 @@ export interface TransformState {
     logo: Transform;
 }
 
+/**
+ * Per-side crop insets, each a fraction (0..1) of the image's container box.
+ * Cutting trims the image along straight, canvas-axis-aligned lines (so the
+ * cut stays straight even when the image is rotated). The trimmed strip shows
+ * the canvas background — the image keeps its proportions and position.
+ * Fraction-based so it survives canvas size-mode changes.
+ */
+export interface CropInset {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+}
+
+export interface CropState {
+    img1: CropInset;
+    img2: CropInset;
+    logo: CropInset;
+}
+
+export type CropSide = 'top' | 'right' | 'bottom' | 'left';
+
 export interface CanvasDimensions {
     width: number;
     height: number;
@@ -100,6 +122,10 @@ export const PHOTO_TYPES: PhotoType[] = [
 ];
 
 export const PHOTO_CATEGORIES = ['facial', 'occlusal', 'intraoral'] as const;
+
+/** Clinic logo asset variants for the comparison watermark. */
+export const LOGO_WHITE_URL = '/images/logo_white.png';
+export const LOGO_BLACK_URL = '/images/logo.png';
 
 export const CANVAS_SIZES: CanvasSizeOption[] = [
     { value: 'auto', label: 'Auto (100%)' },

@@ -77,6 +77,11 @@ interface BatchStatusResult {
     wasAlreadyManufactured?: boolean;
 }
 
+// IndexedDB key for the persisted base aligner-sets directory handle (File System
+// Access API). Module-scoped so the loaders below can reference it before their
+// File System helper siblings are declared.
+const ALIGNER_SETS_HANDLE_KEY = 'base_aligner_sets';
+
 const PatientSets: React.FC = () => {
     const { doctorId, workId } = useParams<{ doctorId?: string; workId?: string }>();
     const loaderData = useLoaderData() as AlignerPatientWorkLoaderResult;
@@ -107,6 +112,85 @@ const PatientSets: React.FC = () => {
     const [notesData, setNotesData] = useState<Record<number, AlignerNote[]>>({});
     const [expandedCommunication, setExpandedCommunication] = useState<Record<number, boolean>>({});
     const [loading, setLoading] = useState<boolean>(false);
+
+    // Self-managed data loaders. Declared above the drawer hooks + mount effects
+    // that reference them so every reference is a backward one (a forward reference
+    // from a hook argument / effect trips react-hooks/immutability "accessed before
+    // declared"). PatientSets keeps these self-managed reads — see CLAUDE.md.
+    const loadAlignerSets = async (workIdParam: number): Promise<void> => {
+        try {
+            // Flat { success, sets, count } (no `data` key) → fetchJSON passthrough.
+            const data = await fetchJSON<{ sets?: AlignerSet[] }>(`/api/aligner/sets/${workIdParam}`, { schema: alignerContract.setsByWorkId.response });
+
+            const sets: AlignerSet[] = data.sets || [];
+            setAlignerSets(sets);
+
+            // Auto-expand the active set
+            const activeSet = sets.find(s => s.is_active === true);
+            if (activeSet) {
+                const setId = activeSet.aligner_set_id;
+                if (!batchesData[setId]) {
+                    await loadBatches(setId);
+                }
+                if (!notesData[setId]) {
+                    await loadNotes(setId, workIdParam);
+                }
+                setExpandedSets(prev => ({ ...prev, [setId]: true }));
+                setExpandedCommunication(prev => ({ ...prev, [setId]: true }));
+            }
+        } catch (error) {
+            console.error('Error loading aligner sets:', error);
+            toast.error('Failed to load aligner sets: ' + httpErrorMessage(error, 'unknown error'));
+        }
+    };
+
+    const loadBatches = async (setId: number): Promise<void> => {
+        try {
+            // Flat { success, batches } (no `data` key) → fetchJSON passthrough.
+            const data = await fetchJSON<{ batches?: AlignerBatch[] }>(`/api/aligner/batches/${setId}`, { schema: alignerContract.batchesBySetId.response });
+            setBatchesData(prev => ({ ...prev, [setId]: data.batches || [] }));
+        } catch (error) {
+            console.error('Error loading batches:', error);
+            setBatchesData(prev => ({ ...prev, [setId]: [] }));
+        }
+    };
+
+    const loadNotes = async (setId: number, workIdParam: number, autoMarkRead: boolean = true): Promise<void> => {
+        try {
+            // Flat { success, notes } (no `data` key) → fetchJSON passthrough.
+            const data = await fetchJSON<{ notes?: AlignerNote[] }>(`/api/aligner/notes/${setId}`, { schema: alignerContract.notesBySetId.response });
+
+            setNotesData(prev => ({ ...prev, [setId]: data.notes || [] }));
+
+            // Auto-mark unread doctor notes as read
+            if (autoMarkRead) {
+                const unreadDoctorNotes = (data.notes || []).filter((note: AlignerNote) =>
+                    note.note_type === 'Doctor' && note.is_read === false
+                );
+
+                if (unreadDoctorNotes.length > 0) {
+                    for (const note of unreadDoctorNotes) {
+                        await markNoteAsRead(note.note_id);
+                    }
+                    await loadNotes(setId, workIdParam, false);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading notes:', error);
+            setNotesData(prev => ({ ...prev, [setId]: [] }));
+        }
+    };
+
+    const markNoteAsRead = async (noteId: number): Promise<void> => {
+        // Callers only pass notes already known to be unread (is_read === false from
+        // the just-loaded notes payload), so toggling to read directly is safe — no
+        // need for a per-note /status round-trip first.
+        try {
+            await patchJSON(`/api/aligner/notes/${noteId}/toggle-read`, {});
+        } catch (error) {
+            console.error('Error marking note as read:', error);
+        }
+    };
 
     // Set drawer hook - handles add/edit set form state
     const {
@@ -182,115 +266,65 @@ const PatientSets: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [hasBaseDirectoryAccess, setHasBaseDirectoryAccess] = useState<boolean>(false);
 
-    // Check if we have base directory access on mount
+    // Self-managed loaders (PatientSets keeps loader-fed / self-managed reads — see
+    // CLAUDE.md). Written as .then-chains so every setState lives in a chained
+    // callback, never synchronously in the mount effects below (set-state-in-effect).
+
+    const loadDoctors = (): void => {
+        // Flat { success, doctors } (no `data` key) → fetchJSON passthrough.
+        fetchJSON<{ doctors?: AlignerDoctorWithAliases[] }>('/api/aligner/doctors', { schema: alignerContract.alignerDoctors.response })
+            .then((data) => setDoctors(data.doctors || []))
+            .catch((error) => console.error('Error loading doctors:', error));
+    };
+
+    const loadAlignerSetsOnly = (): void => {
+        // Patient data is already loaded from the route loader (useLoaderData); only
+        // the aligner sets are fetched here. The loading flag is raised in render
+        // (below) on each work change and lowered when the fetch settles. The async
+        // loadAlignerSets is invoked from a chained callback (not synchronously) so
+        // the mount effect's synchronous body never calls into a setState-bearing
+        // async function (react-hooks/set-state-in-effect).
+        Promise.resolve()
+            .then(() => loadAlignerSets(parseInt(workId || '0')))
+            .catch((error) => console.error('Error loading aligner sets:', error))
+            .finally(() => setLoading(false));
+    };
+
+    const checkBaseDirectoryAccess = (): void => {
+        if (!isFileSystemAccessSupported()) return; // stays false (initial state)
+        getDirectoryHandle(ALIGNER_SETS_HANDLE_KEY)
+            .then((baseHandle) => {
+                if (!baseHandle) {
+                    setHasBaseDirectoryAccess(false);
+                    return;
+                }
+                return checkPermission(baseHandle, 'read').then((permission) => {
+                    setHasBaseDirectoryAccess(permission === 'granted');
+                });
+            })
+            .catch(() => setHasBaseDirectoryAccess(false));
+    };
+
+    // Raise the loading flag whenever the viewed work changes (incl. first mount) —
+    // done during render so the mount effect carries no synchronous setState;
+    // loadAlignerSetsOnly lowers it when the fetch settles.
+    const [loadedWork, setLoadedWork] = useState<string | null>(null);
+    if (loadedWork !== (workId ?? null)) {
+        setLoadedWork(workId ?? null);
+        setLoading(true);
+    }
+
+    // Check base directory access on mount.
     useEffect(() => {
         checkBaseDirectoryAccess();
     }, []);
 
-    // Load aligner sets on mount (patient data comes from loader)
+    // Load aligner sets + doctors on mount / work change (patient data from loader).
     useEffect(() => {
         loadAlignerSetsOnly();
         loadDoctors();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [workId]);
-
-    const loadDoctors = async (): Promise<void> => {
-        try {
-            // Flat { success, doctors } (no `data` key) → fetchJSON passthrough.
-            const data = await fetchJSON<{ doctors?: AlignerDoctorWithAliases[] }>('/api/aligner/doctors', { schema: alignerContract.alignerDoctors.response });
-            setDoctors(data.doctors || []);
-        } catch (error) {
-            console.error('Error loading doctors:', error);
-        }
-    };
-
-    const loadAlignerSetsOnly = async (): Promise<void> => {
-        // Patient data is already loaded from route loader (useLoaderData)
-        // Only need to load aligner sets here
-        try {
-            setLoading(true);
-            await loadAlignerSets(parseInt(workId || '0'));
-        } catch (error) {
-            console.error('Error loading aligner sets:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadAlignerSets = async (workIdParam: number): Promise<void> => {
-        try {
-            // Flat { success, sets, count } (no `data` key) → fetchJSON passthrough.
-            const data = await fetchJSON<{ sets?: AlignerSet[] }>(`/api/aligner/sets/${workIdParam}`, { schema: alignerContract.setsByWorkId.response });
-
-            const sets: AlignerSet[] = data.sets || [];
-            setAlignerSets(sets);
-
-            // Auto-expand the active set
-            const activeSet = sets.find(s => s.is_active === true);
-            if (activeSet) {
-                const setId = activeSet.aligner_set_id;
-                if (!batchesData[setId]) {
-                    await loadBatches(setId);
-                }
-                if (!notesData[setId]) {
-                    await loadNotes(setId, workIdParam);
-                }
-                setExpandedSets(prev => ({ ...prev, [setId]: true }));
-                setExpandedCommunication(prev => ({ ...prev, [setId]: true }));
-            }
-        } catch (error) {
-            console.error('Error loading aligner sets:', error);
-            toast.error('Failed to load aligner sets: ' + httpErrorMessage(error, 'unknown error'));
-        }
-    };
-
-    const loadBatches = async (setId: number): Promise<void> => {
-        try {
-            // Flat { success, batches } (no `data` key) → fetchJSON passthrough.
-            const data = await fetchJSON<{ batches?: AlignerBatch[] }>(`/api/aligner/batches/${setId}`, { schema: alignerContract.batchesBySetId.response });
-            setBatchesData(prev => ({ ...prev, [setId]: data.batches || [] }));
-        } catch (error) {
-            console.error('Error loading batches:', error);
-            setBatchesData(prev => ({ ...prev, [setId]: [] }));
-        }
-    };
-
-    const loadNotes = async (setId: number, workIdParam: number, autoMarkRead: boolean = true): Promise<void> => {
-        try {
-            // Flat { success, notes } (no `data` key) → fetchJSON passthrough.
-            const data = await fetchJSON<{ notes?: AlignerNote[] }>(`/api/aligner/notes/${setId}`, { schema: alignerContract.notesBySetId.response });
-
-            setNotesData(prev => ({ ...prev, [setId]: data.notes || [] }));
-
-            // Auto-mark unread doctor notes as read
-            if (autoMarkRead) {
-                const unreadDoctorNotes = (data.notes || []).filter((note: AlignerNote) =>
-                    note.note_type === 'Doctor' && note.is_read === false
-                );
-
-                if (unreadDoctorNotes.length > 0) {
-                    for (const note of unreadDoctorNotes) {
-                        await markNoteAsRead(note.note_id);
-                    }
-                    await loadNotes(setId, workIdParam, false);
-                }
-            }
-        } catch (error) {
-            console.error('Error loading notes:', error);
-            setNotesData(prev => ({ ...prev, [setId]: [] }));
-        }
-    };
-
-    const markNoteAsRead = async (noteId: number): Promise<void> => {
-        // Callers only pass notes already known to be unread (is_read === false from
-        // the just-loaded notes payload), so toggling to read directly is safe — no
-        // need for a per-note /status round-trip first.
-        try {
-            await patchJSON(`/api/aligner/notes/${noteId}/toggle-read`, {});
-        } catch (error) {
-            console.error('Error marking note as read:', error);
-        }
-    };
 
     const toggleBatches = async (setId: number): Promise<void> => {
         if (expandedSets[setId]) {
@@ -695,28 +729,6 @@ const PatientSets: React.FC = () => {
             toast.error('Failed to save URL: ' + httpErrorMessage(error, 'unknown error'));
         } finally {
             setSavingUrl(false);
-        }
-    };
-
-    // File System Access API helpers - using shared utility
-    const ALIGNER_SETS_HANDLE_KEY = 'base_aligner_sets';
-
-    const checkBaseDirectoryAccess = async (): Promise<void> => {
-        if (!isFileSystemAccessSupported()) {
-            setHasBaseDirectoryAccess(false);
-            return;
-        }
-
-        try {
-            const baseHandle = await getDirectoryHandle(ALIGNER_SETS_HANDLE_KEY);
-            if (baseHandle) {
-                const permission = await checkPermission(baseHandle, 'read');
-                setHasBaseDirectoryAccess(permission === 'granted');
-            } else {
-                setHasBaseDirectoryAccess(false);
-            }
-        } catch {
-            setHasBaseDirectoryAccess(false);
         }
     };
 

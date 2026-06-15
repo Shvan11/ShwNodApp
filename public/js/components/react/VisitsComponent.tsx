@@ -7,33 +7,17 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { deleteJSON, httpErrorMessage } from '@/core/http';
+import { qk } from '@/query/keys';
 import { visitsByWorkQuery } from '@/query/queries';
+import type { VisitRow } from '@shared/contracts/visit.contract';
 import styles from './VisitsComponent.module.css';
 
-interface Visit {
-    id: number;
-    work_id: number;
-    visit_date: string;
-    operator_id?: number;
-    OperatorName?: string;
-    upper_wire_id?: number;
-    UpperWireName?: string;
-    lower_wire_id?: number;
-    LowerWireName?: string;
-    bracket_change?: string;
-    wire_bending?: string;
-    elastics?: string;
-    opg?: boolean;
-    i_photo?: boolean;
-    p_photo?: boolean;
-    f_photo?: boolean;
-    others?: string;
-    next_visit?: string;
-    appliance_removed?: boolean;
-}
+// The visit wire row is owned by the visit contract (single source of truth for
+// both the list and single-visit endpoints) — no parallel hand-written copy.
+type Visit = VisitRow;
 
 interface VisitsComponentProps {
     workId: number | null;
@@ -75,6 +59,7 @@ const highlight = (text: string | undefined, term: string, markClass: string): R
 const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
     const navigate = useNavigate();
     const confirm = useConfirm();
+    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     // Error raised by the delete mutation / dismissed by the banner's close
     // button. Kept separate from the query's read error so each can clear
@@ -84,14 +69,14 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
 
     // Visit list now reads from React Query (keyed by workId; the monotonic
     // request guard is handled by RQ's per-key in-flight dedup + cancellation).
-    const { data, isLoading: loading, error: queryError, refetch: refetchVisits } = useQuery({
+    const { data, isLoading: loading, error: queryError } = useQuery({
         ...visitsByWorkQuery(workId ?? ''),
         enabled: !!workId,
     });
 
     // Sort by visit date descending (most recent first) on a copy, leaving the
     // cached array untouched.
-    const visits = ([...((data ?? []) as unknown as Visit[])]).sort(
+    const visits: Visit[] = [...(data ?? [])].sort(
         (a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()
     );
 
@@ -110,8 +95,9 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
 
         try {
             await deleteJSON('/api/deletevisitbywork', { body: JSON.stringify({ visitId }) });
-            // TODO(phase3): replace manual refetch with query invalidation
-            await refetchVisits();
+            // Invalidate the work's data (qk.work.all covers qk.work.visits) so the
+            // list refreshes here AND in any other observer of this work's visits.
+            await queryClient.invalidateQueries({ queryKey: qk.work.all(workId ?? '') });
         } catch (err) {
             setActionError(httpErrorMessage(err, 'Failed to delete visit'));
         }

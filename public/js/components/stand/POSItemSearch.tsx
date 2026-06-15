@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { StandItem } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
-import { fetchJSON } from '@/core/http';
-import { items as standItemsContract } from '@shared/contracts/stand.contract';
+import { standItemsQuery } from '@/query/queries';
 import styles from './POSItemSearch.module.css';
 
 interface POSItemSearchProps {
@@ -18,15 +18,25 @@ interface POSItemSearchProps {
  */
 const POSItemSearch: React.FC<POSItemSearchProps> = ({ onSelect }) => {
   const [searchText, setSearchText] = useState('');
-  const [results, setResults] = useState<StandItem[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [debouncedTerm, setDebouncedTerm] = useState('');
+  // The dropdown is dismissible (outside click / Escape / select); track that
+  // separately so a manual close doesn't reopen on every re-render.
+  const [dismissed, setDismissed] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Monotonic request id — ignore responses that arrive out of order so a
-  // slow earlier query can't clobber the results of the latest one.
-  const requestSeqRef = useRef(0);
+
+  // React Query owns the fetch + out-of-order handling (only the latest key's
+  // result is surfaced). Min-length gate (2) lives in `enabled`.
+  const enabled = debouncedTerm.length >= 2;
+  const { data, isFetching, isSuccess } = useQuery({
+    ...standItemsQuery({ search: debouncedTerm }),
+    enabled,
+  });
+
+  const results = (data as StandItem[] | undefined) ?? [];
+  const loading = isFetching;
+  const showDropdown = !dismissed && isSuccess && results.length > 0;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -35,53 +45,28 @@ const POSItemSearch: React.FC<POSItemSearchProps> = ({ onSelect }) => {
         containerRef.current &&
         !containerRef.current.contains(e.target as Node)
       ) {
-        setShowDropdown(false);
+        setDismissed(true);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const fetchItems = useCallback(async (query: string) => {
-    if (query.length < 2) {
-      setResults([]);
-      setShowDropdown(false);
-      return;
-    }
-
-    const seq = ++requestSeqRef.current;
-    setLoading(true);
-    try {
-      const data = await fetchJSON<StandItem[]>(
-        `/api/stand/items?search=${encodeURIComponent(query)}`,
-        { schema: standItemsContract.response }
-      );
-      if (seq !== requestSeqRef.current) return; // a newer query superseded this one
-      setResults(data);
-      setShowDropdown(data.length > 0);
-    } catch {
-      if (seq !== requestSeqRef.current) return;
-      setResults([]);
-      setShowDropdown(false);
-    } finally {
-      if (seq === requestSeqRef.current) setLoading(false);
-    }
-  }, []);
-
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
       setSearchText(value);
+      setDismissed(false);
 
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
 
       debounceRef.current = setTimeout(() => {
-        fetchItems(value);
+        setDebouncedTerm(value);
       }, 300);
     },
-    [fetchItems]
+    []
   );
 
   // Cleanup debounce timer on unmount
@@ -97,8 +82,8 @@ const POSItemSearch: React.FC<POSItemSearchProps> = ({ onSelect }) => {
     (item: StandItem) => {
       onSelect(item);
       setSearchText('');
-      setResults([]);
-      setShowDropdown(false);
+      setDebouncedTerm('');
+      setDismissed(true);
     },
     [onSelect]
   );
@@ -106,7 +91,7 @@ const POSItemSearch: React.FC<POSItemSearchProps> = ({ onSelect }) => {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Escape') {
-        setShowDropdown(false);
+        setDismissed(true);
       }
     },
     []
@@ -123,7 +108,7 @@ const POSItemSearch: React.FC<POSItemSearchProps> = ({ onSelect }) => {
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (results.length > 0) setShowDropdown(true);
+            if (results.length > 0) setDismissed(false);
           }}
           placeholder="Search items by name..."
           autoComplete="off"

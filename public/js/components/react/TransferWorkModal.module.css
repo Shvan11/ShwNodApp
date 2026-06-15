@@ -24,51 +24,6 @@
   }
 }
 
-/* Modal Header */
-.modalHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-bottom: 1px solid var(--gray-200);
-  background: var(--gray-50);
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-}
-
-.headerLeft {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
-.headerLeft i {
-  color: var(--primary-color);
-  font-size: 18px;
-}
-
-.modalHeader h3 {
-  margin: 0;
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-}
-
-.closeBtn {
-  background: none;
-  border: none;
-  font-size: 18px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: var(--radius-sm);
-  transition: background-color 0.2s, color 0.2s;
-}
-
-.closeBtn:hover {
-  background-color: var(--gray-200);
-  color: var(--text-primary);
-}
-
 /* Modal Body */
 .modalBody {
   padding: var(--spacing-lg);

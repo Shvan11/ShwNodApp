@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import AsyncSelect from 'react-select/async';
 import type { StylesConfig } from 'react-select';
 import cn from 'classnames';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
-import { fetchJSON, httpErrorMessage } from '@/core/http';
-import { patientPhones } from '@shared/contracts/patient.contract';
+import { httpErrorMessage } from '@/core/http';
+import { patientPhonesQuery } from '@/query/queries';
 import styles from './PatientQuickSearch.module.css';
 
 /**
@@ -72,34 +73,19 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
     allPatients: providedPatients,
     className
 }) => {
-    const [patients, setPatients] = useState<PatientOption[]>(providedPatients || []);
-    const [loading, setLoading] = useState(!providedPatients);
-    const [error, setError] = useState<string | null>(null);
+    // Fetch patients only when not provided via props (the loader-fed path).
+    const { data, isLoading, error: queryError } = useQuery({
+        ...patientPhonesQuery(),
+        enabled: !providedPatients,
+    });
 
-    // Fetch patients if not provided via props
-    useEffect(() => {
-        if (providedPatients) {
-            setPatients(providedPatients);
-            setLoading(false);
-            return;
-        }
-
-        const fetchPatients = async () => {
-            try {
-                setLoading(true);
-                const data = await fetchJSON<PatientOption[]>('/api/patients/phones', { schema: patientPhones.response });
-                setPatients(data);
-                setError(null);
-            } catch (err) {
-                console.error('Failed to fetch patients:', err);
-                setError(httpErrorMessage(err, 'Failed to load patients'));
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchPatients();
-    }, [providedPatients]);
+    const patients = providedPatients ?? ((data as PatientOption[] | undefined) ?? []);
+    const loading = providedPatients ? false : isLoading;
+    const error = providedPatients
+        ? null
+        : queryError
+        ? httpErrorMessage(queryError, 'Failed to load patients')
+        : null;
 
     // Filter out excluded patients
     const filteredPatients = patients.filter(

@@ -147,7 +147,7 @@ const MonthlyCalendarGrid = ({
                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
                             onDoubleClick={handleDoubleClick}
                             onContextMenu={handleContextMenu}
-                            title={isHoliday ? day.holidayName : undefined}
+                            title={isHoliday ? day.holidayName ?? undefined : undefined}
                         >
                             {/* Day number */}
                             <div className={styles.monthDayNumber}>
@@ -156,7 +156,7 @@ const MonthlyCalendarGrid = ({
 
                             {/* Holiday badge */}
                             {currentMonth && isHoliday && (
-                                <div className={styles.holidayBadge} title={day.holidayName}>
+                                <div className={styles.holidayBadge} title={day.holidayName ?? undefined}>
                                     <i className="fas fa-calendar-times"></i>
                                 </div>
                             )}

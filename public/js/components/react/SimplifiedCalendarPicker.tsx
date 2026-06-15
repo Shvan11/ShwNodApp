@@ -1,10 +1,18 @@
-import { useState, useEffect, useCallback, useMemo, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useState, useMemo, type ChangeEvent, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import cn from 'classnames';
-import { fetchJSON, httpErrorMessage } from '@/core/http';
-import * as settings from '@shared/contracts/settings.contract';
-import * as calendar from '@shared/contracts/calendar.contract';
+import { httpErrorMessage } from '@/core/http';
+import { optionQuery, monthAvailabilityQuery, availableSlotsQuery } from '@/query/queries';
 import styles from './SimplifiedCalendarPicker.module.css';
+
+// Format a Date as YYYY-MM-DD in local time (avoids UTC conversion shifting the day).
+const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 interface Appointment {
     patientName: string;
@@ -62,10 +70,6 @@ interface SimplifiedCalendarPickerProps {
 const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }: SimplifiedCalendarPickerProps) => {
     const [currentMonth, setCurrentMonth] = useState<Date>(new Date(initialDate));
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-    const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
-    const [dayAvailability, setDayAvailability] = useState<Record<string, DayAvailabilityInfo>>({});
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const [showAfternoonSlots, setShowAfternoonSlots] = useState(false);
     const [showExtendedSlotsDefault, setShowExtendedSlotsDefault] = useState(false);
     const [daysAhead, setDaysAhead] = useState('');
@@ -81,116 +85,82 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
         [earlySlotTimes, lateSlotTimes]
     );
 
-    // Fetch extended slot settings on mount
-    useEffect(() => {
-        const fetchExtendedSlotsSettings = async () => {
-            try {
-                // /api/options/:name 404s when an option is unset; each GET is
-                // tolerant (.catch → null) so a missing one falls back to its
-                // default without aborting its siblings (the rows are seeded
-                // today — see audit N12/N20).
-                const [earlyData, lateData, defaultData] = await Promise.all([
-                    fetchJSON<OptionResponse>('/api/options/CALENDAR_EARLY_SLOTS', { schema: settings.getOptionByName.response }).catch(() => null),
-                    fetchJSON<OptionResponse>('/api/options/CALENDAR_LATE_SLOTS', { schema: settings.getOptionByName.response }).catch(() => null),
-                    fetchJSON<OptionResponse>('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT', { schema: settings.getOptionByName.response }).catch(() => null)
-                ]);
+    // --- Extended-slot settings (three option rows). optionQuery swallows a 404
+    // to null, so a missing option falls back to its default below (the rows are
+    // seeded today — audit N12/N20).
+    const earlyOptionQuery = useQuery(optionQuery('CALENDAR_EARLY_SLOTS'));
+    const lateOptionQuery = useQuery(optionQuery('CALENDAR_LATE_SLOTS'));
+    const defaultOptionQuery = useQuery(optionQuery('CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT'));
 
-                if (earlyData?.value) {
-                    setEarlySlotTimes(earlyData.value.split(',').filter(Boolean));
-                }
+    // Seed the extended-slot settings from their option queries during render, keyed
+    // on each query's result reference — no setState-in-effect.
+    const [seededEarly, setSeededEarly] = useState<unknown>(null);
+    if (earlyOptionQuery.data !== seededEarly) {
+        setSeededEarly(earlyOptionQuery.data);
+        const value = (earlyOptionQuery.data as OptionResponse | null | undefined)?.value;
+        if (value) setEarlySlotTimes(value.split(',').filter(Boolean));
+    }
 
-                if (lateData?.value) {
-                    setLateSlotTimes(lateData.value.split(',').filter(Boolean));
-                }
+    const [seededLate, setSeededLate] = useState<unknown>(null);
+    if (lateOptionQuery.data !== seededLate) {
+        setSeededLate(lateOptionQuery.data);
+        const value = (lateOptionQuery.data as OptionResponse | null | undefined)?.value;
+        if (value) setLateSlotTimes(value.split(',').filter(Boolean));
+    }
 
-                if (defaultData?.value != null) {
-                    setShowExtendedSlotsDefault(defaultData.value === 'true');
-                }
-            } catch (err) {
-                // Silently fail - keep defaults
-                console.error('Failed to fetch extended slots settings:', err);
-            }
-        };
+    const [seededDefault, setSeededDefault] = useState<unknown>(null);
+    if (defaultOptionQuery.data !== seededDefault) {
+        setSeededDefault(defaultOptionQuery.data);
+        const value = (defaultOptionQuery.data as OptionResponse | null | undefined)?.value;
+        if (value != null) setShowExtendedSlotsDefault(value === 'true');
+    }
 
-        fetchExtendedSlotsSettings();
-    }, []);
+    // --- Month availability, keyed on the viewed month's first/last day strings.
+    const monthStartDate = formatLocalDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
+    const monthEndDate = formatLocalDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
+    const monthQuery = useQuery(monthAvailabilityQuery(monthStartDate, monthEndDate));
+    const dayAvailability: Record<string, DayAvailabilityInfo> =
+        (monthQuery.data?.availability as Record<string, DayAvailabilityInfo> | undefined) ?? {};
 
-    // Fetch month availability
-    const fetchMonthAvailability = useCallback(async (monthDate: Date) => {
-        try {
-            setLoading(true);
-            const year = monthDate.getFullYear();
-            const month = monthDate.getMonth();
-            const firstDay = new Date(year, month, 1);
-            const lastDay = new Date(year, month + 1, 0);
+    // --- Available slots for the selected date, keyed on its YYYY-MM-DD string
+    // (gated — the factory disables the query when no date is selected).
+    const selectedDateStr = selectedDate ? formatLocalDate(selectedDate) : '';
+    const slotsQuery = useQuery(availableSlotsQuery(selectedDateStr));
+    const availableSlots: TimeSlot[] = (slotsQuery.data?.slots as TimeSlot[] | undefined) ?? [];
 
-            // Format dates in local timezone to avoid UTC conversion issues
-            const formatLocalDate = (date: Date): string => {
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            };
+    // Slots loading/errors drive the day-schedule column; surface a month-fetch
+    // error there too (it only shows once a date is picked). `isFetching` (not
+    // `isLoading`) keeps the original per-click spinner on each date change.
+    const loading = slotsQuery.isFetching;
+    const error = slotsQuery.error
+        ? httpErrorMessage(slotsQuery.error, 'Unknown error')
+        : monthQuery.error
+            ? httpErrorMessage(monthQuery.error, 'Unknown error')
+            : null;
 
-            // Post-migration the funnel unwraps the envelope to its payload.
-            const data = await fetchJSON<{ availability?: Record<string, DayAvailabilityInfo> }>(
-                `/api/calendar/month-availability?` +
-                `startDate=${formatLocalDate(firstDay)}&` +
-                `endDate=${formatLocalDate(lastDay)}`,
-                { schema: calendar.monthAvailability.response }
-            );
-            setDayAvailability(data.availability || {});
-        } catch (err) {
-            console.error('Error fetching month availability:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    // Fetch slots for selected date
-    const fetchAvailableSlots = useCallback(async (date: Date) => {
-        try {
-            setLoading(true);
-            // Format date without timezone conversion
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const dateStr = `${year}-${month}-${day}`;
-            // Post-migration the funnel unwraps the envelope to its payload.
-            const data = await fetchJSON<{ slots?: TimeSlot[] }>(
-                `/api/calendar/available-slots?date=${dateStr}`,
-                { schema: calendar.availableSlots.response }
-            );
-
-            const slots: TimeSlot[] = data.slots || [];
-            setAvailableSlots(slots);
-
-            // Show extended slots if:
-            // 1. The default setting is true, OR
-            // 2. Any extended slot has appointments (auto-expand)
-            const hasAppointmentsInExtendedSlots = slots.some(slot =>
-                rareAfternoonTimes.includes(slot.time) &&
-                slot.appointments &&
-                slot.appointments.length > 0
-            );
-            setShowAfternoonSlots(showExtendedSlotsDefault || hasAppointmentsInExtendedSlots);
-        } catch (err) {
-            console.error('Error fetching slots:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
-            setAvailableSlots([]);
-        } finally {
-            setLoading(false);
-        }
-    }, [rareAfternoonTimes, showExtendedSlotsDefault]);
-
-    useEffect(() => {
-        fetchMonthAvailability(currentMonth);
-    }, [currentMonth, fetchMonthAvailability]);
+    // Auto-expand the extended slots when the default is on, or when any extended
+    // slot already has appointments — re-runs when fresh slots arrive, the default
+    // changes, or the extended-slot set changes (keyed adjust-during-render).
+    const [autoExpandKey, setAutoExpandKey] = useState<{ data: unknown; def: boolean; rare: unknown }>(
+        { data: null, def: showExtendedSlotsDefault, rare: rareAfternoonTimes }
+    );
+    if (
+        autoExpandKey.data !== slotsQuery.data ||
+        autoExpandKey.def !== showExtendedSlotsDefault ||
+        autoExpandKey.rare !== rareAfternoonTimes
+    ) {
+        setAutoExpandKey({ data: slotsQuery.data, def: showExtendedSlotsDefault, rare: rareAfternoonTimes });
+        const slots = (slotsQuery.data?.slots as TimeSlot[] | undefined) ?? [];
+        const hasAppointmentsInExtendedSlots = slots.some(slot =>
+            rareAfternoonTimes.includes(slot.time) &&
+            slot.appointments &&
+            slot.appointments.length > 0
+        );
+        setShowAfternoonSlots(showExtendedSlotsDefault || hasAppointmentsInExtendedSlots);
+    }
 
     const handleDateClick = (date: Date) => {
         setSelectedDate(date);
-        fetchAvailableSlots(date);
     };
 
     const handleSlotClick = (slot: TimeSlot) => {
@@ -199,23 +169,23 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
         onSelectDateTime(dateTime);
     };
 
-    // Clear the persistent selection marker when the day changes so it
-    // doesn't bleed across days. The form retains the actual value.
-    useEffect(() => {
+    // Clear the persistent selection marker when the day changes so it doesn't bleed
+    // across days. The form retains the actual value.
+    const [markerDay, setMarkerDay] = useState(selectedDate);
+    if (markerDay !== selectedDate) {
+        setMarkerDay(selectedDate);
         setSelectedSlotKey(null);
-    }, [selectedDate]);
+    }
 
     const goToPreviousMonth = () => {
         setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
         setSelectedDate(null);
-        setAvailableSlots([]);
         setShowAfternoonSlots(false);
     };
 
     const goToNextMonth = () => {
         setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
         setSelectedDate(null);
-        setAvailableSlots([]);
         setShowAfternoonSlots(false);
     };
 

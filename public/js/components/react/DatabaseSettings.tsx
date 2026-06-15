@@ -1,9 +1,13 @@
 import { useState, useEffect, ChangeEvent, MouseEvent } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import styles from './DatabaseSettings.module.css';
 import { formatISODate } from '../../core/utils';
 import { fetchJSON, postJSON, putJSON, httpErrorMessage } from '@/core/http';
+import { databaseConfigQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import * as settings from '@shared/contracts/settings.contract';
 
 interface DatabaseConfig {
@@ -44,17 +48,33 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
         PG_PASSWORD: ''
     });
     const [pendingChanges, setPendingChanges] = useState<PendingChanges>({});
-    const [isLoading, setIsLoading] = useState(false);
     const [isTestingConnection, setIsTestingConnection] = useState(false);
     const confirm = useConfirm();
+    const queryClient = useQueryClient();
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [modal, setModal] = useState<ModalState>({ show: false, title: '', message: '' });
 
-    useEffect(() => {
-        loadCurrentConfig();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    const { data: configData, isLoading, isError, error: loadError } = useQuery(databaseConfigQuery());
+
+    // The DB config is loaded into an editable `config` state — seed it from the
+    // query data during render (keyed on the query result reference) so the form has
+    // mutable local state without a setState-in-effect.
+    const [seededConfigData, setSeededConfigData] = useState<unknown>(null);
+    if (configData?.config && configData !== seededConfigData) {
+        setSeededConfigData(configData);
+        setConfig(configData.config as DatabaseConfig);
+    }
+
+    // Surface a load failure once per error transition. setModal is called directly
+    // (the later-declared showModal would trip react-hooks/immutability).
+    const [prevIsError, setPrevIsError] = useState(isError);
+    if (isError !== prevIsError) {
+        setPrevIsError(isError);
+        if (isError) {
+            setModal({ show: true, title: 'Error', message: 'Failed to load database configuration: ' + httpErrorMessage(loadError, 'Unknown error') });
+        }
+    }
 
     useEffect(() => {
         // Notify parent component about changes
@@ -64,27 +84,6 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
         // onChangesUpdate intentionally excluded — parent should provide a stable ref
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pendingChanges]);
-
-    const loadCurrentConfig = async () => {
-        setIsLoading(true);
-        try {
-            const data = await fetchJSON<{ config?: DatabaseConfig }>(
-                '/api/config/database',
-                { schema: settings.getDatabaseConfig.response }
-            );
-
-            if (data.config) {
-                setConfig(data.config);
-            } else {
-                throw new Error('Failed to load database configuration');
-            }
-        } catch (error) {
-            console.error('Error loading database config:', error);
-            showModal('Error', 'Failed to load database configuration: ' + httpErrorMessage(error, 'Unknown error'));
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     const showModal = (title: string, message: string) => {
         setModal({ show: true, title, message });
@@ -174,6 +173,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
             // A failed save throws from putJSON → caught below.
             setConfig(prev => ({ ...prev, ...pendingChanges }));
             setPendingChanges({});
+            queryClient.invalidateQueries({ queryKey: qk.settings.databaseConfig() });
 
             if (data.requiresRestart) {
                 const shouldRestart = await confirm(
@@ -444,12 +444,11 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                 contentClassName={styles.modalContent}
                 ariaLabelledBy="database-settings-modal-title"
             >
-                <div className={styles.modalHeader}>
-                    <h3 id="database-settings-modal-title">{modal.title}</h3>
-                    <button className={styles.modalClose} onClick={hideModal}>
-                        <i className="fas fa-times"></i>
-                    </button>
-                </div>
+                <ModalHeader
+                    titleId="database-settings-modal-title"
+                    title={modal.title}
+                    onClose={hideModal}
+                />
                 <div className={styles.modalBody}>
                     <pre>{modal.message}</pre>
                 </div>

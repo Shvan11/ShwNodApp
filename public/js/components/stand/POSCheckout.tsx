@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { formatNumber, parseMoneyInput } from '../../utils/formatters';
-import { fetchJSON } from '@/core/http';
-import * as patientContract from '@shared/contracts/patient.contract';
+import { patientSearchQuery } from '@/query/queries';
 import styles from './POSCheckout.module.css';
 
 interface PatientSearchResult {
@@ -38,20 +38,32 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
 
   // Patient search
   const [patientQuery, setPatientQuery] = useState('');
-  const [patientResults, setPatientResults] = useState<PatientSearchResult[]>([]);
+  const [debouncedPatientTerm, setDebouncedPatientTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<PatientSearchResult | null>(null);
-  const [showPatientDropdown, setShowPatientDropdown] = useState(false);
-  const [patientSearchLoading, setPatientSearchLoading] = useState(false);
+  // The dropdown is dismissible (outside click / select / clear); track that
+  // separately so a manual close doesn't reopen on every re-render.
+  const [dismissed, setDismissed] = useState(false);
 
   const patientContainerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Monotonic request id — drop out-of-order patient-search responses.
-  const patientSearchSeqRef = useRef(0);
 
   const amountPaid = parseMoneyInput(amountPaidRaw);
   const change = amountPaid - total;
   const isUnderpaid = amountPaid < total;
   const canConfirm = !disabled && total > 0 && !isUnderpaid;
+
+  // React Query owns the fetch + out-of-order handling. Min-length gate (2)
+  // lives in `enabled`; the factory already disables on an empty term.
+  const patientSearchEnabled = debouncedPatientTerm.length >= 2;
+  const { data: patientData, isFetching: patientSearchLoading, isSuccess: patientSearchSuccess } =
+    useQuery({
+      ...patientSearchQuery(debouncedPatientTerm),
+      enabled: patientSearchEnabled,
+    });
+
+  // /api/patients/search returns { patients, totalCount, hasMore }; read .patients.
+  const patientResults = (patientData?.patients ?? []) as PatientSearchResult[];
+  const showPatientDropdown = !dismissed && patientSearchSuccess && patientResults.length > 0;
 
   // Close patient dropdown on outside click
   useEffect(() => {
@@ -60,7 +72,7 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
         patientContainerRef.current &&
         !patientContainerRef.current.contains(e.target as Node)
       ) {
-        setShowPatientDropdown(false);
+        setDismissed(true);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -76,74 +88,49 @@ const POSCheckout: React.FC<POSCheckoutProps> = ({
     };
   }, []);
 
-  // Pre-fill Amount Paid with cart total; reset on cart clear; preserve user edits
-  useEffect(() => {
+  // Pre-fill Amount Paid with cart total; reset on cart clear; preserve user edits.
+  // Adjust-during-render keyed on the cart total so a total change re-seeds the
+  // field (unless the user has edited it) without a setState-in-effect bailout.
+  const [seededForTotal, setSeededForTotal] = useState<number | null>(null);
+  if (total !== seededForTotal) {
+    setSeededForTotal(total);
     if (total === 0) {
       setAmountPaidRaw('');
       setAmountPaidEdited(false);
     } else if (!amountPaidEdited) {
       setAmountPaidRaw(formatNumber(total));
     }
-  }, [total, amountPaidEdited]);
-
-  const searchPatients = useCallback(async (query: string) => {
-    if (query.length < 2) {
-      setPatientResults([]);
-      setShowPatientDropdown(false);
-      return;
-    }
-
-    const seq = ++patientSearchSeqRef.current;
-    setPatientSearchLoading(true);
-    try {
-      // /api/patients/search returns { patients, totalCount, hasMore } (envelope-
-      // unwrapped to the inner object); read .patients, not the object itself.
-      const data = await fetchJSON<{ patients?: PatientSearchResult[] }>(
-        `/api/patients/search?q=${encodeURIComponent(query)}`,
-        { schema: patientContract.patientSearch.response }
-      );
-      if (seq !== patientSearchSeqRef.current) return; // superseded by a newer query
-      const patients = data.patients ?? [];
-      setPatientResults(patients);
-      setShowPatientDropdown(patients.length > 0);
-    } catch {
-      if (seq !== patientSearchSeqRef.current) return;
-      setPatientResults([]);
-      setShowPatientDropdown(false);
-    } finally {
-      if (seq === patientSearchSeqRef.current) setPatientSearchLoading(false);
-    }
-  }, []);
+  }
 
   const handlePatientQueryChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
       setPatientQuery(value);
       setSelectedPatient(null);
+      setDismissed(false);
 
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
 
       debounceRef.current = setTimeout(() => {
-        searchPatients(value);
+        setDebouncedPatientTerm(value);
       }, 300);
     },
-    [searchPatients]
+    []
   );
 
   const handlePatientSelect = useCallback((patient: PatientSearchResult) => {
     setSelectedPatient(patient);
     setPatientQuery(patient.patient_name);
-    setShowPatientDropdown(false);
-    setPatientResults([]);
+    setDismissed(true);
   }, []);
 
   const handleClearPatient = useCallback(() => {
     setSelectedPatient(null);
     setPatientQuery('');
-    setPatientResults([]);
-    setShowPatientDropdown(false);
+    setDebouncedPatientTerm('');
+    setDismissed(true);
   }, []);
 
   const handleAmountChange = useCallback(

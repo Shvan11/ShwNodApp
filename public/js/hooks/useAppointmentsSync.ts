@@ -78,6 +78,11 @@ export function useAppointmentsSync(
   const retryAttemptRef = useRef(0);
   const cancelledRef = useRef(false);
 
+  // runRecovery retries by re-invoking itself; route the recursion through a ref
+  // so the useCallback body doesn't reference its own binding before it's
+  // initialized (react-hooks/immutability). The callback is stable ([] deps), so
+  // the ref is always current.
+  const runRecoveryRef = useRef<() => void>(undefined);
   const runRecovery = useCallback(async () => {
     const date = currentDateRef.current;
     // The callback (DailyAppointments → loadAppointments) invalidates the React
@@ -107,10 +112,16 @@ export function useAppointmentsSync(
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       retryTimerRef.current = setTimeout(() => {
         retryTimerRef.current = null;
-        runRecovery();
+        runRecoveryRef.current?.();
       }, delay);
     }
   }, []);
+  // Keep the recursion ref pointed at the latest (stable) runRecovery, synced
+  // post-commit rather than during render (refs must not be written in render).
+  // The retry that reads it fires on a >=3s timeout, long after this commits.
+  useLayoutEffect(() => {
+    runRecoveryRef.current = runRecovery;
+  }, [runRecovery]);
 
   const triggerRecoveryFetch = useCallback(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -124,10 +135,9 @@ export function useAppointmentsSync(
   // today. Past/future views opt out entirely: no EventSource opened, no
   // server resources held.
   useEffect(() => {
-    if (!isViewingToday) {
-      setConnectionStatus('disconnected');
-      return;
-    }
+    // Non-today views hold no connection — the disconnected status is derived at
+    // the return (not setState here, which would be a setState-in-effect).
+    if (!isViewingToday) return;
 
     const initialize = async () => {
       try {
@@ -254,9 +264,14 @@ export function useAppointmentsSync(
     };
   }, [isViewingToday, triggerRecoveryFetch]);
 
+  // When not viewing today the hook holds no live connection, so report
+  // 'disconnected' regardless of the internal SSE state (which is shared and may
+  // still be connected for other consumers / the always-mounted event mirror).
+  const effectiveStatus: ConnectionStatus = isViewingToday ? connectionStatus : 'disconnected';
+
   return {
-    connectionStatus,
-    isConnected: connectionStatus === 'connected',
+    connectionStatus: effectiveStatus,
+    isConnected: effectiveStatus === 'connected',
     dataFreshness,
   };
 }

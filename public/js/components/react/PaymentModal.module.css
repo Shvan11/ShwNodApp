@@ -27,49 +27,7 @@
     padding: 0;
 }
 
-/* Compact Header */
-.paymentHeaderCompact {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--spacing-md) calc(var(--spacing-xxl) + var(--spacing-md)) var(--spacing-md) var(--spacing-lg);
-    border-bottom: 1px solid var(--gray-200);
-    background: var(--gray-50);
-}
-
-.paymentHeaderLeft {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-
-.paymentTitleCompact {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
-.paymentTitleCompact i {
-    color: var(--color-purple-light);
-}
-
-.paymentWorkType {
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    padding: 2px var(--spacing-xs);
-    background: var(--gray-200);
-    border-radius: var(--radius-sm);
-}
-
-.paymentHeaderRight {
-    display: flex;
-    align-items: center;
-}
-
+/* Compact Header — balance badge passed to <ModalHeader actions> */
 .paymentBalanceBadge {
     display: flex;
     flex-direction: column;
@@ -531,21 +489,6 @@
         max-width: 100%;
     }
 
-    .paymentHeaderCompact {
-        flex-direction: column;
-        gap: var(--spacing-sm);
-        align-items: flex-start;
-        padding-right: var(--spacing-lg);
-    }
-
-    .paymentHeaderLeft {
-        flex-wrap: wrap;
-    }
-
-    .paymentHeaderRight {
-        width: 100%;
-    }
-
     .paymentBalanceBadge {
         flex-direction: row;
         width: 100%;
@@ -602,19 +545,6 @@
    RESPONSIVE - Mobile (480px)
    ======================================== */
 @media (max-width: 480px) {
-    .paymentHeaderCompact {
-        padding: var(--spacing-sm) var(--spacing-md);
-        padding-right: 40px;
-    }
-
-    .paymentTitleCompact {
-        font-size: var(--font-size-md);
-    }
-
-    .paymentWorkType {
-        font-size: var(--font-size-xs);
-    }
-
     .paymentFormCompact {
         padding: var(--spacing-sm) var(--spacing-md);
     }

@@ -200,8 +200,8 @@ type tooth_number = {
   id: number;
   tooth_code: string;
   tooth_name: string;
-  quadrant: number;
-  tooth_number?: number;
+  quadrant: 'UR' | 'UL' | 'LR' | 'LL';
+  tooth_number: string;
   is_permanent: boolean;
   sort_order?: number;
 };
@@ -923,17 +923,12 @@ export async function getToothNumbers(
   includeDeciduous = true
 ): Promise<tooth_number[]> {
   const db = getKysely();
+  // quadrant / tooth_number are text columns ('UR'…'LL', '11'…); select them as
+  // their real (string) types — the historical `$castTo<number>()` was a type-level
+  // fiction (the runtime values are strings) that forced an `as unknown` at the read.
   let q = db
     .selectFrom('tooth_numbers')
-    .select((eb) => [
-      'id',
-      'tooth_code',
-      'tooth_name',
-      eb.ref('quadrant').$castTo<number>().as('quadrant'),
-      eb.ref('tooth_number').$castTo<number>().as('tooth_number'),
-      'is_permanent',
-      'sort_order',
-    ]);
+    .select(['id', 'tooth_code', 'tooth_name', 'quadrant', 'tooth_number', 'is_permanent', 'sort_order']);
 
   if (includePermanent && !includeDeciduous) {
     q = q.where('is_permanent', '=', true);

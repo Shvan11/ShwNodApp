@@ -4,6 +4,7 @@
  * removed so the action is never ambiguous.
  */
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import styles from './TimepointModals.module.css';
 import type { DeleteScope } from './TimepointActionsMenu';
 
@@ -71,12 +72,13 @@ const DeleteTimepointModal = ({ isOpen, timepoint, scope, deleting, onConfirm, o
             contentClassName={`${styles.modalContent} ${styles.modalSm}`}
             ariaLabelledBy="delete-tp-title"
         >
-            <div className={styles.modalHeader}>
-                <h2 id="delete-tp-title">{cfg.title}</h2>
-                <button type="button" className={styles.closeBtn} onClick={onCancel} aria-label="Close modal">
-                    &times;
-                </button>
-            </div>
+            <ModalHeader
+                variant="danger"
+                title={cfg.title}
+                titleId="delete-tp-title"
+                onClose={onCancel}
+                closeLabel="Close modal"
+            />
 
             <div className={styles.modalBody}>
                 <p className={styles.warningText}>

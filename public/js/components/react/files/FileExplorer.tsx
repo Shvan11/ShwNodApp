@@ -18,12 +18,15 @@ import {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { fetchJSON, postJSON, postFormData, deleteJSON } from '@/core/http';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { postJSON, postFormData, deleteJSON } from '@/core/http';
 import { useToast } from '@/contexts/ToastContext';
 import { useConfirm } from '@/contexts/ConfirmContext';
 import Modal from '@/components/react/Modal';
 import type { FileEntry, FileListing, FileBatchDeleteResult } from '@/types/api.types';
 import * as fileExplorer from '@shared/contracts/file-explorer.contract';
+import { patientFilesQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import { encodeRelPath, errorMessage } from './fileHelpers';
 import FileEntryTile from './FileEntryTile';
 import FilePreviewModal from './FilePreviewModal';
@@ -55,13 +58,9 @@ const FileExplorer = ({ personId, subPath }: Props) => {
   const navigate = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
+  const queryClient = useQueryClient();
 
   const currentPath = useMemo(() => (subPath || '').replace(/^\/+|\/+$/g, ''), [subPath]);
-
-  const [listing, setListing] = useState<FileListing | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const [view, setView] = useState<ViewMode>(
     () => (localStorage.getItem(VIEW_KEY) as ViewMode) || 'grid'
@@ -78,7 +77,20 @@ const FileExplorer = ({ personId, subPath }: Props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const promptInputRef = useRef<HTMLInputElement>(null);
 
-  const reload = useCallback(() => setRefreshKey((k) => k + 1), []);
+  // ── Listing read (React Query; keyed on path + flat, so rapid nav supersedes
+  // cleanly and back/forward is instant from cache). ──
+  const { data, isLoading, error: queryError } = useQuery({
+    ...patientFilesQuery(personId ?? '', currentPath, flat),
+    enabled: !!personId,
+  });
+  const listing = (data as FileListing | undefined) ?? null;
+  const loading = !!personId && isLoading;
+  const error = queryError ? errorMessage(queryError, 'Failed to load files') : null;
+  // Refresh every listing for this patient (any path/flat) after a file mutation.
+  const reload = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: qk.patient.filesAll(personId ?? '') }),
+    [queryClient, personId]
+  );
 
   useEffect(() => {
     localStorage.setItem(VIEW_KEY, view);
@@ -92,34 +104,6 @@ const FileExplorer = ({ personId, subPath }: Props) => {
   useEffect(() => {
     setSelected(new Set());
   }, [currentPath, flat]);
-
-  // ── Fetch listing (AbortController cancels in-flight on rapid nav) ──
-  useEffect(() => {
-    if (!personId) return;
-    const ac = new AbortController();
-    setLoading(true);
-    setError(null);
-    const qs = new URLSearchParams({ path: currentPath, flat: flat ? '1' : '0' });
-    fetchJSON<FileListing>(`/api/patients/${personId}/files?${qs}`, {
-      signal: ac.signal,
-      schema: fileExplorer.list.response,
-    })
-      .then((listing) => {
-        if (ac.signal.aborted) return;
-        setListing(listing);
-      })
-      .catch((err: unknown) => {
-        if (!ac.signal.aborted && (err as Error)?.name !== 'AbortError') {
-          setError(errorMessage(err, 'Failed to load files'));
-        }
-      })
-      .finally(() => {
-        // Don't flip loading for an aborted (superseded) request — otherwise the
-        // empty state flashes between an aborted fetch and its replacement.
-        if (!ac.signal.aborted) setLoading(false);
-      });
-    return () => ac.abort();
-  }, [personId, currentPath, flat, refreshKey]);
 
   // ── Sorted entries (folders first, then name) ──
   const entries = useMemo(() => {
@@ -153,6 +137,7 @@ const FileExplorer = ({ personId, subPath }: Props) => {
   }, [view]);
 
   const rowCount = Math.ceil(entries.length / columns);
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual's useVirtualizer() returns non-memoizable functions, so the React Compiler deliberately skips optimizing this component. There is no code-level fix short of dropping virtualization (needed for large patient file lists); the component is correct unmemoized.
   const virtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => scrollRef.current,

@@ -342,35 +342,6 @@
     flex-direction: column;
 }
 
-.modalHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--spacing-md) var(--spacing-lg);
-    background: var(--gray-50);
-    border-bottom: 1px solid var(--border-color);
-}
-
-.modalHeader h3 {
-    margin: 0;
-    font-size: var(--font-size-lg);
-    color: var(--text-primary);
-}
-
-.modalClose {
-    background: transparent;
-    border: none;
-    padding: var(--spacing-xs);
-    cursor: pointer;
-    color: var(--text-secondary);
-    font-size: var(--font-size-lg);
-    transition: color var(--transition-fast);
-}
-
-.modalClose:hover {
-    color: var(--text-primary);
-}
-
 .modalBody {
     padding: var(--spacing-lg);
     overflow-y: auto;

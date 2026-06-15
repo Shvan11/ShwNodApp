@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './AppointmentCard.module.css';
 
@@ -52,13 +51,6 @@ const AppointmentCard = ({
     onMarkDismissed,
     onUndoState
 }: AppointmentCardProps) => {
-    const [hasAnimated, setHasAnimated] = useState<boolean>(false);
-
-    // Set animation flag on mount only (prevents re-animation on re-renders)
-    useEffect(() => {
-        setHasAnimated(true);
-    }, []); // Empty deps = run once on mount
-
     // Format SQL Server TIME value (HH:MM:SS) to 12-hour format
     const formatTime = (timeString: string | null | undefined): string => {
         if (!timeString) return '';
@@ -225,13 +217,15 @@ const AppointmentCard = ({
         }
     };
 
-    // Build card classes dynamically
+    // Build card classes dynamically. The fade-in animation plays once when the
+    // card mounts: a CSS animation runs only on the element's first paint and
+    // doesn't replay on re-render (the DOM node persists), so no mount flag is
+    // needed — the previous setState-on-mount actually cut the animation short.
     const cardClass = isWaiting ? styles.waiting : styles.card;
-    const animationClass = !hasAnimated ? styles.fadeInUp : '';
 
     return (
         <div
-            className={`${cardClass}${animationClass ? ' ' + animationClass : ''}`}
+            className={`${cardClass} ${styles.fadeInUp}`}
             data-appointment-id={appointment.appointment_id}
             data-status={statusClass}
         >

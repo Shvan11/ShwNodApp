@@ -12,9 +12,45 @@
  *  - retry 2 — transient network/5xx retry for idempotent reads.
  *  - refetchOnWindowFocus off — refetch is driven by SSE + explicit triggers.
  */
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryCache, MutationCache } from '@tanstack/react-query';
+import {
+  reportClientError,
+  isReportableHttpError,
+  describeHttpError,
+  stringifyKey,
+} from '../core/error-reporter';
+
+// Global error sinks — every query/mutation error flows through here in addition to
+// the per-call handling. We forward only the high-value failures (5xx + fail-loud
+// contract drift) to prod error reporting; isReportableHttpError filters the rest
+// (4xx is expected/handled inline; transient network/abort is retried). The report
+// is a raw POST, not a React Query call, so it can't re-enter these caches.
+const queryCache = new QueryCache({
+  onError: (error, query) => {
+    if (!isReportableHttpError(error)) return;
+    reportClientError({
+      source: 'query',
+      message: (error as Error)?.message ?? 'Query error',
+      queryKey: stringifyKey(query.queryKey),
+      ...describeHttpError(error),
+    });
+  },
+});
+
+const mutationCache = new MutationCache({
+  onError: (error) => {
+    if (!isReportableHttpError(error)) return;
+    reportClientError({
+      source: 'mutation',
+      message: (error as Error)?.message ?? 'Mutation error',
+      ...describeHttpError(error),
+    });
+  },
+});
 
 export const queryClient = new QueryClient({
+  queryCache,
+  mutationCache,
   defaultOptions: {
     queries: {
       staleTime: 30_000,

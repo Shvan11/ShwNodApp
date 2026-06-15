@@ -140,10 +140,24 @@ export const IconBadge = ({ size = 18 }: IconProps) => (
     </svg>
 );
 
+export const IconContrast = ({ size = 18 }: IconProps) => (
+    <svg {...base(size)}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none" />
+    </svg>
+);
+
 export const IconReset = ({ size = 18 }: IconProps) => (
     <svg {...base(size)}>
         <path d="M3 12a9 9 0 1 0 2.6-6.3" />
         <path d="M3 4v5h5" />
+    </svg>
+);
+
+export const IconCrop = ({ size = 18 }: IconProps) => (
+    <svg {...base(size)}>
+        <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+        <path d="M2 6h14a2 2 0 0 1 2 2v14" />
     </svg>
 );
 

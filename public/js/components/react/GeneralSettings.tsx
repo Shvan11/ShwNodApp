@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, ChangeEvent } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import cn from 'classnames';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import storage from '../../core/storage';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemePreference } from '../../core/theme';
@@ -9,7 +11,9 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { LANGUAGES, type Language } from '../../core/language';
 import { useArabicFont } from '../../contexts/FontContext';
 import { ARABIC_FONTS, type ArabicFont } from '../../core/font';
-import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
+import { putJSON, httpErrorMessage } from '@/core/http';
+import { allOptionsQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import * as settings from '@shared/contracts/settings.contract';
 import styles from './SettingsSection.module.css';
 
@@ -49,7 +53,6 @@ interface GeneralSettingsProps {
 const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     const [options, setOptions] = useState<OptionsMap>({});
     const [pendingChanges, setPendingChanges] = useState<OptionsMap>({});
-    const [isLoading, setIsLoading] = useState(false);
     const [modal, setModal] = useState<ModalState>({ show: false, title: '', message: '' });
     const [chairIdInput, setChairIdInput] = useState<string>(storage.chairId() ?? '');
     const [chairIdSaved, setChairIdSaved] = useState<string | null>(storage.chairId());
@@ -57,32 +60,31 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     const { language, setLanguage } = useLanguage();
     const { arabicFont, setArabicFont } = useArabicFont();
     const { t } = useTranslation('common');
+    const queryClient = useQueryClient();
 
-    const loadSettings = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const data = await fetchJSON<{
-                options?: Array<{ option_name: string; option_value: string }>;
-            }>('/api/options', { schema: settings.getOptions.response });
+    const { data: optionsData, isLoading, isError, error: loadError, refetch } = useQuery(allOptionsQuery());
 
-            if (data.options) {
-                const optionsMap: OptionsMap = {};
-                data.options.forEach((option) => {
-                    optionsMap[option.option_name] = option.option_value;
-                });
-                setOptions(optionsMap);
-            }
-        } catch (error) {
-            console.error('Error loading settings:', error);
-            showModal('Error', 'Failed to load settings: ' + httpErrorMessage(error, 'Unknown error'));
-        } finally {
-            setIsLoading(false);
+    // Build the editable `options` map from the query data during render (keyed on
+    // the query result reference); `pendingChanges` overlays it for unsaved edits.
+    const [seededOptionsData, setSeededOptionsData] = useState<unknown>(null);
+    if (optionsData?.options && optionsData !== seededOptionsData) {
+        setSeededOptionsData(optionsData);
+        const optionsMap: OptionsMap = {};
+        optionsData.options.forEach((option) => {
+            optionsMap[option.option_name] = option.option_value ?? '';
+        });
+        setOptions(optionsMap);
+    }
+
+    // Surface a load failure once per error transition. setModal is called directly
+    // (the later-declared showModal would trip react-hooks/immutability).
+    const [prevIsError, setPrevIsError] = useState(isError);
+    if (isError !== prevIsError) {
+        setPrevIsError(isError);
+        if (isError) {
+            setModal({ show: true, title: 'Error', message: 'Failed to load settings: ' + httpErrorMessage(loadError, 'Unknown error') });
         }
-    }, []);
-
-    useEffect(() => {
-        loadSettings();
-    }, [loadSettings]);
+    }
 
     useEffect(() => {
         // Notify parent component about changes
@@ -138,6 +140,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
             // putJSON throws on non-2xx, so reaching here means the save succeeded.
             setOptions(prev => ({ ...prev, ...pendingChanges }));
             setPendingChanges({});
+            queryClient.invalidateQueries({ queryKey: qk.settings.options() });
 
             const message = data.failed && data.failed.length > 0
                 ? `Settings saved successfully! ${data.updated} updated, ${data.failed.length} failed: ${data.failed.join(', ')}`
@@ -152,7 +155,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
 
     const refreshSettings = async () => {
         setPendingChanges({});
-        await loadSettings();
+        await refetch();
         showModal('Info', 'Settings refreshed successfully.');
     };
 
@@ -467,12 +470,11 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                 contentClassName={styles.infoModal}
                 ariaLabelledBy="general-settings-modal-title"
             >
-                <div className="modal-header">
-                    <h3 id="general-settings-modal-title">{modal.title}</h3>
-                    <button className="modal-close" onClick={hideModal}>
-                        <i className="fas fa-times"></i>
-                    </button>
-                </div>
+                <ModalHeader
+                    titleId="general-settings-modal-title"
+                    title={modal.title}
+                    onClose={hideModal}
+                />
                 <div className="modal-body">
                     <p>{modal.message}</p>
                 </div>

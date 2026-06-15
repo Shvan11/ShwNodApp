@@ -1,11 +1,13 @@
 // ArchformMatcher.tsx - Match Archform patients to aligner sets
-import { useState, useEffect, useCallback, useMemo, type ChangeEvent, type ReactNode } from 'react';
+import { useState, useMemo, type ChangeEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Select, { type SingleValue, type StylesConfig } from 'react-select';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmDialog from '../../components/react/ConfirmDialog';
-import { fetchJSON, putJSON, patchJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import * as alignerContract from '@shared/contracts/aligner.contract';
+import { putJSON, patchJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { archformPatientsQuery, archformMatchesQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import type { ArchformPatient, AlignerSetForMatch } from './aligner.types';
 import styles from './ArchformMatcher.module.css';
 
@@ -52,12 +54,36 @@ type SortDirection = 'asc' | 'desc';
 const ArchformMatcher: React.FC = () => {
     const toast = useToast();
     const navigate = useNavigate();
-    const [archformPatients, setArchformPatients] = useState<ArchformPatient[]>([]);
-    const [alignerSets, setAlignerSets] = useState<AlignerSetForMatch[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [unavailable, setUnavailable] = useState(false);
-    const [dbPath, setDbPath] = useState('');
+    const queryClient = useQueryClient();
+
+    // /archform/matches reads Postgres, so only /archform/patients can return
+    // 503 { unavailable: true, path } when the Archform SQLite DB is offline. Both
+    // success bodies are the sendSuccess envelope ({ data: { patients|sets, count } });
+    // core/http unwraps `data`, so we read `.patients`/`.sets` directly (audit H4).
+    const patientsQ = useQuery(archformPatientsQuery());
+    const matchesQ = useQuery(archformMatchesQuery());
+
+    const archformPatients = (patientsQ.data?.patients ?? []) as ArchformPatient[];
+    const alignerSets = (matchesQ.data?.sets ?? []) as AlignerSetForMatch[];
+    const loading = patientsQ.isLoading || matchesQ.isLoading;
+
+    // A 503 { unavailable: true } from the patients read = Archform DB offline (a
+    // normal, expected state) — surfaced as its own screen rather than an error.
+    const unavailableData = (patientsQ.error as HttpError | null)?.data as
+        | { unavailable?: boolean; path?: string }
+        | undefined;
+    const unavailable = !!unavailableData?.unavailable;
+    const dbPath = unavailableData?.path || '';
+    const error =
+        !unavailable && (patientsQ.isError || matchesQ.isError)
+            ? httpErrorMessage(patientsQ.error ?? matchesQ.error, 'Failed to load Archform data')
+            : null;
+
+    const reload = (): void => {
+        patientsQ.refetch();
+        matchesQ.refetch();
+    };
+
     const [filter, setFilter] = useState('');
     const [filterMode, setFilterMode] = useState<FilterMode>('all');
     // Track per-row dropdown selections: archformId -> setId (0 = no selection)
@@ -78,46 +104,12 @@ const ArchformMatcher: React.FC = () => {
     const [deleteTarget, setDeleteTarget] = useState<ArchformPatient | null>(null);
     const [deleting, setDeleting] = useState(false);
 
-    const loadData = useCallback(async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            setUnavailable(false);
-
-            // /archform/matches reads Postgres, so only /archform/patients can return
-            // 503 { unavailable: true } when the Archform SQLite DB is offline. That
-            // rejection is now caught below (the detection moved from a body-read to the
-            // catch — see audit N18). Both success bodies are the sendSuccess envelope
-            // ({ success, data: { patients|sets, count } }); core/http.ts unwraps `data`,
-            // so we read `.patients`/`.sets` directly (audit H4).
-            const [patientsData, matchesData] = await Promise.all([
-                fetchJSON<{ patients?: ArchformPatient[] }>('/api/aligner/archform/patients', { schema: alignerContract.archformPatients.response }),
-                fetchJSON<{ sets?: AlignerSetForMatch[] }>('/api/aligner/archform/matches', { schema: alignerContract.archformMatches.response }),
-            ]);
-
-            setArchformPatients(patientsData.patients || []);
-            setAlignerSets(matchesData.sets || []);
-        } catch (err) {
-            // 503 { unavailable: true } = Archform DB offline (a normal, expected state).
-            const data = (err as HttpError).data as
-                | { unavailable?: boolean; path?: string }
-                | undefined;
-            if (data?.unavailable) {
-                setUnavailable(true);
-                setDbPath(data.path || '');
-                return;
-            }
-            const msg = httpErrorMessage(err, 'Failed to load Archform data');
-            setError(msg);
-            toast.error(msg);
-        } finally {
-            setLoading(false);
-        }
-    }, [toast]);
-
-    useEffect(() => {
-        loadData();
-    }, [loadData]);
+    // Invalidate both Archform reads after a write so the table reflects the
+    // server (replaces the prior optimistic local-state mutation).
+    const invalidateArchform = (): void => {
+        queryClient.invalidateQueries({ queryKey: qk.aligner.archformPatients() });
+        queryClient.invalidateQueries({ queryKey: qk.aligner.archformMatches() });
+    };
 
     // Build a map of archformId -> setId from current aligner set data
     const getArchformToSetMap = (): Map<number, number> => {
@@ -185,13 +177,7 @@ const ArchformMatcher: React.FC = () => {
             await patchJSON(`/api/aligner/sets/${selectedSetId}/archform`, { archformId });
 
             toast.success('Match saved');
-            setAlignerSets((prev) =>
-                prev.map((s) =>
-                    s.aligner_set_id === selectedSetId
-                        ? { ...s, archform_id: archformId }
-                        : s
-                )
-            );
+            invalidateArchform();
             setSelections((prev) => {
                 const next = { ...prev };
                 delete next[archformId];
@@ -219,11 +205,7 @@ const ArchformMatcher: React.FC = () => {
             await patchJSON(`/api/aligner/sets/${setId}/archform`, { archformId: null });
 
             toast.success('Match removed');
-            setAlignerSets((prev) =>
-                prev.map((s) =>
-                    s.aligner_set_id === setId ? { ...s, archform_id: null } : s
-                )
-            );
+            invalidateArchform();
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to remove match'));
         } finally {
@@ -321,13 +303,7 @@ const ArchformMatcher: React.FC = () => {
             });
 
             toast.success('Patient name updated');
-            setArchformPatients((prev) =>
-                prev.map((p) =>
-                    p.Id === id
-                        ? { ...p, Name: editName.trim(), LastName: editLastName.trim() }
-                        : p
-                )
-            );
+            invalidateArchform();
             handleCancelEdit();
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to update patient'));
@@ -378,13 +354,7 @@ const ArchformMatcher: React.FC = () => {
             });
 
             toast.success(`Renamed to ${newName} ${newLastName}`);
-            setArchformPatients((prev) =>
-                prev.map((p) =>
-                    p.Id === patient.Id
-                        ? { ...p, Name: newName, LastName: newLastName }
-                        : p
-                )
-            );
+            invalidateArchform();
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to auto-rename patient'));
         } finally {
@@ -408,15 +378,9 @@ const ArchformMatcher: React.FC = () => {
 
             toast.success(`Deleted ${deleteTarget.LastName}`);
 
-            // Remove patient from local state
-            setArchformPatients((prev) => prev.filter((p) => p.Id !== deleteTarget.Id));
-
-            // Clear any ArchformID matches referencing this patient
-            setAlignerSets((prev) =>
-                prev.map((s) =>
-                    s.archform_id === deleteTarget.Id ? { ...s, archform_id: null } : s
-                )
-            );
+            // Server refetch clears the deleted patient and any matches that
+            // referenced it.
+            invalidateArchform();
 
             setDeleteTarget(null);
         } catch (err) {
@@ -471,7 +435,7 @@ const ArchformMatcher: React.FC = () => {
                     Ensure the file is shared and accessible from the server,
                     or update the path in General Settings (ARCHFORM_DB_PATH).
                 </p>
-                <button className={styles.btnRetry} onClick={loadData}>
+                <button className={styles.btnRetry} onClick={reload}>
                     <i className="fas fa-redo"></i> Retry
                 </button>
             </div>
@@ -484,7 +448,7 @@ const ArchformMatcher: React.FC = () => {
                 <i className="fas fa-exclamation-triangle"></i>
                 <h3>Failed to load data</h3>
                 <p>{error}</p>
-                <button className={styles.btnRetry} onClick={loadData}>
+                <button className={styles.btnRetry} onClick={reload}>
                     <i className="fas fa-redo"></i> Retry
                 </button>
             </div>

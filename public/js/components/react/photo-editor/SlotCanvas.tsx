@@ -95,39 +95,33 @@ const SlotCanvas = ({ personId, slot, active, proxyMode, onCropChange, onZoomCha
   // Every populated slot (active OR inactive) drives a cropper, so load the image —
   // flipped onto a blob when flipH/flipV is set — regardless of focus. Toggling
   // `active` no longer reloads the media, so focusing a slot can't flash its image.
+  //
+  // Resolve the media to one URL — null (no source), the plain content URL (no
+  // flip), or a flipped blob URL (async) — through a single promise chain so every
+  // setState lives in the `.then` callback rather than synchronously in the effect
+  // body (react-hooks/set-state-in-effect), and blob revocation stays centralised.
   useEffect(() => {
     let cancelled = false;
-    if (!slot.sourceRelPath) {
-      revoke();
-      setMediaUrl(null);
-      return;
-    }
-    const base = contentUrl(personId, slot.sourceRelPath, proxyMode);
-    if (!slot.flipH && !slot.flipV) {
-      revoke();
-      urlRef.current = base;
-      setMediaUrl(base);
-      return;
-    }
-    makeFlippedUrl(base, slot.flipH, slot.flipV)
-      .then((url) => {
-        if (cancelled) {
-          URL.revokeObjectURL(url);
-          return;
-        }
-        revoke();
-        urlRef.current = url;
-        setMediaUrl(url);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          // Release any stale flipped blob before falling back, otherwise it
-          // leaks (the success path revokes, but this error path skipped it).
-          revoke();
-          urlRef.current = base;
-          setMediaUrl(base); // fall back to unflipped preview
-        }
-      });
+    const base = slot.sourceRelPath ? contentUrl(personId, slot.sourceRelPath, proxyMode) : null;
+    const load: Promise<string | null> =
+      !base ? Promise.resolve(null)
+      : (!slot.flipH && !slot.flipV) ? Promise.resolve(base)
+      // Fall back to the unflipped preview if flipping fails (releases nothing —
+      // makeFlippedUrl revokes its own partial blob on reject).
+      : makeFlippedUrl(base, slot.flipH, slot.flipV).catch(() => base);
+
+    load.then((url) => {
+      if (cancelled) {
+        // Discarded before commit — release the freshly-made blob (a plain base
+        // URL or null is not a blob and needs no revoke).
+        if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+        return;
+      }
+      revoke(); // release the previously-shown blob, if any
+      urlRef.current = url;
+      setMediaUrl(url);
+    });
+
     return () => {
       cancelled = true;
     };

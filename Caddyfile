@@ -32,12 +32,8 @@ local.shwan-orthodontics.com {
         -Server
     }
 
-    # WebSocket support for real-time messaging
-    @websocket {
-        header Connection *Upgrade*
-        header Upgrade websocket
-    }
-    reverse_proxy @websocket localhost:3000
+    # (SSE streams + any WebSocket upgrades pass through the reverse_proxy above
+    # — Caddy handles both natively, so no separate matcher is needed.)
 
     # Logging for debugging
     log {

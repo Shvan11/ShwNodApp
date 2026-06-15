@@ -4,11 +4,12 @@
  * Compact, space-efficient form with dental chart integration
  */
 
-import React, { useState, useEffect, useRef, useCallback, type FormEvent, type ChangeEvent } from 'react';
+import React, { useState, useRef, useCallback, type FormEvent, type ChangeEvent } from 'react';
 import cn from 'classnames';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatISODate } from '../../core/utils';
 import { putJSON, postJSON, httpErrorMessage } from '@/core/http';
+import { qk } from '@/query/keys';
 import * as visitContract from '@shared/contracts/visit.contract';
 import { wiresQuery, operatorsQuery, latestWiresQuery, visitByIdQuery } from '../../query/queries';
 import DentalChart from './DentalChart';
@@ -52,24 +53,8 @@ interface VisitFormData {
 
 // Full visit row as returned by GET /api/getvisitbyid (visitById.response is a
 // loose container; this annotates the long-tail fields the form reads).
-interface VisitRow {
-    id: number;
-    work_id: number;
-    visit_date: string;
-    upper_wire_id?: number;
-    lower_wire_id?: number;
-    bracket_change?: string;
-    wire_bending?: string;
-    elastics?: string;
-    opg?: boolean;
-    p_photo?: boolean;
-    i_photo?: boolean;
-    f_photo?: boolean;
-    others?: string;
-    next_visit?: string;
-    appliance_removed?: boolean;
-    operator_id?: number;
-}
+// The visit wire row is owned by the visit contract (the /getvisitbyid response).
+type VisitRow = visitContract.VisitRow;
 
 interface NewVisitComponentProps {
     workId: number | null;
@@ -83,6 +68,7 @@ type TextFieldKey = 'others' | 'next_visit';
 
 const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisitComponentProps) => {
     const toast = useToast();
+    const queryClient = useQueryClient();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -96,8 +82,8 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
         enabled: !!workId,
     });
 
-    const wires = (wiresData ?? []) as unknown as Wire[];
-    const operators = (operatorsData ?? []) as unknown as Operator[];
+    const wires: Wire[] = wiresData ?? [];
+    const operators: Operator[] = operatorsData ?? [];
     const latestWires: LatestWires = (latestWiresData as LatestWires | undefined) ?? {
         upper_wire_id: null,
         UpperWireName: null,
@@ -142,35 +128,44 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
 
     // Populate the form when the visit record arrives (edit mode). Mirrors the
     // old loadVisitData population exactly — same field coercion / falsy→default.
-    useEffect(() => {
-        if (!visitData) return;
-        const visit = visitData as unknown as VisitRow;
-        setFormData({
-            work_id: visit.work_id,
-            visit_date: visit.visit_date ? formatISODate(visit.visit_date) : '',
-            upper_wire_id: visit.upper_wire_id || '',
-            lower_wire_id: visit.lower_wire_id || '',
-            bracket_change: visit.bracket_change || '',
-            wire_bending: visit.wire_bending || '',
-            elastics: visit.elastics || '',
-            opg: visit.opg || false,
-            p_photo: visit.p_photo || false,
-            i_photo: visit.i_photo || false,
-            f_photo: visit.f_photo || false,
-            others: visit.others || '',
-            next_visit: visit.next_visit || '',
-            appliance_removed: visit.appliance_removed || false,
-            operator_id: visit.operator_id || ''
-        });
-    }, [visitData]);
+    // Done during render (adjust-state-during-render), keyed on the visit identity,
+    // so the React Compiler can optimize and there's no extra post-paint render.
+    const visitKey = visitData ? String(visitId ?? '') : '';
+    const [initializedVisitKey, setInitializedVisitKey] = useState('');
+    if (visitKey !== initializedVisitKey) {
+        setInitializedVisitKey(visitKey);
+        if (visitData) {
+            const visit: VisitRow = visitData;
+            setFormData({
+                work_id: visit.work_id,
+                visit_date: visit.visit_date ? formatISODate(visit.visit_date) : '',
+                upper_wire_id: visit.upper_wire_id || '',
+                lower_wire_id: visit.lower_wire_id || '',
+                bracket_change: visit.bracket_change || '',
+                wire_bending: visit.wire_bending || '',
+                elastics: visit.elastics || '',
+                opg: visit.opg || false,
+                p_photo: visit.p_photo || false,
+                i_photo: visit.i_photo || false,
+                f_photo: visit.f_photo || false,
+                others: visit.others || '',
+                next_visit: visit.next_visit || '',
+                appliance_removed: visit.appliance_removed || false,
+                operator_id: visit.operator_id || ''
+            });
+        }
+    }
 
     // Surface a visit-record load failure in the existing error banner (the old
-    // loadVisitData did setError(...) on its catch).
-    useEffect(() => {
+    // loadVisitData did setError(...) on its catch). Done during render
+    // (adjust-state-during-render) so the React Compiler can optimize it.
+    const [prevVisitError, setPrevVisitError] = useState(visitError);
+    if (visitError !== prevVisitError) {
+        setPrevVisitError(visitError);
         if (visitError) {
             setError(httpErrorMessage(visitError, 'Failed to fetch visit data'));
         }
-    }, [visitError]);
+    }
 
     // Memoized form submit handler
     const handleFormSubmit = useCallback(async (e: FormEvent<HTMLFormElement>) => {
@@ -194,6 +189,13 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 toast.success('Visit added successfully!');
             }
 
+            // Refresh the work's visit list (qk.work.all covers qk.work.visits) so
+            // the added/edited visit appears immediately — the 30s-fresh cache would
+            // otherwise serve a stale list until a hard refresh.
+            if (workId) {
+                queryClient.invalidateQueries({ queryKey: qk.work.all(workId) });
+            }
+
             if (onSave) {
                 onSave(result);
             }
@@ -204,7 +206,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
         } finally {
             setLoading(false);
         }
-    }, [visitId, formData, onSave, toast]);
+    }, [visitId, workId, formData, onSave, toast, queryClient]);
 
     // Memoized tooth click handler - prevents DentalChart re-renders
     const handleToothClick = useCallback((palmerNotation: string) => {

@@ -304,47 +304,6 @@
     flex-direction: column;
 }
 
-.modalHeader {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--spacing-lg);
-    border-bottom: var(--border-width-thin) solid var(--border-light);
-    background: var(--surface-elevated);
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-}
-
-.modalHeader h3 {
-    margin: 0;
-    color: var(--text-primary);
-    font-size: 1.25rem;
-    font-weight: var(--font-weight-semibold);
-}
-
-.modalClose {
-    background: var(--gray-100);
-    border: none;
-    font-size: 2rem;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 0;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-lg);
-    transition: all 0.2s ease;
-    font-weight: var(--font-weight-light);
-    line-height: 1;
-}
-
-.modalClose:hover {
-    background: var(--error-400);
-    color: var(--color-white);
-    transform: scale(1.05);
-}
-
 .modalContentScroll {
     flex: 1;
     overflow-y: auto;
@@ -702,14 +661,10 @@
    Set `--confirm-accent` on the dialog root to theme the title color,
    detail-box accent border, warning text, and action button.
    Selectors are chained on `.confirmDialog` so they outrank the global
-   `.whatsapp-modal-title` / `.whatsapp-btn-send` cascade. */
+   `.whatsapp-btn-send` cascade. */
 
 .confirmDialog {
     --confirm-accent: var(--error-color);
-}
-
-.confirmDialog .confirmTitle {
-    color: var(--confirm-accent);
 }
 
 .confirmBody {

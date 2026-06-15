@@ -2,7 +2,8 @@
   "nav": {
     "dashboard": "لوحة التحكم",
     "appointments": "المواعيد",
-    "search": "بحث"
+    "search": "بحث",
+    "closePatient": "إغلاق علامة تبويب المريض"
   },
   "theme": {
     "light": "فاتح",

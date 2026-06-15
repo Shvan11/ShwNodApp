@@ -42,6 +42,30 @@ export const qk = {
     timepoints: (id: Id) => ['patient', normId(id), 'timepoints'] as const,
     /** GET /api/patients/:id/has-appointment — future-appointment flag. */
     hasAppointment: (id: Id) => ['patient', normId(id), 'has-appointment'] as const,
+    /** GET /api/patients/:id/alerts — patient alerts list. */
+    alerts: (id: Id) => ['patient', normId(id), 'alerts'] as const,
+    /** GET /api/patients/:id/portal — portal-access status. */
+    portal: (id: Id) => ['patient', normId(id), 'portal'] as const,
+    /** GET /api/patient-appointments/:id — the patient's appointment list. */
+    appointments: (id: Id) => ['patient', normId(id), 'appointments'] as const,
+    /** GET /api/patients/:id/gallery/:tpCode — one timepoint's gallery images. */
+    gallery: (id: Id, tpCode: Id) => ['patient', normId(id), 'gallery', normId(tpCode)] as const,
+    /** GET /api/patients/:id/timepoints/:tpCode/images — one timepoint's compare images. */
+    timepointImages: (id: Id, tpCode: Id) =>
+      ['patient', normId(id), 'timepoint-images', normId(tpCode)] as const,
+    /** Prefix over every file listing for a patient (any path/flat) — broad reload. */
+    filesAll: (id: Id) => ['patient', normId(id), 'files'] as const,
+    /** GET /api/patients/:id/files?path=&flat= — file-explorer listing for a folder. */
+    files: (id: Id, path = '', flat = false) =>
+      ['patient', normId(id), 'files', path, flat ? 'flat' : 'nested'] as const,
+    /** GET /api/patients/:id/working-files — working-files listing. */
+    workingFiles: (id: Id) => ['patient', normId(id), 'working-files'] as const,
+    /** GET /api/patients/:id/photos/visibility — per-photo private-flag list. */
+    photoVisibility: (id: Id) => ['patient', normId(id), 'photo-visibility'] as const,
+    /** GET /api/photo-editor/:id/photo-dates — appointment/visit dates for the photo-session picker. */
+    photoDates: (id: Id) => ['patient', normId(id), 'photo-dates'] as const,
+    /** GET /api/patients/search?q= — basic name/phone/id search (keyed by query). */
+    search: (query: string) => ['patient', 'search', query] as const,
   },
   work: {
     /** Parent — invalidates details/visits/payments for this work. */
@@ -56,6 +80,12 @@ export const qk = {
     payments: (workId: Id) => ['work', normId(workId), 'payments'] as const,
     /** GET /api/getlatestwires?workId= — most-recent wires for a work. */
     latestWires: (workId: Id) => ['work', normId(workId), 'latest-wires'] as const,
+    /** GET /api/getworkdetailslist?workId= — the work's detail (procedure) rows. */
+    detailsList: (workId: Id) => ['work', normId(workId), 'details-list'] as const,
+    /** GET /api/work/:workId/transfer-preview — transfer impact preview. */
+    transferPreview: (workId: Id) => ['work', normId(workId), 'transfer-preview'] as const,
+    /** GET /api/diagnosis/:workId — the work's diagnosis row (null when none). */
+    diagnosis: (workId: Id) => ['work', normId(workId), 'diagnosis'] as const,
   },
   visit: {
     /** GET /api/getvisitbyid?visitId= — single visit row (edit form). */
@@ -70,6 +100,8 @@ export const qk = {
   whatsapp: {
     /** WhatsApp message-status table — keeps the legacy key shape. */
     messages: (date: string) => ['whatsapp-messages', date] as const,
+    /** GET message-count for a date (WhatsApp send screen). */
+    messageCount: (date: string) => ['whatsapp-message-count', date] as const,
   },
   templates: {
     /** Parent — invalidates the list and every single-template entry. */
@@ -81,6 +113,8 @@ export const qk = {
   },
   aligner: {
     doctors: () => ['aligner', 'doctors'] as const,
+    /** GET /api/aligner-doctors — the admin doctors list (a different endpoint/shape from doctors()). */
+    doctorsAdmin: () => ['aligner', 'doctors-admin'] as const,
     /** Parent for a work's aligner data (sets/batches). */
     work: (workId: Id) => ['aligner', 'work', workId] as const,
     /** GET /api/aligner/all-sets — all sets across doctors. */
@@ -89,6 +123,12 @@ export const qk = {
     allPatients: () => ['aligner', 'patients', 'all'] as const,
     /** GET /api/aligner/patients/by-doctor/:doctorId. */
     patientsByDoctor: (doctorId: Id) => ['aligner', 'patients', 'by-doctor', doctorId] as const,
+    /** GET /api/aligner/patients/search?q= — aligner patient search (keyed by query). */
+    search: (query: string) => ['aligner', 'patients', 'search', query] as const,
+    /** GET /api/aligner/archform/patients — unmatched Archform patients. */
+    archformPatients: () => ['aligner', 'archform', 'patients'] as const,
+    /** GET /api/aligner/archform/matches — aligner sets available to match. */
+    archformMatches: () => ['aligner', 'archform', 'matches'] as const,
   },
   /** Lookup/reference data — long-lived, rarely changes. */
   lookups: {
@@ -106,6 +146,14 @@ export const qk = {
     wires: () => ['lookups', 'wires'] as const,
     operators: () => ['lookups', 'operators'] as const,
     patientPhones: () => ['lookups', 'patient-phones'] as const,
+    /** GET /api/doctors — doctor options (appointment/calendar filters). */
+    doctors: () => ['lookups', 'doctors'] as const,
+    /** GET /api/settings/cost-presets — estimated-cost preset chips. */
+    costPresets: () => ['lookups', 'cost-presets'] as const,
+    /** GET /api/google?source= — Google contact list (a messaging recipient source). */
+    googleContacts: (source: string) => ['lookups', 'google-contacts', source] as const,
+    /** GET /api/settings/patients-folder — client-facing patients folder UNC path. */
+    patientsFolder: () => ['lookups', 'patients-folder'] as const,
     /** GET /api/employees<query> — keyed by query so param variants don't collide. */
     employees: (query = '') => ['lookups', 'employees', query] as const,
     /** GET /api/positions — employee-position options. */
@@ -115,8 +163,12 @@ export const qk = {
   },
   /** Admin lookup tables — the generic table editor (LookupEditor/HolidayEditor). */
   adminLookups: {
+    /** Parent — invalidates the table-config list and every per-table rowset. */
+    all: () => ['admin-lookups'] as const,
+    /** GET /api/admin/lookups/tables — the editable-table config list. */
+    tables: () => ['admin-lookups', 'tables'] as const,
     /** GET /api/admin/lookups/:tableKey — one lookup table's rows. */
-    table: (tableKey: string) => ['admin-lookups', tableKey] as const,
+    table: (tableKey: string) => ['admin-lookups', 'table', tableKey] as const,
   },
   /** USD→IQD exchange rates (PaymentModal + ExchangeRatesSettings). */
   exchangeRates: {
@@ -176,5 +228,70 @@ export const qk = {
     subcategories: (categoryId: Id) => ['expenses', 'subcategories', categoryId] as const,
     summary: (startDate: string, endDate: string) =>
       ['expenses', 'summary', startDate, endDate] as const,
+    /** GET /api/expenses/:id — single expense (edit form; disabled until an id is set). */
+    byId: (id: Id) => ['expenses', 'by-id', normId(id)] as const,
+  },
+  /** Educational videos library (Videos route). */
+  videos: {
+    all: () => ['videos'] as const,
+    list: () => ['videos', 'list'] as const,
+    categories: () => ['videos', 'categories'] as const,
+  },
+  /** Authenticated-user identity (GET /api/auth/me). */
+  auth: {
+    me: () => ['auth', 'me'] as const,
+  },
+  /** Application users (admin user-management screen). */
+  users: {
+    all: () => ['users'] as const,
+    list: () => ['users', 'list'] as const,
+  },
+  /** App-wide tasks/alerts (header Tasks surface). */
+  tasks: {
+    all: () => ['tasks'] as const,
+    list: () => ['tasks', 'list'] as const,
+    history: () => ['tasks', 'history'] as const,
+  },
+  /** Settings — options, email + database config, status polls. */
+  settings: {
+    all: () => ['settings'] as const,
+    /** GET /api/options — every option row (General settings). */
+    options: () => ['settings', 'options'] as const,
+    /** GET /api/options/:name — a single named option row. */
+    option: (name: string) => ['settings', 'option', name] as const,
+    /** GET /api/email/config — SMTP configuration. */
+    emailConfig: () => ['settings', 'email-config'] as const,
+    /** GET /api/settings/database — the active database connection config. */
+    databaseConfig: () => ['settings', 'database-config'] as const,
+    /** GET /api/sync/supabase-status — failover/reverse sink health (polled). */
+    supabaseStatus: () => ['settings', 'supabase-status'] as const,
+    /** GET /api/sync/dolphin-status — Dolphin sink health (polled). */
+    dolphinStatus: () => ['settings', 'dolphin-status'] as const,
+    /** GET /api/telegram/status — Telegram bot status. */
+    telegramStatus: () => ['settings', 'telegram-status'] as const,
+    /** GET /api/integrations/telegram/status — Telegram MTProto integration status. */
+    integrationsTelegramStatus: () => ['settings', 'integrations-telegram-status'] as const,
+    /** GET /api/wa/group-settings — WhatsApp daily-list group posting config. */
+    whatsappGroupSettings: () => ['settings', 'whatsapp-group-settings'] as const,
+  },
+  /** Reports — daily-invoices modal (keyed by date). */
+  dailyInvoices: (date: string) => ['daily-invoices', date] as const,
+  /** Media — photo-type taxonomy + WebCeph patient link (WebCeph modal). */
+  media: {
+    photoTypes: () => ['media', 'photo-types'] as const,
+    /** GET /api/webceph/patient-link/:personId — WebCeph link row (null when none). */
+    webcephLink: (personId: Id) => ['media', 'webceph-link', normId(personId)] as const,
+  },
+  /** Calendar — month grid / stats / availability / slots (AppointmentCalendar + pickers). */
+  calendar: {
+    all: () => ['calendar'] as const,
+    month: (params: string) => ['calendar', 'month', params] as const,
+    stats: (params: string) => ['calendar', 'stats', params] as const,
+    /** GET /api/calendar/range?start=&end=&doctorId= — the grid (day/week/zoom) window. */
+    range: (start: string, end: string, doctorId: Id) =>
+      ['calendar', 'range', start, end, normId(doctorId)] as const,
+    availability: (year: number, month: number, doctorId: Id) =>
+      ['calendar', 'availability', year, month, normId(doctorId)] as const,
+    slots: (date: string, doctorId: Id) => ['calendar', 'slots', date, normId(doctorId)] as const,
   },
 } as const;

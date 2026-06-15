@@ -8,8 +8,11 @@
  * working with no restart. Admin-only tab; the backend routes are admin-gated too.
  */
 import { useState, useEffect, useCallback, type KeyboardEvent } from 'react';
-import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { postJSON, httpErrorMessage } from '@/core/http';
 import { useToast } from '@/contexts/ToastContext';
+import { integrationsTelegramStatusQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import * as integrations from '@shared/contracts/integrations.contract';
 import styles from './IntegrationsSettings.module.css';
 
@@ -21,9 +24,12 @@ type LoginStep = null | 'phone' | 'code' | 'password';
 
 const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
   const toast = useToast();
+  const queryClient = useQueryClient();
 
-  const [status, setStatus] = useState<integrations.TelegramStatusResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading: loading, isError, error: queryError, refetch } =
+    useQuery(integrationsTelegramStatusQuery());
+  const status = (data as integrations.TelegramStatusResponse | undefined) ?? null;
+
   const [busy, setBusy] = useState(false);
 
   const [step, setStep] = useState<LoginStep>(null);
@@ -36,24 +42,15 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
     onChangesUpdate?.(false);
   }, [onChangesUpdate]);
 
-  const loadStatus = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    try {
-      const s = await fetchJSON<integrations.TelegramStatusResponse>(
-        '/api/integrations/telegram/status',
-        { schema: integrations.telegramStatus.response }
-      );
-      setStatus(s);
-    } catch (err) {
-      toast.error(httpErrorMessage(err, 'Failed to load Telegram status'));
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
+  // Surface a load failure as a toast (the prior fetch's catch path).
   useEffect(() => {
-    void loadStatus();
-  }, [loadStatus]);
+    if (isError) toast.error(httpErrorMessage(queryError, 'Failed to load Telegram status'));
+  }, [isError, queryError, toast]);
+
+  // Re-read status after an auth action. Invalidating refetches the one cache entry.
+  const loadStatus = useCallback(async (): Promise<void> => {
+    await queryClient.invalidateQueries({ queryKey: qk.settings.integrationsTelegramStatus() });
+  }, [queryClient]);
 
   const resetLogin = useCallback((): void => {
     setStep(null);
@@ -189,7 +186,7 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
             appear here.
           </p>
         </div>
-        <button type="button" className={styles.refreshBtn} onClick={() => void loadStatus()} disabled={loading}>
+        <button type="button" className={styles.refreshBtn} onClick={() => void refetch()} disabled={loading}>
           <i className={`fas fa-sync-alt ${loading ? styles.spin : ''}`} aria-hidden="true" /> Refresh
         </button>
       </div>

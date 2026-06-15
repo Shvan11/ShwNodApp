@@ -58,8 +58,9 @@ export type DailyAppointmentsResponse = z.infer<typeof dailyAppointments.respons
 // ===========================================================================
 
 // GET /api/appointment-details — [{ id, detail }] (dropdown feed, inline SQL).
+// details.detail is nullable in the DB → modeled nullable (rendered directly).
 export const appointmentDetails = {
-  response: z.array(z.looseObject({ id: z.number() })),
+  response: z.array(z.looseObject({ id: z.number(), detail: z.string().nullable() })),
 } as const;
 export type AppointmentDetailsResponse = z.infer<typeof appointmentDetails.response>;
 
@@ -121,9 +122,18 @@ export const deleteAppointment = {
 } as const;
 
 // GET /api/patient-appointments/:personId — { appointments: AppointmentResult[] }.
+// app_date is a to_char'd string; app_detail (appointments.app_detail) and the
+// joined DrName (employees.employee_name) are both nullable.
 export const patientAppointments = {
   response: z.object({
-    appointments: z.array(z.looseObject({ appointment_id: z.number() })),
+    appointments: z.array(
+      z.looseObject({
+        appointment_id: z.number(),
+        app_date: z.string(),
+        app_detail: z.string().nullable(),
+        DrName: z.string().nullable(),
+      })
+    ),
   }),
 } as const;
 export type PatientAppointmentsResponse = z.infer<typeof patientAppointments.response>;

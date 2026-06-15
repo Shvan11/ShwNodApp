@@ -2,11 +2,12 @@
  * RestockModal Component
  * Modal for restocking a stand inventory item with quantity and unit cost
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import type { StandItem } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
 import Modal from '../react/Modal';
+import ModalHeader from '../react/ModalHeader';
 import styles from './RestockModal.module.css';
 
 interface RestockModalProps {
@@ -28,14 +29,20 @@ export default function RestockModal({ isOpen, item, onClose, onSave }: RestockM
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
+  // Seed the form when the modal opens or the item changes. Done during render
+  // (keyed on open + item identity) rather than in an effect, so the React Compiler
+  // can optimize and there's no extra post-paint render.
+  const initKey = isOpen && item ? String(item.item_id) : '';
+  const [initializedKey, setInitializedKey] = useState('');
+  if (initKey !== initializedKey) {
+    setInitializedKey(initKey);
     if (isOpen && item) {
       setQuantity(1);
       setUnitCost(item.cost_price);
       setDisplayUnitCost(item.cost_price ? formatNumber(item.cost_price) : '');
       setErrors({});
     }
-  }, [isOpen, item]);
+  }
 
   const handleUnitCostChange = (rawValue: string) => {
     const digits = rawValue.replace(/[^\d]/g, '');
@@ -97,12 +104,11 @@ export default function RestockModal({ isOpen, item, onClose, onSave }: RestockM
       contentClassName={styles.modalContent}
       ariaLabelledBy="restock-modal-title"
     >
-        <div className={styles.modalHeader}>
-          <h2 id="restock-modal-title">Restock Item</h2>
-          <button className={styles.closeBtn} onClick={handleClose} aria-label="Close modal">
-            &times;
-          </button>
-        </div>
+        <ModalHeader
+          title="Restock Item"
+          titleId="restock-modal-title"
+          onClose={handleClose}
+        />
 
         <form onSubmit={handleSubmit}>
           <div className={styles.modalBody}>

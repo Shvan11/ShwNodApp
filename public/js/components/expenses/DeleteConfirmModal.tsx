@@ -4,6 +4,7 @@
  */
 import type { Expense } from '../../hooks/useExpenses';
 import Modal from '../react/Modal';
+import ModalHeader from '../react/ModalHeader';
 import styles from '../../routes/Expenses.module.css';
 
 interface DeleteConfirmModalProps {
@@ -36,12 +37,13 @@ export default function DeleteConfirmModal({ isOpen, expense, onConfirm, onCance
             contentClassName={`${styles.modalContent} ${styles.modalSm}`}
             ariaLabelledBy="delete-expense-modal-title"
         >
-            <div className={styles.modalHeader}>
-                <h2 id="delete-expense-modal-title">Delete Expense</h2>
-                <button className={styles.closeBtn} onClick={onCancel} aria-label="Close modal">
-                    &times;
-                </button>
-            </div>
+            <ModalHeader
+                variant="danger"
+                titleId="delete-expense-modal-title"
+                title="Delete Expense"
+                onClose={onCancel}
+                closeLabel="Close modal"
+            />
 
             <div className={styles.modalBody}>
                 <p className={styles.warningText}>

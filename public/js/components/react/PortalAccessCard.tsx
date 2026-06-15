@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Modal from './Modal';
 import { useToast } from '../../contexts/ToastContext';
-import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import { postJSON, httpErrorMessage } from '@/core/http';
+import { portalStatusQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import * as patientContract from '@shared/contracts/patient.contract';
 import viewStyles from './ViewPatientInfo.module.css';
 import styles from './PortalAccessCard.module.css';
@@ -26,12 +29,6 @@ interface PortalStatus {
   portalUrl: string;
 }
 
-/** Wrapper for PortalStatus — fields beyond `success` may be missing on error. */
-interface PortalStatusResponse extends Partial<PortalStatus> {
-  success: boolean;
-  error?: string;
-}
-
 /** POST /api/patients/:id/portal/reset-pin. */
 interface PortalPinResetResponse {
   success: boolean;
@@ -54,38 +51,34 @@ function formatDateTime(iso: string | null): string {
 
 const PortalAccessCard = ({ personId }: Props) => {
   const toast = useToast();
-  const [status, setStatus] = useState<PortalStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { data, isLoading: loading, error: queryError, refetch } = useQuery(
+    portalStatusQuery(personId)
+  );
+  const error = queryError ? httpErrorMessage(queryError, 'Unknown error') : null;
+
+  const status: PortalStatus | null = useMemo(() => {
+    if (!data) return null;
+    const d = data as Partial<PortalStatus>;
+    return {
+      enabled: d.enabled ?? false,
+      hasPin: d.hasPin ?? false,
+      lockedUntil: d.lockedUntil ?? null,
+      lastLoginAt: d.lastLoginAt ?? null,
+      failedAttempts: d.failedAttempts ?? 0,
+      qrDataUrl: d.qrDataUrl ?? '',
+      portalUrl: d.portalUrl ?? '',
+    };
+  }, [data]);
+
   const [busyAction, setBusyAction] = useState<
     null | 'enable' | 'reset' | 'unlock'
   >(null);
   const [newPin, setNewPin] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle');
 
-  const loadStatus = useCallback(async () => {
-    setError(null);
-    try {
-      const data = await fetchJSON<PortalStatusResponse>(`/api/patients/${personId}/portal`, { schema: patientContract.portalStatus.response });
-      setStatus({
-        enabled: data.enabled ?? false,
-        hasPin: data.hasPin ?? false,
-        lockedUntil: data.lockedUntil ?? null,
-        lastLoginAt: data.lastLoginAt ?? null,
-        failedAttempts: data.failedAttempts ?? 0,
-        qrDataUrl: data.qrDataUrl ?? '',
-        portalUrl: data.portalUrl ?? '',
-      });
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Unknown error'));
-    } finally {
-      setLoading(false);
-    }
-  }, [personId]);
-
-  useEffect(() => {
-    loadStatus();
-  }, [loadStatus]);
+  const invalidatePortal = () =>
+    queryClient.invalidateQueries({ queryKey: qk.patient.portal(personId) });
 
   const handleEnableToggle = async () => {
     if (!status || busyAction) return;
@@ -93,7 +86,7 @@ const PortalAccessCard = ({ personId }: Props) => {
     setBusyAction('enable');
     try {
       await postJSON(`/api/patients/${personId}/portal/enable`, { enabled: next });
-      setStatus({ ...status, enabled: next });
+      await invalidatePortal();
       toast.success(next ? 'Portal access enabled' : 'Portal access disabled');
     } catch (err) {
       toast.error(httpErrorMessage(err, 'Failed to update'));
@@ -112,7 +105,7 @@ const PortalAccessCard = ({ personId }: Props) => {
       }
       setNewPin(data.pin);
       setCopyState('idle');
-      await loadStatus();
+      await invalidatePortal();
     } catch (err) {
       toast.error(httpErrorMessage(err, 'Failed to reset PIN'));
     } finally {
@@ -126,7 +119,7 @@ const PortalAccessCard = ({ personId }: Props) => {
     try {
       await postJSON(`/api/patients/${personId}/portal/unlock`, {});
       toast.success('Portal access unlocked');
-      await loadStatus();
+      await invalidatePortal();
     } catch (err) {
       toast.error(httpErrorMessage(err, 'Failed to unlock'));
     } finally {
@@ -181,7 +174,7 @@ const PortalAccessCard = ({ personId }: Props) => {
           <button
             type="button"
             className="btn btn-sm btn-secondary"
-            onClick={loadStatus}
+            onClick={() => refetch()}
           >
             Retry
           </button>

@@ -11,11 +11,12 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import Select, { type SingleValue, type StylesConfig } from 'react-select';
+import { useQuery } from '@tanstack/react-query';
 import Modal from '../Modal';
+import ModalHeader from '../ModalHeader';
 import { useToast } from '@/contexts/ToastContext';
-import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
-import { patientPhones } from '@shared/contracts/patient.contract';
-import * as utilityContract from '@shared/contracts/utility.contract';
+import { postJSON, httpErrorMessage } from '@/core/http';
+import { patientPhonesQuery, googleContactsQuery, telegramStatusQuery } from '@/query/queries';
 import * as telegram from '@shared/contracts/telegram.contract';
 import type { ShareSource } from '../localsend/LocalSendShareModal';
 import styles from './TelegramShareModal.module.css';
@@ -55,63 +56,57 @@ const selectStyles: StylesConfig<ContactOption, false> = {
 const TelegramShareModal = ({ open, sources, onClose }: Props) => {
   const toast = useToast();
 
-  const [enabled, setEnabled] = useState(true);
   const [source, setSource] = useState<Source>('pat');
-  const [options, setOptions] = useState<ContactOption[]>([]);
   const [selected, setSelected] = useState<ContactOption | null>(null);
   const [phone, setPhone] = useState('');
   const [sending, setSending] = useState(false);
 
-  // Load contacts for the chosen source.
-  const loadContacts = useCallback(
-    async (src: Source): Promise<void> => {
-      try {
-        const data =
-          src === 'pat'
-            ? await fetchJSON<ContactData[]>('/api/patients/phones', {
-                schema: patientPhones.response,
-              })
-            : await fetchJSON<ContactData[]>(`/api/google?source=${encodeURIComponent(src)}`, {
-                schema: utilityContract.google.response,
-              });
+  // Telegram availability — a status hiccup shouldn't block the UI, so a failed
+  // read falls back to "enabled".
+  const statusResult = useQuery({ ...telegramStatusQuery(), enabled: open });
+  const enabled = statusResult.data?.enabled ?? true;
 
-        const arr: ContactData[] = Array.isArray(data) ? data : [];
-        setOptions(
-          arr
-            .filter((c) => c.phone)
-            .map((c) => ({
-              value: c.id ?? (c.phone as string),
-              label: `${c.name || c.text || ''} - ${c.phone}`,
-              phone: c.phone as string,
-            }))
-        );
-      } catch (err) {
-        toast.error(httpErrorMessage(err, 'Failed to load contacts'));
-        setOptions([]);
-      }
-    },
-    [toast]
-  );
+  // Contacts come from the patients' phone book (`pat`) or a Google contact group
+  // (`shw`/`cli`); only the active source fetches while the modal is open.
+  const phonesResult = useQuery({ ...patientPhonesQuery(), enabled: open && source === 'pat' });
+  const googleResult = useQuery({
+    ...googleContactsQuery(source),
+    enabled: open && source !== 'pat',
+  });
+  const activeResult = source === 'pat' ? phonesResult : googleResult;
+  const options: ContactOption[] = ((activeResult.data ?? []) as ContactData[])
+    .filter((c) => c.phone)
+    .map((c) => ({
+      value: c.id ?? (c.phone as string),
+      label: `${c.name || c.text || ''} - ${c.phone}`,
+      phone: c.phone as string,
+    }));
 
-  // Reset + initial load whenever the modal opens.
+  // Reset recipient state whenever the modal opens. Adjust-during-render keyed on
+  // the open state so a fresh open re-seeds the picker without a
+  // setState-in-effect bailout.
+  const [openedKey, setOpenedKey] = useState(open);
+  if (open !== openedKey) {
+    setOpenedKey(open);
+    if (open) {
+      setSource('pat');
+      setSelected(null);
+      setPhone('');
+    }
+  }
+
+  // Surface a contact-load failure (the status read intentionally stays silent).
   useEffect(() => {
-    if (!open) return;
-    setSource('pat');
-    setSelected(null);
-    setPhone('');
-    void loadContacts('pat');
-    fetchJSON<telegram.StatusResponse>('/api/telegram/status', {
-      schema: telegram.status.response,
-    })
-      .then((s) => setEnabled(s.enabled))
-      .catch(() => setEnabled(true)); // don't block the UI on a status hiccup
-  }, [open, loadContacts]);
+    if (activeResult.isError) {
+      toast.error(httpErrorMessage(activeResult.error, 'Failed to load contacts'));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeResult.isError, activeResult.error]);
 
   const handleSourceChange = (src: Source): void => {
     setSource(src);
     setSelected(null);
     setPhone('');
-    void loadContacts(src);
   };
 
   // Prefill the phone input from a picked contact (same shaping as Send Message).
@@ -163,71 +158,77 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
       contentClassName={styles.modal}
       overlayClassName={styles.overlay}
     >
-      <h3 id="telegram-share-title" className={styles.title}>
-        <i className="fab fa-telegram" aria-hidden="true" /> Share via Telegram
-      </h3>
-
-      {!enabled && (
-        <p className={styles.notice}>
-          Telegram is not configured on the server. Set the Telegram API credentials and session to
-          use it.
-        </p>
-      )}
-
-      <span className={styles.subtle}>
-        {sources.length === 1 ? '1 file' : `${sources.length} files`}
-      </span>
-
-      {/* Recipient source */}
-      <select
-        className={styles.sourceSelect}
-        value={source}
-        onChange={(e) => handleSourceChange(e.target.value as Source)}
-        disabled={!enabled}
-      >
-        {(Object.keys(SOURCE_LABELS) as Source[]).map((s) => (
-          <option key={s} value={s}>
-            {SOURCE_LABELS[s]}
-          </option>
-        ))}
-      </select>
-
-      {/* Contact picker */}
-      <Select<ContactOption, false>
-        value={selected}
-        onChange={handleSelect}
-        options={options}
-        isSearchable
-        isClearable
-        isDisabled={!enabled}
-        placeholder="Search and select a contact…"
-        noOptionsMessage={() => 'No contacts found'}
-        classNamePrefix="react-select"
-        styles={selectStyles}
+      <ModalHeader
+        variant="info"
+        titleId="telegram-share-title"
+        icon={<i className="fab fa-telegram" aria-hidden="true" />}
+        title="Share via Telegram"
+        onClose={onClose}
       />
 
-      {/* Phone (editable, prefilled from the contact) */}
-      <input
-        className={styles.phoneInput}
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-        placeholder="Phone number (e.g. 9647XXXXXXXX)"
-        inputMode="tel"
-        disabled={!enabled}
-      />
+      <div className={styles.body}>
+        {!enabled && (
+          <p className={styles.notice}>
+            Telegram is not configured on the server. Set the Telegram API credentials and session to
+            use it.
+          </p>
+        )}
 
-      <div className={styles.footer}>
-        <button type="button" className={styles.toolButton} onClick={onClose}>
-          Cancel
-        </button>
-        <button
-          type="button"
-          className={styles.primaryButton}
-          onClick={() => void handleSend()}
-          disabled={!enabled || sending || !phone.trim()}
+        <span className={styles.subtle}>
+          {sources.length === 1 ? '1 file' : `${sources.length} files`}
+        </span>
+
+        {/* Recipient source */}
+        <select
+          className={styles.sourceSelect}
+          value={source}
+          onChange={(e) => handleSourceChange(e.target.value as Source)}
+          disabled={!enabled}
         >
-          {sending ? 'Sending…' : 'Send'}
-        </button>
+          {(Object.keys(SOURCE_LABELS) as Source[]).map((s) => (
+            <option key={s} value={s}>
+              {SOURCE_LABELS[s]}
+            </option>
+          ))}
+        </select>
+
+        {/* Contact picker */}
+        <Select<ContactOption, false>
+          value={selected}
+          onChange={handleSelect}
+          options={options}
+          isSearchable
+          isClearable
+          isDisabled={!enabled}
+          placeholder="Search and select a contact…"
+          noOptionsMessage={() => 'No contacts found'}
+          classNamePrefix="react-select"
+          styles={selectStyles}
+        />
+
+        {/* Phone (editable, prefilled from the contact) */}
+        <input
+          className={styles.phoneInput}
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Phone number (e.g. 9647XXXXXXXX)"
+          inputMode="tel"
+          disabled={!enabled}
+        />
+
+        <div className={styles.footer}>
+          <button type="button" className={styles.toolButton} onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={() => void handleSend()}
+            disabled={!enabled || sending || !phone.trim()}
+          >
+            {sending ? 'Sending…' : 'Send'}
+          </button>
+        </div>
       </div>
     </Modal>
   );

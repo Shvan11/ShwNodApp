@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { fetchJSON } from '@/core/http';
-import * as authContract from '@shared/contracts/auth.contract';
+import { authMeQuery } from '@/query/queries';
 import * as whatsappContract from '@shared/contracts/whatsapp.contract';
 import sseWhatsapp from '../services/sse-whatsapp';
 
@@ -105,16 +106,28 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
     }
   });
 
+  // Authoritative identity from React Query; synced into the setState-able `user`
+  // (consumers still call `setUser`, e.g. after login) + sessionStorage for an
+  // instant initial paint on the next load.
+  const { data: meData } = useQuery(authMeQuery());
+
+  // Sync into `user` during render (keyed on the query result) — no setState-in-effect.
+  const [seededMe, setSeededMe] = useState<unknown>(null);
+  if (meData !== seededMe) {
+    setSeededMe(meData);
+    const data = meData as { success?: boolean; user?: UserData } | undefined;
+    if (data?.success && data?.user) {
+      setUser(data.user);
+    }
+  }
+
+  // Persist to sessionStorage (external-system write stays in an effect).
   useEffect(() => {
-    fetchJSON<{ success?: boolean; user?: UserData }>('/api/auth/me', { schema: authContract.me.response })
-      .then(data => {
-        if (data?.success && data?.user) {
-          setUser(data.user);
-          sessionStorage.setItem('currentUser', JSON.stringify(data.user));
-        }
-      })
-      .catch(() => { /* ignore */ });
-  }, []);
+    const data = meData as { success?: boolean; user?: UserData } | undefined;
+    if (data?.success && data?.user) {
+      sessionStorage.setItem('currentUser', JSON.stringify(data.user));
+    }
+  }, [meData]);
 
   const [currentPatient, setCurrentPatient] = useState<PatientData | null>(null);
   const [appointmentsCache, setAppointmentsCache] = useState<AppointmentsCache>({});

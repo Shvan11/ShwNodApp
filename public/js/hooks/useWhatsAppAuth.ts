@@ -150,8 +150,11 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   }, []);
 
   // React to qrCode / clientReady arriving from GlobalStateContext (via the
-  // whatsapp_qr_updated and whatsapp_client_ready SSE events).
-  useEffect(() => {
+  // whatsapp_qr_updated and whatsapp_client_ready SSE events). Done during render
+  // (keyed on the two inputs) so it's not a setState-in-effect.
+  const [prevQrReady1, setPrevQrReady1] = useState({ qrCode, clientReady });
+  if (prevQrReady1.qrCode !== qrCode || prevQrReady1.clientReady !== clientReady) {
+    setPrevQrReady1({ qrCode, clientReady });
     if (clientReady) {
       setAuthState(AUTH_STATES.AUTHENTICATED);
     } else if (qrCode) {
@@ -161,7 +164,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
           : AUTH_STATES.QR_REQUIRED
       );
     }
-  }, [qrCode, clientReady]);
+  }
 
   // Subscribe to SSE lifecycle events + prime initial state on mount/reconnect.
   useEffect(() => {
@@ -312,8 +315,15 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     }
   }, [requestInitialState, toast]);
 
-  // Sync authState with global qrCode and clientReady values
-  useEffect(() => {
+  // Sync authState with global qrCode and clientReady values — during render (keyed
+  // on the inputs + current authState) so it's not a setState-in-effect.
+  const [prevQrReady2, setPrevQrReady2] = useState({ clientReady, qrCode, authState });
+  if (
+    prevQrReady2.clientReady !== clientReady ||
+    prevQrReady2.qrCode !== qrCode ||
+    prevQrReady2.authState !== authState
+  ) {
+    setPrevQrReady2({ clientReady, qrCode, authState });
     if (clientReady && authState !== AUTH_STATES.AUTHENTICATED) {
       setAuthState(AUTH_STATES.AUTHENTICATED);
     } else if (!clientReady && qrCode && authState === AUTH_STATES.AUTHENTICATED) {
@@ -321,7 +331,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     } else if (qrCode && authState === AUTH_STATES.CHECKING_SESSION) {
       setAuthState(AUTH_STATES.QR_REQUIRED);
     }
-  }, [clientReady, qrCode, authState]);
+  }
 
   // Manage QR refresh timer based on auth state
   useEffect(() => {

@@ -1,17 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
 import Modal from './Modal';
-import { fetchJSON, deleteJSON, httpErrorMessage } from '@/core/http';
-import * as appointment from '@shared/contracts/appointment.contract';
+import { deleteJSON, httpErrorMessage } from '@/core/http';
+import { patientAppointmentsQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import styles from './PatientAppointments.module.css';
 
 interface PatientAppointment {
     appointment_id: number;
     app_date: string;
-    app_detail?: string;
-    DrName?: string;
+    app_detail?: string | null;
+    DrName?: string | null;
 }
 
 interface PatientAppointmentsProps {
@@ -25,30 +27,14 @@ interface PatientAppointmentsProps {
 const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
     const navigate = useNavigate();
     const toast = useToast();
-    const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
+    const { data, isLoading: loading, error: queryError, refetch } = useQuery({
+        ...patientAppointmentsQuery(personId ?? ''),
+        enabled: !!personId,
+    });
+    const appointments: PatientAppointment[] = data?.appointments ?? [];
+    const error = queryError ? httpErrorMessage(queryError, 'Unknown error') : null;
     const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
-
-    const loadAppointments = async (): Promise<void> => {
-        try {
-            setLoading(true);
-            setError(null);
-            const data = await fetchJSON<{ appointments?: PatientAppointment[] }>(`/api/patient-appointments/${personId}`, { schema: appointment.patientAppointments.response });
-            setAppointments(data.appointments || []);
-        } catch (err) {
-            console.error('Error loading appointments:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
-        loadAppointments();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [personId]);
 
     const handleEdit = (appointment: PatientAppointment): void => {
         // Navigate to edit page with appointment data as state
@@ -61,8 +47,8 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
         try {
             await deleteJSON(`/api/appointments/${appointmentId}`);
 
-            // Reload appointments after deletion
-            await loadAppointments();
+            // Refresh appointments after deletion
+            await queryClient.invalidateQueries({ queryKey: qk.patient.appointments(personId ?? '') });
             setDeleteConfirm(null);
         } catch (err) {
             console.error('Error deleting appointment:', err);
@@ -113,7 +99,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
                 <div className={styles.errorState}>
                     <i className="fas fa-exclamation-circle"></i>
                     <p>{error}</p>
-                    <button onClick={loadAppointments} className={cn('btn', styles.btnRetry)}>
+                    <button onClick={() => refetch()} className={cn('btn', styles.btnRetry)}>
                         <i className="fas fa-redo"></i> Retry
                     </button>
                 </div>

@@ -4,7 +4,7 @@
  * guarantees the overlay outlines stay glued to the drawn pixels.
  */
 
-import type { AutoImageSize, DrawSize, ImageKey, ImageRect, Point, Transform } from './types';
+import type { AutoImageSize, CropInset, DrawSize, ImageKey, ImageRect, Point, Transform } from './types';
 
 // Mirrors renderVertical / renderHorizontal / drawLogo branches in ComparisonEngine.
 export function getContainerRect(
@@ -69,6 +69,22 @@ export function applyTransform(lx: number, ly: number, cx: number, cy: number, t
     return {
         x: cx + t.x + sx * cos - sy * sin,
         y: cy + t.y + sx * sin + sy * cos,
+    };
+}
+
+// Per-side crop fractions → the axis-aligned "kept" sub-rectangle of a
+// container box. Mirrors the clip rect in ComparisonEngine.drawImage, so the
+// overlay's crop outline/handles stay glued to the actually-drawn pixels.
+export function getCropRect(rect: ImageRect, crop: CropInset): ImageRect {
+    const left = crop.left * rect.w;
+    const right = crop.right * rect.w;
+    const top = crop.top * rect.h;
+    const bottom = crop.bottom * rect.h;
+    return {
+        x: rect.x + left,
+        y: rect.y + top,
+        w: Math.max(0, rect.w - left - right),
+        h: Math.max(0, rect.h - top - bottom),
     };
 }
 

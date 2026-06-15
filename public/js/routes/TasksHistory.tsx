@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { httpErrorMessage } from '@/core/http';
+import { qk } from '@/query/keys';
+import { tasksHistoryQuery } from '@/query/queries';
 import {
-    fetchTaskHistory,
     setTaskStatus,
     deleteTask,
     notifyTasksChanged,
@@ -64,43 +66,30 @@ const TasksHistory = () => {
     const navigate = useNavigate();
     const toast = useToast();
     const confirm = useConfirm();
+    const queryClient = useQueryClient();
 
-    const [rows, setRows] = useState<CompletedTaskRow[]>([]);
-    const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | DisplayStatus>('all');
     const [busyId, setBusyId] = useState<number | null>(null);
-    const abortRef = useRef<AbortController | null>(null);
 
-    const load = useCallback((showSpinner = true) => {
-        abortRef.current?.abort();
-        const controller = new AbortController();
-        abortRef.current = controller;
-        if (showSpinner) setLoading(true);
-        fetchTaskHistory(controller.signal)
-            .then((r) => { setRows(r); setLoading(false); })
-            .catch((e) => {
-                if (e instanceof Error && e.name !== 'AbortError') {
-                    setLoading(false);
-                    toast.error(httpErrorMessage(e, 'Failed to load tasks'));
-                }
-            });
-    }, [toast]);
+    const { data, isLoading: loading, isError, error } = useQuery(tasksHistoryQuery());
+    const rows = (data ?? []) as CompletedTaskRow[];
 
     useEffect(() => {
-        load();
-        return () => abortRef.current?.abort();
-    }, [load]);
+        if (isError) toast.error(httpErrorMessage(error, 'Failed to load tasks'));
+    }, [isError, error, toast]);
 
-    // Run a lifecycle mutation, then refetch quietly (so the row reflects its new
-    // state) and let the bell know.
+    // Run a lifecycle mutation, then refresh quietly (so the row reflects its new
+    // state) and let the bell know. Invalidating qk.tasks.all() covers both this
+    // history view and the bell's active list; notifyTasksChanged() additionally
+    // wakes non-RQ listeners (e.g. the patient view) over the change event.
     const runAction = async (id: number, fn: () => Promise<unknown>, okMsg: string, failMsg: string) => {
         setBusyId(id);
         try {
             await fn();
             notifyTasksChanged();
             toast.success(okMsg);
-            load(false);
+            void queryClient.invalidateQueries({ queryKey: qk.tasks.all() });
         } catch (e) {
             toast.error(httpErrorMessage(e, failMsg));
         } finally {

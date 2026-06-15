@@ -24,35 +24,6 @@
   }
 }
 
-.modalHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid var(--gray-200);
-}
-
-.modalHeader h2 {
-  margin: 0;
-  font-size: var(--font-size-xl);
-  color: var(--text-primary);
-}
-
-.closeBtn {
-  color: var(--text-muted);
-  font-size: 28px;
-  font-weight: var(--font-weight-bold);
-  cursor: pointer;
-  transition: color var(--transition-fast);
-  background: none;
-  border: none;
-}
-
-.closeBtn:hover,
-.closeBtn:focus {
-  color: var(--black);
-}
-
 .modalBody {
   padding: 20px;
 }

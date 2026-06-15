@@ -366,44 +366,6 @@
     max-width: 1000px;
 }
 
-.modalHeader {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.modalHeader h3 {
-    margin: 0;
-    font-size: 1.25rem;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.modalClose {
-    background: none;
-    border: none;
-    font-size: 2rem;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 0;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-md);
-    transition: all 0.2s;
-}
-
-.modalClose:hover {
-    background: var(--bg-light);
-    color: var(--text-primary);
-}
-
 .modalBody {
     padding: 1.5rem;
     overflow-y: auto;

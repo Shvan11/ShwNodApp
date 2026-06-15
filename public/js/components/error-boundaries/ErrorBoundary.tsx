@@ -11,6 +11,7 @@
  */
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { useNavigate, useLocation, type NavigateFunction } from 'react-router-dom';
+import { reportClientError } from '../../core/error-reporter';
 import styles from './ErrorBoundary.module.css';
 
 interface ErrorBoundaryProps {
@@ -63,8 +64,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       errorInfo,
     });
 
-    // You can also log to an error reporting service here
-    // Example: logErrorToService(error, errorInfo);
+    // Ship to prod error reporting so a render crash lands in the server logs
+    // instead of dying in this user's console (fire-and-forget; never throws).
+    reportClientError({
+      source: 'react-render',
+      message: error?.message ?? 'Render error',
+      stack: error?.stack,
+      componentStack: errorInfo?.componentStack ?? undefined,
+    });
   }
 
   handleReset = (): void => {

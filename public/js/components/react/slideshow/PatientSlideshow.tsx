@@ -7,10 +7,12 @@
  * endpoints. The working sequence is mirrored to sessionStorage so it survives
  * navigating away and back within the session.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../../contexts/ToastContext';
 import { generateId } from '../../../core/utils';
 import { fetchJSON } from '@/core/http';
+import { timepointsQuery } from '@/query/queries';
 import * as patientContract from '@shared/contracts/patient.contract';
 import SlideshowBuilder from './SlideshowBuilder';
 import SlideshowPlayer from './SlideshowPlayer';
@@ -91,41 +93,30 @@ const withoutSecond = (slide: SlideItem): SlideItem => {
 const PatientSlideshow = ({ personId }: Props) => {
   const toast = useToast();
 
-  const [timepoints, setTimepoints] = useState<Timepoint[]>([]);
-  const [loadingTimepoints, setLoadingTimepoints] = useState(true);
   const [galleries, setGalleries] = useState<Record<string, SlidePhoto[]>>({});
   const [selected, setSelected] = useState<SlideItem[]>(() => readSession(personId));
   const [mode, setMode] = useState<'build' | 'play'>('build');
 
   // Load timepoints whenever the patient changes.
+  const { data: timepointsData, isLoading: loadingTimepoints, isError: timepointsError } = useQuery({
+    ...timepointsQuery(personId ?? ''),
+    enabled: !!personId,
+  });
+  const timepoints: Timepoint[] = useMemo(
+    () =>
+      Array.isArray(timepointsData)
+        ? (timepointsData as TimepointApiRow[]).map((r) => ({
+            tpCode: r.tp_code,
+            tpDateTime: r.tp_date_time,
+            tpDescription: r.tp_description,
+          }))
+        : [],
+    [timepointsData]
+  );
+
   useEffect(() => {
-    if (!personId) {
-      setLoadingTimepoints(false);
-      return;
-    }
-    const ctrl = new AbortController();
-    setLoadingTimepoints(true);
-    fetchJSON<TimepointApiRow[]>(`/api/patients/${personId}/timepoints`, { signal: ctrl.signal, schema: patientContract.timepoints.response })
-      .then((data) =>
-        setTimepoints(
-          Array.isArray(data)
-            ? data.map((r) => ({
-                tpCode: r.tp_code,
-                tpDateTime: r.tp_date_time,
-                tpDescription: r.tp_description,
-              }))
-            : []
-        )
-      )
-      .catch((err) => {
-        if (err.name !== 'AbortError') {
-          toast.error('Failed to load photo sessions');
-          setTimepoints([]);
-        }
-      })
-      .finally(() => setLoadingTimepoints(false));
-    return () => ctrl.abort();
-  }, [personId, toast]);
+    if (timepointsError) toast.error('Failed to load photo sessions');
+  }, [timepointsError, toast]);
 
   // Hydrate the sequence on patient change; otherwise persist it for this session.
   const pidRef = useRef(personId);

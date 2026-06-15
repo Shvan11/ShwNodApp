@@ -9,7 +9,7 @@
  *
  * @module LabelPreviewModal
  */
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { prefetchCsrfToken } from '../../core/http';
@@ -207,8 +207,15 @@ const LabelPreviewModal = ({
     // Determine if modal should show
     const isModalOpen = queueMode ? queuedItems.length > 0 : isOpen;
 
-    // Initialize single batch mode
-    useEffect(() => {
+    // Initialize single batch mode. Adjust-during-render keyed on the open state +
+    // the batch/patient/doctor identity, so opening (or re-targeting) the modal
+    // re-seeds the editable form once, without a setState-in-effect bailout.
+    const singleInitKey = !queueMode && isOpen && batch && patient
+        ? `${batch.batch_sequence ?? ''}|${patient.patient_name ?? ''}|${patient.first_name ?? ''}|${patient.last_name ?? ''}|${initialDoctorName}`
+        : '';
+    const [singleInitializedKey, setSingleInitializedKey] = useState('');
+    if (singleInitKey !== singleInitializedKey) {
+        setSingleInitializedKey(singleInitKey);
         if (!queueMode && isOpen && batch && patient) {
             const name = patient.patient_name ||
                 (patient.first_name && patient.last_name
@@ -232,24 +239,26 @@ const LabelPreviewModal = ({
             setNewLabelText('');
             setEditingLabelId(null);
         }
-    }, [queueMode, isOpen, batch, patient, initialDoctorName]);
+    }
 
-    // Initialize queue mode
-    useEffect(() => {
-        if (queueMode && queuedItems.length > 0) {
-            const batches: QueueBatch[] = queuedItems.map(item => ({
-                ...item,
-                includeLogo: item.includeLogo !== undefined ? item.includeLogo : !!item.doctorLogoPath,
-                originalLabels: [...item.labels] // Store original for reset
-            }));
-            setQueueBatches(batches);
-            setStartingPosition(1);
-            setArabicFont('cairo');
-            setExpandedBatchId(null);
-            setQueueNewLabelText('');
-            setQueueEditingLabel(null);
-        }
-    }, [queueMode, queuedItems]);
+    // Initialize queue mode. Adjust-during-render keyed on the queued-items
+    // identity, so a fresh queue re-seeds the editable batches once, without a
+    // setState-in-effect bailout.
+    const [seededQueuedItems, setSeededQueuedItems] = useState<QueuedItem[] | null>(null);
+    if (queueMode && queuedItems.length > 0 && queuedItems !== seededQueuedItems) {
+        setSeededQueuedItems(queuedItems);
+        const batches: QueueBatch[] = queuedItems.map(item => ({
+            ...item,
+            includeLogo: item.includeLogo !== undefined ? item.includeLogo : !!item.doctorLogoPath,
+            originalLabels: [...item.labels] // Store original for reset
+        }));
+        setQueueBatches(batches);
+        setStartingPosition(1);
+        setArabicFont('cairo');
+        setExpandedBatchId(null);
+        setQueueNewLabelText('');
+        setQueueEditingLabel(null);
+    }
 
     // Calculate totals
     const totalLabels = queueMode

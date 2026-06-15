@@ -6,9 +6,15 @@
  * - Mobile: Accordion/stacked layout for easy mobile access
  */
 
-import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import * as lookup from '@shared/contracts/lookup.contract';
+import { useState, ChangeEvent, FormEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import {
+    referralSourcesQuery,
+    patientTypesQuery,
+    addressesQuery,
+    gendersQuery,
+} from '@/query/queries';
 import * as patientContract from '@shared/contracts/patient.contract';
 import PhoneInput from './PhoneInput';
 import styles from './AddPatientForm.module.css';
@@ -44,7 +50,9 @@ interface Alert {
 
 interface DropdownItem {
     id: number;
-    name: string;
+    // referral_sources.referral / patient_types.patient_type / addresses.zone are
+    // nullable in the DB; the dropdown renders the name directly.
+    name: string | null;
 }
 
 interface DropdownData {
@@ -89,12 +97,22 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
     const [loading, setLoading] = useState(false);
     const [alert, setAlert] = useState<Alert>({ show: false, message: '', type: 'danger' });
-    const [dropdownData, setDropdownData] = useState<DropdownData>({
-        referralSources: [],
-        patientTypes: [],
-        addresses: [],
-        genders: []
-    });
+
+    // Lookup dropdowns — loaded once via React Query.
+    const referralSourcesQ = useQuery(referralSourcesQuery());
+    const patientTypesQ = useQuery(patientTypesQuery());
+    const addressesQ = useQuery(addressesQuery());
+    const gendersQ = useQuery(gendersQuery());
+
+    const dropdownData: DropdownData = {
+        referralSources: referralSourcesQ.data ?? [],
+        patientTypes: patientTypesQ.data ?? [],
+        addresses: addressesQ.data ?? [],
+        genders: gendersQ.data ?? [],
+    };
+
+    const dropdownError =
+        referralSourcesQ.isError || patientTypesQ.isError || addressesQ.isError || gendersQ.isError;
 
     // Tab state for desktop view
     const [activeTab, setActiveTab] = useState('basic');
@@ -108,32 +126,16 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         additional: false
     });
 
-    // Load dropdown data on component mount
-    useEffect(() => {
-        const loadDropdownData = async () => {
-            try {
-                const [referralSources, patientTypes, addresses, genders] = await Promise.all([
-                    fetchJSON<DropdownItem[]>('/api/referral-sources', { schema: lookup.referralSources.response }),
-                    fetchJSON<DropdownItem[]>('/api/patient-types', { schema: lookup.patientTypes.response }),
-                    fetchJSON<DropdownItem[]>('/api/addresses', { schema: lookup.addresses.response }),
-                    fetchJSON<DropdownItem[]>('/api/genders', { schema: lookup.genders.response })
-                ]);
-
-                setDropdownData({
-                    referralSources,
-                    patientTypes,
-                    addresses,
-                    genders
-                });
-            } catch (error) {
-                console.error('Error loading dropdown data:', error);
-                showAlert('Failed to load form data. Please refresh the page.');
-            }
-        };
-
-        loadDropdownData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    // Surface a load failure for any of the dropdown lookups. Done during render
+    // (adjust-state-during-render) rather than in an effect so the React Compiler
+    // can optimize it.
+    const [prevDropdownError, setPrevDropdownError] = useState(dropdownError);
+    if (dropdownError !== prevDropdownError) {
+        setPrevDropdownError(dropdownError);
+        if (dropdownError) {
+            setAlert({ show: true, message: 'Failed to load form data. Please refresh the page.', type: 'danger' });
+        }
+    }
 
     const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;

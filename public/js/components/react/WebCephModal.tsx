@@ -1,8 +1,12 @@
-import { useState, useEffect, useCallback, type ChangeEvent } from 'react';
+import { useState, type ChangeEvent } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import PatientFolderPicker from './PatientFolderPicker';
 import type { FileEntry } from '@/types/api.types';
-import { fetchJSON, postJSON, postFormData, httpErrorMessage } from '@/core/http';
+import { postJSON, postFormData, httpErrorMessage } from '@/core/http';
+import { photoTypesQuery, webcephLinkQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import { formatISODate } from '../../core/utils';
 import { buildContentUrl } from './files/fileHelpers';
 import * as mediaContract from '@shared/contracts/media.contract';
@@ -53,12 +57,21 @@ interface UploadData {
  * from the patient edit form so the flow starts where staff naturally are.
  */
 const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
-    const [webcephData, setWebcephData] = useState<WebcephData | null>(null);
+    const queryClient = useQueryClient();
     const [webcephLoading, setWebcephLoading] = useState(false);
     const [webcephError, setWebcephError] = useState<string | null>(null);
     const [webcephSuccess, setWebcephSuccess] = useState('');
-    const [photoTypes, setPhotoTypes] = useState<PhotoType[]>([]);
     const [showPicker, setShowPicker] = useState(false);
+
+    // Photo-type taxonomy for the upload picker — fetched while the modal is open.
+    const { data: photoTypesData } = useQuery({ ...photoTypesQuery(), enabled: isOpen });
+    const photoTypes = (photoTypesData ?? []) as PhotoType[];
+
+    // The patient's existing WebCeph link, loaded while the modal is open (a 404
+    // resolves to null → the "Create patient" card). Loose contract → cast to the
+    // concrete shape. Created/updated below via setQueryData (no refetch flash).
+    const { data: webcephLinkData } = useQuery({ ...webcephLinkQuery(personId), enabled: isOpen });
+    const webcephData = (webcephLinkData ?? null) as WebcephData | null;
     const [uploadData, setUploadData] = useState<UploadData>({
         recordDate: formatISODate(),
         targetClass: 'lateral_ceph',
@@ -81,38 +94,6 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
         !genderName && 'gender',
         !birthday && 'date of birth',
     ].filter(Boolean) as string[];
-
-    const loadWebcephData = useCallback(async () => {
-        try {
-            // A hit is `{success:true, data}` → unwrapped to the link object.
-            const link = await fetchJSON<WebcephData>(
-                `/api/webceph/patient-link/${personId}`,
-                { schema: mediaContract.patientLink.response }
-            );
-            setWebcephData(link);
-        } catch (err) {
-            // 404 = no WebCeph link yet (the common case, not an error).
-            if ((err as { status?: number }).status !== 404) {
-                console.error('Error loading WebCeph data:', err);
-            }
-        }
-    }, [personId]);
-
-    const loadPhotoTypes = useCallback(async () => {
-        try {
-            const types = await fetchJSON<PhotoType[]>('/api/webceph/photo-types', { schema: mediaContract.photoTypes.response });
-            setPhotoTypes(types);
-        } catch (err) {
-            console.error('Error loading photo types:', err);
-        }
-    }, []);
-
-    // Load WebCeph link + photo types each time the modal opens.
-    useEffect(() => {
-        if (!isOpen) return;
-        loadWebcephData();
-        loadPhotoTypes();
-    }, [isOpen, loadWebcephData, loadPhotoTypes]);
 
     const handleCreateWebcephPatient = async () => {
         if (!patientInfo) return;
@@ -144,11 +125,11 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
                 { schema: mediaContract.createPatient.response }
             );
 
-            setWebcephData({
+            queryClient.setQueryData(qk.media.webcephLink(personId), {
                 webcephPatientId: result.webcephPatientId,
                 link: result.link,
                 createdAt: new Date().toISOString(),
-            });
+            } satisfies WebcephData);
             setWebcephSuccess('Patient created in WebCeph successfully!');
             setTimeout(() => setWebcephSuccess(''), 5000);
         } catch (err) {
@@ -231,15 +212,13 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} contentClassName={styles.dialog}>
-            <div className={styles.header}>
-                <h3 className={styles.headerTitle}>
-                    <i className="fas fa-brain" /> WebCeph AI X-Ray Analysis
-                </h3>
-                <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
-                    <i className="fas fa-times" />
-                </button>
-            </div>
+        <Modal isOpen={isOpen} onClose={onClose} contentClassName={styles.dialog} ariaLabelledBy="webceph-modal-title">
+            <ModalHeader
+                titleId="webceph-modal-title"
+                icon={<i className="fas fa-brain" />}
+                title="WebCeph AI X-Ray Analysis"
+                onClose={onClose}
+            />
 
             <div className={styles.body}>
                 {patientInfo && (

@@ -6,7 +6,7 @@
  * come) and hands the same `ShareSource[]` off to whichever the user picks. Each
  * target renders its own self-contained modal; only one is mounted at a time.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Modal from '../Modal';
 import LocalSendShareModal, { type ShareSource } from '../localsend/LocalSendShareModal';
 import TelegramShareModal from './TelegramShareModal';
@@ -45,10 +45,14 @@ interface Props {
 const ShareSheet = ({ open, sources, onClose }: Props) => {
   const [target, setTarget] = useState<Target>('menu');
 
-  // Always start at the chooser each time the sheet opens.
-  useEffect(() => {
+  // Always start at the chooser each time the sheet opens. Adjust-during-render
+  // keyed on the open state so a fresh open resets to the menu without a
+  // setState-in-effect bailout.
+  const [openedKey, setOpenedKey] = useState(open);
+  if (open !== openedKey) {
+    setOpenedKey(open);
     if (open) setTarget('menu');
-  }, [open]);
+  }
 
   if (!open) return null;
 

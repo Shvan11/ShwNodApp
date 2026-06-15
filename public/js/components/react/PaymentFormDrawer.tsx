@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import type { PaymentSaveData } from '@/types/api.types';
 import { formatNumber } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
@@ -145,13 +146,13 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
             overlayClassName="drawer-overlay"
             contentClassName="drawer-container aligner-payment-drawer"
             initialFocusRef={amountInputRef}
+            ariaLabelledBy="payment-form-drawer-title"
         >
-            <div className="drawer-header">
-                <h2>Add Payment</h2>
-                <button className="close-btn" onClick={handleClose} disabled={saving}>
-                    <i className="fas fa-times"></i>
-                </button>
-            </div>
+            <ModalHeader
+                title="Add Payment"
+                titleId="payment-form-drawer-title"
+                onClose={handleClose}
+            />
 
             <div className="drawer-body">
                 {/* Payment Summary */}

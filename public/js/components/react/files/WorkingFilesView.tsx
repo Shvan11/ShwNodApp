@@ -6,11 +6,11 @@
  * Reuses the file-explorer tile + preview (via an injected working-files URL
  * builder), so it looks and behaves like the Files page minus all mutation.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchJSON } from '@/core/http';
+import { useQuery } from '@tanstack/react-query';
 import type { FileEntry, FileListing } from '@/types/api.types';
-import * as fileExplorer from '@shared/contracts/file-explorer.contract';
+import { workingFilesQuery } from '@/query/queries';
 import { buildWorkingContentUrl, errorMessage } from './fileHelpers';
 import FileEntryTile from './FileEntryTile';
 import FilePreviewModal from './FilePreviewModal';
@@ -25,40 +25,20 @@ const noop = (): void => {};
 
 const WorkingFilesView = ({ personId }: Props) => {
   const navigate = useNavigate();
-  const [entries, setEntries] = useState<FileEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (!personId) return;
-    const ac = new AbortController();
-    setLoading(true);
-    setError(null);
-    fetchJSON<FileListing>(`/api/patients/${personId}/working-files`, {
-      signal: ac.signal,
-      schema: fileExplorer.workingFiles.response,
-    })
-      .then((listing) => {
-        if (ac.signal.aborted) return;
-        setEntries(listing.entries);
-      })
-      .catch((err: unknown) => {
-        if (!ac.signal.aborted && (err as Error)?.name !== 'AbortError') {
-          setError(errorMessage(err, 'Failed to load working files'));
-        }
-      })
-      .finally(() => {
-        if (!ac.signal.aborted) setLoading(false);
-      });
-    return () => ac.abort();
-  }, [personId]);
+  const { data, isLoading, error: queryError } = useQuery({
+    ...workingFilesQuery(personId ?? ''),
+    enabled: !!personId,
+  });
+  const loading = !!personId && isLoading;
+  const error = queryError ? errorMessage(queryError, 'Failed to load working files') : null;
 
   // Stable order: by filename (timepoint then view), numeric-aware.
-  const sorted = useMemo(
-    () => [...entries].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
-    [entries]
-  );
+  const sorted = useMemo(() => {
+    const entries = ((data as FileListing | undefined)?.entries ?? []) as FileEntry[];
+    return [...entries].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  }, [data]);
 
   if (!personId) {
     return <div className={explorer.message}>No patient selected.</div>;

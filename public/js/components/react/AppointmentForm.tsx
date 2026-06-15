@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, type FormEvent } from 'react';
 import cn from 'classnames';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
 import { useToast } from '../../contexts/ToastContext';
 import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import * as appointment from '@shared/contracts/appointment.contract';
+import { qk } from '@/query/keys';
 import { employeesQuery, appointmentDetailsQuery } from '@/query/queries';
 import styles from './AppointmentForm.module.css';
 
@@ -27,7 +28,7 @@ interface Doctor {
 
 interface AppointmentDetail {
     id: number;
-    detail: string;
+    detail: string | null; // details.detail is nullable in the DB
 }
 
 interface AppointmentFormProps {
@@ -56,6 +57,7 @@ interface ApiErrorResponse {
 
 const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps) => {
     const toast = useToast();
+    const queryClient = useQueryClient();
     const [formData, setFormData] = useState<AppointmentFormData>({
         PersonID: personId ?? '',
         AppDate: '',
@@ -78,7 +80,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
     // "Clinic" is the most common assignment, so float it to the top of the
     // dropdown; everyone else keeps the server's SortOrder (Array.sort is stable).
     const doctors = useMemo<Doctor[]>(() => {
-        const list = ((employeesData?.employees ?? []) as unknown as Doctor[]).slice();
+        const list: Doctor[] = (employeesData?.employees ?? []).slice();
         list.sort((a, b) => {
             if (a.employee_name === 'Clinic') return -1;
             if (b.employee_name === 'Clinic') return 1;
@@ -88,7 +90,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
     }, [employeesData]);
 
     const { data: detailsData } = useQuery(appointmentDetailsQuery());
-    const details = (detailsData ?? []) as unknown as AppointmentDetail[];
+    const details: AppointmentDetail[] = detailsData ?? [];
 
     useEffect(() => {
         return () => {
@@ -217,6 +219,12 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                     toast.error('WhatsApp error: ' + httpErrorMessage(err, 'send failed'));
                 });
 
+            // Refresh the patient's appointment-backed reads (has-appointment flag
+            // on the works screen + the appointments list) so the new appointment
+            // shows immediately — the still-fresh cache (30s staleTime) would
+            // otherwise serve a stale list until a hard refresh.
+            queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
+
             // Only call onSuccess, it will handle navigation
             // Don't call onClose as it might interfere with navigation
             if (onSuccess) {
@@ -342,7 +350,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                             >
                                 <option value="">Select type...</option>
                                 {details.filter(d => d.id).map((detail) => (
-                                    <option key={detail.id} value={detail.detail}>
+                                    <option key={detail.id} value={detail.detail ?? ''}>
                                         {detail.detail}
                                     </option>
                                 ))}

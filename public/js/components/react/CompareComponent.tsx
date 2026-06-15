@@ -10,12 +10,11 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
-import { fetchJSON, httpErrorMessage } from '@/core/http';
-import { timepointsQuery } from '@/query/queries';
-import * as patientContract from '@shared/contracts/patient.contract';
+import { httpErrorMessage } from '@/core/http';
+import { timepointsQuery, timepointImagesQuery } from '@/query/queries';
 import ShareSheet from './share/ShareSheet';
 import { useFullscreen } from './slideshow/useFullscreen';
 import type { Timepoint } from './compare/types';
@@ -36,7 +35,6 @@ const CompareComponent = ({ personId }: Props) => {
     const toast = useToast();
     const [selectedTimepoints, setSelectedTimepoints] = useState<number[]>([]);
     const [selectedPhotoType, setSelectedPhotoType] = useState('');
-    const [timepointImages, setTimepointImages] = useState<Record<number, string[]>>({});
     const [canvasSizeMode, setCanvasSizeMode] = useState('auto');
 
     const { engine, snap, canvasRef, canvasEl } = useComparisonEngine();
@@ -55,9 +53,16 @@ const CompareComponent = ({ personId }: Props) => {
         enabled: !!personId,
     });
 
-    // Loose contract models only key fields, so cast to the local Timepoint shape.
-    const timepoints = useMemo(
-        () => (timepointsData as unknown as Timepoint[] | undefined) ?? [],
+    // The wire models tp_code as a string (the query casts it to varchar); the
+    // compare feature works with it numerically (tp_code > 0, ordering), so convert
+    // it here at the boundary instead of an unknown-cast that hid the mismatch.
+    const timepoints = useMemo<Timepoint[]>(
+        () =>
+            (timepointsData ?? []).map((tp) => ({
+                tp_code: Number(tp.tp_code),
+                tp_description: tp.tp_description,
+                tp_date_time: tp.tp_date_time,
+            })),
         [timepointsData],
     );
 
@@ -67,15 +72,36 @@ const CompareComponent = ({ personId }: Props) => {
         }
     }, [timepointsError, toast]);
 
-    // Returns the list of image codes ('10','12',...) available for the given timepoint.
-    // Empty array on failure — callers use it to disable photo types whose image is missing.
-    const fetchTimepointImages = useCallback(async (tpCode: number): Promise<string[]> => {
-        try {
-            return await fetchJSON<string[]>(`/api/patients/${personId}/timepoints/${tpCode}/images`, { schema: patientContract.timepointImages.response });
-        } catch {
-            return [];
-        }
-    }, [personId]);
+    // Per-timepoint image-code lists ('10','12',…) for every selected timepoint —
+    // one parallel React Query per selection (cache key includes the patient, so
+    // tp codes can't leak across patients). A query that hasn't resolved leaves its
+    // entry absent, which keeps the matching photo types disabled (see
+    // isPhotoTypeAvailable). A failed read yields [] (treated as "no images").
+    //
+    // `combine` is load-bearing, not just tidy: it folds the results into the
+    // record AND runs React Query's replaceEqualDeep structural sharing on the
+    // output, so `timepointImages` keeps a STABLE reference across renders while
+    // its content is unchanged. Without it, useQueries hands back a fresh array
+    // every render (its internal trackResult re-maps anew), which makes this memo
+    // — and the load-images effect that depends on it — recompute every render;
+    // since that effect calls engine.loadImages → commit() → re-render, it would
+    // spin into a render loop that freezes the tab the instant a full pair+type
+    // is chosen. Structural sharing is what lets the effect settle.
+    const timepointImages = useQueries({
+        queries: selectedTimepoints.map((tp) => ({
+            ...timepointImagesQuery(personId ?? '', tp),
+            enabled: !!personId,
+        })),
+        combine: (results): Record<number, string[]> => {
+            const rec: Record<number, string[]> = {};
+            selectedTimepoints.forEach((tp, i) => {
+                const result = results[i];
+                if (result?.data) rec[tp] = result.data as string[];
+                else if (result?.isError) rec[tp] = [];
+            });
+            return rec;
+        },
+    });
 
     // Auto-select first/last timepoint (skip tp_code 0) once per patient, the
     // moment their timepoint list is on hand. Render-phase state adjustment
@@ -86,7 +112,6 @@ const CompareComponent = ({ personId }: Props) => {
     const [autoSelectedFor, setAutoSelectedFor] = useState<number | null | undefined>(undefined);
     if (timepoints.length > 0 && autoSelectedFor !== (personId ?? null)) {
         setAutoSelectedFor(personId ?? null);
-        setTimepointImages({});
         setSelectedPhotoType('');
 
         let autoSelected: number[] = [];
@@ -101,27 +126,9 @@ const CompareComponent = ({ personId }: Props) => {
         setSelectedTimepoints(autoSelected);
     }
 
-    // Fetch the image-code list for any selected timepoint that doesn't have
-    // one yet (covers both auto-select and manual toggles). While an entry is
-    // missing, photo types stay disabled — see isPhotoTypeAvailable.
-    useEffect(() => {
-        const missing = selectedTimepoints.filter(tp => !(tp in timepointImages));
-        if (missing.length === 0) return;
-        let cancelled = false;
-        void Promise.all(missing.map(tp => fetchTimepointImages(tp))).then(results => {
-            if (cancelled) return;
-            setTimepointImages(prev => {
-                const next = { ...prev };
-                missing.forEach((tp, i) => { next[tp] = results[i]; });
-                return next;
-            });
-        });
-        return () => { cancelled = true; };
-    }, [selectedTimepoints, timepointImages, fetchTimepointImages]);
-
     // A pair is selectable only when the image exists in EVERY selected timepoint.
-    // A pending fetch (no entry in timepointImages yet) correctly disables the pair
-    // until the fetch resolves — see fetchTimepointImages which returns [] on failure.
+    // A pending query (no entry in timepointImages yet) correctly disables the pair
+    // until it resolves — see the useQueries block, which yields [] on failure.
     const isPhotoTypeAvailable = useCallback((photoCode: string): boolean => {
         if (selectedTimepoints.length === 0) return true;
         return selectedTimepoints.every(tpCode => {
@@ -188,7 +195,9 @@ const CompareComponent = ({ personId }: Props) => {
         const urls = [
             `/DolImgs/${personId}0${sorted[0]}${suffix}`,
             `/DolImgs/${personId}0${sorted[1]}${suffix}`,
-            '/images/logo_white.png',
+            // Engine's current logo variant (non-reactive read) so a fresh pair
+            // keeps the chosen color; the toggle swaps slot 2 directly.
+            engine.getLogoUrl(),
         ];
         let cancelled = false;
         engine.loadImages(urls).catch((err: unknown) => {

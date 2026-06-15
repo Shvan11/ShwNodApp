@@ -15,7 +15,11 @@ import {
     IconArrowUp,
     IconBadge,
     IconBisect,
+    IconCompress,
+    IconContrast,
+    IconCrop,
     IconDownload,
+    IconExpand,
     IconLayout,
     IconReset,
     IconRotateCcw,
@@ -39,6 +43,8 @@ interface Props {
 }
 
 const SELECT_FIRST_HINT = 'Select an element first (click a photo or use the target picker)';
+// Step applied to every crop edge by the symmetric expand/contract buttons.
+const CROP_NUDGE_STEP = 0.03;
 
 const ControlsPanel = ({
     engine,
@@ -53,6 +59,11 @@ const ControlsPanel = ({
 }: Props) => {
     const hasSelection = snap.selectedImage !== 0;
     const canAdjust = engine !== null && hasSelection;
+    const canCrop = engine !== null && (snap.selectedImage === 1 || snap.selectedImage === 2);
+    const cropKey = snap.selectedImage === 1 ? 'img1' : snap.selectedImage === 2 ? 'img2' : null;
+    const activeCrop = cropKey ? snap.crop[cropKey] : null;
+    const cropAtZero = activeCrop !== null
+        && activeCrop.top === 0 && activeCrop.right === 0 && activeCrop.bottom === 0 && activeCrop.left === 0;
     const adjustTitle = (base: string) => (canAdjust ? base : SELECT_FIRST_HINT);
 
     return (
@@ -179,6 +190,44 @@ const ControlsPanel = ({
                         </button>
                     </div>
                 </div>
+                <button
+                    onClick={() => engine?.toggleCropMode()}
+                    disabled={!canCrop}
+                    aria-pressed={snap.cropMode}
+                    title={canCrop
+                        ? 'Trim the selected image with straight cuts — drag its amber edges, then Zoom to refill'
+                        : 'Select Image 1 or Image 2 first, then trim its edges'}
+                    className={cn(styles.cropToggle, snap.cropMode && styles.cropToggleActive)}
+                >
+                    <IconCrop size={15} />
+                    {snap.cropMode ? 'Cropping — drag the amber edges' : 'Crop edges'}
+                </button>
+                {snap.cropMode && (
+                    <>
+                        <div className={styles.cropNudgeRow}>
+                            <button
+                                onClick={() => engine?.nudgeCropAll(-CROP_NUDGE_STEP)}
+                                disabled={cropAtZero}
+                                title="Move all four crop edges outward equally — less trim, grows the kept area"
+                                className={styles.iconButton}
+                            >
+                                <IconExpand size={15} />
+                                Expand
+                            </button>
+                            <button
+                                onClick={() => engine?.nudgeCropAll(CROP_NUDGE_STEP)}
+                                title="Move all four crop edges inward equally — more trim, the reverse of Expand"
+                                className={styles.iconButton}
+                            >
+                                <IconCompress size={15} />
+                                Contract
+                            </button>
+                        </div>
+                        <p className={styles.cropHint}>
+                            Drag an edge to cut · double-click an edge to reset it · then Zoom in to refill the frame.
+                        </p>
+                    </>
+                )}
             </div>
 
             <div className={styles.section}>
@@ -213,6 +262,16 @@ const ControlsPanel = ({
                         className={cn(styles.iconButton, snap.showLogo && styles.iconButtonActive)}
                     >
                         <IconBadge size={16} />
+                    </button>
+                    <button
+                        onClick={() => void engine?.toggleLogoColor()}
+                        disabled={!engine || !snap.showLogo}
+                        aria-pressed={snap.logoBlack}
+                        title={snap.logoBlack ? 'Switch to the white logo' : 'Switch to the black logo'}
+                        aria-label="Toggle logo color"
+                        className={cn(styles.iconButton, snap.logoBlack && styles.iconButtonActive)}
+                    >
+                        <IconContrast size={16} />
                     </button>
                 </div>
                 <button

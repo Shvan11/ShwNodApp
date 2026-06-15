@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, ChangeEvent } from 'react';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import sharedStyles from './DatabaseSettings.module.css';
 import styles from './ProtocolHandlersSettings.module.css';
 import {
@@ -88,7 +89,9 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     // File System Access state
     const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
     const [hasFileAccess, setHasFileAccess] = useState(false);
-    const [browserSupport, setBrowserSupport] = useState<BrowserSupportResult | null>(null);
+    // Browser support is detected synchronously once (lazy initializer — no mount
+    // effect/setState just to compute it).
+    const [browserSupport] = useState<BrowserSupportResult>(() => checkBrowserSupport());
     const [permissionState, setPermissionState] = useState<PermissionState>('prompt');
     const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
 
@@ -102,25 +105,71 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     // FILE HANDLE MANAGEMENT
     // ========================================================================
 
-    const loadSavedHandle = useCallback(async () => {
-        try {
-            const savedHandle = await getFileHandle(HANDLE_STORAGE_KEY);
-            if (savedHandle) {
-                const permission = await checkPermission(savedHandle, 'readwrite');
-                setPermissionState(permission);
+    // Declared before loadSavedHandle (which calls it) so the React Compiler sees it
+    // lexically before use (react-hooks/immutability).
+    const loadConfigFromFile = async (handle: FileSystemFileHandle): Promise<void> => {
+        setIsLoading(true);
+        setConfigError(null);
 
-                if (permission === 'granted') {
-                    setFileHandle(savedHandle);
-                    setHasFileAccess(true);
-                    await loadConfigFromFile(savedHandle);
-                } else {
+        try {
+            // Get file info
+            const file = await handle.getFile();
+            setFileInfo({
+                name: file.name,
+                lastModified: new Date(file.lastModified),
+                size: file.size
+            });
+
+            // Read and parse content
+            const result = await readTextFile(handle);
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to read file');
+            }
+
+            const parsed = parseIniContent(result.data || '');
+            setConfig(parsed);
+            setPendingChanges({});
+        } catch (error) {
+            console.error('Error loading config from file:', error);
+
+            if (isNotFoundError(error)) {
+                // File was deleted/moved
+                await removeHandle(HANDLE_STORAGE_KEY);
+                setFileHandle(null);
+                setHasFileAccess(false);
+                setConfigError('File not found. Please select the INI file again.');
+            } else {
+                setConfigError('Failed to load configuration: ' + (error as Error).message);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Written as a .then-chain (NOT an async fn) so every setState lives in a
+    // chained callback, never synchronously in the caller — the shape the React
+    // Compiler accepts from the mount effect below (an `async` callee trips
+    // react-hooks/set-state-in-effect).
+    const loadSavedHandle = useCallback((): Promise<void> => {
+        return getFileHandle(HANDLE_STORAGE_KEY)
+            .then(savedHandle => {
+                if (!savedHandle) return;
+                return checkPermission(savedHandle, 'readwrite').then(permission => {
+                    setPermissionState(permission);
+
+                    if (permission === 'granted') {
+                        setFileHandle(savedHandle);
+                        setHasFileAccess(true);
+                        return loadConfigFromFile(savedHandle);
+                    }
                     // Handle exists but permission not granted yet
                     setFileHandle(savedHandle);
-                }
-            }
-        } catch (error) {
-            console.error('Error loading saved handle:', error);
-        }
+                });
+            })
+            .catch((error: unknown) => {
+                console.error('Error loading saved handle:', error);
+            });
     }, []);
 
     // ========================================================================
@@ -128,14 +177,11 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     // ========================================================================
 
     useEffect(() => {
-        // Check browser support on mount
-        const support = checkBrowserSupport();
-        setBrowserSupport(support);
-
-        if (support.isSupported) {
+        // Load the saved file handle on mount when the browser supports the API.
+        if (browserSupport.isSupported) {
             loadSavedHandle();
         }
-    }, [loadSavedHandle]);
+    }, [browserSupport, loadSavedHandle]);
 
     useEffect(() => {
         // Notify parent component about changes
@@ -226,46 +272,6 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     // ========================================================================
     // FILE OPERATIONS
     // ========================================================================
-
-    const loadConfigFromFile = async (handle: FileSystemFileHandle): Promise<void> => {
-        setIsLoading(true);
-        setConfigError(null);
-
-        try {
-            // Get file info
-            const file = await handle.getFile();
-            setFileInfo({
-                name: file.name,
-                lastModified: new Date(file.lastModified),
-                size: file.size
-            });
-
-            // Read and parse content
-            const result = await readTextFile(handle);
-
-            if (!result.success) {
-                throw new Error(result.error || 'Failed to read file');
-            }
-
-            const parsed = parseIniContent(result.data || '');
-            setConfig(parsed);
-            setPendingChanges({});
-        } catch (error) {
-            console.error('Error loading config from file:', error);
-
-            if (isNotFoundError(error)) {
-                // File was deleted/moved
-                await removeHandle(HANDLE_STORAGE_KEY);
-                setFileHandle(null);
-                setHasFileAccess(false);
-                setConfigError('File not found. Please select the INI file again.');
-            } else {
-                setConfigError('Failed to load configuration: ' + (error as Error).message);
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     const saveConfiguration = async (): Promise<void> => {
         if (!fileHandle) {
@@ -816,12 +822,11 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 contentClassName={sharedStyles.modalContent}
                 ariaLabelledBy="protocol-handlers-modal-title"
             >
-                <div className={sharedStyles.modalHeader}>
-                    <h3 id="protocol-handlers-modal-title">{modal.title}</h3>
-                    <button className={sharedStyles.modalClose} onClick={hideModal}>
-                        <i className="fas fa-times"></i>
-                    </button>
-                </div>
+                <ModalHeader
+                    titleId="protocol-handlers-modal-title"
+                    title={modal.title}
+                    onClose={hideModal}
+                />
                 <div className={sharedStyles.modalBody}>
                     <pre>{modal.message}</pre>
                 </div>

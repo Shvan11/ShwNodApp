@@ -1,7 +1,9 @@
 /**
  * Custom hook for fetching message count
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { qk } from '../query/keys';
 import { API_ENDPOINTS } from '../utils/whatsapp-send-constants';
 import {
   validateMessageCountResponse,
@@ -45,63 +47,55 @@ function formatMessageCountDisplay(count: MessageCountData): string {
 }
 
 /**
- * Custom hook for message count
+ * Custom hook for message count — fetch on mount and when the date changes, owned
+ * by React Query (keyed by date). The fetch goes through the bespoke WhatsApp
+ * `apiClient` (its own envelope/cancel handling — a deliberate funnel exception),
+ * so the queryFn calls it directly; `cancelPrevious` aborts the previous in-flight
+ * request when the date changes.
  */
 export function useMessageCount(currentDate: string | null): UseMessageCountReturn {
-  const [messageCount, setMessageCount] = useState<MessageCountData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [displayMessage, setDisplayMessage] = useState('');
-
-  const fetchMessageCount = useCallback(async () => {
-    if (!currentDate) return;
-
-    setLoading(true);
-    setError(null);
-    setDisplayMessage('Loading message count...');
-
-    try {
-      const data = await apiClient.get(API_ENDPOINTS.MESSAGE_COUNT(currentDate), {
+  const {
+    data: messageCount,
+    isFetching,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: qk.whatsapp.messageCount(currentDate ?? ''),
+    queryFn: async () => {
+      const data = await apiClient.get(API_ENDPOINTS.MESSAGE_COUNT(currentDate!), {
         cancelPrevious: 'messageCount',
         expectedFields: ['success', 'data'],
       });
+      return validateMessageCountResponse(data);
+    },
+    enabled: !!currentDate,
+  });
 
-      const count = validateMessageCountResponse(data);
-      setMessageCount(count);
+  const loading = isFetching;
+  const errorMessage = error
+    ? error instanceof Error
+      ? error.message
+      : 'Failed to load message count'
+    : null;
 
-      const message = formatMessageCountDisplay(count);
-      setDisplayMessage(message);
-    } catch (err) {
-      // Ignore AbortError - this is expected when a request is cancelled
-      if (err instanceof Error && err.name === 'AbortError') {
-        return;
-      }
+  // Mirror the legacy display states: loading → "Loading…", error → failure copy,
+  // otherwise the formatted count (or empty before the first load).
+  const displayMessage = loading
+    ? 'Loading message count...'
+    : errorMessage
+      ? 'Failed to load message count'
+      : messageCount
+        ? formatMessageCountDisplay(messageCount)
+        : '';
 
-      // Only log actual errors (not cancellations)
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load message count';
-      console.warn('Failed to load message count:', errorMessage);
-      setError(errorMessage);
-      setDisplayMessage('Failed to load message count');
-      setMessageCount(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentDate]);
-
-  // Fetch message count on mount and when date changes
-  useEffect(() => {
-    fetchMessageCount();
-  }, [fetchMessageCount]);
-
-  // Refresh function for manual refresh
   const refresh = useCallback(() => {
-    fetchMessageCount();
-  }, [fetchMessageCount]);
+    void refetch();
+  }, [refetch]);
 
   return {
-    messageCount,
+    messageCount: messageCount ?? null,
     loading,
-    error,
+    error: errorMessage,
     displayMessage,
     refresh,
   };

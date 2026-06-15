@@ -5,45 +5,39 @@
  */
 
 import { useState, useEffect, useCallback, FormEvent } from 'react';
-import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { putJSON, httpErrorMessage } from '@/core/http';
 import { groupSettings as groupSettingsContract } from '@shared/contracts/whatsapp.contract';
 import type { GroupSettingsResponse } from '@shared/contracts/whatsapp.contract';
+import { qk } from '@/query/keys';
+import { whatsappGroupSettingsQuery } from '@/query/queries';
 import { useToast } from '../../contexts/ToastContext';
 import { API_ENDPOINTS } from '../../utils/whatsapp-send-constants';
 import styles from '../../routes/WhatsAppSend.module.css';
 
 export default function GroupSettings() {
   const toast = useToast();
+  const queryClient = useQueryClient();
 
   const [enabled, setEnabled] = useState(true);
   const [groupName, setGroupName] = useState('');
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Load current settings on mount.
+  // Load current settings on mount via React Query, then seed the editable form
+  // fields from them. Adjust-during-render keyed on the fetched payload's identity
+  // so a fresh load re-seeds the editable fields without a setState-in-effect bailout.
+  const { data, isLoading: loading, isError, error } = useQuery(whatsappGroupSettingsQuery());
+  const [seededData, setSeededData] = useState<typeof data>(undefined);
+  if (data && data !== seededData) {
+    setSeededData(data);
+    setEnabled(data.enabled);
+    setGroupName(data.groupName);
+  }
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await fetchJSON<GroupSettingsResponse>(API_ENDPOINTS.WA_GROUP_SETTINGS, {
-          schema: groupSettingsContract.response,
-        });
-        if (!cancelled) {
-          setEnabled(data.enabled);
-          setGroupName(data.groupName);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          toast.error(`Failed to load group settings: ${httpErrorMessage(error, 'Unknown error')}`);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [toast]);
+    if (isError) {
+      toast.error(`Failed to load group settings: ${httpErrorMessage(error, 'Unknown error')}`);
+    }
+  }, [isError, error, toast]);
 
   const handleSave = useCallback(
     async (e: FormEvent) => {
@@ -62,6 +56,11 @@ export default function GroupSettings() {
           { enabled, groupName: trimmed || groupName },
           { schema: groupSettingsContract.response }
         );
+        // Write the saved payload back to the query cache so it stays the single
+        // source of truth — the seed-on-identity logic above then re-syncs the
+        // form fields. Without this the cache keeps the pre-save value and a
+        // remount within staleTime would re-seed the form with stale data.
+        queryClient.setQueryData(qk.settings.whatsappGroupSettings(), saved);
         setEnabled(saved.enabled);
         setGroupName(saved.groupName);
         toast.success('Group settings saved');
@@ -71,7 +70,7 @@ export default function GroupSettings() {
         setSaving(false);
       }
     },
-    [enabled, groupName, toast]
+    [enabled, groupName, toast, queryClient]
   );
 
   return (

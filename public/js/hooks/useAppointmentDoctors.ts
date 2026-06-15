@@ -6,35 +6,20 @@
  * the per-doctor card tints from a single source, so the two always agree.
  */
 
-import { useState, useEffect } from 'react';
-import { fetchJSON } from '@/core/http';
-import * as employee from '@shared/contracts/employee.contract';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { employeesQuery } from '@/query/queries';
 import { buildDoctorColors, type DoctorColorResult, type DoctorColorSource } from '../components/react/doctorColors';
 
 const EMPTY: DoctorColorResult = { byId: new Map(), legend: [] };
 
 export function useAppointmentDoctors(): DoctorColorResult & { loading: boolean } {
-    const [result, setResult] = useState<DoctorColorResult>(EMPTY);
-    const [loading, setLoading] = useState(true);
+    const { data, isLoading: loading } = useQuery(employeesQuery('?getAppointments=true'));
 
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            try {
-                const data = await fetchJSON<{ employees?: DoctorColorSource[] }>('/api/employees?getAppointments=true', { schema: employee.employees.response });
-                const employees = Array.isArray(data?.employees) ? data.employees : [];
-                if (!cancelled) setResult(buildDoctorColors(employees));
-            } catch (err) {
-                console.error('Error loading appointment doctors:', err);
-                if (!cancelled) setResult(EMPTY);
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+    const result = useMemo<DoctorColorResult>(() => {
+        const employees: DoctorColorSource[] = Array.isArray(data?.employees) ? data.employees : [];
+        return employees.length > 0 ? buildDoctorColors(employees) : EMPTY;
+    }, [data]);
 
     return { byId: result.byId, legend: result.legend, loading };
 }

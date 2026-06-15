@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { fetchJSON, httpErrorMessage } from '@/core/http';
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { httpErrorMessage } from '@/core/http';
+import { supabaseStatusQuery } from '@/query/queries';
 import styles from './SupabaseStatusSettings.module.css';
 
 /**
@@ -69,47 +71,26 @@ function formatTime(iso: string | null): string {
 }
 
 const SupabaseStatusSettings = ({ onChangesUpdate }: SupabaseStatusSettingsProps) => {
-    const [sinks, setSinks] = useState<SinkStatus[] | null>(null);
-    const [checkedAt, setCheckedAt] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const isMounted = useRef(true);
+    const { data, isLoading, isError, error: queryError, refetch } = useQuery({
+        ...supabaseStatusQuery(),
+        refetchInterval: POLL_MS,
+    });
+    const status = data as StatusResponse | undefined;
+    const sinks = status?.sinks ?? null;
+    const checkedAt = status?.checkedAt ?? null;
+
+    // Surface either a transport error (thrown) or a server-reported failure
+    // ({ success:false } / no sinks) — mirroring the prior fetch's two paths.
+    const error = isError
+        ? httpErrorMessage(queryError, 'Failed to load Supabase status')
+        : status && (!status.success || !status.sinks)
+          ? status.error || 'Failed to load Supabase status'
+          : null;
 
     // Read-only tab: explicitly declare no unsaved changes so no Save badge ever shows.
     useEffect(() => {
         onChangesUpdate?.(false);
     }, [onChangesUpdate]);
-
-    const fetchStatus = useCallback(async (): Promise<void> => {
-        try {
-            // Raw read (no contract): single sync/CDC status endpoint in sync-webhook.ts,
-            // outside the staff-app contract surface. Left unguarded by design (Phase 1).
-            // eslint-disable-next-line no-restricted-syntax -- raw out-of-surface sync status read
-            const data = await fetchJSON<StatusResponse>('/api/sync/supabase-status');
-            if (!isMounted.current) return;
-            if (data.success && data.sinks) {
-                setSinks(data.sinks);
-                setCheckedAt(data.checkedAt ?? new Date().toISOString());
-                setError(null);
-            } else {
-                setError(data.error || 'Failed to load Supabase status');
-            }
-        } catch (err) {
-            if (isMounted.current) setError(httpErrorMessage(err, 'Failed to load Supabase status'));
-        } finally {
-            if (isMounted.current) setIsLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        isMounted.current = true;
-        fetchStatus();
-        const id = setInterval(fetchStatus, POLL_MS);
-        return () => {
-            isMounted.current = false;
-            clearInterval(id);
-        };
-    }, [fetchStatus]);
 
     return (
         <div className={styles.container}>
@@ -129,7 +110,7 @@ const SupabaseStatusSettings = ({ onChangesUpdate }: SupabaseStatusSettingsProps
                     <button
                         type="button"
                         className={styles.refreshBtn}
-                        onClick={fetchStatus}
+                        onClick={() => refetch()}
                         disabled={isLoading}
                     >
                         <i className={`fas fa-sync-alt ${isLoading ? styles.spin : ''}`}></i>

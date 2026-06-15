@@ -206,9 +206,9 @@ export const patientSearch = {
 } as const;
 export type PatientSearchResponse = z.infer<typeof patientSearch.response>;
 
-// GET /api/patients/tag-options — [{ id, tag }].
+// GET /api/patients/tag-options — [{ id, tag }] (tag_options.tag is NOT NULL).
 export const tagOptions = {
-  response: z.array(z.looseObject({ id: z.number() })),
+  response: z.array(z.looseObject({ id: z.number(), tag: z.string() })),
 } as const;
 
 // GET /api/patients/type-options — [{ id, type }].

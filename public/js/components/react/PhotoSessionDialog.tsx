@@ -1,10 +1,13 @@
 import { useState, useEffect, ChangeEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useImportFolder } from '@/hooks/useImportFolder';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import styles from './PhotoSessionDialog.module.css';
 import { formatISODate } from '../../core/utils';
-import { fetchJSON, postJSON, httpErrorMessage } from '../../core/http';
+import { postJSON, httpErrorMessage } from '../../core/http';
+import { photoDatesQuery } from '@/query/queries';
 import * as photoEditor from '@shared/contracts/photo-editor.contract';
 import type { PhotoPrepareResult } from '../../types/api.types';
 
@@ -52,10 +55,7 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
     // The memory-card import folder reused by the editor's "Move from card" flow; surfaced
     // here so the user sees/grants access before opening the editor.
     const importFolder = useImportFolder('readwrite');
-    const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [appointments, setAppointments] = useState<Appointment[]>([]);
-    const [visits, setVisits] = useState<Visit[]>([]);
     const [timepointType, setTimepointType] = useState('Initial');
     const [selectedDate, setSelectedDate] = useState(formatISODate());
     const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
@@ -65,28 +65,16 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
 
-    const loadPhotoDates = async () => {
-        try {
-            setLoading(true);
-            const data = await fetchJSON<{ appointments?: Appointment[]; visits?: Visit[] }>(
-                `/api/photo-editor/${personId}/photo-dates`,
-                { schema: photoEditor.photoDates.response }
-            );
-            setAppointments(data.appointments || []);
-            setVisits(data.visits || []);
-        } catch (error) {
-            console.error('Error loading photo dates:', error);
-            toast.error('Failed to load appointments and visits');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { data: photoDates, isLoading: loading, isError } = useQuery({
+        ...photoDatesQuery(personId ?? ''),
+        enabled: !!personId,
+    });
+    const appointments = (photoDates?.appointments ?? []) as Appointment[];
+    const visits = (photoDates?.visits ?? []) as Visit[];
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
-        loadPhotoDates();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [personId]);
+        if (isError) toast.error('Failed to load appointments and visits');
+    }, [isError, toast]);
 
     const handleDateSelect = (date: Date | string) => {
         // Always parse and use local date components to match the display format
@@ -202,13 +190,8 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
     };
 
     return (
-        <Modal isOpen={true} onClose={onClose} contentClassName={styles.dialog}>
-                <div className={styles.header}>
-                    <h3>New Photo Session</h3>
-                    <button className={styles.closeBtn} onClick={onClose}>
-                        <i className="fas fa-times" />
-                    </button>
-                </div>
+        <Modal isOpen={true} onClose={onClose} contentClassName={styles.dialog} ariaLabelledBy="photo-session-title">
+                <ModalHeader title="New Photo Session" titleId="photo-session-title" onClose={onClose} />
 
                 <div className={styles.body}>
                     {/* Conflict Warning */}

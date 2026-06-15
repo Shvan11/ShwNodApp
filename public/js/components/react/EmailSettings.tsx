@@ -1,8 +1,11 @@
-import { useState, useEffect, useCallback, type ChangeEvent } from 'react';
+import { useState, useEffect, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
-import * as emailApi from '@shared/contracts/email-api.contract';
+import { qk } from '@/query/keys';
+import { emailConfigQuery } from '@/query/queries';
 import Modal from './Modal';
+import ModalHeader, { type ModalHeaderVariant } from './ModalHeader';
 
 interface EmailConfig {
   smtp_host?: string;
@@ -26,32 +29,40 @@ interface EmailSettingsProps {
   onChangesUpdate?: (hasChanges: boolean) => void;
 }
 
+// Map the modal's status type to the shared ModalHeader's tone + leading icon.
+const MODAL_VARIANT: Record<ModalState['type'], ModalHeaderVariant> = {
+  success: 'success',
+  error: 'danger',
+  info: 'info',
+};
+const MODAL_ICON: Record<ModalState['type'], string> = {
+  success: 'fas fa-check-circle',
+  error: 'fas fa-exclamation-circle',
+  info: 'fas fa-info-circle',
+};
+
 const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
-    const [config, setConfig] = useState<EmailConfig>({});
+    const queryClient = useQueryClient();
+    const { data, isLoading: isConfigLoading, isError } = useQuery(emailConfigQuery());
+    const config = (data?.config ?? {}) as EmailConfig;
     const [pendingChanges, setPendingChanges] = useState<EmailConfig>({});
-    const [isLoading, setIsLoading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
     const [isSending, setIsSending] = useState(false);
     const [modal, setModal] = useState<ModalState>({ show: false, title: '', message: '', type: 'info' });
 
-    const loadEmailConfig = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            // Post-migration the funnel unwraps the envelope to `{ config }`; an
-            // error (404/500) throws from fetchJSON → caught below.
-            const data = await fetchJSON<{ config?: EmailConfig }>('/api/email/config', { schema: emailApi.config.response });
-            setConfig(data.config ?? {});
-        } catch (error) {
-            console.error('Error loading email configuration:', error);
-            showModal('Error', 'Failed to load email settings: ' + httpErrorMessage(error, 'Unknown error'), 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+    // The form is hidden while the config is loading or a save is in flight.
+    const isLoading = isConfigLoading || isSaving;
 
-    useEffect(() => {
-        loadEmailConfig();
-    }, [loadEmailConfig]);
+    // Surface a load failure during render (adjust-state-during-render) rather than
+    // in an effect so the React Compiler can optimize it.
+    const [prevIsError, setPrevIsError] = useState(isError);
+    if (isError !== prevIsError) {
+        setPrevIsError(isError);
+        if (isError) {
+            setModal({ show: true, title: 'Error', message: 'Failed to load email settings. Please try again.', type: 'error' });
+        }
+    }
 
     useEffect(() => {
         // Notify parent component about changes
@@ -93,18 +104,20 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
             return;
         }
 
-        setIsLoading(true);
+        setIsSaving(true);
         try {
             // A failed save throws from postJSON (non-2xx) → caught below.
             await postJSON('/api/email/config', pendingChanges);
-            await loadEmailConfig();
+            // Invalidate the SMTP-config cache so every observer refetches; awaited
+            // so `pendingChanges` is only cleared once the fresh config has landed.
+            await queryClient.invalidateQueries({ queryKey: qk.settings.emailConfig() });
             setPendingChanges({});
             showModal('Success', 'Email configuration saved successfully!', 'success');
         } catch (error) {
             console.error('Error saving email configuration:', error);
             showModal('Error', 'Failed to save email configuration: ' + httpErrorMessage(error, 'Unknown error'), 'error');
         } finally {
-            setIsLoading(false);
+            setIsSaving(false);
         }
     };
 
@@ -367,14 +380,12 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                 contentClassName="modal-content"
                 ariaLabelledBy="email-settings-modal-title"
             >
-                <div className={`modal-header modal-${modal.type}`}>
-                    <h4 id="email-settings-modal-title">
-                        {modal.type === 'success' && <i className="fas fa-check-circle"></i>}
-                        {modal.type === 'error' && <i className="fas fa-exclamation-circle"></i>}
-                        {modal.type === 'info' && <i className="fas fa-info-circle"></i>}
-                        {' '}{modal.title}
-                    </h4>
-                </div>
+                <ModalHeader
+                    variant={MODAL_VARIANT[modal.type]}
+                    titleId="email-settings-modal-title"
+                    icon={<i className={MODAL_ICON[modal.type]} />}
+                    title={modal.title}
+                />
                 <div className="modal-body">
                     <p>{modal.message}</p>
                 </div>

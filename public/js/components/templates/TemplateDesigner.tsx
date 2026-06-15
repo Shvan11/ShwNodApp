@@ -5,11 +5,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Editor as GrapesJSEditorType } from 'grapesjs';
-import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import { postJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
-import * as templateContract from '@shared/contracts/template.contract';
+import { templateQuery } from '@/query/queries';
 
 import styles from './TemplateDesigner.module.css';
 import GrapesJSEditor from './GrapesJSEditor';
@@ -31,43 +31,35 @@ function TemplateDesigner() {
     const confirm = useConfirm();
     const queryClient = useQueryClient();
 
-    const [template, setTemplate] = useState<Template | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
-    const loadTemplate = async (id: string) => {
-        try {
-            setIsLoading(true);
-            const template = await fetchJSON<Template>(`/api/templates/${id}`, { schema: templateContract.getTemplate.response });
-            setTemplate(template);
-            setError(null);
-        } catch (err) {
-            console.error('Error loading template:', err);
-            const errorMessage = httpErrorMessage(err, 'Unknown error');
-            setError('Failed to load template: ' + errorMessage);
-            toast?.error('Failed to load template: ' + errorMessage);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    // Edit mode loads the existing template; the factory is keyed on the id and
+    // disabled when absent (the "new template" path below).
+    const {
+        data: loadedTemplate,
+        isLoading: queryLoading,
+        isError,
+        error: queryError,
+    } = useQuery({
+        ...templateQuery(templateId ?? ''),
+        enabled: !!templateId,
+    });
 
+    // New-template mode seeds a default in place of a fetch; edit mode surfaces the
+    // fetched row. Loading only applies while an edit-mode fetch is in flight.
+    const template: Template | null = templateId
+        ? ((loadedTemplate ?? null) as Template | null)
+        : { template_id: null, template_name: 'New Template', template_file_path: null };
+    const isLoading = !!templateId && queryLoading;
+    const error = isError ? 'Failed to load template: ' + httpErrorMessage(queryError, 'Unknown error') : null;
+
+    // Surface a load failure as a toast (kept out of the render body).
     useEffect(() => {
-        /* eslint-disable react-hooks/set-state-in-effect -- one-shot mount: load the existing template or seed a new one; setState is intentional */
-        if (templateId) {
-            loadTemplate(templateId);
-        } else {
-            // No template ID means we're creating a new template
-            setIsLoading(false);
-            setTemplate({
-                template_id: null,
-                template_name: 'New Template',
-                template_file_path: null
-            });
+        if (isError) {
+            console.error('Error loading template:', queryError);
+            toast?.error('Failed to load template: ' + httpErrorMessage(queryError, 'Unknown error'));
         }
-        /* eslint-enable react-hooks/set-state-in-effect */
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [templateId]);
+    }, [isError, queryError, toast]);
 
     const handleSave = async () => {
         if (!editorRef.current || !templateId) {

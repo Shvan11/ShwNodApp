@@ -47,12 +47,20 @@ const PhotosTab = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (!selectedTp) return;
-    let cancelled = false;
+  // Reset the photo panel synchronously when the selected timepoint changes
+  // (adjust-during-render keyed on selectedTp), so the async load below carries
+  // only its post-await setStates and doesn't trip the setState-in-effect rule.
+  const [loadingTp, setLoadingTp] = useState<string | null>(null);
+  if (selectedTp && selectedTp !== loadingTp) {
+    setLoadingTp(selectedTp);
     setPhotosLoading(true);
     setPhotos(null);
     setPhotosError(null);
+  }
+
+  useEffect(() => {
+    if (!selectedTp) return;
+    let cancelled = false;
     (async () => {
       try {
         // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (CLAUDE.md / audit N17): validates the raw body itself and reads res.ok/error.

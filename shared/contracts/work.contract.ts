@@ -115,24 +115,81 @@ export const getWorkDetails = {
 } as const;
 
 // GET /api/getworks?code= — all works for a patient.
+// One work row as served by GET /api/getworks (work-queries.ts#getWorksByPatient
+// → toWorkWire). Closed `z.object` (the SELECT list is fully enumerated, and a
+// closed row keeps the DB-`interface`-typed `sendData` source assignable without a
+// looseObject index signature). work_id/person_id/status are NOT NULL; addition_date
+// is toWorkWire'd to a `YYYY-MM-DD` string; the joined name columns, FK ids and
+// free-text fields are nullable; WorkStatus is a CASE string, TotalPaid a coalesced
+// sum. `z.infer` (WorkRow) is the single source of truth for the works list read.
+const workRow = z.object({
+  work_id: z.number(),
+  person_id: z.number(),
+  total_required: z.number().nullable(),
+  currency: z.string().nullable(),
+  type_of_work: z.number().nullable(),
+  notes: z.string().nullable(),
+  status: z.number(),
+  addition_date: z.string().nullable(),
+  start_date: z.string().nullable(),
+  debond_date: z.string().nullable(),
+  f_photo_date: z.string().nullable(),
+  i_photo_date: z.string().nullable(),
+  estimated_duration: z.number().nullable(),
+  dr_id: z.number().nullable(),
+  notes_date: z.string().nullable(),
+  keyword_id_1: z.number().nullable(),
+  keyword_id_2: z.number().nullable(),
+  keyword_id_3: z.number().nullable(),
+  keyword_id_4: z.number().nullable(),
+  keyword_id_5: z.number().nullable(),
+  discount: z.number().nullable(),
+  discount_date: z.string().nullable(),
+  discount_reason: z.string().nullable(),
+  doctor_name: z.string().nullable(),
+  type_name: z.string().nullable(),
+  status_name: z.string().nullable(),
+  Keyword1: z.string().nullable(),
+  Keyword2: z.string().nullable(),
+  Keyword3: z.string().nullable(),
+  Keyword4: z.string().nullable(),
+  Keyword5: z.string().nullable(),
+  WorkStatus: z.string(),
+  TotalPaid: z.number(),
+});
+export type WorkRow = z.infer<typeof workRow>;
+
 export const getWorks = {
-  response: z.array(z.looseObject({ work_id: z.number() })),
+  response: z.array(workRow),
 } as const;
 
-// GET /api/getworktypes — dropdown rows ({ id, work_type }).
+// GET /api/getworktypes — dropdown rows ({ id, work_type }). work_types.work_type
+// is NOT NULL.
 export const getWorkTypes = {
-  response: z.array(z.looseObject({ id: z.number() })),
+  response: z.array(z.looseObject({ id: z.number(), work_type: z.string() })),
 } as const;
 
-// GET /api/getworkkeywords — dropdown rows ({ id, key_word }).
+// GET /api/getworkkeywords — dropdown rows ({ id, key_word }). keywords.key_word
+// is nullable in the DB → modeled nullable (rendered directly in the dropdown).
 export const getWorkKeywords = {
-  response: z.array(z.looseObject({ id: z.number() })),
+  response: z.array(z.looseObject({ id: z.number(), key_word: z.string().nullable() })),
 } as const;
 
-// GET /api/teeth?permanent=&deciduous= — { teeth, count }.
+// GET /api/teeth?permanent=&deciduous= — { teeth, count }. Tooth rows are fully
+// modeled: tooth_code/tooth_name/tooth_number are text, quadrant is the controlled
+// 4-value vocabulary (enum), is_permanent a flag — all NOT NULL.
 export const teeth = {
   response: z.object({
-    teeth: z.array(z.looseObject({ id: z.number() })),
+    teeth: z.array(
+      z.looseObject({
+        id: z.number(),
+        tooth_code: z.string(),
+        tooth_name: z.string(),
+        tooth_number: z.string(),
+        quadrant: z.enum(['UR', 'UL', 'LR', 'LL']),
+        is_permanent: z.boolean(),
+      })
+    ),
     count: z.number(),
   }),
 } as const;

@@ -1,8 +1,10 @@
-import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import { useState, ChangeEvent, FormEvent } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
-import * as alignerContract from '@shared/contracts/aligner.contract';
+import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { alignerDoctorsAdminQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import styles from './AlignerDoctorsSettings.module.css';
 import type { AlignerDoctor } from '../../pages/aligner/aligner.types';
 
@@ -19,9 +21,10 @@ interface AlignerDoctorsSettingsProps {
 const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDoctorsSettingsProps) => {
     const toast = useToast();
     const confirm = useConfirm();
-    const [doctors, setDoctors] = useState<AlignerDoctor[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
+    const { data, isLoading: loading, error: queryError, refetch } = useQuery(alignerDoctorsAdminQuery());
+    const doctors = (data?.doctors ?? []) as AlignerDoctor[];
+    const error = queryError ? httpErrorMessage(queryError, 'Failed to load doctors') : null;
     const [editingId, setEditingId] = useState<number | null>(null);
     const [showAddForm, setShowAddForm] = useState(false);
     const [formData, setFormData] = useState<FormData>({
@@ -30,25 +33,8 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
         logo_path: ''
     });
 
-    const loadDoctors = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const data = await fetchJSON<{ doctors?: AlignerDoctor[] }>('/api/aligner-doctors', { schema: alignerContract.doctorsList.response });
-            setDoctors(data.doctors || []);
-        } catch (err) {
-            console.error('Error loading doctors:', err);
-            setError(httpErrorMessage(err, 'Failed to load doctors'));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Load doctors on component mount
-    useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
-        loadDoctors();
-    }, []);
+    // Refresh the shared aligner-doctors cache after a write.
+    const loadDoctors = () => queryClient.invalidateQueries({ queryKey: qk.aligner.doctorsAdmin() });
 
     const handleAdd = () => {
         setFormData({ doctor_name: '', doctor_email: '', logo_path: '' });
@@ -134,7 +120,7 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
                 <div className={styles.errorContainer}>
                     <i className="fas fa-exclamation-triangle"></i>
                     <p>Error: {error}</p>
-                    <button onClick={loadDoctors} className={styles.btnRetry}>
+                    <button onClick={() => refetch()} className={styles.btnRetry}>
                         <i className="fas fa-redo"></i> Retry
                     </button>
                 </div>

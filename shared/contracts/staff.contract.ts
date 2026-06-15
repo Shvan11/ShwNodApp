@@ -11,7 +11,9 @@
  */
 import { z } from 'zod';
 
-const staffMemberRow = z.looseObject({ id: z.number() });
+// Both /doctors and /operators SELECT exactly id + employee_name (NOT NULL);
+// modeling employee_name lets the selectors read it without an unknown-cast.
+const staffMemberRow = z.looseObject({ id: z.number(), employee_name: z.string() });
 
 // GET /api/doctors — employees with position 'Doctor'.
 export const doctors = {

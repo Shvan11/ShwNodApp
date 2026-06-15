@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, ComponentType } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import type { UserResponse } from '@/types/api.types';
-import { fetchJSON } from '@/core/http';
-import * as authContract from '@shared/contracts/auth.contract';
+import { authMeQuery } from '@/query/queries';
 
 // CSS Modules
 import styles from './SettingsContainer.module.css';
@@ -48,7 +48,11 @@ const SettingsComponent: React.FC = () => {
     const { tab } = useParams<{ tab?: string }>();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<string>(tab || 'general');
-    const [userRole, setUserRole] = useState<string | null>(null);
+
+    // Current user role — drives admin-only tab filtering.
+    const { data: meData } = useQuery(authMeQuery());
+    const me = meData as UserResponse | undefined;
+    const userRole = me?.success && me.user ? me.user.role : null;
 
     // Ref to hold current activeTab - allows stable callback that reads current value.
     // Synced in an effect (not during render); the callbacks that read it run after
@@ -75,21 +79,6 @@ const SettingsComponent: React.FC = () => {
         security: { hasChanges: false },
         users: { hasChanges: false }
     });
-
-    // Fetch current user role
-    useEffect(() => {
-        async function fetchUserRole(): Promise<void> {
-            try {
-                const data = await fetchJSON<UserResponse>('/api/auth/me', { schema: authContract.me.response });
-                if (data.success && data.user) {
-                    setUserRole(data.user.role);
-                }
-            } catch (error) {
-                console.error('Failed to fetch user role:', error);
-            }
-        }
-        fetchUserRole();
-    }, []);
 
     // Tab configuration
     const tabs: TabConfig[] = [
@@ -211,13 +200,16 @@ const SettingsComponent: React.FC = () => {
         }
     ];
 
-    // Sync activeTab with URL parameter
-    useEffect(() => {
+    // Sync activeTab with URL parameter. Done during render (adjust-state-during-render),
+    // keyed on the URL `tab` value, rather than in an effect so the React Compiler can
+    // optimize it.
+    const [syncedTab, setSyncedTab] = useState<string | undefined>(tab);
+    if (tab !== syncedTab) {
+        setSyncedTab(tab);
         if (tab && tabs.find(t => t.id === tab && !t.disabled)) {
             setActiveTab(tab);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tab]);
+    }
 
     const handleTabChange = (tabId: string): void => {
         const selectedTab = tabs.find(t => t.id === tabId);

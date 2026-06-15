@@ -3,8 +3,9 @@
  * PUTs to /api/patients/:personId/timepoints/:tpCode (the parent owns the request
  * + list refresh). Mirrors the expenses edit-modal pattern.
  */
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import styles from './TimepointModals.module.css';
 
 interface Timepoint {
@@ -25,12 +26,18 @@ const EditTimepointModal = ({ isOpen, timepoint, saving, onClose, onSave }: Prop
     const [name, setName] = useState('');
     const [date, setDate] = useState('');
 
-    useEffect(() => {
+    // Prefill from the selected timepoint. Done during render (keyed on the
+    // timepoint identity) rather than in an effect, so the React Compiler can
+    // optimize and there's no extra post-paint render.
+    const initKey = timepoint ? timepoint.tpCode : '';
+    const [initializedKey, setInitializedKey] = useState('');
+    if (initKey !== initializedKey) {
+        setInitializedKey(initKey);
         if (timepoint) {
             setName(timepoint.tpDescription ?? '');
             setDate((timepoint.tpDateTime ?? '').substring(0, 10));
         }
-    }, [timepoint]);
+    }
 
     if (!timepoint) return null;
 
@@ -50,12 +57,7 @@ const EditTimepointModal = ({ isOpen, timepoint, saving, onClose, onSave }: Prop
             ariaLabelledBy="edit-tp-title"
         >
             <form onSubmit={handleSubmit}>
-                <div className={styles.modalHeader}>
-                    <h2 id="edit-tp-title">Edit Time Point</h2>
-                    <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close modal">
-                        &times;
-                    </button>
-                </div>
+                <ModalHeader title="Edit Time Point" titleId="edit-tp-title" onClose={onClose} closeLabel="Close modal" />
 
                 <div className={styles.modalBody}>
                     <label className={styles.field}>

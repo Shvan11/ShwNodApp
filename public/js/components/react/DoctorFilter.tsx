@@ -5,10 +5,10 @@
  * Fetches doctor list from /api/doctors and provides selection UI
  */
 
-import { useState, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
-import { fetchJSON, httpErrorMessage } from '@/core/http';
-import * as staff from '@shared/contracts/staff.contract';
+import { useQuery } from '@tanstack/react-query';
+import { httpErrorMessage } from '@/core/http';
+import { doctorsQuery } from '@/query/queries';
 
 interface Doctor {
     id: number;
@@ -22,36 +22,9 @@ interface DoctorFilterProps {
 }
 
 const DoctorFilter = ({ selectedDoctorId, onDoctorChange, className = '' }: DoctorFilterProps) => {
-    const [doctors, setDoctors] = useState<Doctor[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    const fetchDoctors = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-
-            const data = await fetchJSON<Doctor[]>('/api/doctors', { schema: staff.doctors.response });
-
-            // Validate data structure
-            if (Array.isArray(data)) {
-                setDoctors(data);
-            } else {
-                console.error('Invalid doctors data format:', data);
-                setError('Invalid data format');
-            }
-        } catch (err) {
-            console.error('Error fetching doctors:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
-        fetchDoctors();
-    }, []);
+    const { data, isLoading: loading, error: queryError } = useQuery(doctorsQuery());
+    const doctors: Doctor[] = data ?? [];
+    const error = queryError ? httpErrorMessage(queryError, 'Unknown error') : null;
 
     const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
         const value = event.target.value;

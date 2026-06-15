@@ -13,11 +13,14 @@
  *     still works on non-Chromium browsers.
  * (Step 2 — framing + Save → working/ — happens in the slot grid.)
  */
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import styles from './SequenceSidebar.module.css';
 import { useToast } from '../../../contexts/ToastContext';
-import { fetchJSON, postFormData, postJSON, type HttpError } from '@/core/http';
-import * as fileExplorerContract from '@shared/contracts/file-explorer.contract';
+import { postFormData, postJSON, type HttpError } from '@/core/http';
+import { patientFilesQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
+import type { FileListing } from '@/types/api.types';
 import { ensurePermission, showFilePicker } from '@/core/fileSystemAccess';
 import { useImportFolder } from '@/hooks/useImportFolder';
 import RenameFolderModal from './RenameFolderModal';
@@ -45,79 +48,64 @@ interface Props {
 
 const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal = 0 }: Props) => {
   const toast = useToast();
-  const [folders, setFolders] = useState<string[]>([]);
+  const queryClient = useQueryClient();
   const [folder, setFolder] = useState<string>(defaultFolder);
-  const [files, setFiles] = useState<FileEntryLite[]>([]);
-  const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [moving, setMoving] = useState(false);
-  // Whether the selected folder exists on the share (a listing 404 means "not created yet").
-  const [folderExists, setFolderExists] = useState(true);
   const [showRename, setShowRename] = useState(false);
   // Remembers the memory-card folder (and its permission) across sessions, shared with the
   // New Photo Session modal. `.supported` gates the "Move from card" button (Chromium + secure ctx).
   const importFolder = useImportFolder('readwrite');
-  // Bumping these re-runs the loaders after a folder/upload mutation.
-  const [refreshFolders, setRefreshFolders] = useState(0);
-  const [refreshFiles, setRefreshFiles] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Top-level folders for the picker.
-  useEffect(() => {
-    let cancelled = false;
-    fetchJSON<{ entries?: FileEntryLite[] }>(`/api/patients/${personId}/files?path=`, { schema: fileExplorerContract.list.response })
-      .then((res) => {
-        if (cancelled || !res?.entries) return;
-        const dirs = res.entries
-          .filter((e) => e.type === 'dir')
-          .map((e) => e.name);
-        setFolders(dirs);
-      })
-      .catch(() => {
-        /* picker is best-effort */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [personId, refreshFolders]);
+  // Top-level folders for the picker (path=''). Best-effort: a failure just leaves
+  // the picker empty.
+  const foldersQ = useQuery(patientFilesQuery(personId, ''));
+  const folders = useMemo<string[]>(() => {
+    const listing = foldersQ.data as FileListing | undefined;
+    return (listing?.entries ?? []).filter((e) => e.type === 'dir').map((e) => e.name);
+  }, [foldersQ.data]);
 
-  // Images in the selected folder.
+  // Images in the selected folder. A 404 means "not created yet" (folderExists=false);
+  // retry is off so that empty state shows immediately instead of after 2 retries.
+  const filesQ = useQuery({ ...patientFilesQuery(personId, folder), retry: false });
+  const files = useMemo<FileEntryLite[]>(() => {
+    const listing = filesQ.data as FileListing | undefined;
+    return ((listing?.entries ?? []) as FileEntryLite[]).filter(
+      (e) => e.type === 'file' && e.category === 'image'
+    );
+  }, [filesQ.data]);
+  const loading = filesQ.isFetching;
+  // 404 = folder doesn't exist yet; any other status (or success) counts as "exists".
+  const folderStatus = (filesQ.error as HttpError | null)?.status;
+  const folderExists = folderStatus !== 404;
+  // Only a transport/parse failure (no .status) surfaces a toast — matching the old chain.
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    (async () => {
-      try {
-        const res = await fetchJSON<{ entries?: FileEntryLite[] }>(
-          `/api/patients/${personId}/files?path=${encodeURIComponent(folder)}`,
-          { schema: fileExplorerContract.list.response }
-        );
-        if (cancelled) return;
-        setFolderExists(true);
-        const entries = res?.entries || [];
-        setFiles(entries.filter((e) => e.type === 'file' && e.category === 'image'));
-      } catch (err) {
-        if (cancelled) return;
-        // 404 = folder doesn't exist yet; other HTTP statuses still count as "exists".
-        // Only a transport/parse failure (no .status) surfaces a toast — matching the
-        // previous chain, which swallowed non-2xx responses via a null body.
-        const status = (err as HttpError).status;
-        setFolderExists(status !== 404);
-        setFiles([]);
-        if (status === undefined) toast.error('Failed to load folder');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [personId, folder, toast, refreshFiles, refreshSignal]);
+    if (filesQ.error && folderStatus === undefined) toast.error('Failed to load folder');
+  }, [filesQ.error, folderStatus, toast]);
+
+  // The parent bumps refreshSignal (e.g. after a view's original is untagged) to
+  // force a re-list of the current folder.
+  useEffect(() => {
+    if (refreshSignal) {
+      void queryClient.invalidateQueries({ queryKey: qk.patient.files(personId, folder) });
+    }
+    // folder intentionally omitted: a refreshSignal bump targets the folder shown
+    // at bump time, and a folder change already refetches via its own query key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshSignal, personId, queryClient]);
+
+  // Refresh helpers for the mutation handlers below.
+  const reloadFolders = () =>
+    queryClient.invalidateQueries({ queryKey: qk.patient.files(personId, '') });
+  const reloadFiles = () =>
+    queryClient.invalidateQueries({ queryKey: qk.patient.files(personId, folder) });
 
   /** Create the folder on the share; a 409 (already there) is treated as success. */
   const ensureFolder = async (name: string): Promise<void> => {
     try {
       await postJSON(`/api/patients/${personId}/files/folder`, { path: '', name });
-      setRefreshFolders((n) => n + 1);
+      void reloadFolders();
     } catch (err) {
       if ((err as HttpError).status !== 409) throw err;
     }
@@ -143,7 +131,7 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
       const qs = new URLSearchParams({ path: target });
       await postFormData(`/api/patients/${personId}/files/upload?${qs}`, form);
       if (folder !== target) setFolder(target);
-      setRefreshFiles((n) => n + 1);
+      void reloadFiles();
       toast.success(`Uploaded ${list.length} photo${list.length === 1 ? '' : 's'}`);
     } catch (err) {
       toast.error(`Upload failed: ${err instanceof Error ? err.message : 'unknown error'}`);
@@ -214,7 +202,7 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
       }
 
       if (folder !== target) setFolder(target);
-      setRefreshFiles((n) => n + 1);
+      void reloadFiles();
 
       if (failed.length === 0) {
         toast.success(`Moved ${removed} photo${removed === 1 ? '' : 's'} — originals removed from the card`);
@@ -334,8 +322,8 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
           onRenamed={(name) => {
             setShowRename(false);
             setFolder(name);
-            setRefreshFolders((n) => n + 1);
-            setRefreshFiles((n) => n + 1);
+            void reloadFolders();
+            void reloadFiles();
           }}
         />
       )}

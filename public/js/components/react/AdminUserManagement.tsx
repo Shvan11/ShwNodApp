@@ -1,8 +1,10 @@
-import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
+import { useState, type FormEvent, type ChangeEvent } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
-import * as userManagement from '@shared/contracts/user-management.contract';
+import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { usersListQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import Modal from './Modal';
 import styles from './AdminUserManagement.module.css';
 
@@ -37,8 +39,9 @@ interface Message {
 export default function AdminUserManagement() {
   const toast = useToast();
   const confirm = useConfirm();
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data, isLoading: loading, isError } = useQuery(usersListQuery());
+  const users = (data?.users ?? []) as User[];
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [message, setMessage] = useState<Message>({ type: '', text: '' });
 
@@ -55,23 +58,16 @@ export default function AdminUserManagement() {
     role: 'secretary'
   });
 
-  const fetchUsers = async () => {
-    try {
-      // Post-migration the funnel unwraps the envelope to `{ users }`.
-      const data = await fetchJSON<{ users?: User[] }>('/api/users', { schema: userManagement.usersList.response });
-      setUsers(data.users ?? []);
-    } catch (err) {
-      setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error loading users') });
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Refresh the shared user-list cache after a write.
+  const fetchUsers = () => queryClient.invalidateQueries({ queryKey: qk.users.list() });
 
-  // Load users on mount
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
-    fetchUsers();
-  }, []);
+  // Surface a load failure during render (adjust-state-during-render) rather than
+  // in an effect so the React Compiler can optimize it.
+  const [prevIsError, setPrevIsError] = useState(isError);
+  if (isError !== prevIsError) {
+    setPrevIsError(isError);
+    if (isError) setMessage({ type: 'error', text: 'Network error loading users' });
+  }
 
   const handleCreateUser = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

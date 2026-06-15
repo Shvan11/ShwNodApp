@@ -2,13 +2,14 @@
  * ExpenseModal Component
  * Modal for adding and editing expenses
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useCategories, useSubcategories } from '../../hooks/useExpenses';
 import type { Expense, ExpenseData } from '../../hooks/useExpenses';
 import { formatISODate } from '../../core/utils';
 import { formatNumber } from '../../utils/formatters';
 import Modal from '../react/Modal';
+import ModalHeader from '../react/ModalHeader';
 import styles from '../../routes/Expenses.module.css';
 
 // Types
@@ -62,8 +63,13 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
     const [errors, setErrors] = useState<FormErrors>({});
     const [displayAmount, setDisplayAmount] = useState('');
 
-    // Initialize form when modal opens or expense changes
-    useEffect(() => {
+    // Initialize the form when the modal opens or the edit target changes. Done
+    // during render (keyed on open + expense identity) rather than in an effect, so
+    // the React Compiler can optimize and there's no extra post-paint render.
+    const initKey = isOpen ? String(expense?.id ?? 'new') : '';
+    const [initializedKey, setInitializedKey] = useState('');
+    if (initKey !== initializedKey) {
+        setInitializedKey(initKey);
         if (isOpen) {
             if (expense) {
                 // Edit mode - populate with expense data
@@ -93,7 +99,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
             }
             setErrors({});
         }
-    }, [isOpen, expense]);
+    }
 
     const handleInputChange = (field: keyof FormData, value: string) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -191,12 +197,12 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
             contentClassName={styles.modalContent}
             ariaLabelledBy="expense-modal-title"
         >
-                <div className={styles.modalHeader}>
-                    <h2 id="expense-modal-title">{modalTitle}</h2>
-                    <button className={styles.closeBtn} onClick={handleClose} aria-label="Close modal">
-                        &times;
-                    </button>
-                </div>
+                <ModalHeader
+                    titleId="expense-modal-title"
+                    title={modalTitle}
+                    onClose={handleClose}
+                    closeLabel="Close modal"
+                />
 
                 <form onSubmit={handleSubmit}>
                     <div className={styles.modalBody}>

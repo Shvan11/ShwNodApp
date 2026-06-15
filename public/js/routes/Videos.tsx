@@ -1,8 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../contexts/ToastContext';
 import { fetchJSON, putJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
+import { videosQuery, videoCategoriesQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import * as videoContract from '@shared/contracts/video.contract';
 import Modal from '../components/react/Modal';
+import ModalHeader from '../components/react/ModalHeader';
 import styles from './Videos.module.css';
 
 /**
@@ -40,12 +44,14 @@ interface VideoCategory {
  */
 export default function Videos() {
   const toast = useToast();
+  const queryClient = useQueryClient();
 
-  // State
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [categories, setCategories] = useState<VideoCategory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Video list + categories (server state via React Query).
+  const { data: videosData, isLoading: loading, error: videosError, refetch } = useQuery(videosQuery());
+  const videos = (videosData ?? []) as Video[];
+  const error = videosError ? httpErrorMessage(videosError, 'Failed to load videos') : null;
+  const { data: categoriesData } = useQuery(videoCategoriesQuery());
+  const categories = (categoriesData ?? []) as VideoCategory[];
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,41 +80,12 @@ export default function Videos() {
   const [qrData, setQRData] = useState<{ qr: string; url: string; title: string } | null>(null);
   const [isLoadingQR, setIsLoadingQR] = useState(false);
 
-  /**
-   * Fetch all videos
-   */
-  const fetchVideos = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const data = await fetchJSON<Video[]>('/api/videos', { schema: videoContract.list.response });
-      setVideos(data || []);
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to load videos'));
-      toast.error('Failed to load videos');
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
-  /**
-   * Fetch categories
-   */
-  const fetchCategories = useCallback(async () => {
-    try {
-      const data = await fetchJSON<VideoCategory[]>('/api/videos/categories', { schema: videoContract.categories.response });
-      setCategories(data || []);
-    } catch (err) {
-      console.error('Failed to fetch categories:', err);
-    }
-  }, []);
-
-  // Initial data fetch
+  // Surface a video-load failure with a toast (categories fail silently, as before).
   useEffect(() => {
-    fetchVideos();
-    fetchCategories();
-  }, [fetchVideos, fetchCategories]);
+    if (videosError) {
+      toast.error('Failed to load videos');
+    }
+  }, [videosError, toast]);
 
   /**
    * Filter videos based on search and category
@@ -348,7 +325,7 @@ export default function Videos() {
       }
 
       setIsFormModalOpen(false);
-      fetchVideos();
+      queryClient.invalidateQueries({ queryKey: qk.videos.all() });
     } catch (err) {
       toast.error(httpErrorMessage(err, 'Failed to save video'));
     } finally {
@@ -368,7 +345,7 @@ export default function Videos() {
       toast.success('Video deleted successfully');
       setIsDeleteModalOpen(false);
       setVideoToDelete(null);
-      fetchVideos();
+      queryClient.invalidateQueries({ queryKey: qk.videos.all() });
     } catch (err) {
       toast.error(httpErrorMessage(err, 'Failed to delete video'));
     }
@@ -414,7 +391,7 @@ export default function Videos() {
       {error && (
         <div className={styles.errorBanner}>
           <p>Error: {error}</p>
-          <button onClick={fetchVideos} className="btn btn-secondary">
+          <button onClick={() => void refetch()} className="btn btn-secondary">
             Retry
           </button>
         </div>
@@ -538,12 +515,12 @@ export default function Videos() {
           contentClassName={styles.formModal}
           ariaLabelledBy="video-form-title"
         >
-            <div className={styles.modalHeader}>
-              <h2 id="video-form-title">{editingVideo ? 'Edit Video' : 'Add New Video'}</h2>
-              <button className={styles.closeBtn} onClick={() => setIsFormModalOpen(false)}>
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
+            <ModalHeader
+              title={editingVideo ? 'Edit Video' : 'Add New Video'}
+              titleId="video-form-title"
+              icon={<i className={editingVideo ? 'fas fa-edit' : 'fas fa-plus'} />}
+              onClose={() => setIsFormModalOpen(false)}
+            />
             <form onSubmit={handleSubmitForm}>
               <div className={styles.modalBody}>
                 <div className={styles.formGroup}>
@@ -655,12 +632,13 @@ export default function Videos() {
           contentClassName={`${styles.formModal} ${styles.deleteModal}`}
           ariaLabelledBy="video-delete-title"
         >
-            <div className={styles.modalHeader}>
-              <h2 id="video-delete-title">Delete Video</h2>
-              <button className={styles.closeBtn} onClick={() => setIsDeleteModalOpen(false)}>
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
+            <ModalHeader
+              title="Delete Video"
+              titleId="video-delete-title"
+              icon={<i className="fas fa-trash" />}
+              variant="danger"
+              onClose={() => setIsDeleteModalOpen(false)}
+            />
             <div className={styles.modalBody}>
               <p className={styles.warningText}>
                 <i className="fas fa-exclamation-triangle"></i> Are you sure you want to
@@ -696,12 +674,13 @@ export default function Videos() {
           contentClassName={styles.qrModal}
           ariaLabelledBy="video-qr-title"
         >
-            <div className={styles.modalHeader}>
-              <h2 id="video-qr-title">Share Video</h2>
-              <button className={styles.closeBtn} onClick={handleCloseQR}>
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
+            <ModalHeader
+              title="Share Video"
+              titleId="video-qr-title"
+              icon={<i className="fas fa-qrcode" />}
+              variant="info"
+              onClose={handleCloseQR}
+            />
             <div className={styles.qrModalBody}>
               {isLoadingQR ? (
                 <div className={styles.qrLoading}>

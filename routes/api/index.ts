@@ -59,6 +59,7 @@ import telegramRoutes from './telegram.routes.js';
 import shareRoutes from './share.routes.js';
 import integrationsRoutes from './integrations.routes.js';
 import taskRoutes from './task.routes.js';
+import monitoringRoutes from './monitoring.routes.js';
 
 // Import template routes (already modular)
 import templateRouter from '../template-api.js';
@@ -150,5 +151,8 @@ router.use('/integrations', integrationsRoutes);
 
 // Tasks — the app-wide header surface of the alerts table (/api/tasks)
 router.use('/', taskRoutes);
+
+// Monitoring — browser-side error sink (/api/client-error)
+router.use('/', monitoringRoutes);
 
 export default router;

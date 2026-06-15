@@ -192,13 +192,6 @@ const PatientShell = () => {
                 {/* Enhanced Breadcrumb */}
                 <div className={styles.breadcrumbContainer}>
                     <nav className={styles.breadcrumb}>
-                        {/* Home Link - Use Link for SPA navigation */}
-                        <Link to="/patient-management" className={`${styles.breadcrumbItem} ${styles.breadcrumbLink}`}>
-                            <i className="fas fa-home"></i> Home
-                        </Link>
-
-                        <span className={styles.breadcrumbSeparator}>/</span>
-
                         {/* Patient Link - Disabled for new patients */}
                         {isNewPatient ? (
                             <span className={`${styles.breadcrumbItem} ${styles.breadcrumbItemActive}`}>

@@ -30,9 +30,19 @@ const costPresetBody = z.object({
 });
 export type CostPresetBody = z.infer<typeof costPresetBody>;
 
-// GET /api/settings/cost-presets → CostPreset[] (dropdown feed; row-id guard).
+// GET /api/settings/cost-presets → CostPreset[] (dropdown feed). Fully modeled:
+// `currency` is the controlled 3-value vocabulary (enum → precise client type +
+// runtime validation); `amount`/`display_order` are non-null numbers (the query
+// asserts both, and the consumer sorts on display_order).
 export const getPresets = {
-  response: z.array(z.looseObject({ preset_id: z.number() })),
+  response: z.array(
+    z.looseObject({
+      preset_id: z.number(),
+      amount: z.number(),
+      currency: z.enum(['IQD', 'USD', 'EUR']),
+      display_order: z.number(),
+    })
+  ),
 } as const;
 export type GetPresetsResponse = z.infer<typeof getPresets.response>;
 

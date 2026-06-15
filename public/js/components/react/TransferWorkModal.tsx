@@ -1,10 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import styles from './TransferWorkModal.module.css';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import { useToast } from '../../contexts/ToastContext';
 import PatientQuickSearch, { type SelectedPatient } from './PatientQuickSearch';
-import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import { transferPreview as transferPreviewContract } from '@shared/contracts/work.contract';
+import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { transferPreviewQuery } from '@/query/queries';
 
 /**
  * Work data for transfer
@@ -70,29 +72,43 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
   const toast = useToast();
   const [step, setStep] = useState<'search' | 'confirm'>('search');
   const [selectedPatient, setSelectedPatient] = useState<SelectedPatient | null>(null);
-  const [preview, setPreview] = useState<TransferPreview | null>(null);
-  const [loading, setLoading] = useState(false);
   const [transferring, setTransferring] = useState(false);
 
-  // Load preview when patient selected
-  const loadPreview = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    try {
-      const data = await fetchJSON<TransferPreview>(`/api/work/${work.work_id}/transfer-preview`, { schema: transferPreviewContract.response });
-      setPreview(data);
-      setStep('confirm');
-    } catch (error) {
-      toast.error(httpErrorMessage(error, 'Failed to load transfer preview'));
-    } finally {
-      setLoading(false);
+  // Load the transfer preview once a target patient is chosen (gated on selection
+  // in the search step). The factory is keyed on the work id and stays disabled
+  // until a patient is selected.
+  const {
+    data: previewData,
+    isLoading: loading,
+    isError: previewError,
+    error: previewErrorObj,
+  } = useQuery({
+    ...transferPreviewQuery(work.work_id),
+    enabled: selectedPatient !== null,
+  });
+  const preview = (previewData ?? null) as TransferPreview | null;
+
+  // Advance to the confirm step once the preview is available. Done during render
+  // (tracking the previous ready-state so it only fires on the transition) rather
+  // than in an effect, so the React Compiler can optimize.
+  const previewReady = !!preview && selectedPatient !== null;
+  const [prevPreviewReady, setPrevPreviewReady] = useState(previewReady);
+  if (previewReady !== prevPreviewReady) {
+    setPrevPreviewReady(previewReady);
+    if (previewReady) setStep('confirm');
+  }
+
+  // Surface a load failure as a toast.
+  useEffect(() => {
+    if (previewError) {
+      toast.error(httpErrorMessage(previewErrorObj, 'Failed to load transfer preview'));
     }
-  }, [work.work_id, toast]);
+  }, [previewError, previewErrorObj, toast]);
 
   // Handle patient selection from QuickSearch
   const handleSelectPatient = useCallback((patient: SelectedPatient): void => {
     setSelectedPatient(patient);
-    loadPreview();
-  }, [loadPreview]);
+  }, []);
 
   // Execute transfer
   const handleTransfer = async (): Promise<void> => {
@@ -135,20 +151,11 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
   return (
     <Modal isOpen={true} onClose={onClose} contentClassName={styles.modalContent}>
         {/* Header */}
-        <div className={styles.modalHeader}>
-          <div className={styles.headerLeft}>
-            <i className="fas fa-exchange-alt"></i>
-            <h3>Transfer Work</h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className={styles.closeBtn}
-            aria-label="Close"
-          >
-            <i className="fas fa-times"></i>
-          </button>
-        </div>
+        <ModalHeader
+          title="Transfer Work"
+          icon={<i className="fas fa-exchange-alt" />}
+          onClose={onClose}
+        />
 
         {/* Body */}
         <div className={styles.modalBody}>
@@ -284,7 +291,6 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
                 onClick={() => {
                   setStep('search');
                   setSelectedPatient(null);
-                  setPreview(null);
                 }}
                 className={styles.btnSecondary}
               >

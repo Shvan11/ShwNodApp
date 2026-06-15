@@ -15,9 +15,11 @@ import {
     getWeekStartSaturday,
     addWorkingDays
 } from '../../utils/calendarDate';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { qk } from '@/query/keys';
+import { calendarRangeQuery, calendarMonthQuery, calendarStatsQuery } from '@/query/queries';
 import * as holiday from '@shared/contracts/holiday.contract';
-import * as calendar from '@shared/contracts/calendar.contract';
 import type {
     ViewMode,
     CalendarMode,
@@ -119,16 +121,13 @@ const AppointmentCalendar = ({
     selectedSlot: externalSelectedSlot
 }: AppointmentCalendarProps) => {
     const toast = useToast();
+    const queryClient = useQueryClient();
     const { byId: doctorColors, legend: doctorLegend } = useAppointmentDoctors();
 
     // State management
     const [currentDate, setCurrentDate] = useState<Date>(
         initialDate ? parseLocalDate(initialDate) : new Date()
     );
-    const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
-    const [calendarStats, setCalendarStats] = useState<CalendarStats | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const [internalSelectedSlot, setInternalSelectedSlot] = useState<SlotData | null>(null);
     const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
     const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
@@ -174,16 +173,6 @@ const AppointmentCalendar = ({
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    const validateCalendarData = (calendarResult: Partial<CalendarData> | null): CalendarData => {
-        if (!calendarResult) {
-            return { days: [], timeSlots: [] };
-        }
-        return {
-            days: calendarResult.days || [],
-            timeSlots: calendarResult.timeSlots || []
-        };
-    };
-
     // Cell metrics derived from N — applied as CSS vars on the root.
     const rowH = rowHForN(dayCount);
     const fontScale = fontScaleForRowH(rowH);
@@ -215,79 +204,60 @@ const AppointmentCalendar = ({
 
     const rangeLabel = titleSub || titleMain;
 
-    // ── Data fetching ───────────────────────────────────────────────────────
-    // Grid (day/week/zoom): one round-trip to /range returns days + timeSlots + stats.
-    const fetchGrid = useCallback(
-        async (anchor: string, n: number, doctorId: number | null) => {
-            setLoading(true);
-            setError(null);
-            try {
-                const start = anchor;
-                const end = addWorkingDays(anchor, n - 1);
-                const params = new URLSearchParams({ start, end });
-                if (doctorId) params.append('doctorId', String(doctorId));
-
-                const result = await fetchJSON<{
-                    days?: CalendarData['days'];
-                    timeSlots?: string[];
-                    stats?: CalendarStats;
-                }>(`/api/calendar/range?${params}`, { schema: calendar.range.response });
-
-                setCalendarData({ days: result.days ?? [], timeSlots: result.timeSlots ?? [] });
-                setCalendarStats(result.stats ?? null);
-            } catch (err) {
-                console.error('❌ Calendar range fetch error:', err);
-                setError(httpErrorMessage(err, 'Unknown error'));
-                setCalendarData(null);
-                setCalendarStats(null);
-            } finally {
-                setLoading(false);
-            }
-        },
-        []
+    // ── Data fetching (React Query) ─────────────────────────────────────────
+    // Grid (day/week/zoom): one round-trip to /range returns days + timeSlots +
+    // stats. The grid window's end depends on `dayCount`; debounce it into the
+    // query key so dragging the zoom slider through several N values issues one
+    // request (the live `dayCount` still drives the layout/labels immediately).
+    const isGrid = viewMode !== 'month';
+    const [debouncedDayCount, setDebouncedDayCount] = useState(dayCount);
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedDayCount(dayCount), FETCH_DEBOUNCE_MS);
+        return () => clearTimeout(t);
+    }, [dayCount]);
+    const queryEnd = useMemo(
+        () => addWorkingDays(anchorDate, debouncedDayCount - 1),
+        [anchorDate, debouncedDayCount]
     );
+    const rangeQ = useQuery({
+        ...calendarRangeQuery(anchorDate, queryEnd, selectedDoctorId),
+        enabled: isGrid,
+    });
 
     // Month view keeps its own endpoints (separate summary grid).
-    const fetchMonth = useCallback(
-        async (date: Date, doctorId: number | null) => {
-            setLoading(true);
-            setError(null);
-            try {
-                const targetDate = toLocalDateString(date);
-                const params = new URLSearchParams({ date: targetDate });
-                if (doctorId) params.append('doctorId', String(doctorId));
+    const monthDateStr = toLocalDateString(currentDate);
+    const monthParams = `date=${monthDateStr}${selectedDoctorId ? `&doctorId=${selectedDoctorId}` : ''}`;
+    const monthQ = useQuery({ ...calendarMonthQuery(monthParams), enabled: !isGrid });
+    const statsQ = useQuery({ ...calendarStatsQuery(`date=${monthDateStr}`), enabled: !isGrid });
 
-                const [monthResult, statsResult] = await Promise.all([
-                    fetchJSON<Partial<CalendarData>>(`/api/calendar/month?${params}`, {
-                        schema: calendar.month.response
-                    }),
-                    fetchJSON<{ stats?: CalendarStats }>(
-                        `/api/calendar/stats?date=${targetDate}`,
-                        { schema: calendar.stats.response }
-                    )
-                ]);
-
-                setCalendarData(validateCalendarData(monthResult));
-                setCalendarStats(statsResult.stats ?? null);
-            } catch (err) {
-                console.error('❌ Calendar month fetch error:', err);
-                setError(httpErrorMessage(err, 'Unknown error'));
-                setCalendarData(null);
-                setCalendarStats(null);
-            } finally {
-                setLoading(false);
-            }
-        },
-        []
-    );
-
-    // Refetch the active view (used after reschedule/delete/holiday mutations).
-    const refetch = useCallback(
+    // The contract's day/stat rows (shared/contracts/calendar.contract.ts) are now
+    // structurally assignable to the local CalendarData/CalendarStats view models —
+    // calendar.types.ts widened the holiday/patient fields to `… | null` to match — so
+    // the grid/month/stats payloads flow in cast-free, and contract drift surfaces as a
+    // compile error right here on the render path. Month view doesn't render time rows.
+    const calendarData: CalendarData | null = useMemo(
         () =>
-            viewMode === 'month'
-                ? fetchMonth(currentDate, selectedDoctorId)
-                : fetchGrid(anchorDate, dayCount, selectedDoctorId),
-        [viewMode, currentDate, anchorDate, dayCount, selectedDoctorId, fetchMonth, fetchGrid]
+            isGrid
+                ? rangeQ.data
+                    ? { days: rangeQ.data.days, timeSlots: rangeQ.data.timeSlots }
+                    : null
+                : monthQ.data
+                  ? { days: monthQ.data.days, timeSlots: [] }
+                  : null,
+        [isGrid, rangeQ.data, monthQ.data]
+    );
+    const calendarStats: CalendarStats | null = isGrid
+        ? (rangeQ.data?.stats ?? null)
+        : (statsQ.data?.stats ?? null);
+    const loading = isGrid ? rangeQ.isFetching : monthQ.isFetching || statsQ.isFetching;
+    const activeError = isGrid ? rangeQ.error : (monthQ.error ?? statsQ.error);
+    const error = activeError ? httpErrorMessage(activeError, 'Unknown error') : null;
+
+    // Refetch the active view (used after reschedule/delete/holiday mutations) —
+    // invalidating the whole calendar prefix covers grid + month + stats.
+    const refetch = useCallback(
+        () => queryClient.invalidateQueries({ queryKey: qk.calendar.all() }),
+        [queryClient]
     );
 
     // ── Navigation ──────────────────────────────────────────────────────────
@@ -500,9 +470,9 @@ const AppointmentCalendar = ({
         setHolidayModal({
             date: day.date,
             existingHoliday: {
-                ID: day.holidayId,
-                HolidayName: day.holidayName,
-                Description: day.holidayDescription
+                ID: day.holidayId ?? undefined,
+                HolidayName: day.holidayName ?? undefined,
+                Description: day.holidayDescription ?? undefined
             },
             appointmentWarning: null
         });
@@ -590,19 +560,9 @@ const AppointmentCalendar = ({
     }, []);
 
     // Effects
-    // Month fetches immediately; grid fetches are debounced so dragging the zoom
-    // slider through several N values issues one request, not one per step.
-    useEffect(() => {
-        if (viewMode === 'month') {
-            fetchMonth(currentDate, selectedDoctorId);
-            return;
-        }
-        const t = setTimeout(
-            () => fetchGrid(anchorDate, dayCount, selectedDoctorId),
-            FETCH_DEBOUNCE_MS
-        );
-        return () => clearTimeout(t);
-    }, [viewMode, currentDate, anchorDate, dayCount, selectedDoctorId, fetchGrid, fetchMonth]);
+    // (The grid/month data now loads via React Query above — the query keys carry
+    //  viewMode/date/anchor/dayCount/doctor, so navigation refetches automatically;
+    //  the zoom debounce lives in the debouncedDayCount effect.)
 
     // Persist the zoom (day count) per-browser.
     useEffect(() => {

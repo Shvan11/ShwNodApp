@@ -1,12 +1,13 @@
-import { useState, useEffect, type ChangeEvent } from 'react';
+import { useState, type ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import styles from './Diagnosis.module.css';
 import { formatISODate } from '../core/utils';
-import { fetchJSON, postJSON, deleteJSON } from '@/core/http';
-import { patientInfoQuery, worksQuery } from '@/query/queries';
+import { postJSON, deleteJSON } from '@/core/http';
+import { patientInfoQuery, worksQuery, diagnosisQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 
 /**
  * Diagnosis Page
@@ -92,14 +93,12 @@ const Diagnosis = () => {
     const navigate = useNavigate();
     const toast = useToast();
     const confirm = useConfirm();
+    const queryClient = useQueryClient();
 
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [activeTab, setActiveTab] = useState<TabId>('general');
     const [diagnosisExists, setDiagnosisExists] = useState(false);
-    // Diagnosis row read stays raw/schema-less by design (see effect below); its
-    // own loading flag gates the page spinner alongside the two RQ reads.
-    const [diagnosisLoading, setDiagnosisLoading] = useState(true);
 
     // Patient info + works reads on useQuery (the patientShellLoader prefetched
     // patientInfo, so it resolves from cache instantly). Loose contracts model
@@ -112,9 +111,18 @@ const Diagnosis = () => {
         ...worksQuery(personId ?? ''),
         enabled: !!personId,
     });
+    // Diagnosis row read — DELIBERATELY schema-less (returns the row or literal
+    // `null`, the "no diagnosis yet" signal). `isLoading` gates the page spinner
+    // alongside the two RQ reads above; the row seeds the form below (render-phase).
+    const { data: loadedDiagnosis, isLoading: diagnosisLoading } = useQuery(
+        diagnosisQuery(workId ?? '')
+    );
 
-    const patientInfo = (patientData ?? null) as unknown as PatientInfo | null;
-    const works = (worksData ?? null) as unknown as WorkInfo[] | null;
+    // PatientInfo / WorkInfo are loose local adapter shapes (index signature + a
+    // `name` alias the wire doesn't model), so a single structural assertion is the
+    // honest bridge — no `unknown` laundering.
+    const patientInfo = (patientData ?? null) as PatientInfo | null;
+    const works = (worksData ?? null) as WorkInfo[] | null;
     const workInfo = works
         ? works.find(w => w.work_id === parseInt(workId || '0')) ?? null
         : null;
@@ -173,34 +181,21 @@ const Diagnosis = () => {
         c_percent_lafh: ''
     });
 
-    // Diagnosis row read — kept as a standalone raw fetch (patient info + works
-    // now load via useQuery above). `/api/diagnosis/:workId` is DELIBERATELY
-    // schema-less: it returns the row or literal `null` (the "no diagnosis yet"
-    // signal) — not the sendSuccess envelope — so it stays out of the contract
-    // and carries no client schema. Each GET stays independent via .catch(() => null)
-    // (the N14 tolerant mechanic).
-    useEffect(() => {
-        let cancelled = false;
-        setDiagnosisLoading(true);
-        // eslint-disable-next-line no-restricted-syntax -- raw literal-null signal; no contract response
-        fetchJSON<Partial<DiagnosisData> | null>(`/api/diagnosis/${workId}`)
-            .catch(() => null)
-            .then(diagnosis => {
-                if (cancelled) return;
-                if (diagnosis) {
-                    // Format date to YYYY-MM-DD for input
-                    if (diagnosis.dx_date) {
-                        diagnosis.dx_date = formatISODate(diagnosis.dx_date);
-                    }
-                    setDiagnosisData(prev => ({ ...prev, ...diagnosis }));
-                    setDiagnosisExists(true);
-                }
-            })
-            .finally(() => {
-                if (!cancelled) setDiagnosisLoading(false);
-            });
-        return () => { cancelled = true; };
-    }, [workId]);
+    // Seed the editable form once the diagnosis row resolves — done during render,
+    // keyed on workId (the EditAppointmentForm pattern), so there's no
+    // set-state-in-effect. `loadedDiagnosis` is `undefined` until the query settles,
+    // then the row or `null` (no diagnosis yet). We copy before normalizing dx_date
+    // so the React Query cache row is left untouched.
+    const [seededWorkId, setSeededWorkId] = useState<string | undefined>(undefined);
+    if (loadedDiagnosis !== undefined && workId !== seededWorkId) {
+        setSeededWorkId(workId);
+        if (loadedDiagnosis) {
+            const loaded = { ...loadedDiagnosis } as Partial<DiagnosisData>;
+            if (loaded.dx_date) loaded.dx_date = formatISODate(loaded.dx_date);
+            setDiagnosisData(prev => ({ ...prev, ...loaded }));
+            setDiagnosisExists(true);
+        }
+    }
 
     const handleChange = (field: keyof DiagnosisData, value: string) => {
         setDiagnosisData(prev => ({ ...prev, [field]: value }));
@@ -222,6 +217,7 @@ const Diagnosis = () => {
         try {
             setSaving(true);
             await postJSON('/api/diagnosis', diagnosisData);
+            queryClient.invalidateQueries({ queryKey: qk.work.diagnosis(workId ?? '') });
 
             toast.success('Diagnosis saved successfully');
             setDiagnosisExists(true);
@@ -251,6 +247,7 @@ const Diagnosis = () => {
         try {
             setDeleting(true);
             await deleteJSON(`/api/diagnosis/${workId}`);
+            queryClient.invalidateQueries({ queryKey: qk.work.diagnosis(workId ?? '') });
 
             toast.success('Diagnosis deleted successfully');
 

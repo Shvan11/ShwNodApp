@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
-import { timepointsQuery } from '@/query/queries';
+import { timepointsQuery, galleryQuery, photoVisibilityQuery } from '@/query/queries';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
 import tpStyles from './TimePointsSelector.module.css';
@@ -70,7 +70,6 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const navigate = useNavigate();
     const toast = useToast();
     const queryClient = useQueryClient();
-    const [images, setImages] = useState<GalleryImage[]>([]);
     // Timepoints read on useQuery (loose contract models only tp_code/date/desc;
     // rows carry the full Timepoint shape). A timepoint mutation's invalidation
     // refreshes this live (Phase 3).
@@ -78,9 +77,22 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         ...timepointsQuery(personId ?? ''),
         enabled: !!personId,
     });
-    const timepoints = (timepointsData ?? []) as unknown as Timepoint[];
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const timepoints: Timepoint[] = timepointsData ?? [];
+    // Gallery images for the current timepoint, on useQuery. The gallery drives the
+    // grid's loading/error state (the visibility read below is best-effort, exactly
+    // as in the prior Promise.all where gallery threw and visibility .catch→null'd).
+    const galleryQ = useQuery({ ...galleryQuery(personId ?? '', tpCode), enabled: !!personId });
+    const visibilityQ = useQuery({ ...photoVisibilityQuery(personId ?? ''), enabled: !!personId });
+    const images = (galleryQ.data ?? []) as GalleryImage[];
+    const loading = !!personId && galleryQ.isLoading;
+    const error = galleryQ.error ? httpErrorMessage(galleryQ.error, 'Unknown error') : null;
+    // Refresh both gallery reads after a render/delete; callers await it (the await
+    // settles once the refetch completes, preserving the old reload-then-act order).
+    const reloadGallery = () =>
+        Promise.all([
+            queryClient.invalidateQueries({ queryKey: qk.patient.gallery(personId ?? '', tpCode) }),
+            queryClient.invalidateQueries({ queryKey: qk.patient.photoVisibility(personId ?? '') }),
+        ]);
     const lightboxRef = useRef<PhotoSwipeLightbox | null>(null);
     // LocalSend share modal — opened imperatively from the lightbox toolbar.
     const [shareSources, setShareSources] = useState<ShareSource[] | null>(null);
@@ -104,6 +116,17 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     useEffect(() => {
         privateNamesRef.current = privateNames;
     }, [privateNames]);
+    // Seed the private-name set from the visibility query (filtered to this tpCode).
+    // togglePhotoPrivacy still updates this set optimistically; a visibility
+    // invalidation re-seeds it from the server on the next settle. Done during render
+    // (adjust-state-during-render), keyed on the visibility-data identity + tpCode,
+    // rather than in an effect so the React Compiler can optimize it.
+    const [seededFor, setSeededFor] = useState<{ data: typeof visibilityQ.data; tpCode: string } | null>(null);
+    if (seededFor === null || seededFor.data !== visibilityQ.data || seededFor.tpCode !== tpCode) {
+        setSeededFor({ data: visibilityQ.data, tpCode });
+        const priv = (visibilityQ.data?.privateImages ?? []) as Array<{ tp: string; name: string }>;
+        setPrivateNames(new Set(priv.filter((r) => r.tp === tpCode).map((r) => r.name.toLowerCase())));
+    }
     const componentRef = useRef<HTMLDivElement>(null);
     const isSharingRef = useRef(false);
 
@@ -224,48 +247,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const loadTimepoints = async (): Promise<Timepoint[]> => {
         if (!personId) return [];
         const { data } = await refetchTimepoints();
-        return (data ?? []) as unknown as Timepoint[];
-    };
-
-    const loadGalleryImages = async () => {
-        // Skip loading if personId is not valid
-        if (!personId) {
-            setLoading(false);
-            return;
-        }
-
-        try {
-            setLoading(true);
-
-            // Gallery is required (its failure throws → caught below); visibility is
-            // best-effort (per-promise .catch → null → no private flags), mirroring
-            // the old `if (visibilityRes.ok)` tolerance.
-            const [galleryImages, visData] = await Promise.all([
-                fetchJSON<GalleryImage[]>(`/api/patients/${personId}/gallery/${tpCode}`, { schema: patientContract.gallery.response }),
-                fetchJSON<{
-                    success: boolean;
-                    privateImages?: Array<{ tp: string; name: string }>;
-                }>(`/api/patients/${personId}/photos/visibility`, { schema: patientContract.photoVisibilityList.response }).catch(() => null),
-            ]);
-
-            setImages(galleryImages);
-
-            if (visData) {
-                const names = new Set<string>(
-                    (visData.privateImages ?? [])
-                        .filter((r) => r.tp === tpCode)
-                        .map((r) => r.name.toLowerCase())
-                );
-                setPrivateNames(names);
-            } else {
-                setPrivateNames(new Set());
-            }
-        } catch (err) {
-            console.error('Error loading grid:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
-        } finally {
-            setLoading(false);
-        }
+        return data ?? [];
     };
 
     // Toggle a photo's private flag. Called from the PhotoSwipe eye button (outside
@@ -626,14 +608,6 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loading, images]);
 
-    // Load images when component mounts or dependencies change
-    useEffect(() => {
-        if (personId) {
-            loadGalleryImages();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [personId, tpCode]);
-
     // Hold the appointments SSE stream open while this grid is mounted — it also
     // carries `photos_rendered`, fired when a background photo-editor save finishes.
     useEffect(() => {
@@ -657,7 +631,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             // silently broke this match (→ no refetch → stale image until reload).
             const pTp = p.tpCode ?? p.tp_code;
             if (String(p.personId) !== String(personId) || String(pTp) !== String(tpCode)) return;
-            void loadGalleryImages();
+            void reloadGallery();
             void loadTimepoints();
             // Outcome toasts (success / warnings / timeout) are owned by the
             // saving tab's photo-render-watch module — toasting here too would
@@ -787,7 +761,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             setDeleteTp(null);
             if (scope === 'cropped') {
                 // The time point stays — just refresh the gallery if we're viewing it.
-                if (removed.tpCode === tpCode) await loadGalleryImages();
+                if (removed.tpCode === tpCode) await reloadGallery();
             } else {
                 const next = await loadTimepoints();
                 // If the active tab was the one removed, move to a remaining timepoint.

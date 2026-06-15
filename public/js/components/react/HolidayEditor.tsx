@@ -1,12 +1,14 @@
-import { useState, useEffect, useLayoutEffect, type MouseEvent } from 'react';
+import { useState, useEffect, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import LookupEditorModal from './LookupEditorModal';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import { parseLocalDate } from '../../utils/calendarDate';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import * as holiday from '@shared/contracts/holiday.contract';
+import { qk } from '@/query/keys';
 import { adminLookupItemsQuery } from '@/query/queries';
 
 interface Column {
@@ -49,46 +51,54 @@ interface Position {
     left: number;
 }
 
+// Pure positioner — takes an already-measured rect so the DOM read stays visible
+// in the effect body (the compiler then treats the setState as syncing to an
+// external measurement, not derived state; cf. CalendarDayContextMenu).
+const calculatePosition = (rect: DOMRect): Position => {
+    const popoverWidth = 300;
+    const popoverHeight = 180;
+    const padding = 8;
+
+    let left = rect.left - popoverWidth - padding;
+    let top = rect.top + (rect.height / 2) - (popoverHeight / 2);
+
+    if (left < padding) {
+        left = rect.right + padding;
+    }
+
+    if (left + popoverWidth > window.innerWidth - padding) {
+        left = rect.left + (rect.width / 2) - (popoverWidth / 2);
+        top = rect.top - popoverHeight - padding;
+    }
+
+    top = Math.max(padding, Math.min(top, window.innerHeight - popoverHeight - padding));
+    left = Math.max(padding, Math.min(left, window.innerWidth - popoverWidth - padding));
+
+    return { top, left };
+};
+
 /**
  * Positioned delete confirmation popover for holidays
  */
 const DeleteConfirmPopover = ({ anchorEl, itemName, onCancel, onConfirm }: DeleteConfirmPopoverProps) => {
-    const [position, setPosition] = useState<Position | null>(null);
+    // Seed the position by measuring the anchor during render (it's already in the
+    // DOM — it's the button that opened this popover). Positioning on the first
+    // render avoids a post-paint reposition flicker and keeps the only synchronous
+    // setState out of the effect (react-hooks/set-state-in-effect).
+    const [position, setPosition] = useState<Position | null>(() => calculatePosition(anchorEl.getBoundingClientRect()));
 
-    // Calculate position synchronously to prevent flicker
-    const calculatePosition = (anchor: HTMLElement): Position | null => {
-        if (!anchor) return null;
+    // Re-seed during render if the anchor element changes (blessed adjust-state-
+    // during-render pattern — keyed on the anchor identity).
+    const [seededAnchor, setSeededAnchor] = useState(anchorEl);
+    if (anchorEl !== seededAnchor) {
+        setSeededAnchor(anchorEl);
+        setPosition(calculatePosition(anchorEl.getBoundingClientRect()));
+    }
 
-        const rect = anchor.getBoundingClientRect();
-        const popoverWidth = 300;
-        const popoverHeight = 180;
-        const padding = 8;
-
-        let left = rect.left - popoverWidth - padding;
-        let top = rect.top + (rect.height / 2) - (popoverHeight / 2);
-
-        if (left < padding) {
-            left = rect.right + padding;
-        }
-
-        if (left + popoverWidth > window.innerWidth - padding) {
-            left = rect.left + (rect.width / 2) - (popoverWidth / 2);
-            top = rect.top - popoverHeight - padding;
-        }
-
-        top = Math.max(padding, Math.min(top, window.innerHeight - popoverHeight - padding));
-        left = Math.max(padding, Math.min(left, window.innerWidth - popoverWidth - padding));
-
-        return { top, left };
-    };
-
-    // useLayoutEffect prevents flicker by calculating before paint
-    useLayoutEffect(() => {
-        if (!anchorEl) return;
-
-        setPosition(calculatePosition(anchorEl));
-
-        const updatePosition = () => setPosition(calculatePosition(anchorEl));
+    // Keep the popover pinned to the anchor as the viewport changes. setState lives
+    // in the event callback, never synchronously in the effect body.
+    useEffect(() => {
+        const updatePosition = () => setPosition(calculatePosition(anchorEl.getBoundingClientRect()));
         window.addEventListener('resize', updatePosition);
         window.addEventListener('scroll', updatePosition, true);
 
@@ -154,7 +164,8 @@ interface HolidayEditorProps {
  */
 const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditorProps) => {
     const toast = useToast();
-    const { data: itemsData, isLoading: loading, isError, error: itemsError, refetch } =
+    const queryClient = useQueryClient();
+    const { data: itemsData, isLoading: loading, isError, error: itemsError } =
         useQuery(adminLookupItemsQuery(tableKey));
     const items = (itemsData ?? []) as HolidayItem[];
     const [modalOpen, setModalOpen] = useState(false);
@@ -209,7 +220,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
         try {
             await deleteJSON(`/api/admin/lookups/${tableKey}/${itemId}`);
             toast.success('Holiday deleted successfully');
-            refetch();
+            void queryClient.invalidateQueries({ queryKey: qk.adminLookups.table(tableKey) });
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to delete holiday'));
         } finally {
@@ -283,7 +294,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
             setAnchorEl(null);
             setAppointmentWarning(null);
             setPendingHolidayData(null);
-            refetch();
+            void queryClient.invalidateQueries({ queryKey: qk.adminLookups.table(tableKey) });
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to save holiday'));
         }
@@ -468,15 +479,13 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
             >
                 {appointmentWarning && (
                     <>
-                        <div className="modal-header warning-header">
-                            <h3 id="appt-warning-modal-title">
-                                <i className="fas fa-exclamation-triangle"></i>
-                                Existing Appointments Found
-                            </h3>
-                            <button className="modal-close" onClick={handleCancelWarning} type="button">
-                                <i className="fas fa-times"></i>
-                            </button>
-                        </div>
+                        <ModalHeader
+                            variant="warning"
+                            title="Existing Appointments Found"
+                            titleId="appt-warning-modal-title"
+                            icon={<i className="fas fa-exclamation-triangle" />}
+                            onClose={handleCancelWarning}
+                        />
                         <div className="modal-body">
                             <p className="warning-text">
                                 There are <strong>{appointmentWarning.count}</strong> appointment(s)

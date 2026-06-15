@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { useBlocker, useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import styles from './PhotoEditor.module.css';
 import SlotGrid from './SlotGrid';
 import SlotActions from './SlotActions';
@@ -27,10 +27,10 @@ import {
 import { useToast } from '../../../contexts/ToastContext';
 import sseAppointments from '../../../services/sse-appointments';
 import { watchRenderJob } from '../../../services/photo-render-watch';
-import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '../../../core/http';
+import { postJSON, deleteJSON, httpErrorMessage } from '../../../core/http';
 import { qk } from '@/query/keys';
-import * as patientContract from '@shared/contracts/patient.contract';
-import * as fileExplorerContract from '@shared/contracts/file-explorer.contract';
+import { galleryQuery, patientFilesQuery } from '@/query/queries';
+import type { FileListing } from '@/types/api.types';
 
 interface Props {
   personId?: number | null;
@@ -118,10 +118,22 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
   const [removeTarget, setRemoveTarget] = useState<PhotoViewCode | null>(null);
   const [removing, setRemoving] = useState(false);
   const [sidebarRefresh, setSidebarRefresh] = useState(0);
-  // Bumped when a background render for THIS timepoint completes, so hydration
-  // re-runs — covers re-opening the editor before a previous save finished
-  // (the first probe then saw pre-save state).
-  const [hydrateBump, setHydrateBump] = useState(0);
+
+  // On-open hydration probes (best-effort): the working/ gallery (baked crops) and
+  // the timepoint folder listing (tagged originals). Both on React Query so a
+  // background render landing just invalidates them → the hydration effect re-runs.
+  // `retry: false` so a 404 (folder not created yet) settles to empty immediately.
+  const hydrationFolder = folderName(tpName, tpDate);
+  const hydrateGalleryQ = useQuery({
+    ...galleryQuery(personId ?? '', tpCode),
+    enabled: !!personId,
+    retry: false,
+  });
+  const hydrateFilesQ = useQuery({
+    ...patientFilesQuery(personId ?? '', hydrationFolder),
+    enabled: !!personId,
+    retry: false,
+  });
   // Set on a successful save, right before the programmatic navigate — the
   // unsaved-changes blocker below must let that navigation through.
   const justSavedRef = useRef(false);
@@ -153,78 +165,58 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [placedCount]);
 
-  // On open, hydrate slots that already have a saved crop: show the baked image
-  // read-only and, when the source original is still tagged in the folder, enable
-  // "Restore original to re-edit". Reuses the gallery probe + the folder listing —
-  // no new endpoint. Best-effort; a failure just leaves the grid empty.
+  // On open (and whenever either probe settles), hydrate slots that already have a
+  // saved crop: show the baked image read-only and, when the source original is
+  // still tagged in the folder, enable "Restore original to re-edit". Best-effort;
+  // a failed probe just contributes nothing.
+  const hydrateGalleryData = hydrateGalleryQ.data;
+  const hydrateFilesData = hydrateFilesQ.data;
   useEffect(() => {
     if (!personId) return;
-    let cancelled = false;
-    const folder = folderName(tpName, tpDate);
-    (async () => {
-      try {
-        // Independent best-effort probes: a per-promise .catch keeps one failing
-        // without blanking the other (the files route is the sendSuccess envelope,
-        // so fetchJSON unwraps it to { entries }).
-        const [gallery, files] = await Promise.all([
-          fetchJSON<Array<{ name?: string; mtime?: number } | null>>(
-            `/api/patients/${personId}/gallery/${tpCode}`,
-            { schema: patientContract.gallery.response },
-          ).catch(() => [] as Array<{ name?: string; mtime?: number } | null>),
-          fetchJSON<{ entries?: Array<{ name: string; relPath: string; type: string }> }>(
-            `/api/patients/${personId}/files?path=${encodeURIComponent(folder)}`,
-            { schema: fileExplorerContract.list.response },
-          ).catch(() => null),
-        ]);
-        if (cancelled) return;
-        const views: Partial<Record<PhotoViewCode, SlotHydration>> = {};
-        // Cropped images present in working/ → read-only display.
-        if (Array.isArray(gallery)) {
-          for (const img of gallery) {
-            const name = img?.name;
-            const m = name ? /\.(i10|i12|i13|i20|i21|i22|i23|i24)$/.exec(name) : null;
-            if (!name || !m) continue;
-            views[m[1] as PhotoViewCode] = {
-              // Cache-bust with mtime — same reason as the photos grid: an edited
-              // slot is re-rendered to the SAME /DolImgs filename, so without a
-              // changing URL the re-import page shows the stale pre-edit thumbnail.
-              savedImageUrl: img.mtime ? `/DolImgs/${name}?v=${img.mtime}` : `/DolImgs/${name}`,
-              canReEdit: false,
-              reEditRelPath: null,
-              reEditName: null,
-            };
-          }
-        }
-        // Tagged originals → enable "Restore original" for their view.
-        const entries = files?.entries ?? [];
-        for (const e of entries) {
-          if (e.type !== 'file') continue;
-          const tag = parseOriginalViewTag(e.name);
-          if (!tag) continue;
-          views[tag.view] = {
-            ...(views[tag.view] ?? {
-              savedImageUrl: null,
-              canReEdit: false,
-              reEditRelPath: null,
-              reEditName: null,
-            }),
-            canReEdit: true,
-            reEditRelPath: e.relPath,
-            reEditName: tag.original,
-          };
-        }
-        if (Object.keys(views).length) editor.hydrate(views);
-      } catch {
-        /* best-effort hydration */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // editor.hydrate dispatches through a stable reducer dispatch; re-run only
-    // per timepoint, or when a background render lands (hydrateBump).
+    const gallery = (hydrateGalleryData ?? []) as Array<{ name?: string; mtime?: number } | null>;
+    const entries = ((hydrateFilesData as FileListing | undefined)?.entries ?? []) as Array<{
+      name: string;
+      relPath: string;
+      type: string;
+    }>;
+    const views: Partial<Record<PhotoViewCode, SlotHydration>> = {};
+    // Cropped images present in working/ → read-only display.
+    for (const img of gallery) {
+      const name = img?.name;
+      const m = name ? /\.(i10|i12|i13|i20|i21|i22|i23|i24)$/.exec(name) : null;
+      if (!name || !m) continue;
+      views[m[1] as PhotoViewCode] = {
+        // Cache-bust with mtime — same reason as the photos grid: an edited
+        // slot is re-rendered to the SAME /DolImgs filename, so without a
+        // changing URL the re-import page shows the stale pre-edit thumbnail.
+        savedImageUrl: img.mtime ? `/DolImgs/${name}?v=${img.mtime}` : `/DolImgs/${name}`,
+        canReEdit: false,
+        reEditRelPath: null,
+        reEditName: null,
+      };
+    }
+    // Tagged originals → enable "Restore original" for their view.
+    for (const e of entries) {
+      if (e.type !== 'file') continue;
+      const tag = parseOriginalViewTag(e.name);
+      if (!tag) continue;
+      views[tag.view] = {
+        ...(views[tag.view] ?? {
+          savedImageUrl: null,
+          canReEdit: false,
+          reEditRelPath: null,
+          reEditName: null,
+        }),
+        canReEdit: true,
+        reEditRelPath: e.relPath,
+        reEditName: tag.original,
+      };
+    }
+    if (Object.keys(views).length) editor.hydrate(views);
+    // editor.hydrate dispatches through a stable reducer dispatch; re-run only when
+    // a probe's data changes (covers a background render landing → query invalidated).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personId, tpCode, tpName, tpDate, hydrateBump]);
+  }, [personId, tpCode, hydrateGalleryData, hydrateFilesData]);
 
   // Listen for this timepoint's background-render completion while the editor
   // is open: re-hydrate (sidebar included — its originals get view-tagged by the
@@ -236,7 +228,9 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
       const p = payload as { personId?: number | string; tpCode?: number | string; tp_code?: number | string };
       const pTp = p.tpCode ?? p.tp_code;
       if (String(p.personId) !== String(personId) || String(pTp) !== String(tpCode)) return;
-      setHydrateBump((n) => n + 1);
+      // Re-probe gallery + folder (their data change re-runs the hydration effect).
+      void queryClient.invalidateQueries({ queryKey: qk.patient.gallery(personId, tpCode) });
+      void queryClient.invalidateQueries({ queryKey: qk.patient.filesAll(personId) });
       setSidebarRefresh((n) => n + 1);
     };
     void sseAppointments.ensureConnected().catch(() => {
@@ -247,7 +241,7 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
       sseAppointments.off('photos_rendered', onPhotosRendered);
       sseAppointments.release();
     };
-  }, [personId, tpCode]);
+  }, [personId, tpCode, queryClient]);
 
   // Drag the divider to resize the right panel. The sidebar sits on the right, so
   // moving the pointer left widens it. Window-level listeners keep the drag alive if

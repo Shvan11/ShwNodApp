@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, type FormEvent, type ChangeEvent } from 'react';
+import React, { useState, useMemo, type FormEvent, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import WorkCard, { type Work, type WorkStatus } from './WorkCard';
 import PaymentModal from './PaymentModal';
 import TransferWorkModal from './TransferWorkModal';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import TeethSelector from './TeethSelector';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
 import { useToast } from '../../contexts/ToastContext';
@@ -16,7 +17,7 @@ import {
     FILLING_TYPE_OPTIONS,
     FILLING_DEPTH_OPTIONS
 } from '../../config/workTypeConfig';
-import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { qk } from '@/query/keys';
 import {
     worksQuery,
@@ -24,14 +25,13 @@ import {
     hasAppointmentQuery,
     teethQuery,
     implantManufacturersQuery,
+    workDetailsListQuery,
+    paymentHistoryQuery,
 } from '@/query/queries';
-// aliased: the component already has a `paymentHistory` state var (collision)
 import {
-    paymentHistory as paymentHistoryContract,
     deleteInvoice as deleteInvoiceContract,
     type PaymentHistoryResponse,
 } from '@shared/contracts/payment.contract';
-import * as workContract from '@shared/contracts/work.contract';
 import * as appointmentContract from '@shared/contracts/appointment.contract';
 import styles from './WorkComponent.module.css';
 
@@ -146,7 +146,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         ...worksQuery(personId ?? ''),
         enabled: !!personId,
     });
-    const works = useMemo(() => (worksData ?? []) as unknown as Work[], [worksData]);
+    // WorkCard's `Work` is a curated display shape (narrower than the wire row:
+    // required type_of_work, currency as a 'USD'|'IQD' union), so a single assertion
+    // off the typed WorkRow[] bridges it — display-only, no `unknown` laundering.
+    const works = useMemo(() => (worksData ?? []) as Work[], [worksData]);
 
     // Patient demographics, appointment flag, and the two form lookups — all on
     // useQuery so they share the cache (patient info is deduped across screens)
@@ -164,16 +167,15 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const hasNextAppointment = appointmentData?.hasAppointment ?? false;
 
     const { data: teethData } = useQuery(teethQuery());
-    const teethOptions = (teethData?.teeth ?? []) as unknown as ToothOption[];
+    const teethOptions: ToothOption[] = teethData?.teeth ?? [];
 
     const { data: manufacturersData } = useQuery(implantManufacturersQuery());
-    const implantManufacturers = (manufacturersData ?? []) as unknown as ImplantManufacturer[];
+    const implantManufacturers: ImplantManufacturer[] = manufacturersData ?? [];
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'discontinued'>('all');
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [selectedWork, setSelectedWork] = useState<Work | null>(null);
-    const [workDetails, setWorkDetails] = useState<WorkDetail[]>([]);
     const [showDetailForm, setShowDetailForm] = useState(false);
     const [editingDetail, setEditingDetail] = useState<WorkDetail | null>(null);
     const [patientPhotoError, setPatientPhotoError] = useState(false);
@@ -182,8 +184,19 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
     const [selectedWorkForPayment, setSelectedWorkForPayment] = useState<Work | null>(null);
-    const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryResponse>([]);
-    const [loadingPayments, setLoadingPayments] = useState(false);
+
+    // Work-detail rows (View Details modal) and payment history (Payment History
+    // modal) read on useQuery, each gated to its open modal + selected work.
+    const { data: workDetailsData } = useQuery({
+        ...workDetailsListQuery(selectedWork?.work_id ?? 0),
+        enabled: showDetailsModal && !!selectedWork,
+    });
+    const workDetails = (workDetailsData ?? []) as WorkDetail[];
+    const { data: paymentHistoryData, isLoading: loadingPayments } = useQuery({
+        ...paymentHistoryQuery(selectedWorkForPayment?.work_id ?? 0),
+        enabled: showPaymentHistoryModal && !!selectedWorkForPayment,
+    });
+    const paymentHistory = (paymentHistoryData ?? []) as PaymentHistoryResponse;
 
     // Check-in state
     const [checkingIn, setCheckingIn] = useState(false);
@@ -231,15 +244,20 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const [showTeethPermanent, setShowTeethPermanent] = useState(true);
     const [showTeethDeciduous, setShowTeethDeciduous] = useState(false);
 
-    // Auto-expand the first active work when works are loaded
-    useEffect(() => {
+    // Auto-expand the first active work when works are loaded. Done during render
+    // (adjust-state-during-render), keyed on the works-data identity, rather than in
+    // an effect so the React Compiler can optimize it. `expandedWorks` is also user-
+    // editable (expand/collapse), so this only re-seeds when the works data changes.
+    const [autoExpandedFor, setAutoExpandedFor] = useState<Work[] | null>(null);
+    if (worksData != null && autoExpandedFor !== works) {
+        setAutoExpandedFor(works);
         if (works.length > 0) {
             const firstActiveWork = works.find(work => work.status === WORK_STATUS.ACTIVE);
             if (firstActiveWork) {
                 setExpandedWorks(new Set([firstActiveWork.work_id]));
             }
         }
-    }, [works]);
+    }
 
     const handlePrintNoWorkReceipt = () => {
         if (!hasNextAppointment) {
@@ -424,20 +442,15 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         toast.success('Work transferred successfully to another patient');
     };
 
-    const handleViewDetails = async (work: Work) => {
+    const handleViewDetails = (work: Work) => {
         setSelectedWork(work);
         setShowDetailsModal(true);
-        await loadWorkDetails(work.work_id);
+        // The work-details query (gated on the open modal + selectedWork) loads itself.
     };
 
-    const loadWorkDetails = async (workId: number) => {
-        try {
-            const data = await fetchJSON<WorkDetail[]>(`/api/getworkdetailslist?workId=${workId}`, { schema: workContract.getWorkDetailsList.response });
-            setWorkDetails(data);
-        } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to fetch work details'), 5000);
-        }
-    };
+    // Refresh the detail rows for the work currently shown in the details modal.
+    const reloadWorkDetails = (workId: number) =>
+        queryClient.invalidateQueries({ queryKey: qk.work.detailsList(workId) });
 
     const handleAddDetail = () => {
         if (!selectedWork) return;
@@ -497,7 +510,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             }
 
             if (selectedWork) {
-                await loadWorkDetails(selectedWork.work_id);
+                await reloadWorkDetails(selectedWork.work_id);
             }
             setShowDetailForm(false);
         } catch (err) {
@@ -512,7 +525,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             await deleteJSON('/api/deleteworkdetail', { body: JSON.stringify({ detailId }) });
 
             if (selectedWork) {
-                await loadWorkDetails(selectedWork.work_id);
+                await reloadWorkDetails(selectedWork.work_id);
             }
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to delete work detail'), 5000);
@@ -586,25 +599,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         setShowPaymentModal(true);
     };
 
-    const handleViewPaymentHistory = async (work: Work) => {
+    const handleViewPaymentHistory = (work: Work) => {
         setSelectedWorkForPayment(work);
         setShowPaymentHistoryModal(true);
-        await loadPaymentHistory(work.work_id);
-    };
-
-    const loadPaymentHistory = async (workId: number) => {
-        try {
-            setLoadingPayments(true);
-            const data = await fetchJSON<PaymentHistoryResponse>(`/api/getpaymenthistory?workId=${workId}`, {
-                schema: paymentHistoryContract.response, // Validate the boundary (audit H11)
-            });
-            setPaymentHistory(data);
-        } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to fetch payment history'), 5000);
-            setPaymentHistory([]);
-        } finally {
-            setLoadingPayments(false);
-        }
+        // The payment-history query (gated on the open modal + work) loads itself.
     };
 
     const handlePrintReceipt = (work: Work) => {
@@ -807,15 +805,12 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     contentClassName={`${styles.modal} ${styles.detailsModal}`}
                     ariaLabelledBy="work-details-modal-title"
                 >
-                        <div className={styles.modalHeader}>
-                            <h3 id="work-details-modal-title">Work Details - {selectedWork.type_name || 'Work #' + selectedWork.work_id}</h3>
-                            <button
-                                onClick={() => setShowDetailsModal(false)}
-                                className={styles.modalClose}
-                            >
-                                ×
-                            </button>
-                        </div>
+                        <ModalHeader
+                            title={`Work Details - ${selectedWork.type_name || 'Work #' + selectedWork.work_id}`}
+                            titleId="work-details-modal-title"
+                            icon={<i className="fas fa-clipboard-list" />}
+                            onClose={() => setShowDetailsModal(false)}
+                        />
 
                         <div className={styles.detailsContent}>
                             <div className={styles.summaryInfo}>
@@ -923,18 +918,12 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     contentClassName={`${styles.modal} ${styles.detailFormModal}`}
                     ariaLabelledBy="work-detail-form-title"
                 >
-                        <div className={styles.modalHeader}>
-                            <h3 id="work-detail-form-title">
-                                <i className={getWorkTypeConfig(selectedWork.type_of_work).icon}></i>
-                                {' '}{editingDetail ? 'Edit' : 'Add'} {getWorkTypeConfig(selectedWork.type_of_work).name} Item
-                            </h3>
-                            <button
-                                onClick={() => setShowDetailForm(false)}
-                                className={styles.modalClose}
-                            >
-                                ×
-                            </button>
-                        </div>
+                        <ModalHeader
+                            title={`${editingDetail ? 'Edit' : 'Add'} ${getWorkTypeConfig(selectedWork.type_of_work).name} Item`}
+                            titleId="work-detail-form-title"
+                            icon={<i className={getWorkTypeConfig(selectedWork.type_of_work).icon} />}
+                            onClose={() => setShowDetailForm(false)}
+                        />
 
                         <form onSubmit={handleDetailFormSubmit} className={styles.detailForm}>
                             {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('teeth') && (
@@ -1178,15 +1167,12 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     contentClassName={`${styles.modal} ${styles.detailsModal}`}
                     ariaLabelledBy="payment-history-title"
                 >
-                        <div className={styles.modalHeader}>
-                            <h3 id="payment-history-title">Payment History - {selectedWorkForPayment.type_name || 'Work #' + selectedWorkForPayment.work_id}</h3>
-                            <button
-                                onClick={() => setShowPaymentHistoryModal(false)}
-                                className={styles.modalClose}
-                            >
-                                ×
-                            </button>
-                        </div>
+                        <ModalHeader
+                            title={`Payment History - ${selectedWorkForPayment.type_name || 'Work #' + selectedWorkForPayment.work_id}`}
+                            titleId="payment-history-title"
+                            icon={<i className="fas fa-receipt" />}
+                            onClose={() => setShowPaymentHistoryModal(false)}
+                        />
                         <div className={styles.modalContentScroll}>
 
                             <div className={styles.paymentSummaryBox}>
@@ -1258,9 +1244,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                                             await deleteJSON(`/api/deleteInvoice/${payment.InvoiceID}`, {
                                                                                 schema: deleteInvoiceContract.response, // Validate the boundary (audit H11)
                                                                             });
+                                                                            // qk.work.all covers the payment-history child key, so this
+                                                                            // one invalidation refreshes the open modal's list too.
                                                                             queryClient.invalidateQueries({ queryKey: qk.work.all(selectedWorkForPayment.work_id) });
                                                                             toast.success('Payment deleted successfully!');
-                                                                            loadPaymentHistory(selectedWorkForPayment.work_id);
                                                                             queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
                                                                         } catch (error) {
                                                                             console.error('Error deleting payment:', error);
@@ -1318,14 +1305,13 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     contentClassName={`whatsapp-modal ${styles.confirmDialog}`}
                     ariaLabelledBy="delete-work-title"
                 >
-                        <div className="whatsapp-modal-header">
-                            <h3 id="delete-work-title" className={`whatsapp-modal-title ${styles.confirmTitle}`}>
-                                <i className="fas fa-exclamation-triangle"></i> Confirm Delete Work
-                            </h3>
-                            <button onClick={cancelDeleteWork} className="whatsapp-modal-close">
-                                ×
-                            </button>
-                        </div>
+                        <ModalHeader
+                            title="Confirm Delete Work"
+                            titleId="delete-work-title"
+                            icon={<i className="fas fa-exclamation-triangle" />}
+                            variant="danger"
+                            onClose={cancelDeleteWork}
+                        />
                         <div className={styles.confirmBody}>
                             <p className={styles.confirmIntro}>
                                 Are you sure you want to delete this work?
@@ -1371,14 +1357,13 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         ariaLabelledBy="confirm-action-title"
                     >
                             <div style={{ '--confirm-accent': config.color } as React.CSSProperties}>
-                                <div className="whatsapp-modal-header">
-                                    <h3 id="confirm-action-title" className={`whatsapp-modal-title ${styles.confirmTitle}`}>
-                                        <i className={`fas ${config.icon}`}></i> {config.title}
-                                    </h3>
-                                    <button onClick={closeConfirmationModal} className="whatsapp-modal-close">
-                                        ×
-                                    </button>
-                                </div>
+                                <ModalHeader
+                                    title={config.title}
+                                    titleId="confirm-action-title"
+                                    icon={<i className={`fas ${config.icon}`} />}
+                                    variant={confirmationModal.type === 'complete' ? 'success' : confirmationModal.type === 'discontinue' ? 'warning' : 'info'}
+                                    onClose={closeConfirmationModal}
+                                />
                                 <div className={styles.confirmBody}>
                                     <p className={styles.confirmIntro}>
                                         {config.message}

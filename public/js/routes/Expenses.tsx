@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useExpenses, useExpenseMutations } from '../hooks/useExpenses';
 import type { Expense, ExpenseFilters as ExpenseFiltersType, ExpenseData } from '../hooks/useExpenses';
 import ExpenseFilters from '../components/expenses/ExpenseFilters';
@@ -8,8 +9,8 @@ import ExpenseSummary from '../components/expenses/ExpenseSummary';
 import ExpenseModal from '../components/expenses/ExpenseModal';
 import DeleteConfirmModal from '../components/expenses/DeleteConfirmModal';
 import { useToast } from '../contexts/ToastContext';
-import { fetchJSON, httpErrorMessage } from '@/core/http';
-import * as expenseContract from '@shared/contracts/expense.contract';
+import { httpErrorMessage } from '@/core/http';
+import { expenseByIdQuery } from '@/query/queries';
 import styles from './Expenses.module.css';
 
 /**
@@ -87,6 +88,39 @@ export default function Expenses() {
   const [currentExpense, setCurrentExpense] = useState<Expense | null>(null);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
+  // Edit flow: an id gates the single-expense fetch; the row click sets it +
+  // opens the modal, and an effect seeds `currentExpense` once the row arrives.
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const { data: editingExpense, error: editingError } = useQuery(expenseByIdQuery(editingId));
+
+  // Seed the modal's working copy from the fetched expense (edit flow only). Done
+  // during render (adjust-state-during-render), keyed on the fetched-expense identity,
+  // rather than in an effect so the React Compiler can optimize it. `currentExpense`
+  // is also set by other handlers, so this only seeds when a freshly-fetched row arrives.
+  const [seededExpense, setSeededExpense] = useState<Expense | null>(null);
+  if (editingId != null && editingExpense && seededExpense !== editingExpense) {
+    setSeededExpense(editingExpense as Expense);
+    setCurrentExpense(editingExpense as Expense);
+  }
+
+  // Surface a load failure and abandon the edit flow. The reset is done during
+  // render (adjust-during-render, not a setState-in-effect); nulling editingId
+  // both closes the flow and disables the query, which also breaks this condition
+  // so it runs once. The message is captured into state here — as a fresh object
+  // per failure — because nulling editingId clears `editingError`; the effect then
+  // fires the toast (a side effect, not derived state) once per failure object.
+  const [loadErrorToast, setLoadErrorToast] = useState<{ msg: string } | null>(null);
+  if (editingId != null && editingError) {
+    setLoadErrorToast({ msg: httpErrorMessage(editingError, 'Failed to load expense data') });
+    setEditingId(null);
+    setIsExpenseModalOpen(false);
+  }
+  useEffect(() => {
+    if (loadErrorToast) {
+      toast.error(loadErrorToast.msg);
+    }
+  }, [loadErrorToast, toast]);
+
   // Convert FiltersState to ExpenseFiltersType for the hook
   const hookFilters: ExpenseFiltersType = {
     startDate: appliedFilters.startDate,
@@ -126,20 +160,16 @@ export default function Expenses() {
 
   // Open add expense modal
   const handleAddExpense = () => {
+    setEditingId(null);
     setCurrentExpense(null);
     setIsExpenseModalOpen(true);
   };
 
-  // Open edit expense modal
-  const handleEditExpense = async (id: number) => {
-    try {
-      const expense = await fetchJSON<Expense>(`/api/expenses/${id}`, { schema: expenseContract.expenseById.response });
-      setCurrentExpense(expense);
-      setIsExpenseModalOpen(true);
-    } catch (err) {
-      console.error('Error loading expense:', err);
-      toast.error(httpErrorMessage(err, 'Failed to load expense data'));
-    }
+  // Open edit expense modal — the query (gated on editingId) loads the row and
+  // an effect seeds `currentExpense` once it arrives.
+  const handleEditExpense = (id: number) => {
+    setEditingId(id);
+    setIsExpenseModalOpen(true);
   };
 
   // Open delete confirmation modal
@@ -163,6 +193,7 @@ export default function Expenses() {
       }
       setIsExpenseModalOpen(false);
       setCurrentExpense(null);
+      setEditingId(null);
     } catch {
       toast.error(
         currentExpense ? 'Failed to update expense' : 'Failed to create expense'
@@ -237,6 +268,7 @@ export default function Expenses() {
         onClose={() => {
           setIsExpenseModalOpen(false);
           setCurrentExpense(null);
+          setEditingId(null);
         }}
         onSave={handleSaveExpense}
       />

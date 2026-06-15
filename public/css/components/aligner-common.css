@@ -38,23 +38,6 @@
     animation: slideInRight 0.3s ease;
 }
 
-.drawer-header {
-    padding: 0.9rem 1.5rem;
-    border-bottom: 1px solid var(--gray-200);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
-    color: var(--color-white);
-    flex-shrink: 0;
-    flex-grow: 0;
-}
-
-.drawer-header h2 {
-    margin: 0;
-    font-size: 1.15rem;
-}
-
 .close-btn {
     background: rgba(255, 255, 255, 0.2);
     border: none;
@@ -1919,7 +1902,6 @@
         width: 700px;
     }
 
-    .drawer-header,
     .drawer-footer {
         padding: 0.875rem 1.25rem;
     }
@@ -1942,14 +1924,6 @@
     .drawer-container {
         width: 100%;
         max-width: 100%;
-    }
-
-    .drawer-header {
-        padding: 1rem 1rem;
-    }
-
-    .drawer-header h2 {
-        font-size: 1.125rem;
     }
 
     .close-btn {
@@ -2032,14 +2006,6 @@
 
 /* Small mobile devices */
 @media (max-width: 640px) {
-    .drawer-header {
-        padding: 0.875rem 0.875rem;
-    }
-
-    .drawer-header h2 {
-        font-size: 1.0625rem;
-    }
-
     .close-btn {
         width: 48px;
         height: 48px;
@@ -2086,14 +2052,6 @@
 
 /* Extra small devices */
 @media (max-width: 480px) {
-    .drawer-header {
-        padding: 0.75rem;
-    }
-
-    .drawer-header h2 {
-        font-size: 1rem;
-    }
-
     .drawer-body .form-section {
         padding: 0 0.75rem;
     }

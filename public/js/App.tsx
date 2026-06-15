@@ -45,6 +45,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { GlobalErrorBoundary } from './components/error-boundaries/GlobalErrorBoundary';
 import routesConfig from './router/routes.config';
 import { queryClient } from './query/client';
+import { installGlobalErrorReporting } from './core/error-reporter';
 
 // ===================================
 // REACT QUERY (audit M7/M8)
@@ -101,6 +102,11 @@ if (typeof window !== 'undefined') {
       reloadOnce('unhandledrejection');
     }
   });
+
+  // Report uncaught window errors + unhandled rejections (the classes React error
+  // boundaries can't catch) to prod error reporting. Self-healing chunk-load errors
+  // above are skipped inside the reporter.
+  installGlobalErrorReporting();
 }
 
 // Create router instance with all configured routes and loaders

@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, type FormEvent } from 'react';
 import { useLocation } from 'react-router-dom';
 import cn from 'classnames';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
 import { useToast } from '../../contexts/ToastContext';
 import { postJSON, putJSON, httpErrorMessage } from '@/core/http';
+import { qk } from '@/query/keys';
 import { employeesQuery, appointmentDetailsQuery, appointmentByIdQuery } from '@/query/queries';
 import styles from './AppointmentForm.module.css';
 
@@ -27,7 +28,7 @@ interface Doctor {
 
 interface AppointmentDetail {
     id: number;
-    detail: string;
+    detail: string | null; // details.detail is nullable in the DB
 }
 
 interface ExistingAppointment {
@@ -55,6 +56,7 @@ interface EditAppointmentFormProps {
 const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: EditAppointmentFormProps) => {
     const location = useLocation();
     const toast = useToast();
+    const queryClient = useQueryClient();
     const existingAppointment = (location.state as { appointment?: ExistingAppointment } | null)?.appointment;
 
     const [formData, setFormData] = useState<AppointmentFormData>({
@@ -77,7 +79,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     // Doctors + appointment-type options, both on useQuery (cached, shared app-wide).
     const { data: employeesData } = useQuery(employeesQuery('?getAppointments=true'));
     const doctors = useMemo<Doctor[]>(() => {
-        const list = ((employeesData?.employees ?? []) as unknown as Doctor[]).slice();
+        const list: Doctor[] = (employeesData?.employees ?? []).slice();
         // "Clinic" floats to the top; everyone else keeps the server's SortOrder.
         list.sort((a, b) => {
             if (a.employee_name === 'Clinic') return -1;
@@ -88,7 +90,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     }, [employeesData]);
 
     const { data: detailsData } = useQuery(appointmentDetailsQuery());
-    const details = (detailsData ?? []) as unknown as AppointmentDetail[];
+    const details: AppointmentDetail[] = detailsData ?? [];
 
     // Fetch the appointment only when it wasn't handed to us via router state.
     const {
@@ -134,11 +136,19 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
         setOriginalDate(datePart);
     };
 
-    useEffect(() => {
+    // Seed the editable form once the source appointment resolves. Done during
+    // render (keyed on the appointment identity) rather than in an effect, so the
+    // React Compiler can optimize and there's no extra post-paint render.
+    const sourceKey = sourceAppointment
+        ? String(sourceAppointment.appointment_id ?? `${sourceAppointment.person_id ?? ''}|${sourceAppointment.app_date}`)
+        : '';
+    const [prefilledKey, setPrefilledKey] = useState('');
+    if (sourceKey !== prefilledKey) {
+        setPrefilledKey(sourceKey);
         if (sourceAppointment) {
             prefillFormData(sourceAppointment);
         }
-    }, [sourceAppointment]);
+    }
 
     useEffect(() => {
         return () => {
@@ -258,6 +268,11 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                             toast.error('WhatsApp error: ' + httpErrorMessage(err, 'send failed'));
                         });
                 }
+
+                // Refresh the patient's appointment-backed reads so the edited
+                // date/doctor/type shows immediately on returning to the list —
+                // the 30s-fresh cache would otherwise serve stale rows.
+                queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
 
                 onSuccess && onSuccess(result);
                 onClose && onClose();
@@ -381,7 +396,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                             >
                                 <option value="">Select type...</option>
                                 {details.filter(d => d.id).map((detail) => (
-                                    <option key={detail.id} value={detail.detail}>
+                                    <option key={detail.id} value={detail.detail ?? ''}>
                                         {detail.detail}
                                     </option>
                                 ))}

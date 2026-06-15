@@ -6,6 +6,7 @@ import { useState } from 'react';
 import type { StandItem } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
 import Modal from '../react/Modal';
+import ModalHeader from '../react/ModalHeader';
 import styles from './DeleteItemModal.module.css';
 
 interface DeleteItemModalProps {
@@ -37,12 +38,12 @@ export default function DeleteItemModal({ isOpen, item, onConfirm, onCancel }: D
       contentClassName={styles.modalContent}
       ariaLabelledBy="delete-item-modal-title"
     >
-      <div className={styles.modalHeader}>
-        <h2 id="delete-item-modal-title">Delete Item</h2>
-        <button className={styles.closeBtn} onClick={onCancel} aria-label="Close modal">
-          &times;
-        </button>
-      </div>
+      <ModalHeader
+        title="Delete Item"
+        titleId="delete-item-modal-title"
+        variant="danger"
+        onClose={onCancel}
+      />
 
       <div className={styles.modalBody}>
         <p className={styles.warningText}>

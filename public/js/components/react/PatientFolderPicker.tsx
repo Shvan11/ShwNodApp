@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { FileEntry } from '@/types/api.types';
-import { fetchJSON, httpErrorMessage } from '@/core/http';
-import * as fileExplorer from '@shared/contracts/file-explorer.contract';
+import { httpErrorMessage } from '@/core/http';
+import { patientFilesQuery } from '@/query/queries';
+import type * as fileExplorer from '@shared/contracts/file-explorer.contract';
 import { buildContentUrl, categoryIcon, formatSize } from './files/fileHelpers';
 import styles from './PatientFolderPicker.module.css';
 
@@ -23,33 +25,14 @@ interface Props {
  */
 const PatientFolderPicker = ({ personId, selectedRelPath, onSelect }: Props) => {
     const [currentPath, setCurrentPath] = useState('');
-    const [listing, setListing] = useState<fileExplorer.FileListing | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [thumbErrors, setThumbErrors] = useState<Set<string>>(new Set());
 
-    const loadListing = useCallback(async (relPath: string, signal?: AbortSignal) => {
-        try {
-            setLoading(true);
-            setError(null);
-            const data = await fetchJSON<fileExplorer.FileListing>(
-                `/api/patients/${personId}/files?path=${encodeURIComponent(relPath)}`,
-                { signal, schema: fileExplorer.list.response }
-            );
-            setListing(data);
-        } catch (err) {
-            if (err instanceof Error && err.name === 'AbortError') return;
-            setError(httpErrorMessage(err, 'Failed to load folder'));
-        } finally {
-            setLoading(false);
-        }
-    }, [personId]);
-
-    useEffect(() => {
-        const controller = new AbortController();
-        loadListing(currentPath, controller.signal);
-        return () => controller.abort();
-    }, [currentPath, loadListing]);
+    const { data, isLoading: loading, error: queryError, refetch } = useQuery({
+        ...patientFilesQuery(personId, currentPath),
+        enabled: personId != null,
+    });
+    const listing = (data ?? null) as fileExplorer.FileListing | null;
+    const error = queryError ? httpErrorMessage(queryError, 'Failed to load folder') : null;
 
     const markThumbError = (relPath: string) =>
         setThumbErrors((prev) => new Set(prev).add(relPath));
@@ -87,7 +70,7 @@ const PatientFolderPicker = ({ personId, selectedRelPath, onSelect }: Props) => 
             ) : error ? (
                 <div className={styles.state}>
                     <i className="fas fa-exclamation-triangle" /> {error}
-                    <button type="button" className={styles.retryBtn} onClick={() => loadListing(currentPath)}>
+                    <button type="button" className={styles.retryBtn} onClick={() => refetch()}>
                         Retry
                     </button>
                 </div>

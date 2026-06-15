@@ -22,7 +22,14 @@ import { z } from 'zod';
 // alert-queries.ts#getAlertTypes → { alert_type_id, type_name }.
 // ---------------------------------------------------------------------------
 
-const idNameRow = z.looseObject({ id: z.number() });
+// Patient reference lookups: the display column is NULLABLE in the DB
+// (referral_sources.referral / patient_types.patient_type / addresses.zone, each
+// aliased to `name`), so `name` is modeled nullable — the dropdowns render it
+// directly and a null display must not fail-loud the client response guard.
+const idNameRow = z.looseObject({ id: z.number(), name: z.string().nullable() });
+// genders (hardcoded labels) and implant manufacturers (manufacturer_name is NOT
+// NULL) always carry a display name, so `name` is non-null for those two.
+const idNameRowNN = z.looseObject({ id: z.number(), name: z.string() });
 
 export const referralSources = {
   response: z.array(idNameRow),
@@ -40,17 +47,17 @@ export const addresses = {
 export type AddressesResponse = z.infer<typeof addresses.response>;
 
 export const genders = {
-  response: z.array(idNameRow),
+  response: z.array(idNameRowNN),
 } as const;
 export type GendersResponse = z.infer<typeof genders.response>;
 
 export const implantManufacturers = {
-  response: z.array(idNameRow),
+  response: z.array(idNameRowNN),
 } as const;
 export type ImplantManufacturersResponse = z.infer<typeof implantManufacturers.response>;
 
-// alert_types rows are keyed by `alert_type_id` (the consumer reads it).
+// alert_types rows are keyed by `alert_type_id`; `type_name` is NOT NULL.
 export const alertTypes = {
-  response: z.array(z.looseObject({ alert_type_id: z.number() })),
+  response: z.array(z.looseObject({ alert_type_id: z.number(), type_name: z.string() })),
 } as const;
 export type AlertTypesResponse = z.infer<typeof alertTypes.response>;

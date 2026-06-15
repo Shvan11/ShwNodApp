@@ -2,7 +2,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "appointments": "Appointments",
-    "search": "Search"
+    "search": "Search",
+    "closePatient": "Close patient tab"
   },
   "theme": {
     "light": "Light",

@@ -1,5 +1,6 @@
 import React, { useState, ChangeEvent, FormEvent } from 'react';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import { copyToClipboard } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -325,13 +326,13 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
             onClose={handleClose}
             overlayClassName="drawer-overlay"
             contentClassName="drawer-container"
+            ariaLabelledBy="set-form-drawer-title"
         >
-            <div className="drawer-header">
-                <h2>{set ? 'Edit Aligner Set' : 'Add New Aligner Set'}</h2>
-                <button className="close-btn" onClick={handleClose}>
-                    <i className="fas fa-times"></i>
-                </button>
-            </div>
+            <ModalHeader
+                title={set ? 'Edit Aligner Set' : 'Add New Aligner Set'}
+                titleId="set-form-drawer-title"
+                onClose={handleClose}
+            />
 
             <div className="drawer-body">
                 {!doctorsLoaded && !set ? (

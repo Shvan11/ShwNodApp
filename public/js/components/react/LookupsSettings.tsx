@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
-import { fetchJSON } from '@/core/http';
-import * as lookupAdminContract from '@shared/contracts/lookup-admin.contract';
+import { adminLookupTablesQuery } from '@/query/queries';
 import LookupEditor from './LookupEditor';
 import HolidayEditor from './HolidayEditor';
 import CostPresetsSettings from './CostPresetsSettings';
@@ -54,34 +54,22 @@ interface LookupsSettingsProps {
  */
 const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onChangesUpdate }) => {
     const toast = useToast();
-    const [tables, setTables] = useState<TableConfig[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
+    const { data, isLoading: loading, isError } = useQuery(adminLookupTablesQuery());
     const [expandedTable, setExpandedTable] = useState<string | null>(null);
 
-    const loadTableConfigs = async (): Promise<void> => {
-        try {
-            setLoading(true);
-            const data = await fetchJSON<TableConfig[]>('/api/admin/lookups/tables', { schema: lookupAdminContract.tables.response });
-            const costPresetsEntry: TableConfig = {
-                key: COST_PRESETS_TABLE_KEY,
-                displayName: 'Cost Presets',
-                icon: 'fas fa-dollar-sign',
-                idColumn: 'PresetID',
-                columns: [],
-            };
-            setTables([...data, costPresetsEntry]);
-        } catch {
-            toast.error('Failed to load lookup tables configuration');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot data fetch on mount; loader's setState is intentional
-        loadTableConfigs();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        if (isError) toast.error('Failed to load lookup tables configuration');
+    }, [isError, toast]);
+
+    // Append the synthetic cost-presets entry (its own endpoint, not the generic CRUD).
+    const costPresetsEntry: TableConfig = {
+        key: COST_PRESETS_TABLE_KEY,
+        displayName: 'Cost Presets',
+        icon: 'fas fa-dollar-sign',
+        idColumn: 'PresetID',
+        columns: [],
+    };
+    const tables = data ? [...(data as TableConfig[]), costPresetsEntry] : [];
 
     const toggleTable = (tableKey: string): void => {
         setExpandedTable(expandedTable === tableKey ? null : tableKey);

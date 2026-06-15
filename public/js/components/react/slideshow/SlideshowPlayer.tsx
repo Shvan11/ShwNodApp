@@ -92,10 +92,11 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
     setChromeVisible(false);
   };
 
-  // Reveal chrome on mount, then let it auto-hide.
+  // Chrome starts visible (initial state); on mount, arm the auto-hide timer so it
+  // fades on its own. We arm the timer directly rather than calling revealChrome()
+  // to avoid a redundant synchronous setChromeVisible(true) in the effect body.
   useEffect(() => {
-    revealChrome();
-     
+    hideTimerRef.current = window.setTimeout(() => setChromeVisible(false), CHROME_HIDE_MS);
   }, []);
 
   const go = (delta: 1 | -1) => {

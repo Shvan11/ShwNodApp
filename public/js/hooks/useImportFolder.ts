@@ -57,6 +57,39 @@ export function useImportFolder(mode: PermissionMode = 'readwrite'): UseImportFo
   const [status, setStatus] = useState<ImportFolderStatus>(supported ? 'unset' : 'unsupported');
   const [loading, setLoading] = useState(supported);
 
+  // Read the saved handle + its permission without prompting. Written as a
+  // .then-chain (NOT an async fn) so every setState lives in a chained callback,
+  // never synchronously in the caller — that's the shape the React Compiler accepts
+  // from a mount effect (an `async` callee trips react-hooks/set-state-in-effect).
+  // Assumes `supported` — callers guard it.
+  const loadSaved = useCallback(
+    (): Promise<void> =>
+      getDirectoryHandle(IMPORT_FOLDER_KEY)
+        .then(saved => {
+          if (!saved) {
+            setHandle(null);
+            setStatus('unset');
+            return;
+          }
+          setHandle(saved);
+          return checkPermission(saved, mode).then(perm => setStatus(toStatus(perm)));
+        })
+        .catch(() => {
+          setHandle(null);
+          setStatus('unset');
+        })
+        .finally(() => setLoading(false)),
+    [mode]
+  );
+
+  // Mount: read once. `loading` starts true (initial state) and the unsupported
+  // case is already reflected in the initial state, so the effect sets nothing
+  // synchronously — it only kicks off the read when supported.
+  useEffect(() => {
+    if (!supported) return;
+    void loadSaved();
+  }, [supported, loadSaved]);
+
   const refresh = useCallback(async (): Promise<void> => {
     if (!supported) {
       setStatus('unsupported');
@@ -64,26 +97,8 @@ export function useImportFolder(mode: PermissionMode = 'readwrite'): UseImportFo
       return;
     }
     setLoading(true);
-    try {
-      const saved = await getDirectoryHandle(IMPORT_FOLDER_KEY);
-      if (!saved) {
-        setHandle(null);
-        setStatus('unset');
-        return;
-      }
-      setHandle(saved);
-      setStatus(toStatus(await checkPermission(saved, mode)));
-    } catch {
-      setHandle(null);
-      setStatus('unset');
-    } finally {
-      setLoading(false);
-    }
-  }, [supported, mode]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    await loadSaved();
+  }, [supported, loadSaved]);
 
   const choosePick = useCallback(async (): Promise<FileSystemDirectoryHandle | null> => {
     if (!supported) return null;

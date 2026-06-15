@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, FormEvent, ChangeEvent } from 'react';
+import React, { useState, useEffect, useMemo, useRef, FormEvent, ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { useQueries } from '@tanstack/react-query';
 import { formatISODate } from '../../core/utils';
-import { fetchJSON } from '@/core/http';
-import * as lookupAdminContract from '@shared/contracts/lookup-admin.contract';
+import { adminLookupItemsQuery } from '@/query/queries';
 
 // Types
 interface ReferenceConfig {
@@ -54,51 +54,79 @@ interface LookupEditorModalProps {
  * Positioned modal for adding/editing lookup table items
  * Appears next to the anchor element (edit button or add button)
  */
+// Pure positioner — module-scoped, takes an already-measured rect (keeps the DOM
+// read at the call site).
+const calculatePosition = (rect: DOMRect): Position => {
+    const modalWidth = 420;
+    const modalHeight = 400;
+    const padding = 12;
+
+    let left = rect.left - modalWidth - padding;
+    let top = rect.top;
+
+    if (left < padding) {
+        left = rect.right + padding;
+    }
+
+    if (left + modalWidth > window.innerWidth - padding) {
+        left = Math.max(padding, window.innerWidth - modalWidth - padding);
+    }
+
+    if (top + modalHeight > window.innerHeight - padding) {
+        top = Math.max(padding, window.innerHeight - modalHeight - padding);
+    }
+    top = Math.max(padding, top);
+
+    return { top, left };
+};
+
 const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, onSave, columns, editingItem, tableName, idColumn: _idColumn, anchorEl }) => {
     const [formData, setFormData] = useState<FormData>({});
     const [errors, setErrors] = useState<FormErrors>({});
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [position, setPosition] = useState<Position | null>(null);
-    const [referenceOptions, setReferenceOptions] = useState<Record<string, ReferenceOption[]>>({});
     const modalRef = useRef<HTMLDivElement>(null);
 
-    // Fetch dropdown options for any reference columns when the modal opens.
-    // Cached per referenced-table name so multiple columns pointing at the same
-    // table share one fetch, and re-opens reuse the cache.
-    useEffect(() => {
-        if (!isOpen) return;
-        const refColumns = columns.filter(c => c.type === 'reference' && c.reference);
-        if (refColumns.length === 0) return;
+    // Distinct reference-type columns (one fetch per referenced table). Derived
+    // from the columns config while the modal is open; closed → no reads fire.
+    const refColumns = useMemo(
+        () => columns.filter(c => c.type === 'reference' && c.reference),
+        [columns]
+    );
+    const refTables = useMemo(
+        () => (isOpen ? Array.from(new Set(refColumns.map(c => c.reference!.table))) : []),
+        [isOpen, refColumns]
+    );
 
-        const needed = Array.from(new Set(refColumns.map(c => c.reference!.table)))
-            .filter(table => !referenceOptions[table]);
-        if (needed.length === 0) return;
+    // Fetch dropdown options for any reference columns. One query per referenced
+    // table; React Query dedups + caches by key, so multiple columns pointing at
+    // the same table share one fetch and re-opens reuse the cache.
+    const refQueries = useQueries({
+        queries: refTables.map(table => adminLookupItemsQuery(table)),
+    });
 
-        let cancelled = false;
-        (async () => {
-            const fetched: Record<string, ReferenceOption[]> = {};
-            await Promise.all(needed.map(async (table) => {
-                const refCol = refColumns.find(c => c.reference!.table === table)!.reference!;
-                try {
-                    const rows = await fetchJSON<LookupItem[]>(`/api/admin/lookups/${table}`, { schema: lookupAdminContract.items.response });
-                    fetched[table] = rows.map(r => ({
-                        id: r[refCol.idColumn],
-                        label: String(r[refCol.displayColumn] ?? ''),
-                    }));
-                } catch {
-                    // leave undefined; renderInput shows a disabled select
-                }
+    // Map fetched rows into { id, label } per table for the select inputs. A table
+    // whose fetch failed/pending stays absent → renderInput shows a disabled select.
+    const referenceOptions = useMemo(() => {
+        const out: Record<string, ReferenceOption[]> = {};
+        refTables.forEach((table, i) => {
+            const rows = refQueries[i]?.data as LookupItem[] | undefined;
+            if (!rows) return;
+            const refCol = refColumns.find(c => c.reference!.table === table)!.reference!;
+            out[table] = rows.map(r => ({
+                id: r[refCol.idColumn],
+                label: String(r[refCol.displayColumn] ?? ''),
             }));
-            if (!cancelled && Object.keys(fetched).length > 0) {
-                setReferenceOptions(prev => ({ ...prev, ...fetched }));
-            }
-        })();
+        });
+        return out;
+    }, [refTables, refQueries, refColumns]);
 
-        return () => { cancelled = true; };
-    }, [isOpen, columns, referenceOptions]);
-
-    // Initialize form data when modal opens or editingItem changes
-    useEffect(() => {
+    // Initialize form data when the modal opens or the edited item changes — keyed
+    // adjust-during-render, no setState-in-effect. `columns` is the stable per-table
+    // schema (read here, not part of the key, so an unstable prop ref can't loop).
+    const [seededItem, setSeededItem] = useState<{ open: boolean; item: unknown }>({ open: false, item: null });
+    if (seededItem.open !== isOpen || seededItem.item !== editingItem) {
+        setSeededItem({ open: isOpen, item: editingItem });
         if (isOpen) {
             if (editingItem) {
                 // Edit mode: populate form with existing values
@@ -117,46 +145,22 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
             }
             setErrors({});
         }
-    }, [isOpen, editingItem, columns]);
+    }
 
-    // Calculate position - runs synchronously before paint to prevent flicker
-    const calculatePosition = (anchor: HTMLElement): Position | null => {
-        if (!anchor) return null;
+    // Position modal next to the anchor. Seeded by measuring during render (keyed
+    // adjust-during-render, mirroring the form seeding above) so the only
+    // synchronous setState stays out of the effect (react-hooks/set-state-in-effect).
+    const [seededPos, setSeededPos] = useState<{ open: boolean; anchor: HTMLElement | null }>({ open: false, anchor: null });
+    if (seededPos.open !== isOpen || seededPos.anchor !== anchorEl) {
+        setSeededPos({ open: isOpen, anchor: anchorEl });
+        setPosition(isOpen && anchorEl ? calculatePosition(anchorEl.getBoundingClientRect()) : null);
+    }
 
-        const rect = anchor.getBoundingClientRect();
-        const modalWidth = 420;
-        const modalHeight = 400;
-        const padding = 12;
-
-        let left = rect.left - modalWidth - padding;
-        let top = rect.top;
-
-        if (left < padding) {
-            left = rect.right + padding;
-        }
-
-        if (left + modalWidth > window.innerWidth - padding) {
-            left = Math.max(padding, window.innerWidth - modalWidth - padding);
-        }
-
-        if (top + modalHeight > window.innerHeight - padding) {
-            top = Math.max(padding, window.innerHeight - modalHeight - padding);
-        }
-        top = Math.max(padding, top);
-
-        return { top, left };
-    };
-
-    // Position modal next to anchor element - useLayoutEffect prevents flicker
-    useLayoutEffect(() => {
-        if (!isOpen || !anchorEl) {
-            setPosition(null);
-            return;
-        }
-
-        setPosition(calculatePosition(anchorEl));
-
-        const updatePosition = (): void => setPosition(calculatePosition(anchorEl));
+    // Keep the modal pinned to the anchor as the viewport changes — setState lives
+    // in the event callback, never synchronously in the effect body.
+    useEffect(() => {
+        if (!isOpen || !anchorEl) return;
+        const updatePosition = (): void => setPosition(calculatePosition(anchorEl.getBoundingClientRect()));
         window.addEventListener('resize', updatePosition);
         window.addEventListener('scroll', updatePosition, true);
 

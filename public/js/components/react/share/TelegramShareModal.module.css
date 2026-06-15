@@ -7,19 +7,15 @@
 
 .modal {
   width: min(440px, 92vw);
+  display: flex;
+  flex-direction: column;
+}
+
+.body {
   padding: var(--spacing-xl);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
-}
-
-.title {
-  margin: 0;
-  font-size: var(--font-size-lg);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  color: var(--text-primary);
 }
 
 .notice {

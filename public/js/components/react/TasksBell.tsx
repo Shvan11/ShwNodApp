@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { httpErrorMessage } from '@/core/http';
+import { tasksQuery } from '@/query/queries';
 import {
-    fetchTasks,
     setTaskStatus,
     snoozeTask,
     notifyTasksChanged,
@@ -40,7 +41,6 @@ const TasksBell = () => {
     const navigate = useNavigate();
     const toast = useToast();
 
-    const [tasks, setTasks] = useState<TaskRow[]>([]);
     const [open, setOpen] = useState(false);
     const [formOpen, setFormOpen] = useState(false);
     const [editTask, setEditTask] = useState<TaskRow | null>(null);
@@ -51,7 +51,6 @@ const TasksBell = () => {
     // otherwise clip it), so it's positioned with viewport-fixed coords off the bell.
     const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
 
-    const abortRef = useRef<AbortController | null>(null);
     const wrapRef = useRef<HTMLDivElement | null>(null);
     const bellRef = useRef<HTMLButtonElement | null>(null);
     const popRef = useRef<HTMLDivElement | null>(null);
@@ -63,29 +62,23 @@ const TasksBell = () => {
         setCoords({ top: r.bottom + 8, left: Math.max(8, left) });
     }, []);
 
-    const loadTasks = useCallback(() => {
-        abortRef.current?.abort();
-        const controller = new AbortController();
-        abortRef.current = controller;
-        fetchTasks(controller.signal)
-            .then(setTasks)
-            .catch((e) => { if (e instanceof Error && e.name !== 'AbortError') { /* keep last good list */ } });
-    }, []);
+    // Task list on React Query: the staleTime + 5-min `refetchInterval` cover the
+    // mount + poll; a stale read keeps the last good list. The visibility refetch
+    // and the app-wide `tasks:changed` event (fired by every task/alert mutation)
+    // are bridged to refetch below.
+    const { data: tasksData, refetch } = useQuery({ ...tasksQuery(), refetchInterval: REFRESH_MS });
+    const tasks = (tasksData ?? []) as TaskRow[];
 
-    // Mount + periodic poll + visibility refetch + cross-app change event.
     useEffect(() => {
-        loadTasks();
-        const interval = setInterval(loadTasks, REFRESH_MS);
-        const onVisible = () => { if (document.visibilityState === 'visible') loadTasks(); };
+        const onVisible = () => { if (document.visibilityState === 'visible') void refetch(); };
+        const onChanged = () => void refetch();
         document.addEventListener('visibilitychange', onVisible);
-        window.addEventListener(TASKS_CHANGED_EVENT, loadTasks);
+        window.addEventListener(TASKS_CHANGED_EVENT, onChanged);
         return () => {
-            clearInterval(interval);
             document.removeEventListener('visibilitychange', onVisible);
-            window.removeEventListener(TASKS_CHANGED_EVENT, loadTasks);
-            abortRef.current?.abort();
+            window.removeEventListener(TASKS_CHANGED_EVENT, onChanged);
         };
-    }, [loadTasks]);
+    }, [refetch]);
 
     // Close the popover on outside click / Escape; keep it anchored on resize.
     useEffect(() => {
@@ -282,7 +275,7 @@ const TasksBell = () => {
             <TaskFormModal
                 isOpen={formOpen}
                 onClose={() => setFormOpen(false)}
-                onSaved={loadTasks}
+                onSaved={() => refetch()}
                 editTask={editTask}
             />
         </div>

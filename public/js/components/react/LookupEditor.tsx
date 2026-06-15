@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, MouseEvent } from 'react';
+import React, { useState, useEffect, useRef, MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { qk } from '@/query/keys';
 import { adminLookupItemsQuery } from '@/query/queries';
 import LookupEditorModal from './LookupEditorModal';
 
@@ -45,47 +46,53 @@ interface LookupEditorProps {
     idColumn: string;
 }
 
+// Pure positioner — module-scoped, takes an already-measured rect (keeps the DOM
+// read at the call site).
+const calculatePosition = (rect: DOMRect): Position => {
+    const popoverWidth = 280;
+    const popoverHeight = 160;
+    const padding = 8;
+
+    let left = rect.left - popoverWidth - padding;
+    let top = rect.top + (rect.height / 2) - (popoverHeight / 2);
+
+    if (left < padding) {
+        left = rect.right + padding;
+    }
+
+    if (left + popoverWidth > window.innerWidth - padding) {
+        left = rect.left + (rect.width / 2) - (popoverWidth / 2);
+        top = rect.top - popoverHeight - padding;
+    }
+
+    top = Math.max(padding, Math.min(top, window.innerHeight - popoverHeight - padding));
+    left = Math.max(padding, Math.min(left, window.innerWidth - popoverWidth - padding));
+
+    return { top, left };
+};
+
 /**
  * Positioned delete confirmation popover
  * Appears next to the delete button instead of center screen
  */
 const DeleteConfirmPopover: React.FC<DeleteConfirmPopoverProps> = ({ anchorEl, itemName, onCancel, onConfirm }) => {
-    const [position, setPosition] = useState<Position | null>(null);
+    // Seed by measuring the anchor during render (it's the button that opened this
+    // popover, already in the DOM). Positioning on the first render avoids a
+    // post-paint reposition flicker and keeps the only synchronous setState out of
+    // the effect (react-hooks/set-state-in-effect).
+    const [position, setPosition] = useState<Position | null>(() => calculatePosition(anchorEl.getBoundingClientRect()));
 
-    // Calculate position synchronously to prevent flicker
-    const calculatePosition = (anchor: HTMLElement): Position | null => {
-        if (!anchor) return null;
+    // Re-seed during render if the anchor element changes (adjust-state-during-render).
+    const [seededAnchor, setSeededAnchor] = useState(anchorEl);
+    if (anchorEl !== seededAnchor) {
+        setSeededAnchor(anchorEl);
+        setPosition(calculatePosition(anchorEl.getBoundingClientRect()));
+    }
 
-        const rect = anchor.getBoundingClientRect();
-        const popoverWidth = 280;
-        const popoverHeight = 160;
-        const padding = 8;
-
-        let left = rect.left - popoverWidth - padding;
-        let top = rect.top + (rect.height / 2) - (popoverHeight / 2);
-
-        if (left < padding) {
-            left = rect.right + padding;
-        }
-
-        if (left + popoverWidth > window.innerWidth - padding) {
-            left = rect.left + (rect.width / 2) - (popoverWidth / 2);
-            top = rect.top - popoverHeight - padding;
-        }
-
-        top = Math.max(padding, Math.min(top, window.innerHeight - popoverHeight - padding));
-        left = Math.max(padding, Math.min(left, window.innerWidth - popoverWidth - padding));
-
-        return { top, left };
-    };
-
-    // useLayoutEffect prevents flicker by calculating before paint
-    useLayoutEffect(() => {
-        if (!anchorEl) return;
-
-        setPosition(calculatePosition(anchorEl));
-
-        const updatePosition = (): void => setPosition(calculatePosition(anchorEl));
+    // Keep the popover pinned to the anchor as the viewport changes. setState lives
+    // in the event callback, never synchronously in the effect body.
+    useEffect(() => {
+        const updatePosition = (): void => setPosition(calculatePosition(anchorEl.getBoundingClientRect()));
         window.addEventListener('resize', updatePosition);
         window.addEventListener('scroll', updatePosition, true);
 
@@ -144,7 +151,8 @@ const DeleteConfirmPopover: React.FC<DeleteConfirmPopoverProps> = ({ anchorEl, i
  */
 const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, columns, idColumn }) => {
     const toast = useToast();
-    const { data: itemsData, isLoading: loading, isError, error: itemsError, refetch } =
+    const queryClient = useQueryClient();
+    const { data: itemsData, isLoading: loading, isError, error: itemsError } =
         useQuery(adminLookupItemsQuery(tableKey));
     const items = (itemsData ?? []) as LookupItem[];
     const [modalOpen, setModalOpen] = useState<boolean>(false);
@@ -195,7 +203,7 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
         try {
             await deleteJSON(`/api/admin/lookups/${tableKey}/${itemId}`);
             toast.success('Item deleted successfully');
-            refetch();
+            void queryClient.invalidateQueries({ queryKey: qk.adminLookups.table(tableKey) });
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to delete item'));
         } finally {
@@ -217,7 +225,7 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
             toast.success(isEdit ? 'Item updated successfully' : 'Item created successfully');
             setModalOpen(false);
             setAnchorEl(null);
-            refetch();
+            void queryClient.invalidateQueries({ queryKey: qk.adminLookups.table(tableKey) });
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to save item'));
         }

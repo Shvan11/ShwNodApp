@@ -1,4 +1,4 @@
-import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import { useState, ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
@@ -25,19 +25,21 @@ interface Gender {
     name: string;
 }
 
+// addresses.zone / referral_sources.referral / patient_types.patient_type are
+// nullable in the DB (aliased to `name`); rendered directly in the dropdowns.
 interface Address {
     id: number;
-    name: string;
+    name: string | null;
 }
 
 interface ReferralSource {
     id: number;
-    name: string;
+    name: string | null;
 }
 
 interface PatientType {
     id: number;
-    name: string;
+    name: string | null;
 }
 
 interface Tag {
@@ -94,13 +96,13 @@ const EditPatientComponent = ({ personId }: Props) => {
     const { data: patientTypesData } = useQuery(patientTypesQuery());
     const { data: tagsData } = useQuery(tagOptionsQuery());
 
-    // Loose contracts model only `{ id }`, so the runtime rows (which carry
-    // name/tag) need a double cast through unknown.
-    const genders = (gendersData ?? []) as unknown as Gender[];
-    const addresses = (addressesData ?? []) as unknown as Address[];
-    const referralSources = (referralSourcesData ?? []) as unknown as ReferralSource[];
-    const patientTypes = (patientTypesData ?? []) as unknown as PatientType[];
-    const tags = (tagsData ?? []) as unknown as Tag[];
+    // Contract rows now model the display field, so these read straight through
+    // (the local types below match the contract's nullability).
+    const genders: Gender[] = gendersData ?? [];
+    const addresses: Address[] = addressesData ?? [];
+    const referralSources: ReferralSource[] = referralSourcesData ?? [];
+    const patientTypes: PatientType[] = patientTypesData ?? [];
+    const tags: Tag[] = tagsData ?? [];
 
     // Loading screen shows only while the patient record is in flight (a missing
     // personId resolves immediately to "not loading").
@@ -134,8 +136,13 @@ const EditPatientComponent = ({ personId }: Props) => {
     // Populate the form when the patient record arrives (or is refetched after a
     // save). Mirrors the old loadPatientData population exactly — same field
     // coercion (String(...) on FK ids/cost, NULL→'' empty-option, language→'0').
-    useEffect(() => {
-        if (!patientData) return;
+    // Done during render (adjust-state-during-render), keyed on the patient identity,
+    // so the React Compiler can optimize and there's no extra post-paint render.
+    const patientKey = patientData ? String(patientData.person_id) : '';
+    const [initializedPatientKey, setInitializedPatientKey] = useState('');
+    if (patientKey !== initializedPatientKey) {
+        setInitializedPatientKey(patientKey);
+        if (patientData) {
         const data = patientData;
         setFormData({
             person_id: data.person_id,
@@ -160,15 +167,19 @@ const EditPatientComponent = ({ personId }: Props) => {
             currency: data.currency || 'IQD',
             tag_id: data.tag_id ? String(data.tag_id) : ''
         });
-    }, [patientData]);
+        }
+    }
 
     // Surface a patient-record load failure in the existing error banner (the
-    // old loadPatientData did setError(...) on its catch).
-    useEffect(() => {
+    // old loadPatientData did setError(...) on its catch). Done during render
+    // (adjust-state-during-render) so the React Compiler can optimize it.
+    const [prevPatientError, setPrevPatientError] = useState(patientError);
+    if (patientError !== prevPatientError) {
+        setPrevPatientError(patientError);
         if (patientError) {
             setError(httpErrorMessage(patientError, 'Failed to load patient data'));
         }
-    }, [patientError]);
+    }
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();

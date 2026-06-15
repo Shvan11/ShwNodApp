@@ -143,24 +143,24 @@ interface PrintQueueProviderProps {
  * Manages global print queue state with sessionStorage persistence
  */
 export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
-    const [queue, setQueue] = useState<PrintQueueItem[]>([]);
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-
-    // Load queue from sessionStorage on mount
-    useEffect(() => {
+    // Load queue from sessionStorage once, via a lazy initializer (no mount effect
+    // just to seed local state).
+    const [queue, setQueue] = useState<PrintQueueItem[]>(() => {
         try {
             const stored = sessionStorage.getItem(STORAGE_KEY);
             if (stored) {
                 const parsed = JSON.parse(stored);
                 if (Array.isArray(parsed)) {
-                    setQueue(parsed);
+                    return parsed;
                 }
             }
         } catch (e) {
             console.warn('Failed to load print queue from storage:', e);
         }
-    }, []);
+        return [];
+    });
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     // Save queue to sessionStorage on change
     useEffect(() => {

@@ -2,7 +2,7 @@
  * ItemFormModal Component
  * Modal for adding or editing a stand inventory item
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import type { StandItem, StandItemCreateData } from '../../hooks/useStand';
 import { useStandCategories } from '../../hooks/useStand';
@@ -11,6 +11,7 @@ import { formatNumber } from '../../utils/formatters';
 import { postJSON, httpErrorMessage } from '@/core/http';
 import { scanVision, type VisionScanResult } from '@shared/contracts/stand.contract';
 import Modal from '../react/Modal';
+import ModalHeader from '../react/ModalHeader';
 import styles from './ItemFormModal.module.css';
 
 interface ItemFormModalProps {
@@ -128,67 +129,99 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
 
   const isEditMode = !!item;
 
-  useEffect(() => {
-    if (!isOpen) {
-      scanPreviews.forEach((url) => URL.revokeObjectURL(url));
-      setScanImages([]);
-      setScanPreviews([]);
-      setScanning(false);
-      sessionStorage.removeItem(FORM_STORAGE_KEY);
-      return;
-    }
-
-    let restored: PersistedFormState | null = null;
+  // Read this item's persisted draft (survives an accidental close / reload).
+  // Returns null when absent, malformed, or keyed to a different item.
+  const readPersistedDraft = (): PersistedFormState | null => {
     try {
       const saved = sessionStorage.getItem(FORM_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as PersistedFormState;
-        const currentId = item?.item_id ?? null;
-        if (parsed.itemId === currentId) restored = parsed;
-      }
+      if (!saved) return null;
+      const parsed = JSON.parse(saved) as PersistedFormState;
+      return parsed.itemId === (item?.item_id ?? null) ? parsed : null;
     } catch {
-      // ignore malformed storage
+      return null;
     }
+  };
 
-    if (restored) {
-      setFormData(restored.formData);
-      setDisplayCost(restored.formData.costPrice ? formatNumber(restored.formData.costPrice) : '');
-      setDisplaySell(restored.formData.sellPrice ? formatNumber(restored.formData.sellPrice) : '');
-      if (restored.imageDataUrls.length > 0) {
-        (async () => {
-          try {
-            const files = await Promise.all(
-              restored!.imageDataUrls.map((url, i) => dataUrlToFile(url, `restored-${i}.jpg`))
-            );
-            setScanImages(files);
-            setScanPreviews(files.map((f) => URL.createObjectURL(f)));
-          } catch {
-            // ignore — user can re-shoot
-          }
-        })();
+  // Seed / reset the form when the modal opens or the edited item changes — keyed
+  // adjust-during-render (no setState-in-effect), mirroring LookupEditorModal. The
+  // async image restore + blob revocation are handled by the effects below.
+  const [seeded, setSeeded] = useState<{ open: boolean; item: StandItem | null }>({ open: false, item: null });
+  if (seeded.open !== isOpen || seeded.item !== item) {
+    setSeeded({ open: isOpen, item });
+    // Scan state is rebuilt from scratch on each open/close; the blob URLs behind
+    // the cleared previews are released by the close effect's cleanup below.
+    setScanImages([]);
+    setScanPreviews([]);
+    setScanning(false);
+    if (isOpen) {
+      const restored = readPersistedDraft();
+      if (restored) {
+        setFormData(restored.formData);
+        setDisplayCost(restored.formData.costPrice ? formatNumber(restored.formData.costPrice) : '');
+        setDisplaySell(restored.formData.sellPrice ? formatNumber(restored.formData.sellPrice) : '');
+      } else if (item) {
+        setFormData({
+          itemName: item.item_name,
+          sku: item.sku || '',
+          barcode: item.barcode || '',
+          categoryId: item.category_id != null ? String(item.category_id) : '',
+          costPrice: item.cost_price,
+          sellPrice: item.sell_price,
+          currentStock: item.current_stock,
+          reorderLevel: item.reorder_level,
+          expiryDate: item.expiry_date ? item.expiry_date.split('T')[0] : '',
+          unit: item.unit || '',
+          notes: item.notes || '',
+        });
+        setDisplayCost(item.cost_price ? formatNumber(item.cost_price) : '');
+        setDisplaySell(item.sell_price ? formatNumber(item.sell_price) : '');
+      } else {
+        setFormData({ ...DEFAULT_FORM });
+        setDisplayCost('');
+        setDisplaySell('');
       }
-    } else if (item) {
-      setFormData({
-        itemName: item.item_name,
-        sku: item.sku || '',
-        barcode: item.barcode || '',
-        categoryId: item.category_id != null ? String(item.category_id) : '',
-        costPrice: item.cost_price,
-        sellPrice: item.sell_price,
-        currentStock: item.current_stock,
-        reorderLevel: item.reorder_level,
-        expiryDate: item.expiry_date ? item.expiry_date.split('T')[0] : '',
-        unit: item.unit || '',
-        notes: item.notes || '',
-      });
-      setDisplayCost(item.cost_price ? formatNumber(item.cost_price) : '');
-      setDisplaySell(item.sell_price ? formatNumber(item.sell_price) : '');
-    } else {
-      setFormData({ ...DEFAULT_FORM });
-      setDisplayCost('');
-      setDisplaySell('');
+      setErrors({});
     }
-    setErrors({});
+  }
+
+  // Mirror the live preview URLs into a ref so the close cleanup can revoke them
+  // even after the render-phase reset above has cleared the state. This is a ref
+  // write (not setState), and it runs in the commit's setup pass — AFTER the
+  // cleanup pass that reads it — so the cleanup still sees the pre-close URLs.
+  const scanPreviewsRef = useRef<string[]>([]);
+  useEffect(() => {
+    scanPreviewsRef.current = scanPreviews;
+  }, [scanPreviews]);
+
+  // On close (or unmount): release every preview blob and drop the persisted draft.
+  useEffect(() => {
+    if (!isOpen) return;
+    return () => {
+      scanPreviewsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      sessionStorage.removeItem(FORM_STORAGE_KEY);
+    };
+  }, [isOpen]);
+
+  // Restore previously-captured scan images (async) when reopening a persisted
+  // draft — setState lives in the async callback, so it isn't a setState-in-effect.
+  useEffect(() => {
+    if (!isOpen) return;
+    const restored = readPersistedDraft();
+    if (!restored || restored.imageDataUrls.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const files = await Promise.all(
+          restored.imageDataUrls.map((url, i) => dataUrlToFile(url, `restored-${i}.jpg`))
+        );
+        if (cancelled) return;
+        setScanImages(files);
+        setScanPreviews(files.map((f) => URL.createObjectURL(f)));
+      } catch {
+        // ignore — user can re-shoot
+      }
+    })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, item]);
 
@@ -382,16 +415,10 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
     }
   };
 
+  // Closing is fully handled by the isOpen→false transition: the render-phase
+  // reset clears the scan state and the close effect revokes the preview blobs +
+  // drops the persisted draft. So this only notifies the parent.
   const handleClose = () => {
-    setFormData({ ...DEFAULT_FORM });
-    setDisplayCost('');
-    setDisplaySell('');
-    setErrors({});
-    scanPreviews.forEach((url) => URL.revokeObjectURL(url));
-    setScanImages([]);
-    setScanPreviews([]);
-    setScanning(false);
-    sessionStorage.removeItem(FORM_STORAGE_KEY);
     onClose();
   };
 
@@ -404,12 +431,11 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
       contentClassName={styles.modalContent}
       ariaLabelledBy="item-form-modal-title"
     >
-        <div className={styles.modalHeader}>
-          <h2 id="item-form-modal-title">{isEditMode ? 'Edit Item' : 'Add New Item'}</h2>
-          <button className={styles.closeBtn} onClick={handleClose} aria-label="Close modal">
-            &times;
-          </button>
-        </div>
+        <ModalHeader
+          title={isEditMode ? 'Edit Item' : 'Add New Item'}
+          titleId="item-form-modal-title"
+          onClose={handleClose}
+        />
 
         <form onSubmit={handleSubmit}>
           <div className={styles.modalBody}>

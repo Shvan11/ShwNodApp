@@ -21,9 +21,15 @@
     composes: card;
 }
 
-/* Fade in animation */
+/* Fade in animation.
+   Fill mode MUST be `both`, not `forwards`: the cards below stagger their start
+   via `animation-delay`, and `backwards` fill makes the `from { opacity: 0 }`
+   keyframe apply DURING that delay so each card stays invisible until its turn.
+   With `forwards` alone the card sat at its natural opacity:1 during the delay,
+   then snapped to 0 when its active phase began — a visible "flash then fade-in"
+   that was most obvious on the later (longest-delay) cards. */
 .fadeInUp {
-    animation: fadeInUp 0.4s ease-out forwards;
+    animation: fadeInUp 0.4s ease-out both;
 }
 
 @keyframes fadeInUp {

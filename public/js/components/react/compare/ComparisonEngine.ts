@@ -10,8 +10,8 @@
  * (the old in-place `useState` handler tripped react-hooks/immutability).
  */
 
-import type { AutoImageSize, CanvasDimensions, ImageKey, Transform, TransformState } from './types';
-import { KEY_FOR_TOOL } from './types';
+import type { AutoImageSize, CanvasDimensions, CropInset, CropState, ImageKey, Transform, TransformState } from './types';
+import { KEY_FOR_TOOL, LOGO_BLACK_URL, LOGO_WHITE_URL } from './types';
 
 export interface ImageInfo {
     width: number;
@@ -29,6 +29,8 @@ export interface EngineSnapshot {
     orientation: 'vertical' | 'horizontal';
     showBisect: boolean;
     showLogo: boolean;
+    /** True when the dark logo variant is active (vs the default white). */
+    logoBlack: boolean;
     /** 0 = none, 1 = img1, 2 = img2, 3 = logo. */
     selectedImage: number;
     autoMode: boolean;
@@ -36,6 +38,10 @@ export interface EngineSnapshot {
     canvasWidth: number;
     canvasHeight: number;
     transform: TransformState;
+    /** Per-image straight-line edge crop (container fractions). */
+    crop: CropState;
+    /** True while the crop-edit overlay (margin handles) is active. */
+    cropMode: boolean;
 }
 
 function freshTransforms(): TransformState {
@@ -44,6 +50,11 @@ function freshTransforms(): TransformState {
         img2: { x: 0, y: 0, scale: 1, rotation: 0 },
         logo: { x: 0, y: 0, scale: 1, rotation: 0 },
     };
+}
+
+function freshCrop(): CropState {
+    const zero = (): CropInset => ({ top: 0, right: 0, bottom: 0, left: 0 });
+    return { img1: zero(), img2: zero(), logo: zero() };
 }
 
 /** Snapshot served before the engine exists, so the UI renders consistently. */
@@ -55,12 +66,15 @@ export const EMPTY_SNAPSHOT: EngineSnapshot = {
     orientation: 'vertical',
     showBisect: false,
     showLogo: true,
+    logoBlack: false,
     selectedImage: 0,
     autoMode: true,
     autoImageSize: null,
     canvasWidth: 800,
     canvasHeight: 600,
     transform: freshTransforms(),
+    crop: freshCrop(),
+    cropMode: false,
 };
 
 export const getEmptySnapshot = (): EngineSnapshot => EMPTY_SNAPSHOT;
@@ -71,15 +85,19 @@ export class ComparisonEngine {
     private context: CanvasRenderingContext2D;
     private images: HTMLImageElement[] = [];
     private transform: TransformState = freshTransforms();
+    private crop: CropState = freshCrop();
+    private cropMode = false;
     private orientation: 'vertical' | 'horizontal' = 'vertical';
     private showBisect = false;
     private showLogo = true;
+    private logoBlack = false;
     private selectedImage = 0;
     private autoMode = true;
     private autoScale = 1;
     private autoImageSize: AutoImageSize | null = null;
     private originalDimensions: CanvasDimensions;
     private loadSeq = 0;
+    private logoSeq = 0;
     private loading = false;
     private version = 0;
     private listeners = new Set<() => void>();
@@ -109,6 +127,7 @@ export class ComparisonEngine {
             orientation: this.orientation,
             showBisect: this.showBisect,
             showLogo: this.showLogo,
+            logoBlack: this.logoBlack,
             selectedImage: this.selectedImage,
             autoMode: this.autoMode,
             autoImageSize: this.autoImageSize ? { ...this.autoImageSize } : null,
@@ -119,6 +138,12 @@ export class ComparisonEngine {
                 img2: { ...this.transform.img2 },
                 logo: { ...this.transform.logo },
             },
+            crop: {
+                img1: { ...this.crop.img1 },
+                img2: { ...this.crop.img2 },
+                logo: { ...this.crop.logo },
+            },
+            cropMode: this.cropMode,
         };
         return this.snapshot;
     };
@@ -144,20 +169,7 @@ export class ComparisonEngine {
         try {
             const loaded: HTMLImageElement[] = [];
             for (const url of urls) {
-                const img = new Image();
-                await new Promise<void>((resolve, reject) => {
-                    const timeout = setTimeout(() => reject(new Error(`Timeout loading image: ${url}`)), 10000);
-                    img.onload = () => {
-                        clearTimeout(timeout);
-                        resolve();
-                    };
-                    img.onerror = () => {
-                        clearTimeout(timeout);
-                        reject(new Error(`Failed to load image: ${url}`));
-                    };
-                    img.src = url;
-                });
-                loaded.push(img);
+                loaded.push(await this.loadOneImage(url));
             }
             if (seq !== this.loadSeq) return;
             this.images = loaded;
@@ -172,11 +184,30 @@ export class ComparisonEngine {
         }
     }
 
+    /** Loads a single image, rejecting on error or a 10s timeout. */
+    private loadOneImage(url: string): Promise<HTMLImageElement> {
+        return new Promise<HTMLImageElement>((resolve, reject) => {
+            const img = new Image();
+            const timeout = setTimeout(() => reject(new Error(`Timeout loading image: ${url}`)), 10000);
+            img.onload = () => {
+                clearTimeout(timeout);
+                resolve(img);
+            };
+            img.onerror = () => {
+                clearTimeout(timeout);
+                reject(new Error(`Failed to load image: ${url}`));
+            };
+            img.src = url;
+        });
+    }
+
     // --- selection / view options ---
 
     setSelectedImage(tool: number): void {
         if (this.selectedImage === tool) return;
         this.selectedImage = tool;
+        // Crop mode only applies to the two images; switching away exits it.
+        if (tool !== 1 && tool !== 2) this.cropMode = false;
         this.commit();
     }
 
@@ -197,6 +228,28 @@ export class ComparisonEngine {
 
     toggleLogo(): void {
         this.showLogo = !this.showLogo;
+        this.render();
+        this.commit();
+    }
+
+    /** The static asset URL for the current logo variant. */
+    getLogoUrl(): string {
+        return this.logoBlack ? LOGO_BLACK_URL : LOGO_WHITE_URL;
+    }
+
+    /**
+     * Flips the logo between the white and dark asset. Swaps only the logo image
+     * (slot 2) so the patient photos aren't reloaded; a newer toggle or a pair
+     * reload supersedes an in-flight swap (logoSeq guard).
+     */
+    async toggleLogoColor(): Promise<void> {
+        this.logoBlack = !this.logoBlack;
+        this.commit();
+        if (this.images.length < 3) return; // no pair yet; next loadImages uses the flag
+        const seq = ++this.logoSeq;
+        const img = await this.loadOneImage(this.getLogoUrl());
+        if (seq !== this.logoSeq || this.images.length < 3) return;
+        this.images[2] = img;
         this.render();
         this.commit();
     }
@@ -240,6 +293,68 @@ export class ComparisonEngine {
         this.commit();
     }
 
+    // --- crop (straight-line edge trimming) ---
+
+    getCrop(key: ImageKey): CropInset {
+        return { ...this.crop[key] };
+    }
+
+    /**
+     * Sets a per-side crop (container fractions). Each side is clamped and the
+     * two sides on an axis are kept from crossing, so a sliver of image always
+     * remains. Drives the canvas clip rect in drawImage.
+     */
+    setCrop(key: ImageKey, next: CropInset): void {
+        const clampSide = (v: number) => Math.max(0, Math.min(0.95, v));
+        let left = clampSide(next.left);
+        let right = clampSide(next.right);
+        let top = clampSide(next.top);
+        let bottom = clampSide(next.bottom);
+        const MAX_SUM = 0.95;
+        if (left + right > MAX_SUM) {
+            const k = MAX_SUM / (left + right);
+            left *= k;
+            right *= k;
+        }
+        if (top + bottom > MAX_SUM) {
+            const k = MAX_SUM / (top + bottom);
+            top *= k;
+            bottom *= k;
+        }
+        this.crop[key] = { top, right, bottom, left };
+        this.render();
+        this.commit();
+    }
+
+    /**
+     * Steps all four crop insets of the selected image together (symmetric
+     * trim). Positive delta trims more on every side; negative restores toward
+     * the full image. Reuses setCrop, so the same clamp/keep-a-sliver rules apply.
+     */
+    nudgeCropAll(delta: number): void {
+        const key = KEY_FOR_TOOL[this.selectedImage];
+        if (key !== 'img1' && key !== 'img2') return;
+        const c = this.crop[key];
+        this.setCrop(key, {
+            top: c.top + delta,
+            right: c.right + delta,
+            bottom: c.bottom + delta,
+            left: c.left + delta,
+        });
+    }
+
+    /** Crop mode is an overlay-only editing affordance; only valid on img1/img2. */
+    setCropMode(on: boolean): void {
+        const next = on && (this.selectedImage === 1 || this.selectedImage === 2);
+        if (this.cropMode === next) return;
+        this.cropMode = next;
+        this.commit();
+    }
+
+    toggleCropMode(): void {
+        this.setCropMode(!this.cropMode);
+    }
+
     moveImage(direction: 'left' | 'right' | 'up' | 'down', amount = 10): void {
         const key = KEY_FOR_TOOL[this.selectedImage];
         if (!key) return;
@@ -274,6 +389,8 @@ export class ComparisonEngine {
 
     reset(): void {
         this.transform = freshTransforms();
+        this.crop = freshCrop();
+        this.cropMode = false;
         // In auto mode, recompute canvas + autoImageSize from the actual
         // images so reset restores the same layout the user first saw.
         // Falling back to originalDimensions here would leave a stale
@@ -409,11 +526,25 @@ export class ComparisonEngine {
     private drawImage(img: HTMLImageElement, x: number, y: number, width: number, height: number, key: ImageKey): void {
         const ctx = this.context;
         const transform = this.transform[key];
+        const crop = this.crop[key];
 
         if (!img.complete || img.naturalWidth === 0) return;
 
-        // In auto mode, prioritize aspect ratio preservation over transforms
-        if (this.autoMode && transform.x === 0 && transform.y === 0 && transform.scale === 1 && transform.rotation === 0) {
+        // Per-side crop insets (fractions of the container) → an axis-aligned
+        // clip rect in canvas space. Because the clip is set before the rotate,
+        // the cut stays a straight, canvas-aligned line even on a rotated image.
+        const cropL = crop.left * width;
+        const cropR = crop.right * width;
+        const cropT = crop.top * height;
+        const cropB = crop.bottom * height;
+        const hasCrop = cropL > 0 || cropR > 0 || cropT > 0 || cropB > 0;
+        const clipX = x + cropL;
+        const clipY = y + cropT;
+        const clipW = Math.max(0, width - cropL - cropR);
+        const clipH = Math.max(0, height - cropT - cropB);
+
+        // In auto mode with no transforms AND no crop, prioritize aspect ratio preservation
+        if (this.autoMode && !hasCrop && transform.x === 0 && transform.y === 0 && transform.scale === 1 && transform.rotation === 0) {
             // Pure aspect ratio preservation without transforms
             const aspectRatio = img.width / img.height;
             const containerRatio = width / height;
@@ -435,11 +566,12 @@ export class ComparisonEngine {
 
             ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
         } else {
-            // Standard mode with transforms - clip to container so the
-            // image cannot bleed into the other half of the canvas.
+            // Standard mode with transforms - clip to the (cropped) container so
+            // the image cannot bleed into the other half of the canvas and any
+            // trimmed margins read through to the background.
             ctx.save();
             ctx.beginPath();
-            ctx.rect(x, y, width, height);
+            ctx.rect(clipX, clipY, clipW, clipH);
             ctx.clip();
 
             ctx.translate(x + width / 2 + transform.x, y + height / 2 + transform.y);

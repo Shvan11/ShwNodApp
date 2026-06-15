@@ -1,8 +1,9 @@
 // SearchPatient.tsx - Quick search for patients by name/ID/phone
 import React, { useState, useRef, useEffect, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import PhoneDisplay from '../../components/react/PhoneDisplay';
-import { fetchJSON } from '@/core/http';
+import { alignerPatientSearchQuery } from '@/query/queries';
 import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './SearchPatient.module.css';
 
@@ -14,16 +15,23 @@ const SearchPatient: React.FC = () => {
     const navigate = useNavigate();
 
     const [searchQuery, setSearchQuery] = useState<string>('');
-    const [searchResults, setSearchResults] = useState<AlignerPatient[]>([]);
-    const [showResults, setShowResults] = useState<boolean>(false);
-    const [loading, setLoading] = useState<boolean>(false);
+    // Debounced term that actually drives the query (the factory is gated on a
+    // non-empty term, so an empty/short query never fires a request).
+    const [debouncedQuery, setDebouncedQuery] = useState<string>('');
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Clear any pending debounce timer on unmount so it can't fire setState
-    // (or a fetch) after the component is gone.
+    // after the component is gone.
     useEffect(() => () => {
         if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     }, []);
+
+    const { data, isFetching, isSuccess } = useQuery(alignerPatientSearchQuery(debouncedQuery));
+    const searchResults = (data?.patients ?? []) as AlignerPatient[];
+    const loading = isFetching;
+    // Mirror the old behavior: the results panel appears only once a search has
+    // resolved successfully (not while the first request is still in flight).
+    const showResults = debouncedQuery.trim().length >= 2 && isSuccess;
 
     const handleSearchChange = (e: ChangeEvent<HTMLInputElement>): void => {
         const query = e.target.value;
@@ -34,31 +42,13 @@ const SearchPatient: React.FC = () => {
         }
 
         if (query.trim().length < 2) {
-            setShowResults(false);
+            setDebouncedQuery('');
             return;
         }
 
         searchTimeoutRef.current = setTimeout(() => {
-            searchPatients(query);
+            setDebouncedQuery(query);
         }, 300);
-    };
-
-    const searchPatients = async (query: string): Promise<void> => {
-        try {
-            setLoading(true);
-            const data = await fetchJSON<{ patients?: AlignerPatient[] }>(
-                `/api/aligner/patients?search=${encodeURIComponent(query)}`,
-                { schema: alignerContract.searchAlignerPatients.response }
-            );
-
-            setSearchResults(data.patients || []);
-            setShowResults(true);
-        } catch (error) {
-            console.error('Search error:', error);
-            setSearchResults([]);
-        } finally {
-            setLoading(false);
-        }
     };
 
     const selectPatient = (patient: AlignerPatient): void => {

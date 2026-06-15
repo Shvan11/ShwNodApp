@@ -45,9 +45,9 @@ const visitFields = {
 } as const;
 
 // GET /api/getWires — all wire types (no query).
-// wire row: { id, name } (visit-queries.ts#wire — type, non-exported).
+// wire row: { id, name } — `wire_id as id`, `wire as name` (wires.wire NOT NULL).
 export const getWires = {
-  response: z.array(z.looseObject({ id: z.number() })),
+  response: z.array(z.looseObject({ id: z.number(), name: z.string() })),
 } as const;
 
 // GET /api/getlatestwires?workId= — { upper_wire_id, lower_wire_id, UpperWireName, LowerWireName }.
@@ -63,17 +63,43 @@ export const latestWires = {
 } as const;
 export type LatestWiresResponse = z.infer<typeof latestWires.response>;
 
+// Shared visit wire row (visit-queries.ts#Visit) — returned by BOTH
+// /getvisitsbywork (array) and /getvisitbyid (single|null). visit_date is a
+// non-null string; the 5 photo/appliance flags are booleans; the FK ids, the
+// free-text fields, and the joined wire/operator NAME columns are all nullable.
+const visitRow = z.looseObject({
+  id: z.number(),
+  work_id: z.number(),
+  visit_date: z.string(),
+  bracket_change: z.string().nullable(),
+  wire_bending: z.string().nullable(),
+  opg: z.boolean(),
+  others: z.string().nullable(),
+  next_visit: z.string().nullable(),
+  elastics: z.string().nullable(),
+  upper_wire_id: z.number().nullable(),
+  lower_wire_id: z.number().nullable(),
+  p_photo: z.boolean(),
+  i_photo: z.boolean(),
+  f_photo: z.boolean(),
+  appliance_removed: z.boolean(),
+  operator_id: z.number().nullable(),
+  UpperWireName: z.string().nullable(),
+  LowerWireName: z.string().nullable(),
+  OperatorName: z.string().nullable(),
+});
+export type VisitRow = z.infer<typeof visitRow>;
+
 // GET /api/getvisitsbywork?workId= — Visit[].
-// Visit row: { id, visit_date, … } (visit-queries.ts#Visit — type, non-exported).
 export const visitsByWork = {
   query: z.object({ workId: numericParam }),
-  response: z.array(z.looseObject({ id: z.number() })),
+  response: z.array(visitRow),
 } as const;
 
 // GET /api/getvisitbyid?visitId= — single Visit row or null.
 export const visitById = {
   query: z.object({ visitId: numericParam }),
-  response: z.looseObject({ id: z.number() }).nullable(),
+  response: visitRow.nullable(),
 } as const;
 
 // POST /api/addvisitbywork — { visitId } (addVisitByWorkId returns { id } | null).

@@ -18,7 +18,7 @@ import { getKysely } from '../kysely.js';
 type CostPreset = {
   preset_id: number;
   amount: number;
-  currency: string;
+  currency: 'IQD' | 'USD' | 'EUR';
   display_order: number;
 };
 
