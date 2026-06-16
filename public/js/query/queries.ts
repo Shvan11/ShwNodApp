@@ -33,6 +33,7 @@ import * as authContract from '@shared/contracts/auth.contract';
 import * as userManagementContract from '@shared/contracts/user-management.contract';
 import * as emailApiContract from '@shared/contracts/email-api.contract';
 import * as settingsContract from '@shared/contracts/settings.contract';
+import * as brandingContract from '@shared/contracts/branding.contract';
 import * as telegramContract from '@shared/contracts/telegram.contract';
 import * as integrationsContract from '@shared/contracts/integrations.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
@@ -1145,6 +1146,22 @@ export const optionQuery = (name: string) =>
       }
     },
     retry: false,
+  });
+
+/**
+ * GET /api/branding — clinic header logo URL + display name. Read by the
+ * UniversalHeader (every screen) and edited in Settings → General; rarely
+ * changes, so a long staleTime keeps it out of the way after first paint.
+ */
+export const brandingQuery = () =>
+  queryOptions({
+    queryKey: qk.branding(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof brandingContract.getBranding.response>>('/api/branding', {
+        signal,
+        schema: brandingContract.getBranding.response,
+      }),
+    staleTime: 5 * 60 * 1000,
   });
 
 /** GET /api/email/config — SMTP configuration. */

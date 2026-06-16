@@ -155,21 +155,26 @@
     line-height: 1;
 }
 
-/* Assigned doctor — subtle muted label, shown only when viewing all doctors */
-.doctorName {
+/* Assigned doctor — a colour-coded icon chip standing in for the doctor (the
+   name is in the tooltip). Shown only when viewing all doctors. The per-doctor
+   fill/edge/icon colour are applied inline from the doctor's calendar colour;
+   the rule below is the neutral fallback for a doctor with no colour set. */
+.doctorBadge {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-medium);
-    color: var(--text-secondary);
-    line-height: 1;
-    white-space: nowrap;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: var(--radius-full);
+    background: var(--gray-100);
+    border: 1.5px solid var(--gray-300);
+    color: var(--text-muted);
+    flex-shrink: 0;
+    cursor: help;
 }
 
-.doctorName i {
-    font-size: 0.65rem;
-    color: var(--text-muted);
+.doctorBadge i {
+    font-size: 0.7rem;
 }
 
 /* Visit notes icon */

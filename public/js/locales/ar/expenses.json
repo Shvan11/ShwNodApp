@@ -1,0 +1,81 @@
+{
+  "title": "إدارة المصروفات",
+  "addNew": "إضافة مصروف جديد",
+  "errorLoading": "خطأ في تحميل المصروفات: {{error}}",
+  "retry": "إعادة المحاولة",
+  "filters": {
+    "title": "تصفية المصروفات",
+    "reset": "إعادة تعيين جميع عوامل التصفية",
+    "startDate": "تاريخ البداية",
+    "endDate": "تاريخ النهاية",
+    "category": "الفئة",
+    "subcategory": "الفئة الفرعية",
+    "currency": "العملة",
+    "allCategories": "جميع الفئات",
+    "allSubcategories": "جميع الفئات الفرعية",
+    "allCurrencies": "جميع العملات",
+    "apply": "تطبيق التصفية"
+  },
+  "summary": {
+    "totalExpenses": "إجمالي المصروفات",
+    "totalIqd": "إجمالي الدينار العراقي",
+    "totalUsd": "إجمالي الدولار الأمريكي"
+  },
+  "table": {
+    "date": "التاريخ",
+    "amount": "المبلغ",
+    "currency": "العملة",
+    "category": "الفئة",
+    "subcategory": "الفئة الفرعية",
+    "note": "ملاحظة",
+    "actions": "الإجراءات",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "editAria": "تعديل المصروف",
+    "deleteAria": "حذف المصروف",
+    "loading": "جارٍ تحميل المصروفات...",
+    "empty": "لا توجد مصروفات"
+  },
+  "modal": {
+    "addTitle": "إضافة مصروف جديد",
+    "editTitle": "تعديل المصروف",
+    "close": "إغلاق النافذة",
+    "date": "التاريخ",
+    "amount": "المبلغ",
+    "amountPlaceholder": "أدخل المبلغ",
+    "currency": "العملة",
+    "category": "الفئة",
+    "subcategory": "الفئة الفرعية",
+    "selectCategory": "اختر الفئة",
+    "selectSubcategory": "اختر الفئة الفرعية",
+    "note": "ملاحظة",
+    "notePlaceholder": "أضف أي ملاحظات حول هذا المصروف...",
+    "cancel": "إلغاء",
+    "saving": "جارٍ الحفظ…",
+    "add": "إضافة المصروف",
+    "update": "تحديث المصروف",
+    "errorDateRequired": "التاريخ مطلوب",
+    "errorAmountRequired": "يجب إدخال مبلغ صحيح",
+    "errorCurrencyRequired": "العملة مطلوبة"
+  },
+  "delete": {
+    "title": "حذف المصروف",
+    "close": "إغلاق النافذة",
+    "confirm": "هل أنت متأكد أنك تريد حذف هذا المصروف؟ لا يمكن التراجع عن هذا الإجراء.",
+    "date": "التاريخ",
+    "amount": "المبلغ",
+    "category": "الفئة",
+    "note": "ملاحظة",
+    "cancel": "إلغاء",
+    "confirmButton": "حذف المصروف"
+  },
+  "toast": {
+    "created": "تم إنشاء المصروف بنجاح",
+    "updated": "تم تحديث المصروف بنجاح",
+    "deleted": "تم حذف المصروف بنجاح",
+    "createFailed": "فشل في إنشاء المصروف",
+    "updateFailed": "فشل في تحديث المصروف",
+    "deleteFailed": "فشل في حذف المصروف",
+    "loadFailed": "فشل في تحميل بيانات المصروف"
+  }
+}

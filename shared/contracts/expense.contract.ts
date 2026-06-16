@@ -40,11 +40,17 @@ const expenseRow = z.looseObject({
   subcategory_id: z.number().nullable(),
   category_name: z.string().nullable(),
   subcategory_name: z.string().nullable(),
+  // Arabic display names (nullable) — sent beside the base names so the client
+  // resolves per-language with a base-name fallback (zero extra queries; see
+  // CLAUDE.md i18n / RTL → "DB-stored lookup values").
+  category_name_ar: z.string().nullable(),
+  subcategory_name_ar: z.string().nullable(),
 });
 
 const expenseCategoryRow = z.looseObject({
   category_id: z.number(),
   category_name: z.string(),
+  category_name_ar: z.string().nullable(),
 });
 
 const expenseSubcategoryRow = z.looseObject({
@@ -52,6 +58,7 @@ const expenseSubcategoryRow = z.looseObject({
   subcategory_name: z.string(),
   category_id: z.number(),
   category_name: z.string().nullable(),
+  subcategory_name_ar: z.string().nullable(),
 });
 
 // Shared body for create + update — fully enumerated strict `z.object`.

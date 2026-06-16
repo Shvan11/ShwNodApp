@@ -1,0 +1,81 @@
+{
+  "title": "Expense Management",
+  "addNew": "Add New Expense",
+  "errorLoading": "Error loading expenses: {{error}}",
+  "retry": "Retry",
+  "filters": {
+    "title": "Filter Expenses",
+    "reset": "Reset all filters",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "category": "Category",
+    "subcategory": "Subcategory",
+    "currency": "Currency",
+    "allCategories": "All Categories",
+    "allSubcategories": "All Subcategories",
+    "allCurrencies": "All Currencies",
+    "apply": "Apply Filters"
+  },
+  "summary": {
+    "totalExpenses": "Total Expenses",
+    "totalIqd": "Total IQD",
+    "totalUsd": "Total USD"
+  },
+  "table": {
+    "date": "Date",
+    "amount": "Amount",
+    "currency": "Currency",
+    "category": "Category",
+    "subcategory": "Subcategory",
+    "note": "Note",
+    "actions": "Actions",
+    "edit": "Edit",
+    "delete": "Delete",
+    "editAria": "Edit expense",
+    "deleteAria": "Delete expense",
+    "loading": "Loading expenses...",
+    "empty": "No expenses found"
+  },
+  "modal": {
+    "addTitle": "Add New Expense",
+    "editTitle": "Edit Expense",
+    "close": "Close modal",
+    "date": "Date",
+    "amount": "Amount",
+    "amountPlaceholder": "Enter amount",
+    "currency": "Currency",
+    "category": "Category",
+    "subcategory": "Subcategory",
+    "selectCategory": "Select Category",
+    "selectSubcategory": "Select Subcategory",
+    "note": "Note",
+    "notePlaceholder": "Add any notes about this expense...",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "add": "Add Expense",
+    "update": "Update Expense",
+    "errorDateRequired": "Date is required",
+    "errorAmountRequired": "Valid amount is required",
+    "errorCurrencyRequired": "Currency is required"
+  },
+  "delete": {
+    "title": "Delete Expense",
+    "close": "Close modal",
+    "confirm": "Are you sure you want to delete this expense? This action cannot be undone.",
+    "date": "Date",
+    "amount": "Amount",
+    "category": "Category",
+    "note": "Note",
+    "cancel": "Cancel",
+    "confirmButton": "Delete Expense"
+  },
+  "toast": {
+    "created": "Expense created successfully",
+    "updated": "Expense updated successfully",
+    "deleted": "Expense deleted successfully",
+    "createFailed": "Failed to create expense",
+    "updateFailed": "Failed to update expense",
+    "deleteFailed": "Failed to delete expense",
+    "loadFailed": "Failed to load expense data"
+  }
+}

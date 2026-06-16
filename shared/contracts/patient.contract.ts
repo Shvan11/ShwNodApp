@@ -91,14 +91,17 @@ const timepointRow = z.looseObject({
   tp_description: z.string(),
 });
 
-/** Gallery image size entry. Null elements are valid (probe failure for a slot). */
-const galleryImageRow = z.looseObject({
+/** One rendered gallery view: the working-dir JPEG's name + pixel size + mtime.
+ *  `null` when that view hasn't been rendered for the timepoint. */
+const galleryView = z.object({
+  /** Working-dir filename, e.g. `10060.i12` — drives both the /DolImgs URL and the
+   *  working-files thumbnail endpoint. */
   name: z.string(),
-  width: z.number().optional(),
-  height: z.number().optional(),
-  // File mtime (ms) — appended to the image URL as `?v=` so an overwritten render
-  // busts the browser cache instead of showing the stale image at the same URL.
-  mtime: z.number().optional(),
+  width: z.number(),
+  height: z.number(),
+  /** File mtime (ms) — appended to the image URL as `?v=` so an overwritten render
+   *  busts the browser cache instead of showing the stale image at the same URL. */
+  mtime: z.number(),
 }).nullable();
 
 /** Patient phone record (id + name + phone for autocomplete). phone is nullable. */
@@ -188,8 +191,18 @@ export const timepointFolder = {
   response: z.object({ folder: z.string().nullable(), exists: z.boolean() }),
 } as const;
 
-// GET /api/patients/:personId/gallery/:tp — processed gallery image sizes.
-export const gallery = { response: z.array(galleryImageRow) } as const;
+// GET /api/patients/:personId/gallery/:tp — the 8 Dolphin photo views, KEYED BY
+// VIEW CODE (not a positional array) so neither side depends on slot order. The
+// keys mirror shared/photo-views.ts VIEW_CODES; the centre logo is a client-only
+// layout concern and is intentionally not part of the payload.
+export const gallery = {
+  response: z.object({
+    i10: galleryView, i12: galleryView, i13: galleryView, i23: galleryView,
+    i24: galleryView, i20: galleryView, i22: galleryView, i21: galleryView,
+  }),
+} as const;
+export type GalleryResponse = z.infer<typeof gallery.response>;
+export type GalleryView = NonNullable<GalleryResponse[keyof GalleryResponse]>;
 
 // GET /api/patients/phones — bare array of patient phone records.
 export const patientPhones = { response: z.array(patientPhoneRow) } as const;

@@ -1,4 +1,5 @@
 import AppointmentCard, { type DailyAppointment } from './AppointmentCard';
+import type { DoctorColor } from '../calendar.types';
 import styles from './AppointmentsList.module.css';
 
 interface AppointmentsListProps {
@@ -6,10 +7,12 @@ interface AppointmentsListProps {
     appointments: DailyAppointment[];
     showStatus: boolean;
     loading: boolean;
-    // drID → doctor name, for the per-card doctor label.
+    // drID → doctor name, for the per-card doctor icon's tooltip.
     doctorNames?: Map<number, string>;
-    // Whether to show the doctor name on each card (hidden when already filtered
-    // to one doctor, where the per-card name would be redundant).
+    // drID → doctor colour, for tinting the per-card doctor icon.
+    doctorColors?: Map<number, DoctorColor>;
+    // Whether to show the doctor icon on each card (hidden when already filtered
+    // to one doctor, where the per-card doctor marker would be redundant).
     showDoctorName?: boolean;
     onCheckIn?: (appointmentId: number) => void;
     onMarkSeated?: (appointmentId: number) => void;
@@ -32,6 +35,7 @@ const AppointmentsList = ({
     showStatus,
     loading,
     doctorNames,
+    doctorColors,
     showDoctorName = false,
     onCheckIn,
     onMarkSeated,
@@ -99,6 +103,7 @@ const AppointmentsList = ({
                         appointment={appointment}
                         showStatus={showStatus}
                         doctorName={showDoctorName && appointment.dr_id != null ? doctorNames?.get(appointment.dr_id) : undefined}
+                        doctorColor={showDoctorName && appointment.dr_id != null ? doctorColors?.get(appointment.dr_id) : undefined}
                         onCheckIn={onCheckIn}
                         onMarkSeated={onMarkSeated}
                         onMarkDismissed={onMarkDismissed}

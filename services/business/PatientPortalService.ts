@@ -230,9 +230,9 @@ export async function getQrDataUrl(personId: number): Promise<{ qr: string; url:
 }
 
 /**
- * Return the photos at a timepoint that the patient may see.
- * Removes entries whose filenames appear in tblPrivatePhotos for (personId, tp).
- * Always filters out the 'logo.png' slot (not a patient photo).
+ * Return the photos at a timepoint that the patient may see, in canonical view
+ * order. Removes entries whose filenames appear in tblPrivatePhotos for
+ * (personId, tp). (getImageSizes is keyed by view code and excludes the logo.)
  */
 export async function getVisiblePhotos(
   personId: number,
@@ -244,9 +244,8 @@ export async function getVisiblePhotos(
   ]);
   const privateSet = new Set(privateRows.map((r) => r.image_name.toLowerCase()));
   const visible: ImageDimension[] = [];
-  for (const entry of sizes) {
+  for (const entry of Object.values(sizes)) {
     if (!entry) continue;
-    if (entry.name === 'logo.png') continue;
     if (privateSet.has(entry.name.toLowerCase())) continue;
     visible.push(entry);
   }

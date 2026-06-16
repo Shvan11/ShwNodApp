@@ -24,14 +24,6 @@ interface Props {
   personId?: number | null;
 }
 
-interface GalleryEntry {
-  name: string;
-  width?: number;
-  height?: number;
-  /** File mtime (ms) — appended as `?v=` to bust the cache when a slot is re-rendered. */
-  mtime?: number;
-}
-
 /** Raw shape from GET /api/patients/:id/timepoints (snake_case API). */
 interface TimepointApiRow {
   tp_code: string;
@@ -135,9 +127,9 @@ const PatientSlideshow = ({ personId }: Props) => {
   const loadGallery = async (tp: Timepoint): Promise<SlidePhoto[]> => {
     if (galleries[tp.tpCode]) return galleries[tp.tpCode];
     if (!personId) return [];
-    const raw = await fetchJSON<(GalleryEntry | null)[]>(`/api/patients/${personId}/gallery/${tp.tpCode}`, { schema: patientContract.gallery.response });
-    const items: SlidePhoto[] = raw
-      .filter((e): e is GalleryEntry => !!e && !isLogoImage(e.name))
+    const raw = await fetchJSON<patientContract.GalleryResponse>(`/api/patients/${personId}/gallery/${tp.tpCode}`, { schema: patientContract.gallery.response });
+    const items: SlidePhoto[] = Object.values(raw)
+      .filter((e): e is NonNullable<typeof e> => !!e && !isLogoImage(e.name))
       .map((e) => ({
         name: e.name,
         // Cache-bust with mtime so a re-rendered slot isn't served stale from cache.

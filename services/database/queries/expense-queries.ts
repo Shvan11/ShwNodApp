@@ -37,11 +37,17 @@ type Expense = {
   subcategory_id: number | null;
   category_name: string | null;
   subcategory_name: string | null;
+  // Arabic display names (nullable) — returned alongside the base names so the
+  // client resolves per-language with a base-name fallback. See the i18n / RTL
+  // section in CLAUDE.md ("DB-stored lookup values").
+  category_name_ar: string | null;
+  subcategory_name_ar: string | null;
 };
 
 type ExpenseCategory = {
   category_id: number;
   category_name: string;
+  category_name_ar: string | null;
 };
 
 type ExpenseSubcategory = {
@@ -49,6 +55,7 @@ type ExpenseSubcategory = {
   subcategory_name: string;
   category_id: number;
   category_name: string | null;
+  subcategory_name_ar: string | null;
 };
 
 interface ExpenseData {
@@ -93,6 +100,8 @@ export async function getAllExpenses(filters: ExpenseFilters = {}): Promise<Expe
       'e.subcategory_id',
       'c.category_name',
       's.subcategory_name',
+      'c.category_name_ar',
+      's.subcategory_name_ar',
     ]);
 
   if (filters.startDate) {
@@ -144,6 +153,8 @@ export async function getExpenseById(id: number): Promise<Expense | null> {
       'e.subcategory_id',
       'c.category_name',
       's.subcategory_name',
+      'c.category_name_ar',
+      's.subcategory_name_ar',
     ])
     .executeTakeFirst();
 
@@ -157,7 +168,7 @@ export async function getExpenseCategories(): Promise<ExpenseCategory[]> {
   const db = getKysely();
   return db
     .selectFrom('expense_categories')
-    .select(['category_id', 'category_name'])
+    .select(['category_id', 'category_name', 'category_name_ar'])
     .orderBy('category_name')
     .execute();
 }
@@ -172,7 +183,7 @@ export async function getExpenseSubcategories(
   let q = db
     .selectFrom('expense_subcategories as s')
     .leftJoin('expense_categories as c', 's.category_id', 'c.category_id')
-    .select(['s.subcategory_id', 's.subcategory_name', 's.category_id', 'c.category_name']);
+    .select(['s.subcategory_id', 's.subcategory_name', 's.category_id', 'c.category_name', 's.subcategory_name_ar']);
 
   if (categoryId) {
     q = q.where('s.category_id', '=', categoryId);

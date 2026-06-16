@@ -37,7 +37,7 @@
         if (lang !== 'en' && lang !== 'ar') lang = 'en';
         document.documentElement.setAttribute('lang', lang);
         var p = location.pathname;
-        var rtlRoute = (p === '/' || p === '/dashboard');
+        var rtlRoute = (p === '/' || p === '/dashboard' || p === '/expenses' || p.indexOf('/expenses/') === 0);
         document.documentElement.setAttribute('dir', (lang === 'ar' && rtlRoute) ? 'rtl' : 'ltr');
 
         // Arabic webfont — whitelist the font ids (default cairo), set

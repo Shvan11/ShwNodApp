@@ -2,7 +2,9 @@
  * DeleteConfirmModal Component
  * Confirmation modal for deleting expenses
  */
+import { useTranslation } from 'react-i18next';
 import type { Expense } from '../../hooks/useExpenses';
+import { useLocalizedName } from '../../hooks/useLocalizedName';
 import Modal from '../react/Modal';
 import ModalHeader from '../react/ModalHeader';
 import styles from '../../routes/Expenses.module.css';
@@ -15,6 +17,9 @@ interface DeleteConfirmModalProps {
 }
 
 export default function DeleteConfirmModal({ isOpen, expense, onConfirm, onCancel }: DeleteConfirmModalProps) {
+    const { t } = useTranslation('expenses');
+    const localizedName = useLocalizedName();
+
     if (!expense) return null;
 
     const formatNumber = (num: number | undefined): string => {
@@ -40,21 +45,21 @@ export default function DeleteConfirmModal({ isOpen, expense, onConfirm, onCance
             <ModalHeader
                 variant="danger"
                 titleId="delete-expense-modal-title"
-                title="Delete Expense"
+                title={t('delete.title')}
                 onClose={onCancel}
-                closeLabel="Close modal"
+                closeLabel={t('delete.close')}
             />
 
             <div className={styles.modalBody}>
                 <p className={styles.warningText}>
-                    Are you sure you want to delete this expense? This action cannot be undone.
+                    {t('delete.confirm')}
                 </p>
 
                 <div className={styles.expenseDetails}>
-                    <p><strong>Date:</strong> {date}</p>
-                    <p><strong>Amount:</strong> {amount} {currency}</p>
-                    <p><strong>Category:</strong> {expense.category_name || '-'}</p>
-                    {expense.note && <p><strong>Note:</strong> {expense.note}</p>}
+                    <p><strong>{t('delete.date')}:</strong> {date}</p>
+                    <p><strong>{t('delete.amount')}:</strong> {amount} {currency}</p>
+                    <p><strong>{t('delete.category')}:</strong> {localizedName(expense.category_name, expense.category_name_ar) || '-'}</p>
+                    {expense.note && <p><strong>{t('delete.note')}:</strong> {expense.note}</p>}
                 </div>
             </div>
 
@@ -64,14 +69,14 @@ export default function DeleteConfirmModal({ isOpen, expense, onConfirm, onCance
                     className="btn btn-secondary"
                     onClick={onCancel}
                 >
-                    Cancel
+                    {t('delete.cancel')}
                 </button>
                 <button
                     type="button"
                     className="btn btn-danger"
                     onClick={onConfirm}
                 >
-                    Delete Expense
+                    {t('delete.confirmButton')}
                 </button>
             </div>
         </Modal>

@@ -3,7 +3,9 @@
  * Provides filtering interface for expenses with date range, category, and currency filters
  */
 import type { ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useCategories, useSubcategories } from '../../hooks/useExpenses';
+import { useLocalizedName } from '../../hooks/useLocalizedName';
 import type { ExpenseFilters as ExpenseFiltersType } from '../../hooks/useExpenses';
 import styles from '../../routes/Expenses.module.css';
 
@@ -20,14 +22,18 @@ interface ExpenseFiltersProps {
 interface Category {
     category_id: number;
     category_name: string;
+    category_name_ar?: string | null;
 }
 
 interface Subcategory {
     subcategory_id: number;
     subcategory_name: string;
+    subcategory_name_ar?: string | null;
 }
 
 export default function ExpenseFilters({ filters, onFilterChange, onApply, onReset }: ExpenseFiltersProps) {
+    const { t } = useTranslation('expenses');
+    const localizedName = useLocalizedName();
     const { categories } = useCategories() as { categories: Category[] };
     const { subcategories } = useSubcategories(filters.categoryId) as { subcategories: Subcategory[] };
 
@@ -49,13 +55,13 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
             <div className={styles.filterCardHeader}>
                 <div className={styles.filterHeaderContent}>
                     <i className="fas fa-filter"></i>
-                    <h3>Filter Expenses</h3>
+                    <h3>{t('filters.title')}</h3>
                 </div>
                 <button
                     type="button"
                     className={styles.btnResetInline}
                     onClick={onReset}
-                    title="Reset all filters"
+                    title={t('filters.reset')}
                 >
                     <i className="fas fa-redo"></i>
                 </button>
@@ -65,7 +71,7 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                 <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-start-date">
                         <i className="fas fa-calendar-alt"></i>
-                        Start Date
+                        {t('filters.startDate')}
                     </label>
                     <input
                         type="date"
@@ -79,7 +85,7 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                 <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-end-date">
                         <i className="fas fa-calendar-alt"></i>
-                        End Date
+                        {t('filters.endDate')}
                     </label>
                     <input
                         type="date"
@@ -93,7 +99,7 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                 <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-category">
                         <i className="fas fa-folder"></i>
-                        Category
+                        {t('filters.category')}
                     </label>
                     <div className={styles.selectWrapper}>
                         <select
@@ -102,10 +108,10 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                             value={String(filters.categoryId || '')}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => handleCategoryChange(e.target.value)}
                         >
-                            <option value="">All Categories</option>
+                            <option value="">{t('filters.allCategories')}</option>
                             {categories.map(cat => (
                                 <option key={cat.category_id} value={cat.category_id}>
-                                    {cat.category_name}
+                                    {localizedName(cat.category_name, cat.category_name_ar)}
                                 </option>
                             ))}
                         </select>
@@ -116,7 +122,7 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                 <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-subcategory">
                         <i className="fas fa-tag"></i>
-                        Subcategory
+                        {t('filters.subcategory')}
                     </label>
                     <div className={styles.selectWrapper}>
                         <select
@@ -126,10 +132,10 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('subcategoryId', e.target.value)}
                             disabled={!filters.categoryId}
                         >
-                            <option value="">All Subcategories</option>
+                            <option value="">{t('filters.allSubcategories')}</option>
                             {subcategories.map(sub => (
                                 <option key={sub.subcategory_id} value={sub.subcategory_id}>
-                                    {sub.subcategory_name}
+                                    {localizedName(sub.subcategory_name, sub.subcategory_name_ar)}
                                 </option>
                             ))}
                         </select>
@@ -140,7 +146,7 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                 <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-currency">
                         <i className="fas fa-dollar-sign"></i>
-                        Currency
+                        {t('filters.currency')}
                     </label>
                     <div className={styles.selectWrapper}>
                         <select
@@ -149,7 +155,7 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                             value={filters.currency || ''}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('currency', e.target.value)}
                         >
-                            <option value="">All Currencies</option>
+                            <option value="">{t('filters.allCurrencies')}</option>
                             <option value="IQD">IQD</option>
                             <option value="USD">USD</option>
                         </select>
@@ -164,7 +170,7 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                         onClick={onApply}
                     >
                         <i className="fas fa-check"></i>
-                        Apply Filters
+                        {t('filters.apply')}
                     </button>
                 </div>
             </div>

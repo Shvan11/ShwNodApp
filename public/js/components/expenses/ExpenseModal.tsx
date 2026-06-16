@@ -4,7 +4,9 @@
  */
 import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useCategories, useSubcategories } from '../../hooks/useExpenses';
+import { useLocalizedName } from '../../hooks/useLocalizedName';
 import type { Expense, ExpenseData } from '../../hooks/useExpenses';
 import { formatISODate } from '../../core/utils';
 import { formatNumber } from '../../utils/formatters';
@@ -16,11 +18,13 @@ import styles from '../../routes/Expenses.module.css';
 interface Category {
     category_id: number;
     category_name: string;
+    category_name_ar?: string | null;
 }
 
 interface Subcategory {
     subcategory_id: number;
     subcategory_name: string;
+    subcategory_name_ar?: string | null;
 }
 
 interface FormData {
@@ -46,6 +50,8 @@ interface ExpenseModalProps {
 }
 
 export default function ExpenseModal({ isOpen, expense, onClose, onSave }: ExpenseModalProps) {
+    const { t } = useTranslation('expenses');
+    const localizedName = useLocalizedName();
     const { categories } = useCategories() as { categories: Category[] };
     const [categoryId, setCategoryId] = useState<string | number>('');
     const [submitting, setSubmitting] = useState(false);
@@ -133,15 +139,15 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
         const newErrors: FormErrors = {};
 
         if (!formData.expenseDate) {
-            newErrors.expenseDate = 'Date is required';
+            newErrors.expenseDate = t('modal.errorDateRequired');
         }
 
         if (!formData.amount || Number(formData.amount) <= 0) {
-            newErrors.amount = 'Valid amount is required';
+            newErrors.amount = t('modal.errorAmountRequired');
         }
 
         if (!formData.currency) {
-            newErrors.currency = 'Currency is required';
+            newErrors.currency = t('modal.errorCurrencyRequired');
         }
 
         setErrors(newErrors);
@@ -188,7 +194,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
     };
 
     const isEditMode = !!expense;
-    const modalTitle = isEditMode ? 'Edit Expense' : 'Add New Expense';
+    const modalTitle = isEditMode ? t('modal.editTitle') : t('modal.addTitle');
 
     return (
         <Modal
@@ -201,14 +207,14 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                     titleId="expense-modal-title"
                     title={modalTitle}
                     onClose={handleClose}
-                    closeLabel="Close modal"
+                    closeLabel={t('modal.close')}
                 />
 
                 <form onSubmit={handleSubmit}>
                     <div className={styles.modalBody}>
                         <div className={styles.formGroup}>
                             <label htmlFor="expense-date">
-                                Date <span className={styles.required}>*</span>
+                                {t('modal.date')} <span className={styles.required}>*</span>
                             </label>
                             <input
                                 type="date"
@@ -225,7 +231,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                         <div className={styles.formRow}>
                             <div className={styles.formGroup}>
                                 <label htmlFor="expense-amount">
-                                    Amount <span className={styles.required}>*</span>
+                                    {t('modal.amount')} <span className={styles.required}>*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -233,7 +239,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                                     value={displayAmount}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => handleAmountChange(e.target.value)}
                                     onBlur={() => setDisplayAmount(formData.amount ? formatNumber(formData.amount) : '')}
-                                    placeholder="Enter amount"
+                                    placeholder={t('modal.amountPlaceholder')}
                                     className={`${styles.formInput} ${errors.amount ? styles.inputError : ''}`}
                                 />
                                 {errors.amount && (
@@ -243,7 +249,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
 
                             <div className={styles.formGroup}>
                                 <label htmlFor="expense-currency">
-                                    Currency <span className={styles.required}>*</span>
+                                    {t('modal.currency')} <span className={styles.required}>*</span>
                                 </label>
                                 <select
                                     id="expense-currency"
@@ -261,24 +267,24 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label htmlFor="expense-category">Category</label>
+                            <label htmlFor="expense-category">{t('modal.category')}</label>
                             <select
                                 id="expense-category"
                                 value={String(formData.categoryId)}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => handleCategoryChange(e.target.value)}
                                 className={styles.formInput}
                             >
-                                <option value="">Select Category</option>
+                                <option value="">{t('modal.selectCategory')}</option>
                                 {categories.map(cat => (
                                     <option key={cat.category_id} value={cat.category_id}>
-                                        {cat.category_name}
+                                        {localizedName(cat.category_name, cat.category_name_ar)}
                                     </option>
                                 ))}
                             </select>
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label htmlFor="expense-subcategory">Subcategory</label>
+                            <label htmlFor="expense-subcategory">{t('modal.subcategory')}</label>
                             <select
                                 id="expense-subcategory"
                                 value={String(formData.subcategoryId)}
@@ -286,23 +292,23 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                                 disabled={!formData.categoryId}
                                 className={styles.formInput}
                             >
-                                <option value="">Select Subcategory</option>
+                                <option value="">{t('modal.selectSubcategory')}</option>
                                 {subcategories.map(sub => (
                                     <option key={sub.subcategory_id} value={sub.subcategory_id}>
-                                        {sub.subcategory_name}
+                                        {localizedName(sub.subcategory_name, sub.subcategory_name_ar)}
                                     </option>
                                 ))}
                             </select>
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label htmlFor="expense-note">Note</label>
+                            <label htmlFor="expense-note">{t('modal.note')}</label>
                             <textarea
                                 id="expense-note"
                                 rows={3}
                                 value={formData.note}
                                 onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleInputChange('note', e.target.value)}
-                                placeholder="Add any notes about this expense..."
+                                placeholder={t('modal.notePlaceholder')}
                                 className={styles.formInput}
                             />
                         </div>
@@ -315,14 +321,14 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                             onClick={handleClose}
                             disabled={submitting}
                         >
-                            Cancel
+                            {t('modal.cancel')}
                         </button>
                         <button
                             type="submit"
                             className="btn btn-primary"
                             disabled={submitting}
                         >
-                            {submitting ? 'Saving…' : isEditMode ? 'Update Expense' : 'Add Expense'}
+                            {submitting ? t('modal.saving') : isEditMode ? t('modal.update') : t('modal.add')}
                         </button>
                     </div>
                 </form>

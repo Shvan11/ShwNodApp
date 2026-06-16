@@ -2,6 +2,7 @@
  * ExpenseSummary Component
  * Displays expense summary with totals by currency
  */
+import { useTranslation } from 'react-i18next';
 import { useExpenseSummary } from '../../hooks/useExpenses';
 import type { Expense } from '../../hooks/useExpenses';
 import styles from '../../routes/Expenses.module.css';
@@ -30,6 +31,7 @@ interface SummaryResult {
 }
 
 export default function ExpenseSummary({ startDate, endDate, expenses }: ExpenseSummaryProps) {
+    const { t } = useTranslation('expenses');
     const { summary, loading } = useExpenseSummary(startDate, endDate) as { summary: SummaryData | null; loading: boolean };
 
     const formatNumber = (num: number): string => {
@@ -79,19 +81,19 @@ export default function ExpenseSummary({ startDate, endDate, expenses }: Expense
         <div className={styles.summaryContainer}>
             <div className={styles.summaryGrid}>
                 <div className={`${styles.summaryCard} ${styles.totalCount}`}>
-                    <div className={styles.summaryLabel}>Total Expenses</div>
+                    <div className={styles.summaryLabel}>{t('summary.totalExpenses')}</div>
                     <div className={styles.summaryValue}>{count}</div>
                 </div>
 
                 <div className={`${styles.summaryCard} ${styles.currencyIqd}`}>
-                    <div className={styles.summaryLabel}>Total IQD</div>
+                    <div className={styles.summaryLabel}>{t('summary.totalIqd')}</div>
                     <div className={styles.summaryValue}>
                         {formatNumber(iqd)} <span className={styles.currencyLabel}>IQD</span>
                     </div>
                 </div>
 
                 <div className={`${styles.summaryCard} ${styles.currencyUsd}`}>
-                    <div className={styles.summaryLabel}>Total USD</div>
+                    <div className={styles.summaryLabel}>{t('summary.totalUsd')}</div>
                     <div className={styles.summaryValue}>
                         {formatNumber(usd)} <span className={styles.currencyLabel}>USD</span>
                     </div>

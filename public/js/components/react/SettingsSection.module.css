@@ -601,3 +601,47 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* Clinic branding (logo + name) — Settings → General. The preview box mimics the
+   header so admins see roughly how a transparent PNG will read against it. */
+.brandingLogoRow {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.brandingLogoPreview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 180px;
+    height: 64px;
+    padding: 0.5rem 0.75rem;
+    border: 2px dashed var(--gray-300);
+    border-radius: 8px;
+    background: var(--header-bg);
+    overflow: hidden;
+}
+
+.brandingLogoPreview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.brandingLogoEmpty {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--color-white);
+    font-size: 0.85rem;
+    opacity: 0.85;
+}
+
+.brandingLogoActions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}

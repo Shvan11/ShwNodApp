@@ -14,7 +14,6 @@ import { useAppointmentDoctors } from '../../../hooks/useAppointmentDoctors';
 
 // Parse the URL `?dr=` param into a DoctorFilter (defaults to 'all').
 const parseDrParam = (raw: string | null): DoctorFilter => {
-    if (raw === 'unassigned') return 'unassigned';
     if (raw) {
         const n = Number(raw);
         if (Number.isInteger(n)) return n;
@@ -75,14 +74,15 @@ const DailyAppointments = () => {
         parseDrParam(searchParams.get('dr'))
     );
 
-    // Appointment-eligible doctors (shared with the calendar) — drives both the
-    // header dropdown and the drID → name lookup for the per-card doctor label.
-    const { legend: doctors } = useAppointmentDoctors();
+    // Appointment-eligible doctors (shared with the calendar) — drives the header
+    // dropdown plus the drID → name/colour lookups for the per-card doctor icon.
+    // `byId` carries the calendar colour (neutral doctors intentionally omitted).
+    const { legend: doctors, byId: doctorColors } = useAppointmentDoctors();
     const doctorNames = useMemo(
         () => new Map(doctors.map((d) => [d.id, d.name])),
         [doctors]
     );
-    // The per-card doctor name is only useful when viewing all doctors; once the
+    // The per-card doctor icon is only useful when viewing all doctors; once the
     // list is filtered to one doctor it's redundant noise on every card.
     const showDoctorName = selectedDrId === 'all';
 
@@ -210,7 +210,6 @@ const DailyAppointments = () => {
     const matchesDoctor = useCallback(
         (apt: DailyAppointment): boolean => {
             if (selectedDrId === 'all') return true;
-            if (selectedDrId === 'unassigned') return apt.dr_id == null;
             return apt.dr_id === selectedDrId;
         },
         [selectedDrId]
@@ -294,6 +293,7 @@ const DailyAppointments = () => {
                     showStatus={false}
                     loading={loading}
                     doctorNames={doctorNames}
+                    doctorColors={doctorColors}
                     showDoctorName={showDoctorName}
                     onCheckIn={handleCheckIn}
                     emptyMessage={searchTerm ? "No matching patients found." : "No appointments scheduled for this date."}
@@ -306,6 +306,7 @@ const DailyAppointments = () => {
                     showStatus={true}
                     loading={loading}
                     doctorNames={doctorNames}
+                    doctorColors={doctorColors}
                     showDoctorName={showDoctorName}
                     onMarkSeated={handleMarkSeated}
                     onMarkDismissed={handleMarkDismissed}

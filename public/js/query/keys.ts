@@ -276,6 +276,8 @@ export const qk = {
   },
   /** Reports — daily-invoices modal (keyed by date). */
   dailyInvoices: (date: string) => ['daily-invoices', date] as const,
+  /** Clinic branding (header logo + display name) — header + General settings. */
+  branding: () => ['branding'] as const,
   /** Media — photo-type taxonomy + WebCeph patient link (WebCeph modal). */
   media: {
     photoTypes: () => ['media', 'photo-types'] as const,

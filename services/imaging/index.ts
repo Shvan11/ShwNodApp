@@ -5,6 +5,7 @@ import { execFile, ChildProcess } from 'child_process';
 import config from '../../config/config.js';
 import { imageSizeFromFile } from 'image-size/fromFile';
 import { workingFilePath, patientPath } from '../files/clinic-paths.js';
+import { VIEW_CODES, type PhotoViewCode } from '../../shared/photo-views.js';
 import { log } from '../../utils/logger.js';
 
 // ===========================================
@@ -33,51 +34,43 @@ export type ImageDimension = {
 // ===========================================
 
 /**
- * Get image sizes (async version using image-size v2 API)
+ * Probe a time-point's rendered photo views, KEYED BY VIEW CODE (derived from the
+ * shared VIEW_CODES SSoT) so no consumer depends on array position. Each value is
+ * the view's pixel size + mtime, or `null` when that view hasn't been rendered.
+ * The centre logo is a client-only layout concern and is not included.
  * @param pid - Patient ID
- * @param tp - Time point
- * @returns Promise resolving to array of image dimensions
+ * @param tp - Time point code
  */
-async function getImageSizes(pid: string, tp: string): Promise<(ImageDimension | null)[]> {
-  const imegs = [
-    pid + '0' + tp + '.i10',
-    pid + '0' + tp + '.i12',
-    pid + '0' + tp + '.i13',
-    pid + '0' + tp + '.i23',
-    'logo.png',
-    pid + '0' + tp + '.i24',
-    pid + '0' + tp + '.i20',
-    pid + '0' + tp + '.i22',
-    pid + '0' + tp + '.i21',
-  ];
+async function getImageSizes(
+  pid: string,
+  tp: string
+): Promise<Record<PhotoViewCode, ImageDimension | null>> {
+  const probe = async (view: PhotoViewCode): Promise<ImageDimension | null> => {
+    const name = `${pid}0${tp}.${view}`;
+    try {
+      const filePath = workingFilePath(name);
+      // imageSizeFromFile is truly async and non-blocking; stat runs alongside it
+      // to capture the mtime cache-bust token (see ImageDimension.mtime).
+      const [dimensions, stat] = await Promise.all([
+        imageSizeFromFile(filePath),
+        fs.promises.stat(filePath),
+      ]);
+      return {
+        name,
+        width: dimensions.width || 0,
+        height: dimensions.height || 0,
+        mtime: Math.round(stat.mtimeMs),
+      };
+    } catch {
+      return null; // missing or unreadable slot
+    }
+  };
 
-  // Use Promise.all to read all images concurrently (non-blocking)
-  const results = await Promise.all(
-    imegs.map(async (fileName): Promise<ImageDimension | null> => {
-      try {
-        const filePath = workingFilePath(fileName);
-
-        // imageSizeFromFile is truly async and non-blocking; stat runs alongside it
-        // to capture the mtime cache-bust token (see ImageDimension.mtime).
-        const [dimensions, stat] = await Promise.all([
-          imageSizeFromFile(filePath),
-          fs.promises.stat(filePath),
-        ]);
-
-        return {
-          name: fileName,
-          width: dimensions.width || 0,
-          height: dimensions.height || 0,
-          mtime: Math.round(stat.mtimeMs),
-        };
-      } catch {
-        // Return null for missing or invalid images
-        return null;
-      }
-    })
+  // All views probed concurrently (non-blocking).
+  const entries = await Promise.all(
+    VIEW_CODES.map(async (view) => [view, await probe(view)] as const)
   );
-
-  return results;
+  return Object.fromEntries(entries) as Record<PhotoViewCode, ImageDimension | null>;
 }
 
 /**

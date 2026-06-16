@@ -237,6 +237,9 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
     idType: 'int',
     columns: [
       { name: 'category_name', label: 'category Name', type: 'nvarchar', maxLength: 50, required: true },
+      // Optional Arabic display name — falls back to category_name when blank (see
+      // CLAUDE.md i18n / RTL → "DB-stored lookup values"). Generic CRUD picks it up.
+      { name: 'category_name_ar', label: 'category Name (Arabic)', type: 'nvarchar', maxLength: 50, required: false },
     ],
   },
   tblExpenseSubcategories: {
@@ -248,6 +251,11 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
     idType: 'int',
     columns: [
       { name: 'subcategory_name', label: 'Name', type: 'nvarchar', maxLength: 100, required: true },
+      // Optional Arabic display name — falls back to subcategory_name when blank.
+      // NOTE: rows under the "Employees" category are auto-synced from `employees`
+      // (employee-queries.ts writes only subcategory_name), so an Arabic value set
+      // here on those rows can go stale on rename — leave employee/proper-noun rows blank.
+      { name: 'subcategory_name_ar', label: 'Name (Arabic)', type: 'nvarchar', maxLength: 100, required: false },
       {
         name: 'category_id',
         label: 'category',

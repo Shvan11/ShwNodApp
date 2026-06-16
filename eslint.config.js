@@ -210,16 +210,23 @@ export default [
   // newly-translated files here, so a raw string sneaking back in fails CI.
   // `mode: 'jsx-only'` checks JSX text + the user-facing DOM attributes
   // (placeholder/alt/aria-label/value/title — the plugin's built-in blacklistAttrs;
-  // className/id/aria-hidden/role on DOM tags are auto-allowed). The brand
-  // 'Shwan Orthodontics' stays untranslated, so it's allowed via words.exclude —
-  // which also re-states the plugin's default punctuation/ALL-CAPS excludes, because
-  // the options merge is a shallow `_.defaults` (a provided `words` REPLACES the
-  // default wholesale rather than extending it). These files inherit the tsparser
-  // languageOptions from the frontend block above (their globs are a subset of it).
+  // className/id/aria-hidden/role on DOM tags are auto-allowed). The `words.exclude`
+  // re-states the plugin's default punctuation/ALL-CAPS excludes, because the options
+  // merge is a shallow `_.defaults` (a provided `words` REPLACES the default wholesale
+  // rather than extending it). The clinic name is now dynamic branding data
+  // (Settings → General), not a hardcoded literal, so no brand string is excluded.
+  // These files inherit the tsparser languageOptions from the frontend block above
+  // (their globs are a subset of it).
   {
     files: [
       'public/js/routes/Dashboard.tsx',
-      'public/js/components/react/UniversalHeader.tsx'
+      'public/js/components/react/UniversalHeader.tsx',
+      'public/js/routes/Expenses.tsx',
+      'public/js/components/expenses/ExpenseFilters.tsx',
+      'public/js/components/expenses/ExpenseTable.tsx',
+      'public/js/components/expenses/ExpenseSummary.tsx',
+      'public/js/components/expenses/ExpenseModal.tsx',
+      'public/js/components/expenses/DeleteConfirmModal.tsx'
     ],
     plugins: {
       i18next
@@ -229,7 +236,20 @@ export default [
         'error',
         {
           mode: 'jsx-only',
-          words: { exclude: ['[0-9!-/:-@[-`{-~]+', '[A-Z_-]+', 'Shwan Orthodontics'] }
+          // Structural/identity attributes on the shared <Modal>/<ModalHeader>
+          // components are never user-facing, so a string literal there is fine:
+          // titleId/ariaLabelledBy are id references (cf. the allowed id/htmlFor)
+          // and variant is a design-system enum (default|danger|warning|…). This
+          // extends the plugin's DEFAULT jsx-attributes exclude (which `_.defaults`
+          // would otherwise drop wholesale once this key is set) so the real
+          // user-facing attrs — title/label/placeholder/alt/aria-label — stay checked.
+          'jsx-attributes': {
+            exclude: [
+              'className', 'styleName', 'style', 'type', 'key', 'id', 'width', 'height',
+              'titleId', 'ariaLabelledBy', 'variant'
+            ]
+          },
+          words: { exclude: ['[0-9!-/:-@[-`{-~]+', '[A-Z_-]+'] }
         }
       ]
     }

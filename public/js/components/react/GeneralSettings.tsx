@@ -11,10 +11,11 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { LANGUAGES, type Language } from '../../core/language';
 import { useArabicFont } from '../../contexts/FontContext';
 import { ARABIC_FONTS, type ArabicFont } from '../../core/font';
-import { putJSON, httpErrorMessage } from '@/core/http';
-import { allOptionsQuery } from '@/query/queries';
+import { putJSON, postFormData, deleteJSON, httpErrorMessage } from '@/core/http';
+import { allOptionsQuery, brandingQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import * as settings from '@shared/contracts/settings.contract';
+import * as brandingContract from '@shared/contracts/branding.contract';
 import styles from './SettingsSection.module.css';
 
 // Per-device appearance options, mirrored by the header toggle.
@@ -64,6 +65,22 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
 
     const { data: optionsData, isLoading, isError, error: loadError, refetch } = useQuery(allOptionsQuery());
 
+    // Clinic branding (logo + display name) — header customization, shared by all
+    // users. The name buffers in local state (seeded below, render-phase guard); a
+    // freshly-picked logo file + its preview data URL, and a "remove" flag, buffer
+    // until Save. All cleared on a successful save.
+    const { data: brandingData } = useQuery(brandingQuery());
+    const [brandingName, setBrandingName] = useState('');
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const [removeLogoFlag, setRemoveLogoFlag] = useState(false);
+    const [savingBranding, setSavingBranding] = useState(false);
+    const [seededBranding, setSeededBranding] = useState<unknown>(null);
+    if (brandingData && brandingData !== seededBranding) {
+        setSeededBranding(brandingData);
+        setBrandingName(brandingData.clinicName ?? '');
+    }
+
     // Build the editable `options` map from the query data during render (keyed on
     // the query result reference); `pendingChanges` overlays it for unsaved edits.
     const [seededOptionsData, setSeededOptionsData] = useState<unknown>(null);
@@ -101,6 +118,50 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
 
     const hideModal = () => {
         setModal({ show: false, title: '', message: '' });
+    };
+
+    const onLogoPick = (e: ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] ?? null;
+        e.target.value = ''; // reset so re-picking the same file still fires onChange
+        if (!file) return;
+        setLogoFile(file);
+        setRemoveLogoFlag(false);
+        const reader = new FileReader();
+        reader.onload = () => setLogoPreview(typeof reader.result === 'string' ? reader.result : null);
+        reader.readAsDataURL(file);
+    };
+
+    const clearLogo = () => {
+        setLogoFile(null);
+        setLogoPreview(null);
+        setRemoveLogoFlag(true);
+    };
+
+    const saveBranding = async () => {
+        setSavingBranding(true);
+        try {
+            // Logo first (upload a new one, or delete the current), then the name.
+            if (logoFile) {
+                const fd = new FormData();
+                fd.append('logo', logoFile);
+                await postFormData('/api/branding/logo', fd, { schema: brandingContract.uploadLogo.response });
+            } else if (removeLogoFlag) {
+                await deleteJSON('/api/branding/logo', { schema: brandingContract.deleteLogo.response });
+            }
+            if (brandingName !== (brandingData?.clinicName ?? '')) {
+                await putJSON('/api/branding', { clinicName: brandingName }, { schema: brandingContract.updateBranding.response });
+            }
+            // Refresh both the header (branding) cache and reset the edit buffers.
+            await queryClient.invalidateQueries({ queryKey: qk.branding() });
+            setLogoFile(null);
+            setLogoPreview(null);
+            setRemoveLogoFlag(false);
+            showModal('Success', 'Clinic branding updated.');
+        } catch (error) {
+            showModal('Error', 'Failed to update branding: ' + httpErrorMessage(error, 'Unknown error'));
+        } finally {
+            setSavingBranding(false);
+        }
     };
 
     const handleInputChange = (optionName: string, newValue: string) => {
@@ -254,6 +315,12 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
 
     const hasChanges = Object.keys(pendingChanges).length > 0;
 
+    // What the preview shows: a freshly-picked logo, else (unless removal is
+    // staged) the current saved logo. `brandingDirty` gates the Save button.
+    const shownLogo = logoPreview ?? (removeLogoFlag ? null : brandingData?.logo ?? null);
+    const brandingDirty =
+        logoFile != null || removeLogoFlag || brandingName !== (brandingData?.clinicName ?? '');
+
     return (
         <div>
             <section className={styles.subsection}>
@@ -406,6 +473,79 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
 
             <section className={styles.subsection}>
                 <h3 className={styles.pageTitle}>
+                    <i className="fas fa-image"></i>
+                    Clinic Branding
+                </h3>
+                <p className={styles.sectionDescription}>
+                    The logo and name shown in the app header. Saved for the whole clinic (all users).
+                </p>
+
+                <div className={styles.settingGroup}>
+                    <label>Logo</label>
+                    <div className={styles.brandingLogoRow}>
+                        <div className={styles.brandingLogoPreview}>
+                            {shownLogo ? (
+                                <img src={shownLogo} alt="Clinic logo preview" />
+                            ) : (
+                                <span className={styles.brandingLogoEmpty}>
+                                    <i className="fas fa-image" aria-hidden="true" /> No logo
+                                </span>
+                            )}
+                        </div>
+                        <div className={styles.brandingLogoActions}>
+                            <label className="btn btn-secondary">
+                                <i className="fas fa-upload"></i>
+                                Choose image
+                                <input
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp"
+                                    onChange={onLogoPick}
+                                    hidden
+                                />
+                            </label>
+                            {shownLogo && (
+                                <button type="button" className="btn btn-secondary" onClick={clearLogo}>
+                                    <i className="fas fa-trash"></i>
+                                    Remove
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <div className={styles.settingDescription}>
+                        PNG, JPEG, or WebP, up to 2&nbsp;MB. Shown on the colored header — a transparent
+                        PNG works best. Replaces the clinic name when set.
+                    </div>
+                </div>
+
+                <div className={styles.settingGroup}>
+                    <label htmlFor="clinic_name_input">Clinic name</label>
+                    <input
+                        id="clinic_name_input"
+                        type="text"
+                        maxLength={80}
+                        value={brandingName}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => setBrandingName(e.target.value)}
+                        placeholder="Shwan Orthodontics"
+                    />
+                    <div className={styles.settingDescription}>
+                        Shown when no logo is set, and used as the logo&apos;s text alternative.
+                    </div>
+                </div>
+
+                <div className={styles.actions}>
+                    <button
+                        className="btn btn-primary"
+                        onClick={saveBranding}
+                        disabled={!brandingDirty || savingBranding}
+                    >
+                        <i className="fas fa-save"></i>
+                        {savingBranding ? 'Saving…' : 'Save Branding'}
+                    </button>
+                </div>
+            </section>
+
+            <section className={styles.subsection}>
+                <h3 className={styles.pageTitle}>
                     <i className="fas fa-cog"></i>
                     System Options
                 </h3>
@@ -425,8 +565,8 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                                 <p className={styles.noSettings}>No settings found. Please check your database configuration.</p>
                             ) : (
                                 Object.entries(options)
-                                    // Filter out settings that have their own dedicated tabs
-                                    .filter(([key]) => !key.startsWith('EMAIL_') && !key.startsWith('CALENDAR_'))
+                                    // Filter out settings that have their own dedicated tabs / sections
+                                    .filter(([key]) => !key.startsWith('EMAIL_') && !key.startsWith('CALENDAR_') && !key.startsWith('CLINIC_'))
                                     .map(([key, value]) => (
                                     <div key={key} className={cn(styles.settingGroup, pendingChanges[key] !== undefined && styles.pendingChange)}>
                                         <label htmlFor={`setting_${key.replace(/[^a-zA-Z0-9]/g, '_')}`}>

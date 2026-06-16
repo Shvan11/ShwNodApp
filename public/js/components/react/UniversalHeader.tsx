@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
-import { patientInfoQuery } from '@/query/queries';
+import { patientInfoQuery, brandingQuery } from '@/query/queries';
 import TasksBell from './TasksBell';
 import ThemeToggle from './ThemeToggle';
 import UserMenu from './UserMenu';
@@ -12,6 +12,11 @@ import UserMenu from './UserMenu';
 // in-app navigation + a refresh, cleared on tab/browser close, never shared to
 // other tabs). Deliberately NOT localStorage, so it stays temporary.
 const STICKY_PATIENT_KEY = 'stickyPatientTab';
+
+// Fallback shown in the logo slot when no clinic name has been configured yet
+// (a JS constant, not JSX — so it's the seed default, never a hardcoded brand in
+// the rendered tree). Each deployment sets its own name/logo in Settings → General.
+const DEFAULT_CLINIC_NAME = 'Shwan Orthodontics';
 
 interface Patient {
     code: string | number;
@@ -23,15 +28,6 @@ interface User {
     username: string;
     fullName?: string;
     role: string;
-}
-
-interface NavigationContext {
-    currentPage: string;
-    previousPage: string;
-    breadcrumbs: Array<{
-        name: string;
-        url: string;
-    }>;
 }
 
 interface NavigationItem {
@@ -50,6 +46,12 @@ const UniversalHeader = () => {
     // GlobalState already fetches /api/auth/me and exposes the user, so the
     // header reads it from there instead of making its own duplicate request.
     const { user } = useGlobalState();
+
+    // Clinic branding (logo + display name) — configured in Settings → General,
+    // shared by all users. Cached with a long staleTime, so after first paint it
+    // never refetches on navigation. Until it resolves, the name fallback shows.
+    const { data: branding } = useQuery(brandingQuery());
+    const clinicName = branding?.clinicName || DEFAULT_CLINIC_NAME;
 
     // Patient code from the URL (/patient/:code/...). Tells us whether we're
     // *currently* on a patient page and drives the last-sub-view persistence.
@@ -113,41 +115,6 @@ const UniversalHeader = () => {
         }
     };
 
-    // Derived during render (was a setState-in-effect). document.referrer is
-    // constant for the page load; the back button shows when there's a referrer
-    // distinct from the current path.
-    const getNavigationContext = (): NavigationContext => {
-        const referrer = document.referrer;
-        const currentPath = window.location.pathname;
-
-        const context: NavigationContext = {
-            currentPage: getCurrentPageType(currentPath),
-            previousPage: getCurrentPageType(referrer),
-            breadcrumbs: []
-        };
-
-        // Simple breadcrumb logic - can be enhanced
-        if (referrer && referrer !== currentPath) {
-            context.breadcrumbs.push({
-                name: context.previousPage,
-                url: referrer
-            });
-        }
-
-        return context;
-    };
-
-    const getCurrentPageType = (url: string): string => {
-        if (!url) return 'Unknown';
-
-        if (url.includes('/search')) return 'Search';
-        if (url.includes('/patient')) return 'Patient';
-        if (url.includes('/appointment')) return 'Appointments';
-        if (url.includes('/home')) return 'Home';
-
-        return 'Dashboard';
-    };
-
     const navigateToPatient = (patientCode: string | number) => {
         // Return to the patient's last-viewed section (works, diagnosis, visits,
         // payments, photos…) if we've recorded one; otherwise default to photos.
@@ -160,10 +127,6 @@ const UniversalHeader = () => {
         // route active), so there's nothing to navigate away from — the tab just
         // disappears until the next patient is opened.
         setStickyCode(null);
-    };
-
-    const navigateBack = () => {
-        window.history.back();
     };
 
     const navigateToDashboard = () => {
@@ -224,10 +187,6 @@ const UniversalHeader = () => {
         ];
     };
 
-    // Derived in render (compiler-memoized) — declared after its helpers so
-    // there's no temporal-dead-zone access.
-    const navigationContext = getNavigationContext();
-
     // Persist the last-viewed patient sub-page on navigation (a sessionStorage
     // side effect). Declared below its helper for the React Compiler's
     // declare-before-use immutability rule.
@@ -249,14 +208,25 @@ const UniversalHeader = () => {
     return (
         <header className="universal-header">
             <div className="header-container">
-                {/* Header Left - Logo/Brand */}
+                {/* Left region — clinic logo (or name fallback), home shortcut */}
                 <div className="header-left">
-                    <div className="logo-section" role="button" tabIndex={0} onClick={() => navigate('/')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/'); } }}>
-                        <h1 className="clinic-name">Shwan Orthodontics</h1>
+                    <div
+                        className="logo-section"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={t('nav.home')}
+                        onClick={() => navigate('/')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/'); } }}
+                    >
+                        {branding?.logo ? (
+                            <img className="clinic-logo" src={branding.logo} alt={clinicName} />
+                        ) : (
+                            <h1 className="clinic-name">{clinicName}</h1>
+                        )}
                     </div>
                 </div>
 
-                {/* Header Center - Main Navigation */}
+                {/* Center region — main navigation tabs (+ the sticky patient tab) */}
                 <div className="header-center">
                     <nav className="main-navigation">
                         {getNavigationItems().map(item => (
@@ -283,24 +253,38 @@ const UniversalHeader = () => {
                                 >
                                     <i className="fas fa-user" />
                                     <span>{currentPatient.name}</span>
+                                    {/* Close chip lives inside the tab (browser-tab style); can't be a
+                                        nested <button>, so it's a role=button span that stops the click
+                                        from bubbling to the tab's navigate handler. */}
+                                    {!onPatientRoute && (
+                                        <span
+                                            role="button"
+                                            tabIndex={0}
+                                            className="patient-nav-close"
+                                            aria-label={t('nav.closePatient')}
+                                            title={t('nav.closePatient')}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                closePatientTab();
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    closePatientTab();
+                                                }
+                                            }}
+                                        >
+                                            <i className="fas fa-times" />
+                                        </span>
+                                    )}
                                 </button>
-                                {!onPatientRoute && (
-                                    <button
-                                        type="button"
-                                        className="patient-nav-close"
-                                        aria-label={t('nav.closePatient')}
-                                        title={t('nav.closePatient')}
-                                        onClick={closePatientTab}
-                                    >
-                                        <i className="fas fa-times" />
-                                    </button>
-                                )}
                             </div>
                         )}
                     </nav>
                 </div>
 
-                {/* Header Right - Quick Actions */}
+                {/* Right region — notifications, theme, and the account menu (corner) */}
                 <div className="header-right">
                     {/* App-wide tasks bell */}
                     <TasksBell />
@@ -310,13 +294,6 @@ const UniversalHeader = () => {
 
                     {/* Current User — click to open account menu (Change password / Log out) */}
                     {currentUser && <UserMenu user={currentUser} />}
-
-                    {/* Back Button */}
-                    {navigationContext && navigationContext.breadcrumbs.length > 0 && (
-                        <button className="back-btn" onClick={navigateBack}>
-                            <i className="fas fa-arrow-left" />
-                        </button>
-                    )}
                 </div>
             </div>
         </header>

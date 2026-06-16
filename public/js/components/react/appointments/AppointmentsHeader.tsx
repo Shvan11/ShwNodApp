@@ -1,12 +1,12 @@
 import { type ChangeEvent, type MouseEvent } from 'react';
 import ConnectionStatus, { type ConnectionStatusType, type FreshnessType } from './ConnectionStatus';
 import StatsCards from './StatsCards';
+import DoctorFilterSelect from './DoctorFilterSelect';
 import type { LegendDoctor } from '../calendar.types';
 import styles from './AppointmentsHeader.module.css';
 
-// Doctor-filter selection: a specific doctor (employees.id), every doctor, or
-// only appointments with no doctor assigned (dr_id IS NULL).
-export type DoctorFilter = number | 'all' | 'unassigned';
+// Doctor-filter selection: a specific doctor (employees.id) or every doctor.
+export type DoctorFilter = number | 'all';
 
 interface AppointmentsHeaderProps {
     selectedDate: string;
@@ -75,11 +75,6 @@ const AppointmentsHeader = ({
 
     const handleSearchInputChange = (e: ChangeEvent<HTMLInputElement>): void => {
         onSearchChange(e.target.value);
-    };
-
-    const handleDoctorSelectChange = (e: ChangeEvent<HTMLSelectElement>): void => {
-        const { value } = e.target;
-        onDoctorChange(value === 'all' || value === 'unassigned' ? value : Number(value));
     };
 
     // The visible pill is just chrome; the transparent native date input overlays
@@ -153,21 +148,11 @@ const AppointmentsHeader = ({
 
             {/* Doctor filter + search + connection status — right */}
             <div className={styles.searchGroup}>
-                <div className={styles.doctorWrapper}>
-                    <i className={`fas fa-user-md ${styles.doctorIcon}`} aria-hidden="true"></i>
-                    <select
-                        className={styles.doctorSelect}
-                        aria-label="Filter by doctor"
-                        value={String(selectedDrId)}
-                        onChange={handleDoctorSelectChange}
-                    >
-                        <option value="all">All doctors</option>
-                        {doctors.map((doc) => (
-                            <option key={doc.id} value={doc.id}>{doc.name}</option>
-                        ))}
-                        <option value="unassigned">Unassigned</option>
-                    </select>
-                </div>
+                <DoctorFilterSelect
+                    doctors={doctors}
+                    value={selectedDrId}
+                    onChange={onDoctorChange}
+                />
                 <div className={styles.searchWrapper}>
                     <i className={`fas fa-search ${styles.searchIcon}`}></i>
                     <input

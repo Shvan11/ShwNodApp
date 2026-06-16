@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useExpenses, useExpenseMutations } from '../hooks/useExpenses';
 import type { Expense, ExpenseFilters as ExpenseFiltersType, ExpenseData } from '../hooks/useExpenses';
@@ -52,6 +53,8 @@ function getDefaultDateRange(): FiltersState {
 }
 
 export default function Expenses() {
+  const { t } = useTranslation('expenses');
+
   // Toast notifications (now using unified global toast system)
   const toast = useToast();
 
@@ -111,7 +114,7 @@ export default function Expenses() {
   // fires the toast (a side effect, not derived state) once per failure object.
   const [loadErrorToast, setLoadErrorToast] = useState<{ msg: string } | null>(null);
   if (editingId != null && editingError) {
-    setLoadErrorToast({ msg: httpErrorMessage(editingError, 'Failed to load expense data') });
+    setLoadErrorToast({ msg: httpErrorMessage(editingError, t('toast.loadFailed')) });
     setEditingId(null);
     setIsExpenseModalOpen(false);
   }
@@ -186,17 +189,17 @@ export default function Expenses() {
     try {
       if (currentExpense) {
         await updateExpense(currentExpense.id, expenseData);
-        toast.success('Expense updated successfully');
+        toast.success(t('toast.updated'));
       } else {
         await createExpense(expenseData);
-        toast.success('Expense created successfully');
+        toast.success(t('toast.created'));
       }
       setIsExpenseModalOpen(false);
       setCurrentExpense(null);
       setEditingId(null);
     } catch {
       toast.error(
-        currentExpense ? 'Failed to update expense' : 'Failed to create expense'
+        currentExpense ? t('toast.updateFailed') : t('toast.createFailed')
       );
     }
   };
@@ -207,24 +210,24 @@ export default function Expenses() {
 
     try {
       await deleteExpense(expenseToDelete.id);
-      toast.success('Expense deleted successfully');
+      toast.success(t('toast.deleted'));
       setIsDeleteModalOpen(false);
       setExpenseToDelete(null);
     } catch {
-      toast.error('Failed to delete expense');
+      toast.error(t('toast.deleteFailed'));
     }
   };
 
   return (
     <div className={styles.expensesContainer}>
       <div className={styles.expensesPageHeader}>
-        <h1>Expense Management</h1>
+        <h1>{t('title')}</h1>
         <button
           className="btn btn-primary"
           onClick={handleAddExpense}
           disabled={mutationLoading}
         >
-          Add New Expense
+          {t('addNew')}
         </button>
       </div>
 
@@ -246,9 +249,9 @@ export default function Expenses() {
       {/* Error Display */}
       {error && (
         <div className={styles.errorBanner}>
-          <p>Error loading expenses: {error}</p>
+          <p>{t('errorLoading', { error })}</p>
           <button onClick={refetch} className="btn btn-secondary">
-            Retry
+            {t('retry')}
           </button>
         </div>
       )}

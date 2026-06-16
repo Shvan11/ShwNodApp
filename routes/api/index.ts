@@ -57,6 +57,7 @@ import fileExplorerRoutes from './file-explorer.routes.js';
 import localsendRoutes from './localsend.routes.js';
 import telegramRoutes from './telegram.routes.js';
 import shareRoutes from './share.routes.js';
+import brandingRoutes from './branding.routes.js';
 import integrationsRoutes from './integrations.routes.js';
 import taskRoutes from './task.routes.js';
 import monitoringRoutes from './monitoring.routes.js';
@@ -145,6 +146,9 @@ router.use('/telegram', telegramRoutes);
 
 // Share staging — persist browser-generated images so the targets above can send them
 router.use('/share', shareRoutes);
+
+// Clinic branding — header logo + display name (routes define their /branding* prefix)
+router.use('/', brandingRoutes);
 
 // Integrations — manage external-service auth (Telegram now; WhatsApp/Google later)
 router.use('/integrations', integrationsRoutes);

@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import type { DoctorColor } from '../calendar.types';
 import styles from './AppointmentCard.module.css';
 
 // Daily appointment interface matching getDailyAppointmentsOptimized output
@@ -28,9 +29,12 @@ export interface DailyAppointment {
 interface AppointmentCardProps {
     appointment: DailyAppointment;
     showStatus: boolean;
-    // Assigned doctor's name to show on the card. Omitted when redundant
-    // (the list is already filtered to a single doctor) or unknown.
+    // Assigned doctor's name. Drives the per-card doctor icon's tooltip; omitted
+    // when redundant (the list is already filtered to a single doctor) or unknown.
     doctorName?: string | null;
+    // The doctor's calendar colour — tints the per-card doctor icon so the colour
+    // alone identifies the doctor at a glance. null/undefined → neutral tint.
+    doctorColor?: DoctorColor | null;
     onCheckIn?: (appointmentId: number) => void;
     onMarkSeated?: (appointmentId: number) => void;
     onMarkDismissed?: (appointmentId: number) => void;
@@ -51,6 +55,7 @@ const AppointmentCard = ({
     appointment,
     showStatus,
     doctorName,
+    doctorColor,
     onCheckIn,
     onMarkSeated,
     onMarkDismissed,
@@ -267,10 +272,18 @@ const AppointmentCard = ({
                         </div>
                     )}
                     {doctorName && (
-                        <div className={styles.doctorName} title={`Doctor: ${doctorName}`}>
+                        <span
+                            className={styles.doctorBadge}
+                            style={doctorColor ? {
+                                background: doctorColor.fill,
+                                borderColor: doctorColor.edge,
+                                color: doctorColor.edge
+                            } : undefined}
+                            title={`Doctor: ${doctorName}`}
+                            aria-label={`Doctor: ${doctorName}`}
+                        >
                             <i className="fas fa-user-md" aria-hidden="true"></i>
-                            {doctorName}
-                        </div>
+                        </span>
                     )}
                 </div>
 

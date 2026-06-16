@@ -254,10 +254,14 @@ router.get(
           mtimeMs,
           isNaN(width) ? 240 : width
         );
-        res.setHeader('Content-type', 'image/webp');
+        res.setHeader('Content-Type', 'image/webp');
+        // PHI thumbnail → `private` so the off-LAN cloudflared edge / any shared
+        // cache never stores it (auth lives at our origin). Callers bust on
+        // re-render via `?v=mtime`, so a 7-day browser cache is safe + self-heals.
+        res.setHeader('Cache-Control', 'private, max-age=604800');
         res.sendFile(
           thumbPath,
-          { dotfiles: 'allow', cacheControl: true, lastModified: true, maxAge: 7 * 24 * 60 * 60 * 1000 },
+          { dotfiles: 'allow', cacheControl: false, lastModified: true },
           (err) => {
             if (err && !res.headersSent) ErrorResponses.serverError(res, 'Failed to serve thumbnail');
           }

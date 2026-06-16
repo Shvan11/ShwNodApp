@@ -246,41 +246,8 @@
     color: var(--text-secondary);
 }
 
-/* Doctor filter — mirrors the search input chrome */
-.doctorWrapper {
-    position: relative;
-    flex-shrink: 0;
-}
-
-.doctorIcon {
-    position: absolute;
-    left: var(--spacing-sm);
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-secondary);
-    font-size: var(--font-size-base);
-    pointer-events: none;
-}
-
-.doctorSelect {
-    padding: var(--spacing-sm) 2rem var(--spacing-sm) 2.25rem;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-base);
-    font-family: var(--font-primary);
-    background-color: var(--surface-elevated);
-    color: var(--text-primary);
-    transition: all var(--transition-base);
-    line-height: var(--line-height-tight);
-    cursor: pointer;
-    max-width: 11rem;
-}
-
-.doctorSelect:focus {
-    outline: none;
-    border-color: var(--primary-blue);
-    box-shadow: var(--shadow-sm);
-}
+/* The doctor filter is a self-contained custom dropdown (DoctorFilterSelect) —
+   its trigger reuses this same input chrome inline. */
 
 /* Responsive - Tablet & Mobile */
 @media (max-width: 768px) {
@@ -305,16 +272,6 @@
         flex: 1 1 auto;
         min-width: 0;
         max-width: none;
-    }
-
-    .doctorSelect {
-        font-size: var(--font-size-sm);
-        padding: var(--spacing-xs) 1.5rem var(--spacing-xs) 1.75rem;
-        max-width: 8rem;
-    }
-
-    .doctorIcon {
-        font-size: var(--font-size-sm);
     }
 
     .searchInput {

@@ -9,7 +9,12 @@
   top: calc(var(--header-height) + var(--spacing-lg));
   /* Below header with spacing */
   right: var(--spacing-lg);
-  z-index: 2100; /* Must be above drawer-container (2000) to show over modals */
+  /* Toasts are the top-most layer. PhotoSwipe pins its lightbox root at
+     --pswp-root-z-index: 100000, and the share modals that open from inside it
+     out-stack that at 100010 (see LocalSend/Telegram ShareModal). A toast can fire
+     from any of those (e.g. the lightbox visibility toggle), so it must sit above
+     them all — otherwise it renders behind the fullscreen image. */
+  z-index: 100020;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);

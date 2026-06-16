@@ -67,9 +67,9 @@ export const DEFAULT_LANGUAGE: Language = 'en';
  * translate a screen, add its path (and keep the FOUC route check in
  * `public/index.html` in sync). An entry matches the path exactly OR as a path
  * prefix (`<entry>/…`); the root `/` renders the Dashboard so it's matched in
- * `isRtlRoute`. Currently: Dashboard only.
+ * `isRtlRoute`. Currently: Dashboard + Expenses.
  */
-export const RTL_ROUTES: readonly string[] = ['/dashboard'];
+export const RTL_ROUTES: readonly string[] = ['/dashboard', '/expenses'];
 
 /** True if `path` is a translated route that may render RTL. */
 export function isRtlRoute(path: string): boolean {

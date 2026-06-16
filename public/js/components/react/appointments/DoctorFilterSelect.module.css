@@ -1,0 +1,145 @@
+/* DoctorFilterSelect — custom doctor filter dropdown for the appointments
+   header. A native <select> can't render per-doctor colour swatches, so the
+   control is a button trigger + a portaled listbox. Trigger chrome mirrors the
+   search input / old .doctorSelect; the popover mirrors the UserMenu surface;
+   swatches mirror the calendar legend (fill background + edge border). */
+
+.wrap {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+/* Trigger — same chrome as the search input it sits beside */
+.trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    min-width: 9rem;
+    max-width: 12rem;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    font-family: var(--font-primary);
+    background-color: var(--surface-elevated);
+    color: var(--text-primary);
+    transition: all var(--transition-base);
+    line-height: var(--line-height-tight);
+    cursor: pointer;
+}
+
+.trigger:hover {
+    border-color: var(--primary-blue);
+}
+
+.trigger:focus-visible {
+    outline: none;
+    border-color: var(--primary-blue);
+    box-shadow: var(--shadow-sm);
+}
+
+.triggerIcon {
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+    flex-shrink: 0;
+}
+
+.triggerLabel {
+    flex: 1;
+    text-align: start;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.caret {
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+    transition: transform 0.18s ease;
+    flex-shrink: 0;
+}
+
+.caretOpen {
+    transform: rotate(180deg);
+}
+
+/* Popover listbox — mirrors the UserMenu popover surface */
+.menu {
+    max-height: 60vh;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    z-index: var(--z-index-popover);
+    padding: var(--spacing-xs) 0;
+}
+
+.option {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: var(--font-size-sm);
+    text-align: start;
+    cursor: pointer;
+}
+
+.option:hover {
+    background: var(--surface-hover);
+}
+
+.optionSelected {
+    background: var(--surface-hover);
+    font-weight: var(--font-weight-semibold);
+}
+
+.optionLabel {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.allIcon {
+    width: 14px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    flex-shrink: 0;
+}
+
+.check {
+    color: var(--primary-blue);
+    font-size: var(--font-size-xs);
+    flex-shrink: 0;
+}
+
+/* Swatch — mirrors the calendar legend swatch (fill background + edge border;
+   neutral doctors get a dashed outline). Per-doctor colours come inline. */
+.swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-elevated);
+    flex-shrink: 0;
+}
+
+.neutral {
+    border-style: dashed;
+}
+
+@media (max-width: 768px) {
+    .trigger {
+        min-width: 7rem;
+        font-size: var(--font-size-sm);
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+}

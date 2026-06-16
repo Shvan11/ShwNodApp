@@ -2,7 +2,9 @@
  * ExpenseTable Component
  * Displays expenses in a table with edit and delete actions
  */
+import { useTranslation } from 'react-i18next';
 import type { Expense } from '../../hooks/useExpenses';
+import { useLocalizedName } from '../../hooks/useLocalizedName';
 import styles from '../../routes/Expenses.module.css';
 
 // Re-export the Expense type for convenience
@@ -16,6 +18,9 @@ interface ExpenseTableProps {
 }
 
 export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: ExpenseTableProps) {
+    const { t } = useTranslation('expenses');
+    const localizedName = useLocalizedName();
+
     const formatNumber = (num: number | undefined): string => {
         return new Intl.NumberFormat('en-US').format(num || 0);
     };
@@ -29,7 +34,7 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
         return (
             <div className={styles.loadingState}>
                 <div className={styles.loadingSpinner}></div>
-                <p>Loading expenses...</p>
+                <p>{t('table.loading')}</p>
             </div>
         );
     }
@@ -37,7 +42,7 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
     if (!expenses || expenses.length === 0) {
         return (
             <div className={styles.emptyState}>
-                <p>No expenses found</p>
+                <p>{t('table.empty')}</p>
             </div>
         );
     }
@@ -55,13 +60,13 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                 <table className={styles.expensesTable}>
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Amount</th>
-                        <th>Currency</th>
-                        <th>Category</th>
-                        <th>Subcategory</th>
-                        <th>Note</th>
-                        <th>Actions</th>
+                        <th>{t('table.date')}</th>
+                        <th>{t('table.amount')}</th>
+                        <th>{t('table.currency')}</th>
+                        <th>{t('table.category')}</th>
+                        <th>{t('table.subcategory')}</th>
+                        <th>{t('table.note')}</th>
+                        <th>{t('table.actions')}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -70,8 +75,8 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                         const amount = formatNumber(expense.amount);
                         const currency = (expense.currency || '').trim();
                         const currencyLower = currency.toLowerCase();
-                        const category = expense.category_name || '-';
-                        const subcategory = expense.subcategory_name || '-';
+                        const category = localizedName(expense.category_name, expense.category_name_ar) || '-';
+                        const subcategory = localizedName(expense.subcategory_name, expense.subcategory_name_ar) || '-';
                         const note = expense.note || '-';
 
                         return (
@@ -95,16 +100,16 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                                         <button
                                             className="btn-edit"
                                             onClick={() => onEdit(expense.id)}
-                                            aria-label="Edit expense"
+                                            aria-label={t('table.editAria')}
                                         >
-                                            Edit
+                                            {t('table.edit')}
                                         </button>
                                         <button
                                             className="btn-delete"
                                             onClick={() => onDelete(expense.id)}
-                                            aria-label="Delete expense"
+                                            aria-label={t('table.deleteAria')}
                                         >
-                                            Delete
+                                            {t('table.delete')}
                                         </button>
                                     </div>
                                 </td>

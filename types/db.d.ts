@@ -350,6 +350,7 @@ export interface EstimatedCostPresets {
 export interface ExpenseCategories {
   category_id: Generated<number>;
   category_name: string;
+  category_name_ar: string | null;
 }
 
 export interface Expenses {
@@ -367,6 +368,7 @@ export interface ExpenseSubcategories {
   category_id: number;
   subcategory_id: Generated<number>;
   subcategory_name: string;
+  subcategory_name_ar: string | null;
 }
 
 export interface Holidays {

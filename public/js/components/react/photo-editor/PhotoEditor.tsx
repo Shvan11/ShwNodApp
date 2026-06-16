@@ -173,7 +173,7 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
   const hydrateFilesData = hydrateFilesQ.data;
   useEffect(() => {
     if (!personId) return;
-    const gallery = (hydrateGalleryData ?? []) as Array<{ name?: string; mtime?: number } | null>;
+    const gallery = Object.values(hydrateGalleryData ?? {}) as Array<{ name?: string; mtime?: number } | null>;
     const entries = ((hydrateFilesData as FileListing | undefined)?.entries ?? []) as Array<{
       name: string;
       relPath: string;

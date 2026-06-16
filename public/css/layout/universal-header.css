@@ -21,7 +21,11 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 var(--spacing-lg);
-    max-width: var(--container-max-width);
+    /* Full-bleed: the header bar spans the viewport, so its content does too —
+       logo hugs the left edge, the right group hugs the right edge (each inset
+       only by the padding). NOT capped at --container-max-width, which would
+       left-align the content and strand the right group mid-screen on wide displays. */
+    max-width: 100%;
     margin: 0;
     height: 50px;
     box-sizing: border-box;
@@ -38,15 +42,34 @@
 }
 
 .logo-section {
-    margin-right: var(--spacing-xl);
+    display: flex;
+    align-items: center;
+    margin-inline-end: var(--spacing-xl);
+    cursor: pointer;
 }
 
+/* Custom clinic logo (uploaded in Settings → General). Bounded by both axes so
+   any aspect ratio fits the bar without distortion (object-fit keeps the ratio). */
+.clinic-logo {
+    display: block;
+    max-height: 36px;
+    max-width: 220px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    transition: transform 0.2s ease;
+}
+
+.clinic-logo:hover {
+    transform: scale(1.03);
+}
+
+/* Text fallback shown when no logo is configured. */
 .clinic-name {
     color: var(--color-white);
     font-size: 1.2rem;
     font-weight: var(--font-weight-bold);
     margin: 0;
-    cursor: pointer;
     transition: all 0.2s ease;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
@@ -55,8 +78,6 @@
     transform: scale(1.02);
     text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
-
-/* Header Breadcrumb - Namespaced to avoid conflicts with page-level breadcrumbs */
 
 /* Main Navigation */
 .header-center {
@@ -132,32 +153,34 @@
     gap: 0.35rem;
 }
 
+/* Close ("forget this patient") chip tucked inside the tab on its trailing
+   edge, browser-tab style — faint by default, red circle on hover. */
 .patient-nav-close {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.7rem;
-    height: 1.7rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-inline-start: 0.15rem;
+    margin-inline-end: -0.5rem;
     padding: 0;
     color: var(--color-white);
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: transparent;
+    border: none;
     border-radius: var(--radius-full);
     cursor: pointer;
-    transition: all 0.2s ease;
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
+    opacity: 0.65;
+    transition: background 0.2s ease, opacity 0.2s ease;
     flex-shrink: 0;
 }
 
 .patient-nav-close:hover {
     background: var(--danger-color);
-    border-color: var(--danger-color);
-    transform: translateY(-1px);
+    opacity: 1;
 }
 
 .patient-nav-close i {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
 }
 
 /* Header Right Section */
@@ -213,30 +236,6 @@
     text-transform: capitalize;
 }
 
-/* Back Button — white-alpha treatment so it reads cleanly against the fixed
-   purple header gradient (both themes). The theme toggle is its own component
-   (ThemeToggle.module.css — a sliding pill). */
-.back-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    color: var(--color-white);
-    padding: 0.6rem;
-    border-radius: var(--radius-lg);
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 45px;
-    height: 45px;
-}
-
-.back-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateX(-2px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-}
-
 /* Responsive Design */
 @media (max-width: 1024px) {
     .header-container {
@@ -253,7 +252,7 @@
     }
 
     .logo-section {
-        margin-right: 0.5rem;
+        margin-inline-end: 0.5rem;
     }
 
     .clinic-name {
@@ -305,7 +304,12 @@
     }
 
     .logo-section {
-        margin-right: 0;
+        margin-inline-end: 0;
+    }
+
+    .clinic-logo {
+        max-height: 28px;
+        max-width: 150px;
     }
 
     .clinic-name {
@@ -331,7 +335,7 @@
         z-index: 10;
         order: 2;
         justify-content: flex-end;
-        margin-left: auto;
+        margin-inline-start: auto;
     }
 
     .user-info {
@@ -385,13 +389,6 @@
         font-size: 0.8125rem;
         margin-right: 0.25rem;
     }
-
-    .back-btn {
-        width: 36px;
-        height: 36px;
-        padding: 0.375rem;
-        font-size: 0.875rem;
-    }
 }
 
 @media (max-width: 640px) {
@@ -402,6 +399,11 @@
 
     .header-left {
         flex: 1;
+    }
+
+    .clinic-logo {
+        max-height: 24px;
+        max-width: 120px;
     }
 
     .clinic-name {
@@ -455,13 +457,6 @@
     .main-navigation::-webkit-scrollbar {
         display: none;
     }
-
-    .back-btn {
-        width: 32px;
-        height: 32px;
-        padding: 0.25rem;
-        font-size: 0.8125rem;
-    }
 }
 
 @media (max-width: 480px) {
@@ -512,13 +507,6 @@
     .main-navigation::-webkit-scrollbar {
         display: none;
     }
-
-    .back-btn {
-        width: 30px;
-        height: 30px;
-        padding: 0.1875rem;
-        font-size: 0.75rem;
-    }
 }
 
 @media (max-width: 375px) {
@@ -547,17 +535,10 @@
     .nav-btn i {
         font-size: 0.625rem;
     }
-
-    .back-btn {
-        width: 28px;
-        height: 28px;
-        font-size: 0.6875rem;
-    }
 }
 
 /* Focus states for accessibility */
-.nav-btn:focus,
-.back-btn:focus {
+.nav-btn:focus {
     outline: 2px solid rgba(255, 255, 255, 0.5);
     outline-offset: 2px;
 }
