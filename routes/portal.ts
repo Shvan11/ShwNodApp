@@ -19,6 +19,7 @@ import {
   getPatientProfile,
   getPrivateList,
 } from '../services/business/PatientPortalService.js';
+import { workingFilePath } from '../services/files/clinic-paths.js';
 import { log } from '../utils/logger.js';
 
 const router = Router();
@@ -32,6 +33,16 @@ type LoginBody = z.infer<typeof loginSchema>;
 
 const photosParamsSchema = z.object({
   tp: z.string().regex(/^[A-Za-z0-9_-]{1,10}$/, 'Invalid timepoint code'),
+});
+
+// Image-file params for the per-patient photo stream. `name` is the bare Dolphin
+// working-dir filename (`{personId}0{tp}.{view}`, e.g. `688201.i12`); the regex
+// forbids path separators so it can never traverse. The real authorization
+// boundary, though, is the getVisiblePhotos membership check in the handler —
+// a name only streams if it's one of THIS patient's non-private photos.
+const photoFileParamsSchema = z.object({
+  tp: z.string().regex(/^[A-Za-z0-9_-]{1,10}$/, 'Invalid timepoint code'),
+  name: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/, 'Invalid image name'),
 });
 
 // --------------------------------------------------------------------------
@@ -181,6 +192,63 @@ router.get(
     } catch (error) {
       log.error('Portal /photos error', { error: (error as Error).message });
       res.status(500).json({ success: false, error: 'Failed to load photos' });
+    }
+  }
+);
+
+// --------------------------------------------------------------------------
+// GET /api/portal/photos/:tp/:name  — stream a single image
+//
+// The staff gallery serves these bytes from the `/DolImgs` static mount, but
+// that mount sits behind staff-only `authenticateWeb` (it requires a staff
+// session `userId`). A patient-portal browser has only the `shwan.portal`
+// session, so `/DolImgs/...` redirects it to /login.html and the <img> renders
+// blank. This route is the portal's own authenticated image source: it runs
+// under the portal session and only streams a file that getVisiblePhotos
+// confirms is one of THIS patient's non-private photos at this timepoint.
+// --------------------------------------------------------------------------
+router.get(
+  '/photos/:tp/:name',
+  authenticatePatient,
+  validate({ params: photoFileParamsSchema }),
+  async (req: Request<{ tp: string; name: string }>, res: Response): Promise<void> => {
+    try {
+      const pid = req.session.patientId!;
+      const { tp, name } = req.params;
+
+      // Authorization boundary: the patient may only fetch a photo that is
+      // visible (non-private) AND belongs to this timepoint of THEIR record.
+      // getVisiblePhotos is scoped to (pid, tp) and excludes private photos,
+      // and its entries are confirmed to exist on disk.
+      const visible = await getVisiblePhotos(pid, tp);
+      const match = visible.find((p) => p.name.toLowerCase() === name.toLowerCase());
+      if (!match) {
+        res.status(404).end();
+        return;
+      }
+
+      // Stream the canonical on-disk file. `.iNN` view files are JPEG but carry a
+      // non-standard extension, so set the type explicitly (mirrors the /DolImgs
+      // static mount) — iOS Safari refuses to render a wrong/octet-stream type.
+      // `no-cache` forces a revalidation hit on every view so a later privacy
+      // toggle is honoured (304 when unchanged keeps it cheap).
+      res.sendFile(
+        workingFilePath(match.name),
+        {
+          headers: {
+            'Content-Type': 'image/jpeg',
+            'Cache-Control': 'private, no-cache',
+          },
+        },
+        (err) => {
+          if (err && !res.headersSent) {
+            res.status(404).end();
+          }
+        }
+      );
+    } catch (error) {
+      log.error('Portal /photos/:tp/:name error', { error: (error as Error).message });
+      if (!res.headersSent) res.status(500).end();
     }
   }
 );

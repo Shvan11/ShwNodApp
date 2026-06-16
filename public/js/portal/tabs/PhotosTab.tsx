@@ -12,6 +12,13 @@ function formatTpDate(iso: string): string {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+// Portal images are served by the authenticated /api/portal/photos/:tp/:name
+// route (NOT the staff-only /DolImgs static mount, which a patient session can't
+// reach — it redirects to the staff login and the <img> renders blank).
+function photoSrc(tp: string, name: string): string {
+  return `/api/portal/photos/${encodeURIComponent(tp)}/${encodeURIComponent(name)}`;
+}
+
 const PhotosTab = () => {
   const [tps, setTps] = useState<PortalTimePoint[] | null>(null);
   const [tpsError, setTpsError] = useState<string | null>(null);
@@ -153,7 +160,7 @@ const PhotosTab = () => {
         </div>
       )}
 
-      {photos && photos.length > 0 && (
+      {selectedTp && photos && photos.length > 0 && (
         <div className={styles.photoGrid}>
           {photos.map((p, idx) => (
             <button
@@ -164,7 +171,7 @@ const PhotosTab = () => {
               aria-label={`View photo ${idx + 1}`}
             >
               <img
-                src={`/DolImgs/${encodeURIComponent(p.name)}`}
+                src={photoSrc(selectedTp, p.name)}
                 alt=""
                 loading="lazy"
                 className={styles.photoImg}
@@ -174,7 +181,7 @@ const PhotosTab = () => {
         </div>
       )}
 
-      {lightbox !== null && photos && photos[lightbox] && (
+      {selectedTp && lightbox !== null && photos && photos[lightbox] && (
         // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss
         <div
           className={styles.lightbox}
@@ -192,7 +199,7 @@ const PhotosTab = () => {
           </button>
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss */}
           <img
-            src={`/DolImgs/${encodeURIComponent(photos[lightbox].name)}`}
+            src={photoSrc(selectedTp, photos[lightbox].name)}
             alt=""
             className={styles.lightboxImg}
             onClick={(e) => e.stopPropagation()}
