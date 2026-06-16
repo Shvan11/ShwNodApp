@@ -20,6 +20,7 @@ import {
   getPrivateList,
 } from '../services/business/PatientPortalService.js';
 import { workingFilePath } from '../services/files/clinic-paths.js';
+import { getWorkingThumbnail } from '../services/files/thumbnail.service.js';
 import { log } from '../utils/logger.js';
 
 const router = Router();
@@ -44,6 +45,16 @@ const photoFileParamsSchema = z.object({
   tp: z.string().regex(/^[A-Za-z0-9_-]{1,10}$/, 'Invalid timepoint code'),
   name: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/, 'Invalid image name'),
 });
+
+// `?size=thumb` → small disk-cached WebP for the grid; default (no/`full`) →
+// the full-res original for the lightbox / download / share.
+const photoFileQuerySchema = z.object({
+  size: z.enum(['thumb', 'full']).optional(),
+});
+
+// Grid thumbnail width — must be one of thumbnail.service's ALLOWED_WIDTHS, and
+// matches the staff GridComponent's 480px grid thumb so both share one cache.
+const PORTAL_THUMB_WIDTH = 480;
 
 // --------------------------------------------------------------------------
 // POST /api/portal/login
@@ -197,7 +208,7 @@ router.get(
 );
 
 // --------------------------------------------------------------------------
-// GET /api/portal/photos/:tp/:name  — stream a single image
+// GET /api/portal/photos/:tp/:name[?size=thumb]  — stream a single image
 //
 // The staff gallery serves these bytes from the `/DolImgs` static mount, but
 // that mount sits behind staff-only `authenticateWeb` (it requires a staff
@@ -206,12 +217,22 @@ router.get(
 // blank. This route is the portal's own authenticated image source: it runs
 // under the portal session and only streams a file that getVisiblePhotos
 // confirms is one of THIS patient's non-private photos at this timepoint.
+//
+// `?size=thumb` returns a 480px disk-cached WebP for the grid (the originals are
+// 13–18 MP / 2–4 MB JPEGs — far too heavy to load by the gridful over the remote
+// tunnel, and big enough to blank out under iOS Safari's image-memory limit).
+// The default (lightbox / download / share) streams the full-res original. This
+// mirrors the staff GridComponent's thumb-grid / full-on-click split and reuses
+// the same getWorkingThumbnail cache (namespaced working/{personId}/{name}-{mtime}).
 // --------------------------------------------------------------------------
 router.get(
   '/photos/:tp/:name',
   authenticatePatient,
-  validate({ params: photoFileParamsSchema }),
-  async (req: Request<{ tp: string; name: string }>, res: Response): Promise<void> => {
+  validate({ params: photoFileParamsSchema, query: photoFileQuerySchema }),
+  async (
+    req: Request<{ tp: string; name: string }, unknown, unknown, { size?: 'thumb' | 'full' }>,
+    res: Response
+  ): Promise<void> => {
     try {
       const pid = req.session.patientId!;
       const { tp, name } = req.params;
@@ -219,7 +240,7 @@ router.get(
       // Authorization boundary: the patient may only fetch a photo that is
       // visible (non-private) AND belongs to this timepoint of THEIR record.
       // getVisiblePhotos is scoped to (pid, tp) and excludes private photos,
-      // and its entries are confirmed to exist on disk.
+      // and its entries are confirmed to exist on disk (with mtime for the cache key).
       const visible = await getVisiblePhotos(pid, tp);
       const match = visible.find((p) => p.name.toLowerCase() === name.toLowerCase());
       if (!match) {
@@ -227,13 +248,27 @@ router.get(
         return;
       }
 
-      // Stream the canonical on-disk file. `.iNN` view files are JPEG but carry a
-      // non-standard extension, so set the type explicitly (mirrors the /DolImgs
-      // static mount) — iOS Safari refuses to render a wrong/octet-stream type.
-      // `no-cache` forces a revalidation hit on every view so a later privacy
-      // toggle is honoured (304 when unchanged keeps it cheap).
+      const abs = workingFilePath(match.name);
+
+      // ── Grid thumbnail branch ── small WebP, generated once + disk-cached.
+      // `no-cache` re-runs the visibility check above on every view so a later
+      // privacy toggle is honoured (304 when unchanged keeps revalidation cheap).
+      if (req.query.size === 'thumb') {
+        const thumbPath = await getWorkingThumbnail(pid, match.name, abs, match.mtime, PORTAL_THUMB_WIDTH);
+        res.setHeader('Content-Type', 'image/webp');
+        res.setHeader('Cache-Control', 'private, no-cache');
+        res.sendFile(thumbPath, { dotfiles: 'allow', cacheControl: false, lastModified: true }, (err) => {
+          if (err && !res.headersSent) res.status(404).end();
+        });
+        return;
+      }
+
+      // ── Full-res branch (lightbox / download / share) ── stream the original.
+      // `.iNN` view files are JPEG but carry a non-standard extension, so set the
+      // type explicitly (mirrors the /DolImgs mount) — iOS Safari refuses to render
+      // a wrong/octet-stream type.
       res.sendFile(
-        workingFilePath(match.name),
+        abs,
         {
           headers: {
             'Content-Type': 'image/jpeg',

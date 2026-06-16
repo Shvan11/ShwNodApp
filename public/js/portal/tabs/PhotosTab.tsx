@@ -15,8 +15,13 @@ function formatTpDate(iso: string): string {
 // Portal images are served by the authenticated /api/portal/photos/:tp/:name
 // route (NOT the staff-only /DolImgs static mount, which a patient session can't
 // reach — it redirects to the staff login and the <img> renders blank).
-function photoSrc(tp: string, name: string): string {
-  return `/api/portal/photos/${encodeURIComponent(tp)}/${encodeURIComponent(name)}`;
+//
+// The grid loads `?size=thumb` (a light 480px WebP) so a phone isn't pulling a
+// gridful of 13–18 MP originals over the tunnel; the lightbox loads the full-res
+// original. Same thumb-grid / full-on-click split as the staff GridComponent.
+function photoSrc(tp: string, name: string, size?: 'thumb'): string {
+  const base = `/api/portal/photos/${encodeURIComponent(tp)}/${encodeURIComponent(name)}`;
+  return size === 'thumb' ? `${base}?size=thumb` : base;
 }
 
 const PhotosTab = () => {
@@ -171,7 +176,7 @@ const PhotosTab = () => {
               aria-label={`View photo ${idx + 1}`}
             >
               <img
-                src={photoSrc(selectedTp, p.name)}
+                src={photoSrc(selectedTp, p.name, 'thumb')}
                 alt=""
                 loading="lazy"
                 className={styles.photoImg}
