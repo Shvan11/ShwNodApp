@@ -1,7 +1,12 @@
 import { type ChangeEvent, type MouseEvent } from 'react';
 import ConnectionStatus, { type ConnectionStatusType, type FreshnessType } from './ConnectionStatus';
 import StatsCards from './StatsCards';
+import type { LegendDoctor } from '../calendar.types';
 import styles from './AppointmentsHeader.module.css';
+
+// Doctor-filter selection: a specific doctor (employees.id), every doctor, or
+// only appointments with no doctor assigned (dr_id IS NULL).
+export type DoctorFilter = number | 'all' | 'unassigned';
 
 interface AppointmentsHeaderProps {
     selectedDate: string;
@@ -10,6 +15,9 @@ interface AppointmentsHeaderProps {
     isRefreshing: boolean;
     searchTerm: string;
     onSearchChange: (term: string) => void;
+    doctors: LegendDoctor[];
+    selectedDrId: DoctorFilter;
+    onDoctorChange: (value: DoctorFilter) => void;
     connectionStatus: ConnectionStatusType;
     freshness: FreshnessType;
     isViewingToday: boolean;
@@ -34,6 +42,9 @@ const AppointmentsHeader = ({
     isRefreshing,
     searchTerm,
     onSearchChange,
+    doctors,
+    selectedDrId,
+    onDoctorChange,
     connectionStatus,
     freshness,
     isViewingToday,
@@ -64,6 +75,11 @@ const AppointmentsHeader = ({
 
     const handleSearchInputChange = (e: ChangeEvent<HTMLInputElement>): void => {
         onSearchChange(e.target.value);
+    };
+
+    const handleDoctorSelectChange = (e: ChangeEvent<HTMLSelectElement>): void => {
+        const { value } = e.target;
+        onDoctorChange(value === 'all' || value === 'unassigned' ? value : Number(value));
     };
 
     // The visible pill is just chrome; the transparent native date input overlays
@@ -135,8 +151,23 @@ const AppointmentsHeader = ({
                 </button>
             </div>
 
-            {/* Search + connection status — right */}
+            {/* Doctor filter + search + connection status — right */}
             <div className={styles.searchGroup}>
+                <div className={styles.doctorWrapper}>
+                    <i className={`fas fa-user-md ${styles.doctorIcon}`} aria-hidden="true"></i>
+                    <select
+                        className={styles.doctorSelect}
+                        aria-label="Filter by doctor"
+                        value={String(selectedDrId)}
+                        onChange={handleDoctorSelectChange}
+                    >
+                        <option value="all">All doctors</option>
+                        {doctors.map((doc) => (
+                            <option key={doc.id} value={doc.id}>{doc.name}</option>
+                        ))}
+                        <option value="unassigned">Unassigned</option>
+                    </select>
+                </div>
                 <div className={styles.searchWrapper}>
                     <i className={`fas fa-search ${styles.searchIcon}`}></i>
                     <input

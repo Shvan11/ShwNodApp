@@ -5,6 +5,7 @@ import styles from './AppointmentCard.module.css';
 export interface DailyAppointment {
     appointment_id?: number;
     person_id?: number;
+    dr_id?: number | null;
     patient_name?: string;
     patient_type?: string | null;
     Phone?: string | null;
@@ -27,6 +28,9 @@ export interface DailyAppointment {
 interface AppointmentCardProps {
     appointment: DailyAppointment;
     showStatus: boolean;
+    // Assigned doctor's name to show on the card. Omitted when redundant
+    // (the list is already filtered to a single doctor) or unknown.
+    doctorName?: string | null;
     onCheckIn?: (appointmentId: number) => void;
     onMarkSeated?: (appointmentId: number) => void;
     onMarkDismissed?: (appointmentId: number) => void;
@@ -46,6 +50,7 @@ interface AppointmentCardProps {
 const AppointmentCard = ({
     appointment,
     showStatus,
+    doctorName,
     onCheckIn,
     onMarkSeated,
     onMarkDismissed,
@@ -259,6 +264,12 @@ const AppointmentCard = ({
                     {appointment.app_detail && (
                         <div className={styles.appointmentType}>
                             {appointment.app_detail}
+                        </div>
+                    )}
+                    {doctorName && (
+                        <div className={styles.doctorName} title={`Doctor: ${doctorName}`}>
+                            <i className="fas fa-user-md" aria-hidden="true"></i>
+                            {doctorName}
                         </div>
                     )}
                 </div>

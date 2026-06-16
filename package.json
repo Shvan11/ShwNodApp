@@ -47,6 +47,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@fortawesome/fontawesome-free": "6.4.0",
     "@google-cloud/local-auth": "^3.0.1",
     "@google/genai": "^2.8.0",
     "@googleapis/drive": "^20.2.0",

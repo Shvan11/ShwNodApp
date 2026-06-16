@@ -1,0 +1,60 @@
+/**
+ * Global navigation progress bar (see NavigationProgress.tsx).
+ *
+ * Indeterminate "trickle": grows quickly then asymptotes toward ~95% so it
+ * always reads as progress without ever claiming to be done (it unmounts the
+ * instant navigation completes). The appear-animation holds opacity at 0 for
+ * the first ~160ms so fast, cache-served navigations never flash a bar.
+ */
+.bar {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline: 0;
+  block-size: 3px;
+  z-index: var(--z-index-tooltip);
+
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--primary-color), var(--primary-light));
+  box-shadow: 0 0 10px var(--primary-alpha);
+  pointer-events: none;
+
+  animation:
+    nav-progress-trickle 14s cubic-bezier(0.12, 0.78, 0.22, 1) forwards,
+    nav-progress-appear 420ms ease-out forwards;
+}
+
+@keyframes nav-progress-trickle {
+  0% {
+    transform: scaleX(0);
+  }
+  18% {
+    transform: scaleX(0.28);
+  }
+  55% {
+    transform: scaleX(0.62);
+  }
+  100% {
+    transform: scaleX(0.95);
+  }
+}
+
+/* Hold invisible for ~160ms (38% of 420ms) so quick navigations never flash. */
+@keyframes nav-progress-appear {
+  0% {
+    opacity: 0;
+  }
+  38% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    /* No trickle: show a static near-full bar after the same anti-flash delay. */
+    transform: scaleX(0.95);
+    animation: nav-progress-appear 420ms ease-out forwards;
+  }
+}

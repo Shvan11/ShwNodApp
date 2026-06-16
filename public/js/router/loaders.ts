@@ -15,6 +15,7 @@ import { patientPhones, patientSearch, tagOptions, typeOptions } from '@shared/c
 import * as workContract from '@shared/contracts/work.contract';
 import { queryClient } from '../query/client';
 import { loaderQuery } from '../query/loaderQuery';
+import { preloadPatientPage } from '../components/react/ContentRenderer';
 import {
   patientInfoQuery,
   workDetailsQuery,
@@ -220,6 +221,13 @@ export async function patientShellLoader({
   request,
 }: LoaderFunctionArgs): Promise<PatientShellLoaderResult> {
   const { personId, page, workId } = params;
+
+  // Warm the lazy chunk for the tab we're about to render, in parallel with the
+  // data fetch below. ContentRenderer code-splits each patient sub-page, so
+  // without this the page chunk would only begin downloading after PatientShell
+  // mounts — a waterfall. Fire-and-forget (mirrors routes.config's withPreload).
+  preloadPatientPage(page);
+
   const url = new URL(request.url);
   const workIdFromQuery = url.searchParams.get('workId');
   const effectiveWorkId = workId || workIdFromQuery;

@@ -15,6 +15,13 @@
 // GLOBAL CSS IMPORTS
 // ===================================
 
+// Third-party icon font — self-hosted via Vite (publicDir is disabled, so it
+// must enter through the asset pipeline). Replaces the render-blocking cdnjs
+// <link> that used to sit in index.html: same-origin, content-hashed, works
+// offline/on-LAN. Used app-wide (`fa fa-*` classes + SimplifiedCalendarPicker's
+// `font-family: "Font Awesome 6 Free"`), so it's legitimately critical CSS.
+import '@fortawesome/fontawesome-free/css/all.min.css';
+
 // Base styles - Design system foundation
 // Two-tier design tokens: primitive (fixed) → semantic (light) → theme-dark
 // (dark overrides, @media screen). Order matters — dark must follow semantic.

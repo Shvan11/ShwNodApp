@@ -20,6 +20,16 @@ export default defineConfig(({ mode }) => {
   const projectRoot = realpathSync.native(__dirname);
   const publicRoot = resolve(projectRoot, 'public');
 
+  // App-wide runtime that App.tsx / RootLayout mount on EVERY page (React, the
+  // router, the React Query provider, i18n) — rarely changes, so it belongs in
+  // one long-cached eager vendor chunk. Matches EXACT package directories on
+  // purpose: the old `id.includes('react')` was a substring test that also
+  // swept the route-only libs (react-select, react-easy-crop, react-imask/imask,
+  // @tanstack/react-virtual) into this eager bundle. Keep this list to deps that
+  // are genuinely needed for first paint of any route.
+  const VENDOR_CORE =
+    /[\\/]node_modules[\\/](?:react|react-dom|react-is|scheduler|react-router|react-router-dom|use-sync-external-store|@tanstack[\\/](?:react-query|query-core)|react-i18next|i18next)[\\/]/;
+
   return {
   // Define environment variables to expose to the client
   define: {
@@ -72,27 +82,34 @@ export default defineConfig(({ mode }) => {
       output: {
         // Optimal code splitting strategy for production
         manualChunks(id) {
-          // React and core libraries (cached separately)
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'vendor-react';
-            }
+          if (!id.includes('node_modules')) return;
 
-            // GrapesJS - DO NOT bundle, let it stay as dynamic import chunk
-            // This allows it to be loaded only when TemplateDesigner component mounts
-            if (id.includes('grapesjs')) {
-              return; // Return undefined to let Rollup handle it as dynamic chunk
-            }
-
-            // Chart library (chart.js) — used only by the lazy Statistics +
-            // Stand Reports routes, so this chunk loads on demand with them.
-            if (id.includes('chart.js')) {
-              return 'vendor-charts';
-            }
-
-            // Let Vite auto-chunk remaining modules (prevents circular dependency errors)
-            // Previously: return 'vendor-other' - caused "Cannot access before initialization" errors
+          // GrapesJS — DO NOT bundle; let it stay a dynamic import chunk so it
+          // loads only when the TemplateDesigner component mounts.
+          if (id.includes('grapesjs')) {
+            return; // undefined → Rollup keeps it as an on-demand chunk
           }
+
+          // Chart library (chart.js) — used only by the lazy Statistics +
+          // Stand Reports routes, so this chunk loads on demand with them.
+          if (id.includes('chart.js')) {
+            return 'vendor-charts';
+          }
+
+          // App-wide runtime (React/router/query/i18n) — one long-cached eager
+          // chunk. EXACT package match (see VENDOR_CORE above): a bare
+          // includes('react') also pulled react-select, react-easy-crop,
+          // react-imask/imask and @tanstack/react-virtual — all imported ONLY
+          // by lazy route chunks — into this eagerly-loaded bundle (~100 kB raw
+          // parsed on every cold load that no route on first paint needs).
+          if (VENDOR_CORE.test(id)) {
+            return 'vendor-react';
+          }
+
+          // Everything else: let Rollup auto-chunk (prevents the circular-dep
+          // "Cannot access before initialization" errors a catch-all vendor
+          // chunk caused). Route-only deps now ride with the lazy route chunk
+          // that imports them, not the eager bundle.
         }
       }
     }

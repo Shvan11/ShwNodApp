@@ -7,6 +7,11 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import type { Editor as GrapesJSEditorType } from 'grapesjs';
+// GrapesJS stylesheet — co-located with the editor so Vite bundles it into the
+// lazy TemplateDesigner route chunk (loaded only when the designer opens),
+// instead of a render-blocking unpkg <link> in index.html on every page. Uses
+// the installed package version, fixing the prior CSS/JS version drift.
+import 'grapesjs/dist/css/grapes.min.css';
 
 interface Template {
     template_id: number | null;
@@ -48,8 +53,8 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
             if (editorRef.current || !containerRef.current) return;
             try {
                 setIsLoading(true);
-                // Dynamic import — GrapesJS only loads when this component mounts.
-                // CSS is loaded globally in index.html.
+                // Dynamic import — GrapesJS JS only loads when this component
+                // mounts; its CSS rides the same lazy chunk (imported above).
                 const grapesjs = (await import('grapesjs')).default;
                 if (!grapesjs) {
                     throw new Error('GrapesJS module loaded but default export is undefined');

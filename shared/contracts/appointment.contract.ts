@@ -27,6 +27,9 @@ import { idParams, intId, timestampString } from '../validation.js';
 
 const appointmentRowSchema = z.looseObject({
   appointment_id: z.number(),
+  // Assigned doctor (employees.id), nullable — drives the daily page's doctor
+  // filter + per-doctor card tint. The rest of the row rides the looseObject tail.
+  dr_id: z.number().nullable().optional(),
 });
 
 const appointmentStatsSchema = z.object({

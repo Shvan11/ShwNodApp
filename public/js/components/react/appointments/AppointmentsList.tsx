@@ -6,6 +6,11 @@ interface AppointmentsListProps {
     appointments: DailyAppointment[];
     showStatus: boolean;
     loading: boolean;
+    // drID → doctor name, for the per-card doctor label.
+    doctorNames?: Map<number, string>;
+    // Whether to show the doctor name on each card (hidden when already filtered
+    // to one doctor, where the per-card name would be redundant).
+    showDoctorName?: boolean;
     onCheckIn?: (appointmentId: number) => void;
     onMarkSeated?: (appointmentId: number) => void;
     onMarkDismissed?: (appointmentId: number) => void;
@@ -26,6 +31,8 @@ const AppointmentsList = ({
     appointments,
     showStatus,
     loading,
+    doctorNames,
+    showDoctorName = false,
     onCheckIn,
     onMarkSeated,
     onMarkDismissed,
@@ -91,6 +98,7 @@ const AppointmentsList = ({
                         key={appointment.appointment_id}
                         appointment={appointment}
                         showStatus={showStatus}
+                        doctorName={showDoctorName && appointment.dr_id != null ? doctorNames?.get(appointment.dr_id) : undefined}
                         onCheckIn={onCheckIn}
                         onMarkSeated={onMarkSeated}
                         onMarkDismissed={onMarkDismissed}

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLoaderData, useSearchParams } from 'react-router-dom';
-import AppointmentsHeader from './AppointmentsHeader';
+import AppointmentsHeader, { type DoctorFilter } from './AppointmentsHeader';
 import MobileViewToggle, { type ViewType } from './MobileViewToggle';
 import AppointmentsList from './AppointmentsList';
 import type { DailyAppointment } from './AppointmentCard';
@@ -10,6 +10,17 @@ import styles from './DailyAppointments.module.css';
 import { useAppointments } from '../../../hooks/useAppointments';
 import type { Appointment, AppointmentStats } from '../../../hooks/useAppointments';
 import { useAppointmentsSync } from '../../../hooks/useAppointmentsSync';
+import { useAppointmentDoctors } from '../../../hooks/useAppointmentDoctors';
+
+// Parse the URL `?dr=` param into a DoctorFilter (defaults to 'all').
+const parseDrParam = (raw: string | null): DoctorFilter => {
+    if (raw === 'unassigned') return 'unassigned';
+    if (raw) {
+        const n = Number(raw);
+        if (Number.isInteger(n)) return n;
+    }
+    return 'all';
+};
 
 interface LoaderData {
     loadedDate?: string;
@@ -59,6 +70,21 @@ const DailyAppointments = () => {
     );
     const [showFlash, setShowFlash] = useState<boolean>(false);
     const [searchTerm, setSearchTerm] = useState<string>('');
+    // Doctor filter (URL is the source of truth for the initial value).
+    const [selectedDrId, setSelectedDrId] = useState<DoctorFilter>(() =>
+        parseDrParam(searchParams.get('dr'))
+    );
+
+    // Appointment-eligible doctors (shared with the calendar) — drives both the
+    // header dropdown and the drID → name lookup for the per-card doctor label.
+    const { legend: doctors } = useAppointmentDoctors();
+    const doctorNames = useMemo(
+        () => new Map(doctors.map((d) => [d.id, d.name])),
+        [doctors]
+    );
+    // The per-card doctor name is only useful when viewing all doctors; once the
+    // list is filtered to one doctor it's redundant noise on every card.
+    const showDoctorName = selectedDrId === 'all';
 
     // 5. React Query owns the read, keyed by selectedDate; seed its cache with
     // the loader payload for the loaded date (no first-paint flash). The loader
@@ -73,8 +99,7 @@ const DailyAppointments = () => {
         checkInPatient,
         markSeated,
         markDismissed,
-        undoState,
-        getStats
+        undoState
     } = useAppointments(selectedDate, {
         loadedDate: loaderData.loadedDate,
         allAppointments: loaderData.allAppointments as Appointment[] | undefined,
@@ -101,19 +126,26 @@ const DailyAppointments = () => {
     // 8. SSE realtime sync integration
     const { connectionStatus, dataFreshness } = useAppointmentsSync(selectedDate, handleAppointmentsUpdate);
 
-    // 9. Sync URL when date changes (component-driven updates)
+    // 9. Sync URL when date or doctor filter changes (component-driven updates).
+    // Both params are written together so neither clobbers the other; `dr` is
+    // omitted when viewing all doctors.
     useEffect(() => {
-        // Only update if date is different from URL
         const urlDate = searchParams.get('date');
-        if (selectedDate && selectedDate !== urlDate) {
-            setSearchParams({ date: selectedDate }, { replace: true });
+        const urlDr = searchParams.get('dr');
+        const desiredDr = selectedDrId === 'all' ? null : String(selectedDrId);
+
+        if ((selectedDate && selectedDate !== urlDate) || desiredDr !== urlDr) {
+            const next: Record<string, string> = {};
+            if (selectedDate) next.date = selectedDate;
+            if (desiredDr) next.dr = desiredDr;
+            setSearchParams(next, { replace: true });
         }
 
         // Save current date to sessionStorage for return visits
         if (selectedDate) {
             sessionStorage.setItem('lastAppointmentDate', selectedDate);
         }
-    }, [selectedDate, searchParams, setSearchParams]);
+    }, [selectedDate, selectedDrId, searchParams, setSearchParams]);
 
     // 10. Date-change fetching is automatic: useAppointments keys React Query on
     // selectedDate, so changing the date fetches the new day (from cache if warm)
@@ -134,6 +166,7 @@ const DailyAppointments = () => {
         const today = getTodayDate();
         setSelectedDate(today);
         setSearchTerm(''); // Clear search on refresh
+        setSelectedDrId('all'); // Clear doctor filter on refresh
         loadAppointments(today);
     };
 
@@ -173,21 +206,45 @@ const DailyAppointments = () => {
         }
     };
 
-    // Get statistics
-    const stats = getStats();
+    // Doctor + patient-name predicates, applied together to each list.
+    const matchesDoctor = useCallback(
+        (apt: DailyAppointment): boolean => {
+            if (selectedDrId === 'all') return true;
+            if (selectedDrId === 'unassigned') return apt.dr_id == null;
+            return apt.dr_id === selectedDrId;
+        },
+        [selectedDrId]
+    );
 
-    // Filter appointments by search term
-    const filteredAllAppointments = searchTerm
-        ? (allAppointments as DailyAppointment[]).filter((apt) =>
-            apt.patient_name?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-        : (allAppointments as DailyAppointment[]);
+    const matchesSearch = useCallback(
+        (apt: DailyAppointment): boolean =>
+            !searchTerm || !!apt.patient_name?.toLowerCase().includes(searchTerm.toLowerCase()),
+        [searchTerm]
+    );
 
-    const filteredCheckedInAppointments = searchTerm
-        ? (checkedInAppointments as DailyAppointment[]).filter((apt) =>
-            apt.patient_name?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-        : (checkedInAppointments as DailyAppointment[]);
+    const filteredAllAppointments = useMemo(
+        () => (allAppointments as DailyAppointment[]).filter((a) => matchesDoctor(a) && matchesSearch(a)),
+        [allAppointments, matchesDoctor, matchesSearch]
+    );
+
+    const filteredCheckedInAppointments = useMemo(
+        () => (checkedInAppointments as DailyAppointment[]).filter((a) => matchesDoctor(a) && matchesSearch(a)),
+        [checkedInAppointments, matchesDoctor, matchesSearch]
+    );
+
+    // Stats reflect the active filters (doctor + search). Derived from the two
+    // filtered lists, so they equal the server's whole-day stats when unfiltered
+    // (checkedIn = present IS NOT NULL; waiting = checked-in but not seated/dismissed).
+    const stats = useMemo<AppointmentStats>(() => {
+        const checkedIn = filteredCheckedInAppointments.length;
+        const absent = filteredAllAppointments.length;
+        return {
+            total: checkedIn + absent,
+            checkedIn,
+            absent,
+            waiting: filteredCheckedInAppointments.filter((a) => !a.seated_time && !a.dismissed_time).length,
+        };
+    }, [filteredAllAppointments, filteredCheckedInAppointments]);
 
     // Error state
     if (error) {
@@ -211,6 +268,9 @@ const DailyAppointments = () => {
                 isRefreshing={loading}
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
+                doctors={doctors}
+                selectedDrId={selectedDrId}
+                onDoctorChange={setSelectedDrId}
                 connectionStatus={connectionStatus as ConnectionStatusType}
                 freshness={dataFreshness as FreshnessType}
                 isViewingToday={selectedDate === getTodayDate()}
@@ -233,6 +293,8 @@ const DailyAppointments = () => {
                     appointments={filteredAllAppointments}
                     showStatus={false}
                     loading={loading}
+                    doctorNames={doctorNames}
+                    showDoctorName={showDoctorName}
                     onCheckIn={handleCheckIn}
                     emptyMessage={searchTerm ? "No matching patients found." : "No appointments scheduled for this date."}
                     className={mobileView === 'all' ? 'active-view' : ''}
@@ -243,6 +305,8 @@ const DailyAppointments = () => {
                     appointments={filteredCheckedInAppointments}
                     showStatus={true}
                     loading={loading}
+                    doctorNames={doctorNames}
+                    showDoctorName={showDoctorName}
                     onMarkSeated={handleMarkSeated}
                     onMarkDismissed={handleMarkDismissed}
                     onUndoState={handleUndoState}

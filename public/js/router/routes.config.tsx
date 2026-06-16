@@ -7,7 +7,7 @@
  * - Error boundaries per route
  */
 import React from 'react';
-import { Navigate, type RouteObject } from 'react-router-dom';
+import { Navigate, type RouteObject, type LoaderFunction } from 'react-router-dom';
 
 // Layouts
 import RootLayout from '../layouts/RootLayout';
@@ -34,31 +34,70 @@ import {
 // - Component CSS: Each component imports its dedicated CSS
 // See CLAUDE.md "CSS Import Strategy" for details
 
+/**
+ * Like `React.lazy`, but the returned component also exposes `.preload()` —
+ * calling it kicks off the dynamic import (chunk download) ahead of render.
+ * Mirrors React's own `lazy` typing so `<Component />` type-checks unchanged.
+ */
+function lazyRoute<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> & { preload: () => void } {
+  const Component = React.lazy(factory) as React.LazyExoticComponent<T> & {
+    preload: () => void;
+  };
+  // Fire-and-forget: warm the browser's module cache. React.lazy reuses the
+  // same in-flight module promise when it renders, so there's no double fetch.
+  // Swallow rejections here — this is a speculative warm-up; a genuinely
+  // unloadable chunk still surfaces on the render path (React.lazy → Suspense),
+  // where App.tsx's vite:preloadError / unhandledrejection self-heal handles it.
+  // Without this, a failed preload would log spurious [client-error] noise.
+  Component.preload = () => {
+    void factory().catch(() => {});
+  };
+  return Component;
+}
+
+/**
+ * Wrap a route loader so the route's lazy component chunk starts downloading
+ * *in parallel* with the loader's data fetch — collapsing the
+ * loader→lazy-chunk waterfall (fetch data, THEN fetch chunk) into one
+ * concurrent wait. Adds no requests: the chunk loads anyway, just sooner.
+ */
+function withPreload(
+  component: { preload: () => void },
+  loader: LoaderFunction
+): LoaderFunction {
+  return (args) => {
+    component.preload();
+    return loader(args);
+  };
+}
+
 // Lazy-loaded route components - Core routes
 const Dashboard = React.lazy(() => import('../routes/Dashboard'));
 const Statistics = React.lazy(() => import('../routes/Statistics'));
 const Expenses = React.lazy(() => import('../routes/Expenses'));
 const Videos = React.lazy(() => import('../routes/Videos'));
-const PatientManagement = React.lazy(() => import('../routes/PatientManagement'));
+const PatientManagement = lazyRoute(() => import('../routes/PatientManagement'));
 const TasksHistory = React.lazy(() => import('../routes/TasksHistory'));
 
 // Lazy-loaded route components - Settings & Templates
 const SettingsComponent = React.lazy(() => import('../components/react/SettingsComponent'));
-const TemplateManagement = React.lazy(
+const TemplateManagement = lazyRoute(
   () => import('../components/templates/TemplateManagement')
 );
-const TemplateDesigner = React.lazy(() => import('../components/templates/TemplateDesigner'));
+const TemplateDesigner = lazyRoute(() => import('../components/templates/TemplateDesigner'));
 
 // Lazy-loaded route components - Aligner
-const DoctorsList = React.lazy(() => import('../pages/aligner/DoctorsList'));
+const DoctorsList = lazyRoute(() => import('../pages/aligner/DoctorsList'));
 const PatientsList = React.lazy(() => import('../pages/aligner/PatientsList'));
-const PatientSets = React.lazy(() => import('../pages/aligner/PatientSets'));
+const PatientSets = lazyRoute(() => import('../pages/aligner/PatientSets'));
 const SearchPatient = React.lazy(() => import('../pages/aligner/SearchPatient'));
 const AllSetsList = React.lazy(() => import('../pages/aligner/AllSetsList'));
 const ArchformMatcher = React.lazy(() => import('../pages/aligner/ArchformMatcher'));
 
 // Lazy-loaded route components - Patient
-const PatientShell = React.lazy(() => import('../components/react/PatientShell'));
+const PatientShell = lazyRoute(() => import('../components/react/PatientShell'));
 
 // Lazy-loaded route components - Chair-side public display (open access, no auth)
 const ChairDisplay = React.lazy(() => import('../routes/ChairDisplay'));
@@ -71,7 +110,7 @@ const StandSalesHistory = React.lazy(() => import('../routes/StandSalesHistory')
 const StandReports = React.lazy(() => import('../routes/StandReports'));
 
 // Lazy-loaded route components - Appointments & WhatsApp
-const DailyAppointments = React.lazy(() => import('../routes/DailyAppointments'));
+const DailyAppointments = lazyRoute(() => import('../routes/DailyAppointments'));
 const Calendar = React.lazy(() => import('../routes/Calendar'));
 const WhatsAppSend = React.lazy(() => import('../routes/WhatsAppSend'));
 const SendMessage = React.lazy(() => import('../components/react/SendMessage'));
@@ -161,7 +200,7 @@ export const routesConfig: RouteObject[] = [
             <PatientManagement />
           </RouteErrorBoundary>
         ),
-        loader: patientManagementLoader, // Pre-fetch filter data
+        loader: withPreload(PatientManagement, patientManagementLoader), // Pre-fetch filter data + chunk
       },
 
       // Completed-tasks history (the read-back of the alerts done-stamps)
@@ -213,7 +252,7 @@ export const routesConfig: RouteObject[] = [
                 <TemplateManagement />
               </RouteErrorBoundary>
             ),
-            loader: templateListLoader, // Load template list
+            loader: withPreload(TemplateManagement, templateListLoader), // Load template list
           },
           {
             path: 'designer',
@@ -222,7 +261,7 @@ export const routesConfig: RouteObject[] = [
                 <TemplateDesigner />
               </RouteErrorBoundary>
             ),
-            loader: templateDesignerLoader, // Load template for editing (create mode)
+            loader: withPreload(TemplateDesigner, templateDesignerLoader), // Load template for editing (create mode)
           },
           {
             path: 'designer/:templateId',
@@ -231,7 +270,7 @@ export const routesConfig: RouteObject[] = [
                 <TemplateDesigner />
               </RouteErrorBoundary>
             ),
-            loader: templateDesignerLoader, // Load template for editing
+            loader: withPreload(TemplateDesigner, templateDesignerLoader), // Load template for editing
           },
           {
             path: '*',
@@ -256,7 +295,7 @@ export const routesConfig: RouteObject[] = [
                 <DoctorsList />
               </RouteErrorBoundary>
             ),
-            loader: alignerDoctorsLoader, // Load doctors before rendering
+            loader: withPreload(DoctorsList, alignerDoctorsLoader), // Load doctors before rendering
           },
           {
             path: 'all-sets',
@@ -283,7 +322,7 @@ export const routesConfig: RouteObject[] = [
                 <PatientSets />
               </RouteErrorBoundary>
             ),
-            loader: alignerPatientWorkLoader, // Load patient + work details
+            loader: withPreload(PatientSets, alignerPatientWorkLoader), // Load patient + work details
           },
           {
             path: 'search',
@@ -301,7 +340,7 @@ export const routesConfig: RouteObject[] = [
                 <PatientSets />
               </RouteErrorBoundary>
             ),
-            loader: alignerPatientWorkLoader, // Same loader as browse path
+            loader: withPreload(PatientSets, alignerPatientWorkLoader), // Same loader as browse path
           },
           {
             path: 'archform-match',
@@ -335,7 +374,7 @@ export const routesConfig: RouteObject[] = [
                 <PatientShell />
               </RouteErrorBoundary>
             ),
-            loader: patientShellLoader, // Load patient + work details
+            loader: withPreload(PatientShell, patientShellLoader), // Load patient + work details
           },
 
           // Generic patient routes (handles all 14 pages with wildcard)
@@ -349,7 +388,7 @@ export const routesConfig: RouteObject[] = [
                 <PatientShell />
               </RouteErrorBoundary>
             ),
-            loader: patientShellLoader, // Load patient demographics + optional data
+            loader: withPreload(PatientShell, patientShellLoader), // Load patient demographics + optional data
           },
 
           // Default patient route - redirect to works
@@ -423,7 +462,7 @@ export const routesConfig: RouteObject[] = [
             <DailyAppointments />
           </RouteErrorBoundary>
         ),
-        loader: dailyAppointmentsLoader, // Pre-fetch initial data for scroll restoration
+        loader: withPreload(DailyAppointments, dailyAppointmentsLoader), // Pre-fetch initial data + chunk
       },
 
       // Monthly Calendar (100% SSE-driven)

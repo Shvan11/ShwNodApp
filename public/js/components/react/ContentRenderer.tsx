@@ -1,26 +1,80 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type ComponentType } from 'react';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import GridComponent from './GridComponent';
-import XraysComponent from './XraysComponent';
-import FileExplorer from './files/FileExplorer';
-import WorkingFilesView from './files/WorkingFilesView';
-import VisitsComponent from './VisitsComponent';
-import NewVisitComponent from './NewVisitComponent';
-import CompareComponent from './CompareComponent';
-import PatientSlideshow from './slideshow/PatientSlideshow';
-import AppointmentForm from './AppointmentForm';
-import EditAppointmentForm from './EditAppointmentForm';
-import WorkComponent from './WorkComponent';
-import NewWorkComponent from './NewWorkComponent';
-import EditPatientComponent from './EditPatientComponent';
-import ViewPatientInfo from './ViewPatientInfo';
-import PatientAppointments from './PatientAppointments';
-import AddPatientForm from './AddPatientForm';
-import Diagnosis from '../../pages/Diagnosis';
-// new-work-component.css -> NewWorkComponent.module.css
 
-// Lazy-loaded so react-easy-crop stays out of the main bundle.
-const PhotoEditor = lazy(() => import('./photo-editor/PhotoEditor'));
+/**
+ * Each patient sub-page is its own lazy chunk.
+ *
+ * Before: ContentRenderer statically imported all ~18 patient screens, so the
+ * PatientShell route chunk was ~465 KB (117 KB gz) and every patient visit
+ * downloaded WorkComponent, Diagnosis, CompareComponent, both appointment
+ * forms, etc. — even just to view one tab. Now only the rendered tab loads.
+ *
+ * `preloaders` is the single source of truth shared by the lazy components and
+ * `preloadPatientPage()` below, so the loader can warm the exact chunk it's
+ * about to render — collapsing the route-chunk → page-chunk waterfall the split
+ * would otherwise introduce. One page string → one factory; 'work' and
+ * 'diagnosis' share the Diagnosis chunk.
+ */
+const preloaders = new Map<string, () => Promise<unknown>>();
+
+function lazyPage<T extends ComponentType<any>>(
+    pages: string[],
+    factory: () => Promise<{ default: T }>
+) {
+    for (const p of pages) preloaders.set(p, factory);
+    return lazy(factory);
+}
+
+/**
+ * Warm a patient sub-page's chunk ahead of render. Called from
+ * patientShellLoader at route-match so the page chunk downloads in parallel with
+ * the loader's data fetch and the PatientShell chunk (mirrors routes.config's
+ * `.preload()`). Fire-and-forget; unknown/empty pages no-op (the chunk simply
+ * loads on render via Suspense). Swallow rejections — a genuinely unloadable
+ * chunk still surfaces on the render path, where App.tsx's preloadError handler
+ * self-heals; this speculative warm-up must not log spurious [client-error].
+ */
+export function preloadPatientPage(page: string | null | undefined): void {
+    if (!page) return;
+    const factory = preloaders.get(page);
+    if (factory) void factory().catch(() => {});
+}
+
+const GridComponent = lazyPage(['photos'], () => import('./GridComponent'));
+const XraysComponent = lazyPage(['xrays'], () => import('./XraysComponent'));
+const FileExplorer = lazyPage(['files'], () => import('./files/FileExplorer'));
+const WorkingFilesView = lazyPage(['working-files'], () => import('./files/WorkingFilesView'));
+const VisitsComponent = lazyPage(['visits'], () => import('./VisitsComponent'));
+const NewVisitComponent = lazyPage(['new-visit'], () => import('./NewVisitComponent'));
+const CompareComponent = lazyPage(['compare'], () => import('./CompareComponent'));
+const PatientSlideshow = lazyPage(['slideshow'], () => import('./slideshow/PatientSlideshow'));
+const AppointmentForm = lazyPage(['new-appointment'], () => import('./AppointmentForm'));
+const EditAppointmentForm = lazyPage(['edit-appointment'], () => import('./EditAppointmentForm'));
+const WorkComponent = lazyPage(['works'], () => import('./WorkComponent'));
+const NewWorkComponent = lazyPage(['new-work'], () => import('./NewWorkComponent'));
+const EditPatientComponent = lazyPage(['edit-patient'], () => import('./EditPatientComponent'));
+const ViewPatientInfo = lazyPage(['patient-info'], () => import('./ViewPatientInfo'));
+const PatientAppointments = lazyPage(['appointments'], () => import('./PatientAppointments'));
+const AddPatientForm = lazyPage(['add'], () => import('./AddPatientForm'));
+const Diagnosis = lazyPage(['work', 'diagnosis'], () => import('../../pages/Diagnosis'));
+// react-easy-crop rides this chunk, so it stays out of the bundle until edit.
+const PhotoEditor = lazyPage(['photo-editor'], () => import('./photo-editor/PhotoEditor'));
+
+/**
+ * Content-local Suspense fallback. MANDATORY boundary: ContentRenderer's pages
+ * are now lazy, and the nearest Suspense above it is RootLayout's route-level
+ * one — without this, a tab's chunk load would bubble there and blank the whole
+ * app shell (header + sidebar). Scoped here, only the content body shows it.
+ */
+function PageFallback() {
+    return (
+        <div className="loading-fallback">
+            <div className="loading-fallback-content">
+                <div className="loading-spinner"></div>
+            </div>
+        </div>
+    );
+}
 
 interface ContentRendererParams {
     tpCode?: string;
@@ -276,18 +330,16 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
 
             case 'photo-editor':
                 return (
-                    <Suspense fallback={<div className="loading-spinner">Loading editor…</div>}>
-                        <PhotoEditor
-                            // Remount per timepoint so slot state never leaks across
-                            // timepoints (HYDRATE only overwrites slots present in the
-                            // new timepoint's data, leaving others stale otherwise).
-                            key={tpCode || 'none'}
-                            personId={personId}
-                            tpCode={tpCode ? tpCode.replace('tp', '') : ''}
-                            tpName={searchParams.get('tpName') || ''}
-                            tpDate={searchParams.get('date') || ''}
-                        />
-                    </Suspense>
+                    <PhotoEditor
+                        // Remount per timepoint so slot state never leaks across
+                        // timepoints (HYDRATE only overwrites slots present in the
+                        // new timepoint's data, leaving others stale otherwise).
+                        key={tpCode || 'none'}
+                        personId={personId}
+                        tpCode={tpCode ? tpCode.replace('tp', '') : ''}
+                        tpName={searchParams.get('tpName') || ''}
+                        tpDate={searchParams.get('date') || ''}
+                    />
                 );
 
             default:
@@ -306,7 +358,9 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
     return (
         <div className="content-area">
             <div className="content-body">
-                {renderContent()}
+                <Suspense fallback={<PageFallback />}>
+                    {renderContent()}
+                </Suspense>
             </div>
         </div>
     );

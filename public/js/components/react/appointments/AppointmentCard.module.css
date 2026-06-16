@@ -21,15 +21,17 @@
     composes: card;
 }
 
-/* Fade in animation.
-   Fill mode MUST be `both`, not `forwards`: the cards below stagger their start
-   via `animation-delay`, and `backwards` fill makes the `from { opacity: 0 }`
-   keyframe apply DURING that delay so each card stays invisible until its turn.
-   With `forwards` alone the card sat at its natural opacity:1 during the delay,
-   then snapped to 0 when its active phase began — a visible "flash then fade-in"
-   that was most obvious on the later (longest-delay) cards. */
+/* Fade-in animation — every row fades in TOGETHER (no per-row stagger).
+   History: rows used to stagger via `animation-delay` (0→450ms across the first
+   ten cards), which dealt them out one-by-one over ~850ms — a "slow to display"
+   feel even though the data is present in a few ms. That delay window was also
+   the source of the 6th-card flash: a delayed card sat at opacity:1 during its
+   delay, then snapped to opacity:0 (`from`) when its turn began, then faded in.
+   Fading every card in at once removes BOTH problems: with no animation-delay
+   there is no window for a card to flash, so that bug is structurally impossible.
+   `both` fill mode kept as a harmless defensive default. */
 .fadeInUp {
-    animation: fadeInUp 0.4s ease-out both;
+    animation: fadeInUp 0.15s ease-out both;
 }
 
 @keyframes fadeInUp {
@@ -42,18 +44,6 @@
         transform: translateY(0);
     }
 }
-
-/* Staggered animation delays */
-.card:nth-child(1) { animation-delay: 0ms; }
-.card:nth-child(2) { animation-delay: 50ms; }
-.card:nth-child(3) { animation-delay: 100ms; }
-.card:nth-child(4) { animation-delay: 150ms; }
-.card:nth-child(5) { animation-delay: 200ms; }
-.card:nth-child(6) { animation-delay: 250ms; }
-.card:nth-child(7) { animation-delay: 300ms; }
-.card:nth-child(8) { animation-delay: 350ms; }
-.card:nth-child(9) { animation-delay: 400ms; }
-.card:nth-child(10) { animation-delay: 450ms; }
 
 /* Time section */
 .time {
@@ -163,6 +153,23 @@
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
     line-height: 1;
+}
+
+/* Assigned doctor — subtle muted label, shown only when viewing all doctors */
+.doctorName {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-secondary);
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.doctorName i {
+    font-size: 0.65rem;
+    color: var(--text-muted);
 }
 
 /* Visit notes icon */

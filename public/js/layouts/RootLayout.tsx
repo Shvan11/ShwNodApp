@@ -23,6 +23,7 @@ import { ConfirmProvider } from '../contexts/ConfirmContext';
 import UniversalHeader from '../components/react/UniversalHeader';
 import PrintQueueIndicator from '../components/react/PrintQueueIndicator';
 import LabelPreviewModal from '../components/react/LabelPreviewModal';
+import NavigationProgress from '../components/react/NavigationProgress';
 
 interface QueuedItem {
   id: string;
@@ -91,6 +92,11 @@ function RootLayoutInner() {
 
   return (
     <>
+      {/* Top progress bar during route navigation (loader + lazy-chunk wait).
+          Data Router keeps the old screen mounted while loading, so this is the
+          only "something is happening" cue on a nav click. */}
+      <NavigationProgress />
+
       {/* Persistent header - always mounted. `dir` follows the language (not the
           route) so the translated header doesn't flip between screens — see headerDir. */}
       <div id="universal-header-root" dir={headerDir}>
