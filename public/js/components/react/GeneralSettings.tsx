@@ -481,7 +481,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                 </p>
 
                 <div className={styles.settingGroup}>
-                    <label>Logo</label>
+                    <label htmlFor="logo_input">Logo</label>
                     <div className={styles.brandingLogoRow}>
                         <div className={styles.brandingLogoPreview}>
                             {shownLogo ? (
@@ -497,6 +497,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                                 <i className="fas fa-upload"></i>
                                 Choose image
                                 <input
+                                    id="logo_input"
                                     type="file"
                                     accept="image/png,image/jpeg,image/webp"
                                     onChange={onLogoPick}
