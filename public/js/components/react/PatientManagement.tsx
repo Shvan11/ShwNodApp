@@ -480,7 +480,7 @@ const PatientManagement = () => {
                                     options={workTypes}
                                     value={selectedWorkTypes}
                                     onChange={(newValue: MultiValue<SelectOption>) => setSelectedWorkTypes([...newValue])}
-                                    classNamePrefix="pm-select"
+                                    classNamePrefix="react-select"
                                 />
                             </div>
                             <div className={styles.filterGroup}>
@@ -491,7 +491,7 @@ const PatientManagement = () => {
                                     options={keywords}
                                     value={selectedKeywords}
                                     onChange={(newValue: MultiValue<SelectOption>) => setSelectedKeywords([...newValue])}
-                                    classNamePrefix="pm-select"
+                                    classNamePrefix="react-select"
                                 />
                             </div>
                             <div className={styles.filterGroup}>
@@ -502,7 +502,7 @@ const PatientManagement = () => {
                                     options={tags}
                                     value={selectedTags}
                                     onChange={(newValue: MultiValue<SelectOption>) => setSelectedTags([...newValue])}
-                                    classNamePrefix="pm-select"
+                                    classNamePrefix="react-select"
                                 />
                             </div>
                             <div className={styles.filterGroup}>
@@ -513,7 +513,7 @@ const PatientManagement = () => {
                                     options={patientTypes}
                                     value={selectedPatientTypes}
                                     onChange={(newValue: MultiValue<SelectOption>) => setSelectedPatientTypes([...newValue])}
-                                    classNamePrefix="pm-select"
+                                    classNamePrefix="react-select"
                                 />
                             </div>
                             <div className={styles.filterGroup}>
@@ -523,7 +523,7 @@ const PatientManagement = () => {
                                     options={LAST_APPOINTMENT_OPTIONS}
                                     value={LAST_APPOINTMENT_OPTIONS.find(o => o.value === lastAppointmentFilter) || LAST_APPOINTMENT_OPTIONS[0]}
                                     onChange={(option) => setLastAppointmentFilter(option?.value || '')}
-                                    classNamePrefix="pm-select"
+                                    classNamePrefix="react-select"
                                     isClearable
                                 />
                                 {lastAppointmentFilter === 'custom' && (

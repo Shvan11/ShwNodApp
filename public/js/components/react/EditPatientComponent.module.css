@@ -15,12 +15,6 @@
     margin-bottom: 0.75rem;
 }
 
-/* Phone row with 3 columns: Country Code (small), Phone, Phone 2 */
-.formRowPhone {
-    grid-template-columns: 0.5fr 1fr 1fr;
-    gap: 0.75rem;
-}
-
 .formGroup {
     display: flex;
     flex-direction: column;
@@ -136,27 +130,9 @@
     justify-content: center;
 }
 
-.editPatientSuccess {
-    background-color: var(--success-100);
-    border: 1px solid var(--success-200);
-    color: var(--success-800);
-    padding: var(--spacing-md);
-    border-radius: var(--radius-lg);
-    margin-bottom: var(--spacing-md);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-
 /* Required Field Indicator */
 .requiredAsterisk {
     color: var(--error-500);
-}
-
-/* Input Height Consistency */
-.inputHeightConsistent {
-    height: 42px;
-    line-height: 1.5;
 }
 
 /* Utility classes */
@@ -197,10 +173,6 @@
         grid-template-columns: 1fr;
         gap: 0.875rem;
         margin-bottom: 0.875rem;
-    }
-
-    .formRowPhone {
-        grid-template-columns: 1fr;
     }
 
     .formGroup label {

@@ -80,3 +80,78 @@
   justify-content: flex-end;
   gap: var(--spacing-sm);
 }
+
+/* ── Upload progress ─────────────────────────────────────────────── */
+
+.progressWrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.progressTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.progressLabel {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.progressPct {
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.progressName {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progressTrack {
+  width: 100%;
+  height: 8px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--hover-bg);
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary-color);
+  transition: width var(--transition-fast);
+}
+
+.progressErrors {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger, var(--text-secondary));
+}
+
+/* ── Result summary ──────────────────────────────────────────────── */
+
+.resultSummary {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.errorList {
+  margin: 0;
+  padding-inline-start: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  max-height: 160px;
+  overflow-y: auto;
+}

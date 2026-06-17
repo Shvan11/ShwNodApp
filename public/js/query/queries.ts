@@ -1197,6 +1197,18 @@ export const telegramStatusQuery = () =>
       }),
   });
 
+/** GET /api/telegram/send/:jobId — live progress of a Telegram share job (polled). */
+export const telegramSendProgressQuery = (jobId: string) =>
+  queryOptions({
+    queryKey: qk.telegram.sendProgress(jobId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof telegramContract.progress.response>>(
+        `/api/telegram/send/${encodeURIComponent(jobId)}`,
+        { signal, schema: telegramContract.progress.response }
+      ),
+    gcTime: 0,
+  });
+
 /** GET /api/integrations/telegram/status — Telegram MTProto integration status. */
 export const integrationsTelegramStatusQuery = () =>
   queryOptions({

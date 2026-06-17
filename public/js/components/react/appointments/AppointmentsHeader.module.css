@@ -210,7 +210,7 @@
 }
 
 .searchInput::placeholder {
-    color: var(--text-secondary);
+    color: var(--text-placeholder);
 }
 
 .searchIcon {

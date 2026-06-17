@@ -20,8 +20,10 @@ export const status = {
 } as const;
 export type StatusResponse = z.infer<typeof status.response>;
 
-// POST /api/telegram/send → { enabled, sent, total, errors }.
-// Sends each resolved file to one recipient phone (international format).
+// POST /api/telegram/send → { enabled, jobId, total }.
+// Big-file uploads can run for minutes (and MUST NOT be bound to the request's
+// 30s timeout), so this kicks off a background send job and returns its id
+// immediately; the client polls `progress` below for per-file upload status.
 export const send = {
   body: z.object({
     phone: z.string().min(1),
@@ -29,10 +31,32 @@ export const send = {
   }),
   response: z.object({
     enabled: z.boolean(),
-    sent: z.number(),
+    jobId: z.string(),
     total: z.number(),
-    errors: z.array(z.string()),
   }),
 } as const;
 export type SendBody = z.infer<typeof send.body>;
 export type SendResponse = z.infer<typeof send.response>;
+
+// GET /api/telegram/send/:jobId → live snapshot of a running/finished send job.
+// Polled by the share modal to drive a per-file progress bar; the job is held
+// in server memory for a short TTL after it finishes so the final poll lands.
+export const progress = {
+  params: z.object({ jobId: z.string().min(1) }),
+  response: z.object({
+    status: z.enum(['running', 'done']),
+    total: z.number(),
+    /** Files successfully sent so far. */
+    sent: z.number(),
+    /** 1-based index of the file currently uploading (clamped to total). */
+    index: z.number(),
+    /** Display name of the file currently uploading. */
+    name: z.string(),
+    /** Upload fraction (0..1) of the current file. */
+    fileProgress: z.number(),
+    /** Per-file failure messages accumulated so far. */
+    errors: z.array(z.string()),
+  }),
+} as const;
+export type ProgressParams = z.infer<typeof progress.params>;
+export type ProgressResponse = z.infer<typeof progress.response>;

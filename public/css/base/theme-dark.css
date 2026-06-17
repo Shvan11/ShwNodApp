@@ -60,6 +60,7 @@
         --text-secondary: var(--palette-night-50);  /* = body, near-white */
         --text-muted: var(--palette-night-100);     /* #c8cedb — subtle */
         --text-heading: var(--palette-blue-300);    /* card/section titles → light blue */
+        --text-placeholder: var(--palette-night-200); /* #9aa3b2 — dim hint, not the near-white muted tier */
 
         /* ===========================================================
            Borders

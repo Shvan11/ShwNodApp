@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useNavigation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { patientInfoQuery, brandingQuery } from '@/query/queries';
@@ -36,13 +36,24 @@ interface NavigationItem {
     icon: string;
     onClick: () => void;
     isActive: boolean;
+    // True while React Router is navigating to this item's destination (loader in
+    // flight). Drives the per-button spinner so a click gives instant feedback.
+    isPending: boolean;
     disabled?: boolean;
 }
 
 const UniversalHeader = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const navigation = useNavigation();
     const { t } = useTranslation('common');
+
+    // The path React Router is navigating TO while a route loader runs (null when
+    // idle). With v7_startTransition the current screen stays mounted until the
+    // loader resolves, so on a slow load a nav click otherwise looks dead — this
+    // drives a spinner on the specific button whose destination is loading.
+    const pendingPath = navigation.location?.pathname ?? null;
+    const pendingPatientCode = pendingPath?.match(/\/patient\/(\d+)/)?.[1] ?? null;
     // GlobalState already fetches /api/auth/me and exposes the user, so the
     // header reads it from there instead of making its own duplicate request.
     const { user } = useGlobalState();
@@ -102,6 +113,12 @@ const UniversalHeader = () => {
         }
         : null;
 
+    // True only while navigating to the patient's page from elsewhere (not when
+    // switching sub-tabs already on that patient) — drives the patient tab's
+    // pending spinner, mirroring the main nav buttons' blocking-loader feedback.
+    const patientTabPending =
+        !onPatientRoute && currentPatient != null && String(currentPatient.code) === pendingPatientCode;
+
     // Remember the last patient sub-view (works/photos/diagnosis/visits/payments…)
     // so the header's patient button returns there instead of always jumping to
     // photos. Keyed per patient code; stores pathname + search to preserve deep
@@ -160,31 +177,39 @@ const UniversalHeader = () => {
         }
     };
 
-    // Header navigation items configuration
+    // Header navigation items configuration. Each item owns one `match(pathname)`
+    // predicate so the SAME rule drives both the active highlight (current path)
+    // and the pending spinner (the path being navigated to).
     const getNavigationItems = (): NavigationItem[] => {
-        return [
+        const items = [
             {
                 key: 'dashboard',
                 label: t('nav.dashboard'),
                 icon: 'fas fa-home',
                 onClick: navigateToDashboard,
-                isActive: location.pathname === '/' || location.pathname === '/dashboard'
+                match: (p: string) => p === '/' || p === '/dashboard',
             },
             {
                 key: 'appointments',
                 label: t('nav.appointments'),
                 icon: 'fas fa-calendar-alt',
                 onClick: navigateToAppointments,
-                isActive: location.pathname.includes('/appointment')
+                match: (p: string) => p.includes('/appointment'),
             },
             {
                 key: 'search',
                 label: t('nav.search'),
                 icon: 'fas fa-search',
                 onClick: navigateToPatientManagement,
-                isActive: location.pathname.includes('/patient-management')
+                match: (p: string) => p.includes('/patient-management'),
             },
         ];
+
+        return items.map(({ match, ...item }) => ({
+            ...item,
+            isActive: match(location.pathname),
+            isPending: pendingPath != null && match(pendingPath),
+        }));
     };
 
     // Persist the last-viewed patient sub-page on navigation (a sessionStorage
@@ -232,11 +257,15 @@ const UniversalHeader = () => {
                         {getNavigationItems().map(item => (
                             <button
                                 key={item.key}
-                                className={`nav-btn ${item.isActive ? 'active' : ''} ${item.disabled ? 'disabled' : ''}`}
-                                onClick={item.onClick}
+                                className={`nav-btn ${item.isActive ? 'active' : ''} ${item.isPending ? 'pending' : ''} ${item.disabled ? 'disabled' : ''}`}
+                                // While this button's destination is mid-load, swallow
+                                // re-clicks: re-navigating would abort and restart the
+                                // in-flight loader (slower, not faster). Other tabs still work.
+                                onClick={item.isPending ? undefined : item.onClick}
                                 disabled={item.disabled}
+                                aria-busy={item.isPending || undefined}
                             >
-                                <i className={item.icon} />
+                                <i className={item.isPending ? 'fas fa-spinner fa-spin' : item.icon} aria-hidden="true" />
                                 <span>{item.label}</span>
                             </button>
                         ))}
@@ -248,15 +277,16 @@ const UniversalHeader = () => {
                         {currentPatient && (
                             <div className="patient-nav-wrap">
                                 <button
-                                    className={`nav-btn patient-nav ${onPatientRoute ? 'active' : ''}`}
-                                    onClick={() => navigateToPatient(currentPatient.code)}
+                                    className={`nav-btn patient-nav ${onPatientRoute ? 'active' : ''} ${patientTabPending ? 'pending' : ''}`}
+                                    onClick={patientTabPending ? undefined : () => navigateToPatient(currentPatient.code)}
+                                    aria-busy={patientTabPending || undefined}
                                 >
-                                    <i className="fas fa-user" />
+                                    <i className={patientTabPending ? 'fas fa-spinner fa-spin' : 'fas fa-user'} aria-hidden="true" />
                                     <span>{currentPatient.name}</span>
                                     {/* Close chip lives inside the tab (browser-tab style); can't be a
                                         nested <button>, so it's a role=button span that stops the click
                                         from bubbling to the tab's navigate handler. */}
-                                    {!onPatientRoute && (
+                                    {!onPatientRoute && !patientTabPending && (
                                         <span
                                             role="button"
                                             tabIndex={0}

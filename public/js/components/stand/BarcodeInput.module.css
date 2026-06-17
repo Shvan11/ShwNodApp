@@ -21,7 +21,7 @@
 }
 
 .input::placeholder {
-  color: var(--text-muted);
+  color: var(--text-placeholder);
 }
 
 .input:disabled {

@@ -44,12 +44,14 @@
        Three neutral tiers + one heading tier. The former synonyms
        (--text-color / -light / -lighter / -dark / -medium and the raw
        --gray-600/700/800/900-as-text) were all folded into these; use
-       ONLY these four for text colour.
+       ONLY these for text colour. Placeholders get their own tier so dark
+       mode can dim them without dragging muted body text down with it.
        =============================================================== */
     --text-primary: #212529;                 /* body / strong text */
     --text-secondary: #6c757d;               /* secondary text, labels */
-    --text-muted: #999999;                   /* muted / tertiary, placeholders */
+    --text-muted: #999999;                   /* muted / tertiary */
     --text-heading: var(--color-dark-blue);  /* card/section titles — flips in dark */
+    --text-placeholder: #999999;             /* form input placeholders */
 
     /* ===============================================================
        Surfaces & backgrounds

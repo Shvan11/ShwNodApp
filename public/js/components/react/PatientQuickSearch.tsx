@@ -227,7 +227,7 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
                         onChange={handleSelect}
                         placeholder="اكتب للبحث..."
                         isClearable
-                        classNamePrefix="pqs-select"
+                        classNamePrefix="react-select"
                         styles={selectStylesRTL}
                         // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                         autoFocus={autoFocus}
@@ -251,7 +251,7 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
                         onChange={handleSelect}
                         placeholder="Search phone..."
                         isClearable
-                        classNamePrefix="pqs-select"
+                        classNamePrefix="react-select"
                         styles={selectStylesBase}
                         noOptionsMessage={({ inputValue }) =>
                             inputValue.length < 2 ? 'Type at least 2 characters...' : 'No patients found'
@@ -273,7 +273,7 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
                         onChange={handleSelect}
                         placeholder="Search ID..."
                         isClearable
-                        classNamePrefix="pqs-select"
+                        classNamePrefix="react-select"
                         styles={selectStylesBase}
                         noOptionsMessage={({ inputValue }) =>
                             inputValue.length < 1 ? 'Type at least 1 character...' : 'No patients found'

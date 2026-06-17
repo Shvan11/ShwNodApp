@@ -523,8 +523,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 },
 
                 onInit: (el: HTMLElement, pswp: PhotoSwipeInstance) => {
-                    el.setAttribute('title', 'Share to device');
-                    el.setAttribute('aria-label', 'Share to device');
+                    el.setAttribute('title', 'Share');
+                    el.setAttribute('aria-label', 'Share');
 
                     el.addEventListener('click', () => {
                         const src = pswp.currSlide?.data?.src;

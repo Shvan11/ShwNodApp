@@ -94,7 +94,7 @@
 }
 
 .amountInput::placeholder {
-  color: var(--text-muted);
+  color: var(--text-placeholder);
   font-weight: var(--font-weight-normal);
 }
 

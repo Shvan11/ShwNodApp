@@ -681,6 +681,7 @@ const ArchformMatcher: React.FC = () => {
                                                     isDisabled={isSaving}
                                                     placeholder="Search set..."
                                                     noOptionsMessage={() => 'No sets found'}
+                                                    classNamePrefix="react-select"
                                                     styles={setSelectStyles}
                                                     menuPortalTarget={document.body}
                                                     menuPlacement="auto"

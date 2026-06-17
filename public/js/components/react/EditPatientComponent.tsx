@@ -74,7 +74,6 @@ const EditPatientComponent = ({ personId }: Props) => {
     const queryClient = useQueryClient();
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [successMessage, setSuccessMessage] = useState('');
 
     // Patient record read — populates the form via the effect below. Each
     // dropdown read is its own independent query, so one lookup failing can't
@@ -205,11 +204,10 @@ const EditPatientComponent = ({ personId }: Props) => {
             await putJSON(`/api/patients/${pid}`, formData);
             queryClient.invalidateQueries({ queryKey: qk.patient.all(pid) });
 
-            setSuccessMessage('Patient updated successfully!');
             toast.success('Patient updated successfully!');
-            setTimeout(() => {
-                setSuccessMessage('');
-            }, 3000);
+            // Close the form on success — return to the patient's works page
+            // (same destination as Cancel). The toast persists across navigation.
+            navigate(`/patient/${pid}/works`);
         } catch (err) {
             // Duplicate patient name → 409 with code/context in `details` (root kept as a fallback).
             const errorData = (err as HttpError).data as {
@@ -274,13 +272,6 @@ const EditPatientComponent = ({ personId }: Props) => {
                 </div>
             )}
 
-            {successMessage && (
-                <div className={styles.editPatientSuccess}>
-                    <i className="fas fa-check-circle"></i>
-                    {successMessage}
-                </div>
-            )}
-
             {/* Top action buttons */}
             <div className={styles.topActions}>
                 <button
@@ -319,7 +310,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                             value={formData.patient_name}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, patient_name: e.target.value})}
                             required
-                            className={styles.inputHeightConsistent}
+                            className="form-control"
                         />
                     </div>
                 </div>
@@ -330,6 +321,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <input
                             id="edit-first-name"
                             type="text"
+                            className="form-control"
                             value={formData.first_name}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, first_name: e.target.value})}
                         />
@@ -339,18 +331,20 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <input
                             id="edit-last-name"
                             type="text"
+                            className="form-control"
                             value={formData.last_name}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, last_name: e.target.value})}
                         />
                     </div>
                 </div>
 
-                <div className={`${styles.formRow} ${styles.formRowPhone}`}>
+                <div className={styles.formRow}>
                     <div className={styles.formGroup}>
                         <label htmlFor="edit-country-code">Country Code</label>
                         <input
                             id="edit-country-code"
                             type="text"
+                            className="form-control"
                             value={formData.country_code}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, country_code: e.target.value})}
                             placeholder="+964"
@@ -364,6 +358,9 @@ const EditPatientComponent = ({ personId }: Props) => {
                             onChange={(value) => setFormData({...formData, phone: value})}
                         />
                     </div>
+                </div>
+
+                <div className={styles.formRow}>
                     <div className={styles.formGroup}>
                         <label htmlFor="edit-phone2">Phone 2</label>
                         <PhoneInput
@@ -380,6 +377,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <input
                             id="edit-email"
                             type="email"
+                            className="form-control"
                             value={formData.email}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, email: e.target.value})}
                         />
@@ -389,6 +387,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <input
                             id="edit-date-of-birth"
                             type="date"
+                            className="form-control"
                             value={formData.date_of_birth}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, date_of_birth: e.target.value})}
                         />
@@ -400,6 +399,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <label htmlFor="edit-gender">Gender</label>
                         <select
                             id="edit-gender"
+                            className="form-control"
                             value={formData.gender}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, gender: e.target.value})}
                         >
@@ -415,6 +415,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <label htmlFor="edit-language">Language</label>
                         <select
                             id="edit-language"
+                            className="form-control"
                             value={formData.language}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, language: e.target.value})}
                         >
@@ -430,6 +431,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <label htmlFor="edit-address-id">Address/Zone</label>
                         <select
                             id="edit-address-id"
+                            className="form-control"
                             value={formData.address_id}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, address_id: e.target.value})}
                         >
@@ -445,6 +447,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <label htmlFor="edit-referral-source-id">Referral Source</label>
                         <select
                             id="edit-referral-source-id"
+                            className="form-control"
                             value={formData.referral_source_id}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, referral_source_id: e.target.value})}
                         >
@@ -463,6 +466,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <label htmlFor="edit-patient-type-id">Patient Type</label>
                         <select
                             id="edit-patient-type-id"
+                            className="form-control"
                             value={formData.patient_type_id}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, patient_type_id: e.target.value})}
                         >
@@ -478,6 +482,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <label htmlFor="edit-tag-id">Tag</label>
                         <select
                             id="edit-tag-id"
+                            className="form-control"
                             value={formData.tag_id}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, tag_id: e.target.value})}
                         >
@@ -497,6 +502,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <input
                             id="edit-estimated-cost"
                             type="text"
+                            className="form-control"
                             value={formData.estimated_cost ? formData.estimated_cost.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                 const rawValue = e.target.value.replace(/,/g, '');
@@ -511,6 +517,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <label htmlFor="edit-currency">Currency</label>
                         <select
                             id="edit-currency"
+                            className="form-control"
                             value={formData.currency}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, currency: e.target.value})}
                         >
@@ -525,6 +532,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                     <label htmlFor="edit-notes">Notes</label>
                     <textarea
                         id="edit-notes"
+                        className="form-control"
                         value={formData.notes}
                         onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData({...formData, notes: e.target.value})}
                         rows={3}

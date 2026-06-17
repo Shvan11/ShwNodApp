@@ -229,7 +229,7 @@
 
 .formInput::placeholder,
 .formTextarea::placeholder {
-    color: var(--text-secondary);
+    color: var(--text-placeholder);
     opacity: 0.6;
 }
 

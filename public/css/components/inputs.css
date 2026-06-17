@@ -33,7 +33,7 @@
 }
 
 .form-control::placeholder {
-    color: var(--text-muted);
+    color: var(--text-placeholder);
     opacity: 1;
 }
 
@@ -131,7 +131,7 @@ textarea.form-control {
 }
 
 .pm-select__placeholder {
-    color: var(--text-muted);
+    color: var(--text-placeholder);
     font-size: var(--font-size-base);
 }
 

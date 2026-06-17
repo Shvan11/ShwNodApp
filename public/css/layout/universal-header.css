@@ -145,6 +145,22 @@
     border-color: rgba(255, 255, 255, 0.1);
 }
 
+/* Pending navigation — the destination route's loader is still running. Keep the
+   button bright and clearly "working" (NOT the dimmed disabled look); the spinner
+   icon + aria-busy carry the state, and re-clicks are swallowed in the handler. */
+.nav-btn.pending {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+    cursor: progress;
+}
+
+.nav-btn.pending:hover {
+    transform: none;
+    box-shadow: none;
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
 /* Sticky patient tab — the patient pill, plus a close ("forget this patient")
    chip shown once the tab is backgrounded (we've navigated off that patient's page). */
 .patient-nav-wrap {

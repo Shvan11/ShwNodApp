@@ -169,7 +169,7 @@
 /* Placeholder styling */
 .formGroup input::placeholder,
 .formGroup textarea::placeholder {
-    color: var(--text-secondary);
+    color: var(--text-placeholder);
     opacity: 1;
 }
 

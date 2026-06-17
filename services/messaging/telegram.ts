@@ -52,6 +52,37 @@ interface SendGramResult {
 }
 
 /**
+ * Per-send options. The route already resolved the file's metadata, so we take
+ * it here rather than re-`stat`ing, and expose an upload-progress callback so a
+ * background job can surface a real progress bar.
+ */
+export interface SendGramFileOptions {
+  /** Human display name — preserves the real extension for documents. */
+  displayName?: string;
+  /** MIME type (from the share resolver) — decides photo vs document. */
+  mimeType?: string;
+  /** Known byte size — avoids a redundant `stat`. */
+  size?: number;
+  /** Upload progress for this file, a fraction in [0, 1]. */
+  onProgress?: (fraction: number) => void;
+}
+
+/**
+ * Telegram caps inline *photos* at 10 MB (and recompresses them). Anything
+ * larger — or any non-image — must go as a document to arrive intact (documents
+ * stream up to ~2 GB). Below this, images keep the existing inline-photo path.
+ */
+const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+const IMAGE_EXT_RE = /\.(jpe?g|png|webp|gif|bmp)$/i;
+
+/** Strip path separators + control chars; keep the real (UTF-8) name + extension. */
+function sanitizeDocumentName(name: string): string {
+  const base = name.split(/[/\\]/).pop() || 'file';
+  // eslint-disable-next-line no-control-regex
+  return base.replace(/[\x00-\x1f]/g, '_').trim() || 'file';
+}
+
+/**
  * Extended TelegramClient with internal connection
  * Uses intersection type instead of extends to avoid type conflicts
  */
@@ -127,9 +158,14 @@ async function teardownClient(client: ExtendedTelegramClient): Promise<void> {
  * Send a file using Telegram API
  * @param phone - The recipient's phone number
  * @param filepath - Path to the file to send
+ * @param opts - Display name / mime / size / progress callback (see type)
  * @returns Promise resolving to the result object
  */
-export async function sendgramfile(phone: string, filepath: string): Promise<SendGramResult> {
+export async function sendgramfile(
+  phone: string,
+  filepath: string,
+  opts: SendGramFileOptions = {}
+): Promise<SendGramResult> {
   const gramSession = await getGramSession();
 
   log.info(`Telegram sendgramfile called - Phone: ${phone}, File: ${filepath}`);
@@ -199,35 +235,52 @@ export async function sendgramfile(phone: string, filepath: string): Promise<Sen
       return { result: 'ERROR', error: `File not found or not readable: ${filepath}` };
     }
 
-    // Convert filename to phone-compatible format
-    const originalFilename = filepath.split(/[/\\]/).pop() || ''; // Get filename from path
-    const convertedFilename = getPhoneCompatibleFilename(originalFilename);
-
-    // Force as photo using CustomFile with .jpg extension and InputMediaUploadedPhoto
-    // Non-blocking async stat operation
+    // Non-blocking async stat (size may already be known from the resolver).
     const fileStats = await fs.stat(filepath);
+    const originalFilename = filepath.split(/[/\\]/).pop() || '';
+    const displayName = opts.displayName || originalFilename;
+    const size = opts.size ?? fileStats.size;
+    const mimeType = opts.mimeType ?? '';
 
-    log.info(`=== TELEGRAM PHOTO FORCE ===`);
+    // Images within Telegram's photo cap keep the inline-photo path (and the
+    // clinic photo-naming convention, e.g. i10 → Profile.jpg). Big files and
+    // non-images go as documents so they arrive intact and uncapped.
+    const isImage = mimeType.startsWith('image/') || IMAGE_EXT_RE.test(displayName);
+    const asPhoto = isImage && size <= PHOTO_MAX_BYTES;
+
+    const fileName = asPhoto
+      ? getPhoneCompatibleFilename(originalFilename)
+      : sanitizeDocumentName(displayName);
+
+    log.info(`=== TELEGRAM SEND (${asPhoto ? 'photo' : 'document'}) ===`);
     log.info(`Original file: ${originalFilename}`);
-    log.info(`Converted filename: ${convertedFilename}`);
-    log.info(`File size: ${fileStats.size} bytes`);
+    log.info(`Send filename: ${fileName}`);
+    log.info(`File size: ${size} bytes, mime: ${mimeType || 'unknown'}`);
 
-    // Create CustomFile with .jpg filename to force photo recognition
-    const customFile = new CustomFile(convertedFilename, fileStats.size, filepath);
+    const customFile = new CustomFile(fileName, size, filepath);
 
-    // Upload file first
+    // Upload first; onProgress fires per chunk with a 0..1 fraction.
     const uploadedFile = await client.uploadFile({
       file: customFile,
       workers: 1,
+      onProgress: opts.onProgress
+        ? (fraction: number) => opts.onProgress?.(typeof fraction === 'number' ? fraction : 0)
+        : undefined,
     });
 
-    // Send as photo using InputMediaUploadedPhoto
+    // Photos render inline; documents preserve the original bytes + filename.
+    const media = asPhoto
+      ? new Api.InputMediaUploadedPhoto({ file: uploadedFile })
+      : new Api.InputMediaUploadedDocument({
+          file: uploadedFile,
+          mimeType: mimeType || 'application/octet-stream',
+          attributes: [new Api.DocumentAttributeFilename({ fileName })],
+        });
+
     const result = (await client.invoke(
       new Api.messages.SendMedia({
         peer: phone,
-        media: new Api.InputMediaUploadedPhoto({
-          file: uploadedFile,
-        }),
+        media,
         message: '', // Required message parameter (empty string for no caption)
         // Use big-integer library's bigInt which is what telegram expects
         randomId: bigInt(Math.floor(Math.random() * 1000000000)),

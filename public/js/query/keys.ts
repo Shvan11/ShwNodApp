@@ -274,6 +274,11 @@ export const qk = {
     /** GET /api/wa/group-settings — WhatsApp daily-list group posting config. */
     whatsappGroupSettings: () => ['settings', 'whatsapp-group-settings'] as const,
   },
+  /** Telegram — transient share-job progress poll (keyed by job id). */
+  telegram: {
+    /** GET /api/telegram/send/:jobId — per-file upload progress of a send job. */
+    sendProgress: (jobId: string) => ['telegram', 'send-progress', jobId] as const,
+  },
   /** Reports — daily-invoices modal (keyed by date). */
   dailyInvoices: (date: string) => ['daily-invoices', date] as const,
   /** Clinic branding (header logo + display name) — header + General settings. */

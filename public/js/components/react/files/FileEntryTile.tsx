@@ -36,7 +36,7 @@ interface Props {
   onRename: (entry: FileEntry) => void;
   onDelete: (entry: FileEntry) => void;
   onToggleSelect: (entry: FileEntry) => void;
-  /** Share this file to a LAN device (LocalSend). Omitted → no share button. */
+  /** Share this file (opens the share sheet: LocalSend / Telegram). Omitted → no share button. */
   onShare?: (entry: FileEntry) => void;
 }
 
@@ -139,8 +139,8 @@ const FileEntryTile = ({
               type="button"
               className={styles.iconButton}
               onClick={() => onShare(entry)}
-              title="Share to device"
-              aria-label={`Share ${entry.name} to a device`}
+              title="Share"
+              aria-label={`Share ${entry.name}`}
             >
               <i className="fas fa-share-nodes" aria-hidden="true" />
             </button>
