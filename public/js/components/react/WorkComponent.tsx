@@ -1,31 +1,21 @@
-import React, { useState, useMemo, type FormEvent, type ChangeEvent } from 'react';
+import React, { useState, useMemo, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import WorkCard, { type Work, type WorkStatus } from './WorkCard';
-import { type WorkDetail } from './WorkDetailsPanel';
 import PaymentModal from './PaymentModal';
 import TransferWorkModal from './TransferWorkModal';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
-import TeethSelector from './TeethSelector';
-import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
+import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
-import {
-    getWorkTypeConfig,
-    MATERIAL_OPTIONS,
-    FILLING_TYPE_OPTIONS,
-    FILLING_DEPTH_OPTIONS
-} from '../../config/workTypeConfig';
-import { postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { postJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { qk } from '@/query/keys';
 import {
     worksQuery,
     patientInfoQuery,
     hasAppointmentQuery,
-    teethQuery,
-    implantManufacturersQuery,
     paymentHistoryQuery,
 } from '@/query/queries';
 import {
@@ -48,38 +38,6 @@ interface PatientInfo {
         alertSeverity: number;
         alertDetails: string;
     };
-}
-
-interface DetailFormData {
-    work_id: number | null;
-    TeethIds: number[];
-    filling_type: string;
-    filling_depth: string;
-    canals_no: string;
-    working_length: string;
-    implant_length: string;
-    implant_diameter: string;
-    implant_manufacturer_id: string;
-    material: string;
-    lab_name: string;
-    item_cost: string;
-    start_date: string;
-    completed_date: string;
-    note: string;
-}
-
-interface ToothOption {
-    id: number;
-    tooth_code: string;
-    tooth_name: string;
-    tooth_number?: string;
-    quadrant: 'UR' | 'UL' | 'LR' | 'LL';
-    is_permanent: boolean;
-}
-
-interface ImplantManufacturer {
-    id: number;
-    name: string;
 }
 
 /** Blocking-record counts carried on a work-delete 409 (`details.dependencies`). */
@@ -143,18 +101,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     });
     const hasNextAppointment = appointmentData?.hasAppointment ?? false;
 
-    const { data: teethData } = useQuery(teethQuery());
-    const teethOptions: ToothOption[] = teethData?.teeth ?? [];
-
-    const { data: manufacturersData } = useQuery(implantManufacturersQuery());
-    const implantManufacturers: ImplantManufacturer[] = manufacturersData ?? [];
-
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'discontinued'>('all');
-    // selectedWork is the work whose treatment-item form modal is open (set by add/edit).
-    const [selectedWork, setSelectedWork] = useState<Work | null>(null);
-    const [showDetailForm, setShowDetailForm] = useState(false);
-    const [editingDetail, setEditingDetail] = useState<WorkDetail | null>(null);
     const [patientPhotoError, setPatientPhotoError] = useState(false);
 
     // Payment-related state
@@ -191,30 +139,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     // Transfer work modal state (admin only)
     const [showTransferModal, setShowTransferModal] = useState(false);
     const [workToTransfer, setWorkToTransfer] = useState<Work | null>(null);
-
-    // Work detail form state - includes all possible fields for all work types
-    const [detailFormData, setDetailFormData] = useState<DetailFormData>({
-        work_id: null,
-        TeethIds: [],
-        filling_type: '',
-        filling_depth: '',
-        canals_no: '',
-        working_length: '',
-        implant_length: '',
-        implant_diameter: '',
-        implant_manufacturer_id: '',
-        material: '',
-        lab_name: '',
-        item_cost: '',
-        start_date: '',
-        completed_date: '',
-        note: ''
-    });
-    const [displayItemCost, setDisplayItemCost] = useState('');
-
-    // Teeth multi-select filter toggles (the options themselves come from useQuery above)
-    const [showTeethPermanent, setShowTeethPermanent] = useState(true);
-    const [showTeethDeciduous, setShowTeethDeciduous] = useState(false);
 
     // Auto-expand the first active work when works are loaded. Done during render
     // (adjust-state-during-render), keyed on the works-data identity, rather than in
@@ -412,88 +336,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         // Refresh works since the work was transferred away
         queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
         toast.success('Work transferred successfully to another patient');
-    };
-
-    // Refresh a work's detail rows — shared key, so the card's inline panel updates too.
-    const reloadWorkDetails = (workId: number) =>
-        queryClient.invalidateQueries({ queryKey: qk.work.detailsList(workId) });
-
-    const handleAddDetail = (work: Work) => {
-        setSelectedWork(work);
-        setEditingDetail(null);
-        setDetailFormData({
-            work_id: work.work_id,
-            TeethIds: [],
-            filling_type: '',
-            filling_depth: '',
-            canals_no: '',
-            working_length: '',
-            implant_length: '',
-            implant_diameter: '',
-            implant_manufacturer_id: '',
-            material: '',
-            lab_name: '',
-            item_cost: '',
-            start_date: '',
-            completed_date: '',
-            note: ''
-        });
-        setDisplayItemCost('');
-        setShowDetailForm(true);
-    };
-
-    const handleEditDetail = (work: Work, detail: WorkDetail) => {
-        setSelectedWork(work);
-        setEditingDetail(detail);
-        setDetailFormData({
-            work_id: detail.work_id,
-            TeethIds: detail.TeethIds || [],
-            filling_type: detail.filling_type || '',
-            filling_depth: detail.filling_depth || '',
-            canals_no: String(detail.canals_no || ''),
-            working_length: detail.working_length || '',
-            implant_length: String(detail.implant_length || ''),
-            implant_diameter: String(detail.implant_diameter || ''),
-            implant_manufacturer_id: String(detail.implant_manufacturer_id || ''),
-            material: detail.material || '',
-            lab_name: detail.lab_name || '',
-            item_cost: String(detail.item_cost || ''),
-            start_date: detail.start_date ? detail.start_date.split('T')[0] : '',
-            completed_date: detail.completed_date ? detail.completed_date.split('T')[0] : '',
-            note: detail.note || ''
-        });
-        setDisplayItemCost(detail.item_cost ? formatNumber(detail.item_cost) : '');
-        setShowDetailForm(true);
-    };
-
-    const handleDetailFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-
-        try {
-            if (editingDetail) {
-                await putJSON('/api/updateworkdetail', { detailId: editingDetail.id, ...detailFormData });
-            } else {
-                await postJSON('/api/addworkdetail', detailFormData);
-            }
-
-            if (selectedWork) {
-                await reloadWorkDetails(selectedWork.work_id);
-            }
-            setShowDetailForm(false);
-        } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to save work detail'), 5000);
-        }
-    };
-
-    const handleDeleteDetail = async (detailId: number, workId: number) => {
-        if (!await confirm('Are you sure you want to delete this work detail?', { title: 'Delete Work Detail', danger: true, confirmText: 'Delete' })) return;
-
-        try {
-            await deleteJSON('/api/deleteworkdetail', { body: JSON.stringify({ detailId }) });
-            await reloadWorkDetails(workId);
-        } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to delete work detail'), 5000);
-        }
     };
 
     const getProgressPercentage = (work: Work): number => {
@@ -730,9 +572,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         isExpanded={expandedWorks.has(work.work_id)}
                         isAdmin={isAdmin}
                         onToggleExpanded={() => toggleWorkExpanded(work.work_id)}
-                        onAddDetail={handleAddDetail}
-                        onEditDetail={handleEditDetail}
-                        onDeleteDetail={handleDeleteDetail}
                         onEdit={handleEditWork}
                         onDelete={handleDeleteWork}
                         onTransfer={handleTransferWork}
@@ -762,240 +601,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     </div>
                 )}
             </div>
-
-            {/* Work Detail Form Modal */}
-            {showDetailForm && selectedWork && (
-                <Modal
-                    isOpen={true}
-                    onClose={() => setShowDetailForm(false)}
-                    contentClassName={`${styles.modal} ${styles.detailFormModal}`}
-                    ariaLabelledBy="work-detail-form-title"
-                >
-                        <ModalHeader
-                            title={`${editingDetail ? 'Edit' : 'Add'} ${getWorkTypeConfig(selectedWork.type_of_work).name} Item`}
-                            titleId="work-detail-form-title"
-                            icon={<i className={getWorkTypeConfig(selectedWork.type_of_work).icon} />}
-                            onClose={() => setShowDetailForm(false)}
-                        />
-
-                        <form onSubmit={handleDetailFormSubmit} className={styles.detailForm}>
-                            {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('teeth') && (
-                                <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                                    <span>Select Teeth</span>
-                                    <TeethSelector
-                                        teethOptions={teethOptions}
-                                        selectedTeethIds={detailFormData.TeethIds}
-                                        onSelectionChange={(newTeethIds) => setDetailFormData({ ...detailFormData, TeethIds: newTeethIds })}
-                                        showPermanent={showTeethPermanent}
-                                        showDeciduous={showTeethDeciduous}
-                                        onFilterChange={(type, value) => {
-                                            if (type === 'permanent') setShowTeethPermanent(value);
-                                            if (type === 'deciduous') setShowTeethDeciduous(value);
-                                        }}
-                                    />
-                                </div>
-                            )}
-
-                            <div className={styles.formRow}>
-                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('fillingType') && (
-                                    <div className={styles.formGroup}>
-                                        <label htmlFor="work-detail-filling-type">Filling Type</label>
-                                        <select
-                                            id="work-detail-filling-type"
-                                            value={detailFormData.filling_type}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, filling_type: e.target.value })}
-                                        >
-                                            <option value="">Select Type</option>
-                                            {FILLING_TYPE_OPTIONS.map((opt: string) => (
-                                                <option key={opt} value={opt}>{opt}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-
-                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('fillingDepth') && (
-                                    <div className={styles.formGroup}>
-                                        <label htmlFor="work-detail-filling-depth">Filling Depth</label>
-                                        <select
-                                            id="work-detail-filling-depth"
-                                            value={detailFormData.filling_depth}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, filling_depth: e.target.value })}
-                                        >
-                                            <option value="">Select Depth</option>
-                                            {FILLING_DEPTH_OPTIONS.map((opt: string) => (
-                                                <option key={opt} value={opt}>{opt}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-
-                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('canalsNo') && (
-                                    <div className={styles.formGroup}>
-                                        <label htmlFor="work-detail-canals-no">Number of Canals</label>
-                                        <input
-                                            id="work-detail-canals-no"
-                                            type="number"
-                                            value={detailFormData.canals_no}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, canals_no: e.target.value })}
-                                            min="1"
-                                            max="5"
-                                            placeholder="1-5"
-                                        />
-                                    </div>
-                                )}
-
-                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('workingLength') && (
-                                    <div className={styles.formGroup}>
-                                        <label htmlFor="work-detail-working-length">Working Length</label>
-                                        <input
-                                            id="work-detail-working-length"
-                                            type="text"
-                                            value={detailFormData.working_length}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, working_length: e.target.value })}
-                                            placeholder="e.g., 20mm, 18mm, 19mm"
-                                        />
-                                    </div>
-                                )}
-
-                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('implantManufacturer') && (
-                                    <div className={styles.formGroup}>
-                                        <label htmlFor="work-detail-manufacturer">Manufacturer</label>
-                                        <select
-                                            id="work-detail-manufacturer"
-                                            value={detailFormData.implant_manufacturer_id}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, implant_manufacturer_id: e.target.value })}
-                                        >
-                                            <option value="">Select Manufacturer...</option>
-                                            {implantManufacturers.map(m => (
-                                                <option key={m.id} value={m.id}>{m.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-
-                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('implantLength') && (
-                                    <div className={styles.formGroup}>
-                                        <label htmlFor="work-detail-implant-length">Implant Length (mm)</label>
-                                        <input
-                                            id="work-detail-implant-length"
-                                            type="number"
-                                            step="0.5"
-                                            value={detailFormData.implant_length}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, implant_length: e.target.value })}
-                                            placeholder="e.g., 10, 11.5, 13"
-                                        />
-                                    </div>
-                                )}
-
-                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('implantDiameter') && (
-                                    <div className={styles.formGroup}>
-                                        <label htmlFor="work-detail-implant-diameter">Implant Diameter (mm)</label>
-                                        <input
-                                            id="work-detail-implant-diameter"
-                                            type="number"
-                                            step="0.1"
-                                            value={detailFormData.implant_diameter}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, implant_diameter: e.target.value })}
-                                            placeholder="e.g., 3.5, 4.0, 5.0"
-                                        />
-                                    </div>
-                                )}
-
-                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('material') && (
-                                    <div className={styles.formGroup}>
-                                        <label htmlFor="work-detail-material">Material</label>
-                                        <select
-                                            id="work-detail-material"
-                                            value={detailFormData.material}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, material: e.target.value })}
-                                        >
-                                            <option value="">Select Material</option>
-                                            {MATERIAL_OPTIONS.map((opt: string) => (
-                                                <option key={opt} value={opt}>{opt}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-
-                                {getWorkTypeConfig(selectedWork.type_of_work).fields.includes('labName') && (
-                                    <div className={styles.formGroup}>
-                                        <label htmlFor="work-detail-lab-name">Lab Name</label>
-                                        <input
-                                            id="work-detail-lab-name"
-                                            type="text"
-                                            value={detailFormData.lab_name}
-                                            onChange={(e) => setDetailFormData({ ...detailFormData, lab_name: e.target.value })}
-                                            placeholder="Enter lab name"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className={styles.formRow}>
-                                <div className={styles.formGroup}>
-                                    <label htmlFor="work-detail-start-date">Start Date</label>
-                                    <input
-                                        id="work-detail-start-date"
-                                        type="date"
-                                        value={detailFormData.start_date}
-                                        onChange={(e) => setDetailFormData({ ...detailFormData, start_date: e.target.value })}
-                                    />
-                                </div>
-
-                                <div className={styles.formGroup}>
-                                    <label htmlFor="work-detail-completed-date">Completed Date</label>
-                                    <input
-                                        id="work-detail-completed-date"
-                                        type="date"
-                                        value={detailFormData.completed_date}
-                                        onChange={(e) => setDetailFormData({ ...detailFormData, completed_date: e.target.value })}
-                                    />
-                                </div>
-
-                                <div className={styles.formGroup}>
-                                    <label htmlFor="work-detail-item-cost">Item Cost</label>
-                                    <input
-                                        id="work-detail-item-cost"
-                                        type="text"
-                                        value={displayItemCost}
-                                        onChange={(e) => {
-                                            const digits = e.target.value.replace(/[^\d]/g, '');
-                                            const num = parseInt(digits, 10) || 0;
-                                            setDisplayItemCost(num ? num.toLocaleString('en-US') : '');
-                                            setDetailFormData({ ...detailFormData, item_cost: String(num) });
-                                        }}
-                                        onBlur={() => setDisplayItemCost(detailFormData.item_cost ? formatNumber(detailFormData.item_cost) : '')}
-                                        placeholder="Optional"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                                <label htmlFor="work-detail-note">Notes</label>
-                                <textarea
-                                    id="work-detail-note"
-                                    value={detailFormData.note}
-                                    onChange={(e) => setDetailFormData({ ...detailFormData, note: e.target.value })}
-                                    rows={3}
-                                    placeholder="Additional notes..."
-                                />
-                            </div>
-
-                            <div className={styles.formActions}>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowDetailForm(false)}
-                                    className="btn btn-secondary"
-                                >
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn btn-primary">
-                                    {editingDetail ? 'Update Item' : 'Add Item'}
-                                </button>
-                            </div>
-                        </form>
-                </Modal>
-            )}
 
             {/* Payment Modal */}
             {showPaymentModal && selectedWorkForPayment && (

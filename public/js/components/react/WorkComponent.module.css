@@ -248,7 +248,7 @@
 .worksCardContainer {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.75rem;
     padding: 0.25rem 0;
 }
 
@@ -356,72 +356,6 @@
 .statusCompleted {
     background: var(--success-100);
     color: var(--success-700);
-}
-
-/* ===== DETAIL FORM ===== */
-
-.detailForm {
-    padding: var(--spacing-lg);
-}
-
-.modal.detailFormModal {
-    max-width: 700px;
-    width: 95%;
-}
-
-.formRow {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-}
-
-.formGroup {
-    display: flex;
-    flex-direction: column;
-}
-
-.fullWidth {
-    grid-column: 1 / -1;
-}
-
-.formGroup label {
-    font-weight: var(--font-weight-medium);
-    color: var(--text-primary);
-    margin-bottom: var(--spacing-xs);
-    font-size: 0.875rem;
-}
-
-.formGroup input,
-.formGroup select,
-.formGroup textarea {
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: var(--border-width-thin) solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 0.875rem;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.formGroup input:focus,
-.formGroup select:focus,
-.formGroup textarea:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px var(--primary-alpha);
-}
-
-.formGroup textarea {
-    resize: vertical;
-    min-height: 80px;
-}
-
-.formActions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--spacing-md);
-    margin-top: var(--spacing-xl);
-    padding-top: var(--spacing-lg);
-    border-top: var(--border-width-thin) solid var(--border-light);
 }
 
 /* ===== PAYMENT SUMMARY BOX ===== */

@@ -12,7 +12,7 @@ import styles from './TeethSelector.module.css';
  * - Toggle filters for permanent/deciduous visibility
  */
 
-interface ToothOption {
+export interface ToothOption {
     id: number;
     tooth_code: string;
     tooth_name: string;
@@ -28,6 +28,8 @@ interface TeethSelectorProps {
     showPermanent?: boolean;
     showDeciduous?: boolean;
     onFilterChange?: (type: 'permanent' | 'deciduous', value: boolean) => void;
+    /** Display-only: no clicks, no filter toggles, no footer; auto-shows only the arches that hold selected teeth. */
+    readOnly?: boolean;
 }
 
 type QuadrantKey = 'UR' | 'UL' | 'LR' | 'LL';
@@ -43,7 +45,8 @@ const TeethSelector = React.memo(({
     onSelectionChange,
     showPermanent = true,
     showDeciduous = true,
-    onFilterChange
+    onFilterChange,
+    readOnly = false
 }: TeethSelectorProps) => {
     // Memoize teeth groupings by quadrant
     const teethByQuadrant = useMemo((): TeethByQuadrant => {
@@ -83,13 +86,14 @@ const TeethSelector = React.memo(({
     // Memoize selected IDs as Set for O(1) lookup
     const selectedSet = useMemo(() => new Set(selectedTeethIds), [selectedTeethIds]);
 
-    // Handle tooth click - toggle selection
+    // Handle tooth click - toggle selection (no-op in read-only mode)
     const handleToothClick = useCallback((toothId: number) => {
+        if (readOnly) return;
         const newSelection = selectedSet.has(toothId)
             ? selectedTeethIds.filter(id => id !== toothId)
             : [...selectedTeethIds, toothId];
         onSelectionChange(newSelection);
-    }, [selectedTeethIds, selectedSet, onSelectionChange]);
+    }, [readOnly, selectedTeethIds, selectedSet, onSelectionChange]);
 
     // Handle filter changes
     const handleFilterChange = useCallback((type: 'permanent' | 'deciduous', value: boolean) => {
@@ -104,6 +108,18 @@ const TeethSelector = React.memo(({
     // Memoize computed values
     const hasPermanentTeeth = useMemo(() => teethOptions.some(t => t.is_permanent), [teethOptions]);
     const hasDeciduousTeeth = useMemo(() => teethOptions.some(t => !t.is_permanent), [teethOptions]);
+
+    // Read-only mode shows only the arches that actually contain selected teeth.
+    const hasSelectedPermanent = useMemo(
+        () => teethOptions.some(t => t.is_permanent && selectedSet.has(t.id)),
+        [teethOptions, selectedSet]
+    );
+    const hasSelectedDeciduous = useMemo(
+        () => teethOptions.some(t => !t.is_permanent && selectedSet.has(t.id)),
+        [teethOptions, selectedSet]
+    );
+    const effShowPermanent = readOnly ? hasSelectedPermanent : showPermanent;
+    const effShowDeciduous = readOnly ? hasSelectedDeciduous : showDeciduous;
 
     // Get selected teeth display text
     const selectedDisplay = useMemo(() => {
@@ -121,10 +137,10 @@ const TeethSelector = React.memo(({
             <div
                 key={tooth.id}
                 className={cn(styles.tooth, isSelected && styles.toothSelected)}
-                role="button"
-                tabIndex={0}
-                onClick={() => handleToothClick(tooth.id)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToothClick(tooth.id); } }}
+                role={readOnly ? undefined : 'button'}
+                tabIndex={readOnly ? -1 : 0}
+                onClick={readOnly ? undefined : () => handleToothClick(tooth.id)}
+                onKeyDown={readOnly ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToothClick(tooth.id); } }}
                 title={tooth.tooth_name}
             >
                 {isLower && <span className={styles.toothNumber}>{toothNumber}</span>}
@@ -148,7 +164,8 @@ const TeethSelector = React.memo(({
                 key={tooth.id}
                 type="button"
                 className={cn(styles.deciduousBtn, isSelected && styles.deciduousBtnSelected)}
-                onClick={() => handleToothClick(tooth.id)}
+                onClick={readOnly ? undefined : () => handleToothClick(tooth.id)}
+                tabIndex={readOnly ? -1 : 0}
                 title={tooth.tooth_name}
             >
                 {toothLetter}
@@ -203,9 +220,9 @@ const TeethSelector = React.memo(({
     };
 
     return (
-        <div className={styles.container}>
+        <div className={cn(styles.container, readOnly && styles.readOnly)}>
             {/* Filter toggles */}
-            {(hasPermanentTeeth || hasDeciduousTeeth) && onFilterChange && (
+            {!readOnly && (hasPermanentTeeth || hasDeciduousTeeth) && onFilterChange && (
                 <div className={styles.filters}>
                     {hasPermanentTeeth && (
                         <label className={styles.filter}>
@@ -231,7 +248,7 @@ const TeethSelector = React.memo(({
             )}
 
             {/* Permanent Teeth - Graphical Chart */}
-            {showPermanent && hasPermanentTeeth && (
+            {effShowPermanent && hasPermanentTeeth && (
                 <div className={styles.permanent}>
                     {renderPermanentArch('Upper', false)}
                     {renderPermanentArch('Lower', true)}
@@ -239,7 +256,7 @@ const TeethSelector = React.memo(({
             )}
 
             {/* Deciduous Teeth - Letter Grid */}
-            {showDeciduous && hasDeciduousTeeth && (
+            {effShowDeciduous && hasDeciduousTeeth && (
                 <div className={styles.deciduous}>
                     <div className={styles.deciduousLabel}>Deciduous Teeth</div>
                     {renderDeciduousArch('Upper (Primary)', false)}
@@ -248,7 +265,7 @@ const TeethSelector = React.memo(({
             )}
 
             {/* Selected display */}
-            {selectedTeethIds.length > 0 && (
+            {!readOnly && selectedTeethIds.length > 0 && (
                 <div className={styles.selected}>
                     <strong>Selected:</strong> {selectedDisplay}
                     <button

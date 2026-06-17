@@ -1,5 +1,5 @@
-/* Inline treatment-items panel inside an expanded WorkCard.
-   Relocated from the former Work Details modal (WorkComponent.module.css). */
+/* Inline treatment-items panel inside an expanded WorkCard: a header + a
+   stacked list of full WorkDetailItem cards (read / in-place edit). */
 
 .panel {
     margin-bottom: 1rem;
@@ -29,45 +29,12 @@
     gap: 0.5rem;
 }
 
-/* Cap the height so a work with many items doesn't blow out the card; the
-   header row stays pinned while the body scrolls. Horizontal scroll is the
-   narrow-screen fallback (parity with the old modal's table container). */
-.tableContainer {
-    overflow: auto;
-    max-height: 320px;
-}
-
-.table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.table th,
-.table td {
-    padding: 0.625rem 0.75rem;
-    text-align: left;
-    border-bottom: var(--border-width-thin) solid var(--gray-200);
-}
-
-.table th {
-    background: var(--gray-50);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-secondary);
-    font-size: var(--font-size-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    position: sticky;
-    top: 0;
-    z-index: 1;
-}
-
-.table td {
-    font-size: 0.875rem;
-    color: var(--text-primary);
-}
-
-.table tr:hover td {
-    background: var(--surface-hover);
+/* Vertical stack of item cards. Grows naturally so nothing is hidden. */
+.body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
 }
 
 .noData,
@@ -77,46 +44,4 @@
     padding: 1.5rem;
     font-style: italic;
     font-size: 0.875rem;
-}
-
-/* ===== STATUS BADGES ===== */
-
-.statusBadge {
-    display: inline-block;
-    padding: 0.125rem 0.5rem;
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    text-transform: uppercase;
-}
-
-.statusCompleted {
-    background: var(--success-100);
-    color: var(--success-700);
-}
-
-.statusStarted {
-    background: var(--primary-100);
-    color: var(--primary-700);
-}
-
-.statusPending {
-    background: var(--gray-100);
-    color: var(--text-secondary);
-}
-
-.teethBadge {
-    display: inline-block;
-    padding: 2px 8px;
-    background: var(--primary-50);
-    color: var(--primary-700);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-}
-
-.actionButtons {
-    display: flex;
-    gap: var(--spacing-xs);
-    flex-wrap: wrap;
 }

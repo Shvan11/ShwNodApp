@@ -6,7 +6,12 @@
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     transition: all 0.2s ease;
-    border-left: 4px solid transparent;
+    /* Full border demarcates neighbouring cards where the shadow can't —
+       especially in dark mode, where --border (night-500) is clearly visible.
+       The inline-start edge keeps the 4px status accent (set by the status
+       classes below); declared after the shorthand so it isn't clobbered. */
+    border: var(--border-width-thin) solid var(--border);
+    border-inline-start: 4px solid transparent;
     overflow: visible;
 }
 
@@ -24,16 +29,16 @@
 }
 
 .active {
-    border-left-color: var(--success-500);
+    border-inline-start-color: var(--success-500);
 }
 
 .completed {
-    border-left-color: var(--gray-500);
+    border-inline-start-color: var(--gray-500);
     opacity: 0.85;
 }
 
 .discontinued {
-    border-left-color: var(--warning-color);
+    border-inline-start-color: var(--warning-color);
     opacity: 0.75;
     background: linear-gradient(135deg, var(--surface) 0%, var(--amber-50) 100%);
 }

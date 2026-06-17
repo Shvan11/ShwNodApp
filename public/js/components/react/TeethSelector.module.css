@@ -10,6 +10,19 @@
     -webkit-overflow-scrolling: touch;
 }
 
+/* ===== READ-ONLY (display) MODE ===== */
+/* Non-interactive chart used to visualize a saved item's teeth. Teeth keep
+   their selected highlight but lose hover/cursor/click affordances. */
+.readOnly {
+    padding: var(--spacing-sm);
+}
+
+.readOnly .tooth,
+.readOnly .deciduousBtn {
+    pointer-events: none;
+    cursor: default;
+}
+
 /* ===== FILTER TOGGLES ===== */
 .filters {
     display: flex;

@@ -1,0 +1,172 @@
+/* One treatment item inside an expanded WorkCard: a read-only "full" card that
+   flips to an in-place editable form. Mirrors the former detail-form modal. */
+
+.card {
+    position: relative;
+    border: var(--border-width-thin) solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    padding: var(--spacing-md);
+}
+
+/* ===== READ MODE ===== */
+
+.cardActions {
+    position: absolute;
+    top: var(--spacing-sm);
+    inset-inline-end: var(--spacing-sm);
+    display: flex;
+    gap: var(--spacing-xs);
+    z-index: 1;
+}
+
+.chartBlock {
+    margin-bottom: var(--spacing-md);
+}
+
+.fieldGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--spacing-sm) var(--spacing-md);
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.fieldFull {
+    grid-column: 1 / -1;
+}
+
+.fieldLabel {
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-secondary);
+}
+
+.fieldValue {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+}
+
+.teethBadge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--primary-50);
+    color: var(--primary-700);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+/* ===== STATUS BADGES ===== */
+
+.statusBadge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+}
+
+.statusCompleted {
+    background: var(--success-100);
+    color: var(--success-700);
+}
+
+.statusStarted {
+    background: var(--primary-100);
+    color: var(--primary-700);
+}
+
+.statusPending {
+    background: var(--gray-100);
+    color: var(--text-secondary);
+}
+
+/* ===== EDIT MODE ===== */
+
+.editCard {
+    border-color: var(--primary-300);
+    box-shadow: 0 0 0 2px var(--primary-alpha);
+}
+
+.editTitle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 0.9375rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-md);
+}
+
+.editTitle i {
+    color: var(--primary-color);
+}
+
+.formRow {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.formGroup {
+    display: flex;
+    flex-direction: column;
+}
+
+.fullWidth {
+    grid-column: 1 / -1;
+    margin-bottom: var(--spacing-md);
+}
+
+.formGroup label,
+.formLabel {
+    font-weight: var(--font-weight-medium);
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+    font-size: 0.875rem;
+}
+
+.formGroup input,
+.formGroup select,
+.formGroup textarea {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: var(--border-width-thin) solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    background: var(--surface);
+    color: var(--text-primary);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.formGroup input:focus,
+.formGroup select:focus,
+.formGroup textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px var(--primary-alpha);
+}
+
+.formGroup textarea {
+    resize: vertical;
+    min-height: 70px;
+}
+
+.formActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: var(--border-width-thin) solid var(--border-light);
+}
