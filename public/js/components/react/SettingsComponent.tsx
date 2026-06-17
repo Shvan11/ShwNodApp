@@ -22,6 +22,7 @@ import CalendarTimesSettings from './CalendarTimesSettings';
 import SupabaseStatusSettings from './SupabaseStatusSettings';
 import DolphinStatusSettings from './DolphinStatusSettings';
 import IntegrationsSettings from './IntegrationsSettings';
+import DatabaseBackupSettings from './DatabaseBackupSettings';
 
 // Types
 interface SettingsTabComponentProps {
@@ -74,6 +75,7 @@ const SettingsComponent: React.FC = () => {
         supabaseStatus: { hasChanges: false },
         dolphinStatus: { hasChanges: false },
         integrations: { hasChanges: false },
+        databaseBackup: { hasChanges: false },
         messaging: { hasChanges: false },
         system: { hasChanges: false },
         security: { hasChanges: false },
@@ -95,6 +97,13 @@ const SettingsComponent: React.FC = () => {
             icon: 'fas fa-database',
             component: DatabaseSettings,
             description: 'Database connection and configuration'
+        },
+        {
+            id: 'databaseBackup',
+            label: 'Database Backup',
+            icon: 'fas fa-download',
+            component: DatabaseBackupSettings,
+            description: 'Download a full backup of this clinic\'s database'
         },
         {
             id: 'protocolHandlers',

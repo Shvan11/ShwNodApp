@@ -167,7 +167,7 @@ export async function getDailyAppointmentsOptimized(
     .where('a.app_day', '=', sql<string>`${dateStr}::date`)
     .select([
       'a.appointment_id', 'a.person_id', 'a.app_detail', 'a.present', 'a.seated', 'a.dismissed',
-      'a.app_date', 'a.app_cost', 'a.dr_id', 'p.patient_name', 'pt.patient_type',
+      'a.app_date', 'a.app_cost', 'a.dr_id', 'p.patient_name', 'pt.patient_type', 'pt.patient_type_name_ar',
       sql<boolean>`EXISTS(SELECT 1 FROM "alerts" al WHERE al."person_id"=p."person_id" AND al."status"='active' AND (al."expires_at" IS NULL OR al."expires_at" >= CURRENT_DATE))`.as('hasActiveAlert'),
       sql<boolean>`COALESCE((SELECT (w."type_of_work" IN (1,2,11,19,20)) FROM "works" w WHERE w."person_id"=a."person_id" AND w."status"=1 LIMIT 1), false)`.as('isOrthoVisit'),
       sql<boolean>`EXISTS(SELECT 1 FROM "works" w2 JOIN "visits" vis ON vis."work_id"=w2."work_id" WHERE w2."person_id"=a."person_id" AND vis."visit_date"=${dateStr}::date)`.as('hasVisit'),
@@ -201,6 +201,7 @@ export async function getDailyAppointmentsOptimized(
       app_detail: r.app_detail,
       app_date: r.appDate,
       patient_type: r.patient_type,
+      patient_type_name_ar: r.patient_type_name_ar,
       patient_name: r.patient_name,
       hasActiveAlert: r.hasActiveAlert,
       apptime: r.apptime,
@@ -223,6 +224,7 @@ export async function getDailyAppointmentsOptimized(
       app_cost: r.app_cost,
       apptime: r.apptime,
       patient_type: r.patient_type,
+      patient_type_name_ar: r.patient_type_name_ar,
       patient_name: r.patient_name,
       hasActiveAlert: r.hasActiveAlert,
       has_visit: r.hasVisit,

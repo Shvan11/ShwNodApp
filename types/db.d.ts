@@ -488,6 +488,7 @@ export interface Patients {
 export interface PatientTypes {
   id: Generated<number>;
   patient_type: string | null;
+  patient_type_name_ar: string | null;
 }
 
 export interface Pgmigrations {

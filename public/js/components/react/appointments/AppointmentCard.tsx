@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import type { DoctorColor } from '../calendar.types';
 import styles from './AppointmentCard.module.css';
 
@@ -9,6 +11,7 @@ export interface DailyAppointment {
     dr_id?: number | null;
     patient_name?: string;
     patient_type?: string | null;
+    patient_type_name_ar?: string | null;
     Phone?: string | null;
     apptime?: string | null;
     app_detail?: string | null;
@@ -61,7 +64,11 @@ const AppointmentCard = ({
     onMarkDismissed,
     onUndoState
 }: AppointmentCardProps) => {
-    // Format SQL Server TIME value (HH:MM:SS) to 12-hour format
+    const { t } = useTranslation('appointments');
+    const localizedName = useLocalizedName();
+
+    // Format SQL Server TIME value (HH:MM:SS) to 12-hour format. Digits stay
+    // Western (product decision); only the AM/PM marker localizes (ص/م in Arabic).
     const formatTime = (timeString: string | null | undefined): string => {
         if (!timeString) return '';
 
@@ -70,7 +77,7 @@ const AppointmentCard = ({
 
         let hours = parseInt(timeParts[0]);
         const minutes = timeParts[1];
-        const period = hours >= 12 ? 'PM' : 'AM';
+        const period = hours >= 12 ? t('card.pm') : t('card.am');
 
         hours = hours % 12;
         hours = hours ? hours : 12; // 0 should be 12
@@ -78,7 +85,9 @@ const AppointmentCard = ({
         return `${hours}:${minutes} ${period}`;
     };
 
-    // Determine current status
+    // Determine current status. NOTE: the returned values are logical/CSS keys
+    // (drive `data-status` selectors + the `=== 'Checked In'` checks below), NOT
+    // visible text — so they stay English and are deliberately not translated.
     const getCurrentStatus = (): string => {
         if (!showStatus) {
             return appointment.present || appointment.seated || appointment.dismissed ? 'Checked In' : 'Scheduled';
@@ -140,7 +149,7 @@ const AppointmentCard = ({
                             onCheckIn(appointmentId);
                         }
                     }}
-                    title={isCheckedIn ? "Checked In" : "Click to Check In"}
+                    title={isCheckedIn ? t('actions.checkedIn') : t('actions.clickToCheckIn')}
                 >
                     <i className="fas fa-user-check"></i>
                 </button>
@@ -172,7 +181,7 @@ const AppointmentCard = ({
                                 onUndoState(appointmentId, 'present');
                             }
                         }}
-                        title={canUndoPresent ? `Checked In: ${presentTime} - Click to undo` : (isSeated ? "Cannot undo: Patient is already seated" : "Cannot undo: Visit is completed")}
+                        title={canUndoPresent ? t('actions.checkedInUndo', { time: presentTime }) : (isSeated ? t('actions.cannotUndoSeated') : t('actions.cannotUndoCompleted'))}
                         disabled={!canUndoPresent}
                     >
                         <i className="fas fa-user-check"></i>
@@ -192,12 +201,12 @@ const AppointmentCard = ({
                                 onMarkSeated(appointmentId);
                             }
                         }}
-                        title={isSeated ? (canUndoSeated ? `Seated: ${seatedTime} - Click to undo` : "Cannot undo: Visit is completed") : "Click to Seat Patient"}
+                        title={isSeated ? (canUndoSeated ? t('actions.seatedUndo', { time: seatedTime }) : t('actions.cannotUndoCompleted')) : t('actions.clickToSeat')}
                         disabled={Boolean(isSeated && !canUndoSeated)}
                     >
                         <img
                             src={isSeated ? "/images/dental_chair.svg" : "/images/dental_chair_grey.svg"}
-                            alt="Seat"
+                            alt={t('card.seatAlt')}
                             className={styles.chairIcon}
                         />
                         {seatedTime && <span className={styles.statusTime}>{seatedTime}</span>}
@@ -216,7 +225,7 @@ const AppointmentCard = ({
                                 onMarkDismissed(appointmentId);
                             }
                         }}
-                        title={isDismissed ? `Completed: ${dismissedTime} - Click to undo` : (isSeated ? "Click to Complete Visit" : "Not seated yet")}
+                        title={isDismissed ? t('actions.completedUndo', { time: dismissedTime }) : (isSeated ? t('actions.clickToComplete') : t('actions.notSeatedYet'))}
                         disabled={!isSeated && !isDismissed}
                     >
                         <i className="fas fa-check-circle"></i>
@@ -240,7 +249,7 @@ const AppointmentCard = ({
             data-status={statusClass}
         >
             <div className={styles.time}>
-                {appointment.apptime || 'N/A'}
+                {appointment.apptime || t('card.noTime')}
             </div>
 
             <div className={styles.info}>
@@ -251,10 +260,10 @@ const AppointmentCard = ({
                             className={styles.patientLink}
                             onClick={handlePatientClick}
                         >
-                            {appointment.patient_name || 'Unknown'}
+                            {appointment.patient_name || t('card.unknownPatient')}
                         </a>
                         {appointment.hasActiveAlert && (
-                            <i className={`fas fa-bell ${styles.alertIcon}`} title="Patient has an active alert"></i>
+                            <i className={`fas fa-bell ${styles.alertIcon}`} title={t('card.activeAlert')}></i>
                         )}
                         {/* "Active" is the overwhelming default — badging it on every
                             row is noise. Only surface the exceptional types (New,
@@ -262,7 +271,7 @@ const AppointmentCard = ({
                         {appointment.patient_type && appointment.patient_type.toLowerCase() !== 'active' && (
                             <span className={styles.patientTypeBadge}>
                                 <i className="fas fa-tag"></i>
-                                {appointment.patient_type}
+                                {localizedName(appointment.patient_type, appointment.patient_type_name_ar)}
                             </span>
                         )}
                     </div>
@@ -279,8 +288,8 @@ const AppointmentCard = ({
                                 borderColor: doctorColor.edge,
                                 color: doctorColor.edge
                             } : undefined}
-                            title={`Doctor: ${doctorName}`}
-                            aria-label={`Doctor: ${doctorName}`}
+                            title={t('card.doctor', { name: doctorName })}
+                            aria-label={t('card.doctor', { name: doctorName })}
                         >
                             <i className="fas fa-user-md" aria-hidden="true"></i>
                         </span>
@@ -291,7 +300,7 @@ const AppointmentCard = ({
                     <div className={styles.infoLine2}>
                         <span
                             className={appointment.has_visit ? styles.visitNotesRegistered : styles.visitNotesMissing}
-                            title={appointment.has_visit ? 'Visit notes registered ✓' : 'No visit notes yet'}
+                            title={appointment.has_visit ? t('card.visitNotesRegistered') : t('card.noVisitNotes')}
                         >
                             <i className={`fas fa-${appointment.has_visit ? 'clipboard-check' : 'clipboard'}`}></i>
                         </span>

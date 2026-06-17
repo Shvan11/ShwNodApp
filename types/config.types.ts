@@ -171,6 +171,8 @@ export interface AppConfig {
   urls: UrlConfig;
   webceph: WebCephConfig;
   localsend: LocalSendConfig;
+  /** Path to the `pg_dump` binary for the database-backup download (defaults to 'pg_dump' on PATH). */
+  pgDumpPath: string;
   cs_export?: string;
   gram_session?: string;
 }

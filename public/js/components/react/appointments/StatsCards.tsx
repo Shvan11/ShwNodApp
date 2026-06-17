@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import styles from './StatsCards.module.css';
 
 interface StatsCardsProps {
@@ -25,6 +26,7 @@ interface StatValues {
  * No manual memoization needed - the compiler handles it automatically.
  */
 const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0, variant = 'cards' }: StatsCardsProps) => {
+    const { t } = useTranslation('appointments');
     const [animatedTotal, setAnimatedTotal] = useState<number>(0);
     const [animatedCheckedIn, setAnimatedCheckedIn] = useState<number>(0);
     const [animatedAbsent, setAnimatedAbsent] = useState<number>(0);
@@ -92,7 +94,7 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0, variant
     const isHeader = variant === 'header';
     const containerClass = isHeader ? styles.headerContainer : styles.container;
     // "Total Appointments" is too wide for the inline header chip — trim it there.
-    const totalLabel = isHeader ? 'Total' : 'Total Appointments';
+    const totalLabel = isHeader ? t('stats.total') : t('stats.totalAppointments');
 
     return (
         <div className={containerClass}>
@@ -111,7 +113,7 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0, variant
                     <i className="fas fa-user-check"></i>
                 </div>
                 <div className={styles.content}>
-                    <div className={styles.label}>Checked In</div>
+                    <div className={styles.label}>{t('stats.checkedIn')}</div>
                     <div className={styles.value}>{isNaN(animatedCheckedIn) ? 0 : animatedCheckedIn}</div>
                 </div>
             </div>
@@ -121,7 +123,7 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0, variant
                     <i className="fas fa-user-clock"></i>
                 </div>
                 <div className={styles.content}>
-                    <div className={styles.label}>Remaining</div>
+                    <div className={styles.label}>{t('stats.remaining')}</div>
                     <div className={styles.value}>{isNaN(animatedAbsent) ? 0 : animatedAbsent}</div>
                 </div>
             </div>
@@ -131,7 +133,7 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0, variant
                     <i className="fas fa-clock"></i>
                 </div>
                 <div className={styles.content}>
-                    <div className={styles.label}>Waiting</div>
+                    <div className={styles.label}>{t('stats.waiting')}</div>
                     <div className={styles.value}>{isNaN(animatedWaiting) ? 0 : animatedWaiting}</div>
                 </div>
             </div>

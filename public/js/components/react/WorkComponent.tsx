@@ -2,6 +2,7 @@ import React, { useState, useMemo, type FormEvent, type ChangeEvent } from 'reac
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import WorkCard, { type Work, type WorkStatus } from './WorkCard';
+import { type WorkDetail } from './WorkDetailsPanel';
 import PaymentModal from './PaymentModal';
 import TransferWorkModal from './TransferWorkModal';
 import Modal from './Modal';
@@ -25,7 +26,6 @@ import {
     hasAppointmentQuery,
     teethQuery,
     implantManufacturersQuery,
-    workDetailsListQuery,
     paymentHistoryQuery,
 } from '@/query/queries';
 import {
@@ -48,29 +48,6 @@ interface PatientInfo {
         alertSeverity: number;
         alertDetails: string;
     };
-}
-
-interface WorkDetail {
-    id: number;
-    work_id: number;
-    TeethIds?: number[];
-    Teeth?: string;
-    ImplantManufacturerName?: string;
-    filling_type?: string;
-    filling_depth?: string;
-    canals_no?: number;
-    working_length?: string;
-    implant_length?: number;
-    implant_diameter?: number;
-    implant_manufacturer_id?: number;
-    material?: string;
-    lab_name?: string;
-    item_cost?: number;
-    start_date?: string;
-    completed_date?: string;
-    note?: string;
-    // Allow dynamic access for work type display fields
-    [key: string]: string | number | number[] | undefined;
 }
 
 interface DetailFormData {
@@ -174,7 +151,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'discontinued'>('all');
-    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    // selectedWork is the work whose treatment-item form modal is open (set by add/edit).
     const [selectedWork, setSelectedWork] = useState<Work | null>(null);
     const [showDetailForm, setShowDetailForm] = useState(false);
     const [editingDetail, setEditingDetail] = useState<WorkDetail | null>(null);
@@ -185,13 +162,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
     const [selectedWorkForPayment, setSelectedWorkForPayment] = useState<Work | null>(null);
 
-    // Work-detail rows (View Details modal) and payment history (Payment History
-    // modal) read on useQuery, each gated to its open modal + selected work.
-    const { data: workDetailsData } = useQuery({
-        ...workDetailsListQuery(selectedWork?.work_id ?? 0),
-        enabled: showDetailsModal && !!selectedWork,
-    });
-    const workDetails = (workDetailsData ?? []) as WorkDetail[];
+    // Payment history read on useQuery, gated to its open modal + selected work.
+    // (Work-detail rows now load inside each WorkCard's inline WorkDetailsPanel.)
     const { data: paymentHistoryData, isLoading: loadingPayments } = useQuery({
         ...paymentHistoryQuery(selectedWorkForPayment?.work_id ?? 0),
         enabled: showPaymentHistoryModal && !!selectedWorkForPayment,
@@ -442,21 +414,15 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         toast.success('Work transferred successfully to another patient');
     };
 
-    const handleViewDetails = (work: Work) => {
-        setSelectedWork(work);
-        setShowDetailsModal(true);
-        // The work-details query (gated on the open modal + selectedWork) loads itself.
-    };
-
-    // Refresh the detail rows for the work currently shown in the details modal.
+    // Refresh a work's detail rows — shared key, so the card's inline panel updates too.
     const reloadWorkDetails = (workId: number) =>
         queryClient.invalidateQueries({ queryKey: qk.work.detailsList(workId) });
 
-    const handleAddDetail = () => {
-        if (!selectedWork) return;
+    const handleAddDetail = (work: Work) => {
+        setSelectedWork(work);
         setEditingDetail(null);
         setDetailFormData({
-            work_id: selectedWork.work_id,
+            work_id: work.work_id,
             TeethIds: [],
             filling_type: '',
             filling_depth: '',
@@ -476,7 +442,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         setShowDetailForm(true);
     };
 
-    const handleEditDetail = (detail: WorkDetail) => {
+    const handleEditDetail = (work: Work, detail: WorkDetail) => {
+        setSelectedWork(work);
         setEditingDetail(detail);
         setDetailFormData({
             work_id: detail.work_id,
@@ -518,15 +485,12 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         }
     };
 
-    const handleDeleteDetail = async (detailId: number) => {
+    const handleDeleteDetail = async (detailId: number, workId: number) => {
         if (!await confirm('Are you sure you want to delete this work detail?', { title: 'Delete Work Detail', danger: true, confirmText: 'Delete' })) return;
 
         try {
             await deleteJSON('/api/deleteworkdetail', { body: JSON.stringify({ detailId }) });
-
-            if (selectedWork) {
-                await reloadWorkDetails(selectedWork.work_id);
-            }
+            await reloadWorkDetails(workId);
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to delete work detail'), 5000);
         }
@@ -766,7 +730,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         isExpanded={expandedWorks.has(work.work_id)}
                         isAdmin={isAdmin}
                         onToggleExpanded={() => toggleWorkExpanded(work.work_id)}
-                        onViewDetails={handleViewDetails}
+                        onAddDetail={handleAddDetail}
+                        onEditDetail={handleEditDetail}
+                        onDeleteDetail={handleDeleteDetail}
                         onEdit={handleEditWork}
                         onDelete={handleDeleteWork}
                         onTransfer={handleTransferWork}
@@ -796,119 +762,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     </div>
                 )}
             </div>
-
-            {/* Work Details Modal */}
-            {showDetailsModal && selectedWork && (
-                <Modal
-                    isOpen={true}
-                    onClose={() => setShowDetailsModal(false)}
-                    contentClassName={`${styles.modal} ${styles.detailsModal}`}
-                    ariaLabelledBy="work-details-modal-title"
-                >
-                        <ModalHeader
-                            title={`Work Details - ${selectedWork.type_name || 'Work #' + selectedWork.work_id}`}
-                            titleId="work-details-modal-title"
-                            icon={<i className="fas fa-clipboard-list" />}
-                            onClose={() => setShowDetailsModal(false)}
-                        />
-
-                        <div className={styles.detailsContent}>
-                            <div className={styles.summaryInfo}>
-                                <h4 className={styles.referenceSection}>
-                                    <i className="fas fa-info-circle"></i> Reference Information
-                                </h4>
-                                <div className={styles.infoGrid}>
-                                    <div className={styles.infoItem}>
-                                        <span>Work ID:</span>
-                                        <span className={styles.workId}>{selectedWork.work_id}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className={styles.detailsSection}>
-                                <div className={styles.sectionHeader}>
-                                    <h4>
-                                        <i className={getWorkTypeConfig(selectedWork.type_of_work).icon}></i>
-                                        {' '}{getWorkTypeConfig(selectedWork.type_of_work).name} Details
-                                    </h4>
-                                    <button
-                                        onClick={handleAddDetail}
-                                        className="btn btn-sm btn-primary"
-                                    >
-                                        <i className="fas fa-plus"></i> Add Item
-                                    </button>
-                                </div>
-
-                                <div className={styles.detailsTableContainer}>
-                                    <table className={styles.detailsTable}>
-                                        <thead>
-                                            <tr>
-                                                {getWorkTypeConfig(selectedWork.type_of_work).displayFields.map((field: { key: string; label: string }) => (
-                                                    <th key={field.key}>{field.label}</th>
-                                                ))}
-                                                <th>Status</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {workDetails.map((detail) => (
-                                                <tr key={detail.id}>
-                                                    {getWorkTypeConfig(selectedWork.type_of_work).displayFields.map((field: { key: string; label: string }) => (
-                                                        <td key={field.key}>
-                                                            {field.key === 'Teeth' ? (
-                                                                <span className={styles.teethBadge}>{detail.Teeth || '-'}</span>
-                                                            ) : field.key === 'canals_no' ? (
-                                                                detail.canals_no ? `${detail.canals_no} canal${detail.canals_no > 1 ? 's' : ''}` : '-'
-                                                            ) : field.key === 'implant_length' || field.key === 'implant_diameter' ? (
-                                                                detail[field.key] ? `${detail[field.key]} mm` : '-'
-                                                            ) : (
-                                                                detail[field.key] || '-'
-                                                            )}
-                                                        </td>
-                                                    ))}
-                                                    <td>
-                                                        {detail.completed_date ? (
-                                                            <span className={`${styles.statusBadge} ${styles.statusCompleted}`}>Completed</span>
-                                                        ) : detail.start_date ? (
-                                                            <span className={`${styles.statusBadge} ${styles.statusStarted}`}>Started</span>
-                                                        ) : (
-                                                            <span className={`${styles.statusBadge} ${styles.statusPending}`}>Pending</span>
-                                                        )}
-                                                    </td>
-                                                    <td>
-                                                        <div className={styles.actionButtons}>
-                                                            <button
-                                                                onClick={() => handleEditDetail(detail)}
-                                                                className="btn btn-xs btn-secondary"
-                                                                title="Edit"
-                                                            >
-                                                                <i className="fas fa-edit"></i>
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteDetail(detail.id)}
-                                                                className="btn btn-xs btn-danger"
-                                                                title="Delete"
-                                                            >
-                                                                <i className="fas fa-trash"></i>
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {workDetails.length === 0 && (
-                                                <tr>
-                                                    <td colSpan={getWorkTypeConfig(selectedWork.type_of_work).displayFields.length + 2} className={styles.noData}>
-                                                        No treatment items recorded yet
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                </Modal>
-            )}
 
             {/* Work Detail Form Modal */}
             {showDetailForm && selectedWork && (

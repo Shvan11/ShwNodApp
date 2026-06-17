@@ -20,6 +20,7 @@ import DatabaseConfigService from '../../services/config/DatabaseConfigService.j
 import { sendSuccess, sendData, ErrorResponses } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import { log } from '../../utils/logger.js';
+import { spawnPgDump, backupFilename } from '../../services/database/backup.js';
 import * as settings from '../../shared/contracts/settings.contract.js';
 
 const router = Router();
@@ -307,6 +308,87 @@ router.get(
     }
   }
 );
+
+/**
+ * Download a full database backup.
+ * GET /api/config/database/backup
+ *
+ * Runs `pg_dump -Fc` and pipes its stdout straight to the response as a downloadable
+ * `.dump` file (nothing is kept on the server). Deliberately RAW — a binary stream, so
+ * no envelope/contract here (cf. the PDF/video download routes). Available to any
+ * logged-in staff user (the /api mount is already auth-gated); a backup is read-only and
+ * non-destructive. WARNING: the dump is unencrypted and contains patient data.
+ *
+ * Response headers are delayed until pg_dump's first stdout byte, so an early failure
+ * (binary missing, auth/connection error) returns a clean JSON 500 instead of a corrupt
+ * download. A failure *after* bytes have streamed truncates the response (res.destroy)
+ * to signal the client that the file is incomplete.
+ */
+router.get('/config/database/backup', (req: Request, res: Response): void => {
+  // A dump can exceed the global 30s request timeout on a large DB — opt this stream out.
+  req.setTimeout(0);
+  res.setTimeout(0);
+
+  const child = spawnPgDump();
+  let stderr = '';
+  let headersSent = false;
+
+  // Retain a bounded slice of stderr so a chatty failure can't grow unbounded.
+  child.stderr.on('data', (chunk: Buffer) => {
+    if (stderr.length < 8192) stderr += chunk.toString();
+  });
+
+  // Commit to a download response on the first stdout chunk. Removing this bootstrap
+  // listener returns the stream to paused mode, so no bytes are dropped before pipe().
+  const onFirstData = (firstChunk: Buffer): void => {
+    child.stdout.removeListener('data', onFirstData);
+    headersSent = true;
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${backupFilename(new Date())}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.write(firstChunk);
+    child.stdout.pipe(res);
+  };
+  child.stdout.on('data', onFirstData);
+
+  // Spawn-level failure (e.g. pg_dump binary not found / PG_DUMP_PATH wrong).
+  child.on('error', (err: Error) => {
+    log.error('Database backup failed to start', { error: err.message });
+    if (!res.headersSent) {
+      ErrorResponses.internalError(
+        res,
+        'Backup failed to start — is pg_dump installed and PG_DUMP_PATH correct?'
+      );
+    } else {
+      res.destroy();
+    }
+  });
+
+  child.on('exit', (code: number | null) => {
+    if (code === 0) {
+      log.info('Database backup completed');
+      // pipe() ends the response on stdout 'end'. A custom-format archive always has a
+      // header, so headers should be set by now; guard the impossible no-output case.
+      if (!headersSent && !res.headersSent) {
+        ErrorResponses.internalError(res, 'Backup produced no output');
+      }
+      return;
+    }
+    log.error('Database backup failed', { exitCode: code, stderr: stderr.trim() });
+    if (!res.headersSent) {
+      const detail = stderr.trim() || `pg_dump exit code ${code}`;
+      ErrorResponses.internalError(res, `Backup failed: ${detail}`);
+    } else {
+      // Headers already flushed mid-stream — truncate so the client sees an incomplete file.
+      res.destroy();
+    }
+  });
+
+  // Client navigated away / cancelled the download — stop pg_dump.
+  req.on('close', () => {
+    if (child.exitCode === null && !child.killed) child.kill();
+  });
+});
 
 // ===== SYSTEM MANAGEMENT ENDPOINTS =====
 

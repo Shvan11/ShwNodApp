@@ -226,7 +226,15 @@ export default [
       'public/js/components/expenses/ExpenseTable.tsx',
       'public/js/components/expenses/ExpenseSummary.tsx',
       'public/js/components/expenses/ExpenseModal.tsx',
-      'public/js/components/expenses/DeleteConfirmModal.tsx'
+      'public/js/components/expenses/DeleteConfirmModal.tsx',
+      'public/js/components/react/appointments/DailyAppointments.tsx',
+      'public/js/components/react/appointments/AppointmentsHeader.tsx',
+      'public/js/components/react/appointments/AppointmentsList.tsx',
+      'public/js/components/react/appointments/AppointmentCard.tsx',
+      'public/js/components/react/appointments/StatsCards.tsx',
+      'public/js/components/react/appointments/ConnectionStatus.tsx',
+      'public/js/components/react/appointments/DoctorFilterSelect.tsx',
+      'public/js/components/react/appointments/MobileViewToggle.tsx'
     ],
     plugins: {
       i18next

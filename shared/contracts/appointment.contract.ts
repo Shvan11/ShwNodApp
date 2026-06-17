@@ -30,6 +30,10 @@ const appointmentRowSchema = z.looseObject({
   // Assigned doctor (employees.id), nullable — drives the daily page's doctor
   // filter + per-doctor card tint. The rest of the row rides the looseObject tail.
   dr_id: z.number().nullable().optional(),
+  // Patient-type lookup: base value + its optional Arabic display name (clinic-
+  // owned, edited via the Lookups admin). The card picks one via useLocalizedName.
+  patient_type: z.string().nullable().optional(),
+  patient_type_name_ar: z.string().nullable().optional(),
 });
 
 const appointmentStatsSchema = z.object({

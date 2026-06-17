@@ -2,6 +2,7 @@ import { useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import cn from 'classnames';
 import { isOrthoWork, needsDetails } from '../../config/workTypeConfig';
+import WorkDetailsPanel, { type WorkDetail } from './WorkDetailsPanel';
 import styles from './WorkCard.module.css';
 
 export interface Work {
@@ -44,7 +45,9 @@ interface WorkCardProps {
     isExpanded: boolean;
     isAdmin?: boolean;
     onToggleExpanded: () => void;
-    onViewDetails: (work: Work) => void;
+    onAddDetail: (work: Work) => void;
+    onEditDetail: (work: Work, detail: WorkDetail) => void;
+    onDeleteDetail: (detailId: number, workId: number) => void;
     onEdit: (work: Work) => void;
     onDelete: (work: Work) => void;
     onTransfer?: (work: Work) => void;
@@ -70,7 +73,9 @@ const WorkCard = ({
     isExpanded,
     isAdmin = false,
     onToggleExpanded,
-    onViewDetails,
+    onAddDetail,
+    onEditDetail,
+    onDeleteDetail,
     onEdit,
     onDelete,
     onTransfer,
@@ -287,6 +292,17 @@ const WorkCard = ({
                         </div>
                     )}
 
+                    {/* Treatment items — inline panel for non-ortho works that track procedure rows */}
+                    {needsDetails(work.type_of_work) && (
+                        <WorkDetailsPanel
+                            workId={work.work_id}
+                            typeOfWork={work.type_of_work}
+                            onAdd={() => onAddDetail(work)}
+                            onEdit={(detail) => onEditDetail(work, detail)}
+                            onDelete={(detailId) => onDeleteDetail(detailId, work.work_id)}
+                        />
+                    )}
+
                     {/* Primary Actions - Conditionally show based on work type */}
                     <div className={styles.primaryActions}>
                         {/* Visits & Diagnosis only for ortho-related works */}
@@ -333,18 +349,6 @@ const WorkCard = ({
                             <span>Payments</span>
                         </button>
 
-                        {/* Details only for non-ortho works that need treatment items */}
-                        {needsDetails(work.type_of_work) && (
-                            <button
-                                type="button"
-                                className="btn btn-card-action btn-details"
-                                onClick={() => onViewDetails(work)}
-                                title="View treatment details"
-                            >
-                                <i className="fas fa-list-alt"></i>
-                                <span>Details</span>
-                            </button>
-                        )}
                     </div>
 
                     {/* Secondary Actions */}

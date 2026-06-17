@@ -1,8 +1,10 @@
 import { type ChangeEvent, type MouseEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import ConnectionStatus, { type ConnectionStatusType, type FreshnessType } from './ConnectionStatus';
 import StatsCards from './StatsCards';
 import DoctorFilterSelect from './DoctorFilterSelect';
 import type { LegendDoctor } from '../calendar.types';
+import { getActiveLanguageMeta } from '../../../core/language';
 import styles from './AppointmentsHeader.module.css';
 
 // Doctor-filter selection: a specific doctor (employees.id) or every doctor.
@@ -51,11 +53,15 @@ const AppointmentsHeader = ({
     showFlash,
     stats
 }: AppointmentsHeaderProps) => {
-    // Compact, weekday-prefixed date — e.g. "Sat, 13-6-2026".
+    const { t } = useTranslation('appointments');
+
+    // Compact, weekday-prefixed date — e.g. "Sat, 13-6-2026" / "السبت, 13-6-2026".
+    // The weekday localizes to the active language; day/month/year stay Western
+    // digits (the active locale pins Latin numerals — see core/language.ts).
     const formatShortDate = (dateString: string): string => {
-        if (!dateString) return 'Today';
+        if (!dateString) return t('header.today');
         const date = new Date(dateString + 'T12:00:00'); // noon avoids TZ date-shift
-        const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
+        const weekday = date.toLocaleDateString(getActiveLanguageMeta().locale, { weekday: 'short' });
         return `${weekday}, ${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`;
     };
 
@@ -107,8 +113,8 @@ const AppointmentsHeader = ({
                         type="button"
                         className={styles.dayNavButton}
                         onClick={() => shiftDay(-1)}
-                        title="Previous day"
-                        aria-label="Previous day"
+                        title={t('header.previousDay')}
+                        aria-label={t('header.previousDay')}
                     >
                         <i className="fas fa-chevron-left"></i>
                     </button>
@@ -119,7 +125,7 @@ const AppointmentsHeader = ({
                         <i className={`fas fa-chevron-down ${styles.datePillCaret}`} aria-hidden="true"></i>
                         <input
                             type="date"
-                            aria-label="Select appointment date"
+                            aria-label={t('header.selectDate')}
                             className={styles.datePillInput}
                             value={selectedDate}
                             onChange={handleDateInputChange}
@@ -130,8 +136,8 @@ const AppointmentsHeader = ({
                         type="button"
                         className={styles.dayNavButton}
                         onClick={() => shiftDay(1)}
-                        title="Next day"
-                        aria-label="Next day"
+                        title={t('header.nextDay')}
+                        aria-label={t('header.nextDay')}
                     >
                         <i className="fas fa-chevron-right"></i>
                     </button>
@@ -140,7 +146,7 @@ const AppointmentsHeader = ({
                     className={styles.refreshButton}
                     onClick={onRefresh}
                     disabled={isRefreshing}
-                    title="Jump to today and refresh"
+                    title={t('header.refresh')}
                 >
                     <i className={`fas fa-sync-alt ${isRefreshing ? styles.spinning : ''}`}></i>
                 </button>
@@ -158,7 +164,7 @@ const AppointmentsHeader = ({
                     <input
                         type="text"
                         className={styles.searchInput}
-                        placeholder="Search patient..."
+                        placeholder={t('header.searchPlaceholder')}
                         value={searchTerm}
                         onChange={handleSearchInputChange}
                     />
@@ -166,7 +172,7 @@ const AppointmentsHeader = ({
                         <button
                             className={styles.searchClear}
                             onClick={() => onSearchChange('')}
-                            title="Clear search"
+                            title={t('header.clearSearch')}
                         >
                             <i className="fas fa-times"></i>
                         </button>

@@ -310,87 +310,7 @@
     padding: 1rem;
 }
 
-/* ===== WORK DETAILS CONTENT ===== */
-
-.detailsContent {
-    padding: 1.5rem;
-}
-
-.summaryInfo {
-    background: var(--surface-elevated);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-lg);
-    margin-bottom: var(--spacing-lg);
-    border: var(--border-width-thin) solid var(--border-light);
-}
-
-.summaryInfo h4 {
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-}
-
-.referenceSection {
-    color: var(--indigo-600);
-    border-bottom: var(--border-width-medium) solid var(--indigo-100);
-}
-
-.infoGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.infoItem {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-}
-
-.infoItem label {
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-secondary);
-    display: block;
-    margin-bottom: 0.25rem;
-}
-
-.infoItem span {
-    font-size: 1rem;
-    color: var(--text-primary);
-    font-weight: var(--font-weight-medium);
-}
-
-.workId {
-    font-family: monospace;
-    font-weight: var(--font-weight-semibold);
-}
-
-/* ===== DETAILS SECTION ===== */
-
-.detailsSection {
-    background: var(--surface);
-    border-radius: var(--radius-md);
-    border: var(--border-width-thin) solid var(--border-light);
-    overflow: hidden;
-}
-
-.sectionHeader {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--spacing-lg);
-    border-bottom: var(--border-width-thin) solid var(--border-light);
-    background: var(--surface-elevated);
-}
-
-.sectionHeader h4 {
-    margin: 0;
-    color: var(--text-primary);
-    font-size: 1.125rem;
-    font-weight: var(--font-weight-semibold);
-}
-
-/* ===== DETAILS TABLE ===== */
+/* ===== DETAILS TABLE (Payment History modal) ===== */
 
 .detailsTableContainer {
     overflow-x: auto;
@@ -431,49 +351,11 @@
     font-style: italic;
 }
 
-/* ===== STATUS BADGES ===== */
-
-.statusBadge {
-    display: inline-block;
-    padding: 0.125rem 0.5rem;
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    text-transform: uppercase;
-}
+/* ===== STATUS BADGE (NewWorkComponent) ===== */
 
 .statusCompleted {
     background: var(--success-100);
     color: var(--success-700);
-}
-
-.statusStarted {
-    background: var(--primary-100);
-    color: var(--primary-700);
-}
-
-.statusPending {
-    background: var(--gray-100);
-    color: var(--text-secondary);
-}
-
-/* Teeth Badge */
-.teethBadge {
-    display: inline-block;
-    padding: 2px 8px;
-    background: var(--primary-50);
-    color: var(--primary-700);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-}
-
-/* ===== ACTION BUTTONS ===== */
-
-.actionButtons {
-    display: flex;
-    gap: var(--spacing-xs);
-    flex-wrap: wrap;
 }
 
 /* ===== DETAIL FORM ===== */
@@ -775,27 +657,12 @@
         max-height: 95vh;
     }
 
-    .infoGrid {
-        grid-template-columns: 1fr;
-    }
-
-    .sectionHeader {
-        flex-direction: column;
-        align-items: stretch;
-        gap: var(--spacing-md);
-    }
-
     .detailsTableContainer {
         overflow-x: auto;
     }
 
     .detailsTable {
         min-width: 600px;
-    }
-
-    .actionButtons {
-        flex-direction: column;
-        gap: var(--spacing-xs);
     }
 
     .formRow {
@@ -834,18 +701,6 @@
 
     .summaryLabelInline {
         font-size: 0.625rem;
-    }
-
-    .detailsContent {
-        padding: var(--spacing-md);
-    }
-
-    .summaryInfo {
-        padding: var(--spacing-md);
-    }
-
-    .sectionHeader {
-        padding: var(--spacing-md);
     }
 
     .detailsTable th,

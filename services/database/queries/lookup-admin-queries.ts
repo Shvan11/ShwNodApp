@@ -118,6 +118,7 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
     idType: 'int',
     columns: [
       { name: 'patient_type', label: 'Patient type', type: 'varchar', maxLength: 50, required: false },
+      { name: 'patient_type_name_ar', label: 'Patient type (Arabic)', type: 'nvarchar', maxLength: 50, required: false },
     ],
   },
   tblTagOptions: {

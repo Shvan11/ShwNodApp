@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import styles from './MobileViewToggle.module.css';
 
 type ViewType = 'all' | 'checked-in';
@@ -16,6 +17,7 @@ interface MobileViewToggleProps {
  * Toggle between "All Appointments" and "Checked-In" views on mobile
  */
 const MobileViewToggle = ({ activeView, onViewChange, allCount, checkedInCount }: MobileViewToggleProps) => {
+    const { t } = useTranslation('appointments');
     return (
         <div className={styles.container}>
             <button
@@ -24,7 +26,7 @@ const MobileViewToggle = ({ activeView, onViewChange, allCount, checkedInCount }
                 onClick={() => onViewChange('all')}
             >
                 <i className="fas fa-calendar-alt"></i>
-                <span>All ({allCount})</span>
+                <span>{t('mobile.all', { count: allCount })}</span>
             </button>
             <button
                 className={activeView === 'checked-in' ? styles.buttonActive : styles.button}
@@ -32,7 +34,7 @@ const MobileViewToggle = ({ activeView, onViewChange, allCount, checkedInCount }
                 onClick={() => onViewChange('checked-in')}
             >
                 <i className="fas fa-user-check"></i>
-                <span>Checked-In ({checkedInCount})</span>
+                <span>{t('mobile.checkedIn', { count: checkedInCount })}</span>
             </button>
         </div>
     );

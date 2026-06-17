@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import type { DoctorFilter } from './AppointmentsHeader';
 import type { LegendDoctor } from '../calendar.types';
@@ -22,6 +23,7 @@ interface DoctorFilterSelectProps {
  * doctor's identity — the same colour that tints the per-card doctor icon.
  */
 const DoctorFilterSelect = ({ doctors, value, onChange }: DoctorFilterSelectProps) => {
+    const { t } = useTranslation('appointments');
     const [open, setOpen] = useState(false);
     const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
 
@@ -77,7 +79,7 @@ const DoctorFilterSelect = ({ doctors, value, onChange }: DoctorFilterSelectProp
                 onClick={toggleOpen}
                 aria-haspopup="listbox"
                 aria-expanded={open}
-                aria-label="Filter by doctor"
+                aria-label={t('filter.byDoctor')}
             >
                 {selectedDoctor ? (
                     <span
@@ -90,7 +92,7 @@ const DoctorFilterSelect = ({ doctors, value, onChange }: DoctorFilterSelectProp
                 ) : (
                     <i className={`fas fa-user-md ${styles.triggerIcon}`} aria-hidden="true" />
                 )}
-                <span className={styles.triggerLabel}>{selectedDoctor ? selectedDoctor.name : 'All doctors'}</span>
+                <span className={styles.triggerLabel}>{selectedDoctor ? selectedDoctor.name : t('filter.allDoctors')}</span>
                 <i className={`fas fa-chevron-down ${styles.caret} ${open ? styles.caretOpen : ''}`} aria-hidden="true" />
             </button>
 
@@ -98,7 +100,7 @@ const DoctorFilterSelect = ({ doctors, value, onChange }: DoctorFilterSelectProp
                 <div
                     className={styles.menu}
                     role="listbox"
-                    aria-label="Filter by doctor"
+                    aria-label={t('filter.byDoctor')}
                     ref={popRef}
                     style={{ position: 'fixed', top: coords.top, left: coords.left, width: coords.width }}
                 >
@@ -110,7 +112,7 @@ const DoctorFilterSelect = ({ doctors, value, onChange }: DoctorFilterSelectProp
                         onClick={() => selectValue('all')}
                     >
                         <i className={`fas fa-user-md ${styles.allIcon}`} aria-hidden="true" />
-                        <span className={styles.optionLabel}>All doctors</span>
+                        <span className={styles.optionLabel}>{t('filter.allDoctors')}</span>
                         {value === 'all' && <i className={`fas fa-check ${styles.check}`} aria-hidden="true" />}
                     </button>
 

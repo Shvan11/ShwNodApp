@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import styles from './ConnectionStatus.module.css';
 
 type ConnectionStatusType = 'connected' | 'disconnected' | 'reconnecting' | 'error' | 'connecting';
@@ -17,6 +18,8 @@ interface ConnectionStatusProps {
  * "Static" because SSE subscriptions don't apply to non-today views.
  */
 const ConnectionStatus = ({ status, freshness, isViewingToday, showFlash = false }: ConnectionStatusProps) => {
+    const { t } = useTranslation('appointments');
+
     type EffectiveState = 'static' | 'live' | 'stale' | 'reconnecting' | 'disconnected' | 'error' | 'connecting';
 
     const effective: EffectiveState = !isViewingToday
@@ -27,13 +30,13 @@ const ConnectionStatus = ({ status, freshness, isViewingToday, showFlash = false
 
     const getStatusText = (): string => {
         switch (effective) {
-            case 'static': return 'Static';
-            case 'live': return 'Live';
-            case 'stale': return 'Stale — Resyncing';
-            case 'disconnected': return 'Offline';
-            case 'reconnecting': return 'Reconnecting...';
-            case 'error': return 'Connection Error';
-            default: return 'Connecting...';
+            case 'static': return t('connection.static');
+            case 'live': return t('connection.live');
+            case 'stale': return t('connection.stale');
+            case 'disconnected': return t('connection.offline');
+            case 'reconnecting': return t('connection.reconnecting');
+            case 'error': return t('connection.error');
+            default: return t('connection.connecting');
         }
     };
 

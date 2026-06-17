@@ -26,10 +26,6 @@
     color: var(--selection-color);
 }
 
-.btn-card-action.btn-details i {
-    color: var(--blue-300);
-}
-
 /* --- Secondary action button modifiers --- */
 
 .btn-card-secondary.btn-add-payment {

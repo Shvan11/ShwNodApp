@@ -39,6 +39,7 @@ const envSchema = z
     PG_DATABASE: z.string().optional(),
     PG_USER: z.string().optional(),
     PG_PASSWORD: z.string().optional(),
+    PG_DUMP_PATH: z.string().optional(),
   })
   .refine(
     (env) => !!env.DATABASE_URL || !!(env.PG_HOST && env.PG_DATABASE && env.PG_USER),
@@ -97,6 +98,11 @@ const config: AppConfig = {
     connectionTimeoutMillis: 30000,
     idleTimeoutMillis: 30000,
   },
+  // Path to the `pg_dump` binary used by the database-backup download. Defaults to
+  // resolving `pg_dump` on PATH (correct on Linux/WSL); Windows prod should set
+  // PG_DUMP_PATH to the install bin, e.g. C:\Program Files\PostgreSQL\18\bin\pg_dump.exe.
+  // NOTE: pg_dump's version must be >= the server's PostgreSQL major version.
+  pgDumpPath: process.env.PG_DUMP_PATH || 'pg_dump',
   telegram: {
     token: process.env.TELEGRAM_TOKEN,
     chatId: process.env.TELEGRAM_CHAT_ID,

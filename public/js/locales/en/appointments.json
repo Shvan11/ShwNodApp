@@ -1,0 +1,68 @@
+{
+  "header": {
+    "today": "Today",
+    "previousDay": "Previous day",
+    "nextDay": "Next day",
+    "selectDate": "Select appointment date",
+    "refresh": "Jump to today and refresh",
+    "searchPlaceholder": "Search patient...",
+    "clearSearch": "Clear search"
+  },
+  "stats": {
+    "total": "Total",
+    "totalAppointments": "Total Appointments",
+    "checkedIn": "Checked In",
+    "remaining": "Remaining",
+    "waiting": "Waiting"
+  },
+  "lists": {
+    "allTitle": "All Appointments",
+    "checkedInTitle": "Checked-In Patients",
+    "noMatching": "No matching patients found.",
+    "noAppointments": "No appointments scheduled for this date.",
+    "noCheckedIn": "No patients checked in yet."
+  },
+  "mobile": {
+    "all": "All ({{count}})",
+    "checkedIn": "Checked-In ({{count}})"
+  },
+  "filter": {
+    "byDoctor": "Filter by doctor",
+    "allDoctors": "All doctors"
+  },
+  "connection": {
+    "static": "Static",
+    "live": "Live",
+    "stale": "Stale — Resyncing",
+    "offline": "Offline",
+    "reconnecting": "Reconnecting...",
+    "error": "Connection Error",
+    "connecting": "Connecting..."
+  },
+  "card": {
+    "unknownPatient": "Unknown",
+    "noTime": "N/A",
+    "activeAlert": "Patient has an active alert",
+    "visitNotesRegistered": "Visit notes registered ✓",
+    "noVisitNotes": "No visit notes yet",
+    "doctor": "Doctor: {{name}}",
+    "seatAlt": "Seat",
+    "am": "AM",
+    "pm": "PM"
+  },
+  "actions": {
+    "checkedIn": "Checked In",
+    "clickToCheckIn": "Click to Check In",
+    "checkedInUndo": "Checked In: {{time}} - Click to undo",
+    "cannotUndoSeated": "Cannot undo: Patient is already seated",
+    "cannotUndoCompleted": "Cannot undo: Visit is completed",
+    "seatedUndo": "Seated: {{time}} - Click to undo",
+    "clickToSeat": "Click to Seat Patient",
+    "completedUndo": "Completed: {{time}} - Click to undo",
+    "clickToComplete": "Click to Complete Visit",
+    "notSeatedYet": "Not seated yet"
+  },
+  "errors": {
+    "failedToLoad": "Failed to load appointments: {{error}}"
+  }
+}

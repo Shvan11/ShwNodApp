@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLoaderData, useSearchParams } from 'react-router-dom';
 import AppointmentsHeader, { type DoctorFilter } from './AppointmentsHeader';
 import MobileViewToggle, { type ViewType } from './MobileViewToggle';
@@ -42,6 +43,8 @@ interface LoaderData {
  * - Native scroll restoration via React Router
  */
 const DailyAppointments = () => {
+    const { t } = useTranslation('appointments');
+
     // 1. Get initial data from loader
     const loaderData = useLoaderData() as LoaderData;
 
@@ -251,7 +254,7 @@ const DailyAppointments = () => {
             <div className={styles.view}>
                 <div className={styles.errorMessage}>
                     <i className="fas fa-exclamation-circle"></i>
-                    Failed to load appointments: {error}
+                    {t('errors.failedToLoad', { error })}
                 </div>
             </div>
         );
@@ -288,7 +291,7 @@ const DailyAppointments = () => {
             {/* Appointments lists */}
             <div className={styles.container}>
                 <AppointmentsList
-                    title="All Appointments"
+                    title={t('lists.allTitle')}
                     appointments={filteredAllAppointments}
                     showStatus={false}
                     loading={loading}
@@ -296,12 +299,12 @@ const DailyAppointments = () => {
                     doctorColors={doctorColors}
                     showDoctorName={showDoctorName}
                     onCheckIn={handleCheckIn}
-                    emptyMessage={searchTerm ? "No matching patients found." : "No appointments scheduled for this date."}
+                    emptyMessage={searchTerm ? t('lists.noMatching') : t('lists.noAppointments')}
                     className={mobileView === 'all' ? 'active-view' : ''}
                 />
 
                 <AppointmentsList
-                    title="Checked-In Patients"
+                    title={t('lists.checkedInTitle')}
                     appointments={filteredCheckedInAppointments}
                     showStatus={true}
                     loading={loading}
@@ -311,7 +314,7 @@ const DailyAppointments = () => {
                     onMarkSeated={handleMarkSeated}
                     onMarkDismissed={handleMarkDismissed}
                     onUndoState={handleUndoState}
-                    emptyMessage={searchTerm ? "No matching patients found." : "No patients checked in yet."}
+                    emptyMessage={searchTerm ? t('lists.noMatching') : t('lists.noCheckedIn')}
                     className={mobileView === 'checked-in' ? 'active-view' : ''}
                 />
             </div>

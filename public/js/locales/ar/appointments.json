@@ -1,0 +1,68 @@
+{
+  "header": {
+    "today": "اليوم",
+    "previousDay": "اليوم السابق",
+    "nextDay": "اليوم التالي",
+    "selectDate": "اختر تاريخ الموعد",
+    "refresh": "الانتقال إلى اليوم والتحديث",
+    "searchPlaceholder": "البحث عن مريض...",
+    "clearSearch": "مسح البحث"
+  },
+  "stats": {
+    "total": "الإجمالي",
+    "totalAppointments": "إجمالي المواعيد",
+    "checkedIn": "الحاضرون",
+    "remaining": "المتبقي",
+    "waiting": "في الانتظار"
+  },
+  "lists": {
+    "allTitle": "جميع المواعيد",
+    "checkedInTitle": "المرضى الحاضرون",
+    "noMatching": "لا يوجد مرضى مطابقون.",
+    "noAppointments": "لا توجد مواعيد محجوزة لهذا التاريخ.",
+    "noCheckedIn": "لم يحضر أي مريض بعد."
+  },
+  "mobile": {
+    "all": "الكل ({{count}})",
+    "checkedIn": "الحاضرون ({{count}})"
+  },
+  "filter": {
+    "byDoctor": "تصفية حسب الطبيب",
+    "allDoctors": "جميع الأطباء"
+  },
+  "connection": {
+    "static": "ثابت",
+    "live": "مباشر",
+    "stale": "قديم — إعادة المزامنة",
+    "offline": "غير متصل",
+    "reconnecting": "إعادة الاتصال...",
+    "error": "خطأ في الاتصال",
+    "connecting": "جارٍ الاتصال..."
+  },
+  "card": {
+    "unknownPatient": "غير معروف",
+    "noTime": "غير محدد",
+    "activeAlert": "لدى المريض تنبيه نشط",
+    "visitNotesRegistered": "تم تسجيل ملاحظات الزيارة ✓",
+    "noVisitNotes": "لا توجد ملاحظات زيارة بعد",
+    "doctor": "الطبيب: {{name}}",
+    "seatAlt": "إجلاس",
+    "am": "ص",
+    "pm": "م"
+  },
+  "actions": {
+    "checkedIn": "تم تسجيل الوصول",
+    "clickToCheckIn": "اضغط لتسجيل الوصول",
+    "checkedInUndo": "تم تسجيل الوصول: {{time}} - اضغط للتراجع",
+    "cannotUndoSeated": "لا يمكن التراجع: تم إجلاس المريض بالفعل",
+    "cannotUndoCompleted": "لا يمكن التراجع: اكتملت الزيارة",
+    "seatedUndo": "تم الإجلاس: {{time}} - اضغط للتراجع",
+    "clickToSeat": "اضغط لإجلاس المريض",
+    "completedUndo": "اكتملت: {{time}} - اضغط للتراجع",
+    "clickToComplete": "اضغط لإنهاء الزيارة",
+    "notSeatedYet": "لم يتم الإجلاس بعد"
+  },
+  "errors": {
+    "failedToLoad": "فشل في تحميل المواعيد: {{error}}"
+  }
+}

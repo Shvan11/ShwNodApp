@@ -17,15 +17,17 @@ import { getStoredLanguagePreference } from '../core/language';
 import enCommon from '../locales/en/common.json';
 import enDashboard from '../locales/en/dashboard.json';
 import enExpenses from '../locales/en/expenses.json';
+import enAppointments from '../locales/en/appointments.json';
 import arCommon from '../locales/ar/common.json';
 import arDashboard from '../locales/ar/dashboard.json';
 import arExpenses from '../locales/ar/expenses.json';
+import arAppointments from '../locales/ar/appointments.json';
 
 export const defaultNS = 'common';
 
 export const resources = {
-  en: { common: enCommon, dashboard: enDashboard, expenses: enExpenses },
-  ar: { common: arCommon, dashboard: arDashboard, expenses: arExpenses },
+  en: { common: enCommon, dashboard: enDashboard, expenses: enExpenses, appointments: enAppointments },
+  ar: { common: arCommon, dashboard: arDashboard, expenses: arExpenses, appointments: arAppointments },
 } as const;
 
 void i18n.use(initReactI18next).init({
@@ -33,7 +35,7 @@ void i18n.use(initReactI18next).init({
   lng: getStoredLanguagePreference(),
   fallbackLng: 'en',
   defaultNS,
-  ns: ['common', 'dashboard', 'expenses'],
+  ns: ['common', 'dashboard', 'expenses', 'appointments'],
   interpolation: { escapeValue: false }, // React escapes for us
   react: { useSuspense: false }, // synchronous resources — never suspend
 });
@@ -46,6 +48,7 @@ const _arCoversEn: {
   common: typeof enCommon;
   dashboard: typeof enDashboard;
   expenses: typeof enExpenses;
+  appointments: typeof enAppointments;
 } = resources.ar;
 void _arCoversEn;
 
