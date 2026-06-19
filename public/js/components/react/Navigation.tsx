@@ -3,6 +3,8 @@ import type { MouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
+import { postJSON, httpErrorMessage } from '@/core/http';
+import * as threeshape from '@shared/contracts/threeshape.contract';
 import PhotoSessionDialog from './PhotoSessionDialog';
 import { patientInfoQuery, patientsFolderQuery, timepointsQuery } from '@/query/queries';
 
@@ -37,6 +39,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
     const moreActionsButtonRef = useRef<HTMLDivElement>(null);
     const [moreActionsFlyoutPosition, setMoreActionsFlyoutPosition] = useState({ bottom: 0 });
     const [showNativePhotoEditor, setShowNativePhotoEditor] = useState(false);
+    const [sendingTo3Shape, setSendingTo3Shape] = useState(false);
     const navigate = useNavigate();
 
     // Check if this is the "new patient" form
@@ -100,24 +103,23 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         }
     };
 
-    const handleOpen3Shape = () => {
+    // Push the patient to 3Shape Unite and start a scan workflow via the Web Service
+    // (server → scanner workstation). Replaces the legacy `tshape:` protocol handler:
+    // no per-client install, and it works from any browser on the LAN.
+    const handleOpen3Shape = async () => {
+        if (!hasPatient || sendingTo3Shape) return;
+        setSendingTo3Shape(true);
         try {
-            const patientName = patientInfo?.patient_name
-                || patientInfo?.patientName
-                || patientInfo?.Name
-                || patientInfo?.name
-                || '';
-            const names = String(patientName).trim().split(' ');
-            const firstName = names[0] || '';
-            const lastName = names.slice(1).join(' ') || '';
-
-            // Use dedicated tshape: protocol handler (named "tshape" because URI schemes must start with a letter)
-            const url = `tshape:${personId}?firstname=${encodeURIComponent(firstName)}&lastname=${encodeURIComponent(lastName)}`;
-            window.location.href = url;
-
+            await postJSON(
+                `/api/threeshape/patients/${personId}/initiate-workflow`,
+                {},
+                { schema: threeshape.initiateWorkflow.response }
+            );
+            toast.success('Sent to 3Shape — start the scan on the scanner');
         } catch (err) {
-            console.error('Error opening 3Shape Unite:', err);
-            toast.error('Failed to open 3Shape Unite: ' + (err instanceof Error ? err.message : 'Unknown error'));
+            toast.error(httpErrorMessage(err, 'Failed to send to 3Shape'));
+        } finally {
+            setSendingTo3Shape(false);
         }
     };
 
@@ -287,7 +289,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                         onMouseLeave={() => setMoreActionsExpanded(false)}
                     >
                         <div
-                            className={`sidebar-nav-item more-actions-btn ${(currentPage === 'compare' || currentPage === 'xrays' || currentPage === 'slideshow') ? 'active' : ''} ${isNewPatient ? 'disabled' : ''}`}
+                            className={`sidebar-nav-item more-actions-btn ${(currentPage === 'compare' || currentPage === 'xrays' || currentPage === 'slideshow' || currentPage === 'scans') ? 'active' : ''} ${isNewPatient ? 'disabled' : ''}`}
                             title={isNewPatient ? "Save patient first to access more actions" : "More Actions"}
                         >
                             <div className="nav-item-icon">
@@ -342,20 +344,31 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                         </Link>
 
                         <Link
+                            to={`/patient/${personId}/scans`}
+                            className={`flyout-action-item ${currentPage === 'scans' ? 'active' : ''}`}
+                            onClick={() => setMoreActionsExpanded(false)}
+                        >
+                            <div className="action-item-icon">
+                                <i className="fas fa-cube" />
+                            </div>
+                            <span className="action-item-label">3D Scans</span>
+                        </Link>
+
+                        <Link
                             to="#"
-                            className={`flyout-action-item ${isNewPatient ? 'disabled' : ''}`}
+                            className={`flyout-action-item ${isNewPatient || sendingTo3Shape ? 'disabled' : ''}`}
                             onClick={(e) => {
                                 e.preventDefault();
-                                if (isNewPatient) return;
-                                handleOpen3Shape();
+                                if (isNewPatient || sendingTo3Shape) return;
+                                void handleOpen3Shape();
                                 setMoreActionsExpanded(false);
                             }}
-                            title={isNewPatient ? "Save patient first" : "Launch 3Shape Unite with patient data"}
+                            title={isNewPatient ? "Save patient first" : "Send patient to 3Shape & start a scan"}
                         >
                             <div className="action-item-icon">
                                 <img src="/images/3Shape_transparent_256x256.png" alt="3Shape" />
                             </div>
-                            <span className="action-item-label">3Shape</span>
+                            <span className="action-item-label">{sendingTo3Shape ? 'Sending…' : '3Shape'}</span>
                         </Link>
 
                         <Link

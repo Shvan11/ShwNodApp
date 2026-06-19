@@ -5,6 +5,7 @@
 import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
+import { validate } from '../../middleware/validate.js';
 import * as reports from '../../shared/contracts/reports.contract.js';
 import {
   calculateMonthlyStatistics,
@@ -16,7 +17,12 @@ import {
   getMonthlyGrandTotals,
   getYearlyMonthlyTotals,
   getDailyInvoices,
+  getDoctorCommissions,
+  getRevenueByWorkType,
+  getRevenueByDoctor,
+  type RevenueBreakdownRow,
 } from '../../services/database/queries/report-queries.js';
+import { getLatestExchangeRate } from '../../services/database/queries/payment-queries.js';
 
 const router = Router();
 
@@ -28,6 +34,25 @@ type StatisticsQuery = reports.StatisticsQuery;
 type YearlyStatisticsQuery = reports.YearlyStatisticsQuery;
 type MultiYearStatisticsQuery = reports.MultiYearStatisticsQuery;
 type DailyInvoicesQuery = reports.DailyInvoicesQuery;
+type CommissionsQuery = reports.CommissionsQuery;
+type RevenueBreakdownQuery = reports.RevenueBreakdownQuery;
+
+/** Default IQD-per-USD rate used only if the `sms` table has no rate at all. */
+const FALLBACK_EXCHANGE_RATE = 1450;
+
+/**
+ * Attach usd_equivalent (paid_usd + paid_iqd / rate, rounded to 2dp) to each breakdown
+ * row and sort descending — the "which earns most money" ranking. IQD/USD stay separate
+ * in the payload; the USD-equivalent is only a ranking + headline figure.
+ */
+function rankByUsdEquivalent(rows: RevenueBreakdownRow[], rate: number): reports.RevenueRow[] {
+  return rows
+    .map((r) => ({
+      ...r,
+      usd_equivalent: Math.round((r.paid_usd + r.paid_iqd / rate) * 100) / 100,
+    }))
+    .sort((a, b) => b.usd_equivalent - a.usd_equivalent);
+}
 
 /**
  * currency totals structure
@@ -282,6 +307,92 @@ router.get('/statistics/multi-year', async (req: Request<object, object, object,
     ErrorResponses.internalError(res, 'Failed to fetch multi-year statistics', error as Error);
   }
 });
+
+/**
+ * GET /statistics/commissions
+ * Per-doctor commission over a date range (the Statistics "Commissions" tab; the
+ * client defaults the range to the current month). For each commission-enabled
+ * doctor, commission = money collected on their works in [startDate, endDate]
+ * × their rate / 100, computed separately for IQD and USD (no conversion). Quit
+ * doctors are included for periods they were working.
+ * Query params: startDate, endDate (YYYY-MM-DD — validated by the contract).
+ */
+router.get(
+  '/statistics/commissions',
+  validate({ query: reports.commissions.query }),
+  async (req: Request<object, object, object, CommissionsQuery>, res: Response): Promise<void> => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      // YYYY-MM-DD compares lexicographically == chronologically.
+      if (startDate > endDate) {
+        ErrorResponses.badRequest(res, 'startDate must be on or before endDate');
+        return;
+      }
+
+      // Money collected per doctor, split by currency (pure aggregation in SQL).
+      const paid = await getDoctorCommissions(startDate, endDate);
+
+      // Commission = collected × rate / 100, rounded, per currency.
+      const rows = paid.map((d) => ({
+        ...d,
+        commission_iqd: Math.round((d.paid_iqd * d.commission_percentage) / 100),
+        commission_usd: Math.round((d.paid_usd * d.commission_percentage) / 100),
+      }));
+
+      sendData(res, reports.commissions.response, { rows, startDate, endDate });
+    } catch (error) {
+      log.error('Error fetching doctor commissions:', error);
+      ErrorResponses.internalError(res, 'Failed to fetch doctor commissions', error as Error);
+    }
+  }
+);
+
+/**
+ * GET /statistics/revenue-breakdown
+ * Revenue collected in [startDate, endDate] broken down by work type AND by doctor
+ * (the Statistics "Breakdown" tab; client defaults the range to the current month).
+ * Money = invoices.amount_paid keyed on date_of_payment, split by works.currency. Each
+ * list is ranked by a USD-equivalent total (paid_usd + paid_iqd / rate) using the most
+ * recent real exchange rate from `sms` (NOT the hardcoded statistics fallback); the rate
+ * used is echoed back so the UI can show it.
+ * Query params: startDate, endDate (YYYY-MM-DD — validated by the contract).
+ */
+router.get(
+  '/statistics/revenue-breakdown',
+  validate({ query: reports.revenueBreakdown.query }),
+  async (req: Request<object, object, object, RevenueBreakdownQuery>, res: Response): Promise<void> => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      // YYYY-MM-DD compares lexicographically == chronologically.
+      if (startDate > endDate) {
+        ErrorResponses.badRequest(res, 'startDate must be on or before endDate');
+        return;
+      }
+
+      // Independent reads — fan out in one wave.
+      const [latestRate, byWorkTypeRaw, byDoctorRaw] = await Promise.all([
+        getLatestExchangeRate(),
+        getRevenueByWorkType(startDate, endDate),
+        getRevenueByDoctor(startDate, endDate),
+      ]);
+
+      const exchangeRate = latestRate ?? FALLBACK_EXCHANGE_RATE;
+
+      sendData(res, reports.revenueBreakdown.response, {
+        byWorkType: rankByUsdEquivalent(byWorkTypeRaw, exchangeRate),
+        byDoctor: rankByUsdEquivalent(byDoctorRaw, exchangeRate),
+        exchangeRate,
+        startDate,
+        endDate,
+      });
+    } catch (error) {
+      log.error('Error fetching revenue breakdown:', error);
+      ErrorResponses.internalError(res, 'Failed to fetch revenue breakdown', error as Error);
+    }
+  }
+);
 
 /**
  * GET /daily-invoices

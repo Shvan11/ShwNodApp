@@ -42,6 +42,7 @@ type Employee = {
   email: string | null;
   phone: string | null;
   percentage: boolean;
+  commission_percentage: number | null;
   receive_email: boolean;
   get_appointments: boolean;
   is_active: boolean;
@@ -117,7 +118,7 @@ router.get('/employees', validate({ query: employee.employees.query }), async (r
       : sql``;
 
     const { rows: employees } = await sql<Employee>`
-      SELECT e."id", e."employee_name", e."position", p."position_name", e."email", e."phone", e."percentage", e."receive_email", e."get_appointments", e."is_active", e."sort_order", e."appointment_color"
+      SELECT e."id", e."employee_name", e."position", p."position_name", e."email", e."phone", e."percentage", e."commission_percentage", e."receive_email", e."get_appointments", e."is_active", e."sort_order", e."appointment_color"
       FROM "employees" e
       LEFT JOIN "positions" p ON e."position" = p."id"
       ${whereClause}
@@ -163,7 +164,7 @@ router.get('/positions', async (_req: Request, res: Response): Promise<void> => 
  */
 router.post('/employees', validate({ body: employee.createEmployee.body }), async (req: Request<object, object, employee.EmployeeBody>, res: Response): Promise<void> => {
   try {
-    const { employee_name, position, email, phone, percentage, receiveEmail, getAppointments, is_active, sort_order, appointment_color } = req.body;
+    const { employee_name, position, email, phone, percentage, commissionPercentage, receiveEmail, getAppointments, is_active, sort_order, appointment_color } = req.body;
 
     if (!employee_name || employee_name.trim() === '') {
       ErrorResponses.badRequest(res, 'Employee name is required');
@@ -189,6 +190,9 @@ router.post('/employees', validate({ body: employee.createEmployee.body }), asyn
       email: email && email.trim() !== '' ? email.trim() : null,
       phone: phone && phone.trim() !== '' ? phone.trim() : null,
       percentage: !!percentage,
+      // Rate is stored only when the flag is on; off → null (belt-and-suspenders
+      // with the contract refine that requires a rate when the flag is on).
+      commission_percentage: percentage ? (commissionPercentage ?? null) : null,
       receive_email: !!receiveEmail,
       get_appointments: !!getAppointments,
       // Omitted → active by default (new hires); explicit false marks a quit employee.
@@ -212,7 +216,7 @@ router.post('/employees', validate({ body: employee.createEmployee.body }), asyn
 router.put('/employees/:id', validate({ params: employee.updateEmployee.params, body: employee.updateEmployee.body }), async (req: Request<EmployeeParams, object, employee.EmployeeBody>, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { employee_name, position, email, phone, percentage, receiveEmail, getAppointments, is_active, sort_order, appointment_color } = req.body;
+    const { employee_name, position, email, phone, percentage, commissionPercentage, receiveEmail, getAppointments, is_active, sort_order, appointment_color } = req.body;
 
     if (!employee_name || employee_name.trim() === '') {
       ErrorResponses.badRequest(res, 'Employee name is required');
@@ -238,6 +242,9 @@ router.put('/employees/:id', validate({ params: employee.updateEmployee.params, 
       email: email && email.trim() !== '' ? email.trim() : null,
       phone: phone && phone.trim() !== '' ? phone.trim() : null,
       percentage: !!percentage,
+      // Rate is stored only when the flag is on; off → null (belt-and-suspenders
+      // with the contract refine that requires a rate when the flag is on).
+      commission_percentage: percentage ? (commissionPercentage ?? null) : null,
       receive_email: !!receiveEmail,
       get_appointments: !!getAppointments,
       is_active: is_active === undefined ? true : !!is_active,

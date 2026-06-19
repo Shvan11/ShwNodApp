@@ -71,3 +71,48 @@ export const telegramAuthCancel = {
 export const telegramLogout = {
   response: z.object({ ok: z.boolean() }),
 } as const;
+
+// ── 3Shape Unite Web Service (OAuth) ──
+// The interactive connect flow itself is browser redirects under /api/auth/3shape
+// (login/callback); these endpoints just surface status + disconnect. Closed
+// z.object — the status is built field-for-field from the OAuth manager.
+
+// GET /api/integrations/3shape/status — connection status (no live workstation call).
+export const threeshapeStatus = {
+  response: z.object({
+    configured: z.boolean(),
+    connected: z.boolean(),
+    expiresAt: z.string().nullable(),
+    scopes: z.string().nullable(),
+  }),
+} as const;
+export type ThreeShapeStatusResponse = z.infer<typeof threeshapeStatus.response>;
+
+// POST /api/integrations/3shape/disconnect — clear the stored tokens.
+export const threeshapeDisconnect = {
+  response: z.object({ ok: z.boolean() }),
+} as const;
+
+// POST /api/integrations/3shape/webhook/register — subscribe the workstation to events.
+export const threeshapeWebhookRegister = {
+  response: z.object({ ok: z.boolean(), callbackUrl: z.string() }),
+} as const;
+
+const threeshapeWebhookSub = z.object({
+  subscriptionId: z.string(),
+  callbackUrl: z.string().nullable(),
+  events: z.array(z.string()),
+});
+
+// GET /api/integrations/3shape/webhooks — current subscriptions.
+export const threeshapeWebhookList = {
+  response: z.object({ subscriptions: z.array(threeshapeWebhookSub) }),
+} as const;
+export type ThreeShapeWebhookListResponse = z.infer<typeof threeshapeWebhookList.response>;
+
+// DELETE /api/integrations/3shape/webhooks/:subscriptionId — remove a subscription.
+export const threeshapeWebhookDelete = {
+  params: z.object({ subscriptionId: z.string().min(1) }),
+  response: z.object({ ok: z.boolean() }),
+} as const;
+export type ThreeShapeWebhookDeleteParams = z.infer<typeof threeshapeWebhookDelete.params>;

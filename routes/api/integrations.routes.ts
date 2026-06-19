@@ -14,10 +14,20 @@ import { log } from '../../utils/logger.js';
 import { authorize } from '../../middleware/auth.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import config from '../../config/config.js';
 import * as telegramAuth from '../../services/messaging/telegram-auth.js';
+import * as threeShapeOAuth from '../../services/threeshape/oauth.js';
+import * as threeShapeClient from '../../services/threeshape/client.js';
+import { sendThreeShapeError } from '../../services/threeshape/route-helpers.js';
 import * as integrations from '../../shared/contracts/integrations.contract.js';
 
 const router = Router();
+
+/** Effective webhook callback URL: explicit config, else the redirect URI's origin. */
+function webhookCallbackUrl(): string {
+  if (config.threeshape.webhookUrl) return config.threeshape.webhookUrl;
+  return `${new URL(config.threeshape.redirectUri).origin}/api/integrations/3shape/webhook`;
+}
 
 // Every integration-management action is admin-only.
 router.use(authorize(['admin']));
@@ -100,5 +110,69 @@ router.post('/telegram/logout', async (_req: Request, res: Response): Promise<vo
     ErrorResponses.internalError(res, 'Failed to log out of Telegram');
   }
 });
+
+// GET /api/integrations/3shape/status — connection status (the connect flow itself
+// is the browser redirect at /api/auth/3shape/login).
+router.get('/3shape/status', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const status = await threeShapeOAuth.getStatus();
+    sendData(res, integrations.threeshapeStatus.response, status);
+  } catch (err) {
+    log.error('[Integrations] 3shape status failed', { error: (err as Error).message });
+    ErrorResponses.internalError(res, 'Failed to read 3Shape status');
+  }
+});
+
+// POST /api/integrations/3shape/disconnect — clear the stored tokens.
+router.post('/3shape/disconnect', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    await threeShapeOAuth.disconnect();
+    sendData(res, integrations.threeshapeDisconnect.response, { ok: true });
+  } catch (err) {
+    log.error('[Integrations] 3shape disconnect failed', { error: (err as Error).message });
+    ErrorResponses.internalError(res, 'Failed to disconnect 3Shape');
+  }
+});
+
+// POST /api/integrations/3shape/webhook/register — subscribe the workstation to scan
+// events (CallbackUrl + shared secret as Bearer). Requires THREESHAPE_WEBHOOK_SECRET.
+router.post('/3shape/webhook/register', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const secret = config.threeshape.webhookSecret;
+    if (!secret) {
+      ErrorResponses.badRequest(res, 'Set THREESHAPE_WEBHOOK_SECRET before registering a webhook.');
+      return;
+    }
+    const callbackUrl = webhookCallbackUrl();
+    await threeShapeClient.registerWebhook({ callbackUrl, authSchema: 'Bearer', authValue: secret });
+    sendData(res, integrations.threeshapeWebhookRegister.response, { ok: true, callbackUrl });
+  } catch (err) {
+    sendThreeShapeError(res, err, 'Failed to register the 3Shape webhook');
+  }
+});
+
+// GET /api/integrations/3shape/webhooks — current subscriptions.
+router.get('/3shape/webhooks', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const subscriptions = await threeShapeClient.listWebhooks();
+    sendData(res, integrations.threeshapeWebhookList.response, { subscriptions });
+  } catch (err) {
+    sendThreeShapeError(res, err, 'Failed to list 3Shape webhooks');
+  }
+});
+
+// DELETE /api/integrations/3shape/webhooks/:subscriptionId — remove a subscription.
+router.delete(
+  '/3shape/webhooks/:subscriptionId',
+  validate({ params: integrations.threeshapeWebhookDelete.params }),
+  async (req: Request<integrations.ThreeShapeWebhookDeleteParams>, res: Response): Promise<void> => {
+    try {
+      await threeShapeClient.deleteWebhook(req.params.subscriptionId);
+      sendData(res, integrations.threeshapeWebhookDelete.response, { ok: true });
+    } catch (err) {
+      sendThreeShapeError(res, err, 'Failed to delete the 3Shape webhook');
+    }
+  }
+);
 
 export default router;

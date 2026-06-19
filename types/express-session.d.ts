@@ -15,5 +15,8 @@ declare module 'express-session' {
     // Patient portal session fields (separate cookie `shwan.portal`)
     patientId?: number;
     patientName?: string;
+    // Short-lived 3Shape OAuth PKCE state, set by /api/auth/3shape/login and
+    // consumed (one-shot) by /api/auth/3shape/callback.
+    threeshape?: { state: string; verifier: string; createdAt: number };
   }
 }

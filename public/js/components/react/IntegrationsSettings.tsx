@@ -7,11 +7,12 @@
  * (options table), so once authorized the file-share Telegram option starts
  * working with no restart. Admin-only tab; the backend routes are admin-gated too.
  */
-import { useState, useEffect, useCallback, type KeyboardEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, type KeyboardEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { postJSON, httpErrorMessage } from '@/core/http';
 import { useToast } from '@/contexts/ToastContext';
-import { integrationsTelegramStatusQuery } from '@/query/queries';
+import { integrationsTelegramStatusQuery, integrationsThreeShapeStatusQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import * as integrations from '@shared/contracts/integrations.contract';
 import styles from './IntegrationsSettings.module.css';
@@ -162,6 +163,67 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
       fn();
     }
   };
+
+  // ── 3Shape Unite (OAuth Web Service) ──
+  const { data: tsData, isLoading: tsLoading } = useQuery(integrationsThreeShapeStatusQuery());
+  const tsStatus = (tsData as integrations.ThreeShapeStatusResponse | undefined) ?? null;
+  const [tsBusy, setTsBusy] = useState(false);
+
+  // Handle the one-shot ?threeshape=connected|error flag the OAuth callback
+  // redirects back with: toast, refresh status, then strip it from the URL.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const oauthFlagHandled = useRef(false);
+  useEffect(() => {
+    if (oauthFlagHandled.current) return;
+    const flag = searchParams.get('threeshape');
+    if (!flag) return;
+    oauthFlagHandled.current = true;
+    if (flag === 'connected') {
+      toast.success('3Shape connected');
+    } else {
+      const reason = searchParams.get('reason');
+      toast.error(reason ? `3Shape connection failed: ${reason}` : '3Shape connection failed');
+    }
+    void queryClient.invalidateQueries({ queryKey: qk.settings.integrationsThreeShapeStatus() });
+    const next = new URLSearchParams(searchParams);
+    next.delete('threeshape');
+    next.delete('reason');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, toast, queryClient]);
+
+  // Start OAuth: full-page navigation to the server route, which 302s to 3Shape.
+  // External-provider redirect — a sanctioned exception to the SPA-only nav rule.
+  const connectThreeShape = useCallback((): void => {
+    window.location.href = '/api/auth/3shape/login';
+  }, []);
+
+  const disconnectThreeShape = useCallback(async (): Promise<void> => {
+    setTsBusy(true);
+    try {
+      await postJSON(
+        '/api/integrations/3shape/disconnect',
+        {},
+        { schema: integrations.threeshapeDisconnect.response }
+      );
+      toast.success('3Shape disconnected');
+      await queryClient.invalidateQueries({ queryKey: qk.settings.integrationsThreeShapeStatus() });
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to disconnect 3Shape'));
+    } finally {
+      setTsBusy(false);
+    }
+  }, [toast, queryClient]);
+
+  const tsHealth: 'ok' | 'warn' | 'off' = !tsStatus?.configured
+    ? 'off'
+    : tsStatus.connected
+      ? 'ok'
+      : 'warn';
+  const tsHealthLabel = !tsStatus?.configured
+    ? 'Not configured'
+    : tsStatus.connected
+      ? 'Connected'
+      : 'Not connected';
 
   const health: 'ok' | 'warn' | 'off' = !status?.configured
     ? 'off'
@@ -345,6 +407,74 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
                   </button>
                 </div>
               </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── 3Shape Unite card ── */}
+      <div className={`${styles.card} ${styles[tsHealth]}`}>
+        <div className={styles.cardHeader}>
+          <span className={styles.serviceName}>
+            <i className="fas fa-cube" aria-hidden="true" /> 3Shape Unite
+          </span>
+          <span className={`${styles.badge} ${styles[tsHealth]}`}>
+            <span className={styles.dot} />
+            {tsLoading && !tsStatus ? 'Checking…' : tsHealthLabel}
+          </span>
+        </div>
+        <p className={styles.serviceDescription}>
+          The clinic 3Shape account used by the scanner Web Service. Connect once to push
+          patients / start scans and pull finished cases. Sign in as the clinic account.
+        </p>
+
+        {tsStatus && !tsStatus.configured && (
+          <div className={styles.notice}>
+            3Shape is not configured. Set <code>THREESHAPE_CLIENT_ID</code> and{' '}
+            <code>THREESHAPE_WEBSERVICE_BASE</code> in the server environment, then refresh.
+          </div>
+        )}
+
+        {tsStatus?.configured && (
+          <dl className={styles.rows}>
+            <div className={styles.row}>
+              <dt>Status</dt>
+              <dd>
+                {tsStatus.connected ? (
+                  <span className={styles.okText}>Connected</span>
+                ) : (
+                  'Not connected'
+                )}
+              </dd>
+            </div>
+            {tsStatus.connected && tsStatus.expiresAt && (
+              <div className={styles.row}>
+                <dt>Token expires</dt>
+                <dd>{new Date(tsStatus.expiresAt).toLocaleString()}</dd>
+              </div>
+            )}
+          </dl>
+        )}
+
+        {tsStatus?.configured && (
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={connectThreeShape}
+              disabled={tsBusy}
+            >
+              {tsStatus.connected ? 'Reconnect' : 'Connect'}
+            </button>
+            {tsStatus.connected && (
+              <button
+                type="button"
+                className={styles.dangerBtn}
+                onClick={() => void disconnectThreeShape()}
+                disabled={tsBusy}
+              >
+                Disconnect
+              </button>
             )}
           </div>
         )}

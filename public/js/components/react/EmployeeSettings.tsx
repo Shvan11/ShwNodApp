@@ -22,6 +22,7 @@ interface FormData {
     email: string;
     phone: string;
     percentage: boolean;
+    commissionPercentage: string;
     receiveEmail: boolean;
     getAppointments: boolean;
     is_active: boolean;
@@ -60,6 +61,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         email: '',
         phone: '',
         percentage: false,
+        commissionPercentage: '',
         receiveEmail: false,
         getAppointments: false,
         is_active: true,
@@ -99,6 +101,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             email: '',
             phone: '',
             percentage: false,
+            commissionPercentage: '',
             receiveEmail: false,
             getAppointments: false,
             is_active: true,
@@ -117,6 +120,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             email: employee.email || '',
             phone: employee.phone || '',
             percentage: employee.percentage || false,
+            commissionPercentage: String(employee.commission_percentage ?? ''),
             receiveEmail: employee.receive_email || false,
             getAppointments: employee.get_appointments || false,
             is_active: employee.is_active ?? true,
@@ -135,6 +139,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             email: '',
             phone: '',
             percentage: false,
+            commissionPercentage: '',
             receiveEmail: false,
             getAppointments: false,
             is_active: true,
@@ -187,12 +192,17 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         const value = target.type === 'checkbox' ? (target as HTMLInputElement).checked : target.value;
         setFormData(prev => {
             const next = { ...prev, [name]: value };
-            // Marking someone as quit clears their commission / email / appointment
-            // flags (mirrors the server's auto-clear) so the form stays truthful.
+            // Quitting clears EMAIL + APPOINTMENT flags (mirrors the server) so the
+            // form stays truthful. Commission is PRESERVED on quit, so a doctor who
+            // left still appears in the commission report for periods they worked.
             if (name === 'is_active' && value === false) {
-                next.percentage = false;
                 next.receiveEmail = false;
                 next.getAppointments = false;
+            }
+            // Turning percentage OFF clears the rate (the server nulls it too; the
+            // contract requires a rate only when the flag is on).
+            if (name === 'percentage' && value === false) {
+                next.commissionPercentage = '';
             }
             return next;
         });
@@ -463,7 +473,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
 
                                             {!formData.is_active && (
                                                 <p className={styles.fieldHelp}>
-                                                    <i className="fas fa-info-circle"></i> This employee is marked as having quit, so email, appointment and commission options are disabled.
+                                                    <i className="fas fa-info-circle"></i> This employee is marked as having quit, so email and appointment options are disabled. Commission settings are kept so past-period commission reports stay accurate.
                                                 </p>
                                             )}
                                             <div className={styles.checkboxGroup}>
@@ -506,7 +516,6 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                             name="percentage"
                                                             checked={formData.percentage}
                                                             onChange={handleInputChange}
-                                                            disabled={!formData.is_active}
                                                         />
                                                         <span className={styles.checkboxLabel}>
                                                             <i className="fas fa-percent"></i>
@@ -514,6 +523,30 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                         </span>
                                                     </label>
                                                 </div>
+
+                                                {formData.percentage && (
+                                                    <div className={styles.commissionRateField}>
+                                                        <label htmlFor="commissionPercentage">
+                                                            Commission rate <span className={styles.required}>*</span>
+                                                            <span className={styles.fieldHelp}>(% of payments collected on this doctor&apos;s works)</span>
+                                                        </label>
+                                                        <div className={styles.commissionRateInput}>
+                                                            <input
+                                                                type="number"
+                                                                id="commissionPercentage"
+                                                                name="commissionPercentage"
+                                                                value={formData.commissionPercentage}
+                                                                onChange={handleInputChange}
+                                                                min="1"
+                                                                max="100"
+                                                                step="1"
+                                                                required
+                                                                placeholder="e.g., 15"
+                                                            />
+                                                            <span className={styles.commissionRateSuffix}>%</span>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}
@@ -620,7 +653,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                             {employee.percentage ? (
                                                 <span className={`${styles.badge} ${styles.badgeSuccess}`}>
                                                     <i className="fas fa-percent"></i>
-                                                    Yes
+                                                    {employee.commission_percentage != null ? `${employee.commission_percentage}%` : 'Yes'}
                                                 </span>
                                             ) : (
                                                 <span className={`${styles.badge} ${styles.badgeMuted}`}>

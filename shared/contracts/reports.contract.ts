@@ -124,6 +124,70 @@ export const dailyInvoices = {
 } as const;
 export type DailyInvoicesQuery = z.infer<typeof dailyInvoices.query>;
 
+// ── Doctor commissions (GET /api/statistics/commissions?startDate=&endDate=) ─────
+// Per commission-enabled doctor (employees.percentage = true): the money COLLECTED
+// on their works (sum of invoices.amount_paid, by date_of_payment in the period) split
+// by works.currency, and commission = collected × rate / 100. IQD and USD stay separate
+// (no conversion). CLOSED `z.object` containers — fully modeled, no long-tail metadata,
+// so NOT a D2 loose-response marker (no baseline bump). Money columns are PG integers
+// → JS numbers; commission_* are rounded in the route.
+const commissionRow = z.object({
+  doctor_id: z.number(),
+  doctor_name: z.string(),
+  commission_percentage: z.number(),
+  paid_iqd: z.number(),
+  paid_usd: z.number(),
+  commission_iqd: z.number(),
+  commission_usd: z.number(),
+});
+export type CommissionRow = z.infer<typeof commissionRow>;
+
+export const commissions = {
+  query: z.object({
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD'),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD'),
+  }),
+  response: z.object({
+    rows: z.array(commissionRow),
+    startDate: z.string(),
+    endDate: z.string(),
+  }),
+} as const;
+export type CommissionsQuery = z.infer<typeof commissions.query>;
+
+// ── Revenue breakdown (GET /api/statistics/revenue-breakdown?startDate=&endDate=) ─
+// Money COLLECTED on works in the period (sum of invoices.amount_paid by date_of_payment),
+// split by works.currency, grouped two ways: by work type and by doctor. `id`/`name` are
+// generic so one row schema + one table serves both dimensions. `usd_equivalent` =
+// paid_usd + paid_iqd / exchangeRate (computed + rounded in the route, used as the "most
+// money" ranking key); `exchangeRate` is the most recent real rate from `sms` (NOT a
+// hardcoded 1450). CLOSED `z.object` containers — fully modeled, so NOT a D2 loose-response
+// marker (no baseline bump), same as the commissions schema. Money columns are PG integers.
+const revenueRow = z.object({
+  id: z.number(),
+  name: z.string(),
+  paid_iqd: z.number(),
+  paid_usd: z.number(),
+  work_count: z.number(),
+  usd_equivalent: z.number(),
+});
+export type RevenueRow = z.infer<typeof revenueRow>;
+
+export const revenueBreakdown = {
+  query: z.object({
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD'),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD'),
+  }),
+  response: z.object({
+    byWorkType: z.array(revenueRow),
+    byDoctor: z.array(revenueRow),
+    exchangeRate: z.number(),
+    startDate: z.string(),
+    endDate: z.string(),
+  }),
+} as const;
+export type RevenueBreakdownQuery = z.infer<typeof revenueBreakdown.query>;
+
 // GET statistics query shapes (type-only — handlers parse the strings manually).
 export const statisticsQuery = z.object({
   month: z.string().optional(),

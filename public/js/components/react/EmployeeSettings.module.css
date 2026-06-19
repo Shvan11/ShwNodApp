@@ -235,6 +235,49 @@
     font-weight: 500;
 }
 
+/* Commission rate field — appears under the percentage checkbox when it's on.
+   Indented to align under the checkbox label text. Not inside .checkboxItem, so
+   it escapes the row-flex `.checkboxItem label` rule. */
+.commissionRateField {
+    margin-inline-start: 2.1rem;
+    margin-top: calc(-1 * var(--spacing-xs));
+}
+
+.commissionRateField label {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    margin-bottom: var(--spacing-xs);
+    display: block;
+}
+
+.commissionRateInput {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    max-width: 170px;
+}
+
+.commissionRateInput input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.6rem 0.75rem;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.commissionRateInput input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.commissionRateSuffix {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
 /* Calendar colour picker */
 .colorField {
     display: flex;

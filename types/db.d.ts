@@ -316,6 +316,7 @@ export interface Elastics {
 
 export interface Employees {
   appointment_color: string | null;
+  commission_percentage: number | null;
   email: string | null;
   employee_name: string;
   get_appointments: Generated<boolean>;
@@ -398,6 +399,16 @@ export interface Implants {
   tooth: string | null;
   updated_at: Timestamp | null;
   work_id: number;
+}
+
+export interface IntegrationOauthTokens {
+  access_token: string;
+  expires_at: Timestamp;
+  provider: string;
+  refresh_token: string | null;
+  scope: string | null;
+  token_type: Generated<string>;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface Invoices {
@@ -816,6 +827,7 @@ export interface DB {
   image_types: ImageTypes;
   implant_manufacturers: ImplantManufacturers;
   implants: Implants;
+  integration_oauth_tokens: IntegrationOauthTokens;
   invoices: Invoices;
   keywords: Keywords;
   message_status_history: MessageStatusHistory;

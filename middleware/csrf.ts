@@ -76,6 +76,9 @@ const staff = makeCsrf('shwan.csrf', (req) => {
   const p = req.originalUrl.split('?')[0];
   return (
     p === '/api/auth/login' ||
+    // 3Shape Unite posts webhook events here from the scanner workstation (no
+    // session, no CSRF token); the endpoint authenticates via its own shared secret.
+    p === '/api/integrations/3shape/webhook' ||
     p.startsWith('/api/chair-display/') ||
     p.startsWith('/api/portal')
   );

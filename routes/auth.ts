@@ -4,11 +4,13 @@
  */
 import { Router, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { verifyCredentials, hashPassword } from '../middleware/auth.js';
+import { verifyCredentials, hashPassword, authenticate, authorize } from '../middleware/auth.js';
 import { sql } from 'kysely';
 import { getKysely } from '../services/database/kysely.js';
 import { log } from '../utils/logger.js';
 import type { LoginBody, ChangePasswordBody } from '../shared/contracts/auth.contract.js';
+import * as threeShapeOAuth from '../services/threeshape/oauth.js';
+import { ThreeShapeError } from '../services/threeshape/errors.js';
 
 const router = Router();
 
@@ -279,5 +281,92 @@ router.post(
     }
   }
 );
+
+// ============================================================================
+// 3Shape Unite — OAuth 2.0 (Authorization Code + PKCE) connect flow
+// ============================================================================
+// Mounted pre-gate under /api/auth (index.ts) so the browser redirect lands
+// OUTSIDE the staff/admin gate. `/login` self-guards as admin (it is started from
+// inside the app); `/callback` is gate-exempt and validated by `state` + the
+// session-held PKCE verifier. Both are GET ⇒ CSRF-safe, so they pass
+// staffCsrfProtection. The callback's registered redirect URI is exactly
+// `/api/auth/3shape/callback` (config.threeshape.redirectUri).
+
+const THREESHAPE_SETTINGS_URL = '/settings/integrations';
+const THREESHAPE_PKCE_TTL_MS = 10 * 60 * 1000; // login → callback round-trip window
+
+/**
+ * GET /api/auth/3shape/login — admin-only. Generate PKCE + state, stash in the
+ * session, and 302 to the 3Shape authorize endpoint.
+ */
+router.get(
+  '/3shape/login',
+  authenticate,
+  authorize(['admin']),
+  (req: Request, res: Response): void => {
+    if (!threeShapeOAuth.isConfigured()) {
+      res.status(503).json({ success: false, error: '3Shape is not configured on this server.' });
+      return;
+    }
+    const state = threeShapeOAuth.generateState();
+    const verifier = threeShapeOAuth.generateVerifier();
+    const challenge = threeShapeOAuth.challengeFromVerifier(verifier);
+    req.session.threeshape = { state, verifier, createdAt: Date.now() };
+    const url = threeShapeOAuth.buildAuthorizeUrl(state, challenge);
+    // Persist the PKCE state BEFORE redirecting — the callback (a fresh request
+    // after the round-trip to 3Shape) must read it back from the store.
+    req.session.save((err) => {
+      if (err) {
+        log.error('[3Shape] failed to persist OAuth session', { error: err.message });
+        res.status(500).json({ success: false, error: 'Could not start 3Shape sign-in.' });
+        return;
+      }
+      res.redirect(url);
+    });
+  }
+);
+
+/**
+ * GET /api/auth/3shape/callback — gate-exempt; validated by `state`. Exchange the
+ * code for tokens, then redirect to the Settings → Integrations card with a flag.
+ */
+router.get('/3shape/callback', async (req: Request, res: Response): Promise<void> => {
+  const back = (params: string): void => res.redirect(`${THREESHAPE_SETTINGS_URL}?${params}`);
+  const fail = (reason: string): void => back(`threeshape=error&reason=${encodeURIComponent(reason)}`);
+
+  const code = typeof req.query.code === 'string' ? req.query.code : undefined;
+  const state = typeof req.query.state === 'string' ? req.query.state : undefined;
+  const oauthError = typeof req.query.error === 'string' ? req.query.error : undefined;
+
+  // One-shot: consume the stashed PKCE state regardless of outcome.
+  const pkce = req.session.threeshape;
+  delete req.session.threeshape;
+
+  if (oauthError) {
+    log.warn('[3Shape] authorize returned an error', { error: oauthError });
+    fail(oauthError);
+    return;
+  }
+  if (!pkce || !state || state !== pkce.state) {
+    fail('invalid_state');
+    return;
+  }
+  if (Date.now() - pkce.createdAt > THREESHAPE_PKCE_TTL_MS) {
+    fail('expired');
+    return;
+  }
+  if (!code) {
+    fail('missing_code');
+    return;
+  }
+
+  try {
+    await threeShapeOAuth.exchangeCode(code, pkce.verifier);
+    back('threeshape=connected');
+  } catch (err) {
+    log.error('[3Shape] token exchange failed', { error: (err as Error).message });
+    fail(err instanceof ThreeShapeError ? err.code : 'exchange_failed');
+  }
+});
 
 export default router;

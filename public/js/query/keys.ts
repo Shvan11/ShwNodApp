@@ -188,6 +188,12 @@ export const qk = {
       ['reports', 'yearly', startMonth, startYear, rate] as const,
     multiYear: (startYear: number, endYear: number, rate: number) =>
       ['reports', 'multi-year', startYear, endYear, rate] as const,
+    /** GET /api/statistics/commissions?startDate=&endDate= — per-doctor commission. */
+    commissions: (startDate: string, endDate: string) =>
+      ['reports', 'commissions', startDate, endDate] as const,
+    /** GET /api/statistics/revenue-breakdown?startDate=&endDate= — revenue by work type & doctor. */
+    revenueBreakdown: (startDate: string, endDate: string) =>
+      ['reports', 'revenue-breakdown', startDate, endDate] as const,
   },
   /**
    * Stand / mini-pharmacy. `all()` is the prefix every stand read shares, so a
@@ -271,6 +277,8 @@ export const qk = {
     telegramStatus: () => ['settings', 'telegram-status'] as const,
     /** GET /api/integrations/telegram/status — Telegram MTProto integration status. */
     integrationsTelegramStatus: () => ['settings', 'integrations-telegram-status'] as const,
+    /** GET /api/integrations/3shape/status — 3Shape Unite Web Service integration status. */
+    integrationsThreeShapeStatus: () => ['settings', 'integrations-3shape-status'] as const,
     /** GET /api/wa/group-settings — WhatsApp daily-list group posting config. */
     whatsappGroupSettings: () => ['settings', 'whatsapp-group-settings'] as const,
   },
@@ -278,6 +286,14 @@ export const qk = {
   telegram: {
     /** GET /api/telegram/send/:jobId — per-file upload progress of a send job. */
     sendProgress: (jobId: string) => ['telegram', 'send-progress', jobId] as const,
+  },
+  /** 3Shape Unite — per-patient cases/media pulled live from the Web Service. */
+  threeshape: {
+    all: (id: Id) => ['threeshape', normId(id)] as const,
+    /** GET /api/threeshape/patients/:id/cases */
+    cases: (id: Id) => ['threeshape', normId(id), 'cases'] as const,
+    /** GET /api/threeshape/patients/:id/media */
+    media: (id: Id) => ['threeshape', normId(id), 'media'] as const,
   },
   /** Reports — daily-invoices modal (keyed by date). */
   dailyInvoices: (date: string) => ['daily-invoices', date] as const,

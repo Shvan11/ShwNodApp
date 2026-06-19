@@ -1,0 +1,171 @@
+/* Statistics → Commissions tab. Rendered inside the Statistics chart card. */
+
+.container {
+    padding: var(--spacing-sm) 0;
+}
+
+/* From / To date range bar */
+.periodBar {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+    margin-bottom: var(--spacing-lg);
+}
+
+.periodField {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.periodField label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.periodField input {
+    padding: 0.5rem 0.75rem;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: var(--surface);
+    color: var(--text-primary);
+}
+
+.periodField input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.arrow {
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
+}
+
+.spinner {
+    color: var(--primary-color);
+    margin-bottom: 0.6rem;
+}
+
+/* Empty / error / invalid-range messages */
+.message {
+    color: var(--text-secondary);
+    padding: var(--spacing-lg);
+    text-align: center;
+}
+
+.messageError {
+    color: var(--error-600);
+    padding: var(--spacing-lg);
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+}
+
+/* Results table */
+.tableWrapper {
+    overflow-x: auto;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table thead {
+    background: var(--gray-50);
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.table th {
+    padding: 0.85rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.table td {
+    padding: 0.85rem 1rem;
+    color: var(--text-primary);
+}
+
+.table tbody tr {
+    border-bottom: 1px solid var(--gray-200);
+    transition: background-color 0.2s ease;
+}
+
+.table tbody tr:hover {
+    background: var(--gray-50);
+}
+
+.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.docName {
+    font-weight: 600;
+}
+
+.commission {
+    color: var(--success-800);
+    font-weight: 600;
+}
+
+.totalRow {
+    background: var(--gray-50);
+    border-top: 2px solid var(--gray-200);
+}
+
+/* Mobile: stack the table into labelled cards (mirrors the employee table). */
+@media (max-width: 600px) {
+    .table thead {
+        display: none;
+    }
+
+    .table,
+    .table tbody,
+    .table tfoot,
+    .table tr,
+    .table td {
+        display: block;
+        width: 100%;
+    }
+
+    .table tbody tr,
+    .table tfoot tr {
+        margin-bottom: var(--spacing-md);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .table td {
+        padding: var(--spacing-xs) 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-align: right;
+    }
+
+    .table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: var(--font-size-sm);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-right: var(--spacing-md);
+    }
+}

@@ -48,6 +48,9 @@ const employeeRow = z.object({
   is_active: z.boolean(),
   sort_order: z.number(),
   appointment_color: z.string().nullable(),
+  // Per-doctor commission rate (1–100), or null when not on commission. The
+  // `percentage` boolean above is the on/off flag; this is the rate it gates.
+  commission_percentage: z.number().nullable(),
 });
 export type EmployeeRow = z.infer<typeof employeeRow>;
 
@@ -96,6 +99,15 @@ const employeeBody = z.object({
   email: z.string().optional(),
   phone: z.string().optional(),
   percentage: z.boolean().optional(),
+  // Commission rate (1–100), gated by `percentage`. The form sends a STRING (''
+  // when not on commission) like sort_order, so ''/undefined/null → null and a real
+  // value coerces; the flag↔rate coupling is enforced by the refine below.
+  commissionPercentage: z
+    .preprocess(
+      (v) => (v === '' || v === undefined || v === null ? null : v),
+      z.coerce.number().int().min(1).max(100).nullable()
+    )
+    .optional(),
   receiveEmail: z.boolean().optional(),
   getAppointments: z.boolean().optional(),
   // Employment status — true = currently employed, false = quit/left. Optional in
@@ -104,6 +116,11 @@ const employeeBody = z.object({
   is_active: z.boolean().optional(),
   sort_order: z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().optional()).optional(),
   appointment_color: z.string().nullable().optional(),
+}).refine((d) => !d.percentage || d.commissionPercentage != null, {
+  // Percentage-based compensation ON requires a rate; the handler also nulls the
+  // rate whenever the flag is off, so an off-flag stale value can't reach the DB.
+  message: 'A commission rate (1–100%) is required when percentage-based compensation is enabled',
+  path: ['commissionPercentage'],
 });
 export type EmployeeBody = z.infer<typeof employeeBody>;
 

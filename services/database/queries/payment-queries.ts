@@ -135,6 +135,25 @@ export async function getCurrentExchangeRate(): Promise<number | null> {
 }
 
 /**
+ * Most recent exchange rate on record (any date), newest first. Unlike
+ * getCurrentExchangeRate() this does NOT require today's rate to be entered — it
+ * returns the latest non-null `sms.exchange_rate`. null only if none was ever set.
+ * Used by the Statistics → Breakdown tab to rank dual-currency revenue by a
+ * USD-equivalent total without resorting to a hardcoded fallback.
+ */
+export async function getLatestExchangeRate(): Promise<number | null> {
+  const row = await getKysely()
+    .selectFrom('sms')
+    .where('exchange_rate', 'is not', null)
+    .select('exchange_rate')
+    .orderBy('date', 'desc')
+    .limit(1)
+    .executeTakeFirst();
+
+  return row ? row.exchange_rate : null;
+}
+
+/**
  * Adds a new invoice record with dual-currency support
  */
 export async function addInvoice(invoiceData: InvoiceData): Promise<{ invoice_id: number }[]> {

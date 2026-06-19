@@ -59,6 +59,7 @@ import telegramRoutes from './telegram.routes.js';
 import shareRoutes from './share.routes.js';
 import brandingRoutes from './branding.routes.js';
 import integrationsRoutes from './integrations.routes.js';
+import threeshapeRoutes from './threeshape.routes.js';
 import taskRoutes from './task.routes.js';
 import monitoringRoutes from './monitoring.routes.js';
 
@@ -152,6 +153,9 @@ router.use('/', brandingRoutes);
 
 // Integrations — manage external-service auth (Telegram now; WhatsApp/Google later)
 router.use('/integrations', integrationsRoutes);
+
+// 3Shape Unite Web Service — per-patient scan actions (routes self-prefix /threeshape/*)
+router.use('/', threeshapeRoutes);
 
 // Tasks — the app-wide header surface of the alerts table (/api/tasks)
 router.use('/', taskRoutes);

@@ -36,6 +36,7 @@ import * as settingsContract from '@shared/contracts/settings.contract';
 import * as brandingContract from '@shared/contracts/branding.contract';
 import * as telegramContract from '@shared/contracts/telegram.contract';
 import * as integrationsContract from '@shared/contracts/integrations.contract';
+import * as threeshapeContract from '@shared/contracts/threeshape.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
 import * as taskContract from '@shared/contracts/task.contract';
 import * as videoContract from '@shared/contracts/video.contract';
@@ -752,6 +753,30 @@ export const multiYearStatisticsQuery = (startYear: number, endYear: number, exc
       ),
   });
 
+/** GET /api/statistics/commissions?startDate=&endDate= — per-doctor commission for a period. */
+export const doctorCommissionsQuery = (startDate: string, endDate: string) =>
+  queryOptions({
+    queryKey: qk.reports.commissions(startDate, endDate),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof reportsContract.commissions.response>>(
+        `/api/statistics/commissions?startDate=${startDate}&endDate=${endDate}`,
+        { signal, schema: reportsContract.commissions.response }
+      ),
+    enabled: !!startDate && !!endDate,
+  });
+
+/** GET /api/statistics/revenue-breakdown?startDate=&endDate= — revenue by work type & doctor. */
+export const revenueBreakdownQuery = (startDate: string, endDate: string) =>
+  queryOptions({
+    queryKey: qk.reports.revenueBreakdown(startDate, endDate),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof reportsContract.revenueBreakdown.response>>(
+        `/api/statistics/revenue-breakdown?startDate=${startDate}&endDate=${endDate}`,
+        { signal, schema: reportsContract.revenueBreakdown.response }
+      ),
+    enabled: !!startDate && !!endDate,
+  });
+
 // ---------------------------------------------------------------------------
 // Admin lookup tables — the generic table editor (LookupEditor/HolidayEditor).
 // ---------------------------------------------------------------------------
@@ -1218,6 +1243,42 @@ export const integrationsTelegramStatusQuery = () =>
         '/api/integrations/telegram/status',
         { signal, schema: integrationsContract.telegramStatus.response }
       ),
+  });
+
+/** GET /api/integrations/3shape/status — 3Shape Unite Web Service integration status. */
+export const integrationsThreeShapeStatusQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.integrationsThreeShapeStatus(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof integrationsContract.threeshapeStatus.response>>(
+        '/api/integrations/3shape/status',
+        { signal, schema: integrationsContract.threeshapeStatus.response }
+      ),
+  });
+
+/** GET /api/threeshape/patients/:id/cases — patient's 3Shape cases (live). retry off:
+ *  a not-connected / unreachable error is actionable, not transient. */
+export const threeShapeCasesQuery = (personId: number | string) =>
+  queryOptions({
+    queryKey: qk.threeshape.cases(personId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof threeshapeContract.listCases.response>>(
+        `/api/threeshape/patients/${personId}/cases`,
+        { signal, schema: threeshapeContract.listCases.response }
+      ),
+    retry: false,
+  });
+
+/** GET /api/threeshape/patients/:id/media — patient's 3Shape media files (live). */
+export const threeShapeMediaQuery = (personId: number | string) =>
+  queryOptions({
+    queryKey: qk.threeshape.media(personId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof threeshapeContract.listMedia.response>>(
+        `/api/threeshape/patients/${personId}/media`,
+        { signal, schema: threeshapeContract.listMedia.response }
+      ),
+    retry: false,
   });
 
 /** GET /api/wa/group-settings — WhatsApp daily-list group posting config. */

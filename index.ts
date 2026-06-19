@@ -37,6 +37,7 @@ import adminRoutes from './routes/admin.js';
 import syncWebhookRoutes from './routes/sync-webhook.js';
 import emailApiRoutes from './routes/email-api.js';
 import authRoutes from './routes/auth.js';
+import threeshapeWebhookRoutes from './routes/api/threeshape-webhook.routes.js';
 import userManagementRoutes from './routes/user-management.js';
 import costPresetRoutes from './routes/api/cost-preset.routes.js';
 import lookupRoutes from './routes/api/lookup.routes.js';
@@ -286,6 +287,9 @@ async function initializeApplication(): Promise<AppInitResult> {
     // ===== AUTHENTICATION MIDDLEWARE (MUST BE BEFORE ROUTES) =====
     // Public routes - NO authentication required
     app.use('/api/auth', authRoutes);
+    // 3Shape Unite webhook receiver — pre-gate (the scanner workstation has no
+    // session) + CSRF-exempt (middleware/csrf.ts); authenticated by a shared secret.
+    app.use(threeshapeWebhookRoutes);
     // Reference-data routes mounted BEFORE the auth gate so their GETs are public.
     // costPresetRoutes' mutations (POST/PUT/DELETE) self-guard with inline
     // authenticate/authorize(['admin']); lookupRoutes is read-only. These are the

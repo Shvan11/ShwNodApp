@@ -4,6 +4,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import Chart from '../../utils/chartSetup';
 import DailyInvoicesModal from './DailyInvoicesModal';
+import DoctorCommissionsView from './DoctorCommissionsView';
+import RevenueBreakdownView from './RevenueBreakdownView';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
 import { getChartThemeColors } from '../../utils/chartTheme';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -77,8 +79,13 @@ interface ChartDataItem {
 }
 
 // View mode constants
-const VIEW_MODES = { DAILY: 'daily', MONTHLY: 'monthly', YEARLY: 'yearly' } as const;
+const VIEW_MODES = { DAILY: 'daily', MONTHLY: 'monthly', YEARLY: 'yearly', COMMISSIONS: 'commissions', BREAKDOWN: 'breakdown' } as const;
 type ViewMode = typeof VIEW_MODES[keyof typeof VIEW_MODES];
+
+// Self-contained tabs that own their own date-range picker + query and so hide the
+// month-nav, summary cards, and daily table the time-based views share.
+const isCustomView = (mode: ViewMode): boolean =>
+    mode === VIEW_MODES.COMMISSIONS || mode === VIEW_MODES.BREAKDOWN;
 
 const StatisticsComponent = () => {
     const { resolvedTheme } = useTheme();
@@ -425,7 +432,9 @@ const StatisticsComponent = () => {
                     </h1>
                 </div>
 
-            {/* Controls */}
+            {/* Controls (month nav) — hidden in the self-contained tabs (Commissions /
+                Breakdown), which carry their own From/To date-range picker. */}
+            {!isCustomView(viewMode) && (
             <div className={styles.controlsSection}>
                 <div className={styles.dateSelector}>
                     <button onClick={handlePrevMonth} className={styles.btnNav} title="Previous Month">
@@ -463,10 +472,12 @@ const StatisticsComponent = () => {
                     </button>
                 </div>
             </div>
+            )}
 
             {statistics && (
                 <>
-                    {/* Summary Cards - Monthly Totals Only */}
+                    {/* Summary Cards - Monthly Totals Only (hidden in the self-contained tabs) */}
+                    {!isCustomView(viewMode) && (
                     <div className={styles.summaryCards}>
                         <div className={`${styles.summaryCard} ${styles.revenue}`}>
                             <div className={styles.cardHeader}>
@@ -519,6 +530,7 @@ const StatisticsComponent = () => {
                             </div>
                         </div>
                     </div>
+                    )}
 
                     {/* Chart - Grand Total (USD) */}
                     <div className={`${styles.chartsSection} ${styles.chartsSectionSingle}`}>
@@ -639,13 +651,20 @@ const StatisticsComponent = () => {
                                 </div>
                             )}
 
-                            <div className={`${styles.chartContainer} ${styles.chartContainerLarge}`}>
-                                <canvas ref={revenueTrendChartRef}></canvas>
-                            </div>
+                            {viewMode === VIEW_MODES.COMMISSIONS ? (
+                                <DoctorCommissionsView />
+                            ) : viewMode === VIEW_MODES.BREAKDOWN ? (
+                                <RevenueBreakdownView />
+                            ) : (
+                                <div className={`${styles.chartContainer} ${styles.chartContainerLarge}`}>
+                                    <canvas ref={revenueTrendChartRef}></canvas>
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    {/* Daily Data Table */}
+                    {/* Daily Data Table (hidden in the self-contained tabs) */}
+                    {!isCustomView(viewMode) && (
                     <div className={styles.tableSection}>
                         <h3>Daily Breakdown</h3>
                         <div className={styles.tableWrapper}>
@@ -701,6 +720,7 @@ const StatisticsComponent = () => {
                             </table>
                         </div>
                     </div>
+                    )}
                 </>
             )}
             </div>

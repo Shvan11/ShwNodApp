@@ -42,6 +42,7 @@ export function preloadPatientPage(page: string | null | undefined): void {
 
 const GridComponent = lazyPage(['photos'], () => import('./GridComponent'));
 const XraysComponent = lazyPage(['xrays'], () => import('./XraysComponent'));
+const ThreeShapeScansView = lazyPage(['scans'], () => import('./ThreeShapeScansView'));
 const FileExplorer = lazyPage(['files'], () => import('./files/FileExplorer'));
 const WorkingFilesView = lazyPage(['working-files'], () => import('./files/WorkingFilesView'));
 const VisitsComponent = lazyPage(['visits'], () => import('./VisitsComponent'));
@@ -124,6 +125,13 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
             case 'xrays':
                 return (
                     <XraysComponent
+                        personId={personId}
+                    />
+                );
+
+            case 'scans':
+                return (
+                    <ThreeShapeScansView
                         personId={personId}
                     />
                 );

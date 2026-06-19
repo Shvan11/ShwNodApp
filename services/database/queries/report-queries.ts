@@ -176,3 +176,123 @@ export async function getDailyInvoices(date: string): Promise<BaseInvoice[]> {
 
   return rows;
 }
+
+/** One commission-eligible doctor's money COLLECTED in a period, split by currency. */
+export interface DoctorCommissionPaid {
+  doctor_id: number;
+  doctor_name: string;
+  commission_percentage: number;
+  paid_iqd: number;
+  paid_usd: number;
+}
+
+/**
+ * Per commission-enabled doctor, the money COLLECTED on their works within
+ * [startDate, endDate] — sum of invoices.amount_paid keyed on date_of_payment, split
+ * by works.currency. Doctors are matched via works.dr_id = employees.id (a NOT NULL
+ * real FK) and filtered to `percentage = true AND commission_percentage IS NOT NULL`
+ * — there is NO is_active filter, so a doctor who has since quit still reports for
+ * periods they were working. Only doctors with ≥1 payment in the window appear (inner
+ * joins + HAVING). amount_paid is the value applied to the work in works.currency (the
+ * iqd_received/usd_received cash-box columns are deliberately NOT used). The commission
+ * itself (× rate / 100, rounded) is computed in the route — this stays pure aggregation.
+ * Index path: employees(percentage) → works(ix_works_dr_id) → invoices(ix_wid_date_sum).
+ */
+export async function getDoctorCommissions(
+  startDate: string,
+  endDate: string
+): Promise<DoctorCommissionPaid[]> {
+  const { rows } = await sql<DoctorCommissionPaid>`
+    SELECT
+      e."id"                    AS doctor_id,
+      e."employee_name"         AS doctor_name,
+      e."commission_percentage" AS commission_percentage,
+      COALESCE(SUM(i."amount_paid") FILTER (WHERE w."currency" = 'IQD'), 0) AS paid_iqd,
+      COALESCE(SUM(i."amount_paid") FILTER (WHERE w."currency" = 'USD'), 0) AS paid_usd
+    FROM "employees" e
+    JOIN "works" w    ON w."dr_id"   = e."id"
+    JOIN "invoices" i ON i."work_id" = w."work_id"
+    WHERE e."percentage" = true
+      AND e."commission_percentage" IS NOT NULL
+      AND i."date_of_payment" >= ${startDate}::date
+      AND i."date_of_payment" <= ${endDate}::date
+    GROUP BY e."id", e."employee_name", e."commission_percentage"
+    HAVING SUM(i."amount_paid") > 0
+    ORDER BY e."employee_name"
+  `.execute(getKysely());
+
+  return rows;
+}
+
+/**
+ * One revenue-breakdown row — money COLLECTED on a category's works in a period, split
+ * by currency. `id`/`name` are generic across both breakdown dimensions (work type or
+ * doctor) so a single row shape + table component serves both. `usd_equivalent` (and the
+ * "most money" ranking) is computed in the route, not here — this stays pure aggregation.
+ */
+export interface RevenueBreakdownRow {
+  id: number;
+  name: string;
+  paid_iqd: number;
+  paid_usd: number;
+  work_count: number;
+}
+
+/**
+ * Revenue COLLECTED per WORK TYPE within [startDate, endDate] — sum of invoices.amount_paid
+ * keyed on date_of_payment, split by works.currency, grouped by work_types. Same revenue
+ * definition + currency-split idiom as getDoctorCommissions (citext currency compares
+ * case-insensitively; a NULL-currency work lands in neither bucket). Only types with ≥1
+ * payment in the window appear (inner joins + HAVING). work_count = distinct paying works.
+ */
+export async function getRevenueByWorkType(
+  startDate: string,
+  endDate: string
+): Promise<RevenueBreakdownRow[]> {
+  const { rows } = await sql<RevenueBreakdownRow>`
+    SELECT
+      wt."id"           AS id,
+      wt."work_type"    AS name,
+      COALESCE(SUM(i."amount_paid") FILTER (WHERE w."currency" = 'IQD'), 0) AS paid_iqd,
+      COALESCE(SUM(i."amount_paid") FILTER (WHERE w."currency" = 'USD'), 0) AS paid_usd,
+      COUNT(DISTINCT w."work_id")                                           AS work_count
+    FROM "invoices" i
+    JOIN "works" w        ON w."work_id"      = i."work_id"
+    JOIN "work_types" wt  ON wt."id"          = w."type_of_work"
+    WHERE i."date_of_payment" >= ${startDate}::date
+      AND i."date_of_payment" <= ${endDate}::date
+    GROUP BY wt."id", wt."work_type"
+    HAVING SUM(i."amount_paid") > 0
+  `.execute(getKysely());
+
+  return rows;
+}
+
+/**
+ * Revenue COLLECTED per DOCTOR within [startDate, endDate] — as getRevenueByWorkType but
+ * grouped by employees on works.dr_id (a NOT NULL real FK). Unlike getDoctorCommissions
+ * there is NO percentage/is_active filter: every doctor with paid works appears, quit or
+ * not, commission-enabled or not.
+ */
+export async function getRevenueByDoctor(
+  startDate: string,
+  endDate: string
+): Promise<RevenueBreakdownRow[]> {
+  const { rows } = await sql<RevenueBreakdownRow>`
+    SELECT
+      e."id"            AS id,
+      e."employee_name" AS name,
+      COALESCE(SUM(i."amount_paid") FILTER (WHERE w."currency" = 'IQD'), 0) AS paid_iqd,
+      COALESCE(SUM(i."amount_paid") FILTER (WHERE w."currency" = 'USD'), 0) AS paid_usd,
+      COUNT(DISTINCT w."work_id")                                           AS work_count
+    FROM "invoices" i
+    JOIN "works" w      ON w."work_id" = i."work_id"
+    JOIN "employees" e  ON e."id"      = w."dr_id"
+    WHERE i."date_of_payment" >= ${startDate}::date
+      AND i."date_of_payment" <= ${endDate}::date
+    GROUP BY e."id", e."employee_name"
+    HAVING SUM(i."amount_paid") > 0
+  `.execute(getKysely());
+
+  return rows;
+}

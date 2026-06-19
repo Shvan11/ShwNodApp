@@ -141,6 +141,21 @@ const config: AppConfig = {
     userApiPassword: process.env.WEBCEPH_USER_API_PASSWORD,
     baseUrl: process.env.WEBCEPH_API_BASE_URL || 'https://api.webceph.com'
   },
+  // 3Shape Unite Web Service (OAuth PKCE public client — no secret). Blank
+  // THREESHAPE_CLIENT_ID / THREESHAPE_WEBSERVICE_BASE leaves it disabled.
+  threeshape: {
+    clientId: process.env.THREESHAPE_CLIENT_ID,
+    authority: process.env.THREESHAPE_AUTHORITY || 'https://identity.3shape.com',
+    scopes:
+      process.env.THREESHAPE_SCOPES ||
+      'openid api profile api.workflow.init api.media.read api.media.download api.cases.read license.read offline_access',
+    redirectUri:
+      process.env.THREESHAPE_REDIRECT_URI ||
+      'https://local.shwan-orthodontics.com/api/auth/3shape/callback',
+    webServiceBase: process.env.THREESHAPE_WEBSERVICE_BASE,
+    webhookSecret: process.env.THREESHAPE_WEBHOOK_SECRET,
+    webhookUrl: process.env.THREESHAPE_WEBHOOK_URL,
+  },
   localsend: {
     enabled: process.env.LOCALSEND_ENABLED === 'true',
     port: parseInt(process.env.LOCALSEND_PORT || '53317', 10),

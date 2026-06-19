@@ -16,6 +16,7 @@ export interface EmployeeWriteData {
   email: string | null;
   phone: string | null;
   percentage: boolean;
+  commission_percentage: number | null;
   receive_email: boolean;
   get_appointments: boolean;
   is_active: boolean;
@@ -33,10 +34,13 @@ export async function createEmployee(data: EmployeeWriteData): Promise<number> {
         position: data.position,
         email: data.email,
         phone: data.phone,
-        // A quit (inactive) employee is no longer a commission / email /
-        // appointment participant — force those flags off regardless of what
-        // was posted, so they vanish from every recipient/dropdown list.
-        percentage: data.is_active && data.percentage,
+        // Quit (is_active=false) clears the EMAIL + APPOINTMENT flags — a former
+        // employee is no longer a recipient and gets no new appointments. The
+        // commission flag + rate are PRESERVED on quit (the route already couples
+        // them: rate is null iff the flag is off) so the doctor still appears in the
+        // Statistics commission report for periods they were working.
+        percentage: data.percentage,
+        commission_percentage: data.commission_percentage,
         receive_email: data.is_active && data.receive_email,
         get_appointments: data.is_active && data.get_appointments,
         is_active: data.is_active,
@@ -71,9 +75,10 @@ export async function updateEmployee(id: number, data: EmployeeWriteData): Promi
         position: data.position,
         email: data.email,
         phone: data.phone,
-        // Marking an employee as quit (is_active=false) auto-clears their
-        // commission / email / appointment flags — see createEmployee.
-        percentage: data.is_active && data.percentage,
+        // Quit (is_active=false) clears EMAIL + APPOINTMENT flags only; the
+        // commission flag + rate are PRESERVED on quit — see createEmployee.
+        percentage: data.percentage,
+        commission_percentage: data.commission_percentage,
         receive_email: data.is_active && data.receive_email,
         get_appointments: data.is_active && data.get_appointments,
         is_active: data.is_active,

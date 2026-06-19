@@ -120,6 +120,31 @@ export interface WebCephConfig {
 }
 
 /**
+ * 3Shape Unite Web Service integration configuration.
+ *
+ * OAuth 2.0 (PKCE, public client — no secret) against `identity.3shape.com`; the
+ * `/v3` REST API is served by the Unite Web Service on the workstation Host Device
+ * (`webServiceBase`, e.g. `https://WORK_PC:5492`). Blank `clientId`/`webServiceBase`
+ * disables the integration (status reports "not configured").
+ */
+export interface ThreeShapeConfig {
+  /** OAuth public client id (blank disables the integration). */
+  clientId?: string;
+  /** OIDC issuer/authority. Defaults to https://identity.3shape.com. */
+  authority: string;
+  /** Space-separated OAuth scopes. */
+  scopes: string;
+  /** Registered redirect URI for the auth-code callback. */
+  redirectUri: string;
+  /** Workstation Web Service base URL, e.g. https://WORK_PC:5492 (blank disables API calls). */
+  webServiceBase?: string;
+  /** Shared secret 3Shape presents on webhook callbacks (blank disables the webhook). */
+  webhookSecret?: string;
+  /** Webhook callback URL; defaults to the redirect URI's origin + the webhook path. */
+  webhookUrl?: string;
+}
+
+/**
  * File system configuration
  */
 export interface FileSystemConfig {
@@ -170,6 +195,7 @@ export interface AppConfig {
   server: ServerConfig;
   urls: UrlConfig;
   webceph: WebCephConfig;
+  threeshape: ThreeShapeConfig;
   localsend: LocalSendConfig;
   /** Path to the `pg_dump` binary for the database-backup download (defaults to 'pg_dump' on PATH). */
   pgDumpPath: string;
@@ -231,6 +257,13 @@ export interface OptionalEnvVars {
   WEBCEPH_USER_EMAIL?: string;
   WEBCEPH_USER_API_PASSWORD?: string;
   WEBCEPH_API_BASE_URL?: string;
+  THREESHAPE_CLIENT_ID?: string;
+  THREESHAPE_AUTHORITY?: string;
+  THREESHAPE_SCOPES?: string;
+  THREESHAPE_REDIRECT_URI?: string;
+  THREESHAPE_WEBSERVICE_BASE?: string;
+  THREESHAPE_WEBHOOK_SECRET?: string;
+  THREESHAPE_WEBHOOK_URL?: string;
   CS_EXPORT?: string;
   GRAM_SESSION?: string;
   FAILOVER_SYNC_ENABLED?: string;
