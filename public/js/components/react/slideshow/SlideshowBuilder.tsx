@@ -16,6 +16,7 @@ import { useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, SyntheticEvent } from 'react';
 import cn from 'classnames';
 import { useToast } from '../../../contexts/ToastContext';
+import { httpErrorMessage } from '../../../core/http';
 import { photoId } from './photoTypes';
 import type { SlideItem, SlidePhoto, Timepoint } from './types';
 import styles from './SlideshowBuilder.module.css';
@@ -116,9 +117,9 @@ const SlideshowBuilder = ({
       try {
         await loadGallery(tp);
         setTpError((p) => ({ ...p, [tp.tpCode]: false }));
-      } catch {
+      } catch (err) {
         setTpError((p) => ({ ...p, [tp.tpCode]: true }));
-        toast.error('Failed to load photos for this session');
+        toast.error(httpErrorMessage(err, 'Failed to load photos for this session'));
       } finally {
         setTpLoading((p) => ({ ...p, [tp.tpCode]: false }));
       }

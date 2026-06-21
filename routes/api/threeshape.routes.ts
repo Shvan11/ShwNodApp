@@ -13,23 +13,29 @@ import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import { getPatientById } from '../../services/database/queries/patient-queries.js';
+import { PhoneFormatter } from '../../utils/phoneFormatter.js';
 import * as threeShapeClient from '../../services/threeshape/client.js';
 import { sendThreeShapeError } from '../../services/threeshape/route-helpers.js';
 import * as threeshape from '../../shared/contracts/threeshape.contract.js';
 
 const router = Router();
 
-/** First/last name: prefer the dedicated columns, else split the display name. */
+/**
+ * First/last name for 3Shape. Send `patient_name` — the clinic's primary,
+ * always-present full name (Arabic for this clinic) — split into first + last so
+ * the patient shows in Arabic in Unite. `first_name`/`last_name` hold the optional
+ * English transliteration and are only a fallback if `patient_name` is blank.
+ * 3Shape requires a non-empty lastName, so a single-token name goes there.
+ */
 function deriveName(p: {
   first_name: string | null;
   last_name: string | null;
   patient_name: string;
 }): { first: string; last: string } {
-  if (p.first_name || p.last_name) {
-    return { first: p.first_name ?? '', last: p.last_name ?? '' };
-  }
-  const parts = (p.patient_name ?? '').trim().split(/\s+/);
-  return { first: parts[0] ?? '', last: parts.slice(1).join(' ') };
+  const parts = (p.patient_name ?? '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return { first: parts[0], last: parts.slice(1).join(' ') };
+  if (parts.length === 1) return { first: '', last: parts[0] };
+  return { first: p.first_name ?? '', last: p.last_name ?? '' };
 }
 
 // POST /api/threeshape/patients/:personId/initiate-workflow — push the patient and
@@ -46,16 +52,34 @@ router.post(
         return;
       }
       const { first, last } = deriveName(patient);
+      // 3Shape requires E.164; our DB stores bare local numbers (e.g. 7XXXXXXXXX).
+      // Normalize, and omit (rather than 400 the whole workflow) if not valid.
+      const phoneNumber = PhoneFormatter.forE164(patient.phone ?? '');
+      if (patient.phone && !phoneNumber) {
+        log.warn('[3Shape] omitting invalid phone from workflow', { personId });
+      }
       await threeShapeClient.initiateWorkflow({
         integrationId: String(patient.person_id),
         firstName: first,
         lastName: last,
         email: patient.email,
-        phoneNumber: patient.phone,
+        phoneNumber,
         dateOfBirth: patient.date_of_birth,
         gender: patient.gender,
       });
       log.info('[3Shape] workflow initiated', { personId });
+      // Bring the Unite app up on the workstation if it isn't already open.
+      // Best-effort: an already-running Unite (or a launch hiccup) must not fail
+      // the push, which has already succeeded above.
+      try {
+        await threeShapeClient.launchUnite();
+        log.info('[3Shape] launchUnite requested', { personId });
+      } catch (err) {
+        log.warn('[3Shape] launchUnite failed (continuing)', {
+          personId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
       sendData(res, threeshape.initiateWorkflow.response, { ok: true });
     } catch (err) {
       sendThreeShapeError(res, err, 'Failed to start the 3Shape scan');
@@ -104,6 +128,8 @@ router.get(
 
 const mediaIdParam = z.object({ mediaId: z.string().min(1) });
 const caseIdParam = z.object({ caseId: z.string().min(1) });
+// A media item can hold several files (e.g. Upper + Lower DICOM); fileId selects one.
+const mediaDownloadQuery = z.object({ fileId: z.string().optional() });
 
 async function forwardBinary(
   res: Response,
@@ -118,13 +144,13 @@ async function forwardBinary(
   res.send(buf);
 }
 
-// GET /api/threeshape/media/:mediaId/download
+// GET /api/threeshape/media/:mediaId/download[?fileId=…]
 router.get(
   '/threeshape/media/:mediaId/download',
-  validate({ params: mediaIdParam }),
-  async (req: Request<{ mediaId: string }>, res: Response): Promise<void> => {
+  validate({ params: mediaIdParam, query: mediaDownloadQuery }),
+  async (req: Request<{ mediaId: string }, unknown, unknown, { fileId?: string }>, res: Response): Promise<void> => {
     try {
-      const upstream = await threeShapeClient.fetchMediaDownload(req.params.mediaId);
+      const upstream = await threeShapeClient.fetchMediaDownload(req.params.mediaId, req.query.fileId);
       await forwardBinary(res, upstream, `3shape-media-${req.params.mediaId}`);
     } catch (err) {
       sendThreeShapeError(res, err, 'Failed to download the file');

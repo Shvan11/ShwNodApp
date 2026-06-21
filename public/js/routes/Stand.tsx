@@ -7,6 +7,7 @@ import ExpiringItemsPanel from '../components/stand/ExpiringItemsPanel';
 import RestockModal from '../components/stand/RestockModal';
 import { useStandItemMutations } from '../hooks/useStand';
 import { useToast } from '../contexts/ToastContext';
+import { httpErrorMessage } from '@/core/http';
 import { useState, useEffect } from 'react';
 import styles from './Stand.module.css';
 
@@ -34,8 +35,8 @@ export default function Stand() {
       await doRestock(restockItem.item_id, quantity, unitCost);
       toast.success('Item restocked successfully');
       setRestockItem(null);
-    } catch {
-      toast.error('Failed to restock item');
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to restock item'));
     }
   };
 

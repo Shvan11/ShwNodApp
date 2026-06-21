@@ -30,6 +30,7 @@ import RestockModal from '../components/stand/RestockModal';
 import StockAdjustModal from '../components/stand/StockAdjustModal';
 import StockMovementsModal from '../components/stand/StockMovementsModal';
 import { useToast } from '../contexts/ToastContext';
+import { httpErrorMessage } from '@/core/http';
 import styles from './StandInventory.module.css';
 
 export default function StandInventory() {
@@ -108,8 +109,8 @@ export default function StandInventory() {
       }
       setIsFormOpen(false);
       setFormItem(null);
-    } catch {
-      toast.error(formItem ? 'Failed to update item' : 'Failed to create item');
+    } catch (err) {
+      toast.error(httpErrorMessage(err, formItem ? 'Failed to update item' : 'Failed to create item'));
     }
   };
 
@@ -119,8 +120,8 @@ export default function StandInventory() {
       await deleteItem(deleteTarget.item_id);
       toast.success('Item deactivated successfully');
       setDeleteTarget(null);
-    } catch {
-      toast.error('Failed to deactivate item');
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to deactivate item'));
     }
   };
 
@@ -130,8 +131,8 @@ export default function StandInventory() {
       await restockItem(restockTarget.item_id, quantity, unitCost);
       toast.success('Item restocked successfully');
       setRestockTarget(null);
-    } catch {
-      toast.error('Failed to restock item');
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to restock item'));
     }
   };
 
@@ -141,8 +142,8 @@ export default function StandInventory() {
       await adjustStock(adjustTarget.item_id, delta, reason);
       toast.success('Stock adjusted successfully');
       setAdjustTarget(null);
-    } catch {
-      toast.error('Failed to adjust stock');
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to adjust stock'));
     }
   };
 

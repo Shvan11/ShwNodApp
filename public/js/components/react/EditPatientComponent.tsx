@@ -5,7 +5,8 @@ import { useToast } from '../../contexts/ToastContext';
 import PhoneInput from './PhoneInput';
 import styles from './EditPatientComponent.module.css';
 import { formatISODate } from '../../core/utils';
-import { putJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { putJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import * as patientContract from '@shared/contracts/patient.contract';
 import { qk } from '@/query/keys';
 import {
     patientByIdQuery,
@@ -73,6 +74,7 @@ const EditPatientComponent = ({ personId }: Props) => {
     const toast = useToast();
     const queryClient = useQueryClient();
     const [saving, setSaving] = useState(false);
+    const [translating, setTranslating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Patient record read — populates the form via the effect below. Each
@@ -230,6 +232,35 @@ const EditPatientComponent = ({ personId }: Props) => {
         }
     };
 
+    // On-demand AI romanization of the Arabic patient name → fills First/Last for the
+    // user to review before saving. Clean translate (bounded 8s, no retries): it either
+    // fills the name or shows the server's error — no silent empty/manual fallback.
+    const handleTranslateName = async () => {
+        const arabicName = formData.patient_name.trim();
+        if (!arabicName) {
+            toast.warning('Enter the patient name first');
+            return;
+        }
+        try {
+            setTranslating(true);
+            const result = await postJSON<patientContract.TransliterateNameResult>(
+                '/api/patients/transliterate-name',
+                { patientName: arabicName },
+                { schema: patientContract.transliterateName.response }
+            );
+            setFormData(prev => ({
+                ...prev,
+                first_name: result.firstName || prev.first_name,
+                last_name: result.lastName || prev.last_name,
+            }));
+            toast.success('Translated — review the name and save');
+        } catch (err) {
+            toast.error(httpErrorMessage(err, 'Failed to translate name'));
+        } finally {
+            setTranslating(false);
+        }
+    };
+
     const handleCancel = () => {
         // Navigate back to works page using React Router
         if (validPersonId) {
@@ -336,6 +367,23 @@ const EditPatientComponent = ({ personId }: Props) => {
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, last_name: e.target.value})}
                         />
                     </div>
+                </div>
+
+                {/* Subtle on-demand AI romanization of the Arabic name → fills First/Last for review */}
+                <div className={styles.formRow}>
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={handleTranslateName}
+                        disabled={translating || !formData.patient_name.trim()}
+                        title="Suggest an English first and last name from the Arabic name using AI"
+                    >
+                        {translating ? (
+                            <><i className="fas fa-spinner fa-spin"></i> Translating…</>
+                        ) : (
+                            <><i className="fas fa-language"></i> Translate name with AI</>
+                        )}
+                    </button>
                 </div>
 
                 <div className={styles.formRow}>

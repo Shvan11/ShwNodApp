@@ -499,6 +499,17 @@ class WhatsAppService extends EventEmitter {
   private wsEmitter: WebSocketEmitter | null = null;
   private messageState: typeof messageState;
 
+  // Ready watchdog: recovers the "authenticated but `ready` never fires" fresh-
+  // link stall by auto-restarting (see armReadyWatchdog).
+  private readyWatchdog: ReturnType<typeof setTimeout> | null = null;
+  private readyWatchdogRestarts = 0;
+
+  // Liveness heartbeat: a plain network drop can kill the socket WITHOUT firing
+  // `disconnected`/`change_state`, so we poll getState() to catch silent death
+  // (see startHeartbeat).
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private heartbeatMisses = 0;
+
   private eventHandlers: {
     onQR: (qr: string) => Promise<void>;
     onReady: () => Promise<void>;
@@ -644,6 +655,18 @@ class WhatsAppService extends EventEmitter {
     log.info('Starting initialization', { forceRestart });
 
     try {
+      // Cold start (boot / on-demand / reconnect): a stale `lockfile` left by a
+      // prior process (crash or unclean shutdown) makes Puppeteer refuse to launch
+      // with "browser is already running". Clear it BEFORE the launch instead of
+      // failing first and self-healing on the retry — gated on the lockfile
+      // actually existing, so a clean start pays only one stat(). The forceRestart
+      // path still has its client here (and already unlocked in restart()), so
+      // this fires only on a true cold start.
+      if (!this.clientState.client && (await this.profileLockExists())) {
+        log.warn('Stale WhatsApp profile lock detected before init — unlocking proactively');
+        await this.ensureProfileUnlocked();
+      }
+
       if (forceRestart && this.clientState.client) {
         await this.destroyClient('restart');
       }
@@ -700,9 +723,17 @@ class WhatsAppService extends EventEmitter {
       }
     } catch (error) {
       // A failed initialize() leaves the Puppeteer Chrome alive and holding
-      // the userDataDir SingletonLock, so every subsequent retry fails with
+      // the userDataDir lock, so every subsequent retry fails with
       // "browser is already running for ...session-client". Tear it down now.
       await this.cleanupFailedClient();
+
+      // If the launch collided with a browser that already owns the profile,
+      // clear the lock + any orphan chrome.exe so the scheduled reconnect can
+      // actually succeed instead of hitting the same collision forever.
+      const initErrMsg = (error as Error)?.message || '';
+      if (/already running|ProcessSingleton/i.test(initErrMsg)) {
+        await this.ensureProfileUnlocked();
+      }
 
       this.clientState.setState('ERROR', error as Error);
       await this.messageState.setClientReady(false);
@@ -1105,7 +1136,29 @@ class WhatsAppService extends EventEmitter {
 
     log.info('Client authenticated successfully');
 
+    // A QR still in state means this auth came from a fresh scan rather than a
+    // silent session restore. Only the fresh-link path suffers the "never ready"
+    // stall and should arm the watchdog — a slow session restore can legitimately
+    // take longer than the watchdog window and must not be interrupted. Capture
+    // this BEFORE clearing the QR below.
+    const wasFreshLink = !!this.messageState.qr;
+
     await this.messageState.setQR(null);
+
+    // Tell the UI the scan worked so it stops presenting the QR as if it failed,
+    // even though `ready` (which marks the client usable) may still be seconds
+    // away — or, on a fresh link, may never arrive (handled by the watchdog).
+    this.broadcastReadyState(false, 'authenticated', 'Authenticated — finishing connection…');
+
+    // Ready watchdog. On a FRESH QR link, whatsapp-web.js frequently fires
+    // `authenticated` but never `ready`: the post-auth page navigation destroys
+    // Puppeteer's injected context ("Execution context was destroyed" /
+    // "detached Frame" in Client.inject), so the client stays unusable and the
+    // QR lingers until someone restarts. The session is already persisted by
+    // now, so a restart reloads it and `ready` fires in ~1s — automate it.
+    if (wasFreshLink) {
+      this.armReadyWatchdog();
+    }
 
     log.info('Waiting 60s for session to stabilize...');
 
@@ -1119,6 +1172,10 @@ class WhatsAppService extends EventEmitter {
 
   private async handleReady(): Promise<void> {
     log.info('Client ready');
+
+    // `ready` arrived — cancel the watchdog and reset its restart budget.
+    this.clearReadyWatchdog();
+    this.readyWatchdogRestarts = 0;
 
     if (this.clientState.client) {
       try {
@@ -1146,6 +1203,149 @@ class WhatsAppService extends EventEmitter {
         message: 'WhatsApp client is ready!',
       });
     }
+
+    // Connected — start the liveness heartbeat so a silently-dropped socket gets
+    // detected and recovered instead of sitting dead until the next send fails.
+    this.startHeartbeat();
+  }
+
+  /** Cancel a pending ready-watchdog (ready arrived, or we're tearing down). */
+  private clearReadyWatchdog(): void {
+    if (this.readyWatchdog) {
+      clearTimeout(this.readyWatchdog);
+      this.readyWatchdog = null;
+    }
+  }
+
+  /**
+   * After `authenticated`, give `ready` a bounded window to arrive; if it
+   * doesn't, restart once to reload the freshly-persisted session — the proven
+   * recovery for whatsapp-web.js's "authenticated but never ready" fresh-link
+   * stall (post-auth navigation kills the injected context, so `ready` never
+   * fires, yet a restart that reloads the saved session reaches ready in ~1s).
+   *
+   * Fires AFTER the 60s stabilization window so the restart never races session
+   * persistence, and is capped by MAX_RESTARTS so a genuinely broken session
+   * can't loop forever. The CONNECTED guard makes it a no-op if ready did fire.
+   */
+  private armReadyWatchdog(): void {
+    this.clearReadyWatchdog();
+    const READY_WATCHDOG_DELAY_MS = 75000;
+    const READY_WATCHDOG_MAX_RESTARTS = 2;
+
+    this.readyWatchdog = setTimeout(() => {
+      this.readyWatchdog = null;
+
+      // Ready arrived (or we've otherwise left the auth flow) — nothing to do.
+      if (this.clientState.isState('CONNECTED') || this.messageState.clientReady) {
+        return;
+      }
+
+      if (this.readyWatchdogRestarts >= READY_WATCHDOG_MAX_RESTARTS) {
+        log.error(
+          'WhatsApp authenticated but never became ready after auto-restarts — leaving it for manual recovery',
+          { restarts: this.readyWatchdogRestarts }
+        );
+        return;
+      }
+
+      this.readyWatchdogRestarts += 1;
+      log.warn(
+        'Authenticated but no `ready` event — auto-restarting to reload the persisted session',
+        { attempt: this.readyWatchdogRestarts, maxAttempts: READY_WATCHDOG_MAX_RESTARTS }
+      );
+      void this.restart().catch((err) => {
+        log.error('Ready-watchdog restart failed', { error: (err as Error).message });
+      });
+    }, READY_WATCHDOG_DELAY_MS);
+
+    // Never let this timer hold the process open during shutdown.
+    if (typeof this.readyWatchdog.unref === 'function') {
+      this.readyWatchdog.unref();
+    }
+  }
+
+  /** Stop the liveness heartbeat and reset its miss counter. */
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    this.heartbeatMisses = 0;
+  }
+
+  /**
+   * Start the liveness heartbeat. whatsapp-web.js does NOT fire `disconnected` on
+   * a plain network drop, so a connection can die silently and we'd only discover
+   * it when the next send fails. Every 60s we ask the page for `client.getState()`;
+   * two consecutive non-`CONNECTED`/error probes mean the socket is dead → restart
+   * (which reloads the saved session, no QR needed). Debounced by two misses to
+   * ride out getState()'s known transient flakiness. Started on `ready`, stopped
+   * on every teardown; idempotent (safe to call on repeated `ready` events).
+   */
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    const HEARTBEAT_INTERVAL_MS = 60000;
+    this.heartbeatTimer = setInterval(() => {
+      void this.heartbeatTick();
+    }, HEARTBEAT_INTERVAL_MS);
+    if (typeof this.heartbeatTimer.unref === 'function') {
+      this.heartbeatTimer.unref();
+    }
+  }
+
+  private async heartbeatTick(): Promise<void> {
+    // Only probe when we BELIEVE we're up; the init/reconnect paths own every
+    // other state, and a user-initiated teardown must not be fought.
+    if (
+      !this.clientState.isState('CONNECTED') ||
+      !this.messageState.clientReady ||
+      this.clientState.destroyInProgress ||
+      this.messageState.manualDisconnect
+    ) {
+      return;
+    }
+
+    const client = this.clientState.client;
+    if (!client) return;
+
+    const HEARTBEAT_MAX_MISSES = 2;
+    let state: string | null = null;
+    let probeFailed = false;
+    try {
+      state = await Promise.race([
+        client.getState(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('getState timeout')), 10000)
+        ),
+      ]);
+    } catch (err) {
+      probeFailed = true;
+      log.debug('WhatsApp heartbeat probe threw', { error: (err as Error).message });
+    }
+
+    // 'CONNECTED' is the only healthy value; anything else (or a throw) is a miss.
+    if (!probeFailed && state === 'CONNECTED') {
+      this.heartbeatMisses = 0;
+      return;
+    }
+
+    this.heartbeatMisses += 1;
+    log.warn('WhatsApp heartbeat miss — connection may be dead', {
+      state: state ?? 'error',
+      miss: this.heartbeatMisses,
+      maxMisses: HEARTBEAT_MAX_MISSES,
+    });
+
+    if (this.heartbeatMisses < HEARTBEAT_MAX_MISSES) return;
+
+    log.error('WhatsApp connection is silently dead — restarting to recover', {
+      lastState: state ?? 'error',
+    });
+    this.stopHeartbeat(); // restart() starts a fresh one on the next `ready`
+    void this.restart().catch((err) => {
+      log.error('Heartbeat-triggered restart failed', { error: (err as Error).message });
+    });
   }
 
   private async handleMessageAck(msg: WhatsAppMessage, ack: number): Promise<void> {
@@ -1229,6 +1429,8 @@ class WhatsAppService extends EventEmitter {
 
   private async handleDisconnected(reason: string): Promise<void> {
     log.warn(`Client disconnected`, { reason });
+    this.clearReadyWatchdog();
+    this.stopHeartbeat();
     this.clientState.setState('DISCONNECTED');
     await this.messageState.setClientReady(false);
     this.broadcastReadyState(false, 'disconnected', `WhatsApp disconnected: ${reason}`);
@@ -1306,6 +1508,8 @@ class WhatsAppService extends EventEmitter {
   async restart(): Promise<boolean> {
     log.info('Restarting WhatsApp client - preserving authentication');
 
+    this.clearReadyWatchdog();
+    this.stopHeartbeat();
     this.messageState.manualDisconnect = true;
 
     try {
@@ -1322,15 +1526,35 @@ class WhatsAppService extends EventEmitter {
         }
       }
 
+      // Capture the live Chrome's PID BEFORE destroying the client. In QR mode
+      // `ready` never fired, so clientState.browser is null — the only handle to
+      // the running browser is the client's pupBrowser. We need the PID to be
+      // sure the process is gone before relaunching: a still-dying or orphaned
+      // Chrome keeps owning the LocalAuth profile and makes initialize() throw
+      // "The browser is already running for …session-client".
+      const priorProc = this.clientState.client?.pupBrowser?.process?.() ?? null;
+
       if (this.clientState.client) {
         try {
-          await this.clientState.client.destroy();
+          await Promise.race([
+            this.clientState.client.destroy(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Client destroy timeout')), 15000)
+            ),
+          ]);
           log.info('Client destroyed for restart - authentication preserved');
         } catch (error) {
-          log.error('Error destroying client during restart', error);
+          log.error(
+            'Error destroying client during restart - will force-unlock the profile',
+            error
+          );
         }
         this.clientState.client = null;
       }
+
+      // Make absolutely sure no Chrome still owns the profile, else the
+      // initialize() below fails with "browser is already running".
+      await this.ensureProfileUnlocked(priorProc);
 
       this.clientState.cleanup();
       this.clientState.setState('DISCONNECTED');
@@ -1409,6 +1633,8 @@ class WhatsAppService extends EventEmitter {
 
   async destroyClient(reason = 'manual'): Promise<void> {
     log.info(`Destroying WhatsApp client (reason: ${reason})`);
+    this.clearReadyWatchdog();
+    this.stopHeartbeat();
 
     if (
       this.clientState.client &&
@@ -1463,6 +1689,122 @@ class WhatsAppService extends EventEmitter {
       this.clientState.browser = null;
       this.clientState.page = null;
       this.clientState.destroyInProgress = false;
+    }
+  }
+
+  /** Cheap check: does Puppeteer's Windows profile `lockfile` exist? */
+  private async profileLockExists(): Promise<boolean> {
+    try {
+      const fsMod = await import('fs');
+      const pathMod = await import('path');
+      const lockPath = pathMod.default.resolve('.wwebjs_auth', 'session-client', 'lockfile');
+      return fsMod.default.existsSync(lockPath);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Guarantee the LocalAuth Chrome profile is free before (re)launching.
+   *
+   * Puppeteer refuses to launch on a profile another Chrome still owns and throws
+   * "The browser is already running for <userDataDir>" — on Windows it detects a
+   * leftover `<dir>\lockfile` plus Chrome's ProcessSingleton mutex held by a live
+   * chrome.exe (BrowserLauncher.js). A bare destroy() can leave the old chrome.exe
+   * still dying, and an unclean prior shutdown (e.g. the SIGHUP console-disconnect
+   * path) can orphan one entirely. So we: (1) hard-kill the browser we had a handle
+   * to and wait for it to actually exit, (2) on Windows kill any orphan chrome.exe
+   * still bound to THIS profile (matched by command line, so the user's own Chrome
+   * is never touched), then (3) delete the stale lock files.
+   */
+  private async ensureProfileUnlocked(
+    trackedProc: { kill?: (signal: string) => void; pid?: number } | null = null
+  ): Promise<void> {
+    const fsMod = await import('fs');
+    const pathMod = await import('path');
+    const sessionDir = pathMod.default.resolve('.wwebjs_auth', 'session-client');
+
+    if (trackedProc?.pid) {
+      await this.killPidAndWait(trackedProc.pid);
+    }
+
+    if (process.platform === 'win32') {
+      await this.killWindowsChromeForProfile(sessionDir);
+    }
+
+    for (const name of ['lockfile', 'SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
+      try {
+        fsMod.default.rmSync(pathMod.default.join(sessionDir, name), {
+          force: true,
+          maxRetries: 3,
+          retryDelay: 200,
+        });
+      } catch (err) {
+        log.debug(`Profile unlock: could not remove ${name}`, {
+          error: (err as Error).message,
+        });
+      }
+    }
+  }
+
+  /** SIGKILL a PID, then poll (signal 0) until it's actually gone or we time out. */
+  private async killPidAndWait(pid: number, timeoutMs = 8000): Promise<void> {
+    try {
+      process.kill(pid, 'SIGKILL');
+      log.info('Killed leftover WhatsApp Chrome process', { pid });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ESRCH') return; // already gone
+      log.debug('killPidAndWait: initial kill failed', {
+        pid,
+        error: (err as Error).message,
+      });
+    }
+
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      try {
+        process.kill(pid, 0); // probe: throws ESRCH once the process is gone
+      } catch {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    log.warn('Leftover Chrome process still alive after kill timeout', { pid });
+  }
+
+  /**
+   * Kill any chrome.exe whose command line references THIS LocalAuth profile dir.
+   * Targeted on purpose — it must never close the staff member's personal Chrome,
+   * only the orphaned WhatsApp-Web browser bound to our --user-data-dir.
+   */
+  private async killWindowsChromeForProfile(sessionDir: string): Promise<void> {
+    if (process.platform !== 'win32') return;
+    try {
+      const { execFile } = await import('child_process');
+      const { promisify } = await import('util');
+      const run = promisify(execFile);
+
+      const needle = sessionDir.replace(/'/g, "''"); // escape single quotes for PS
+      const script =
+        `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" | ` +
+        `Where-Object { $_.CommandLine -and $_.CommandLine -like '*${needle}*' } | ` +
+        `ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; $_.ProcessId } catch {} }`;
+
+      const { stdout } = await run(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-Command', script],
+        { timeout: 10000, windowsHide: true, encoding: 'utf8' }
+      );
+      const pids = String(stdout).trim();
+      if (pids) {
+        log.warn('Killed orphan Chrome bound to the WhatsApp profile', {
+          pids: pids.split(/\s+/),
+        });
+      }
+    } catch (err) {
+      log.debug('Orphan-Chrome scan failed (non-fatal)', {
+        error: (err as Error).message,
+      });
     }
   }
 
@@ -1851,6 +2193,17 @@ class WhatsAppService extends EventEmitter {
 
   async initializeOnDemand(): Promise<boolean> {
     log.debug('initializeOnDemand called - checking conditions');
+
+    // Honor WHATSAPP_AUTO_INIT=false as a TRUE kill-switch: block every
+    // automatic init path, not just the boot one (index.ts gates boot the same
+    // way). The global SSE subscription registers a QR viewer for every logged-in
+    // user, so without this gate the on-demand path would auto-start WhatsApp
+    // regardless of the flag. Manual start (whatsapp.initialize() via
+    // POST /api/wa/initialize) bypasses this and still works.
+    if (process.env.WHATSAPP_AUTO_INIT === 'false') {
+      log.debug('On-demand init skipped — WHATSAPP_AUTO_INIT=false (manual start only)');
+      return false;
+    }
 
     if (
       this.clientState.isState('CONNECTED') ||

@@ -24,21 +24,37 @@ export type InitiateWorkflowParams = z.infer<typeof initiateWorkflow.params>;
 // Normalized (camelCase) shapes the server maps the raw 3Shape DTOs into.
 const personIdParam = z.object({ personId: z.string().regex(/^\d+$/, 'personId must be numeric') });
 
+const caseIndication = z.object({
+  from: z.number().nullable(),
+  to: z.number().nullable(),
+  type: z.string().nullable(),
+  material: z.string().nullable(),
+});
+
 const scanCase = z.object({
   id: z.string(),
+  workflowStatus: z.string().nullable(),
+  creationDate: z.string().nullable(),
+  deliveryDate: z.string().nullable(),
+  lastModifiedDate: z.string().nullable(),
+  uniteCloudLink: z.string().nullable(),
+  indications: z.array(caseIndication),
+});
+
+const scanMediaFile = z.object({
+  id: z.string().nullable(),
   name: z.string().nullable(),
-  workflowId: z.string().nullable(),
-  itemNames: z.array(z.string()),
-  isScanned: z.boolean(),
-  isModelled: z.boolean(),
+  size: z.number().nullable(),
+  fileType: z.string().nullable(),
+  scanType: z.string().nullable(),
 });
 
 const scanMedia = z.object({
   id: z.string(),
-  name: z.string().nullable(),
-  type: z.string().nullable(),
-  fileName: z.string().nullable(),
-  createdAt: z.string().nullable(),
+  mediaType: z.string().nullable(),
+  captureDate: z.string().nullable(),
+  uniteCloudLink: z.string().nullable(),
+  files: z.array(scanMediaFile),
 });
 
 // GET /api/threeshape/patients/:personId/cases — finished cases pulled live.

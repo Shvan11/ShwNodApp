@@ -16,6 +16,12 @@ import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import config from '../../config/config.js';
 import * as telegramAuth from '../../services/messaging/telegram-auth.js';
+import {
+  getGeminiStatus,
+  setGeminiConfig,
+  clearGeminiConfig,
+  testGeminiConnection,
+} from '../../services/business/gemini-config.js';
 import * as threeShapeOAuth from '../../services/threeshape/oauth.js';
 import * as threeShapeClient from '../../services/threeshape/client.js';
 import { sendThreeShapeError } from '../../services/threeshape/route-helpers.js';
@@ -108,6 +114,57 @@ router.post('/telegram/logout', async (_req: Request, res: Response): Promise<vo
   } catch (err) {
     log.error('[Integrations] telegram logout failed', { error: (err as Error).message });
     ErrorResponses.internalError(res, 'Failed to log out of Telegram');
+  }
+});
+
+// ── Gemini (Google GenAI) ──
+
+// GET /api/integrations/gemini/status — configuration status (masked key).
+router.get('/gemini/status', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    sendData(res, integrations.geminiStatus.response, await getGeminiStatus());
+  } catch (err) {
+    log.error('[Integrations] gemini status failed', { error: (err as Error).message });
+    ErrorResponses.internalError(res, 'Failed to read Gemini status');
+  }
+});
+
+// POST /api/integrations/gemini/config — save API key and/or model.
+router.post(
+  '/gemini/config',
+  validate({ body: integrations.geminiConfig.body }),
+  async (
+    req: Request<object, object, integrations.GeminiConfigBody>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      await setGeminiConfig(req.body);
+      sendData(res, integrations.geminiConfig.response, await getGeminiStatus());
+    } catch (err) {
+      log.error('[Integrations] gemini config failed', { error: (err as Error).message });
+      ErrorResponses.internalError(res, 'Failed to save Gemini configuration');
+    }
+  }
+);
+
+// POST /api/integrations/gemini/test — lightweight connectivity check.
+router.post('/gemini/test', async (_req: Request, res: Response): Promise<void> => {
+  const result = await testGeminiConnection();
+  sendData(res, integrations.geminiTest.response, {
+    ok: result.ok,
+    model: result.model,
+    error: result.error ?? null,
+  });
+});
+
+// POST /api/integrations/gemini/clear — drop the DB overrides (revert to env).
+router.post('/gemini/clear', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    await clearGeminiConfig();
+    sendData(res, integrations.geminiClear.response, await getGeminiStatus());
+  } catch (err) {
+    log.error('[Integrations] gemini clear failed', { error: (err as Error).message });
+    ErrorResponses.internalError(res, 'Failed to clear Gemini configuration');
   }
 });
 

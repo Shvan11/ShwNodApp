@@ -924,6 +924,38 @@ router.get(
 );
 
 /**
+ * Transliterate an Arabic patient name into English on demand.
+ * POST /patients/transliterate-name
+ *
+ * Powers the Edit Patient form's "Translate with AI" button. Best-effort and
+ * bounded (the underlying Gemini call is capped at 8s with no retries): returns
+ * empty strings when the model is unconfigured/unavailable or can't produce a
+ * clean Latin first+last, so the UI falls back to manual entry. No DB write —
+ * the user reviews the suggestion and saves the form themselves. Registered
+ * before POST /patients so the literal path can never be shadowed.
+ */
+router.post(
+  '/patients/transliterate-name',
+  validate({ body: patientContract.transliterateName.body }),
+  async (
+    req: Request<unknown, unknown, patientContract.TransliterateNameBody>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { patientName } = req.body;
+      const { firstName, lastName } = await transliterateNameToEnglish(patientName);
+      sendData(res, patientContract.transliterateName.response, { firstName, lastName });
+    } catch (err) {
+      // Clean success-or-error: surface the real reason (not configured / no usable
+      // result / API error) so the UI shows it directly — no silent empty fallback.
+      const message = err instanceof Error ? err.message : 'Could not translate the name';
+      log.warn('Transliterate name failed', { error: message });
+      ErrorResponses.badRequest(res, message);
+    }
+  }
+);
+
+/**
  * Create new patient
  * POST /patients
  */
@@ -992,17 +1024,17 @@ router.post(
 
       // English first/last not supplied → auto-fill by romanizing the Arabic patientName
       // with Gemini, AFTER responding so the create request never blocks on the API call.
-      // Best-effort, fire-and-forget: only fills the missing field(s), and silently keeps
-      // them empty if Gemini is unconfigured / errors / can't produce a clean Latin name.
+      // Fire-and-forget: on success it fills the missing field(s); a translate failure just
+      // logs and leaves the name for manual entry later (the catch is error containment for
+      // the detached promise, not a fallback path).
       if (!processedData.firstName || !processedData.lastName) {
         void (async () => {
           try {
-            const ai = await transliterateNameToEnglish(processedData.patientName);
-            if (!ai) return;
+            const { firstName, lastName } = await transliterateNameToEnglish(processedData.patientName);
             await updatePatientName(
               String(result.personId),
-              processedData.firstName || ai.firstName,
-              processedData.lastName || ai.lastName
+              processedData.firstName || firstName,
+              processedData.lastName || lastName
             );
           } catch (err) {
             log.warn('Background name transliteration failed', {

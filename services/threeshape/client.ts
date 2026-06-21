@@ -85,11 +85,12 @@ export interface InitiateWorkflowPatient {
 /** POST /v3/patients/initiate-workflow — push the patient + start a scan workflow. */
 export async function initiateWorkflow(patient: InitiateWorkflowPatient): Promise<void> {
   // Omit null/empty optionals so we never send empty fields to the scanner.
+  // Only IntegrationId + LastName are required by 3Shape; FirstName is optional.
   const details: Record<string, unknown> = {
     IntegrationId: patient.integrationId,
-    FirstName: patient.firstName,
     LastName: patient.lastName,
   };
+  if (patient.firstName) details.FirstName = patient.firstName;
   if (patient.patientId) details.PatientId = patient.patientId;
   if (patient.email) details.Email = patient.email;
   if (patient.phoneNumber) details.PhoneNumber = patient.phoneNumber;
@@ -103,6 +104,22 @@ export async function initiateWorkflow(patient: InitiateWorkflowPatient): Promis
     body: JSON.stringify({ PatientDetails: details }),
   });
   await ensureOk(res, 'initiate-workflow');
+}
+
+/**
+ * POST /v3/launchUnite — bring the Unite / Dental Desktop app up on the
+ * workstation. Empty body (`UniteLaunchParametersDto`). Launching an
+ * already-running Unite is a no-op on 3Shape's side. Note: this still goes
+ * through the Web Service (:5492), so it can only foreground a Unite whose Web
+ * Service is reachable — it cannot revive a fully-down workstation.
+ */
+export async function launchUnite(): Promise<void> {
+  const res = await wsFetch('/v3/launchUnite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({}),
+  });
+  await ensureOk(res, 'launchUnite');
 }
 
 // ── Pull: cases + media (read-through, keyed by IntegrationId = person_id) ──
@@ -125,14 +142,32 @@ function extractArray(json: unknown): unknown[] {
   return [];
 }
 
+/** A case indication, normalized for the UI. */
+export interface CaseIndication {
+  from: number | null;
+  to: number | null;
+  type: string | null;
+  material: string | null;
+}
+
 /** Our normalized case shape (camelCase) — what the contract/UI consume. */
 export interface ScanCase {
+  /** = 3Shape `caseId`; also the key for the case-thumbnail proxy. */
   id: string;
-  name: string | null;
-  workflowId: string | null;
-  itemNames: string[];
-  isScanned: boolean;
-  isModelled: boolean;
+  workflowStatus: string | null;
+  creationDate: string | null;
+  /** null when 3Shape returns its no-date sentinel (year < 1900). */
+  deliveryDate: string | null;
+  lastModifiedDate: string | null;
+  uniteCloudLink: string | null;
+  indications: CaseIndication[];
+}
+
+/** 3Shape uses a 1753-01-01 (.NET/SQL min) sentinel for "no date" — null it out. */
+function normalizeDate(d: string | null | undefined): string | null {
+  if (!d) return null;
+  const year = Number(d.slice(0, 4));
+  return Number.isFinite(year) && year < 1900 ? null : d;
 }
 
 /** GET /v3/patients/{integrationId}/cases — a patient's cases (paged; first 100). */
@@ -145,28 +180,47 @@ export async function getCases(integrationId: string, workflowStatus?: string): 
   );
   return extractArray(json).flatMap((raw) => {
     const parsed = v3Case.safeParse(raw);
-    if (!parsed.success || parsed.data.Id == null) return [];
+    if (!parsed.success || parsed.data.caseId == null) return [];
     const c = parsed.data;
     return [
       {
-        id: String(c.Id),
-        name: c.Name ?? null,
-        workflowId: c.WorkflowId != null ? String(c.WorkflowId) : null,
-        itemNames: c.ItemNames ?? [],
-        isScanned: c.IsScanned ?? false,
-        isModelled: c.IsModelled ?? false,
+        id: String(c.caseId),
+        workflowStatus: c.workflowStatus ?? null,
+        creationDate: c.creationDate ?? null,
+        deliveryDate: normalizeDate(c.deliveryDate),
+        lastModifiedDate: c.lastModifiedDate ?? null,
+        uniteCloudLink: c.uniteCloudLink ?? null,
+        indications: (c.indications ?? []).map((i) => ({
+          from: i.from ?? null,
+          to: i.to ?? null,
+          type: i.type ?? null,
+          material: i.material ?? null,
+        })),
       },
     ];
   });
 }
 
+/** A downloadable file inside a media item, normalized for the UI. */
+export interface ScanMediaFile {
+  /** = 3Shape mediaFiles[].id; pass as `fileId` to the download proxy. */
+  id: string | null;
+  name: string | null;
+  size: number | null;
+  fileType: string | null;
+  /** Upper | Lower | Bite | null (surface scans only). */
+  scanType: string | null;
+}
+
 /** Our normalized media shape (camelCase). */
 export interface ScanMedia {
+  /** = 3Shape media id; also the key for the thumbnail/download proxies. */
   id: string;
-  name: string | null;
-  type: string | null;
-  fileName: string | null;
-  createdAt: string | null;
+  mediaType: string | null; // Image | SurfaceScan | VolumeScan | Pdf | Video
+  captureDate: string | null;
+  /** Unite Cloud web-viewer link — the only way to view TRIOS scans (not downloadable). */
+  uniteCloudLink: string | null;
+  files: ScanMediaFile[];
 }
 
 /** GET /v3/patients/{integrationId}/media — a patient's media files (paged; first 200). */
@@ -179,15 +233,21 @@ export async function getMedia(integrationId: string, type?: string): Promise<Sc
   );
   return extractArray(json).flatMap((raw) => {
     const parsed = v3Media.safeParse(raw);
-    if (!parsed.success || parsed.data.Id == null) return [];
+    if (!parsed.success || parsed.data.id == null) return [];
     const m = parsed.data;
     return [
       {
-        id: String(m.Id),
-        name: m.Name ?? null,
-        type: m.Type ?? null,
-        fileName: m.FileName ?? null,
-        createdAt: m.CreatedAt ?? null,
+        id: String(m.id),
+        mediaType: m.mediaType ?? null,
+        captureDate: m.captureDate ?? null,
+        uniteCloudLink: m.uniteCloudLink ?? null,
+        files: (m.mediaFiles ?? []).map((f) => ({
+          id: f.id != null ? String(f.id) : null,
+          name: f.name ?? null,
+          size: f.size != null ? Number(f.size) : null,
+          fileType: f.fileType ?? null,
+          scanType: f.metadata?.scanType ?? null,
+        })),
       },
     ];
   });
@@ -251,12 +311,12 @@ export async function listWebhooks(): Promise<WebhookSubscription[]> {
   const json = await getJson('/v3/webhooks', 'list webhooks');
   return extractArray(json).flatMap((raw) => {
     const parsed = v3Webhook.safeParse(raw);
-    if (!parsed.success || parsed.data.SubscriptionId == null) return [];
+    if (!parsed.success || parsed.data.subscriptionId == null) return [];
     return [
       {
-        subscriptionId: String(parsed.data.SubscriptionId),
-        callbackUrl: parsed.data.CallbackUrl ?? null,
-        events: parsed.data.SubscribedEvents ?? [],
+        subscriptionId: String(parsed.data.subscriptionId),
+        callbackUrl: parsed.data.callbackUrl ?? null,
+        events: parsed.data.subscribedEvents ?? [],
       },
     ];
   });

@@ -3,6 +3,7 @@ import EventEmitter from 'events';
 import ResourceManager from '../core/ResourceManager.js';
 import { getDatabaseStats } from '../database/index.js';
 import messageState from '../state/messageState.js';
+import whatsapp from '../messaging/whatsapp.js';
 import { log } from '../../utils/logger.js';
 
 /**
@@ -104,26 +105,68 @@ class HealthCheckService extends EventEmitter {
       30000
     ); // Check every 30 seconds
 
-    // WhatsApp client health check
+    // WhatsApp client health check.
+    //
+    // A fresh start is SLOW by design: the client can spend up to ~2 min
+    // restoring a LocalAuth session (or sitting on a QR) before `ready`. That
+    // preparing window is normal, not a failure — warning every 15s through it
+    // (which floods the logs after every restart, because the app-wide SSE keeps
+    // activeViewers > 0) just cries wolf. So this check stays HEALTHY and quiet
+    // while the client is actively initializing OR still inside a startup grace
+    // window, and only reports unhealthy once it's been not-ready with viewers
+    // watching for longer than that — i.e. genuinely stuck or errored.
+    const WHATSAPP_READY_GRACE_MS = 180000; // 3 min: covers SESSION_RESTORATION_TIMEOUT (120s) + buffer
+    let whatsappNotReadySince: number | null = null;
+
     this.registerCheck(
       'whatsapp',
       async () => {
         const clientReady = messageState.clientReady;
         const activeViewers = messageState.activeQRViewers;
         const stateDump = messageState.dump();
+        // WHATSAPP_AUTO_INIT=false intentionally leaves the client off until a
+        // manual start; the app-wide SSE keeps activeViewers > 0 for every
+        // logged-in user, so this off state must not warn.
+        const autoInitDisabled = process.env.WHATSAPP_AUTO_INIT === 'false';
 
-        // Consider healthy if:
-        // 1. Client is ready, OR
-        // 2. No active viewers (client doesn't need to be ready)
-        const healthy = clientReady || activeViewers === 0;
+        const svcStatus = whatsapp.getStatus() as { state?: string; initializing?: boolean };
+        const clientState = svcStatus.state ?? 'UNKNOWN';
+        // Actively spinning up / restoring session / waiting on a scan — expected,
+        // time-bounded, and self-healing (the ready-watchdog covers a stuck scan).
+        const initializing = clientState === 'INITIALIZING' || svcStatus.initializing === true;
 
+        // "Not ready" stopwatch — runs only while we'd otherwise care (viewers
+        // present, auto-init on, client not ready); reset the moment that clears.
+        const settled = clientReady || activeViewers === 0 || autoInitDisabled;
+        if (settled) {
+          whatsappNotReadySince = null;
+        } else if (whatsappNotReadySince === null) {
+          whatsappNotReadySince = Date.now();
+        }
+        const notReadyForMs = whatsappNotReadySince === null ? 0 : Date.now() - whatsappNotReadySince;
+        const withinGrace = notReadyForMs < WHATSAPP_READY_GRACE_MS;
+
+        // Healthy (no alarm) when ready, idle, disabled, still preparing, or
+        // inside the grace window. Only a prolonged not-ready-with-viewers warns.
+        const healthy = settled || initializing || withinGrace;
+
+        let status: string;
         let message: string;
         if (clientReady) {
+          status = 'ready';
           message = 'WhatsApp client is ready';
+        } else if (autoInitDisabled) {
+          status = 'disabled';
+          message = 'WhatsApp client not started (WHATSAPP_AUTO_INIT=false — manual start)';
         } else if (activeViewers === 0) {
+          status = 'idle';
           message = 'WhatsApp client idle (no viewers)';
+        } else if (initializing || withinGrace) {
+          status = 'initializing';
+          message = `WhatsApp client is preparing (${clientState.toLowerCase()}, ${Math.round(notReadyForMs / 1000)}s)`;
         } else {
-          message = 'WhatsApp client is not ready but has viewers';
+          status = 'stuck';
+          message = `WhatsApp client not ready after ${Math.round(notReadyForMs / 1000)}s (state: ${clientState})`;
         }
 
         return {
@@ -131,9 +174,11 @@ class HealthCheckService extends EventEmitter {
           details: {
             clientReady,
             activeQRViewers: activeViewers,
+            clientState,
+            notReadyForMs,
             lastActivity: stateDump.lastActivity,
             inactiveFor: Date.now() - stateDump.lastActivity,
-            status: clientReady ? 'ready' : activeViewers === 0 ? 'idle' : 'initializing',
+            status,
           },
           message,
         };

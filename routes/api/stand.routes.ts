@@ -34,7 +34,8 @@ import {
   validateAndVoidSale,
   StandValidationError,
 } from '../../services/business/StandService.js';
-import { GoogleGenAI, Type } from '@google/genai';
+import { Type } from '@google/genai';
+import { getGeminiClient, getGeminiModel } from '../../services/business/gemini-config.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { ErrorResponses, sendData, sendError, sendSuccess } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
@@ -51,15 +52,6 @@ const router = Router();
 // service-side cart validation — validateAndCreateSale IS the boundary — so the
 // contract pins only its response.
 
-// Singleton Gemini client — created once, reused across requests
-let geminiClient: InstanceType<typeof GoogleGenAI> | null = null;
-function getGeminiClient(): GoogleGenAI | null {
-  if (geminiClient) return geminiClient;
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-  geminiClient = new GoogleGenAI({ apiKey });
-  return geminiClient;
-}
 
 // ============================================================================
 // HELPER: Catch StandValidationError and convert to 400
@@ -205,12 +197,13 @@ router.post(
         }
       }
 
-      const ai = getGeminiClient();
+      const ai = await getGeminiClient();
       if (!ai) {
-        log.error('GEMINI_API_KEY is not configured');
+        log.error('Gemini is not configured');
         ErrorResponses.internalError(res, 'Vision scanning is not configured');
         return;
       }
+      const geminiModel = await getGeminiModel();
 
       const imageParts = images.map((base64Str) => {
         const match = base64Str.match(/^data:(image\/\w+);base64,(.+)$/);
@@ -226,7 +219,7 @@ For the barcode, read the numbers printed under any barcode or near a QR code.
 For item_name, combine the brand name and product name as shown on packaging.`;
 
       const generateRequest = {
-        model: process.env.GEMINI_MODEL ?? 'gemini-3-flash-preview',
+        model: geminiModel,
         contents: [
           {
             role: 'user',

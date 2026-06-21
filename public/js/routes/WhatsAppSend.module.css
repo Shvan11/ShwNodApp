@@ -550,38 +550,42 @@
   background-color: var(--gray-100);
 }
 
-/* Status indicator dot */
-.statusIndicator {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 8px;
-  vertical-align: middle;
-  background-color: var(--gray-400);
+/* WhatsApp-style delivery ticks (Status column) */
+.waStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.statusIndicator:global(.status-pending) {
-  background-color: var(--gray-400);
+.waTick {
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
 }
-.statusIndicator:global(.status-ready) {
-  background-color: #f59e0b;
+
+/* sent (1 tick) + delivered (2 ticks) — neutral gray, like WhatsApp */
+.waTickGray {
+  color: #8696a0;
 }
-.statusIndicator:global(.status-server) {
-  background-color: #60a5fa;
+
+/* read / played (2 ticks) — WhatsApp read-blue */
+.waTickBlue {
+  color: #53bdeb;
 }
-.statusIndicator:global(.status-device) {
-  background-color: var(--blue-500);
+
+/* not sent yet — muted clock */
+.waTickPending {
+  color: var(--gray-400);
 }
-.statusIndicator:global(.status-read) {
-  background-color: var(--success-green);
+
+/* ready to resend — amber clock */
+.waTickReady {
+  color: #f59e0b;
 }
-.statusIndicator:global(.status-played) {
-  background-color: var(--success-600);
-}
-.statusIndicator:global(.status-failed),
-.statusIndicator:global(.status-invalid) {
-  background-color: var(--error-color);
+
+/* failed / invalid phone — red */
+.waTickFailed {
+  color: var(--error-color);
 }
 
 .statusTable tbody tr:global(.status-ready) {

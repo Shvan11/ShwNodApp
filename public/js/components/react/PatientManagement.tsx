@@ -357,9 +357,9 @@ const PatientManagement = () => {
                 setHasSearched(true);
                 setLoading(false);
             })
-            .catch(() => {
+            .catch((err) => {
                 setLoading(false);
-                toast.error('Failed to load all patients');
+                toast.error(httpErrorMessage(err, 'Failed to load all patients'));
             });
     };
 

@@ -48,7 +48,7 @@ interface InitialStateResponse {
  */
 export interface WhatsAppAuthActions {
   handleRetry: () => void;
-  handleRefreshQR: () => void;
+  handleRefreshQR: () => Promise<void>;
   handleRestart: () => Promise<void>;
   handleDestroy: () => Promise<void>;
   handleLogout: () => Promise<void>;
@@ -248,9 +248,29 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     void requestInitialState();
   }, [requestInitialState]);
 
-  const handleRefreshQR = useCallback(() => {
-    void requestInitialState();
-  }, [requestInitialState]);
+  // "Refresh QR Code" — get a genuinely NEW code. The displayed QR is already
+  // live-pushed on every whatsapp-web.js rotation via SSE, so just re-fetching
+  // state can't change it; only a fresh client init mints a new QR. The server
+  // route restarts in the background (fire-and-forget) and returns 200 at once,
+  // and the new QR arrives over SSE within a few seconds — which flips authState
+  // back to QR_REQUIRED on its own.
+  const handleRefreshQR = useCallback(async () => {
+    toast.info('Generating a new QR code…');
+    setAuthState(AUTH_STATES.INITIALIZING);
+    setError(null);
+    try {
+      await postJSON('/api/wa/refresh-qr', {});
+      setTimeout(() => {
+        void requestInitialState();
+      }, CONFIG.CLIENT_RESTART_DELAY_MS);
+    } catch (err) {
+      console.error('Refresh QR failed:', err);
+      setAuthState(AUTH_STATES.ERROR);
+      const message = httpErrorMessage(err, 'Could not refresh QR code');
+      setError(message);
+      toast.error(message);
+    }
+  }, [requestInitialState, toast]);
 
   const handleRestart = useCallback(async () => {
     toast.info('Restarting WhatsApp client…');

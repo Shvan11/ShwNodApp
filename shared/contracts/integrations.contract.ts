@@ -72,6 +72,44 @@ export const telegramLogout = {
   response: z.object({ ok: z.boolean() }),
 } as const;
 
+// ── Gemini (Google GenAI) ──
+// Runtime-managed API key + model (stored in the `options` table, env fallback),
+// managed from Settings → Integrations. The raw key is NEVER returned — status
+// carries only a masked form. Closed z.object (field-for-field DTO).
+
+// GET /api/integrations/gemini/status — configuration status (masked key).
+export const geminiStatus = {
+  response: z.object({
+    configured: z.boolean(),
+    source: z.enum(['db', 'env']).nullable(),
+    model: z.string(),
+    maskedKey: z.string().nullable(),
+  }),
+} as const;
+export type GeminiStatusResponse = z.infer<typeof geminiStatus.response>;
+
+// POST /api/integrations/gemini/config — save key and/or model. Omitting `apiKey`
+// leaves the stored key untouched (so the model can be changed on its own).
+export const geminiConfig = {
+  body: z.object({
+    apiKey: z.string().optional(),
+    model: z.string().optional(),
+  }),
+  response: geminiStatus.response,
+} as const;
+export type GeminiConfigBody = z.infer<typeof geminiConfig.body>;
+
+// POST /api/integrations/gemini/test — lightweight connectivity check.
+export const geminiTest = {
+  response: z.object({ ok: z.boolean(), model: z.string(), error: z.string().nullable() }),
+} as const;
+export type GeminiTestResponse = z.infer<typeof geminiTest.response>;
+
+// POST /api/integrations/gemini/clear — drop the DB overrides (revert to env).
+export const geminiClear = {
+  response: geminiStatus.response,
+} as const;
+
 // ── 3Shape Unite Web Service (OAuth) ──
 // The interactive connect flow itself is browser redirects under /api/auth/3shape
 // (login/callback); these endpoints just surface status + disconnect. Closed

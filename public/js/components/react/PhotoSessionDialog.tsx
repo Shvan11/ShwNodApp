@@ -1,4 +1,5 @@
 import { useState, useEffect, ChangeEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useImportFolder } from '@/hooks/useImportFolder';
@@ -52,6 +53,7 @@ interface ConflictInfo {
 
 const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Props) => {
     const toast = useToast();
+    const navigate = useNavigate();
     // The memory-card import folder reused by the editor's "Move from card" flow; surfaced
     // here so the user sees/grants access before opening the editor.
     const importFolder = useImportFolder('readwrite');
@@ -59,11 +61,10 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
     const [timepointType, setTimepointType] = useState('Initial');
     const [selectedDate, setSelectedDate] = useState(formatISODate());
     const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
-    // Set when the server reports the patient has no English name — Dolphin's patient columns are
-    // Latin1 and corrupt Arabic, so we capture an English first/last before proceeding.
-    const [needsName, setNeedsName] = useState(false);
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
+    // Set (with a message) when the server reports the patient has no English name. Dolphin's
+    // patient columns are Latin1 and corrupt Arabic, so instead of capturing a name inline we
+    // bounce the user to the Edit Patient form (which offers on-demand AI translation).
+    const [needsProfileFix, setNeedsProfileFix] = useState<string | null>(null);
 
     const { data: photoDates, isLoading: loading, isError } = useQuery({
         ...photoDatesQuery(personId ?? ''),
@@ -90,27 +91,15 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
         setSelectedDate(`${year}-${month}-${day}`);
     };
 
-    // Latin-1 (CP1252) only — mirrors the server's isLatin1 guard. Arabic chars would corrupt in Dolphin.
-    const isLatin1 = (s: string) => /^[ -ÿ]+$/.test(s);
+    const handleOpenEditPatient = () => {
+        onClose();
+        navigate(`/patient/${personId}/edit-patient`);
+    };
 
     const handleSubmit = async (overrideDate = false) => {
         if (!patientInfo?.first_name && !patientInfo?.patient_name) {
             toast.error('Patient name is required');
             return;
-        }
-
-        // When the server has asked for an English name, validate before resubmitting.
-        if (needsName) {
-            const f = firstName.trim();
-            const l = lastName.trim();
-            if (!f || !l) {
-                toast.error('Enter both an English first and last name');
-                return;
-            }
-            if (!isLatin1(f) || !isLatin1(l)) {
-                toast.error('Use English (Latin) letters only — Dolphin Imaging cannot store Arabic names');
-                return;
-            }
         }
 
         try {
@@ -121,13 +110,12 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                 tpDescription: timepointType,
                 tpDate: selectedDate,
                 overrideDate,
-                ...(needsName ? { firstName: firstName.trim(), lastName: lastName.trim() } : {})
             }, { schema: photoEditor.prepare.response });
 
-            // Patient has no English name — Dolphin can't store Arabic, so capture one and resubmit.
+            // Patient has no English name — Dolphin can't store Arabic. Bounce to the Edit Patient
+            // form (which offers on-demand AI translation) rather than proceeding.
             if ('needsName' in result) {
-                setNeedsName(true);
-                toast.error(result.message || 'An English first and last name is required');
+                setNeedsProfileFix(result.message || 'This patient needs an English name before adding photos.');
                 setSubmitting(false);
                 return;
             }
@@ -226,46 +214,35 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                         </div>
                     )}
 
-                    {/* English-name capture — shown when the patient has no Latin name (Dolphin can't store Arabic) */}
-                    {needsName && (
-                        <>
-                            <div className={`${styles.conflictWarning} ${styles.conflictError}`}>
-                                <div className={styles.conflictIcon}>
-                                    <i className="fas fa-language" />
+                    {/* English name required — bounce to the Edit Patient form (Dolphin can't store Arabic). */}
+                    {needsProfileFix ? (
+                        <div className={`${styles.conflictWarning} ${styles.conflictError}`}>
+                            <div className={styles.conflictIcon}>
+                                <i className="fas fa-language" />
+                            </div>
+                            <div className={styles.conflictContent}>
+                                <strong>English name required</strong>
+                                <p>{needsProfileFix}</p>
+                                <div className={styles.conflictActions}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        onClick={handleOpenEditPatient}
+                                    >
+                                        <i className="fas fa-user-edit" /> Open Edit Patient Form
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={onClose}
+                                    >
+                                        Cancel
+                                    </button>
                                 </div>
-                                <div className={styles.conflictContent}>
-                                    <strong>English name required</strong>
-                                    <p>
-                                        This patient has no English name. Enter an English (Latin) first and last
-                                        name — Dolphin Imaging cannot store Arabic names.
-                                    </p>
-                                </div>
                             </div>
-                            <div className={styles.formGroup}>
-                                <label htmlFor="photo-session-first-name">First Name (English)</label>
-                                <input
-                                    id="photo-session-first-name"
-                                    type="text"
-                                    value={firstName}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setFirstName(e.target.value)}
-                                    className={styles.formInput}
-                                    placeholder="e.g. Malika"
-                                />
-                            </div>
-                            <div className={styles.formGroup}>
-                                <label htmlFor="photo-session-last-name">Last Name (English)</label>
-                                <input
-                                    id="photo-session-last-name"
-                                    type="text"
-                                    value={lastName}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => setLastName(e.target.value)}
-                                    className={styles.formInput}
-                                    placeholder="e.g. Mohammed"
-                                />
-                            </div>
-                        </>
-                    )}
-
+                        </div>
+                    ) : (
+                    <>
                     {/* Timepoint Type */}
                     <div className={styles.formGroup}>
                         <label htmlFor="photo-session-timepoint-type">Timepoint Type</label>
@@ -411,10 +388,12 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                             )}
                         </>
                     )}
+                    </>
+                    )}
                 </div>
 
                 <div className={styles.footer}>
-                    {!conflictInfo && (
+                    {!conflictInfo && !needsProfileFix && (
                         <>
                             <button
                                 type="button"
@@ -430,7 +409,7 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                                 onClick={() => handleSubmit(false)}
                                 disabled={submitting || loading}
                             >
-                                {submitting ? 'Opening…' : needsName ? 'Save & Open Editor' : 'Open Editor'}
+                                {submitting ? 'Opening…' : 'Open Editor'}
                             </button>
                         </>
                     )}

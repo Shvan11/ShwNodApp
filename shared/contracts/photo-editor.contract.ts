@@ -24,14 +24,16 @@ export const personIdParams = z.object({
 });
 
 // POST /api/photo-editor/:personId/prepare → discriminated PhotoPrepareResult.
+// No firstName/lastName here: a patient missing an English name is bounced to the
+// Edit Patient form (the `needsName` result) rather than captured inline — see
+// PhotoSessionDialog. Dolphin needs a Latin name, but acquiring it is no longer
+// part of this hot path.
 export const prepare = {
   params: personIdParams,
   body: z.object({
     tpDescription: z.string().min(1, 'tpDescription is required'),
     tpDate: z.string().regex(YMD, 'Invalid tpDate (expected YYYY-MM-DD)'),
     overrideDate: z.boolean().optional(),
-    firstName: z.string().optional(),
-    lastName: z.string().optional(),
   }),
   response: z.looseObject({
     tp_code: z.number().optional(),

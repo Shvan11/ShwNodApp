@@ -324,6 +324,17 @@ export const updatePatient = {
 } as const;
 export type UpdatePatientBody = z.infer<typeof updatePatient.body>;
 
+// POST /api/patients/transliterate-name — on-demand romanization of an Arabic
+// patient name for the Edit Patient form's "Translate with AI" button. Returns
+// the suggested first/last for the user to review before saving (empty strings
+// when the model is unconfigured/unavailable or can't produce a clean Latin name).
+export const transliterateName = {
+  body: z.object({ patientName: z.string().min(1, 'patientName is required') }),
+  response: z.object({ firstName: z.string(), lastName: z.string() }),
+} as const;
+export type TransliterateNameBody = z.infer<typeof transliterateName.body>;
+export type TransliterateNameResult = z.infer<typeof transliterateName.response>;
+
 // DELETE /api/patients/:personId — { folderRemoved }.
 export const deletePatient = {
   response: z.object({ folderRemoved: z.boolean() }),

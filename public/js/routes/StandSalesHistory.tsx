@@ -4,6 +4,7 @@ import SalesHistoryTable from '../components/stand/SalesHistoryTable';
 import SaleDetailModal from '../components/stand/SaleDetailModal';
 import Modal from '../components/react/Modal';
 import { useToast } from '../contexts/ToastContext';
+import { httpErrorMessage } from '@/core/http';
 import styles from './StandSalesHistory.module.css';
 
 function formatDateString(date: Date): string {
@@ -65,8 +66,8 @@ export default function StandSalesHistory() {
       toast.success('Sale voided successfully');
       setVoidSaleId(null);
       setViewSaleId(null);
-    } catch {
-      toast.error('Failed to void sale');
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to void sale'));
     } finally {
       setVoiding(false);
     }

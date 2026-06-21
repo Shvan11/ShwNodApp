@@ -115,7 +115,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                 {},
                 { schema: threeshape.initiateWorkflow.response }
             );
-            toast.success('Sent to 3Shape — start the scan on the scanner');
+            toast.success('Sent to 3Shape — opening Unite on the scanner');
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to send to 3Shape'));
         } finally {

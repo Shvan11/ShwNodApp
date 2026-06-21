@@ -4,20 +4,20 @@ Links Archform (aligner design software) patients to aligner sets in the main da
 
 ## What was added
 
-- **`ArchformID` column** on `tblAlignerSets` (nullable INT)
-- **`ARCHFORM_DB_PATH`** setting in `tbloptions` (editable in General Settings)
+- **`archform_id` column** on `aligner_sets` (nullable `integer`)
+- **`ARCHFORM_DB_PATH`** setting in the `options` table (editable in General Settings)
 - **Backend service** (`services/archform/archform-db.ts`) — reads/writes Archform's SQLite DB via `better-sqlite3` with stale connection detection and auto-reconnect
 - **5 API endpoints** in `aligner.routes.ts`:
   - `GET /api/aligner/archform/patients` — list Archform patients from SQLite
   - `GET /api/aligner/archform/matches` — list aligner sets with ArchformID, FirstName, LastName
   - `PATCH /api/aligner/sets/:setId/archform` — save/clear a match
   - `PUT /api/aligner/archform/patients/:id` — edit patient name in Archform DB
-  - `DELETE /api/aligner/archform/patients/:id` — cascading delete patient + all related data from Archform DB, clears SQL Server references
+  - `DELETE /api/aligner/archform/patients/:id` — cascading delete patient + all related data from Archform DB, clears the main-DB (`aligner_sets.archform_id`) references
 - **Frontend page** (`ArchformMatcher.tsx`) — table with:
   - **Match/Unmatch**: dropdown to link Archform patients to aligner sets
   - **Sortable columns**: Name, Created, Modified (asc/desc toggle)
   - **Inline edit**: pencil icon to rename patient directly in Archform DB
-  - **Auto-rename**: magic wand icon (matched patients only) — sets Archform Name to `FirstName LastName` and LastName to `Dr_DoctorName_SetSequence` using English name fields from `tblpatients`. Validates that English names exist and contain Latin characters; shows warning if not.
+  - **Auto-rename**: magic wand icon (matched patients only) — sets Archform Name to `FirstName LastName` and LastName to `Dr_DoctorName_SetSequence` using English name fields from `patients`. Validates that English names exist and contain Latin characters; shows warning if not.
   - **Delete**: trash icon with confirmation dialog, cascading delete of all related Archform data
   - **Filter**: by name text and match status (matched/unmatched)
 - **4th toggle button** ("Archform Match") in the aligner section nav, route at `/aligner/archform-match`
@@ -34,11 +34,15 @@ The folder is shared on the LAN as **"Archform"**.
 
 ### Configuration
 
-Set `ARCHFORM_DB_PATH` in General Settings (`tbloptions`) to point to the database file:
+Set `ARCHFORM_DB_PATH` in General Settings (the `options` table) to point to the database file:
 - **Windows production**: `\\workPC\Archform\__ARCHFORMDB` (UNC path, resolved via NetBIOS — works with dynamic IP)
 - **WSL2 development**: `/mnt/archform/__ARCHFORMDB` (requires manual mount, see below)
 
-### WSL2 Development Mount
+### WSL2 Development Mount (legacy — dev is now Windows-native)
+
+> Dev and prod now both run on **Windows** (the share is reached directly via the
+> `\\workPC\Archform\__ARCHFORMDB` UNC path — no mount needed). The CIFS recipe below
+> is kept only for the historical WSL2 dev box.
 
 The SMB share must be mounted manually before using this feature. The mount is **not persistent** — remount after restart or when workPC's IP changes.
 
@@ -74,7 +78,7 @@ Patient
 ```
 
 - Archform uses sentinel values `0` and `-1` instead of NULL for "not set" — handled by `isValidFk()`.
-- SQL Server `tblAlignerSets.ArchformID` references are cleared **before** the SQLite delete.
+- The main DB's `aligner_sets.archform_id` references are cleared **before** the SQLite delete.
 
 ## Protocol Handler (Open in Archform)
 

@@ -279,6 +279,8 @@ export const qk = {
     integrationsTelegramStatus: () => ['settings', 'integrations-telegram-status'] as const,
     /** GET /api/integrations/3shape/status — 3Shape Unite Web Service integration status. */
     integrationsThreeShapeStatus: () => ['settings', 'integrations-3shape-status'] as const,
+    /** GET /api/integrations/gemini/status — Gemini (Google GenAI) integration status. */
+    integrationsGeminiStatus: () => ['settings', 'integrations-gemini-status'] as const,
     /** GET /api/wa/group-settings — WhatsApp daily-list group posting config. */
     whatsappGroupSettings: () => ['settings', 'whatsapp-group-settings'] as const,
   },

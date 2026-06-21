@@ -6,7 +6,7 @@ This document provides comprehensive guidelines for proper logging in production
 
 ## Current Winston Configuration
 
-**Location**: `utils/logger.js`
+**Location**: `utils/logger.ts`
 
 **Log Levels** (from highest to lowest priority):
 - `error` - Error messages and exceptions
@@ -50,7 +50,7 @@ NODE_ENV=production      # Enable production mode
 1. **Critical Errors**
    ```javascript
    log.error('Database connection failed', {
-     server: config.database.server,
+     host: process.env.PG_HOST,
      error: err.message,
      code: err.code,
      timestamp: new Date().toISOString()
@@ -156,7 +156,7 @@ NODE_ENV=production      # Enable production mode
 
 **Problem**: Every database query logs "Query completed: undefined rows affected/returned"
 
-**Fix**: Changed from `console.log()` to `log.debug()` in `services/database/index.js`
+**Fix**: Changed from `console.log()` to `log.debug()` in `services/database/index.ts`
 
 **Before**:
 ```javascript
@@ -176,7 +176,7 @@ log.debug(`Query completed: ${rowCount} rows affected/returned`);
 
 **Recommendation**: Add request IDs for tracing and reduce verbosity
 
-**Location**: `services/database/queries/messaging-queries.js`
+**Location**: `services/database/queries/messaging-queries.ts`
 
 **Suggested Fix**:
 ```javascript
@@ -208,8 +208,8 @@ if (failed.length > 0) {
 **Fix**: Added `debug: false` to all `dotenv.config()` calls
 
 **Files Updated**:
-- `config/config.js`
-- `index.js`
+- `config/config.ts`
+- `index.ts`
 
 **Before**:
 ```javascript
@@ -227,7 +227,7 @@ dotenv.config({ debug: false });
 
 **Recommendation**: Replace with structured Winston logs
 
-**Before** (in `index.js`):
+**Before** (in `index.ts`):
 ```javascript
 console.log('🚀 Starting Shwan Orthodontics Application...');
 console.log('💬 DEBUG: About to connect WhatsApp service...');
@@ -315,9 +315,9 @@ log.info('WhatsApp batch send completed', {
 
 ### Log File Locations
 
-```bash
-/home/administrator/projects/ShwNodApp/logs/
-├── error.log       # Errors only (5MB x 5 files)
+```
+C:\ShwNodApp\logs\           # = <cwd>/logs when running as the webapp.exe service
+├── error.log       # Errors only (5MB x 5 files; also gets [client-error] reports)
 ├── combined.log    # All logs (5MB x 5 files)
 ```
 
@@ -409,7 +409,7 @@ LOG_LEVEL=error
 This will **only** log errors, producing minimal output:
 
 ```
-2025-11-21 18:00:00 [error]: Database connection failed {"server":"Clinic","error":"Connection timeout","code":"ETIMEDOUT"}
+2025-11-21 18:00:00 [error]: Database connection failed {"host":"localhost","error":"Connection timeout","code":"ETIMEDOUT"}
 2025-11-21 18:05:30 [error]: WhatsApp message delivery failed {"messageId":"msg_123","recipient":"+9647501234567","error":"Rate limit exceeded","retryCount":3}
 ```
 

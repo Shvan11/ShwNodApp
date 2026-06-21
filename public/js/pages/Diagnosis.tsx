@@ -5,7 +5,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import styles from './Diagnosis.module.css';
 import { formatISODate } from '../core/utils';
-import { postJSON, deleteJSON } from '@/core/http';
+import { postJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { patientInfoQuery, worksQuery, diagnosisQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 
@@ -227,8 +227,10 @@ const Diagnosis = () => {
                 navigate(`/patient/${personId}/works`);
             }, 500);
         } catch (err) {
+            // Surface the server's actual reason (e.g. a validation message) — a
+            // bare toast hid which field the 400 rejected. See httpErrorMessage.
             console.error('Error saving diagnosis:', err);
-            toast.error('Failed to save diagnosis');
+            toast.error(httpErrorMessage(err, 'Failed to save diagnosis'));
         } finally {
             setSaving(false);
         }
@@ -257,7 +259,7 @@ const Diagnosis = () => {
             }, 500);
         } catch (err) {
             console.error('Error deleting diagnosis:', err);
-            toast.error('Failed to delete diagnosis');
+            toast.error(httpErrorMessage(err, 'Failed to delete diagnosis'));
         } finally {
             setDeleting(false);
         }

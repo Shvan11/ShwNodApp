@@ -1256,6 +1256,17 @@ export const integrationsThreeShapeStatusQuery = () =>
       ),
   });
 
+/** GET /api/integrations/gemini/status — Gemini (Google GenAI) integration status. */
+export const integrationsGeminiStatusQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.integrationsGeminiStatus(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof integrationsContract.geminiStatus.response>>(
+        '/api/integrations/gemini/status',
+        { signal, schema: integrationsContract.geminiStatus.response }
+      ),
+  });
+
 /** GET /api/threeshape/patients/:id/cases — patient's 3Shape cases (live). retry off:
  *  a not-connected / unreachable error is actionable, not transient. */
 export const threeShapeCasesQuery = (personId: number | string) =>

@@ -238,23 +238,26 @@ Example: `12345_John_Doe_Set1_2025-10-20T14-30-00.pdf`
 | `/api/admin/google-drive/test` | GET | Test Drive connection |
 | `/api/admin/google-drive/status` | GET | Check configuration status |
 
-### Portal Endpoints
+### Aligner (staff) Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/portal/sets/:setId/upload-pdf` | POST | Upload PDF for a set |
-| `/api/portal/sets/:setId/pdf` | DELETE | Delete PDF from a set |
+| `/api/aligner/sets/:setId/upload-pdf` | POST | Upload PDF for a set |
+| `/api/aligner/sets/:setId/pdf` | DELETE | Delete PDF from a set |
 
 ## Database Schema
 
-The following fields were added to `tblAlignerSets`:
+The following fields live on the PostgreSQL `aligner_sets` table (snake_case):
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `SetPdfUrl` | NVARCHAR(2000) | Public shareable link to the PDF |
-| `DriveFileId` | NVARCHAR(255) | Google Drive file ID for management |
-| `PdfUploadedAt` | DATETIME | Timestamp of last upload |
-| `PdfUploadedBy` | NVARCHAR(255) | Email of person who uploaded |
+| `set_pdf_url` | `text` | Public shareable link to the PDF |
+| `drive_file_id` | `text` | Google Drive file ID for management |
+| `pdf_uploaded_at` | `timestamp` | Timestamp of last upload |
+| `pdf_uploaded_by` | `text` | Email of person who uploaded |
+
+> Service implementation: `services/google-drive/google-drive-client.ts`. Column
+> names are authoritative in `types/db.d.ts` (`npm run db:codegen`).
 
 ## Support
 

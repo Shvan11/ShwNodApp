@@ -98,6 +98,22 @@ export function formatForSMS(phone: string, countryCode: string = DEFAULT_COUNTR
 }
 
 /**
+ * Formats a phone number as strict E.164 (e.g. +9647XXXXXXXXX).
+ * Returns '' when the input isn't a valid number for the country, so callers
+ * can safely omit it. Use for APIs that reject non-E.164 input — e.g. the
+ * 3Shape Unite Web Service (`initiate-workflow` 400s on a bad PhoneNumber).
+ * @param phone - Raw phone number
+ * @param countryCode - Country code (default: 964)
+ * @returns E.164 number with + prefix, or '' if invalid/empty
+ */
+export function formatForE164(phone: string, countryCode: string = DEFAULT_COUNTRY_CODE): string {
+  if (!phone) return '';
+  if (!isValidPhoneNumber(phone, countryCode)) return '';
+
+  return '+' + normalizePhoneNumber(phone, countryCode);
+}
+
+/**
  * Formats phone number for database storage
  * Database stores in format: 9647XXXXXXXX (without + prefix)
  * @param phone - Raw phone number
@@ -229,6 +245,7 @@ export const PhoneFormatter = {
   forWhatsApp: formatForWhatsApp,
   forTelegram: formatForTelegram,
   forSMS: formatForSMS,
+  forE164: formatForE164,
   forDatabase: formatForDatabase,
   forDisplay: formatForDisplay,
   forLocalDisplay: formatLocalForDisplay,

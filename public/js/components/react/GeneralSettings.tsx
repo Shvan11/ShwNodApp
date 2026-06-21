@@ -566,8 +566,10 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                                 <p className={styles.noSettings}>No settings found. Please check your database configuration.</p>
                             ) : (
                                 Object.entries(options)
-                                    // Filter out settings that have their own dedicated tabs / sections
-                                    .filter(([key]) => !key.startsWith('EMAIL_') && !key.startsWith('CALENDAR_') && !key.startsWith('CLINIC_'))
+                                    // Filter out settings that have their own dedicated tabs / sections.
+                                    // `gemini_*` is managed in Settings → Integrations (and the API key is
+                                    // a secret — never surface it as a plaintext field here).
+                                    .filter(([key]) => !key.startsWith('EMAIL_') && !key.startsWith('CALENDAR_') && !key.startsWith('CLINIC_') && !key.startsWith('gemini_'))
                                     .map(([key, value]) => (
                                     <div key={key} className={cn(styles.settingGroup, pendingChanges[key] !== undefined && styles.pendingChange)}>
                                         <label htmlFor={`setting_${key.replace(/[^a-zA-Z0-9]/g, '_')}`}>

@@ -169,8 +169,8 @@ export default function Videos() {
         url: data.url,
         title: data.title,
       });
-    } catch {
-      toast.error('Failed to generate QR code');
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to generate QR code'));
       setIsQRModalOpen(false);
     } finally {
       setIsLoadingQR(false);

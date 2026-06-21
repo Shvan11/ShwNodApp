@@ -726,6 +726,45 @@ router.post(
 );
 
 /**
+ * Refresh the WhatsApp QR code.
+ * POST /refresh-qr (mounted at /api/wa)
+ *
+ * The displayed QR is already live-pushed on every whatsapp-web.js rotation via the
+ * SSE channel, so re-fetching state can't change it — the only way to mint a *new*
+ * code is a fresh client init. This force-restarts the client to do exactly that.
+ *
+ * It is FIRE-AND-FORGET (returns 200 immediately, restarts in the background): a
+ * blocking restart can't be awaited over HTTP because, in QR mode, the init promise
+ * doesn't resolve until a scan or FRESH_AUTH_TIMEOUT (90s) — far past the 30s request
+ * timeout. The fresh QR arrives over `GET /api/sse/whatsapp` within a few seconds.
+ */
+router.post('/refresh-qr', (_req: Request, res: Response): void => {
+  try {
+    log.info('WhatsApp QR refresh requested - restarting client to mint a new QR');
+    res.json({
+      success: true,
+      message: 'Refreshing QR code',
+      action: 'refresh_qr_requested',
+      timestamp: Date.now()
+    });
+
+    setImmediate(async () => {
+      try {
+        await whatsapp.restart();
+        log.info('QR refresh restart completed');
+      } catch (error) {
+        log.error('QR refresh restart failed:', (error as Error).message);
+      }
+    });
+  } catch (error) {
+    log.error('Error handling WhatsApp QR refresh request:', error);
+    ErrorResponses.internalError(res, 'Failed to process QR refresh request', {
+      error: (error as Error).message
+    });
+  }
+});
+
+/**
  * Destroy WhatsApp client - close browser but preserve authentication
  * POST /destroy (mounted at /api/wa)
  * This closes the browser/puppeteer but keeps authentication for reconnection
@@ -827,6 +866,40 @@ router.get('/initialize', (_req: Request, res: Response): void => {
     });
   } catch (error) {
     log.error('Error handling WhatsApp initialization request:', error);
+    ErrorResponses.internalError(res, 'Failed to process initialization request', {
+      error: (error as Error).message
+    });
+  }
+});
+
+/**
+ * Manually start the WhatsApp client.
+ * POST /initialize (mounted at /api/wa)
+ * Mutation twin of the GET above, for the in-app "Start WhatsApp" button — calls
+ * whatsapp.initialize() directly, so it works even when WHATSAPP_AUTO_INIT=false
+ * disables every automatic init path (boot + on-demand). Returns 200 immediately
+ * and initializes in the background; the SSE channel reports ready/QR.
+ */
+router.post('/initialize', (_req: Request, res: Response): void => {
+  try {
+    log.info('Manual WhatsApp initialization requested');
+    res.json({
+      success: true,
+      message: 'WhatsApp initialization started',
+      timestamp: Date.now(),
+      action: 'initialize_requested'
+    });
+
+    setImmediate(async () => {
+      try {
+        await whatsapp.initialize();
+        log.info('Manual WhatsApp initialization completed successfully');
+      } catch (error) {
+        log.error('Manual WhatsApp initialization failed:', (error as Error).message);
+      }
+    });
+  } catch (error) {
+    log.error('Error handling manual WhatsApp initialization request:', error);
     ErrorResponses.internalError(res, 'Failed to process initialization request', {
       error: (error as Error).message
     });

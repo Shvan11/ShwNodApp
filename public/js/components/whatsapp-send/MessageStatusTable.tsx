@@ -3,10 +3,38 @@
  * Displays message status for selected date
  */
 
-import type { MessageStatusValue } from '../../utils/whatsapp-send-constants';
+import { MESSAGE_STATUS, type MessageStatusValue } from '../../utils/whatsapp-send-constants';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import styles from '../../routes/WhatsAppSend.module.css';
 import { formatISODate } from '../../core/utils';
+
+/**
+ * WhatsApp-style delivery indicator for the Status column (Font Awesome):
+ *  - 1 gray tick   (fa-check)         → sent to server
+ *  - 2 gray ticks  (fa-check-double)  → delivered to device
+ *  - 2 blue ticks  (fa-check-double)  → read / played
+ *  - clock         (fa-clock)         → not sent yet / ready to resend
+ *  - alert         (fa-circle-exclamation) → failed / invalid phone
+ */
+function StatusTicks({ status }: { status: MessageStatusValue }) {
+  switch (status) {
+    case MESSAGE_STATUS.SERVER:
+      return <i className={`fas fa-check ${styles.waTick} ${styles.waTickGray}`} aria-hidden="true" />;
+    case MESSAGE_STATUS.DEVICE:
+      return <i className={`fas fa-check-double ${styles.waTick} ${styles.waTickGray}`} aria-hidden="true" />;
+    case MESSAGE_STATUS.READ:
+    case MESSAGE_STATUS.PLAYED:
+      return <i className={`fas fa-check-double ${styles.waTick} ${styles.waTickBlue}`} aria-hidden="true" />;
+    case MESSAGE_STATUS.READY:
+      return <i className={`fas fa-clock ${styles.waTick} ${styles.waTickReady}`} aria-hidden="true" />;
+    case MESSAGE_STATUS.FAILED:
+    case MESSAGE_STATUS.INVALID_PHONE:
+      return <i className={`fas fa-circle-exclamation ${styles.waTick} ${styles.waTickFailed}`} aria-hidden="true" />;
+    case MESSAGE_STATUS.PENDING:
+    default:
+      return <i className={`far fa-clock ${styles.waTick} ${styles.waTickPending}`} aria-hidden="true" />;
+  }
+}
 
 export interface MessageItem {
   status: MessageStatusValue;
@@ -151,8 +179,10 @@ export default function MessageStatusTable({
                     <div dangerouslySetInnerHTML={{ __html: escapeHtml(phoneNumber) }} />
                   </td>
                   <td className={styles.statusCell}>
-                    <span className={`${styles.statusIndicator} ${statusClass}`}></span>
-                    {statusText}
+                    <span className={styles.waStatus}>
+                      <StatusTicks status={msg.status} />
+                      {statusText}
+                    </span>
                   </td>
                   <td className={styles.timeSent}>{timeSent}</td>
                   <td className={styles.messagePreview} title={messageText}>

@@ -23,7 +23,6 @@ import {
   getPatientForPhotoSession,
   getExistingPhotoDate,
   updatePhotoDate,
-  updatePatientName,
   getPhotoSessionAppointments,
   getPhotoSessionVisits,
 } from '../../services/database/queries/photo-session-queries.js';
@@ -33,7 +32,6 @@ import {
   getNativeTimePoint,
   deleteNativeTimePointImage,
 } from '../../services/database/queries/native-timepoint-queries.js';
-import { transliterateNameToEnglish } from '../../services/business/name-transliteration.js';
 import { renderSlotToWorking, deleteWorkingView } from '../../services/imaging/photo-render.service.js';
 import { tagOriginalForView, untagOriginalForView } from '../../services/imaging/photo-original-tags.js';
 import { timepointFolderName } from '../../services/imaging/photo-cleanup.service.js';
@@ -47,16 +45,6 @@ const router = Router();
 let wsEmitter: EventEmitter | null = null;
 export function setWebSocketEmitter(emitter: EventEmitter): void {
   wsEmitter = emitter;
-}
-
-/**
- * Latin-1 (CP1252) representable. Dolphin's patient-name columns are varchar with a Latin1
- * collation, so any non-Latin-1 character (e.g. Arabic script) is stored as '?'. We gate names
- * through this before they can reach the CDC dolphin sink.
- */
-function isLatin1(s: string): boolean {
-  // eslint-disable-next-line no-control-regex -- full Latin-1 byte range \u0000-\u00ff = "representable in a Latin1 varchar"
-  return /^[\u0000-\u00ff]+$/.test(s);
 }
 
 // Internal narrowing type for ONE render slot. The `/render` request body
@@ -131,48 +119,20 @@ router.post(
       }
 
       // Dolphin needs a Latin first+last name (its patient columns are varchar/Latin1 and corrupt
-      // Arabic to '?'). If the patient has no English name, force one before any timepoint/image
-      // row is created — otherwise the CDC dolphin sink replicates a '????' / empty-index patient
-      // that can't be found in Dolphin Imaging.
+      // Arabic to '?'). If the patient has no English name we stop here and tell the client to
+      // send the user to the Edit Patient form to add one (which offers on-demand AI translation).
+      // We deliberately do NOT auto-translate on this hot path: it's a synchronous external call
+      // that, when the model is slow/overloaded, used to hang the "Open Editor" click up to the
+      // 30s request timeout. The fix-it flow is explicit and never blocks.
       const dbFirst = patient.firstName?.trim() ?? '';
       const dbLast = patient.lastName?.trim() ?? '';
       if (!dbFirst || !dbLast) {
-        const { firstName, lastName } = req.body as PrepareBody;
-        let newFirst = firstName?.trim() ?? '';
-        let newLast = lastName?.trim() ?? '';
-
-        // No name supplied by the client → try to auto-fill by romanizing the Arabic patient_name
-        // with Gemini. Best-effort; if it's unconfigured or can't produce a clean Latin first+last
-        // we fall through to asking the user.
-        if (!newFirst || !newLast) {
-          const ai = await transliterateNameToEnglish(patient.patientName);
-          if (ai) {
-            newFirst = newFirst || ai.firstName;
-            newLast = newLast || ai.lastName;
-          }
-        }
-
-        if (!newFirst || !newLast) {
-          sendData(res, photoEditor.prepare.response, {
-            needsName: true,
-            message:
-              'This patient has no English name. Enter an English (Latin) first and last name to add photos — Dolphin Imaging cannot store Arabic names.',
-          });
-          return;
-        }
-        if (!isLatin1(newFirst) || !isLatin1(newLast)) {
-          ErrorResponses.badRequest(
-            res,
-            'First and last name must use English (Latin) letters only — Dolphin Imaging cannot store Arabic names.'
-          );
-          return;
-        }
-        await updatePatientName(personId, newFirst, newLast);
-        log.info('[PhotoEditor] set English name for Dolphin compatibility', {
-          personId,
-          firstName: newFirst,
-          lastName: newLast,
+        sendData(res, photoEditor.prepare.response, {
+          needsName: true,
+          message:
+            'This patient has no English name. Open the Edit Patient form to add an English (Latin) first and last name — Dolphin Imaging cannot store Arabic names.',
         });
+        return;
       }
 
       // tblwork Initial/Final date conflict detection + optional override.

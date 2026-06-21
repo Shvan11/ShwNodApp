@@ -12,7 +12,11 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { postJSON, httpErrorMessage } from '@/core/http';
 import { useToast } from '@/contexts/ToastContext';
-import { integrationsTelegramStatusQuery, integrationsThreeShapeStatusQuery } from '@/query/queries';
+import {
+  integrationsTelegramStatusQuery,
+  integrationsThreeShapeStatusQuery,
+  integrationsGeminiStatusQuery,
+} from '@/query/queries';
 import { qk } from '@/query/keys';
 import * as integrations from '@shared/contracts/integrations.contract';
 import styles from './IntegrationsSettings.module.css';
@@ -213,6 +217,84 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
       setTsBusy(false);
     }
   }, [toast, queryClient]);
+
+  // ── Gemini (Google GenAI) ──
+  const { data: gmData, isLoading: gmLoading } = useQuery(integrationsGeminiStatusQuery());
+  const gmStatus = (gmData as integrations.GeminiStatusResponse | undefined) ?? null;
+  const [gmKey, setGmKey] = useState('');
+  const [gmModel, setGmModel] = useState('');
+  const [gmBusy, setGmBusy] = useState(false);
+  const [gmTest, setGmTest] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  // Seed the model input once from the loaded status (don't clobber user edits).
+  const [gmSeeded, setGmSeeded] = useState(false);
+  if (!gmSeeded && gmStatus) {
+    setGmSeeded(true);
+    setGmModel(gmStatus.model);
+  }
+
+  const saveGemini = useCallback(async (): Promise<void> => {
+    setGmBusy(true);
+    setGmTest(null);
+    try {
+      // Only send a field the user actually set — omitting apiKey keeps the
+      // stored key, so changing just the model never wipes it.
+      const body: { apiKey?: string; model?: string } = {};
+      if (gmKey.trim()) body.apiKey = gmKey.trim();
+      if (gmModel.trim()) body.model = gmModel.trim();
+      await postJSON('/api/integrations/gemini/config', body, { schema: integrations.geminiConfig.response });
+      setGmKey('');
+      toast.success('Gemini settings saved');
+      await queryClient.invalidateQueries({ queryKey: qk.settings.integrationsGeminiStatus() });
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to save Gemini settings'));
+    } finally {
+      setGmBusy(false);
+    }
+  }, [gmKey, gmModel, toast, queryClient]);
+
+  const testGemini = useCallback(async (): Promise<void> => {
+    setGmBusy(true);
+    setGmTest(null);
+    try {
+      const result = await postJSON<integrations.GeminiTestResponse>(
+        '/api/integrations/gemini/test',
+        {},
+        { schema: integrations.geminiTest.response }
+      );
+      setGmTest(
+        result.ok
+          ? { ok: true, msg: `Connected — model ${result.model} responded.` }
+          : { ok: false, msg: result.error || 'Test failed' }
+      );
+    } catch (err) {
+      setGmTest({ ok: false, msg: httpErrorMessage(err, 'Test failed') });
+    } finally {
+      setGmBusy(false);
+    }
+  }, []);
+
+  const clearGemini = useCallback(async (): Promise<void> => {
+    setGmBusy(true);
+    setGmTest(null);
+    try {
+      await postJSON('/api/integrations/gemini/clear', {}, { schema: integrations.geminiClear.response });
+      setGmKey('');
+      toast.success('Reverted to environment configuration');
+      await queryClient.invalidateQueries({ queryKey: qk.settings.integrationsGeminiStatus() });
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to clear Gemini settings'));
+    } finally {
+      setGmBusy(false);
+    }
+  }, [toast, queryClient]);
+
+  const gmHealth: 'ok' | 'warn' | 'off' = gmStatus?.configured ? 'ok' : 'off';
+  const gmHealthLabel = !gmStatus?.configured
+    ? 'Not configured'
+    : gmStatus.source === 'db'
+      ? 'Configured'
+      : 'Configured (env)';
 
   const tsHealth: 'ok' | 'warn' | 'off' = !tsStatus?.configured
     ? 'off'
@@ -476,6 +558,106 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
                 Disconnect
               </button>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Gemini (AI) card ── */}
+      <div className={`${styles.card} ${styles[gmHealth]}`}>
+        <div className={styles.cardHeader}>
+          <span className={styles.serviceName}>
+            <i className="fas fa-robot" aria-hidden="true" /> Gemini (AI)
+          </span>
+          <span className={`${styles.badge} ${styles[gmHealth]}`}>
+            <span className={styles.dot} />
+            {gmLoading && !gmStatus ? 'Checking…' : gmHealthLabel}
+          </span>
+        </div>
+        <p className={styles.serviceDescription}>
+          Google Gemini powers AI name transliteration and the Stand product-vision scan. Set the
+          API key here to add or rotate it without restarting the server.
+        </p>
+
+        <dl className={styles.rows}>
+          <div className={styles.row}>
+            <dt>API key</dt>
+            <dd>
+              {gmStatus?.maskedKey ? (
+                <span className={styles.okText}>
+                  {gmStatus.maskedKey}
+                  {gmStatus.source === 'env' ? ' · from environment' : ''}
+                </span>
+              ) : (
+                'Not set'
+              )}
+            </dd>
+          </div>
+          {gmStatus?.configured && (
+            <div className={styles.row}>
+              <dt>Model</dt>
+              <dd>{gmStatus.model}</dd>
+            </div>
+          )}
+        </dl>
+
+        <div className={styles.loginRow}>
+          <label className={styles.loginLabel}>
+            {gmStatus?.configured ? 'API key (enter a new key to replace)' : 'API key'}
+            <input
+              className={styles.input}
+              type="password"
+              value={gmKey}
+              onChange={(e) => setGmKey(e.target.value)}
+              placeholder={gmStatus?.configured ? 'Leave blank to keep current key' : 'AIza…'}
+              autoComplete="off"
+            />
+          </label>
+          <label className={styles.loginLabel}>
+            Model
+            <input
+              className={styles.input}
+              value={gmModel}
+              onChange={(e) => setGmModel(e.target.value)}
+              placeholder="gemini-3-flash-preview"
+            />
+          </label>
+        </div>
+
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.primaryBtn}
+            onClick={() => void saveGemini()}
+            disabled={gmBusy || (!gmKey.trim() && !gmModel.trim())}
+          >
+            {gmBusy ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => void testGemini()}
+            disabled={gmBusy || !gmStatus?.configured}
+          >
+            Test connection
+          </button>
+          {gmStatus?.source === 'db' && (
+            <button
+              type="button"
+              className={styles.dangerBtn}
+              onClick={() => void clearGemini()}
+              disabled={gmBusy}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        {gmTest && (
+          <div className={styles.notice}>
+            <span className={gmTest.ok ? styles.okText : styles.warnText}>
+              {gmTest.ok ? '✓ ' : '✗ '}
+              {gmTest.msg}
+            </span>
           </div>
         )}
       </div>
