@@ -109,14 +109,23 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
     const handleOpen3Shape = async () => {
         if (!hasPatient || sendingTo3Shape) return;
         setSendingTo3Shape(true);
+        // Immediate, persistent feedback for the unavoidable few-second round-trip
+        // (push the patient → launch Unite on the scanner workstation over the LAN).
+        // The "Sending…" label on the button isn't enough: this button lives in the
+        // More-actions flyout, which closes the instant it's clicked — so without a
+        // toast the click looks like it did nothing. Long duration; we clear it
+        // explicitly the moment the call settles.
+        const pendingId = toast.info('Sending patient to 3Shape…', 60000);
         try {
             await postJSON(
                 `/api/threeshape/patients/${personId}/initiate-workflow`,
                 {},
                 { schema: threeshape.initiateWorkflow.response }
             );
+            toast.removeToast(pendingId);
             toast.success('Sent to 3Shape — opening Unite on the scanner');
         } catch (err) {
+            toast.removeToast(pendingId);
             toast.error(httpErrorMessage(err, 'Failed to send to 3Shape'));
         } finally {
             setSendingTo3Shape(false);
