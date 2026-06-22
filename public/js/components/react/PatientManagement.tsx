@@ -10,6 +10,7 @@ import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { formatDate } from '@/core/utils';
 import { qk } from '@/query/keys';
 import { patientSearch as patientSearchContract } from '@shared/contracts/patient.contract';
 import * as appointmentContract from '@shared/contracts/appointment.contract';
@@ -605,7 +606,7 @@ const PatientManagement = () => {
                                         {p.first_name && <div>{p.first_name} {p.last_name}</div>}
                                     </td>
                                     <td data-label="Phone"><PhoneDisplay phone={p.phone} /> {!p.phone && '-'}</td>
-                                    <td data-label="Date">{p.date_added ? new Date(p.date_added).toLocaleDateString() : '-'}</td>
+                                    <td data-label="Date">{p.date_added ? formatDate(p.date_added) : '-'}</td>
                                     <td data-label="Tag">{p.TagName ? <span className={styles.tagBadge}>{p.TagName}</span> : '-'}</td>
                                     <td data-label="Actions">
                                         <div className={styles.actionButtons}>
