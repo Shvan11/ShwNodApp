@@ -6,20 +6,9 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { revenueBreakdownQuery } from '@/query/queries';
 import { httpErrorMessage } from '@/core/http';
 import { formatNumber } from '../../utils/formatters';
+import PeriodNavigator, { currentMonthStart, currentMonthEnd } from './PeriodNavigator';
 import type { RevenueRow } from '@shared/contracts/reports.contract';
 import styles from './RevenueBreakdownView.module.css';
-
-// Current calendar month [first, last day] as local-wall-clock YYYY-MM-DD strings.
-const pad2 = (n: number): string => String(n).padStart(2, '0');
-const ymd = (d: Date): string => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-const monthStart = (): string => {
-    const now = new Date();
-    return ymd(new Date(now.getFullYear(), now.getMonth(), 1));
-};
-const monthEnd = (): string => {
-    const now = new Date();
-    return ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
-};
 
 // Cap the bar chart to the top earners (the table still lists everyone).
 const TOP_N = 15;
@@ -179,8 +168,8 @@ const BreakdownSection = ({ title, icon, nameLabel, rows, resolvedTheme }: Break
  */
 const RevenueBreakdownView = () => {
     const { resolvedTheme } = useTheme();
-    const [startDate, setStartDate] = useState(monthStart);
-    const [endDate, setEndDate] = useState(monthEnd);
+    const [startDate, setStartDate] = useState(currentMonthStart);
+    const [endDate, setEndDate] = useState(currentMonthEnd);
 
     const invalidRange = !!startDate && !!endDate && startDate > endDate;
 
@@ -196,32 +185,13 @@ const RevenueBreakdownView = () => {
 
     return (
         <div className={styles.container}>
-            <div className={styles.periodBar}>
-                <div className={styles.periodField}>
-                    <label htmlFor="breakdown-start">From</label>
-                    <input
-                        id="breakdown-start"
-                        type="date"
-                        value={startDate}
-                        max={endDate || undefined}
-                        onChange={(e) => setStartDate(e.target.value)}
-                    />
-                </div>
-                <i className={`fas fa-arrow-right ${styles.arrow}`} aria-hidden="true"></i>
-                <div className={styles.periodField}>
-                    <label htmlFor="breakdown-end">To</label>
-                    <input
-                        id="breakdown-end"
-                        type="date"
-                        value={endDate}
-                        min={startDate || undefined}
-                        onChange={(e) => setEndDate(e.target.value)}
-                    />
-                </div>
-                {isFetching && !invalidRange && (
-                    <i className={`fas fa-spinner fa-spin ${styles.spinner}`} aria-hidden="true"></i>
-                )}
-            </div>
+            <PeriodNavigator
+                startDate={startDate}
+                endDate={endDate}
+                onChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+                isFetching={isFetching && !invalidRange}
+                idPrefix="breakdown"
+            />
 
             {exchangeRate > 0 && (
                 <p className={styles.rateNote}>
@@ -240,17 +210,17 @@ const RevenueBreakdownView = () => {
             ) : (
                 <>
                     <BreakdownSection
-                        title="Revenue by Work Type"
-                        icon="fa-briefcase"
-                        nameLabel="Work Type"
-                        rows={byWorkType}
-                        resolvedTheme={resolvedTheme}
-                    />
-                    <BreakdownSection
                         title="Revenue by Doctor"
                         icon="fa-user-md"
                         nameLabel="Doctor"
                         rows={byDoctor}
+                        resolvedTheme={resolvedTheme}
+                    />
+                    <BreakdownSection
+                        title="Revenue by Work Type"
+                        icon="fa-briefcase"
+                        nameLabel="Work Type"
+                        rows={byWorkType}
                         resolvedTheme={resolvedTheme}
                     />
                 </>

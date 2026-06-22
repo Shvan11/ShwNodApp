@@ -9,6 +9,7 @@ import RevenueBreakdownView from './RevenueBreakdownView';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
 import { getChartThemeColors } from '../../utils/chartTheme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { httpErrorMessage } from '@/core/http';
 import {
     statisticsQuery,
@@ -87,8 +88,23 @@ type ViewMode = typeof VIEW_MODES[keyof typeof VIEW_MODES];
 const isCustomView = (mode: ViewMode): boolean =>
     mode === VIEW_MODES.COMMISSIONS || mode === VIEW_MODES.BREAKDOWN;
 
+// Tabs that expose per-doctor earnings / revenue breakdowns — admin-only.
+const isAdminOnlyView = (mode: ViewMode): boolean =>
+    mode === VIEW_MODES.COMMISSIONS || mode === VIEW_MODES.BREAKDOWN;
+
+// Label + icon for each tab, rendered in the persistent page-level tab bar.
+const TAB_META: Record<ViewMode, { label: string; icon: string }> = {
+    [VIEW_MODES.DAILY]: { label: 'Daily', icon: 'fa-calendar-day' },
+    [VIEW_MODES.MONTHLY]: { label: 'Monthly', icon: 'fa-calendar-alt' },
+    [VIEW_MODES.YEARLY]: { label: 'Yearly', icon: 'fa-calendar' },
+    [VIEW_MODES.COMMISSIONS]: { label: 'Commissions', icon: 'fa-hand-holding-dollar' },
+    [VIEW_MODES.BREAKDOWN]: { label: 'Breakdown', icon: 'fa-chart-pie' },
+};
+
 const StatisticsComponent = () => {
     const { resolvedTheme } = useTheme();
+    const { user } = useGlobalState();
+    const isAdmin = user?.role === 'admin';
     const [searchParams, setSearchParams] = useSearchParams();
     const [month, setMonth] = useState(parseInt(searchParams.get('month') || '') || new Date().getMonth() + 1);
     const [year, setYear] = useState(parseInt(searchParams.get('year') || '') || new Date().getFullYear());
@@ -101,6 +117,13 @@ const StatisticsComponent = () => {
     const [exchangeRate] = useState(1450);
     const [viewMode, setViewMode] = useState<ViewMode>((searchParams.get('view') as ViewMode) || VIEW_MODES.DAILY);
 
+    // Non-admins can't reach the admin-only tabs — if one is selected via a deep link
+    // (?view=breakdown / ?view=commissions), coerce it to Daily for rendering. Derived
+    // (not a setState-in-effect) so it's recomputed every render: an admin whose identity
+    // resolves a beat after first paint snaps straight to their tab with no bounce.
+    const effectiveViewMode: ViewMode =
+        !isAdmin && isAdminOnlyView(viewMode) ? VIEW_MODES.DAILY : viewMode;
+
     // Statistics for the selected month — the headline read. `isFetching` drives the
     // refresh spinner; `keepPreviousData` keeps the last month on screen during a
     // month change instead of flashing the full-screen spinner.
@@ -110,7 +133,13 @@ const StatisticsComponent = () => {
         isError,
         error: statsError,
         refetch: refetchStatistics,
-    } = useQuery({ ...statisticsQuery(month, year, exchangeRate), placeholderData: keepPreviousData });
+    } = useQuery({
+        ...statisticsQuery(month, year, exchangeRate),
+        placeholderData: keepPreviousData,
+        // The custom tabs (Commissions / Breakdown) own their own queries and never
+        // read the monthly stats — don't fetch them while one of those tabs is open.
+        enabled: !isCustomView(effectiveViewMode),
+    });
     const statistics = (statisticsData ?? null) as StatisticsData | null;
     const error = isError ? httpErrorMessage(statsError, 'Failed to fetch statistics') : null;
 
@@ -118,14 +147,14 @@ const StatisticsComponent = () => {
     // keepPreviousData here).
     const { data: yearlyDataRaw, isFetching: loadingYearly } = useQuery({
         ...yearlyStatisticsQuery(periodStartMonth, periodStartYear, exchangeRate),
-        enabled: viewMode === VIEW_MODES.MONTHLY,
+        enabled: effectiveViewMode === VIEW_MODES.MONTHLY,
     });
     const yearlyData = (yearlyDataRaw ?? null) as YearlyData | null;
 
     // Multi-year rollup — only fetched in Yearly view.
     const { data: multiYearDataRaw, isFetching: loadingMultiYear } = useQuery({
         ...multiYearStatisticsQuery(yearRangeStart, yearRangeEnd, exchangeRate),
-        enabled: viewMode === VIEW_MODES.YEARLY,
+        enabled: effectiveViewMode === VIEW_MODES.YEARLY,
     });
     const multiYearData = (multiYearDataRaw ?? null) as MultiYearData | null;
 
@@ -195,12 +224,12 @@ const StatisticsComponent = () => {
         if (!revenueTrendChartRef.current) return;
 
         // Wait for yearly data to load before rendering monthly view
-        if (viewMode === VIEW_MODES.MONTHLY && loadingYearly) {
+        if (effectiveViewMode === VIEW_MODES.MONTHLY && loadingYearly) {
             return;
         }
 
         // Wait for multi-year data to load before rendering yearly view
-        if (viewMode === VIEW_MODES.YEARLY && loadingMultiYear) {
+        if (effectiveViewMode === VIEW_MODES.YEARLY && loadingMultiYear) {
             return;
         }
 
@@ -216,7 +245,7 @@ const StatisticsComponent = () => {
         let chartTitle = 'Grand Total (USD)';
 
         // Aggregate data based on view mode
-        switch (viewMode) {
+        switch (effectiveViewMode) {
             case VIEW_MODES.DAILY:
                 chartData = statistics.dailyData.map(day => ({
                     label: `${new Date(day.Day).getDate()}/${new Date(day.Day).getMonth() + 1}`,
@@ -269,20 +298,20 @@ const StatisticsComponent = () => {
         const chartColors = getChartThemeColors();
 
         revenueTrendChartInstance.current = new Chart(ctx, {
-            type: viewMode === VIEW_MODES.YEARLY ? 'bar' : 'line',
+            type: effectiveViewMode === VIEW_MODES.YEARLY ? 'bar' : 'line',
             data: {
                 labels: labels,
                 datasets: [{
                     label: 'Grand Total (USD)',
                     data: grandTotals,
                     borderColor: successGreen,
-                    backgroundColor: viewMode === VIEW_MODES.YEARLY
+                    backgroundColor: effectiveViewMode === VIEW_MODES.YEARLY
                         ? `${successGreen}cc`
                         : `${successGreen}1a`,
                     tension: 0.3,
                     fill: true,
                     borderWidth: 3,
-                    pointRadius: viewMode === VIEW_MODES.DAILY ? 4 : 6,
+                    pointRadius: effectiveViewMode === VIEW_MODES.DAILY ? 4 : 6,
                     pointBackgroundColor: successGreen,
                     pointHoverRadius: 8
                 }]
@@ -342,7 +371,7 @@ const StatisticsComponent = () => {
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [statistics, exchangeRate, viewMode, month, year, yearlyData, loadingYearly, multiYearData, loadingMultiYear, yearRangeStart, yearRangeEnd, resolvedTheme]);
+    }, [statistics, exchangeRate, effectiveViewMode, month, year, yearlyData, loadingYearly, multiYearData, loadingMultiYear, yearRangeStart, yearRangeEnd, resolvedTheme]);
 
     // Navigation handlers
     const handlePrevMonth = () => {
@@ -398,43 +427,52 @@ const StatisticsComponent = () => {
         window.print();
     };
 
-    if (loading && !statistics) {
-        return (
-            <div className={styles.statisticsContainer}>
-                <div className={styles.loadingState}>
-                    <div className={styles.spinner}></div>
-                    <p>Loading statistics...</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (error && !statistics) {
-        return (
-            <div className={styles.statisticsContainer}>
-                <div className={styles.errorState}>
-                    <i className="fas fa-exclamation-triangle"></i>
-                    <p>{error}</p>
-                    <button className={styles.btnRetry} onClick={() => refetchStatistics()}>Try Again</button>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <>
             <div className={styles.statisticsContainer}>
-                {/* Page Title */}
-                <div className={styles.pageTitle}>
-                    <h1>
-                        <i className="fas fa-chart-bar"></i>
-                        Financial Statistics
-                    </h1>
+                {/* Header: page title + a persistent, page-level tab bar. Living above
+                    every conditional element (month nav, cards, table), the tabs keep
+                    the same position in every view — switching tabs never moves them. */}
+                <div className={styles.pageHeader}>
+                    <div className={styles.pageTitle}>
+                        <h1>
+                            <i className="fas fa-chart-bar"></i>
+                            Financial Statistics
+                        </h1>
+                    </div>
+                    <div className={styles.viewTabs} role="tablist" aria-label="Statistics views">
+                        {Object.values(VIEW_MODES)
+                            .filter((value) => isAdmin || !isAdminOnlyView(value))
+                            .map((value) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={effectiveViewMode === value}
+                                    className={`${styles.viewTab} ${effectiveViewMode === value ? styles.viewTabActive : ''}`}
+                                    onClick={() => setViewMode(value)}
+                                >
+                                    <i className={`fas ${TAB_META[value].icon}`} aria-hidden="true"></i>
+                                    <span>{TAB_META[value].label}</span>
+                                </button>
+                            ))}
+                    </div>
                 </div>
 
-            {/* Controls (month nav) — hidden in the self-contained tabs (Commissions /
-                Breakdown), which carry their own From/To date-range picker. */}
-            {!isCustomView(viewMode) && (
+                {/* The self-contained tabs own everything below the tab bar (their own
+                    From/To navigator + query). The time-based tabs share the month nav,
+                    summary cards, trend chart, and daily table that follow. */}
+                {effectiveViewMode === VIEW_MODES.COMMISSIONS ? (
+                    <div className={`${styles.chartCard} ${styles.chartCardFull}`}>
+                        <DoctorCommissionsView />
+                    </div>
+                ) : effectiveViewMode === VIEW_MODES.BREAKDOWN ? (
+                    <div className={`${styles.chartCard} ${styles.chartCardFull}`}>
+                        <RevenueBreakdownView />
+                    </div>
+                ) : (
+                <>
+            {/* Controls (month nav) */}
             <div className={styles.controlsSection}>
                 <div className={styles.dateSelector}>
                     <button onClick={handlePrevMonth} className={styles.btnNav} title="Previous Month">
@@ -472,12 +510,21 @@ const StatisticsComponent = () => {
                     </button>
                 </div>
             </div>
-            )}
 
-            {statistics && (
+            {loading && !statistics ? (
+                <div className={styles.loadingState}>
+                    <div className={styles.spinner}></div>
+                    <p>Loading statistics...</p>
+                </div>
+            ) : error && !statistics ? (
+                <div className={styles.errorState}>
+                    <i className="fas fa-exclamation-triangle"></i>
+                    <p>{error}</p>
+                    <button className={styles.btnRetry} onClick={() => refetchStatistics()}>Try Again</button>
+                </div>
+            ) : statistics ? (
                 <>
-                    {/* Summary Cards - Monthly Totals Only (hidden in the self-contained tabs) */}
-                    {!isCustomView(viewMode) && (
+                    {/* Summary Cards — month-scoped totals */}
                     <div className={styles.summaryCards}>
                         <div className={`${styles.summaryCard} ${styles.revenue}`}>
                             <div className={styles.cardHeader}>
@@ -530,28 +577,12 @@ const StatisticsComponent = () => {
                             </div>
                         </div>
                     </div>
-                    )}
 
-                    {/* Chart - Grand Total (USD) */}
+                    {/* Trend chart */}
                     <div className={`${styles.chartsSection} ${styles.chartsSectionSingle}`}>
                         <div className={`${styles.chartCard} ${styles.chartCardFull}`}>
-                            {/* View Mode Selector - Near the chart */}
-                            <div className={styles.chartControls}>
-                                <div className={styles.viewModeSelector}>
-                                    {Object.entries(VIEW_MODES).map(([key, value]) => (
-                                        <button
-                                            key={value}
-                                            className={`${styles.viewModeBtn} ${viewMode === value ? styles.active : ''}`}
-                                            onClick={() => setViewMode(value)}
-                                        >
-                                            {key.charAt(0) + key.slice(1).toLowerCase()}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
                             {/* Period Selector for Monthly View */}
-                            {viewMode === VIEW_MODES.MONTHLY && (
+                            {effectiveViewMode === VIEW_MODES.MONTHLY && (
                                 <div className={styles.periodSelector}>
                                     <div className={styles.periodSelectorLabel}>
                                         <i className="fas fa-calendar-alt"></i>
@@ -598,7 +629,7 @@ const StatisticsComponent = () => {
                             )}
 
                             {/* Year Range Selector for Yearly View */}
-                            {viewMode === VIEW_MODES.YEARLY && (
+                            {effectiveViewMode === VIEW_MODES.YEARLY && (
                                 <div className={styles.periodSelector}>
                                     <div className={styles.periodSelectorLabel}>
                                         <i className="fas fa-calendar-alt"></i>
@@ -651,20 +682,13 @@ const StatisticsComponent = () => {
                                 </div>
                             )}
 
-                            {viewMode === VIEW_MODES.COMMISSIONS ? (
-                                <DoctorCommissionsView />
-                            ) : viewMode === VIEW_MODES.BREAKDOWN ? (
-                                <RevenueBreakdownView />
-                            ) : (
-                                <div className={`${styles.chartContainer} ${styles.chartContainerLarge}`}>
-                                    <canvas ref={revenueTrendChartRef}></canvas>
-                                </div>
-                            )}
+                            <div className={`${styles.chartContainer} ${styles.chartContainerLarge}`}>
+                                <canvas ref={revenueTrendChartRef}></canvas>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Daily Data Table (hidden in the self-contained tabs) */}
-                    {!isCustomView(viewMode) && (
+                    {/* Daily Data Table */}
                     <div className={styles.tableSection}>
                         <h3>Daily Breakdown</h3>
                         <div className={styles.tableWrapper}>
@@ -720,9 +744,10 @@ const StatisticsComponent = () => {
                             </table>
                         </div>
                     </div>
-                    )}
                 </>
-            )}
+                ) : null}
+                </>
+                )}
             </div>
 
             {/* Daily Invoices Modal */}

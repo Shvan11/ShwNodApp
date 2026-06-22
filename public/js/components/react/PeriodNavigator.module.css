@@ -1,0 +1,113 @@
+/* Shared From/To range bar with whole-month stepping.
+   Used by the Statistics Commissions + Breakdown tabs. */
+
+.periodBar {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+    margin-bottom: var(--spacing-lg);
+}
+
+/* Prev / next whole-month chevrons */
+.navBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--primary-color);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+}
+
+.navBtn:hover {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: var(--color-white);
+}
+
+.navBtn:active {
+    transform: scale(0.96);
+}
+
+.periodField {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.periodField label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.periodField input {
+    padding: 0.5rem 0.75rem;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: var(--surface);
+    color: var(--text-primary);
+}
+
+.periodField input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.arrow {
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
+}
+
+/* Jump back to the current calendar month */
+.thisMonthBtn {
+    height: 40px;
+    padding: 0 1rem;
+    flex-shrink: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.thisMonthBtn:hover {
+    background: var(--background-secondary);
+}
+
+.spinner {
+    color: var(--primary-color);
+    margin-bottom: 0.7rem;
+    align-self: flex-end;
+}
+
+@media (max-width: 600px) {
+    .periodBar {
+        gap: var(--spacing-sm);
+    }
+
+    /* Let the two date fields share a row with their chevrons */
+    .periodField {
+        flex: 1 1 40%;
+    }
+
+    .periodField input {
+        width: 100%;
+    }
+
+    .thisMonthBtn {
+        flex: 1 1 100%;
+    }
+}

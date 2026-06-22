@@ -3,20 +3,8 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { doctorCommissionsQuery } from '@/query/queries';
 import { httpErrorMessage } from '@/core/http';
 import { formatNumber } from '../../utils/formatters';
+import PeriodNavigator, { currentMonthStart, currentMonthEnd } from './PeriodNavigator';
 import styles from './DoctorCommissionsView.module.css';
-
-// Current calendar month [first, last day] as local-wall-clock YYYY-MM-DD strings.
-// (Day 0 of next month = last day of this month.)
-const pad2 = (n: number): string => String(n).padStart(2, '0');
-const ymd = (d: Date): string => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-const monthStart = (): string => {
-    const now = new Date();
-    return ymd(new Date(now.getFullYear(), now.getMonth(), 1));
-};
-const monthEnd = (): string => {
-    const now = new Date();
-    return ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
-};
 
 /**
  * Statistics → Commissions tab. For a From/To period (default: the current month),
@@ -26,8 +14,8 @@ const monthEnd = (): string => {
  * date-range state + query, so it does not depend on the page's monthly stats.
  */
 const DoctorCommissionsView = () => {
-    const [startDate, setStartDate] = useState(monthStart);
-    const [endDate, setEndDate] = useState(monthEnd);
+    const [startDate, setStartDate] = useState(currentMonthStart);
+    const [endDate, setEndDate] = useState(currentMonthEnd);
 
     const invalidRange = !!startDate && !!endDate && startDate > endDate;
 
@@ -52,32 +40,13 @@ const DoctorCommissionsView = () => {
 
     return (
         <div className={styles.container}>
-            <div className={styles.periodBar}>
-                <div className={styles.periodField}>
-                    <label htmlFor="commission-start">From</label>
-                    <input
-                        id="commission-start"
-                        type="date"
-                        value={startDate}
-                        max={endDate || undefined}
-                        onChange={(e) => setStartDate(e.target.value)}
-                    />
-                </div>
-                <i className={`fas fa-arrow-right ${styles.arrow}`} aria-hidden="true"></i>
-                <div className={styles.periodField}>
-                    <label htmlFor="commission-end">To</label>
-                    <input
-                        id="commission-end"
-                        type="date"
-                        value={endDate}
-                        min={startDate || undefined}
-                        onChange={(e) => setEndDate(e.target.value)}
-                    />
-                </div>
-                {isFetching && !invalidRange && (
-                    <i className={`fas fa-spinner fa-spin ${styles.spinner}`} aria-hidden="true"></i>
-                )}
-            </div>
+            <PeriodNavigator
+                startDate={startDate}
+                endDate={endDate}
+                onChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+                isFetching={isFetching && !invalidRange}
+                idPrefix="commission"
+            />
 
             {invalidRange ? (
                 <p className={styles.message}>The start date must be on or before the end date.</p>
