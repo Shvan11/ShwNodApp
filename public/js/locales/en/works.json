@@ -1,0 +1,177 @@
+{
+  "loading": {
+    "works": "Loading works..."
+  },
+  "common": {
+    "cancel": "Cancel",
+    "doctor": "Doctor",
+    "workType": "Work Type",
+    "totalRequired": "Total Required",
+    "patient": "Patient",
+    "na": "N/A",
+    "notSet": "Not set"
+  },
+  "patientCard": {
+    "smileAlt": "{{name}} - Smile"
+  },
+  "summary": {
+    "total": "Total",
+    "active": "Active",
+    "completed": "Completed",
+    "discontinued": "Discontinued"
+  },
+  "controls": {
+    "searchPlaceholder": "Search works...",
+    "addWork": "Add New Work"
+  },
+  "filter": {
+    "all": "All Works",
+    "active": "Active",
+    "completed": "Completed",
+    "discontinued": "Discontinued"
+  },
+  "checkin": {
+    "title": "Check in patient for today",
+    "titleDone": "Patient already checked in today",
+    "checkIn": "Check In",
+    "checkingIn": "Checking In...",
+    "checkedIn": "Checked In",
+    "toastAlready": "{{name}} is already checked in today!",
+    "toastAdded": "{{name}} added to today's appointments and checked in!",
+    "toastSuccess": "{{name}} checked in successfully!",
+    "toastFail": "Failed to check in patient"
+  },
+  "printAppointment": {
+    "label": "Print Appointment Receipt",
+    "loading": "Loading...",
+    "title": "Print appointment confirmation receipt",
+    "noAppt": "No future appointment scheduled",
+    "toastNoAppt": "Patient has no scheduled appointment",
+    "toastWindowFailed": "Failed to open receipt window. Please check your popup blocker settings.",
+    "toastOpening": "Opening appointment receipt..."
+  },
+  "empty": {
+    "noMatch": "No works match your criteria",
+    "none": "No works found for this patient"
+  },
+  "toast": {
+    "completed": "Work marked as completed",
+    "discontinued": "Work marked as discontinued",
+    "reactivated": "Work reactivated successfully",
+    "failComplete": "Failed to complete work",
+    "failDiscontinue": "Failed to discontinue work",
+    "failReactivate": "Failed to reactivate work",
+    "deleted": "Work deleted successfully!",
+    "failDelete": "Failed to delete work",
+    "transferred": "Work transferred successfully to another patient",
+    "paymentAdded": "Payment added successfully!"
+  },
+  "deleteDeps": {
+    "header": "⚠️ CANNOT DELETE WORK - EXISTING RECORDS FOUND ⚠️",
+    "intro": "This work has the following records that must be deleted first:",
+    "payments": "• {{n}} payment(s)",
+    "visits": "• {{n}} visit(s)",
+    "items": "• {{n}} treatment detail(s)",
+    "diagnoses": "• {{n}} diagnosis(es)",
+    "implants": "• {{n}} implant(s)",
+    "screws": "• {{n}} screw(s)",
+    "alignerSets": "• {{n}} aligner set(s)",
+    "footer": "⚠️ Delete these records first, then try again."
+  },
+  "deleteWork": {
+    "title": "Confirm Delete Work",
+    "confirm": "Are you sure you want to delete this work?",
+    "cannotUndo": "⚠️ This action cannot be undone!",
+    "button": "Delete Work"
+  },
+  "statusModal": {
+    "complete": {
+      "title": "Complete Work",
+      "message": "Are you sure you want to mark this work as completed?",
+      "warning": "This will change the work status to Finished.",
+      "button": "Complete Work"
+    },
+    "discontinue": {
+      "title": "Discontinue Work",
+      "message": "Are you sure you want to discontinue this work?",
+      "warning": "This indicates the patient has abandoned treatment.",
+      "button": "Discontinue"
+    },
+    "reactivate": {
+      "title": "Reactivate Work",
+      "message": "Are you sure you want to reactivate this work?",
+      "warning": "This will make it the active work for this patient.",
+      "button": "Reactivate"
+    }
+  },
+  "paymentHistory": {
+    "title": "Payment History - {{name}}",
+    "workFallback": "Work #{{id}}",
+    "totalRequired": "Total Required:",
+    "totalPaid": "Total Paid:",
+    "balanceRemaining": "Balance Remaining:",
+    "loading": "Loading payment history...",
+    "table": {
+      "date": "Date",
+      "amountPaid": "Amount Paid ({{currency}})",
+      "actualAmount": "Actual Amount",
+      "actualCurrency": "Actual Currency",
+      "change": "Change",
+      "actions": "Actions"
+    },
+    "editTitle": "Edit Payment",
+    "editComingSoon": "Edit payment functionality coming soon!\n\nPayment ID: {{id}}\nAmount: {{amount}}",
+    "deleteTitle": "Delete Payment",
+    "deleteConfirm": "Are you sure you want to delete this payment?\n\nAmount: {{amount}}\nDate: {{date}}\n\nThis action cannot be undone.",
+    "deleteConfirmButton": "Delete",
+    "deleteSuccess": "Payment deleted successfully!",
+    "deleteError": "Error deleting payment: {{error}}",
+    "unknownError": "Unknown error",
+    "noPayments": "No payments recorded yet for this work",
+    "addPayment": "Add New Payment",
+    "fullyPaid": "This work is fully paid"
+  },
+  "card": {
+    "otherTreatment": "Other Treatment",
+    "drPrefix": "Dr. {{name}}",
+    "notAssigned": "Not assigned",
+    "balance": "Balance: {{amount}}",
+    "moreActions": "More actions",
+    "editWork": "Edit Work",
+    "transferWork": "Transfer Work",
+    "markComplete": "Mark Complete",
+    "markDiscontinued": "Mark Discontinued",
+    "reactivate": "Reactivate",
+    "deleteWork": "Delete Work",
+    "treatmentProgress": "Treatment Progress",
+    "totalCost": "Total Cost",
+    "discount": "Discount",
+    "net": "Net",
+    "paid": "Paid",
+    "remaining": "Remaining",
+    "discountApplied": "Discount applied",
+    "discountOnDate": " on {{date}}",
+    "discountReason": " — {{reason}}",
+    "started": "Started: {{date}}",
+    "duration": "Duration: {{months}} months",
+    "debond": "Debond: {{date}}",
+    "statusCompleted": "Completed",
+    "statusDiscontinued": "Discontinued",
+    "statusActive": "Active",
+    "newVisit": "New Visit",
+    "newVisitTitle": "Add new visit for this work",
+    "visits": "Visits",
+    "visitsTitle": "View visits for this work",
+    "diagnosis": "Diagnosis",
+    "diagnosisTitle": "View diagnosis and treatment plan",
+    "payments": "Payments",
+    "paymentsTitle": "View payment history",
+    "addPayment": "Add Payment",
+    "addPaymentNoBalance": "No balance remaining",
+    "addPaymentTitle": "Add payment for this work",
+    "printReceipt": "Print Receipt",
+    "printReceiptTitle": "Print today's receipt",
+    "addAlignerSet": "Add Aligner Set",
+    "addAlignerSetTitle": "Add or manage aligner sets"
+  }
+}

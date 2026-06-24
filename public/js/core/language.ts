@@ -67,14 +67,35 @@ export const DEFAULT_LANGUAGE: Language = 'en';
  * translate a screen, add its path (and keep the FOUC route check in
  * `public/index.html` in sync). An entry matches the path exactly OR as a path
  * prefix (`<entry>/…`); the root `/` renders the Dashboard so it's matched in
- * `isRtlRoute`. Currently: Dashboard + Expenses + Appointments.
+ * `isRtlRoute`. Currently: Dashboard + Expenses + Appointments + the patient
+ * Works page.
  */
 export const RTL_ROUTES: readonly string[] = ['/dashboard', '/expenses', '/appointments'];
+
+/**
+ * Translated routes whose path carries a dynamic segment, so they can't be
+ * expressed as a static prefix in RTL_ROUTES. Each is matched precisely (NOT the
+ * whole `/patient/:id/*` subtree) so untranslated sibling patient pages
+ * (visits/diagnosis/…) stay LTR English. Keep in sync with the FOUC check in
+ * `public/index.html`. Currently:
+ *   - the patient Works page (`/patient/:id/works`)
+ *   - the appointment-booking workflow: the appointments list
+ *     (`/patient/:id/appointments`), the new-appointment form
+ *     (`/patient/:id/new-appointment`) and the edit-appointment form
+ *     (`/patient/:id/edit-appointment/:appointmentId`).
+ */
+const RTL_ROUTE_PATTERNS: readonly RegExp[] = [
+  /^\/patient\/[^/]+\/works\/?$/,
+  /^\/patient\/[^/]+\/appointments\/?$/,
+  /^\/patient\/[^/]+\/new-appointment\/?$/,
+  /^\/patient\/[^/]+\/edit-appointment(\/.*)?$/,
+];
 
 /** True if `path` is a translated route that may render RTL. */
 export function isRtlRoute(path: string): boolean {
   if (path === '/') return true; // root route renders the Dashboard
-  return RTL_ROUTES.some((route) => path === route || path.startsWith(route + '/'));
+  if (RTL_ROUTES.some((route) => path === route || path.startsWith(route + '/'))) return true;
+  return RTL_ROUTE_PATTERNS.some((re) => re.test(path));
 }
 
 /** Direction to apply: RTL only when the language is RTL AND the route is translated. */

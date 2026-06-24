@@ -23,10 +23,17 @@ interface FormErrors {
 }
 
 export default function StockAdjustModal({ isOpen, item, onClose, onSave }: StockAdjustModalProps) {
-  const [delta, setDelta] = useState(0);
+  // Raw text rather than a number so an in-progress negative ("" → "-" → "-5")
+  // survives. A controlled type="number" reports a lone "-" as "", which would
+  // collapse to 0 and wipe the minus sign — making it impossible to type a
+  // negative delta to reduce stock.
+  const [deltaText, setDeltaText] = useState('');
   const [reason, setReason] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
+
+  const parsed = parseInt(deltaText, 10);
+  const delta = Number.isNaN(parsed) ? 0 : parsed;
 
   // Reset the form when the modal opens. Done during render (keyed on open) rather
   // than in an effect, so the React Compiler can optimize and there's no extra
@@ -36,7 +43,7 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
   if (initKey !== initializedKey) {
     setInitializedKey(initKey);
     if (isOpen) {
-      setDelta(0);
+      setDeltaText('');
       setReason('');
       setErrors({});
     }
@@ -69,7 +76,7 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
   };
 
   const handleClose = () => {
-    setDelta(0);
+    setDeltaText('');
     setReason('');
     setErrors({});
     onClose();
@@ -112,16 +119,20 @@ export default function StockAdjustModal({ isOpen, item, onClose, onSave }: Stoc
                 Adjustment (Delta) <span className={styles.required}>*</span>
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 id="adjust-delta"
                 className={`${styles.formInput} ${errors.delta ? styles.inputError : ''}`}
-                value={delta}
+                value={deltaText}
+                placeholder="e.g. 5 to add, -5 to remove"
                 onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                  const val = parseInt(e.target.value, 10) || 0;
-                  setDelta(val);
-                  if (errors.delta) setErrors((prev) => ({ ...prev, delta: null }));
+                  const raw = e.target.value;
+                  // Allow empty, a lone leading minus, or an optional minus + digits.
+                  if (raw === '' || /^-?\d*$/.test(raw)) {
+                    setDeltaText(raw);
+                    if (errors.delta) setErrors((prev) => ({ ...prev, delta: null }));
+                  }
                 }}
-                step="1"
               />
               <span className={styles.hintText}>
                 Use positive values to add stock, negative to remove

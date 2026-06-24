@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, type FormEvent } from 'react';
 import cn from 'classnames';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
 import { useToast } from '../../contexts/ToastContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { formatAppointmentDateTime } from '@/utils/formatters';
 import * as appointment from '@shared/contracts/appointment.contract';
 import { qk } from '@/query/keys';
 import { employeesQuery, appointmentDetailsQuery } from '@/query/queries';
@@ -56,6 +59,8 @@ interface ApiErrorResponse {
  */
 
 const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps) => {
+    const { t } = useTranslation('appointments');
+    const { language } = useLanguage();
     const toast = useToast();
     const queryClient = useQueryClient();
     const [formData, setFormData] = useState<AppointmentFormData>({
@@ -176,10 +181,10 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
 
     const validateForm = (): boolean => {
         const errors: ValidationErrors = {};
-        if (!formData.AppDate) errors.AppDate = 'Select a date';
-        if (!formData.AppTime) errors.AppTime = 'Select a time';
-        if (!formData.DrID) errors.DrID = 'Select a doctor';
-        if (!formData.AppDetail) errors.AppDetail = 'Select appointment type';
+        if (!formData.AppDate) errors.AppDate = t('form.errorSelectDate');
+        if (!formData.AppTime) errors.AppTime = t('form.errorSelectTime');
+        if (!formData.DrID) errors.DrID = t('form.errorSelectDoctor');
+        if (!formData.AppDetail) errors.AppDetail = t('form.errorSelectType');
         setValidation(errors);
         return Object.keys(errors).length === 0;
     };
@@ -210,13 +215,13 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
             })
                 .then((waResult) => {
                     if (waResult.success) {
-                        toast.success('Appointment confirmation sent via WhatsApp!');
+                        toast.success(t('form.waSent'));
                     } else {
-                        toast.warning(waResult.message || 'Failed to send WhatsApp');
+                        toast.warning(waResult.message || t('form.waFailed'));
                     }
                 })
                 .catch(err => {
-                    toast.error('WhatsApp error: ' + httpErrorMessage(err, 'send failed'));
+                    toast.error(t('form.waError', { error: httpErrorMessage(err, 'send failed') }));
                 });
 
             // Refresh the patient's appointment-backed reads (has-appointment flag
@@ -241,13 +246,13 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
             const errorCode = errorData?.code ?? errorData?.details?.code;
 
             if (errorCode === 'HOLIDAY_CONFLICT') {
-                const holidayName = errorData?.details?.holidayName || 'Holiday';
-                setError(`Cannot create appointment: ${holidayName} is a holiday. No appointments are allowed on this date.`);
+                const holidayName = errorData?.details?.holidayName || t('calendar.holiday');
+                setError(t('form.errorHolidayConflict', { holiday: holidayName }));
             } else if (errorCode === 'APPOINTMENT_CONFLICT') {
-                setError('Patient already has an appointment on this date.');
+                setError(t('form.errorAppointmentConflict'));
             } else {
                 console.error('Error creating appointment:', err);
-                setError(httpErrorMessage(err, 'Unknown error'));
+                setError(httpErrorMessage(err, t('form.errorUnknown')));
             }
         } finally {
             setLoading(false);
@@ -256,16 +261,9 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
 
     const getDateTimeDisplay = (): string => {
         if (formData.AppDate && formData.AppTime) {
-            const date = new Date(`${formData.AppDate}T${formData.AppTime}`);
-            return date.toLocaleString(undefined, {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit'
-            });
+            return formatAppointmentDateTime(new Date(`${formData.AppDate}T${formData.AppTime}`), language);
         }
-        return 'No time selected';
+        return t('form.noTimeSelected');
     };
 
     return (
@@ -273,10 +271,10 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
             {/* Page Header */}
             <header className={styles.pageHeader}>
                 <div>
-                    <h1><i className="fas fa-calendar-plus"></i> New Appointment</h1>
-                    <p>Patient #{personId}</p>
+                    <h1><i className="fas fa-calendar-plus"></i> {t('form.newTitle')}</h1>
+                    <p>{t('form.patientLabel', { id: personId })}</p>
                 </div>
-                <button className={styles.closeButton} onClick={onClose} title="Close">
+                <button className={styles.closeButton} onClick={onClose} title={t('form.close')}>
                     <i className="fas fa-times"></i>
                 </button>
             </header>
@@ -292,7 +290,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                 {/* RIGHT COLUMN: Form */}
                 <div className={styles.formColumn} ref={formColumnRef}>
                     <div className={styles.formHeader}>
-                        <h2><i className="fas fa-clipboard-list"></i> Appointment Details</h2>
+                        <h2><i className="fas fa-clipboard-list"></i> {t('form.detailsHeading')}</h2>
                     </div>
 
                     <form onSubmit={handleSubmit} className={styles.form}>
@@ -304,7 +302,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                         )}
 
                         <div className={styles.formField}>
-                            <span><i className="fas fa-calendar-check"></i> Selected Time</span>
+                            <span><i className="fas fa-calendar-check"></i> {t('form.selectedTime')}</span>
                             <div
                                 ref={selectedTimeRef}
                                 className={cn(styles.selectedTime, {
@@ -319,7 +317,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                         </div>
 
                         <div className={styles.formField}>
-                            <label htmlFor="doctor"><i className="fas fa-user-md"></i> Doctor</label>
+                            <label htmlFor="doctor"><i className="fas fa-user-md"></i> {t('form.doctor')}</label>
                             <select
                                 id="doctor"
                                 name="DrID"
@@ -328,7 +326,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                                 onChange={handleInputChange}
                                 className={validation.DrID ? styles.error : ''}
                             >
-                                <option value="">Select doctor...</option>
+                                <option value="">{t('form.selectDoctor')}</option>
                                 {doctors.filter(d => d.id).map((doctor) => (
                                     <option key={doctor.id} value={doctor.id}>
                                         {doctor.employee_name}
@@ -339,7 +337,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                         </div>
 
                         <div className={styles.formField}>
-                            <label htmlFor="details"><i className="fas fa-notes-medical"></i> Appointment Type</label>
+                            <label htmlFor="details"><i className="fas fa-notes-medical"></i> {t('form.appointmentType')}</label>
                             <select
                                 id="details"
                                 name="AppDetail"
@@ -348,7 +346,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                                 onChange={handleInputChange}
                                 className={validation.AppDetail ? styles.error : ''}
                             >
-                                <option value="">Select type...</option>
+                                <option value="">{t('form.selectType')}</option>
                                 {details.filter(d => d.id).map((detail) => (
                                     <option key={detail.id} value={detail.detail ?? ''}>
                                         {detail.detail}
@@ -366,7 +364,7 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                                 disabled={loading}
                             >
                                 <i className="fas fa-times"></i>
-                                Cancel
+                                {t('form.cancel')}
                             </button>
                             <button
                                 type="submit"
@@ -376,12 +374,12 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                                 {loading ? (
                                     <>
                                         <i className="fas fa-spinner fa-spin"></i>
-                                        Creating...
+                                        {t('form.creating')}
                                     </>
                                 ) : (
                                     <>
                                         <i className="fas fa-check"></i>
-                                        Create Appointment
+                                        {t('form.create')}
                                     </>
                                 )}
                             </button>

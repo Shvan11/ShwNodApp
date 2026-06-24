@@ -490,6 +490,7 @@
 .lookup-editor-popover input[type="text"],
 .lookup-editor-popover input[type="number"],
 .lookup-editor-popover input[type="date"],
+.lookup-editor-popover select,
 .lookup-editor-popover textarea {
     width: 100%;
     padding: var(--spacing-sm) var(--spacing-md);
@@ -499,7 +500,31 @@
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* Native <select> needs explicit box-model + colors to match the text inputs
+   (browsers don't inherit them): clear the OS chrome, draw a consistent chevron,
+   and leave inline-end room so the arrow never overlaps the value. */
+.lookup-editor-popover select {
+    appearance: none;
+    background-color: var(--background-primary);
+    color: var(--text-primary);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%23888' stroke-width='1.5' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--spacing-md) center;
+    padding-inline-end: calc(var(--spacing-md) * 2 + 12px);
+    cursor: pointer;
+}
+
+[dir="rtl"] .lookup-editor-popover select {
+    background-position: left var(--spacing-md) center;
+}
+
+.lookup-editor-popover select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .lookup-editor-popover input:focus,
+.lookup-editor-popover select:focus,
 .lookup-editor-popover textarea:focus {
     outline: none;
     border-color: var(--primary-color);
@@ -507,11 +532,13 @@
 }
 
 .lookup-editor-popover input.input-error,
+.lookup-editor-popover select.input-error,
 .lookup-editor-popover textarea.input-error {
     border-color: var(--error-color);
 }
 
 .lookup-editor-popover input.input-error:focus,
+.lookup-editor-popover select.input-error:focus,
 .lookup-editor-popover textarea.input-error:focus {
     box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
 }

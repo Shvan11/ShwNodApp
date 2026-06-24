@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import Modal from './Modal';
 import { deleteJSON, httpErrorMessage } from '@/core/http';
+import { formatAppointmentListDateTime } from '@/utils/formatters';
 import { patientAppointmentsQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import styles from './PatientAppointments.module.css';
@@ -25,6 +28,8 @@ interface PatientAppointmentsProps {
  * Display and manage all appointments for a specific patient
  */
 const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
+    const { t } = useTranslation('appointments');
+    const { language } = useLanguage();
     const navigate = useNavigate();
     const toast = useToast();
     const queryClient = useQueryClient();
@@ -52,31 +57,13 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
             setDeleteConfirm(null);
         } catch (err) {
             console.error('Error deleting appointment:', err);
-            toast.error(httpErrorMessage(err, 'Failed to delete appointment'));
+            toast.error(httpErrorMessage(err, t('list.deleteFailed')));
         }
     };
 
-    const formatDateTime = (dateTime: string): string => {
-        const date = new Date(dateTime);
-
-        // Get day name
-        const dayName = date.toLocaleString(undefined, { weekday: 'short' });
-
-        // Get date components
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-
-        // Get time
-        const time = date.toLocaleString(undefined, {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-        });
-
-        // Format: "Mon 25/12/2024 2:30 PM"
-        return `${dayName} ${day}/${month}/${year} ${time}`;
-    };
+    // Day-prefixed date+time, e.g. "Mon 25/12/2024 2:30 PM" / "سبت 25/12/2026 2:30 م".
+    // The weekday + meridiem localize; day/month/year stay Western digits.
+    const formatDateTime = (dateTime: string): string => formatAppointmentListDateTime(new Date(dateTime), language);
 
     const isPastAppointment = (dateTime: string): boolean => {
         return new Date(dateTime) < new Date();
@@ -87,7 +74,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
             <div className={styles.container}>
                 <div className={styles.loadingState}>
                     <i className="fas fa-spinner fa-spin"></i>
-                    <p>Loading appointments...</p>
+                    <p>{t('list.loading')}</p>
                 </div>
             </div>
         );
@@ -100,7 +87,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
                     <i className="fas fa-exclamation-circle"></i>
                     <p>{error}</p>
                     <button onClick={() => refetch()} className={cn('btn', styles.btnRetry)}>
-                        <i className="fas fa-redo"></i> Retry
+                        <i className="fas fa-redo"></i> {t('list.retry')}
                     </button>
                 </div>
             </div>
@@ -111,26 +98,26 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
         <div className={styles.container}>
             <div className={styles.header}>
                 <h2>
-                    <i className="fas fa-calendar-check"></i> Patient Appointments
+                    <i className="fas fa-calendar-check"></i> {t('list.title')}
                 </h2>
                 <button
                     className={cn('btn', styles.btnNewAppointment)}
                     onClick={() => navigate(`/patient/${personId}/new-appointment`)}
                 >
-                    <i className="fas fa-plus"></i> New Appointment
+                    <i className="fas fa-plus"></i> {t('list.newAppointment')}
                 </button>
             </div>
 
             {appointments.length === 0 ? (
                 <div className={styles.emptyState}>
                     <i className="fas fa-calendar-times"></i>
-                    <h3>No Appointments</h3>
-                    <p>This patient has no appointments scheduled.</p>
+                    <h3>{t('list.emptyTitle')}</h3>
+                    <p>{t('list.emptyText')}</p>
                     <button
                         className={cn('btn', styles.btnNewAppointment)}
                         onClick={() => navigate(`/patient/${personId}/new-appointment`)}
                     >
-                        <i className="fas fa-plus"></i> Schedule First Appointment
+                        <i className="fas fa-plus"></i> {t('list.scheduleFirst')}
                     </button>
                 </div>
             ) : (
@@ -152,7 +139,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
                                             {formatDateTime(appointment.app_date)}
                                         </div>
                                         <div className={styles.type}>
-                                            {appointment.app_detail || 'No details'}
+                                            {appointment.app_detail || t('list.noDetails')}
                                         </div>
                                         {appointment.DrName && (
                                             <div className={styles.doctor}>
@@ -166,17 +153,17 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
                                         <button
                                             className="btn-edit"
                                             onClick={() => handleEdit(appointment)}
-                                            title="Edit appointment"
+                                            title={t('list.editTitle')}
                                         >
-                                            Edit
+                                            {t('list.edit')}
                                         </button>
                                     )}
                                     <button
                                         className="btn-delete"
                                         onClick={() => setDeleteConfirm(appointment.appointment_id)}
-                                        title="Delete appointment"
+                                        title={t('list.deleteTitle')}
                                     >
-                                        Delete
+                                        {t('list.delete')}
                                     </button>
                                 </div>
                             </div>
@@ -193,21 +180,21 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
                 ariaLabelledBy="patient-appointments-delete-title"
             >
                 <h3 id="patient-appointments-delete-title">
-                    <i className="fas fa-exclamation-triangle"></i> Confirm Delete
+                    <i className="fas fa-exclamation-triangle"></i> {t('list.confirmDeleteTitle')}
                 </h3>
-                <p>Are you sure you want to delete this appointment?</p>
+                <p>{t('list.confirmDeleteText')}</p>
                 <div className={styles.modalActions}>
                     <button
                         className={cn('btn', styles.btnCancel)}
                         onClick={() => setDeleteConfirm(null)}
                     >
-                        Cancel
+                        {t('list.cancel')}
                     </button>
                     <button
                         className="btn-delete"
                         onClick={() => deleteConfirm !== null && handleDelete(deleteConfirm)}
                     >
-                        Delete
+                        {t('list.delete')}
                     </button>
                 </div>
             </Modal>

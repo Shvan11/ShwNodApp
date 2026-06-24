@@ -24,6 +24,10 @@ import { isForeignKeyViolation } from '../../../utils/pg-errors.js';
 
 // type definitions
 interface ReferenceConfig {
+  // The *whitelist KEY* of the referenced lookup table (e.g. `tblExpenseCategories`),
+  // NOT its raw PG table name. The client uses this as the admin-endpoint key to fetch
+  // dropdown options (`GET /api/admin/lookups/:table`); the server JOIN resolves it to
+  // the actual PG table via LOOKUP_TABLE_CONFIG (see getLookupItems).
   table: string;
   idColumn: string;
   displayColumn: string;
@@ -262,7 +266,7 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
         label: 'category',
         type: 'reference',
         required: true,
-        reference: { table: 'expense_categories', idColumn: 'category_id', displayColumn: 'category_name' },
+        reference: { table: 'tblExpenseCategories', idColumn: 'category_id', displayColumn: 'category_name' },
       },
     ],
   },
@@ -341,8 +345,12 @@ export async function getLookupItems(tableKey: string): Promise<LookupItem[]> {
   config.columns.forEach((col, idx) => {
     if (col.type === 'reference' && col.reference) {
       const joinAlias = sql.id(`r${idx}`);
+      // `reference.table` is the referenced table's whitelist KEY — resolve it to the
+      // actual PG table name via the config (falls back to treating it as a raw name).
+      const refConfig = LOOKUP_TABLE_CONFIG[col.reference.table];
+      const refPgTable = pgTableName(refConfig ? refConfig.tableName : col.reference.table);
       joinParts.push(
-        sql`LEFT JOIN ${sql.id(pgTableName(col.reference!.table))} AS ${joinAlias} ON ${joinAlias}.${sql.id(col.reference!.idColumn)} = ${baseAlias}.${sql.id(col.name)}`
+        sql`LEFT JOIN ${sql.id(refPgTable)} AS ${joinAlias} ON ${joinAlias}.${sql.id(col.reference!.idColumn)} = ${baseAlias}.${sql.id(col.name)}`
       );
       selectParts.push(
         sql`${joinAlias}.${sql.id(col.reference.displayColumn)} AS ${sql.id(`${col.name}_display`)}`

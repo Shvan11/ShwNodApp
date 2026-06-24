@@ -1,5 +1,6 @@
 import React, { useState, useMemo, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import WorkCard, { type Work, type WorkStatus } from './WorkCard';
 import PaymentModal from './PaymentModal';
@@ -62,6 +63,19 @@ const WORK_STATUS: WorkStatus = {
     DISCONTINUED: 3
 };
 
+type FilterStatus = 'all' | 'active' | 'completed' | 'discontinued';
+
+// Filter <option> values are programmatic tokens, kept here as expressions so the
+// i18next ratchet's `value`-attr check doesn't flag them as literals; only the
+// labels are translated (via labelKey) at render time. `as const` narrows labelKey
+// to literal keys so the typed t() accepts them.
+const FILTER_OPTIONS = [
+    { value: 'all', labelKey: 'filter.all' },
+    { value: 'active', labelKey: 'filter.active' },
+    { value: 'completed', labelKey: 'filter.completed' },
+    { value: 'discontinued', labelKey: 'filter.discontinued' },
+] as const;
+
 /**
  * Work Component
  * Displays list of patient's treatment works
@@ -69,6 +83,7 @@ const WORK_STATUS: WorkStatus = {
  */
 const WorkComponent = ({ personId }: WorkComponentProps) => {
     const navigate = useNavigate();
+    const { t } = useTranslation('works');
     const toast = useToast();
     const confirm = useConfirm();
     const queryClient = useQueryClient();
@@ -102,7 +117,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const hasNextAppointment = appointmentData?.hasAppointment ?? false;
 
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'discontinued'>('all');
+    const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
     const [patientPhotoError, setPatientPhotoError] = useState(false);
 
     // Payment-related state
@@ -157,7 +172,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     const handlePrintNoWorkReceipt = () => {
         if (!hasNextAppointment) {
-            toast.warning('Patient has no scheduled appointment');
+            toast.warning(t('printAppointment.toastNoAppt'));
             return;
         }
 
@@ -167,9 +182,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         const receiptWindow = window.open(receiptUrl, '_blank');
 
         if (!receiptWindow) {
-            toast.error('Failed to open receipt window. Please check your popup blocker settings.');
+            toast.error(t('printAppointment.toastWindowFailed'));
         } else {
-            toast.success('Opening appointment receipt...');
+            toast.success(t('printAppointment.toastOpening'));
         }
     };
 
@@ -213,17 +228,17 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 case 'complete':
                     endpoint = '/api/finishwork';
                     body = { workId: work.work_id };
-                    successMessage = 'Work marked as completed';
+                    successMessage = t('toast.completed');
                     break;
                 case 'discontinue':
                     endpoint = '/api/discontinuework';
                     body = { workId: work.work_id };
-                    successMessage = 'Work marked as discontinued';
+                    successMessage = t('toast.discontinued');
                     break;
                 case 'reactivate':
                     endpoint = '/api/reactivatework';
                     body = { workId: work.work_id, personId: work.person_id };
-                    successMessage = 'Work reactivated successfully';
+                    successMessage = t('toast.reactivated');
                     break;
             }
 
@@ -232,7 +247,12 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             toast.success(successMessage);
             queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
         } catch (err) {
-            toast.error(httpErrorMessage(err, `Failed to ${type} work`), 5000);
+            const failFallback = type === 'complete'
+                ? t('toast.failComplete')
+                : type === 'discontinue'
+                    ? t('toast.failDiscontinue')
+                    : t('toast.failReactivate');
+            toast.error(httpErrorMessage(err, failFallback), 5000);
         }
     };
 
@@ -243,30 +263,30 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
         const configs = {
             complete: {
-                title: 'Complete Work',
+                title: t('statusModal.complete.title'),
                 icon: 'fa-check-circle',
                 color: 'var(--success-color)',
-                message: 'Are you sure you want to mark this work as completed?',
-                warning: 'This will change the work status to Finished.',
-                buttonText: 'Complete Work',
+                message: t('statusModal.complete.message'),
+                warning: t('statusModal.complete.warning'),
+                buttonText: t('statusModal.complete.button'),
                 buttonIcon: 'fa-check'
             },
             discontinue: {
-                title: 'Discontinue Work',
+                title: t('statusModal.discontinue.title'),
                 icon: 'fa-times-circle',
                 color: 'var(--warning-color)',
-                message: 'Are you sure you want to discontinue this work?',
-                warning: 'This indicates the patient has abandoned treatment.',
-                buttonText: 'Discontinue',
+                message: t('statusModal.discontinue.message'),
+                warning: t('statusModal.discontinue.warning'),
+                buttonText: t('statusModal.discontinue.button'),
                 buttonIcon: 'fa-times'
             },
             reactivate: {
-                title: 'Reactivate Work',
+                title: t('statusModal.reactivate.title'),
                 icon: 'fa-redo',
                 color: 'var(--primary-color)',
-                message: 'Are you sure you want to reactivate this work?',
-                warning: 'This will make it the active work for this patient.',
-                buttonText: 'Reactivate',
+                message: t('statusModal.reactivate.message'),
+                warning: t('statusModal.reactivate.warning'),
+                buttonText: t('statusModal.reactivate.button'),
                 buttonIcon: 'fa-redo'
             }
         };
@@ -288,7 +308,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             const work = workToDelete;
             await deleteJSON('/api/deletework', { body: JSON.stringify({ workId: work.work_id }) });
 
-            toast.success('Work deleted successfully!');
+            toast.success(t('toast.deleted'));
             queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
         } catch (err) {
             // A 409 carries a `details.dependencies` breakdown of the blocking records.
@@ -296,24 +316,24 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             const deps = (httpErr.data as { details?: { dependencies?: WorkDeleteDependencies } } | undefined)
                 ?.details?.dependencies;
             if (httpErr.status === 409 && deps) {
-                let detailMessage = '⚠️ CANNOT DELETE WORK - EXISTING RECORDS FOUND ⚠️\n\n';
-                detailMessage += 'This work has the following records that must be deleted first:\n\n';
+                let detailMessage = `${t('deleteDeps.header')}\n\n`;
+                detailMessage += `${t('deleteDeps.intro')}\n\n`;
 
-                if (deps.InvoiceCount && deps.InvoiceCount > 0) detailMessage += `• ${deps.InvoiceCount} payment(s)\n`;
-                if (deps.VisitCount && deps.VisitCount > 0) detailMessage += `• ${deps.VisitCount} visit(s)\n`;
-                if (deps.ItemCount && deps.ItemCount > 0) detailMessage += `• ${deps.ItemCount} treatment detail(s)\n`;
-                if (deps.DiagnosisCount && deps.DiagnosisCount > 0) detailMessage += `• ${deps.DiagnosisCount} diagnosis(es)\n`;
-                if (deps.ImplantCount && deps.ImplantCount > 0) detailMessage += `• ${deps.ImplantCount} implant(s)\n`;
-                if (deps.ScrewCount && deps.ScrewCount > 0) detailMessage += `• ${deps.ScrewCount} screw(s)\n`;
-                if (deps.AlignerSetCount && deps.AlignerSetCount > 0) detailMessage += `• ${deps.AlignerSetCount} aligner set(s)\n`;
+                if (deps.InvoiceCount && deps.InvoiceCount > 0) detailMessage += `${t('deleteDeps.payments', { n: deps.InvoiceCount })}\n`;
+                if (deps.VisitCount && deps.VisitCount > 0) detailMessage += `${t('deleteDeps.visits', { n: deps.VisitCount })}\n`;
+                if (deps.ItemCount && deps.ItemCount > 0) detailMessage += `${t('deleteDeps.items', { n: deps.ItemCount })}\n`;
+                if (deps.DiagnosisCount && deps.DiagnosisCount > 0) detailMessage += `${t('deleteDeps.diagnoses', { n: deps.DiagnosisCount })}\n`;
+                if (deps.ImplantCount && deps.ImplantCount > 0) detailMessage += `${t('deleteDeps.implants', { n: deps.ImplantCount })}\n`;
+                if (deps.ScrewCount && deps.ScrewCount > 0) detailMessage += `${t('deleteDeps.screws', { n: deps.ScrewCount })}\n`;
+                if (deps.AlignerSetCount && deps.AlignerSetCount > 0) detailMessage += `${t('deleteDeps.alignerSets', { n: deps.AlignerSetCount })}\n`;
 
-                detailMessage += '\n⚠️ Delete these records first, then try again.';
+                detailMessage += `\n${t('deleteDeps.footer')}`;
 
                 toast.error(detailMessage, 10000);
                 return;
             }
 
-            toast.error(httpErrorMessage(err, 'Failed to delete work'), 5000);
+            toast.error(httpErrorMessage(err, t('toast.failDelete')), 5000);
         } finally {
             setWorkToDelete(null);
         }
@@ -335,7 +355,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         setWorkToTransfer(null);
         // Refresh works since the work was transferred away
         queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
-        toast.success('Work transferred successfully to another patient');
+        toast.success(t('toast.transferred'));
     };
 
     const getProgressPercentage = (work: Work): number => {
@@ -383,12 +403,12 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         });
 
     const formatCurrency = (amount?: number | null, currency?: string | null): string => {
-        if (!amount && amount !== 0) return 'N/A';
+        if (!amount && amount !== 0) return t('common.na');
         return formatCurrencyUtil(amount, currency || 'USD');
     };
 
     const formatDate = (dateString?: string): string => {
-        if (!dateString) return 'Not set';
+        if (!dateString) return t('common.notSet');
         return new Date(dateString).toLocaleDateString();
     };
 
@@ -436,24 +456,25 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 { schema: appointmentContract.quickCheckin.response }
             );
 
+            const patientLabel = patientInfo?.name || t('common.patient');
             if (result.alreadyCheckedIn) {
-                toast.success(`${patientInfo?.name || 'Patient'} is already checked in today!`);
+                toast.success(t('checkin.toastAlready', { name: patientLabel }));
                 setCheckedIn(true);
             } else if (result.created) {
-                toast.success(`${patientInfo?.name || 'Patient'} added to today's appointments and checked in!`);
+                toast.success(t('checkin.toastAdded', { name: patientLabel }));
                 setCheckedIn(true);
             } else {
-                toast.success(`${patientInfo?.name || 'Patient'} checked in successfully!`);
+                toast.success(t('checkin.toastSuccess', { name: patientLabel }));
                 setCheckedIn(true);
             }
         } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to check in patient'), 5000);
+            toast.error(httpErrorMessage(err, t('checkin.toastFail')), 5000);
         } finally {
             setCheckingIn(false);
         }
     };
 
-    if (loading) return <div className={styles.loading}>Loading works...</div>;
+    if (loading) return <div className={styles.loading}>{t('loading.works')}</div>;
 
     return (
         <div className={styles.component}>
@@ -466,7 +487,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         ) : (
                             <img
                                 src={`/DolImgs/${personId}00.i13`}
-                                alt={`${patientInfo.patient_name} - Smile`}
+                                alt={t('patientCard.smileAlt', { name: patientInfo.patient_name })}
                                 className={styles.patientPhoto}
                                 onError={() => setPatientPhotoError(true)}
                             />
@@ -500,61 +521,60 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                             <div className={styles.workSummaryInline}>
                                 <div className={styles.summaryCardInline}>
                                     <span className={styles.summaryValueInline}>{works.length}</span>
-                                    <span className={styles.summaryLabelInline}>Total</span>
+                                    <span className={styles.summaryLabelInline}>{t('summary.total')}</span>
                                 </div>
                                 <div className={styles.summaryCardInline}>
                                     <span className={styles.summaryValueInline}>{works.filter(w => w.status === WORK_STATUS.ACTIVE).length}</span>
-                                    <span className={styles.summaryLabelInline}>Active</span>
+                                    <span className={styles.summaryLabelInline}>{t('summary.active')}</span>
                                 </div>
                                 <div className={styles.summaryCardInline}>
                                     <span className={styles.summaryValueInline}>{works.filter(w => w.status === WORK_STATUS.FINISHED).length}</span>
-                                    <span className={styles.summaryLabelInline}>Completed</span>
+                                    <span className={styles.summaryLabelInline}>{t('summary.completed')}</span>
                                 </div>
                                 <div className={styles.summaryCardInline}>
                                     <span className={styles.summaryValueInline}>{works.filter(w => w.status === WORK_STATUS.DISCONTINUED).length}</span>
-                                    <span className={styles.summaryLabelInline}>Discontinued</span>
+                                    <span className={styles.summaryLabelInline}>{t('summary.discontinued')}</span>
                                 </div>
                             </div>
                         </div>
                         <div className={styles.patientControls}>
                             <input
                                 type="text"
-                                placeholder="Search works..."
+                                placeholder={t('controls.searchPlaceholder')}
                                 value={searchTerm}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                                 className={styles.searchInput}
                             />
                             <select
                                 value={filterStatus}
-                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value as typeof filterStatus)}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value as FilterStatus)}
                                 className={styles.filterSelect}
                             >
-                                <option value="all">All Works</option>
-                                <option value="active">Active</option>
-                                <option value="completed">Completed</option>
-                                <option value="discontinued">Discontinued</option>
+                                {FILTER_OPTIONS.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
+                                ))}
                             </select>
                             <button
                                 onClick={handleQuickCheckin}
                                 className={`btn btn-work-checkin ${checkedIn ? styles.checkedIn : ''} ${checkingIn ? styles.checkingIn : ''}`}
                                 disabled={checkingIn || checkedIn}
-                                title={checkedIn ? 'Patient already checked in today' : 'Check in patient for today'}
+                                title={checkedIn ? t('checkin.titleDone') : t('checkin.title')}
                             >
                                 <i className="fas fa-user-check"></i>
-                                {checkingIn ? 'Checking In...' : checkedIn ? 'Checked In' : 'Check In'}
+                                {checkingIn ? t('checkin.checkingIn') : checkedIn ? t('checkin.checkedIn') : t('checkin.checkIn')}
                             </button>
                             <button
                                 onClick={handlePrintNoWorkReceipt}
                                 className="btn btn-secondary"
                                 disabled={loadingAppointment || !hasNextAppointment}
-                                title={!hasNextAppointment ? 'No future appointment scheduled' : 'Print appointment confirmation receipt'}
+                                title={!hasNextAppointment ? t('printAppointment.noAppt') : t('printAppointment.title')}
                             >
                                 <i className="fas fa-print"></i>
-                                {loadingAppointment ? 'Loading...' : 'Print Appointment Receipt'}
+                                {loadingAppointment ? t('printAppointment.loading') : t('printAppointment.label')}
                             </button>
                             <button onClick={handleAddWork} className="btn btn-primary">
                                 <i className="fas fa-plus"></i>
-                                Add New Work
+                                {t('controls.addWork')}
                             </button>
                         </div>
                     </div>
@@ -595,8 +615,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         <i className={`fas fa-tooth ${styles.noWorksIcon}`}></i>
                         <p className={styles.noWorksText}>
                             {searchTerm || filterStatus !== 'all'
-                                ? 'No works match your criteria'
-                                : 'No works found for this patient'}
+                                ? t('empty.noMatch')
+                                : t('empty.none')}
                         </p>
                     </div>
                 )}
@@ -612,7 +632,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
                     }}
                     onSuccess={() => {
-                        toast.success('Payment added successfully!');
+                        toast.success(t('toast.paymentAdded'));
                     }}
                 />
             )}
@@ -626,7 +646,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     ariaLabelledBy="payment-history-title"
                 >
                         <ModalHeader
-                            title={`Payment History - ${selectedWorkForPayment.type_name || 'Work #' + selectedWorkForPayment.work_id}`}
+                            title={t('paymentHistory.title', { name: selectedWorkForPayment.type_name || t('paymentHistory.workFallback', { id: selectedWorkForPayment.work_id }) })}
                             titleId="payment-history-title"
                             icon={<i className="fas fa-receipt" />}
                             onClose={() => setShowPaymentHistoryModal(false)}
@@ -636,19 +656,19 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                             <div className={styles.paymentSummaryBox}>
                                 <div className={styles.paymentSummaryGrid}>
                                     <div className={styles.paymentSummaryItem}>
-                                        <span className={styles.paymentSummaryLabel}>Total Required:</span>
+                                        <span className={styles.paymentSummaryLabel}>{t('paymentHistory.totalRequired')}</span>
                                         <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValueTotal}`}>
                                             {formatCurrency(selectedWorkForPayment.total_required, selectedWorkForPayment.currency)}
                                         </span>
                                     </div>
                                     <div className={styles.paymentSummaryItem}>
-                                        <span className={styles.paymentSummaryLabel}>Total Paid:</span>
+                                        <span className={styles.paymentSummaryLabel}>{t('paymentHistory.totalPaid')}</span>
                                         <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValuePaid}`}>
                                             {formatCurrency(selectedWorkForPayment.TotalPaid, selectedWorkForPayment.currency)}
                                         </span>
                                     </div>
                                     <div className={styles.paymentSummaryItem}>
-                                        <span className={styles.paymentSummaryLabel}>Balance Remaining:</span>
+                                        <span className={styles.paymentSummaryLabel}>{t('paymentHistory.balanceRemaining')}</span>
                                         <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValueBalance}`}>
                                             {formatCurrency((selectedWorkForPayment.total_required || 0) - (selectedWorkForPayment.TotalPaid || 0), selectedWorkForPayment.currency)}
                                         </span>
@@ -658,19 +678,19 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
                             {loadingPayments ? (
                                 <div className={styles.loading}>
-                                    Loading payment history...
+                                    {t('paymentHistory.loading')}
                                 </div>
                             ) : (
                                 <div className={styles.detailsTableContainer}>
                                     <table className={styles.detailsTable}>
                                         <thead>
                                             <tr>
-                                                <th>Date</th>
-                                                <th>Amount Paid ({selectedWorkForPayment.currency})</th>
-                                                <th>Actual Amount</th>
-                                                <th>Actual Currency</th>
-                                                <th>Change</th>
-                                                <th>Actions</th>
+                                                <th>{t('paymentHistory.table.date')}</th>
+                                                <th>{t('paymentHistory.table.amountPaid', { currency: selectedWorkForPayment.currency })}</th>
+                                                <th>{t('paymentHistory.table.actualAmount')}</th>
+                                                <th>{t('paymentHistory.table.actualCurrency')}</th>
+                                                <th>{t('paymentHistory.table.change')}</th>
+                                                <th>{t('paymentHistory.table.actions')}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -687,16 +707,16 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                         <div className={styles.paymentActions}>
                                                             <button
                                                                 onClick={() => {
-                                                                    toast.info(`Edit payment functionality coming soon!\n\nPayment ID: ${payment.InvoiceID}\nAmount: ${formatCurrency(payment.amount_paid, selectedWorkForPayment.currency)}`);
+                                                                    toast.info(t('paymentHistory.editComingSoon', { id: payment.InvoiceID, amount: formatCurrency(payment.amount_paid, selectedWorkForPayment.currency) }));
                                                                 }}
                                                                 className={styles.btnActionEdit}
-                                                                title="Edit Payment"
+                                                                title={t('paymentHistory.editTitle')}
                                                             >
                                                                 <i className="fas fa-edit"></i>
                                                             </button>
                                                             <button
                                                                 onClick={async () => {
-                                                                    if (await confirm(`Are you sure you want to delete this payment?\n\nAmount: ${formatCurrency(payment.amount_paid, selectedWorkForPayment.currency)}\nDate: ${formatDate(payment.date_of_payment)}\n\nThis action cannot be undone.`, { title: 'Delete Payment', danger: true, confirmText: 'Delete' })) {
+                                                                    if (await confirm(t('paymentHistory.deleteConfirm', { amount: formatCurrency(payment.amount_paid, selectedWorkForPayment.currency), date: formatDate(payment.date_of_payment) }), { title: t('paymentHistory.deleteTitle'), danger: true, confirmText: t('paymentHistory.deleteConfirmButton') })) {
                                                                         try {
                                                                             // Route is sendSuccess-enveloped → fetchData unwraps + throws on non-2xx.
                                                                             await deleteJSON(`/api/deleteInvoice/${payment.InvoiceID}`, {
@@ -705,16 +725,16 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                                             // qk.work.all covers the payment-history child key, so this
                                                                             // one invalidation refreshes the open modal's list too.
                                                                             queryClient.invalidateQueries({ queryKey: qk.work.all(selectedWorkForPayment.work_id) });
-                                                                            toast.success('Payment deleted successfully!');
+                                                                            toast.success(t('paymentHistory.deleteSuccess'));
                                                                             queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
                                                                         } catch (error) {
                                                                             console.error('Error deleting payment:', error);
-                                                                            toast.error(`Error deleting payment: ${httpErrorMessage(error, 'Unknown error')}`);
+                                                                            toast.error(t('paymentHistory.deleteError', { error: httpErrorMessage(error, t('paymentHistory.unknownError')) }));
                                                                         }
                                                                     }
                                                                 }}
                                                                 className={styles.btnActionDelete}
-                                                                title="Delete Payment"
+                                                                title={t('paymentHistory.deleteTitle')}
                                                             >
                                                                 <i className="fas fa-trash"></i>
                                                             </button>
@@ -725,7 +745,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                             {paymentHistory.length === 0 && (
                                                 <tr>
                                                     <td colSpan={6} className={styles.noData}>
-                                                        No payments recorded yet for this work
+                                                        {t('paymentHistory.noPayments')}
                                                     </td>
                                                 </tr>
                                             )}
@@ -743,11 +763,11 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                         }}
                                         className={`btn btn-primary ${styles.addPaymentBtn}`}
                                     >
-                                        <i className="fas fa-plus"></i> Add New Payment
+                                        <i className="fas fa-plus"></i> {t('paymentHistory.addPayment')}
                                     </button>
                                 ) : (
                                     <div className={styles.paymentFullyPaid}>
-                                        <i className="fas fa-check-circle"></i> This work is fully paid
+                                        <i className="fas fa-check-circle"></i> {t('paymentHistory.fullyPaid')}
                                     </div>
                                 )}
                             </div>
@@ -764,7 +784,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     ariaLabelledBy="delete-work-title"
                 >
                         <ModalHeader
-                            title="Confirm Delete Work"
+                            title={t('deleteWork.title')}
                             titleId="delete-work-title"
                             icon={<i className="fas fa-exclamation-triangle" />}
                             variant="danger"
@@ -772,32 +792,32 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         />
                         <div className={styles.confirmBody}>
                             <p className={styles.confirmIntro}>
-                                Are you sure you want to delete this work?
+                                {t('deleteWork.confirm')}
                             </p>
                             <div className={styles.confirmDetailsBox}>
                                 <p className={styles.confirmDetailLine}>
-                                    <strong>Work Type:</strong> {workToDelete.type_name || 'N/A'}
+                                    <strong>{t('common.workType')}:</strong> {workToDelete.type_name || t('common.na')}
                                 </p>
                                 <p className={styles.confirmDetailLine}>
-                                    <strong>Doctor:</strong> {workToDelete.doctor_name || 'N/A'}
+                                    <strong>{t('common.doctor')}:</strong> {workToDelete.doctor_name || t('common.na')}
                                 </p>
                                 <p className={styles.confirmDetailLine}>
-                                    <strong>Total Required:</strong> {formatCurrency(workToDelete.total_required, workToDelete.currency)}
+                                    <strong>{t('common.totalRequired')}:</strong> {formatCurrency(workToDelete.total_required, workToDelete.currency)}
                                 </p>
                             </div>
                             <p className={`${styles.confirmWarning} ${styles.confirmWarningStrong}`}>
-                                ⚠️ This action cannot be undone!
+                                {t('deleteWork.cannotUndo')}
                             </p>
                         </div>
                         <div className="whatsapp-actions">
                             <button onClick={cancelDeleteWork} className="whatsapp-btn-cancel">
-                                <i className="fas fa-times"></i> Cancel
+                                <i className="fas fa-times"></i> {t('common.cancel')}
                             </button>
                             <button
                                 onClick={confirmDeleteWork}
                                 className={`whatsapp-btn-send ${styles.confirmActionButton}`}
                             >
-                                <i className="fas fa-trash"></i> Delete Work
+                                <i className="fas fa-trash"></i> {t('deleteWork.button')}
                             </button>
                         </div>
                 </Modal>
@@ -828,13 +848,13 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     </p>
                                     <div className={styles.confirmDetailsBox}>
                                         <p className={styles.confirmDetailLine}>
-                                            <strong>Work Type:</strong> {config.work.type_name || 'N/A'}
+                                            <strong>{t('common.workType')}:</strong> {config.work.type_name || t('common.na')}
                                         </p>
                                         <p className={styles.confirmDetailLine}>
-                                            <strong>Doctor:</strong> {config.work.doctor_name || 'N/A'}
+                                            <strong>{t('common.doctor')}:</strong> {config.work.doctor_name || t('common.na')}
                                         </p>
                                         <p className={styles.confirmDetailLine}>
-                                            <strong>Total Required:</strong> {formatCurrency(config.work.total_required, config.work.currency)}
+                                            <strong>{t('common.totalRequired')}:</strong> {formatCurrency(config.work.total_required, config.work.currency)}
                                         </p>
                                     </div>
                                     <p className={styles.confirmWarning}>
@@ -843,7 +863,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 </div>
                                 <div className="whatsapp-actions">
                                     <button onClick={closeConfirmationModal} className="whatsapp-btn-cancel">
-                                        <i className="fas fa-times"></i> Cancel
+                                        <i className="fas fa-times"></i> {t('common.cancel')}
                                     </button>
                                     <button
                                         onClick={executeConfirmedAction}

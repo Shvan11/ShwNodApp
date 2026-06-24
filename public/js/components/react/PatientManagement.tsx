@@ -23,6 +23,7 @@ interface Patient {
     last_name?: string;
     phone?: string;
     date_added?: string;
+    last_visit?: string;
     TagName?: string;
 }
 
@@ -327,9 +328,13 @@ const PatientManagement = () => {
     };
 
     const handleSortToggle = (key: string) => {
-        let direction: 'asc' | 'desc' = 'asc';
-        if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-        else if (key === 'date') direction = sortConfig.key === key && sortConfig.direction === 'desc' ? 'asc' : 'desc';
+        // Clicking the active column flips direction; switching columns picks a
+        // sensible default — date-like columns start newest-first (desc), name asc.
+        const dateLike = key === 'date' || key === 'lastVisit';
+        const direction: 'asc' | 'desc' =
+            sortConfig.key === key
+                ? (sortConfig.direction === 'asc' ? 'desc' : 'asc')
+                : (dateLike ? 'desc' : 'asc');
 
         const newSort: SortConfig = { key, direction };
         setSortConfig(newSort);
@@ -576,6 +581,12 @@ const PatientManagement = () => {
                                     <i className={cn('fas', sortConfig.direction === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down', styles.sortIcon)}></i>
                                 )}
                             </button>
+                            <button className={cn(styles.sortBtn, sortConfig.key === 'lastVisit' && styles.sortBtnActive)} onClick={() => handleSortToggle('lastVisit')}>
+                                Last Visit
+                                {sortConfig.key === 'lastVisit' && (
+                                    <i className={cn('fas', sortConfig.direction === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down', styles.sortIcon)}></i>
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -587,7 +598,7 @@ const PatientManagement = () => {
             {hasSearched && (
                 <div className={cn(styles.tableContainer, loading && styles.tableLoadingOverlay)}>
                     <table className={styles.table}>
-                        <thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Date</th><th>Tag</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Date</th><th>Last Visit</th><th>Tag</th><th>Actions</th></tr></thead>
                         <tbody>
                             {patients.map(p => (
                                 <tr key={p.person_id}>
@@ -607,6 +618,7 @@ const PatientManagement = () => {
                                     </td>
                                     <td data-label="Phone"><PhoneDisplay phone={p.phone} /> {!p.phone && '-'}</td>
                                     <td data-label="Date">{p.date_added ? formatDate(p.date_added) : '-'}</td>
+                                    <td data-label="Last Visit">{p.last_visit ? formatDate(p.last_visit) : '-'}</td>
                                     <td data-label="Tag">{p.TagName ? <span className={styles.tagBadge}>{p.TagName}</span> : '-'}</td>
                                     <td data-label="Actions">
                                         <div className={styles.actionButtons}>
@@ -618,7 +630,7 @@ const PatientManagement = () => {
                                     </td>
                                 </tr>
                             ))}
-                            {patients.length === 0 && <tr><td colSpan={6} className={styles.noData}>No results</td></tr>}
+                            {patients.length === 0 && <tr><td colSpan={7} className={styles.noData}>No results</td></tr>}
                         </tbody>
                     </table>
 

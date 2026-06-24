@@ -100,6 +100,7 @@ type PatientSearchResult = {
   estimated_cost: number | null;
   currency: string | null;
   date_added: string | null;
+  last_visit: string | null;
   GenderName: string | null;
   AddressName: string | null;
   ReferralSource: string | null;
@@ -751,6 +752,14 @@ router.get(
           order === 'desc'
             ? sql`ORDER BY "date_added" DESC NULLS LAST`
             : sql`ORDER BY "date_added" ASC NULLS LAST`;
+      } else if (sortBy === 'lastVisit') {
+        // Same alias-reference rule as date_added: the last_visit subquery is
+        // exposed only as its select-list alias, a 'YYYY-MM-DD' string that
+        // sorts correctly by day. Patients with no appointments sort last.
+        orderByClause =
+          order === 'desc'
+            ? sql`ORDER BY "last_visit" DESC NULLS LAST`
+            : sql`ORDER BY "last_visit" ASC NULLS LAST`;
       } else {
         orderByClause =
           order === 'desc'
@@ -777,6 +786,11 @@ router.get(
                     p."address_id", p."referral_source_id", p."patient_type_id", p."tag_id",
                     p."notes", p."language", p."country_code",
                     p."estimated_cost", p."currency", to_char(p."date_added", 'YYYY-MM-DD') as "date_added",
+                    (
+                        SELECT to_char(MAX(la."app_date"), 'YYYY-MM-DD')
+                        FROM "appointments" la
+                        WHERE la."person_id" = p."person_id"
+                    ) as "last_visit",
                     CASE p."gender" WHEN 1 THEN 'Male' WHEN 2 THEN 'Female' END as "GenderName", a."zone" as "AddressName",
                     r."referral" as "ReferralSource", pt."patient_type" as "PatientTypeName",
                     tag."tag" as "TagName",

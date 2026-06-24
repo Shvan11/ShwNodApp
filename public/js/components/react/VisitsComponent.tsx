@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { deleteJSON, httpErrorMessage } from '@/core/http';
+import { formatDate } from '@/core/utils';
 import { qk } from '@/query/keys';
 import { visitsByWorkQuery } from '@/query/queries';
 import type { VisitRow } from '@shared/contracts/visit.contract';
@@ -103,11 +104,6 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
         }
     };
 
-    const formatDate = (dateString: string): string => {
-        if (!dateString) return 'Not set';
-        return new Date(dateString).toLocaleDateString();
-    };
-
     if (loading) return <div className={styles.loading}>Loading visits...</div>;
 
     const filteredVisits = searchTerm
@@ -179,7 +175,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                         <div className={styles.cardHeader}>
                             <div>
                                 <h3 className={styles.cardTitle}>
-                                    <i className="fas fa-calendar-check"></i> {formatDate(visit.visit_date)}
+                                    <i className="fas fa-calendar-check"></i> {formatDate(visit.visit_date) || 'Not set'}
                                 </h3>
                                 <div className={styles.cardMeta}>
                                     {visit.OperatorName && (

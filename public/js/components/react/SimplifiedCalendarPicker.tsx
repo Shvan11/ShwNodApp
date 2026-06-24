@@ -1,8 +1,11 @@
 import { useState, useMemo, type ChangeEvent, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import cn from 'classnames';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { httpErrorMessage } from '@/core/http';
+import { calendarWeekdayHeaders, formatMonthName, formatScheduleDate } from '@/utils/formatters';
 import { optionQuery, monthAvailabilityQuery, availableSlotsQuery } from '@/query/queries';
 import styles from './SimplifiedCalendarPicker.module.css';
 
@@ -68,6 +71,8 @@ interface SimplifiedCalendarPickerProps {
  */
 
 const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }: SimplifiedCalendarPickerProps) => {
+    const { t } = useTranslation('appointments');
+    const { language } = useLanguage();
     const [currentMonth, setCurrentMonth] = useState<Date>(new Date(initialDate));
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [showAfternoonSlots, setShowAfternoonSlots] = useState(false);
@@ -268,7 +273,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
 
     const calendarDays = generateCalendarDays();
     const monthNumber = currentMonth.getMonth() + 1;
-    const monthNameOnly = currentMonth.toLocaleDateString(undefined, { month: 'long' });
+    const monthNameOnly = formatMonthName(currentMonth, language);
     const year = currentMonth.getFullYear();
     const monthName = `${monthNumber}/${year}`;
 
@@ -312,7 +317,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                     </div>
                 ) : (
                     <div className={styles.slotEmpty}>
-                        <i className="fas fa-check-circle"></i> Available
+                        <i className="fas fa-check-circle"></i> {t('calendar.slotAvailable')}
                     </div>
                 )}
             </div>
@@ -328,20 +333,20 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                     <input
                         type="number"
                         min="0"
-                        placeholder="Days ahead..."
+                        placeholder={t('calendar.daysAheadPlaceholder')}
                         value={daysAhead}
                         onChange={(e: ChangeEvent<HTMLInputElement>) => setDaysAhead(e.target.value)}
                         onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleJumpToDays()}
                         className={styles.daysAheadInput}
                     />
-                    <button className={styles.jumpBtn} onClick={handleJumpToDays} title="Jump to date">
+                    <button className={styles.jumpBtn} onClick={handleJumpToDays} title={t('calendar.jumpToDate')}>
                         <i className="fas fa-arrow-right"></i>
                     </button>
                 </div>
 
                 {/* View Full Calendar Button */}
                 <Link to="/calendar" className={styles.fullCalendarLink}>
-                    <i className="fas fa-calendar-alt"></i> Full Calendar
+                    <i className="fas fa-calendar-alt"></i> {t('calendar.fullCalendar')}
                 </Link>
 
                 <div className={styles.calendarHeader}>
@@ -358,7 +363,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                 </div>
 
                 <div className={styles.calendarWeekdays}>
-                    {['S', 'S', 'M', 'T', 'W', 'T'].map((day, i) => (
+                    {calendarWeekdayHeaders(language).map((day, i) => (
                         <div key={i} className={styles.weekday}>{day}</div>
                     ))}
                 </div>
@@ -375,11 +380,11 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                         // Build tooltip
                         let tooltip: string;
                         if (dayInfo.isHoliday) {
-                            tooltip = dayInfo.holidayName || 'Holiday';
+                            tooltip = dayInfo.holidayName || t('calendar.holiday');
                         } else if (dayInfo.appointmentCount > 0) {
-                            tooltip = `${dayInfo.appointmentCount} appointments`;
+                            tooltip = t('calendar.appointmentsCount', { count: dayInfo.appointmentCount });
                         } else {
-                            tooltip = 'No appointments';
+                            tooltip = t('calendar.noAppointmentsTooltip');
                         }
 
                         return (
@@ -412,7 +417,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                 </div>
 
                 <button className={styles.todayBtn} onClick={goToToday}>
-                    <i className="fas fa-calendar-day"></i> Today
+                    <i className="fas fa-calendar-day"></i> {t('header.today')}
                 </button>
             </div>
 
@@ -421,12 +426,12 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                 {!selectedDate ? (
                     <div className={styles.emptyState}>
                         <i className="fas fa-hand-pointer"></i>
-                        <p>Select a date to view available time slots</p>
+                        <p>{t('calendar.selectDatePrompt')}</p>
                     </div>
                 ) : loading ? (
                     <div className={styles.emptyState}>
                         <i className="fas fa-spinner fa-spin"></i>
-                        <p>Loading...</p>
+                        <p>{t('calendar.loading')}</p>
                     </div>
                 ) : error ? (
                     <div className={cn(styles.emptyState, styles.error)}>
@@ -436,20 +441,16 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                 ) : availableSlots.length === 0 ? (
                     <div className={styles.emptyState}>
                         <i className="fas fa-calendar-times"></i>
-                        <p>No slots for this date</p>
+                        <p>{t('calendar.noSlots')}</p>
                     </div>
                 ) : (
                     <>
                         <div className={styles.scheduleHeader}>
                             <h3>
-                                {selectedDate.toLocaleDateString(undefined, {
-                                    weekday: 'long',
-                                    month: 'short',
-                                    day: 'numeric'
-                                })}
+                                {formatScheduleDate(selectedDate, language)}
                             </h3>
                             <span className={styles.availableCount}>
-                                {availableSlots.filter(s => s.slotStatus === 'available' || s.slotStatus === 'booked').length} available
+                                {t('calendar.available', { count: availableSlots.filter(s => s.slotStatus === 'available' || s.slotStatus === 'booked').length })}
                             </span>
                         </div>
 
@@ -494,7 +495,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
                                             >
                                                 <div className={styles.afternoonToggleText}>
                                                     <i className="fas fa-clock"></i>
-                                                    {showAfternoonSlots ? 'Hide' : 'Show'} early & late slots
+                                                    {showAfternoonSlots ? t('calendar.hideExtended') : t('calendar.showExtended')}
                                                 </div>
                                                 <i className={cn('fas fa-chevron-down', styles.afternoonToggleIcon, { [styles.expanded]: showAfternoonSlots })}></i>
                                             </div>

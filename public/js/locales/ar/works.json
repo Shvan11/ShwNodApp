@@ -1,0 +1,177 @@
+{
+  "loading": {
+    "works": "جاري تحميل الأعمال..."
+  },
+  "common": {
+    "cancel": "إلغاء",
+    "doctor": "الطبيب",
+    "workType": "نوع العمل",
+    "totalRequired": "المبلغ الإجمالي المطلوب",
+    "patient": "المريض",
+    "na": "غير متاح",
+    "notSet": "غير محدد"
+  },
+  "patientCard": {
+    "smileAlt": "{{name}} - ابتسامة"
+  },
+  "summary": {
+    "total": "الإجمالي",
+    "active": "نشط",
+    "completed": "مكتمل",
+    "discontinued": "متوقف"
+  },
+  "controls": {
+    "searchPlaceholder": "البحث في الأعمال...",
+    "addWork": "إضافة عمل جديد"
+  },
+  "filter": {
+    "all": "جميع الأعمال",
+    "active": "نشط",
+    "completed": "مكتمل",
+    "discontinued": "متوقف"
+  },
+  "checkin": {
+    "title": "تسجيل حضور المريض لليوم",
+    "titleDone": "تم تسجيل حضور المريض اليوم بالفعل",
+    "checkIn": "تسجيل الحضور",
+    "checkingIn": "جاري التسجيل...",
+    "checkedIn": "تم تسجيل الحضور",
+    "toastAlready": "{{name}} مسجّل حضوره اليوم بالفعل!",
+    "toastAdded": "تمت إضافة {{name}} إلى مواعيد اليوم وتسجيل حضوره!",
+    "toastSuccess": "تم تسجيل حضور {{name}} بنجاح!",
+    "toastFail": "فشل تسجيل حضور المريض"
+  },
+  "printAppointment": {
+    "label": "طباعة إيصال الموعد",
+    "loading": "جاري التحميل...",
+    "title": "طباعة إيصال تأكيد الموعد",
+    "noAppt": "لا يوجد موعد قادم مجدول",
+    "toastNoAppt": "لا يوجد موعد مجدول للمريض",
+    "toastWindowFailed": "فشل فتح نافذة الإيصال. يرجى التحقق من إعدادات مانع النوافذ المنبثقة.",
+    "toastOpening": "جاري فتح إيصال الموعد..."
+  },
+  "empty": {
+    "noMatch": "لا توجد أعمال تطابق معايير البحث",
+    "none": "لا توجد أعمال لهذا المريض"
+  },
+  "toast": {
+    "completed": "تم تعليم العمل كمكتمل",
+    "discontinued": "تم تعليم العمل كمتوقف",
+    "reactivated": "تمت إعادة تفعيل العمل بنجاح",
+    "failComplete": "فشل إكمال العمل",
+    "failDiscontinue": "فشل إيقاف العمل",
+    "failReactivate": "فشل إعادة تفعيل العمل",
+    "deleted": "تم حذف العمل بنجاح!",
+    "failDelete": "فشل حذف العمل",
+    "transferred": "تم نقل العمل بنجاح إلى مريض آخر",
+    "paymentAdded": "تمت إضافة الدفعة بنجاح!"
+  },
+  "deleteDeps": {
+    "header": "⚠️ لا يمكن حذف العمل - توجد سجلات مرتبطة ⚠️",
+    "intro": "يحتوي هذا العمل على السجلات التالية التي يجب حذفها أولاً:",
+    "payments": "• {{n}} دفعة",
+    "visits": "• {{n}} زيارة",
+    "items": "• {{n}} تفصيل علاج",
+    "diagnoses": "• {{n}} تشخيص",
+    "implants": "• {{n}} زرعة",
+    "screws": "• {{n}} برغي",
+    "alignerSets": "• {{n}} مجموعة تقويم شفاف",
+    "footer": "⚠️ احذف هذه السجلات أولاً ثم حاول مرة أخرى."
+  },
+  "deleteWork": {
+    "title": "تأكيد حذف العمل",
+    "confirm": "هل أنت متأكد من حذف هذا العمل؟",
+    "cannotUndo": "⚠️ لا يمكن التراجع عن هذا الإجراء!",
+    "button": "حذف العمل"
+  },
+  "statusModal": {
+    "complete": {
+      "title": "إكمال العمل",
+      "message": "هل أنت متأكد من تعليم هذا العمل كمكتمل؟",
+      "warning": "سيؤدي هذا إلى تغيير حالة العمل إلى مُنجز.",
+      "button": "إكمال العمل"
+    },
+    "discontinue": {
+      "title": "إيقاف العمل",
+      "message": "هل أنت متأكد من إيقاف هذا العمل؟",
+      "warning": "يشير هذا إلى أن المريض قد توقف عن العلاج.",
+      "button": "إيقاف"
+    },
+    "reactivate": {
+      "title": "إعادة تفعيل العمل",
+      "message": "هل أنت متأكد من إعادة تفعيل هذا العمل؟",
+      "warning": "سيجعل هذا العمل النشط لهذا المريض.",
+      "button": "إعادة تفعيل"
+    }
+  },
+  "paymentHistory": {
+    "title": "سجل الدفعات - {{name}}",
+    "workFallback": "عمل رقم {{id}}",
+    "totalRequired": "المبلغ الإجمالي المطلوب:",
+    "totalPaid": "إجمالي المدفوع:",
+    "balanceRemaining": "الرصيد المتبقي:",
+    "loading": "جاري تحميل سجل الدفعات...",
+    "table": {
+      "date": "التاريخ",
+      "amountPaid": "المبلغ المدفوع ({{currency}})",
+      "actualAmount": "المبلغ الفعلي",
+      "actualCurrency": "العملة الفعلية",
+      "change": "الباقي",
+      "actions": "إجراءات"
+    },
+    "editTitle": "تعديل الدفعة",
+    "editComingSoon": "ميزة تعديل الدفعة قادمة قريباً!\n\nرقم الدفعة: {{id}}\nالمبلغ: {{amount}}",
+    "deleteTitle": "حذف الدفعة",
+    "deleteConfirm": "هل أنت متأكد من حذف هذه الدفعة؟\n\nالمبلغ: {{amount}}\nالتاريخ: {{date}}\n\nلا يمكن التراجع عن هذا الإجراء.",
+    "deleteConfirmButton": "حذف",
+    "deleteSuccess": "تم حذف الدفعة بنجاح!",
+    "deleteError": "خطأ في حذف الدفعة: {{error}}",
+    "unknownError": "خطأ غير معروف",
+    "noPayments": "لا توجد دفعات مسجلة لهذا العمل بعد",
+    "addPayment": "إضافة دفعة جديدة",
+    "fullyPaid": "تم دفع هذا العمل بالكامل"
+  },
+  "card": {
+    "otherTreatment": "علاج آخر",
+    "drPrefix": "د. {{name}}",
+    "notAssigned": "غير مُعيَّن",
+    "balance": "الرصيد: {{amount}}",
+    "moreActions": "المزيد من الإجراءات",
+    "editWork": "تعديل العمل",
+    "transferWork": "نقل العمل",
+    "markComplete": "تعليم كمكتمل",
+    "markDiscontinued": "تعليم كمتوقف",
+    "reactivate": "إعادة تفعيل",
+    "deleteWork": "حذف العمل",
+    "treatmentProgress": "تقدّم العلاج",
+    "totalCost": "التكلفة الإجمالية",
+    "discount": "الخصم",
+    "net": "الصافي",
+    "paid": "المدفوع",
+    "remaining": "المتبقي",
+    "discountApplied": "تم تطبيق خصم",
+    "discountOnDate": " بتاريخ {{date}}",
+    "discountReason": " — {{reason}}",
+    "started": "بدأ: {{date}}",
+    "duration": "المدة: {{months}} شهر",
+    "debond": "إزالة التقويم: {{date}}",
+    "statusCompleted": "مكتمل",
+    "statusDiscontinued": "متوقف",
+    "statusActive": "نشط",
+    "newVisit": "زيارة جديدة",
+    "newVisitTitle": "إضافة زيارة جديدة لهذا العمل",
+    "visits": "الزيارات",
+    "visitsTitle": "عرض زيارات هذا العمل",
+    "diagnosis": "التشخيص",
+    "diagnosisTitle": "عرض التشخيص وخطة العلاج",
+    "payments": "الدفعات",
+    "paymentsTitle": "عرض سجل الدفعات",
+    "addPayment": "إضافة دفعة",
+    "addPaymentNoBalance": "لا يوجد رصيد متبقٍ",
+    "addPaymentTitle": "إضافة دفعة لهذا العمل",
+    "printReceipt": "طباعة الإيصال",
+    "printReceiptTitle": "طباعة إيصال اليوم",
+    "addAlignerSet": "إضافة مجموعة تقويم",
+    "addAlignerSetTitle": "إضافة أو إدارة مجموعات التقويم الشفاف"
+  }
+}

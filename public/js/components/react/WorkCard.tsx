@@ -1,5 +1,6 @@
 import { useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import cn from 'classnames';
 import { isOrthoWork, needsDetails } from '../../config/workTypeConfig';
 import WorkDetailsPanel from './WorkDetailsPanel';
@@ -88,16 +89,17 @@ const WorkCard = ({
     WORK_STATUS
 }: WorkCardProps) => {
     const navigate = useNavigate();
+    const { t } = useTranslation('works');
     const [showActions, setShowActions] = useState(false);
 
     const getStatusBadge = () => {
         if (work.status === WORK_STATUS.FINISHED) {
-            return <span className={cn(styles.statusBadge, styles.statusBadgeCompleted)}>Completed</span>;
+            return <span className={cn(styles.statusBadge, styles.statusBadgeCompleted)}>{t('card.statusCompleted')}</span>;
         }
         if (work.status === WORK_STATUS.DISCONTINUED) {
-            return <span className={cn(styles.statusBadge, styles.statusBadgeDiscontinued)}>Discontinued</span>;
+            return <span className={cn(styles.statusBadge, styles.statusBadgeDiscontinued)}>{t('card.statusDiscontinued')}</span>;
         }
-        return <span className={cn(styles.statusBadge, styles.statusBadgeActive)}>Active</span>;
+        return <span className={cn(styles.statusBadge, styles.statusBadgeActive)}>{t('card.statusActive')}</span>;
     };
 
     const isActive = work.status === WORK_STATUS.ACTIVE;
@@ -128,15 +130,15 @@ const WorkCard = ({
                     <div className={styles.title}>
                         <i className={cn('fas', isExpanded ? 'fa-chevron-down' : 'fa-chevron-right', styles.chevronIcon)}></i>
                         <i className="fas fa-tooth"></i>
-                        <h3>{work.type_name || 'Other Treatment'}</h3>
+                        <h3>{work.type_name || t('card.otherTreatment')}</h3>
                         {getStatusBadge()}
                     </div>
                     <div className={styles.metaMinimal}>
-                        <span><i className="fas fa-user-md"></i> {work.doctor_name ? (work.doctor_name === 'Admin' ? work.doctor_name : `Dr. ${work.doctor_name}`) : 'Not assigned'}</span>
+                        <span><i className="fas fa-user-md"></i> {work.doctor_name ? (work.doctor_name === 'Admin' ? work.doctor_name : t('card.drPrefix', { name: work.doctor_name })) : t('card.notAssigned')}</span>
                         <span><i className="fas fa-calendar-plus"></i> {formatDate(work.addition_date)}</span>
                         {!isExpanded && getRemainingBalance() > 0 && (
                             <span className={styles.balanceIndicator}>
-                                <i className="fas fa-exclamation-circle"></i> Balance: {formatCurrency(getRemainingBalance(), work.currency)}
+                                <i className="fas fa-exclamation-circle"></i> {t('card.balance', { amount: formatCurrency(getRemainingBalance(), work.currency) })}
                             </span>
                         )}
                     </div>
@@ -153,33 +155,33 @@ const WorkCard = ({
                             e.stopPropagation();
                             setShowActions(!showActions);
                         }}
-                        title="More actions"
+                        title={t('card.moreActions')}
                     >
                         <i className="fas fa-ellipsis-v"></i>
                     </button>
                     {showActions && (
                         <div className={styles.dropdown}>
                             <button type="button" onClick={() => { onEdit(work); setShowActions(false); }}>
-                                <i className="fas fa-edit"></i> Edit Work
+                                <i className="fas fa-edit"></i> {t('card.editWork')}
                             </button>
                             {isAdmin && onTransfer && (
                                 <button type="button" onClick={() => { onTransfer(work); setShowActions(false); }}>
-                                    <i className="fas fa-exchange-alt"></i> Transfer Work
+                                    <i className="fas fa-exchange-alt"></i> {t('card.transferWork')}
                                 </button>
                             )}
                             {isActive && (
                                 <>
                                     <button type="button" onClick={() => { onComplete(work); setShowActions(false); }}>
-                                        <i className="fas fa-check-circle"></i> Mark Complete
+                                        <i className="fas fa-check-circle"></i> {t('card.markComplete')}
                                     </button>
                                     <button type="button" onClick={() => { onDiscontinue(work); setShowActions(false); }}>
-                                        <i className="fas fa-ban"></i> Mark Discontinued
+                                        <i className="fas fa-ban"></i> {t('card.markDiscontinued')}
                                     </button>
                                 </>
                             )}
                             {(isFinished || isDiscontinued) && (
                                 <button type="button" onClick={() => { onReactivate(work); setShowActions(false); }}>
-                                    <i className="fas fa-redo"></i> Reactivate
+                                    <i className="fas fa-redo"></i> {t('card.reactivate')}
                                 </button>
                             )}
                             <button
@@ -187,7 +189,7 @@ const WorkCard = ({
                                 className={styles.dropdownDeleteBtn}
                                 onClick={() => { onDelete(work); setShowActions(false); }}
                             >
-                                <i className="fas fa-trash-alt"></i> Delete Work
+                                <i className="fas fa-trash-alt"></i> {t('card.deleteWork')}
                             </button>
                         </div>
                     )}
@@ -200,7 +202,7 @@ const WorkCard = ({
                     {/* Progress Section */}
                     <div className={styles.progress}>
                         <div className={styles.progressInfo}>
-                            <span className={styles.progressLabel}>Treatment Progress</span>
+                            <span className={styles.progressLabel}>{t('card.treatmentProgress')}</span>
                             <span className={styles.progressPercentage}>{getProgressPercentage(work)}%</span>
                         </div>
                         <div className={styles.progressBarContainer}>
@@ -214,19 +216,19 @@ const WorkCard = ({
                     {/* Financial Summary */}
                     <div className={styles.financial}>
                         <div className={styles.financialItem}>
-                            <span className={styles.financialLabel}>Total Cost</span>
+                            <span className={styles.financialLabel}>{t('card.totalCost')}</span>
                             <span className={styles.financialValue}>{formatCurrency(work.total_required, work.currency)}</span>
                         </div>
                         {getDiscount() > 0 && (
                             <>
                                 <div className={styles.financialItem}>
-                                    <span className={styles.financialLabel}>Discount</span>
+                                    <span className={styles.financialLabel}>{t('card.discount')}</span>
                                     <span className={cn(styles.financialValue, styles.financialValueDiscount)}>
                                         -{formatCurrency(getDiscount(), work.currency)}
                                     </span>
                                 </div>
                                 <div className={styles.financialItem}>
-                                    <span className={styles.financialLabel}>Net</span>
+                                    <span className={styles.financialLabel}>{t('card.net')}</span>
                                     <span className={cn(styles.financialValue, styles.financialValueNet)}>
                                         {formatCurrency((work.total_required || 0) - getDiscount(), work.currency)}
                                     </span>
@@ -234,11 +236,11 @@ const WorkCard = ({
                             </>
                         )}
                         <div className={styles.financialItem}>
-                            <span className={styles.financialLabel}>Paid</span>
+                            <span className={styles.financialLabel}>{t('card.paid')}</span>
                             <span className={cn(styles.financialValue, styles.financialValuePaid)}>{formatCurrency(work.TotalPaid, work.currency)}</span>
                         </div>
                         <div className={styles.financialItem}>
-                            <span className={styles.financialLabel}>Remaining</span>
+                            <span className={styles.financialLabel}>{t('card.remaining')}</span>
                             <span className={cn(styles.financialValue, isFullyPaid() ? styles.financialValuePaidFull : styles.financialValueRemaining)}>
                                 {formatCurrency(getRemainingBalance(), work.currency)}
                             </span>
@@ -250,8 +252,9 @@ const WorkCard = ({
                         <div className={cn(styles.infoItem, styles.discountBadge)}>
                             <i className="fas fa-tag"></i>
                             <span>
-                                Discount applied{work.discount_date ? ` on ${formatDate(work.discount_date)}` : ''}
-                                {work.discount_reason ? ` — ${work.discount_reason}` : ''}
+                                {t('card.discountApplied')}
+                                {work.discount_date ? t('card.discountOnDate', { date: formatDate(work.discount_date) }) : ''}
+                                {work.discount_reason ? t('card.discountReason', { reason: work.discount_reason }) : ''}
                             </span>
                         </div>
                     )}
@@ -262,19 +265,19 @@ const WorkCard = ({
                             {work.start_date && (
                                 <div className={styles.infoItem}>
                                     <i className="fas fa-play-circle"></i>
-                                    <span>Started: {formatDate(work.start_date)}</span>
+                                    <span>{t('card.started', { date: formatDate(work.start_date) })}</span>
                                 </div>
                             )}
                             {work.estimated_duration && (
                                 <div className={styles.infoItem}>
                                     <i className="fas fa-clock"></i>
-                                    <span>Duration: {work.estimated_duration} months</span>
+                                    <span>{t('card.duration', { months: work.estimated_duration })}</span>
                                 </div>
                             )}
                             {work.debond_date && (
                                 <div className={styles.infoItem}>
                                     <i className="fas fa-calendar-check"></i>
-                                    <span>Debond: {formatDate(work.debond_date)}</span>
+                                    <span>{t('card.debond', { date: formatDate(work.debond_date) })}</span>
                                 </div>
                             )}
                             {work.notes && (
@@ -303,28 +306,28 @@ const WorkCard = ({
                                     type="button"
                                     className="btn btn-card-action btn-new-visit"
                                     onClick={() => onNewVisit(work)}
-                                    title="Add new visit for this work"
+                                    title={t('card.newVisitTitle')}
                                 >
                                     <i className="fas fa-plus-circle"></i>
-                                    <span>New Visit</span>
+                                    <span>{t('card.newVisit')}</span>
                                 </button>
                                 <button
                                     type="button"
                                     className="btn btn-card-action btn-visits"
                                     onClick={() => onViewVisits(work)}
-                                    title="View visits for this work"
+                                    title={t('card.visitsTitle')}
                                 >
                                     <i className="fas fa-calendar-check"></i>
-                                    <span>Visits</span>
+                                    <span>{t('card.visits')}</span>
                                 </button>
                                 <button
                                     type="button"
                                     className="btn btn-card-action btn-diagnosis"
                                     onClick={() => navigate(`/patient/${personId}/work/${work.work_id}/diagnosis`)}
-                                    title="View diagnosis and treatment plan"
+                                    title={t('card.diagnosisTitle')}
                                 >
                                     <i className="fas fa-stethoscope"></i>
-                                    <span>Diagnosis</span>
+                                    <span>{t('card.diagnosis')}</span>
                                 </button>
                             </>
                         )}
@@ -334,10 +337,10 @@ const WorkCard = ({
                             type="button"
                             className="btn btn-card-action btn-payments"
                             onClick={() => onViewPaymentHistory(work)}
-                            title="View payment history"
+                            title={t('card.paymentsTitle')}
                         >
                             <i className="fas fa-history"></i>
-                            <span>Payments</span>
+                            <span>{t('card.payments')}</span>
                         </button>
 
                     </div>
@@ -349,29 +352,29 @@ const WorkCard = ({
                             className={cn('btn btn-card-secondary btn-add-payment', isFullyPaid() && 'disabled')}
                             onClick={() => !isFullyPaid() && onAddPayment(work)}
                             disabled={isFullyPaid()}
-                            title={isFullyPaid() ? "No balance remaining" : "Add payment for this work"}
+                            title={isFullyPaid() ? t('card.addPaymentNoBalance') : t('card.addPaymentTitle')}
                         >
                             <i className="fas fa-dollar-sign"></i>
-                            <span>Add Payment</span>
+                            <span>{t('card.addPayment')}</span>
                         </button>
                         <button
                             type="button"
                             className="btn btn-card-secondary btn-print-receipt"
                             onClick={() => onPrintReceipt(work)}
-                            title="Print today's receipt"
+                            title={t('card.printReceiptTitle')}
                         >
                             <i className="fas fa-print"></i>
-                            <span>Print Receipt</span>
+                            <span>{t('card.printReceipt')}</span>
                         </button>
                         {isAlignerWork(work) && (
                             <button
                                 type="button"
                                 className="btn btn-card-secondary btn-add-set"
                                 onClick={() => onAddAlignerSet(work)}
-                                title="Add or manage aligner sets"
+                                title={t('card.addAlignerSetTitle')}
                             >
                                 <i className="fas fa-tooth"></i>
-                                <span>Add Aligner Set</span>
+                                <span>{t('card.addAlignerSet')}</span>
                             </button>
                         )}
                     </div>

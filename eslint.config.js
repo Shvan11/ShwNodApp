@@ -234,7 +234,13 @@ export default [
       'public/js/components/react/appointments/StatsCards.tsx',
       'public/js/components/react/appointments/ConnectionStatus.tsx',
       'public/js/components/react/appointments/DoctorFilterSelect.tsx',
-      'public/js/components/react/appointments/MobileViewToggle.tsx'
+      'public/js/components/react/appointments/MobileViewToggle.tsx',
+      'public/js/components/react/WorkComponent.tsx',
+      'public/js/components/react/WorkCard.tsx',
+      'public/js/components/react/AppointmentForm.tsx',
+      'public/js/components/react/EditAppointmentForm.tsx',
+      'public/js/components/react/SimplifiedCalendarPicker.tsx',
+      'public/js/components/react/PatientAppointments.tsx'
     ],
     plugins: {
       i18next
@@ -247,14 +253,16 @@ export default [
           // Structural/identity attributes on the shared <Modal>/<ModalHeader>
           // components are never user-facing, so a string literal there is fine:
           // titleId/ariaLabelledBy are id references (cf. the allowed id/htmlFor)
-          // and variant is a design-system enum (default|danger|warning|…). This
-          // extends the plugin's DEFAULT jsx-attributes exclude (which `_.defaults`
-          // would otherwise drop wholesale once this key is set) so the real
-          // user-facing attrs — title/label/placeholder/alt/aria-label — stay checked.
+          // and variant is a design-system enum (default|danger|warning|…). `to`
+          // is a React Router <Link>/<Navigate> route path (a location, never
+          // display text — the sibling of the allowed id/htmlFor). This extends
+          // the plugin's DEFAULT jsx-attributes exclude (which `_.defaults` would
+          // otherwise drop wholesale once this key is set) so the real user-facing
+          // attrs — title/label/placeholder/alt/aria-label — stay checked.
           'jsx-attributes': {
             exclude: [
               'className', 'styleName', 'style', 'type', 'key', 'id', 'width', 'height',
-              'titleId', 'ariaLabelledBy', 'variant'
+              'titleId', 'ariaLabelledBy', 'variant', 'to'
             ]
           },
           words: { exclude: ['[0-9!-/:-@[-`{-~]+', '[A-Z_-]+'] }

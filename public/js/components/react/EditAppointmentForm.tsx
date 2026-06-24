@@ -2,9 +2,12 @@ import { useState, useEffect, useMemo, useRef, type ChangeEvent, type FormEvent 
 import { useLocation } from 'react-router-dom';
 import cn from 'classnames';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
 import { useToast } from '../../contexts/ToastContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { postJSON, putJSON, httpErrorMessage } from '@/core/http';
+import { formatAppointmentDateTime } from '@/utils/formatters';
 import { qk } from '@/query/keys';
 import { employeesQuery, appointmentDetailsQuery, appointmentByIdQuery } from '@/query/queries';
 import styles from './AppointmentForm.module.css';
@@ -54,6 +57,8 @@ interface EditAppointmentFormProps {
  */
 
 const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: EditAppointmentFormProps) => {
+    const { t } = useTranslation('appointments');
+    const { language } = useLanguage();
     const location = useLocation();
     const toast = useToast();
     const queryClient = useQueryClient();
@@ -112,7 +117,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
     // Surface either a submit error or an appointment-load failure.
     const displayError =
-        error ?? (appointmentIsError ? httpErrorMessage(appointmentError, 'Unknown error') : null);
+        error ?? (appointmentIsError ? httpErrorMessage(appointmentError, t('form.errorUnknown')) : null);
 
     // Seed the editable form once the source appointment resolves. Declared before
     // the effect so it isn't "used before declaration"; the setState lives inside
@@ -222,10 +227,10 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
     const validateForm = (): boolean => {
         const errors: ValidationErrors = {};
-        if (!formData.AppDate) errors.AppDate = 'Select a date';
-        if (!formData.AppTime) errors.AppTime = 'Select a time';
-        if (!formData.DrID) errors.DrID = 'Select a doctor';
-        if (!formData.AppDetail) errors.AppDetail = 'Select appointment type';
+        if (!formData.AppDate) errors.AppDate = t('form.errorSelectDate');
+        if (!formData.AppTime) errors.AppTime = t('form.errorSelectTime');
+        if (!formData.DrID) errors.DrID = t('form.errorSelectDoctor');
+        if (!formData.AppDetail) errors.AppDetail = t('form.errorSelectType');
         setValidation(errors);
         return Object.keys(errors).length === 0;
     };
@@ -259,13 +264,13 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                     })
                         .then((waResult) => {
                             if (waResult.success) {
-                                toast.success('Appointment confirmation sent via WhatsApp!');
+                                toast.success(t('form.waSent'));
                             } else {
-                                toast.warning(waResult.message || 'Failed to send WhatsApp');
+                                toast.warning(waResult.message || t('form.waFailed'));
                             }
                         })
                         .catch(err => {
-                            toast.error('WhatsApp error: ' + httpErrorMessage(err, 'send failed'));
+                            toast.error(t('form.waError', { error: httpErrorMessage(err, 'send failed') }));
                         });
                 }
 
@@ -277,13 +282,13 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                 onSuccess && onSuccess(result);
                 onClose && onClose();
             } else {
-                throw new Error(result.error || 'Failed to update appointment');
+                throw new Error(result.error || t('form.errorUpdateFailed'));
             }
         } catch (err) {
             // putJSON throws on non-2xx; httpErrorMessage surfaces the server's
             // error message (this form has no conflict-code branching — M1).
             console.error('Error updating appointment:', err);
-            setError(httpErrorMessage(err, 'Unknown error'));
+            setError(httpErrorMessage(err, t('form.errorUnknown')));
         } finally {
             setLoading(false);
         }
@@ -291,16 +296,9 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
     const getDateTimeDisplay = (): string => {
         if (formData.AppDate && formData.AppTime) {
-            const date = new Date(`${formData.AppDate}T${formData.AppTime}`);
-            return date.toLocaleString(undefined, {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit'
-            });
+            return formatAppointmentDateTime(new Date(`${formData.AppDate}T${formData.AppTime}`), language);
         }
-        return 'No time selected';
+        return t('form.noTimeSelected');
     };
 
     if (loadingData) {
@@ -308,7 +306,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
             <div className={styles.page}>
                 <div className={styles.loadingState}>
                     <i className="fas fa-spinner fa-spin"></i>
-                    <p>Loading appointment data...</p>
+                    <p>{t('form.loadingData')}</p>
                 </div>
             </div>
         );
@@ -319,10 +317,10 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
             {/* Page Header */}
             <header className={styles.pageHeader}>
                 <div>
-                    <h1><i className="fas fa-calendar-edit"></i> Edit Appointment</h1>
-                    <p>Patient #{personId}</p>
+                    <h1><i className="fas fa-calendar-edit"></i> {t('form.editTitle')}</h1>
+                    <p>{t('form.patientLabel', { id: personId })}</p>
                 </div>
-                <button className={styles.closeButton} onClick={onClose} title="Close">
+                <button className={styles.closeButton} onClick={onClose} title={t('form.close')}>
                     <i className="fas fa-times"></i>
                 </button>
             </header>
@@ -338,7 +336,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                 {/* RIGHT COLUMN: Form */}
                 <div className={styles.formColumn} ref={formColumnRef}>
                     <div className={styles.formHeader}>
-                        <h2><i className="fas fa-clipboard-list"></i> Appointment Details</h2>
+                        <h2><i className="fas fa-clipboard-list"></i> {t('form.detailsHeading')}</h2>
                     </div>
 
                     <form onSubmit={handleSubmit} className={styles.form}>
@@ -350,7 +348,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                         )}
 
                         <div className={styles.formField}>
-                            <span><i className="fas fa-calendar-check"></i> Selected Time</span>
+                            <span><i className="fas fa-calendar-check"></i> {t('form.selectedTime')}</span>
                             <div
                                 ref={selectedTimeRef}
                                 className={cn(styles.selectedTime, {
@@ -365,7 +363,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                         </div>
 
                         <div className={styles.formField}>
-                            <label htmlFor="doctor"><i className="fas fa-user-md"></i> Doctor</label>
+                            <label htmlFor="doctor"><i className="fas fa-user-md"></i> {t('form.doctor')}</label>
                             <select
                                 id="doctor"
                                 name="DrID"
@@ -374,7 +372,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                                 onChange={handleInputChange}
                                 className={validation.DrID ? styles.error : ''}
                             >
-                                <option value="">Select doctor...</option>
+                                <option value="">{t('form.selectDoctor')}</option>
                                 {doctors.filter(d => d.id).map((doctor) => (
                                     <option key={doctor.id} value={doctor.id}>
                                         {doctor.employee_name}
@@ -385,7 +383,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                         </div>
 
                         <div className={styles.formField}>
-                            <label htmlFor="details"><i className="fas fa-notes-medical"></i> Appointment Type</label>
+                            <label htmlFor="details"><i className="fas fa-notes-medical"></i> {t('form.appointmentType')}</label>
                             <select
                                 id="details"
                                 name="AppDetail"
@@ -394,7 +392,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                                 onChange={handleInputChange}
                                 className={validation.AppDetail ? styles.error : ''}
                             >
-                                <option value="">Select type...</option>
+                                <option value="">{t('form.selectType')}</option>
                                 {details.filter(d => d.id).map((detail) => (
                                     <option key={detail.id} value={detail.detail ?? ''}>
                                         {detail.detail}
@@ -412,7 +410,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                                 disabled={loading}
                             >
                                 <i className="fas fa-times"></i>
-                                Cancel
+                                {t('form.cancel')}
                             </button>
                             <button
                                 type="submit"
@@ -422,12 +420,12 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                                 {loading ? (
                                     <>
                                         <i className="fas fa-spinner fa-spin"></i>
-                                        Updating...
+                                        {t('form.updating')}
                                     </>
                                 ) : (
                                     <>
                                         <i className="fas fa-save"></i>
-                                        Update Appointment
+                                        {t('form.update')}
                                     </>
                                 )}
                             </button>
