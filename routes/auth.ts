@@ -11,6 +11,7 @@ import { log } from '../utils/logger.js';
 import type { LoginBody, ChangePasswordBody } from '../shared/contracts/auth.contract.js';
 import * as threeShapeOAuth from '../services/threeshape/oauth.js';
 import { ThreeShapeError } from '../services/threeshape/errors.js';
+import { normalizeRole, ADMIN_ROLES } from '../shared/auth/roles.js';
 
 const router = Router();
 
@@ -38,16 +39,8 @@ const loginLimiter = rateLimit({
 // Body shapes (LoginBody / ChangePasswordBody) come from the auth contract — these
 // handlers keep their own manual checks + rate limiting + security-specific error
 // responses, so the contract is the type SSoT but isn't wired to `validate()`.
-
-// Extend Express Session
-declare module 'express-session' {
-  interface SessionData {
-    userId?: number;
-    username?: string;
-    fullName?: string;
-    userRole?: string;
-  }
-}
+// Session shape (userId/username/userRole/fullName) is declared once, canonically,
+// in `types/express-session.d.ts` — no local re-declaration here.
 
 /**
  * POST /api/auth/login
@@ -97,7 +90,7 @@ router.post(
       req.session.userId = result.user!.userId;
       req.session.username = result.user!.username;
       req.session.fullName = result.user!.fullName;
-      req.session.userRole = result.user!.role;
+      req.session.userRole = normalizeRole(result.user!.role);
 
       // Extend session if "Remember Me" is checked
       if (rememberMe) {
@@ -257,9 +250,7 @@ router.post(
       log.info('Password changed', { username: req.session.username });
 
       // Regenerate session ID to invalidate the old session cookie; preserve login data
-      const { userId, username, userRole, fullName } = req.session as typeof req.session & {
-        userId: number; username: string; userRole: string; fullName: string;
-      };
+      const { userId, username, userRole, fullName } = req.session;
       await new Promise<void>((resolve, reject) => {
         req.session.regenerate((err) => (err ? reject(err) : resolve()));
       });
@@ -302,7 +293,7 @@ const THREESHAPE_PKCE_TTL_MS = 10 * 60 * 1000; // login → callback round-trip 
 router.get(
   '/3shape/login',
   authenticate,
-  authorize(['admin']),
+  authorize(ADMIN_ROLES),
   (req: Request, res: Response): void => {
     if (!threeShapeOAuth.isConfigured()) {
       res.status(503).json({ success: false, error: '3Shape is not configured on this server.' });

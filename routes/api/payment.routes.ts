@@ -27,6 +27,7 @@ import {
   listExchangeRates
 } from '../../services/database/queries/payment-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import { FINANCE_ROLES } from '../../shared/auth/roles.js';
 import {
   requireRecordAge,
   getInvoiceCreationDate
@@ -51,6 +52,7 @@ import {
   validateAndCreateInvoice,
   PaymentValidationError
 } from '../../services/business/PaymentService.js';
+import { enqueueApproval, recordNotice } from '../../services/approvals/approval-service.js';
 
 const router = Router();
 
@@ -316,6 +318,8 @@ router.get(
  */
 router.post(
   '/updateExchangeRateForDate',
+  authenticate,
+  authorize(FINANCE_ROLES),
   validate({ body: updateExchangeRate.body }),
   async (
     req: Request<unknown, unknown, UpdateExchangeRateBody>,
@@ -372,6 +376,8 @@ router.post(
  */
 router.post(
   '/addInvoice',
+  authenticate,
+  authorize(FINANCE_ROLES),
   validate({ body: addInvoice.body }),
   async (
     req: Request<unknown, unknown, AddInvoiceBody>,
@@ -438,12 +444,25 @@ router.post(
 router.delete(
   '/deleteInvoice/:invoiceId',
   authenticate,
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: deleteInvoice.params }),
   requireRecordAge({
     resourceType: 'invoice',
     operation: 'delete',
-    getRecordDate: getInvoiceCreationDate
+    getRecordDate: getInvoiceCreationDate,
+    enqueueIfRestricted: async (req, res) => {
+      const { invoiceId } = req.params as { invoiceId: string };
+      const { requestId } = await enqueueApproval(
+        'invoice.delete',
+        { invoiceId: parseInt(invoiceId) },
+        req
+      );
+      sendData(res, deleteInvoice.response, {
+        outcome: 'pending',
+        requestId,
+        message: 'Submitted for admin approval',
+      });
+    },
   }),
   async (req: Request<{ invoiceId: string }>, res: Response): Promise<void> => {
     try {
@@ -464,7 +483,9 @@ router.delete(
         return;
       }
 
-      sendData(res, deleteInvoice.response, { rowsAffected }, 'Invoice deleted successfully');
+      // Notify tier: same-day admin-visible FYI; recordNotice no-ops for admin callers.
+      await recordNotice('invoice.delete', { invoiceId: parseInt(invoiceId) }, req);
+      sendData(res, deleteInvoice.response, { outcome: 'applied', rowsAffected }, 'Invoice deleted successfully');
     } catch (error) {
       log.error('Error deleting invoice:', error);
       ErrorResponses.internalError(

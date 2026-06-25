@@ -16,6 +16,7 @@
  */
 import { z } from 'zod';
 import { intId, dateString, idParams } from '../validation.js';
+import { withPendingOutcome } from './approvals.contract.js';
 
 // ---------------------------------------------------------------------------
 // GET /api/getpaymenthistory?workId= — bare array of invoice rows.
@@ -151,9 +152,11 @@ export type AddInvoiceResponse = z.infer<typeof addInvoice.response>;
 // DELETE /api/deleteInvoice/:invoiceId — { rowsAffected }.
 // ---------------------------------------------------------------------------
 
+// A Front-Desk delete of an invoice not created today routes through admin
+// approval instead of applying immediately — see `services/approvals/`.
 export const deleteInvoice = {
   params: idParams('invoiceId'),
-  response: z.object({ rowsAffected: z.number() }),
+  response: withPendingOutcome({ rowsAffected: z.number() }),
 } as const;
 export type DeleteInvoiceResponse = z.infer<typeof deleteInvoice.response>;
 

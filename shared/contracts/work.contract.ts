@@ -29,6 +29,7 @@
  */
 import { z } from 'zod';
 import { intId } from '../validation.js';
+import { withPendingOutcome } from './approvals.contract.js';
 
 // ---------------------------------------------------------------------------
 // Shared building blocks.
@@ -36,6 +37,13 @@ import { intId } from '../validation.js';
 
 /** `{ rowsAffected }` — the closed shape every lifecycle/mutation handler returns. */
 const rowsAffected = z.object({ rowsAffected: z.number() });
+
+/**
+ * `updateWork`/`deleteWork` can divert a Front-Desk edit/delete on an old (or
+ * discount) work into an admin-approval hold — see `services/approvals/`. Both
+ * keep the plain `rowsAffected` shape on the immediate-apply path.
+ */
+const rowsAffectedOrPending = withPendingOutcome(rowsAffected.shape);
 
 // The work forms send numeric fields as STRINGS ('' when blank). Collapse ''/null
 // → undefined (NOT 0) so the service optionals hold; a chosen value coerces. The
@@ -251,7 +259,7 @@ export const updateWork = {
     discount_date: z.union([z.string(), z.null()]).optional(),
     discount_reason: z.union([z.string(), z.null()]).optional(),
   }),
-  response: rowsAffected,
+  response: rowsAffectedOrPending,
 } as const;
 export type UpdateWorkBody = z.infer<typeof updateWork.body>;
 
@@ -267,7 +275,7 @@ export const reactivateWork = { body: workStatusBody, response: rowsAffected } a
 // DELETE /api/deletework — { workId } (fully enumerated) → { rowsAffected }.
 export const deleteWork = {
   body: z.object({ workId: intId }),
-  response: rowsAffected,
+  response: rowsAffectedOrPending,
 } as const;
 export type DeleteWorkBody = z.infer<typeof deleteWork.body>;
 

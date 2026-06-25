@@ -175,6 +175,11 @@
     color: var(--info-800);
 }
 
+.roleClinical {
+    background: var(--warning-100);
+    color: var(--warning-800);
+}
+
 .statusBadge {
     display: inline-block;
     padding: 4px 10px;

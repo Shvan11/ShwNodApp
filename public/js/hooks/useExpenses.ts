@@ -158,8 +158,8 @@ export function useSubcategories(categoryId: number | string | null | undefined)
  */
 export function useExpenseMutations(): {
   createExpense: (expenseData: ExpenseData) => Promise<Expense>;
-  updateExpense: (id: number, expenseData: ExpenseData) => Promise<Expense>;
-  deleteExpense: (id: number) => Promise<void>;
+  updateExpense: (id: number, expenseData: ExpenseData) => Promise<{ outcome: 'applied' | 'pending' }>;
+  deleteExpense: (id: number) => Promise<{ outcome: 'applied' | 'pending' }>;
   loading: boolean;
   error: string | null;
 } {
@@ -187,14 +187,15 @@ export function useExpenseMutations(): {
   );
 
   const updateExpense = useCallback(
-    async (id: number, expenseData: ExpenseData): Promise<Expense> => {
+    async (id: number, expenseData: ExpenseData): Promise<{ outcome: 'applied' | 'pending' }> => {
       try {
         setLoading(true);
         setError(null);
 
-        const data = await putJSON<Expense>(`/api/expenses/${id}`, expenseData, { schema: expenseContract.updateExpense.response });
+        const data = await putJSON<{ outcome: string }>(`/api/expenses/${id}`, expenseData, { schema: expenseContract.updateExpense.response });
+        if (data.outcome === 'pending') return { outcome: 'pending' };
         void queryClient.invalidateQueries({ queryKey: qk.expenses.all() });
-        return data;
+        return { outcome: 'applied' };
       } catch (err) {
         setError(httpErrorMessage(err, 'Failed to update expense'));
         throw err;
@@ -206,13 +207,15 @@ export function useExpenseMutations(): {
   );
 
   const deleteExpense = useCallback(
-    async (id: number): Promise<void> => {
+    async (id: number): Promise<{ outcome: 'applied' | 'pending' }> => {
       try {
         setLoading(true);
         setError(null);
 
-        await deleteJSON(`/api/expenses/${id}`);
+        const data = await deleteJSON<{ outcome: string }>(`/api/expenses/${id}`, { schema: expenseContract.deleteExpense.response });
+        if (data.outcome === 'pending') return { outcome: 'pending' };
         void queryClient.invalidateQueries({ queryKey: qk.expenses.all() });
+        return { outcome: 'applied' };
       } catch (err) {
         setError(httpErrorMessage(err, 'Failed to delete expense'));
         throw err;

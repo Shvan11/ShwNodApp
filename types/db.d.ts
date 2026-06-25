@@ -164,6 +164,24 @@ export interface Appointments {
   want_wa: Generated<boolean | null>;
 }
 
+export interface ApprovalRequests {
+  action_type: string;
+  kind: string;
+  payload: Json;
+  person_id: number | null;
+  request_id: Generated<number>;
+  requested_at: Generated<Timestamp>;
+  requested_by: string;
+  review_note: string | null;
+  reviewed_at: Timestamp | null;
+  reviewed_by: string | null;
+  status: Generated<string>;
+  summary: string;
+  target_id: number;
+  target_table: string;
+  target_version: string | null;
+}
+
 export interface Bends {
   bend: string;
   bend_id: Generated<number>;
@@ -805,6 +823,7 @@ export interface DB {
   aligner_notes: AlignerNotes;
   aligner_sets: AlignerSets;
   appointments: Appointments;
+  approval_requests: ApprovalRequests;
   bends: Bends;
   calendar: Calendar;
   carried_wires: CarriedWires;

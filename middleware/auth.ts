@@ -51,7 +51,7 @@ export function authenticate(
  * @example
  * router.delete('/invoice/:id', authorize(['admin', 'accountant']), handler);
  */
-export function authorize(allowedRoles: UserRole[] = []) {
+export function authorize(allowedRoles: readonly UserRole[] = []) {
   return (
     req: Request,
     res: Response<ApiErrorResponse>,
@@ -64,7 +64,14 @@ export function authorize(allowedRoles: UserRole[] = []) {
       });
     }
 
-    const userRole = (req.session.userRole || 'user') as UserRole;
+    const userRole = req.session.userRole;
+    if (!userRole) {
+      return res.status(403).json({
+        success: false,
+        error: 'Insufficient permissions',
+        message: 'No role assigned to this session'
+      });
+    }
 
     // Admin has access to everything
     if (userRole === 'admin') {

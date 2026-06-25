@@ -3,7 +3,7 @@
  *
  * Currently Telegram only: drive the interactive MTProto user login (request
  * code → submit code → optional 2FA password) and surface live status. The whole
- * router is admin-gated (`authorize(['admin'])`) — it logs into the clinic's
+ * router is admin-gated (`authorize(ADMIN_ROLES)`) — it logs into the clinic's
  * Telegram account. Follows the shared-contract pattern: `validate(...)` against
  * the contract schemas, then `sendData(res, <action>.response, data)`. The stateful
  * login lives in `services/messaging/telegram-auth.ts`; these handlers are a thin,
@@ -12,6 +12,7 @@
 import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
 import { authorize } from '../../middleware/auth.js';
+import { ADMIN_ROLES } from '../../shared/auth/roles.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import config from '../../config/config.js';
@@ -36,7 +37,7 @@ function webhookCallbackUrl(): string {
 }
 
 // Every integration-management action is admin-only.
-router.use(authorize(['admin']));
+router.use(authorize(ADMIN_ROLES));
 
 // GET /api/integrations/telegram/status — live auth status.
 router.get('/telegram/status', async (_req: Request, res: Response): Promise<void> => {

@@ -258,6 +258,13 @@ export const qk = {
     list: () => ['tasks', 'list'] as const,
     history: () => ['tasks', 'history'] as const,
   },
+  /** Maker-checker approval / notice queue. */
+  approvals: {
+    all: () => ['approvals'] as const,
+    list: () => ['approvals', 'list'] as const,
+    history: () => ['approvals', 'history'] as const,
+    mine: () => ['approvals', 'mine'] as const,
+  },
   /** Settings — options, email + database config, status polls. */
   settings: {
     all: () => ['settings'] as const,

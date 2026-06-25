@@ -25,6 +25,7 @@ import {
   optionalPositiveIntQuery,
   optionalNonNegIntQuery,
 } from '../validation.js';
+import { withPendingOutcome } from './approvals.contract.js';
 
 // ---------------------------------------------------------------------------
 // ROW SCHEMAS (Phase 3)
@@ -133,15 +134,17 @@ export const expenseById = {
   response: expenseRow,
 } as const;
 
-// PUT /api/expenses/:id — updateExpense → { success, id }.
+// PUT /api/expenses/:id — updateExpense → { success, id }. A Front-Desk edit of an
+// expense not created today routes through admin approval instead — see
+// `services/approvals/`.
 export const updateExpense = {
   params: idParams('id'),
   body: expenseBody,
-  response: z.object({ success: z.boolean(), id: z.number() }),
+  response: withPendingOutcome({ success: z.boolean(), id: z.number() }),
 } as const;
 
-// DELETE /api/expenses/:id — deleteExpense → { success, id }.
+// DELETE /api/expenses/:id — deleteExpense → { success, id }. Same hold rule as above.
 export const deleteExpense = {
   params: idParams('id'),
-  response: z.object({ success: z.boolean(), id: z.number() }),
+  response: withPendingOutcome({ success: z.boolean(), id: z.number() }),
 } as const;

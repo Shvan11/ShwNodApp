@@ -5,12 +5,19 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { postJSON, httpErrorMessage } from '@/core/http';
 import { authMeQuery } from '@/query/queries';
 import styles from './UserManagement.module.css';
+import { ROLE_LABELS, type UserRole } from '@shared/auth/roles';
 
 interface UserInfo {
   username: string;
   fullName: string | null;
-  role: string;
+  role: UserRole;
 }
+
+const ROLE_BADGE_CLASS: Record<UserRole, string> = {
+  admin: styles.admin,
+  front_desk: styles.frontDesk,
+  clinical: styles.clinical,
+};
 
 interface Message {
   type: 'success' | 'error' | '';
@@ -109,8 +116,8 @@ export default function UserManagement() {
             <span>{userInfo.fullName || 'Not set'}</span>
 
             <strong>Role:</strong>
-            <span className={`${styles.userRoleBadge} ${userInfo.role === 'admin' ? styles.admin : ''}`}>
-              {userInfo.role}
+            <span className={`${styles.userRoleBadge} ${ROLE_BADGE_CLASS[userInfo.role]}`}>
+              {ROLE_LABELS[userInfo.role]}
             </span>
           </div>
         ) : (

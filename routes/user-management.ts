@@ -11,6 +11,7 @@ import { sendData, ErrorResponses } from '../utils/error-response.js';
 import { sql } from 'kysely';
 import { getKysely } from '../services/database/kysely.js';
 import * as userManagement from '../shared/contracts/user-management.contract.js';
+import { ADMIN_ROLES, normalizeRole } from '../shared/auth/roles.js';
 
 const router = Router();
 
@@ -23,6 +24,7 @@ type UserIdParams = userManagement.UserIdParams;
 // Request bodies are the contract's z.infer SSoT (Phase 14 root migration).
 type CreateUserBody = userManagement.CreateUserBody;
 type ResetPasswordBody = userManagement.ResetPasswordBody;
+type UpdateRoleBody = userManagement.UpdateRoleBody;
 
 type UserResult = {
   userId: number;
@@ -34,18 +36,35 @@ type UserResult = {
   createdAt: Date;
 };
 
-// Extend Express Session
-declare module 'express-session' {
-  interface SessionData {
-    userId?: number;
-    username?: string;
-    fullName?: string;
-    userRole?: string;
-  }
-}
+// Session shape (userId/username/userRole/fullName) is declared once, canonically,
+// in `types/express-session.d.ts` — no local re-declaration here.
 
 // All routes require admin role
-router.use(authorize(['admin']));
+router.use(authorize(ADMIN_ROLES));
+
+/**
+ * Count active admins, optionally excluding one user (the target of a
+ * demote/deactivate/delete) — guards against locking everyone out by removing
+ * the last admin.
+ */
+async function countOtherActiveAdmins(excludeUserId: number): Promise<number> {
+  const db = getKysely();
+  const { rows } = await sql<{ count: number }>`
+    SELECT COUNT(*)::int AS "count" FROM "users"
+    WHERE "role" OPERATOR(public.=) 'admin'::public.citext
+      AND "is_active" = true
+      AND "user_id" != ${excludeUserId}
+  `.execute(db);
+  return rows[0]?.count ?? 0;
+}
+
+async function getUserRoleStatus(userId: number): Promise<{ role: string; isActive: boolean } | undefined> {
+  const db = getKysely();
+  const { rows } = await sql<{ role: string; isActive: boolean }>`
+    SELECT "role" AS "role", "is_active" AS "isActive" FROM "users" WHERE "user_id" = ${userId}
+  `.execute(db);
+  return rows[0];
+}
 
 /**
  * GET /api/users
@@ -145,6 +164,51 @@ router.put(
 );
 
 /**
+ * PUT /api/users/:userId/role
+ * Change a user's role (admin only) — F4: there was previously no way to
+ * change a user's role short of editing the DB directly.
+ */
+router.put(
+  '/:userId/role',
+  validate({ params: userManagement.updateRole.params, body: userManagement.updateRole.body }),
+  async (
+    req: Request<UserIdParams, unknown, UpdateRoleBody>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { userId } = req.params;
+      const { role } = req.body;
+      const id = parseInt(userId);
+
+      const target = await getUserRoleStatus(id);
+      if (!target) {
+        ErrorResponses.badRequest(res, 'User not found');
+        return;
+      }
+      if (
+        target.isActive &&
+        normalizeRole(target.role) === 'admin' &&
+        role !== 'admin' &&
+        (await countOtherActiveAdmins(id)) === 0
+      ) {
+        ErrorResponses.badRequest(res, 'Cannot demote the last active admin');
+        return;
+      }
+
+      const db = getKysely();
+      await sql`UPDATE "users" SET "role" = ${role} WHERE "user_id" = ${id}`.execute(db);
+
+      log.info(`Role changed for user ID ${userId} to ${role} by ${req.session.username}`);
+
+      sendData(res, userManagement.updateRole.response, { message: 'Role updated successfully' });
+    } catch (error) {
+      log.error('Error updating user role', { error: (error as Error).message });
+      ErrorResponses.internalError(res, 'Failed to update role', error as Error);
+    }
+  }
+);
+
+/**
  * PUT /api/users/:userId/toggle
  * Toggle user active status
  */
@@ -154,16 +218,27 @@ router.put(
   async (req: Request<UserIdParams>, res: Response): Promise<void> => {
     try {
       const { userId } = req.params;
+      const id = parseInt(userId);
 
       // Prevent deactivating yourself
-      if (parseInt(userId) === req.session.userId) {
+      if (id === req.session.userId) {
         ErrorResponses.badRequest(res, 'Cannot deactivate your own account');
+        return;
+      }
+
+      const target = await getUserRoleStatus(id);
+      if (!target) {
+        ErrorResponses.badRequest(res, 'User not found');
+        return;
+      }
+      if (target.isActive && normalizeRole(target.role) === 'admin' && (await countOtherActiveAdmins(id)) === 0) {
+        ErrorResponses.badRequest(res, 'Cannot deactivate the last active admin');
         return;
       }
 
       // Toggle active status
       const db = getKysely();
-      await sql`UPDATE "users" SET "is_active" = NOT "is_active" WHERE "user_id" = ${parseInt(userId)}`.execute(db);
+      await sql`UPDATE "users" SET "is_active" = NOT "is_active" WHERE "user_id" = ${id}`.execute(db);
 
       log.info(`User status toggled for ID ${userId} by ${req.session.username}`);
 
@@ -185,15 +260,26 @@ router.delete(
   async (req: Request<UserIdParams>, res: Response): Promise<void> => {
     try {
       const { userId } = req.params;
+      const id = parseInt(userId);
 
       // Prevent deleting yourself
-      if (parseInt(userId) === req.session.userId) {
+      if (id === req.session.userId) {
         ErrorResponses.badRequest(res, 'Cannot delete your own account');
         return;
       }
 
+      const target = await getUserRoleStatus(id);
+      if (!target) {
+        ErrorResponses.badRequest(res, 'User not found');
+        return;
+      }
+      if (target.isActive && normalizeRole(target.role) === 'admin' && (await countOtherActiveAdmins(id)) === 0) {
+        ErrorResponses.badRequest(res, 'Cannot delete the last active admin');
+        return;
+      }
+
       const db = getKysely();
-      await sql`DELETE FROM "users" WHERE "user_id" = ${parseInt(userId)}`.execute(db);
+      await sql`DELETE FROM "users" WHERE "user_id" = ${id}`.execute(db);
 
       log.info(`User deleted: ID ${userId} by ${req.session.username}`);
 

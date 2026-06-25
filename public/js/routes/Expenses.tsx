@@ -10,6 +10,8 @@ import ExpenseSummary from '../components/expenses/ExpenseSummary';
 import ExpenseModal from '../components/expenses/ExpenseModal';
 import DeleteConfirmModal from '../components/expenses/DeleteConfirmModal';
 import { useToast } from '../contexts/ToastContext';
+import { useGlobalState } from '../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { httpErrorMessage } from '@/core/http';
 import { expenseByIdQuery } from '@/query/queries';
 import styles from './Expenses.module.css';
@@ -57,6 +59,9 @@ export default function Expenses() {
 
   // Toast notifications (now using unified global toast system)
   const toast = useToast();
+
+  const { user } = useGlobalState();
+  const caps = roleCaps(user?.role as UserRole | undefined);
 
   const [searchParams] = useSearchParams();
 
@@ -188,8 +193,8 @@ export default function Expenses() {
   const handleSaveExpense = async (expenseData: ExpenseData) => {
     try {
       if (currentExpense) {
-        await updateExpense(currentExpense.id, expenseData);
-        toast.success(t('toast.updated'));
+        const r = await updateExpense(currentExpense.id, expenseData);
+        toast.success(r.outcome === 'pending' ? 'Submitted for admin approval' : t('toast.updated'));
       } else {
         await createExpense(expenseData);
         toast.success(t('toast.created'));
@@ -209,8 +214,8 @@ export default function Expenses() {
     if (!expenseToDelete) return;
 
     try {
-      await deleteExpense(expenseToDelete.id);
-      toast.success(t('toast.deleted'));
+      const r = await deleteExpense(expenseToDelete.id);
+      toast.success(r.outcome === 'pending' ? 'Submitted for admin approval' : t('toast.deleted'));
       setIsDeleteModalOpen(false);
       setExpenseToDelete(null);
     } catch {
@@ -222,13 +227,15 @@ export default function Expenses() {
     <div className={styles.expensesContainer}>
       <div className={styles.expensesPageHeader}>
         <h1>{t('title')}</h1>
-        <button
-          className="btn btn-primary"
-          onClick={handleAddExpense}
-          disabled={mutationLoading}
-        >
-          {t('addNew')}
-        </button>
+        {caps.writeFinance && (
+          <button
+            className="btn btn-primary"
+            onClick={handleAddExpense}
+            disabled={mutationLoading}
+          >
+            {t('addNew')}
+          </button>
+        )}
       </div>
 
       {/* Filters Section */}
@@ -262,6 +269,7 @@ export default function Expenses() {
         loading={loading}
         onEdit={handleEditExpense}
         onDelete={handleDeleteExpense}
+        writeFinance={caps.writeFinance}
       />
 
       {/* Expense Modal (Add/Edit) */}

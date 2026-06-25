@@ -12,7 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { formatDate } from '@/core/utils';
 import { qk } from '@/query/keys';
-import { patientSearch as patientSearchContract } from '@shared/contracts/patient.contract';
+import { patientSearch as patientSearchContract, deletePatient as deletePatientContract } from '@shared/contracts/patient.contract';
 import * as appointmentContract from '@shared/contracts/appointment.contract';
 import styles from './PatientManagement.module.css';
 
@@ -387,12 +387,16 @@ const PatientManagement = () => {
         if (!selectedPatient || deleting) return;
         setDeleting(true);
         try {
-            const data = await deleteJSON<{ folderRemoved?: boolean; message?: string }>(`/api/patients/${selectedPatient.person_id}`);
+            const data = await deleteJSON<{ outcome: string; folderRemoved?: boolean }>(`/api/patients/${selectedPatient.person_id}`, { schema: deletePatientContract.response });
+            setShowDeleteConfirm(false);
+            if (data.outcome === 'pending') {
+                toast.success('Submitted for admin approval');
+                return;
+            }
             queryClient.invalidateQueries({ queryKey: qk.patient.all(selectedPatient.person_id) });
             executeSearch();
-            setShowDeleteConfirm(false);
             if (data.folderRemoved === false) {
-                toast.warning(data.message || 'Patient deleted, but its photo folder could not be removed.');
+                toast.warning('Patient deleted, but its photo folder could not be removed.');
             } else {
                 toast.success('Patient and photo folder deleted');
             }

@@ -12,12 +12,18 @@
  */
 
 import { log } from '../../utils/logger.js';
-import { getInfos } from '../database/queries/patient-queries.js';
+import { getInfos, deletePatient } from '../database/queries/patient-queries.js';
 import {
   getTimePoints,
   getTimePointImgs,
 } from '../database/queries/timepoint-queries.js';
 import { getPayments, type Payment } from '../database/queries/payment-queries.js';
+import { getTimePointCodesForPatient } from '../database/queries/native-timepoint-queries.js';
+import {
+  deleteWorkingFilesForPatient,
+} from '../imaging/photo-cleanup.service.js';
+import { deletePatientFolder } from '../files/file-explorer.service.js';
+import { purgeDolphinPatient } from '../sync/cdc/dolphin-sink.js';
 
 /**
  * Patient information returned from service
@@ -264,4 +270,59 @@ export async function getPatientPayments(
     log.error(`Error fetching payments for patient ${pid}:`, { error: error instanceof Error ? error.message : String(error) });
     throw new Error('Failed to fetch patient payments', { cause: error });
   }
+}
+
+/**
+ * Delete a patient and all its dependent records/files. Extracted from
+ * `DELETE /patients/:personId` so the same cascade can be replayed from an admin
+ * approval (`services/approvals/approval-actions.ts`, action `patient.delete`)
+ * without duplicating the folder/working-files/Dolphin cleanup.
+ */
+export async function deletePatientCascade(personId: number): Promise<{ folderRemoved: boolean }> {
+  // Capture the patient's tpCodes BEFORE the delete — deletePatient's cascade
+  // (fk_time_points_tblpatients ON DELETE CASCADE) drops the timepoint rows, so
+  // afterwards we'd have no way to name the rendered working/ files to remove.
+  const tpCodes = await getTimePointCodesForPatient(personId);
+
+  await deletePatient(personId);
+
+  // DB cascade is authoritative; the on-share photo folder is removed after it
+  // succeeds. Best-effort + logged: a locked file on the SMB share (EBUSY) must
+  // not leave the request hanging in a "record gone but call failed" state.
+  let folderRemoved = true;
+  try {
+    await deletePatientFolder(personId);
+  } catch (folderErr) {
+    folderRemoved = false;
+    log.error('Patient record deleted but folder removal failed', {
+      personId,
+      error: (folderErr as Error).message,
+    });
+  }
+
+  // Wipe the rendered working/ gallery files (the originals folder above does NOT
+  // cover them — they live in the flat shared working/ dir). Best-effort: each file
+  // delete already swallows its own error.
+  try {
+    await deleteWorkingFilesForPatient(personId, tpCodes);
+  } catch (workingErr) {
+    log.error('Patient deleted but working/ files cleanup failed', {
+      personId,
+      error: (workingErr as Error).message,
+    });
+  }
+
+  // Finish the Dolphin wipe: the CDC sink removes the Dolphin timepoints/images
+  // (via the cascade deletes), but never the Dolphin patient row — purge it here so
+  // the patient fully disappears from Dolphin Imaging. No-op if Dolphin sync is off.
+  try {
+    await purgeDolphinPatient(personId);
+  } catch (dolphinErr) {
+    log.error('Patient deleted but Dolphin purge failed', {
+      personId,
+      error: (dolphinErr as Error).message,
+    });
+  }
+
+  return { folderRemoved };
 }

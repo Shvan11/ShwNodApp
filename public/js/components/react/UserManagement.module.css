@@ -44,6 +44,14 @@
     background: var(--success-color);
 }
 
+.frontDesk {
+    background: var(--info-color);
+}
+
+.clinical {
+    background: var(--warning-color);
+}
+
 /* ===================================
    SECTION TITLE VARIANTS
    =================================== */

@@ -21,9 +21,15 @@ import { resolveFileForServe, FileExplorerError } from '../../services/files/fil
 import { getFileMimeType } from '../../utils/file-mime.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import { authenticate, authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import * as media from '../../shared/contracts/media.contract.js';
 
 const router = Router();
+
+// All photo/x-ray (WebCeph) routes are clinical — gate the whole router
+// rather than each route individually.
+router.use(authenticate, authorize(CLINICAL_ROLES));
 
 // In-memory upload with a hard size cap so an oversized/abusive body can't
 // balloon RAM. X-ray/photo formats (.dcm/.pano/JPEG) sit well under 50MB;

@@ -6,7 +6,7 @@
  * OWN per-route protection:
  *   - @public    GET  /settings/cost-presets        — read-only, populates dropdowns.
  *   - @protected POST/PUT/DELETE /settings/cost-presets[/:id] — self-guarded with
- *               inline `authenticate, authorize(['admin'])`; they change clinic-wide
+ *               inline `authenticate, authorize(ADMIN_ROLES)`; they change clinic-wide
  *               billing presets and were previously reachable without a session.
  *
  * Because the gate is bypassed for this mount, any NEW route added here MUST carry
@@ -24,6 +24,7 @@ import {
 } from '../../services/database/queries/cost-preset-queries.js';
 import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import { ADMIN_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import * as costPreset from '../../shared/contracts/cost-preset.contract.js';
 
@@ -71,9 +72,9 @@ router.get('/settings/cost-presets', async (req: Request<object, object, object,
  * POST /settings/cost-presets
  * Create a new cost preset
  * Body: { amount: number, currency: string, displayOrder: number }
- * @protected admin — self-guarded (pre-gate mount): authenticate + authorize(['admin']).
+ * @protected admin — self-guarded (pre-gate mount): authenticate + authorize(ADMIN_ROLES).
  */
-router.post('/settings/cost-presets', authenticate, authorize(['admin']), validate({ body: costPreset.createPreset.body }), async (req: Request<object, object, costPreset.CostPresetBody>, res: Response): Promise<void> => {
+router.post('/settings/cost-presets', authenticate, authorize(ADMIN_ROLES), validate({ body: costPreset.createPreset.body }), async (req: Request<object, object, costPreset.CostPresetBody>, res: Response): Promise<void> => {
   try {
     const { amount, currency, displayOrder = 0 } = req.body;
 
@@ -106,9 +107,9 @@ router.post('/settings/cost-presets', authenticate, authorize(['admin']), valida
  * PUT /settings/cost-presets/:id
  * Update an existing cost preset
  * Body: { amount: number, currency: string, displayOrder: number }
- * @protected admin — self-guarded (pre-gate mount): authenticate + authorize(['admin']).
+ * @protected admin — self-guarded (pre-gate mount): authenticate + authorize(ADMIN_ROLES).
  */
-router.put('/settings/cost-presets/:id', authenticate, authorize(['admin']), validate({ body: costPreset.updatePreset.body }), async (req: Request<CostPresetParams, object, costPreset.CostPresetBody>, res: Response): Promise<void> => {
+router.put('/settings/cost-presets/:id', authenticate, authorize(ADMIN_ROLES), validate({ body: costPreset.updatePreset.body }), async (req: Request<CostPresetParams, object, costPreset.CostPresetBody>, res: Response): Promise<void> => {
   try {
     const presetId = parseInt(req.params.id, 10);
     if (!Number.isInteger(presetId) || presetId <= 0) {
@@ -145,9 +146,9 @@ router.put('/settings/cost-presets/:id', authenticate, authorize(['admin']), val
 /**
  * DELETE /settings/cost-presets/:id
  * Delete a cost preset
- * @protected admin — self-guarded (pre-gate mount): authenticate + authorize(['admin']).
+ * @protected admin — self-guarded (pre-gate mount): authenticate + authorize(ADMIN_ROLES).
  */
-router.delete('/settings/cost-presets/:id', authenticate, authorize(['admin']), async (req: Request<CostPresetParams>, res: Response): Promise<void> => {
+router.delete('/settings/cost-presets/:id', authenticate, authorize(ADMIN_ROLES), async (req: Request<CostPresetParams>, res: Response): Promise<void> => {
   try {
     const presetId = parseInt(req.params.id);
 

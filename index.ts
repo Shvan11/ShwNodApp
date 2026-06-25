@@ -58,6 +58,7 @@ import { EventEmitter } from 'events';
 // ===== ADDED: Import new infrastructure components =====
 import HealthCheck from './services/monitoring/HealthCheck.js';
 import { testConnection, testConnectionWithRetry, shutdown as shutdownDatabase } from './services/database/index.js';
+import { assertRoleConstraintMatchesRegistry } from './services/database/role-constraint-check.js';
 import { clinicRoot, workingDir } from './services/files/clinic-paths.js';
 import { startCdc, stopCdc } from './services/sync/cdc/index.js';
 import { teardownSupabasePools } from './services/sync/cdc/supabase-pool.js';
@@ -149,6 +150,10 @@ async function initializeApplication(): Promise<AppInitResult> {
       startBackgroundDatabaseRetry();
     } else {
       log.info('✅ Database connection successful');
+      // Drift guard: the role allowed-set lives in three places (DB CHECK,
+      // contract enum, shared registry) with no FK linking them. Verify the
+      // live CHECK still matches ALL_ROLES; logs loudly on drift, never blocks boot.
+      await assertRoleConstraintMatchesRegistry();
     }
 
     // Setup middleware

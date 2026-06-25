@@ -45,6 +45,12 @@ interface WorkCardProps {
     isAlignerWork: (work: Work) => boolean;
     isExpanded: boolean;
     isAdmin?: boolean;
+    /**
+     * Money mutations (Add Payment) hide when false — clinical role sees finance read-only.
+     * Defaults to false (fail-closed): a caller must opt in by passing `caps.writeFinance`,
+     * so a new render site that forgets the prop never silently re-exposes the trigger.
+     */
+    writeFinance?: boolean;
     onToggleExpanded: () => void;
     onEdit: (work: Work) => void;
     onDelete: (work: Work) => void;
@@ -70,6 +76,7 @@ const WorkCard = ({
     isAlignerWork,
     isExpanded,
     isAdmin = false,
+    writeFinance = false,
     onToggleExpanded,
     onEdit,
     onDelete,
@@ -347,16 +354,18 @@ const WorkCard = ({
 
                     {/* Secondary Actions */}
                     <div className={styles.secondaryActions}>
-                        <button
-                            type="button"
-                            className={cn('btn btn-card-secondary btn-add-payment', isFullyPaid() && 'disabled')}
-                            onClick={() => !isFullyPaid() && onAddPayment(work)}
-                            disabled={isFullyPaid()}
-                            title={isFullyPaid() ? t('card.addPaymentNoBalance') : t('card.addPaymentTitle')}
-                        >
-                            <i className="fas fa-dollar-sign"></i>
-                            <span>{t('card.addPayment')}</span>
-                        </button>
+                        {writeFinance && (
+                            <button
+                                type="button"
+                                className={cn('btn btn-card-secondary btn-add-payment', isFullyPaid() && 'disabled')}
+                                onClick={() => !isFullyPaid() && onAddPayment(work)}
+                                disabled={isFullyPaid()}
+                                title={isFullyPaid() ? t('card.addPaymentNoBalance') : t('card.addPaymentTitle')}
+                            >
+                                <i className="fas fa-dollar-sign"></i>
+                                <span>{t('card.addPayment')}</span>
+                            </button>
+                        )}
                         <button
                             type="button"
                             className="btn btn-card-secondary btn-print-receipt"

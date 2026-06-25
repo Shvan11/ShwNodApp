@@ -62,6 +62,7 @@ import integrationsRoutes from './integrations.routes.js';
 import threeshapeRoutes from './threeshape.routes.js';
 import taskRoutes from './task.routes.js';
 import monitoringRoutes from './monitoring.routes.js';
+import approvalRoutes from './approval.routes.js';
 
 // Import template routes (already modular)
 import templateRouter from '../template-api.js';
@@ -162,5 +163,8 @@ router.use('/', taskRoutes);
 
 // Monitoring — browser-side error sink (/api/client-error)
 router.use('/', monitoringRoutes);
+
+// Approvals — maker-checker approval/notice queue (/api/approvals*)
+router.use('/', approvalRoutes);
 
 export default router;

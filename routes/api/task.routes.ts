@@ -10,6 +10,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
@@ -54,7 +55,7 @@ router.get('/tasks/history', authenticate, async (_req: Request, res: Response):
 router.post(
   '/tasks',
   authenticate,
-  authorize(['admin', 'secretary', 'doctor']),
+  authorize(CLINICAL_ROLES),
   validate({ body: taskContract.createTask.body }),
   async (
     req: Request<Record<string, never>, unknown, taskContract.CreateTaskBody>,
@@ -101,7 +102,7 @@ router.post(
 router.delete(
   '/tasks/:alertId',
   authenticate,
-  authorize(['admin', 'secretary', 'doctor']),
+  authorize(CLINICAL_ROLES),
   validate({ params: taskContract.deleteTask.params }),
   async (req: Request<{ alertId: string }>, res: Response): Promise<void> => {
     try {

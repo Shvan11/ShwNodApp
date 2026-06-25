@@ -7,8 +7,13 @@ import { usersListQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import Modal from './Modal';
 import styles from './AdminUserManagement.module.css';
+import { ASSIGNABLE_ROLES, ROLE_LABELS, type UserRole } from '@shared/auth/roles';
 
-type UserRole = 'secretary' | 'admin';
+const ROLE_BADGE_CLASS: Record<UserRole, string> = {
+  admin: styles.roleAdmin,
+  front_desk: styles.roleSecretary,
+  clinical: styles.roleClinical,
+};
 
 interface User {
   userId: number;
@@ -55,7 +60,7 @@ export default function AdminUserManagement() {
     username: '',
     password: '',
     fullName: '',
-    role: 'secretary'
+    role: 'front_desk'
   });
 
   // Refresh the shared user-list cache after a write.
@@ -76,7 +81,7 @@ export default function AdminUserManagement() {
     try {
       await postJSON('/api/users', formData);
       setMessage({ type: 'success', text: 'User created successfully!' });
-      setFormData({ username: '', password: '', fullName: '', role: 'secretary' });
+      setFormData({ username: '', password: '', fullName: '', role: 'front_desk' });
       setShowCreateForm(false);
       fetchUsers(); // Reload list
     } catch (err) {
@@ -90,6 +95,18 @@ export default function AdminUserManagement() {
     try {
       await putJSON(`/api/users/${userId}/toggle`, {});
       setMessage({ type: 'success', text: 'User status updated' });
+      fetchUsers();
+    } catch (err) {
+      setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error') });
+    }
+  };
+
+  const handleRoleChange = async (userId: number, role: UserRole) => {
+    if (!await confirm(`Change this user's role to "${ROLE_LABELS[role]}"?`, { title: 'Change Role' })) return;
+
+    try {
+      await putJSON(`/api/users/${userId}/role`, { role });
+      setMessage({ type: 'success', text: 'Role updated' });
       fetchUsers();
     } catch (err) {
       setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error') });
@@ -203,8 +220,9 @@ export default function AdminUserManagement() {
                   onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, role: e.target.value as UserRole })}
                   required
                 >
-                  <option value="secretary">Secretary - Can edit/delete today's records only</option>
-                  <option value="admin">Admin - Full access to all records</option>
+                  {ASSIGNABLE_ROLES.map((role) => (
+                    <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -244,9 +262,16 @@ export default function AdminUserManagement() {
                   <td><strong>{user.username}</strong></td>
                   <td>{user.fullName || '-'}</td>
                   <td>
-                    <span className={`${styles.roleBadge} ${user.role === 'admin' ? styles.roleAdmin : styles.roleSecretary}`}>
-                      {user.role}
-                    </span>
+                    <select
+                      className={`${styles.roleBadge} ${ROLE_BADGE_CLASS[user.role]}`}
+                      value={user.role}
+                      onChange={(e: ChangeEvent<HTMLSelectElement>) => handleRoleChange(user.userId, e.target.value as UserRole)}
+                      aria-label={`Role for ${user.username}`}
+                    >
+                      {ASSIGNABLE_ROLES.map((role) => (
+                        <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                      ))}
+                    </select>
                   </td>
                   <td>
                     <span className={`${styles.statusBadge} ${user.isActive ? styles.statusActive : styles.statusInactive}`}>

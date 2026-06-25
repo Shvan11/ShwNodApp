@@ -24,6 +24,8 @@ import {
 import { InternalEmitterEvents } from '../../services/messaging/websocket-events.js';
 import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import { authenticate, authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import * as appointment from '../../shared/contracts/appointment.contract.js';
 import { log } from '../../utils/logger.js';
 import {
@@ -34,6 +36,10 @@ import {
 } from '../../services/business/AppointmentService.js';
 
 const router = Router();
+
+// Every appointment route is clinical (book/check-in/edit/delete) — gate the
+// whole router rather than each route individually.
+router.use(authenticate, authorize(CLINICAL_ROLES));
 
 // WebSocket emitter will be injected to avoid circular imports
 let wsEmitter: EventEmitter | null = null;

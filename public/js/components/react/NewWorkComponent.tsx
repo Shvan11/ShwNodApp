@@ -9,7 +9,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { postJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { useToast } from '../../contexts/ToastContext';
 import { qk } from '@/query/keys';
 import * as workContract from '@shared/contracts/work.contract';
 import {
@@ -116,6 +118,7 @@ type TabType = 'basic' | 'dates' | 'keywords';
 
 const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWorkComponentProps) => {
     const queryClient = useQueryClient();
+    const toast = useToast();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -185,6 +188,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
 
     const { user } = useGlobalState();
     const isAdmin = user?.role === 'admin';
+    // Clinical staff (doctors/assistants) add works without a cost — the cost/
+    // currency inputs and the "mark as finished" (paid) shortcut are finance-only.
+    const caps = roleCaps(user?.role as UserRole | undefined);
 
     // Auto-format the display value when the matching formData field changes — done
     // during render (keyed on the field) so there's no setState-in-effect.
@@ -305,9 +311,15 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     delete updatePayload.discount;
                     delete updatePayload.discount_date;
                 }
-                result = await putJSON<WorkResponse>('/api/updatework', updatePayload, { schema: workContract.updateWork.response });
+                const updateResult = await putJSON<{ outcome: string }>('/api/updatework', updatePayload, { schema: workContract.updateWork.response });
+                if (updateResult.outcome === 'pending') {
+                    toast.success('Submitted for admin approval');
+                    if (onSave) onSave({} as WorkResponse);
+                    return;
+                }
                 queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
                 queryClient.invalidateQueries({ queryKey: qk.work.all(workId) });
+                result = {} as WorkResponse;
             } else {
                 // Add new work - use special endpoint if createAsFinished is true
                 // Strip discount fields from creation payload (not supported at creation)
@@ -683,42 +695,44 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         </div>
                     )}
 
-                    <div className={styles.formRow}>
-                        <div className={styles.formGroup}>
-                            <label htmlFor="work-total-required">Total Required</label>
-                            <input
-                                id="work-total-required"
-                                type="text"
-                                value={displayValues.total_required}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                    const numericValue = parseFormattedNumber(e.target.value) || 0;
-                                    // Auto-switch to IQD if amount > 10,000 (USD amounts are typically < 10,000)
-                                    const newCurrency = numericValue > 10000 ? 'IQD' : formData.currency;
-                                    setFormData({...formData, total_required: numericValue, currency: newCurrency});
-                                    setDisplayValues(prev => ({...prev, total_required: e.target.value}));
-                                }}
-                                onBlur={() => {
-                                    setDisplayValues(prev => ({...prev, total_required: formatNumber(formData.total_required)}));
-                                }}
-                                placeholder="Enter amount (defaults to 0)"
-                            />
-                        </div>
+                    {caps.writeFinance && (
+                        <div className={styles.formRow}>
+                            <div className={styles.formGroup}>
+                                <label htmlFor="work-total-required">Total Required</label>
+                                <input
+                                    id="work-total-required"
+                                    type="text"
+                                    value={displayValues.total_required}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                                        const numericValue = parseFormattedNumber(e.target.value) || 0;
+                                        // Auto-switch to IQD if amount > 10,000 (USD amounts are typically < 10,000)
+                                        const newCurrency = numericValue > 10000 ? 'IQD' : formData.currency;
+                                        setFormData({...formData, total_required: numericValue, currency: newCurrency});
+                                        setDisplayValues(prev => ({...prev, total_required: e.target.value}));
+                                    }}
+                                    onBlur={() => {
+                                        setDisplayValues(prev => ({...prev, total_required: formatNumber(formData.total_required)}));
+                                    }}
+                                    placeholder="Enter amount (defaults to 0)"
+                                />
+                            </div>
 
-                        <div className={styles.formGroup}>
-                            <label htmlFor="work-currency">Currency</label>
-                            <select
-                                id="work-currency"
-                                value={formData.currency}
-                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, currency: e.target.value})}
-                            >
-                                <option value="USD">USD</option>
-                                <option value="IQD">IQD</option>
-                                <option value="EUR">EUR</option>
-                            </select>
+                            <div className={styles.formGroup}>
+                                <label htmlFor="work-currency">Currency</label>
+                                <select
+                                    id="work-currency"
+                                    value={formData.currency}
+                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, currency: e.target.value})}
+                                >
+                                    <option value="USD">USD</option>
+                                    <option value="IQD">IQD</option>
+                                    <option value="EUR">EUR</option>
+                                </select>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
-                    {!workId && (
+                    {!workId && caps.writeFinance && (
                         <div className={styles.formRow}>
                             <div className={`${styles.formGroup} ${styles.fullWidth}`}>
                                 <label className={styles.checkboxLabel}>

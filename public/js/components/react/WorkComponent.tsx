@@ -11,6 +11,7 @@ import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { postJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { qk } from '@/query/keys';
 import {
@@ -23,6 +24,7 @@ import {
     deleteInvoice as deleteInvoiceContract,
     type PaymentHistoryResponse,
 } from '@shared/contracts/payment.contract';
+import { deleteWork as deleteWorkContract } from '@shared/contracts/work.contract';
 import * as appointmentContract from '@shared/contracts/appointment.contract';
 import styles from './WorkComponent.module.css';
 
@@ -89,6 +91,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const queryClient = useQueryClient();
     const { user } = useGlobalState();
     const isAdmin = user?.role === 'admin';
+    // Clinical staff see payments/receipts read-only — money mutations stay
+    // hidden (Add Payment), reads/printing stay visible (history, receipt).
+    const caps = roleCaps(user?.role as UserRole | undefined);
     // Works list read — the headline gap-fix target. On useQuery so a work
     // mutation's invalidateQueries(qk.patient.all) refreshes it live (Phase 3).
     // Loose contract models only { work_id }; the rows carry the full Work shape.
@@ -306,8 +311,15 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
         try {
             const work = workToDelete;
-            await deleteJSON('/api/deletework', { body: JSON.stringify({ workId: work.work_id }) });
+            const deleteResult = await deleteJSON<{ outcome: string }>('/api/deletework', {
+                body: JSON.stringify({ workId: work.work_id }),
+                schema: deleteWorkContract.response,
+            });
 
+            if (deleteResult.outcome === 'pending') {
+                toast.success('Submitted for admin approval');
+                return;
+            }
             toast.success(t('toast.deleted'));
             queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
         } catch (err) {
@@ -591,6 +603,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         isAlignerWork={isAlignerWork}
                         isExpanded={expandedWorks.has(work.work_id)}
                         isAdmin={isAdmin}
+                        writeFinance={caps.writeFinance}
                         onToggleExpanded={() => toggleWorkExpanded(work.work_id)}
                         onEdit={handleEditWork}
                         onDelete={handleDeleteWork}
@@ -718,10 +731,13 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                                 onClick={async () => {
                                                                     if (await confirm(t('paymentHistory.deleteConfirm', { amount: formatCurrency(payment.amount_paid, selectedWorkForPayment.currency), date: formatDate(payment.date_of_payment) }), { title: t('paymentHistory.deleteTitle'), danger: true, confirmText: t('paymentHistory.deleteConfirmButton') })) {
                                                                         try {
-                                                                            // Route is sendSuccess-enveloped → fetchData unwraps + throws on non-2xx.
-                                                                            await deleteJSON(`/api/deleteInvoice/${payment.InvoiceID}`, {
-                                                                                schema: deleteInvoiceContract.response, // Validate the boundary (audit H11)
+                                                                            const invResult = await deleteJSON<{ outcome: string }>(`/api/deleteInvoice/${payment.InvoiceID}`, {
+                                                                                schema: deleteInvoiceContract.response,
                                                                             });
+                                                                            if (invResult.outcome === 'pending') {
+                                                                                toast.success('Submitted for admin approval');
+                                                                                return;
+                                                                            }
                                                                             // qk.work.all covers the payment-history child key, so this
                                                                             // one invalidation refreshes the open modal's list too.
                                                                             queryClient.invalidateQueries({ queryKey: qk.work.all(selectedWorkForPayment.work_id) });

@@ -30,6 +30,7 @@
  */
 import { z } from 'zod';
 import { idParams, numericParam, intId, optionalDateString, dateString, timestampString } from '../validation.js';
+import { withPendingOutcome } from './approvals.contract.js';
 
 /** A `<select>`-backed id on the CREATE body: '' (nothing chosen) → undefined (so
  *  the service's `toInt` yields NULL, not 0); a chosen value (form string / number)
@@ -335,9 +336,11 @@ export const transliterateName = {
 export type TransliterateNameBody = z.infer<typeof transliterateName.body>;
 export type TransliterateNameResult = z.infer<typeof transliterateName.response>;
 
-// DELETE /api/patients/:personId — { folderRemoved }.
+// DELETE /api/patients/:personId — { folderRemoved }. A Front-Desk delete of a
+// patient not created today routes through admin approval instead — see
+// `services/approvals/`.
 export const deletePatient = {
-  response: z.object({ folderRemoved: z.boolean() }),
+  response: withPendingOutcome({ folderRemoved: z.boolean() }),
 } as const;
 
 // PUT /api/patients/:personId/estimated-cost — { estimatedCost, currency };

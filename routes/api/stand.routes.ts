@@ -37,6 +37,7 @@ import {
 import { Type } from '@google/genai';
 import { getGeminiClient, getGeminiModel } from '../../services/business/gemini-config.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import { ADMIN_ROLES, FINANCE_ROLES } from '../../shared/auth/roles.js';
 import { ErrorResponses, sendData, sendError, sendSuccess } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import * as standContract from '../../shared/contracts/stand.contract.js';
@@ -95,7 +96,7 @@ router.get('/stand/categories', async (_req: Request, res: Response): Promise<vo
 router.post(
   '/stand/categories',
   authenticate,
-  authorize(['admin']),
+  authorize(ADMIN_ROLES),
   validate({ body: standContract.createCategory.body }),
   async (req: Request<unknown, unknown, standContract.CreateCategoryBody>, res: Response): Promise<void> => {
     try {
@@ -115,7 +116,7 @@ router.post(
 router.put(
   '/stand/categories/:id',
   authenticate,
-  authorize(['admin']),
+  authorize(ADMIN_ROLES),
   validate({ params: standContract.updateCategory.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
@@ -132,7 +133,7 @@ router.put(
 router.delete(
   '/stand/categories/:id',
   authenticate,
-  authorize(['admin']),
+  authorize(ADMIN_ROLES),
   validate({ params: standContract.deleteCategory.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
@@ -172,7 +173,7 @@ router.get('/stand/items/expiring', async (req: Request, res: Response): Promise
 router.post(
   '/stand/items/scan-vision',
   authenticate,
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ body: standContract.scanVision.body }),
   async (req: Request<unknown, unknown, standContract.ScanVisionBody>, res: Response): Promise<void> => {
     try {
@@ -329,7 +330,7 @@ router.get('/stand/items/:id', async (req: Request<{ id: string }>, res: Respons
 router.post(
   '/stand/items',
   authenticate,
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ body: standContract.createItem.body }),
   // Body typed from the CreateItemBody z.infer (SSoT, shared with the client).
   // validate() enforces itemName/costPrice/sellPrice at the boundary, so the old
@@ -349,7 +350,7 @@ router.post(
 router.put(
   '/stand/items/:id',
   authenticate,
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: standContract.updateItem.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
@@ -366,7 +367,7 @@ router.put(
 router.delete(
   '/stand/items/:id',
   authenticate,
-  authorize(['admin']),
+  authorize(ADMIN_ROLES),
   validate({ params: standContract.deleteItem.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
@@ -383,7 +384,7 @@ router.delete(
 router.post(
   '/stand/items/:id/restock',
   authenticate,
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: standContract.restock.params, body: standContract.restock.body }),
   // Body typed from RestockBody (SSoT). validate() enforces quantity+unitCost as
   // numbers; the kept `!quantity` guard still rejects a zero-unit restock.
@@ -408,7 +409,7 @@ router.post(
 router.post(
   '/stand/items/:id/adjust',
   authenticate,
-  authorize(['admin']),
+  authorize(ADMIN_ROLES),
   validate({ params: standContract.adjust.params, body: standContract.adjust.body }),
   // Body typed from AdjustBody (SSoT). validate() enforces delta (number) + reason
   // (min 1); `delta === undefined` is dropped (TS2367 against the required number).
@@ -452,7 +453,7 @@ router.get('/stand/items/:id/movements', async (req: Request<{ id: string }>, re
 router.post(
   '/stand/sales',
   authenticate,
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const cashierId = req.session?.userId ?? null;
@@ -501,7 +502,7 @@ router.get('/stand/sales/:id', async (req: Request<{ id: string }>, res: Respons
 router.post(
   '/stand/sales/:id/void',
   authenticate,
-  authorize(['admin']),
+  authorize(ADMIN_ROLES),
   validate({ params: standContract.voidSale.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {

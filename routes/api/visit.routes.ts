@@ -20,10 +20,16 @@ import {
 } from '../../services/database/queries/visit-queries.js';
 import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import { authenticate, authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import * as visit from '../../shared/contracts/visit.contract.js';
 import { log } from '../../utils/logger.js';
 
 const router = Router();
+
+// Every visit/wire route is clinical (visit CRUD, wire tracking) — gate the
+// whole router rather than each route individually.
+router.use(authenticate, authorize(CLINICAL_ROLES));
 
 // ============================================================================
 // TYPE DEFINITIONS

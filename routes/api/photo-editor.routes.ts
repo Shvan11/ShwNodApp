@@ -2,7 +2,7 @@
  * Native Photo Editor routes — the app's photo-session flow.
  *
  * Rides the global `/api` authenticate gate; writes additionally require
- * admin/secretary.
+ * a clinical role (admin/front_desk/clinical).
  *
  *  GET  /:personId/photo-dates — appointments + visits to suggest session dates.
  *  POST /:personId/prepare     — find/create a timepoint in the local clone tables
@@ -15,6 +15,7 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import type { EventEmitter } from 'events';
 import { authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import { InternalEmitterEvents } from '../../services/messaging/websocket-events.js';
 import { sendData, ErrorResponses } from '../../utils/error-response.js';
@@ -99,7 +100,7 @@ type DeleteViewBody = photoEditor.DeleteViewBody;
  */
 router.post(
   '/:personId/prepare',
-  authorize(['admin', 'secretary']),
+  authorize(CLINICAL_ROLES),
   validate({ params: photoEditor.prepare.params, body: photoEditor.prepare.body }),
   async (req: Request, res: Response): Promise<void> => {
     try {
@@ -188,7 +189,7 @@ router.post(
  */
 router.post(
   '/:personId/render',
-  authorize(['admin', 'secretary']),
+  authorize(CLINICAL_ROLES),
   validate({ params: photoEditor.personIdParams, body: renderBodySchema }),
   async (req: Request, res: Response): Promise<void> => {
     try {
@@ -376,7 +377,7 @@ async function processRenderJob(job: RenderJob): Promise<void> {
  */
 router.delete(
   '/:personId/view',
-  authorize(['admin', 'secretary']),
+  authorize(CLINICAL_ROLES),
   validate({ params: photoEditor.view.params, body: photoEditor.view.body }),
   async (req: Request, res: Response): Promise<void> => {
     try {

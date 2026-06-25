@@ -32,6 +32,7 @@ import {
 } from '../database/queries/work-queries.js';
 import { getPatientById } from '../database/queries/patient-queries.js';
 import { isToday } from '../../middleware/time-based-auth.js';
+import { ROLES, type UserRole } from '../../shared/auth/roles.js';
 
 // Re-export WORK_STATUS for convenience
 export { WORK_STATUS };
@@ -341,18 +342,26 @@ async function formatDuplicateActiveWorkError(
  * @throws WorkValidationError If validation fails or duplicate active work exists
  */
 export async function validateAndCreateWork(
-  workData: WorkCreateData
+  workData: WorkCreateData,
+  userRole?: UserRole
 ): Promise<{ work_id: number }> {
   // Validate required fields
   validateWorkRequiredFields(workData);
 
-  // Default total_required to 0 if empty or not provided
   const normalizedData = { ...workData };
-  if (
+  if (userRole === ROLES.CLINICAL) {
+    // Clinical staff add works without cost — ignore any client-sent money
+    // fields rather than trust them.
+    normalizedData.total_required = 0;
+    normalizedData.currency = undefined;
+    delete normalizedData.discount;
+    delete normalizedData.discount_date;
+  } else if (
     normalizedData.total_required === '' ||
     normalizedData.total_required === null ||
     normalizedData.total_required === undefined
   ) {
+    // Default total_required to 0 if empty or not provided
     normalizedData.total_required = 0;
   }
 
@@ -543,7 +552,7 @@ export interface UpdateWorkInput {
  */
 export async function validateAndUpdateWork(
   input: UpdateWorkInput
-): Promise<{ rowsAffected: number }> {
+): Promise<{ rowsAffected: number; moneyChanged: boolean }> {
   const { workId, userRole } = input;
   const workData: Record<string, unknown> = { ...input.workData };
 
@@ -597,10 +606,10 @@ export async function validateAndUpdateWork(
   }
 
   // ===== FINANCIAL FIELDS PERMISSION CHECK =====
-  // Non-admins may only change total_required / currency on the work's creation day.
-  let isChangingFinancialFields = false;
+  // Track whether a money field actually CHANGED (not merely present in the body)
+  // so the route's notify tier only FYIs the admin on real same-day money edits.
+  let moneyFieldsChanged = false;
   if (
-    userRole !== 'admin' &&
     currentWork &&
     financialFields.some((field) => Object.prototype.hasOwnProperty.call(workData, field))
   ) {
@@ -610,18 +619,20 @@ export async function validateAndUpdateWork(
     const currencyChanged =
       workData.currency !== undefined &&
       String(workData.currency) !== String(currentWork.currency);
-    isChangingFinancialFields = totalRequiredChanged || currencyChanged;
-  }
-
-  if (isChangingFinancialFields && currentWork) {
-    // currentWork.addition_date is the creation date (was a separate getWorkCreationDate query).
-    const created = currentWork.addition_date;
-    if (!created || !isToday(created)) {
-      throw new WorkUpdateError(
-        'forbidden',
-        'Cannot edit financial fields (Total Required, currency) for work not created today. Contact admin.',
-        { restrictedFields: financialFields }
-      );
+    if (totalRequiredChanged || currencyChanged) {
+      moneyFieldsChanged = true;
+      // Non-admins may only change total_required / currency on the work's creation day.
+      // currentWork.addition_date is the creation date (was a separate getWorkCreationDate query).
+      if (userRole !== 'admin') {
+        const created = currentWork.addition_date;
+        if (!created || !isToday(created)) {
+          throw new WorkUpdateError(
+            'forbidden',
+            'Cannot edit financial fields (Total Required, currency) for work not created today. Contact admin.',
+            { restrictedFields: financialFields }
+          );
+        }
+      }
     }
   }
 
@@ -667,6 +678,10 @@ export async function validateAndUpdateWork(
       discountDate !== undefined &&
       String(discountDate ?? '') !== String(workWithPaid.discount_date ?? '');
 
+    if (discountChanged || discountDateChanged) {
+      moneyFieldsChanged = true;
+    }
+
     if ((discountChanged || discountDateChanged) && userRole !== 'admin') {
       throw new WorkUpdateError('forbidden', 'Only admin can add or edit discount.', {
         restrictedFields: [...discountAdminFields],
@@ -694,7 +709,7 @@ export async function validateAndUpdateWork(
   }
 
   const result = await updateWork(workId, workData as Parameters<typeof updateWork>[1]);
-  return { rowsAffected: result.rowCount };
+  return { rowsAffected: result.rowCount, moneyChanged: moneyFieldsChanged };
 }
 
 /**

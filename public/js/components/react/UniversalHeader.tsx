@@ -4,7 +4,10 @@ import { useNavigate, useLocation, useNavigation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { patientInfoQuery, brandingQuery } from '@/query/queries';
+import { ROLES } from '@shared/auth/roles';
 import TasksBell from './TasksBell';
+import ApprovalsBell from './ApprovalsBell';
+import MyApprovalsBadge from './MyApprovalsBadge';
 import ThemeToggle from './ThemeToggle';
 import UserMenu from './UserMenu';
 
@@ -318,6 +321,11 @@ const UniversalHeader = () => {
                 <div className="header-right">
                     {/* App-wide tasks bell */}
                     <TasksBell />
+
+                    {/* Maker-checker approval queue: admin sees all pending holds + notices;
+                        front-desk sees their own submissions and their outcome. */}
+                    {user?.role === ROLES.ADMIN && <ApprovalsBell />}
+                    {user?.role === ROLES.FRONT_DESK && <MyApprovalsBadge />}
 
                     {/* Theme toggle — sliding Light ⇄ Dark pill (system default lives in Settings) */}
                     <ThemeToggle />

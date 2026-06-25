@@ -7,6 +7,7 @@ import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import { authorize } from '../../middleware/auth.js';
+import { ADMIN_ROLES } from '../../shared/auth/roles.js';
 import * as reports from '../../shared/contracts/reports.contract.js';
 import {
   calculateMonthlyStatistics,
@@ -320,7 +321,7 @@ router.get('/statistics/multi-year', async (req: Request<object, object, object,
  */
 router.get(
   '/statistics/commissions',
-  authorize(['admin']), // per-doctor earnings — admin-only (mirrors the hidden Statistics tab)
+  authorize(ADMIN_ROLES), // per-doctor earnings — admin-only (mirrors the hidden Statistics tab)
   validate({ query: reports.commissions.query }),
   async (req: Request<object, object, object, CommissionsQuery>, res: Response): Promise<void> => {
     try {
@@ -362,7 +363,7 @@ router.get(
  */
 router.get(
   '/statistics/revenue-breakdown',
-  authorize(['admin']), // revenue by doctor/work type — admin-only (mirrors the hidden Statistics tab)
+  authorize(ADMIN_ROLES), // revenue by doctor/work type — admin-only (mirrors the hidden Statistics tab)
   validate({ query: reports.revenueBreakdown.query }),
   async (req: Request<object, object, object, RevenueBreakdownQuery>, res: Response): Promise<void> => {
     try {

@@ -37,6 +37,7 @@ import {
   getToothNumbers
 } from '../../services/database/queries/work-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import { ADMIN_ROLES, FINANCE_ROLES, CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import {
   requireRecordAge,
@@ -44,6 +45,7 @@ import {
 } from '../../middleware/time-based-auth.js';
 import { sendSuccess, sendData, sendError, ErrorResponses } from '../../utils/error-response.js';
 import * as workContract from '../../shared/contracts/work.contract.js';
+import { enqueueApproval, recordNotice } from '../../services/approvals/approval-service.js';
 import { log } from '../../utils/logger.js';
 import {
   validateAndCreateWork,
@@ -139,6 +141,8 @@ router.get(
  */
 router.post(
   '/addwork',
+  authenticate,
+  authorize(CLINICAL_ROLES),
   validate({ body: workContract.addWork.body }),
   async (
     req: Request<unknown, unknown, workContract.AddWorkBody>,
@@ -146,7 +150,7 @@ router.post(
   ): Promise<void> => {
     try {
       // Delegate to service layer for validation and creation
-      const result = await validateAndCreateWork(req.body);
+      const result = await validateAndCreateWork(req.body, req.session?.userRole);
 
       sendData(res, workContract.addWork.response, { workId: result.work_id }, 'Work added successfully');
     } catch (error) {
@@ -183,6 +187,8 @@ router.post(
  */
 router.post(
   '/addWorkWithInvoice',
+  authenticate,
+  authorize(FINANCE_ROLES),
   validate({ body: workContract.addWorkWithInvoice.body }),
   async (
     req: Request<unknown, unknown, workContract.AddWorkWithInvoiceBody>,
@@ -233,7 +239,7 @@ router.post(
 router.put(
   '/updatework',
   authenticate,
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ body: workContract.updateWork.body }),
   async (req: Request<unknown, unknown, workContract.UpdateWorkBody>, res: Response): Promise<void> => {
     try {
@@ -249,7 +255,13 @@ router.put(
         workData
       });
 
-      sendData(res, workContract.updateWork.response, { rowsAffected: result.rowsAffected }, 'Work updated successfully');
+      // Notify tier: only when a money field actually CHANGED (computed in the
+      // service against the current row) and the caller is non-admin — write an
+      // informational notice. recordNotice no-ops for admin callers.
+      if (result.moneyChanged) {
+        await recordNotice('work.update', req.body as Record<string, unknown>, req);
+      }
+      sendData(res, workContract.updateWork.response, { outcome: 'applied', rowsAffected: result.rowsAffected }, 'Work updated successfully');
     } catch (error) {
       if (error instanceof WorkUpdateError) {
         const details = error.details ?? null;
@@ -261,9 +273,21 @@ router.put(
           case 'conflict':
             ErrorResponses.conflict(res, error.message, details);
             return;
-          case 'forbidden':
-            ErrorResponses.forbidden(res, error.message, details);
+          case 'forbidden': {
+            // A Front-Desk user tried to edit discount or old-record financial fields.
+            // Divert to the approval queue instead of returning 403.
+            const actionType = (error.details?.restrictedFields as string[] | undefined)
+              ?.some(f => f === 'discount' || f === 'discount_date')
+              ? 'work.discount' as const
+              : 'work.update' as const;
+            const { requestId } = await enqueueApproval(actionType, req.body as Record<string, unknown>, req);
+            sendData(res, workContract.updateWork.response, {
+              outcome: 'pending',
+              requestId,
+              message: 'Submitted for admin approval',
+            });
             return;
+          }
           case 'badRequest':
             ErrorResponses.badRequest(res, error.message, details);
             return;
@@ -280,6 +304,8 @@ router.put(
  */
 router.post(
   '/finishwork',
+  authenticate,
+  authorize(FINANCE_ROLES),
   validate({ body: workContract.finishWork.body }),
   async (
     req: Request<unknown, unknown, WorkStatusBody>,
@@ -301,6 +327,8 @@ router.post(
  */
 router.post(
   '/discontinuework',
+  authenticate,
+  authorize(FINANCE_ROLES),
   validate({ body: workContract.discontinueWork.body }),
   async (
     req: Request<unknown, unknown, WorkStatusBody>,
@@ -322,6 +350,8 @@ router.post(
  */
 router.post(
   '/reactivatework',
+  authenticate,
+  authorize(FINANCE_ROLES),
   validate({ body: workContract.reactivateWork.body }),
   async (
     req: Request<unknown, unknown, WorkStatusBody>,
@@ -370,13 +400,21 @@ router.post(
 router.delete(
   '/deletework',
   authenticate,
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
+  validate({ body: workContract.deleteWork.body }),
   requireRecordAge({
     resourceType: 'work',
     operation: 'delete',
-    getRecordDate: getWorkCreationDate
+    getRecordDate: getWorkCreationDate,
+    enqueueIfRestricted: async (req, res) => {
+      const { requestId } = await enqueueApproval('work.delete', req.body as Record<string, unknown>, req);
+      sendData(res, workContract.deleteWork.response, {
+        outcome: 'pending',
+        requestId,
+        message: 'Submitted for admin approval',
+      });
+    },
   }),
-  validate({ body: workContract.deleteWork.body }),
   async (
     req: Request<unknown, unknown, DeleteWorkBody>,
     res: Response
@@ -389,7 +427,9 @@ router.delete(
 
       // DeleteResult.rowsAffected is optional; on the success path it's the deleted
       // row count — coerce a (type-only) undefined to 0 to satisfy the strict contract.
-      sendData(res, workContract.deleteWork.response, { rowsAffected: result.rowsAffected ?? 0 }, 'Work deleted successfully');
+      // Notify tier: same-day admin-visible FYI; recordNotice no-ops for admin callers.
+      await recordNotice('work.delete', { workId: req.body.workId }, req);
+      sendData(res, workContract.deleteWork.response, { outcome: 'applied', rowsAffected: result.rowsAffected ?? 0 }, 'Work deleted successfully');
     } catch (error) {
       // Handle validation errors from service layer (expected business-rule
       // rejections — log at warn, not error, and without a stack trace).
@@ -498,6 +538,8 @@ router.get(
  */
 router.post(
   '/addworkdetail',
+  authenticate,
+  authorize(FINANCE_ROLES),
   validate({ body: workContract.addWorkDetail.body }),
   async (
     req: Request<unknown, unknown, workContract.AddWorkDetailBody>,
@@ -563,6 +605,8 @@ router.post(
  */
 router.put(
   '/updateworkdetail',
+  authenticate,
+  authorize(FINANCE_ROLES),
   validate({ body: workContract.updateWorkDetail.body }),
   async (
     req: Request<unknown, unknown, workContract.UpdateWorkDetailBody>,
@@ -632,6 +676,8 @@ router.put(
  */
 router.delete(
   '/deleteworkdetail',
+  authenticate,
+  authorize(FINANCE_ROLES),
   validate({ body: workContract.deleteWorkDetail.body }),
   async (
     req: Request<unknown, unknown, workContract.WorkDetailIdBody>,
@@ -761,6 +807,8 @@ router.get(
  */
 router.post(
   '/diagnosis',
+  authenticate,
+  authorize(CLINICAL_ROLES),
   validate({ body: workContract.diagnosis.body }),
   async (
     req: Request<unknown, unknown, workContract.DiagnosisBody>,
@@ -928,6 +976,8 @@ router.post(
  */
 router.delete(
   '/diagnosis/:workId',
+  authenticate,
+  authorize(CLINICAL_ROLES),
   async (req: Request<{ workId: string }>, res: Response): Promise<void> => {
     try {
       const { workId } = req.params;
@@ -962,7 +1012,7 @@ router.delete(
 router.get(
   '/work/:workId/transfer-preview',
   authenticate,
-  authorize(['admin']),
+  authorize(ADMIN_ROLES),
   async (req: Request<{ workId: string }>, res: Response): Promise<void> => {
     try {
       const { workId } = req.params;
@@ -1026,7 +1076,7 @@ router.get(
 router.post(
   '/work/:workId/transfer',
   authenticate,
-  authorize(['admin']),
+  authorize(ADMIN_ROLES),
   validate({ body: workContract.transfer.body }),
   async (
     req: Request<{ workId: string }, unknown, workContract.TransferBody>,

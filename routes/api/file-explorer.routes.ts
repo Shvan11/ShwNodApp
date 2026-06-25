@@ -6,7 +6,7 @@
  * delete). All path safety lives in services/files/file-explorer.service.ts.
  *
  * Reads ride the global `/api` `authenticate` gate (index.ts). Writes add
- * `authorize(['admin','secretary'])`. Every content fetch + mutation is
+ * `authorize(FINANCE_ROLES)`. Every content fetch + mutation is
  * audit-logged with the acting user id.
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
@@ -16,6 +16,7 @@ import { createReadStream, promises as fsp } from 'fs';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendError, sendData } from '../../utils/error-response.js';
 import { authorize } from '../../middleware/auth.js';
+import { FINANCE_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import { timeouts } from '../../middleware/timeout.js';
 import * as fileExplorer from '../../shared/contracts/file-explorer.contract.js';
@@ -337,7 +338,7 @@ function runUpload(req: Request, res: Response, next: NextFunction): void {
 
 router.post(
   '/patients/:personId/files/upload',
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: fileExplorer.upload.params }),
   runUpload,
   async (req: Request<PersonIdParams>, res: Response): Promise<void> => {
@@ -381,7 +382,7 @@ router.post(
 
 router.post(
   '/patients/:personId/files/folder',
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: fileExplorer.folder.params, body: fileExplorer.folder.body }),
   async (req: Request<PersonIdParams, unknown, { path?: string; name?: string }>, res: Response): Promise<void> => {
     try {
@@ -402,7 +403,7 @@ router.post(
 
 router.post(
   '/patients/:personId/files/rename',
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: fileExplorer.rename.params, body: fileExplorer.rename.body }),
   async (req: Request<PersonIdParams, unknown, { path?: string; newName?: string }>, res: Response): Promise<void> => {
     try {
@@ -427,7 +428,7 @@ router.post(
 
 router.delete(
   '/patients/:personId/files',
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: fileExplorer.deleteEntry.params }),
   async (req: Request<PersonIdParams>, res: Response): Promise<void> => {
     try {
@@ -455,7 +456,7 @@ const MAX_BATCH_DELETE = 5000;
 
 router.post(
   '/patients/:personId/files/delete-batch',
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: fileExplorer.deleteBatch.params }),
   timeouts.long, // bulk renames over SMB can exceed the global 30s gate
   async (

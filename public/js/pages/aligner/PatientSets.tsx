@@ -23,6 +23,8 @@ import {
     isAbortError
 } from '../../core/fileSystemAccess';
 import { useToast } from '../../contexts/ToastContext';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { usePrintQueue } from '../../contexts/PrintQueueContext';
 import { useSetDrawer } from '../../hooks/useSetDrawer';
 import { useBatchDrawer } from '../../hooks/useBatchDrawer';
@@ -89,6 +91,8 @@ const PatientSets: React.FC = () => {
     const toast = useToast();
     const queryClient = useQueryClient();
     const { addToQueue, isInQueue, removeByBatchId } = usePrintQueue();
+    const { user } = useGlobalState();
+    const caps = roleCaps(user?.role as UserRole | undefined);
 
     // Determine if we came from doctor browse or direct search
     const isFromDoctorBrowse = doctorId !== undefined;
@@ -1369,7 +1373,7 @@ const PatientSets: React.FC = () => {
                                                     <span>Archform</span>
                                                 </button>
                                             )}
-                                            {set.set_cost && (set.Balance || 0) > 0 && (
+                                            {caps.writeFinance && set.set_cost && (set.Balance || 0) > 0 && (
                                                 <button
                                                     className="btn btn-primary btn-sm"
                                                     onClick={(e) => {

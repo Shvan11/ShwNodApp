@@ -1,0 +1,307 @@
+/* ApprovalsBell — admin header bell for the maker-checker approval queue.
+   Bell matches the header (white icon on coloured background). Popover mirrors
+   TasksBell layout; holds get an orange bar, notices get a blue bar. */
+
+.wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.bellBtn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-white);
+    font-size: var(--font-size-lg);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.bellBtn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.badge {
+    position: absolute;
+    top: 2px;
+    inset-inline-end: 2px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--radius-full);
+    color: var(--color-white);
+    font-size: 11px;
+    font-weight: var(--font-weight-bold);
+    line-height: 18px;
+    text-align: center;
+}
+
+/* Hold (pending approval) → red + pulse; notice (FYI) → blue */
+.badgeHold {
+    background: var(--error-500);
+    animation: holdPulse 2s ease-in-out infinite;
+}
+
+.badgeNotice {
+    background: var(--info-500, #0ea5e9);
+}
+
+@keyframes holdPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.5); }
+    50% { box-shadow: 0 0 0 5px rgba(220, 53, 69, 0); }
+}
+
+/* Popover — portaled to <body>; position:fixed, top/left set inline from bell rect */
+.popover {
+    width: 390px;
+    max-width: calc(100vw - 24px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    z-index: var(--z-index-popover);
+    overflow: hidden;
+}
+
+.popHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-light);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-heading);
+}
+
+.popCount {
+    display: inline-block;
+    margin-inline-start: var(--spacing-xs);
+    padding: 0 var(--spacing-sm);
+    border-radius: var(--radius-full);
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.list {
+    max-height: min(65vh, 520px);
+    overflow-y: auto;
+}
+
+.empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xl);
+    color: var(--text-muted);
+}
+
+.empty i {
+    font-size: 1.75rem;
+    color: var(--success-500);
+}
+
+/* Section divider (Holds / Notices) */
+.section {
+    border-bottom: 1px solid var(--border-light);
+}
+
+.section:last-child {
+    border-bottom: none;
+}
+
+.sectionLabel {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--surface-muted);
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Row */
+.item {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.item:last-child {
+    border-bottom: none;
+}
+
+/* Left-edge colour bar */
+.kindBar {
+    flex: 0 0 4px;
+    border-radius: var(--radius-full);
+}
+
+.kindHold   { background: var(--warning-500); }
+.kindNotice { background: var(--info-500, #0ea5e9); }
+
+.itemBody {
+    flex: 1;
+    min-width: 0;
+}
+
+.itemText {
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.itemMeta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-xs);
+}
+
+.patientChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    background: var(--primary-50);
+    color: var(--primary-700);
+    border-radius: var(--radius-full);
+    padding: 2px var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+}
+
+.patientChip:hover {
+    background: var(--primary-100);
+}
+
+.typeTag {
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    padding: 1px var(--spacing-xs);
+    font-size: var(--font-size-xs);
+}
+
+.byTag {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.age {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    margin-inline-start: auto;
+}
+
+/* Inline rejection form */
+.rejectRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
+}
+
+.rejectInput {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+    padding: 3px var(--spacing-xs);
+    font-size: var(--font-size-xs);
+}
+
+.confirmRejectBtn {
+    border: 1px solid var(--error-500);
+    background: transparent;
+    color: var(--error-500);
+    border-radius: var(--radius-sm);
+    padding: 2px var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+}
+
+.confirmRejectBtn:hover {
+    background: var(--error-500);
+    color: var(--color-white);
+}
+
+.cancelBtn {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    padding: 2px var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+}
+
+.cancelBtn:hover {
+    background: var(--surface-hover);
+}
+
+/* Per-row action buttons (vertical stack) */
+.actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.actions button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.approveBtn {
+    background: var(--success-50, #f0fdf4);
+    color: var(--success-600, #16a34a);
+}
+
+.approveBtn:hover {
+    background: var(--success-500);
+    color: var(--color-white);
+}
+
+.rejectBtn {
+    background: var(--error-50, #fef2f2);
+    color: var(--error-600, #dc2626);
+}
+
+.rejectBtn:hover {
+    background: var(--error-500);
+    color: var(--color-white);
+}
+
+.ackBtn {
+    background: transparent;
+    color: var(--text-muted);
+}
+
+.ackBtn:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+}

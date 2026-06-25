@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { UserResponse } from '@/types/api.types';
 import { authMeQuery } from '@/query/queries';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 
 // CSS Modules
 import styles from './SettingsContainer.module.css';
@@ -37,6 +38,8 @@ interface TabConfig {
     description: string;
     disabled?: boolean;
     adminOnly?: boolean;
+    /** Hide from roles without finance-write capability (clinical). */
+    financeOnly?: boolean;
 }
 
 interface TabDataState {
@@ -138,7 +141,8 @@ const SettingsComponent: React.FC = () => {
             label: 'Exchange Rates',
             icon: 'fas fa-exchange-alt',
             component: ExchangeRatesSettings,
-            description: "Edit today's USD→IQD rate and view historical rates"
+            description: "Edit today's USD→IQD rate and view historical rates",
+            financeOnly: true
         },
         {
             id: 'lookups',
@@ -246,9 +250,14 @@ const SettingsComponent: React.FC = () => {
     }, []); // Empty deps = stable reference forever
 
     // Filter tabs based on user role
+    const caps = roleCaps((userRole ?? undefined) as UserRole | undefined);
     const filteredTabs = tabs.filter(tabItem => {
         // Hide admin-only tabs from non-admins
         if (tabItem.adminOnly && userRole !== 'admin') {
+            return false;
+        }
+        // Hide finance-write tabs from clinical (view-only money access)
+        if (tabItem.financeOnly && !caps.writeFinance) {
             return false;
         }
         return true;

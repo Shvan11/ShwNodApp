@@ -15,9 +15,11 @@ interface ExpenseTableProps {
     loading: boolean;
     onEdit: (id: number) => void;
     onDelete: (id: number) => void;
+    /** Edit/delete actions hide when false — clinical role sees expenses read-only. */
+    writeFinance?: boolean;
 }
 
-export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: ExpenseTableProps) {
+export default function ExpenseTable({ expenses, loading, onEdit, onDelete, writeFinance = true }: ExpenseTableProps) {
     const { t } = useTranslation('expenses');
     const localizedName = useLocalizedName();
 
@@ -66,7 +68,7 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                         <th>{t('table.category')}</th>
                         <th>{t('table.subcategory')}</th>
                         <th>{t('table.note')}</th>
-                        <th>{t('table.actions')}</th>
+                        {writeFinance && <th>{t('table.actions')}</th>}
                     </tr>
                 </thead>
                 <tbody>
@@ -95,24 +97,26 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }: Ex
                                 <td className={styles.noteCell} title={note}>
                                     {note}
                                 </td>
-                                <td>
-                                    <div className={styles.actionButtons}>
-                                        <button
-                                            className="btn-edit"
-                                            onClick={() => onEdit(expense.id)}
-                                            aria-label={t('table.editAria')}
-                                        >
-                                            {t('table.edit')}
-                                        </button>
-                                        <button
-                                            className="btn-delete"
-                                            onClick={() => onDelete(expense.id)}
-                                            aria-label={t('table.deleteAria')}
-                                        >
-                                            {t('table.delete')}
-                                        </button>
-                                    </div>
-                                </td>
+                                {writeFinance && (
+                                    <td>
+                                        <div className={styles.actionButtons}>
+                                            <button
+                                                className="btn-edit"
+                                                onClick={() => onEdit(expense.id)}
+                                                aria-label={t('table.editAria')}
+                                            >
+                                                {t('table.edit')}
+                                            </button>
+                                            <button
+                                                className="btn-delete"
+                                                onClick={() => onDelete(expense.id)}
+                                                aria-label={t('table.deleteAria')}
+                                            >
+                                                {t('table.delete')}
+                                            </button>
+                                        </div>
+                                    </td>
+                                )}
                             </tr>
                         );
                     })}

@@ -39,6 +39,14 @@ export interface RecordAgeOptions {
   operation: OperationType;
   getRecordDate: GetRecordDateFn;
   restrictedFields?: string[];
+  /**
+   * When set, called instead of returning 403 for a non-admin on a restricted
+   * (old-record delete, or old-record update of restricted fields). The callback
+   * enqueues the approval hold and sends the pending-outcome response itself —
+   * each route has its own `withPendingOutcome` contract shape, so the response
+   * responsibility stays with the caller.
+   */
+  enqueueIfRestricted?: (req: Request, res: Response) => Promise<void>;
 }
 
 /**
@@ -72,7 +80,8 @@ export function requireRecordAge(options: RecordAgeOptions) {
     resourceType,
     operation,
     getRecordDate,
-    restrictedFields = []
+    restrictedFields = [],
+    enqueueIfRestricted,
   } = options;
 
   return async (
@@ -92,6 +101,10 @@ export function requireRecordAge(options: RecordAgeOptions) {
       if (!isToday(recordDate)) {
         // Record is old (not created today)
         if (operation === 'delete') {
+          if (enqueueIfRestricted) {
+            await enqueueIfRestricted(req, res);
+            return;
+          }
           return res.status(403).json({
             success: false,
             error: 'Forbidden',
@@ -106,6 +119,10 @@ export function requireRecordAge(options: RecordAgeOptions) {
           );
 
           if (updatingRestrictedField) {
+            if (enqueueIfRestricted) {
+              await enqueueIfRestricted(req, res);
+              return;
+            }
             return res.status(403).json({
               success: false,
               error: 'Forbidden',

@@ -5,19 +5,18 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import type { Session } from 'express-session';
+import type { UserRole } from '../shared/auth/roles.js';
 
 // ===========================================
 // USER TYPES
 // ===========================================
 
 /**
- * Application user roles.
- *
- * App-level domain knowledge — the `users.role` column is a free-form
- * `citext`/string in the generated DB types, so this narrowed union lives here
- * (the API contract), not in the database row types.
+ * Application user roles — re-exported from the `shared/auth/roles.ts` SSoT
+ * (the DB `users.role` column is a free-form `citext`, so this narrowed union
+ * is the API contract's authority, not the generated DB row types).
  */
-export type UserRole = 'admin' | 'secretary' | 'doctor' | 'user';
+export type { UserRole };
 
 /**
  * User without sensitive data — the sanitized shape returned to clients

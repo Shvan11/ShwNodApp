@@ -289,3 +289,12 @@ export function getPaymentHistoryByWorkId(workId: number): Promise<PaymentRecord
     ])
     .execute() as Promise<PaymentRecord[]>;
 }
+
+/** Delete a single invoice by primary key. Returns the number of rows deleted (0 or 1). */
+export async function deleteInvoiceById(invoiceId: number): Promise<number> {
+  const db = getKysely();
+  const result = await sql`
+    DELETE FROM "invoices" WHERE "invoice_id" = ${invoiceId}
+  `.execute(db);
+  return Number(result.numAffectedRows ?? 0n);
+}

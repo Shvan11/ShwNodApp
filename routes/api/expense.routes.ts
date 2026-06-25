@@ -25,6 +25,7 @@ import {
   getExpenseTotalsByCurrency
 } from '../../services/database/queries/expense-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import { FINANCE_ROLES } from '../../shared/auth/roles.js';
 import {
   requireRecordAge,
   getExpenseCreationDate
@@ -33,6 +34,7 @@ import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import * as expense from '../../shared/contracts/expense.contract.js';
 import { log } from '../../utils/logger.js';
+import { enqueueApproval, recordNotice } from '../../services/approvals/approval-service.js';
 
 const router = Router();
 
@@ -176,6 +178,8 @@ router.get(
  */
 router.post(
   '/expenses',
+  authenticate,
+  authorize(FINANCE_ROLES),
   validate({ body: expense.createExpense.body }),
   async (
     req: Request<unknown, unknown, expense.CreateExpenseBody>,
@@ -305,12 +309,25 @@ router.get(
 router.put(
   '/expenses/:id',
   authenticate,
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: expense.updateExpense.params, body: expense.updateExpense.body }),
   requireRecordAge({
     resourceType: 'expense',
     operation: 'update',
-    getRecordDate: getExpenseCreationDate
+    getRecordDate: getExpenseCreationDate,
+    enqueueIfRestricted: async (req, res) => {
+      const id = parseInt((req.params as { id: string }).id);
+      const { requestId } = await enqueueApproval(
+        'expense.update',
+        { id, ...req.body as Record<string, unknown> },
+        req
+      );
+      sendData(res, expense.updateExpense.response, {
+        outcome: 'pending',
+        requestId,
+        message: 'Submitted for admin approval',
+      });
+    },
   }),
   async (
     req: Request<{ id: string }, unknown, expense.CreateExpenseBody>,
@@ -353,7 +370,9 @@ router.put(
       };
 
       const result = await updateExpense(expenseId, expenseData);
-      sendData(res, expense.updateExpense.response, result, 'Expense updated successfully');
+      // Notify tier: same-day admin-visible FYI; recordNotice no-ops for admin callers.
+      await recordNotice('expense.update', { id: expenseId, ...req.body as Record<string, unknown> }, req);
+      sendData(res, expense.updateExpense.response, { outcome: 'applied', ...result }, 'Expense updated successfully');
     } catch (error) {
       log.error('Error updating expense:', error);
       ErrorResponses.internalError(
@@ -372,12 +391,21 @@ router.put(
 router.delete(
   '/expenses/:id',
   authenticate,
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: expense.deleteExpense.params }),
   requireRecordAge({
     resourceType: 'expense',
     operation: 'delete',
-    getRecordDate: getExpenseCreationDate
+    getRecordDate: getExpenseCreationDate,
+    enqueueIfRestricted: async (req, res) => {
+      const id = parseInt((req.params as { id: string }).id);
+      const { requestId } = await enqueueApproval('expense.delete', { id }, req);
+      sendData(res, expense.deleteExpense.response, {
+        outcome: 'pending',
+        requestId,
+        message: 'Submitted for admin approval',
+      });
+    },
   }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
@@ -391,7 +419,9 @@ router.delete(
       }
 
       const result = await deleteExpense(expenseId);
-      sendData(res, expense.deleteExpense.response, result, 'Expense deleted successfully');
+      // Notify tier: same-day admin-visible FYI; recordNotice no-ops for admin callers.
+      await recordNotice('expense.delete', { id: expenseId }, req);
+      sendData(res, expense.deleteExpense.response, { outcome: 'applied', ...result }, 'Expense deleted successfully');
     } catch (error) {
       log.error('Error deleting expense:', error);
       ErrorResponses.internalError(

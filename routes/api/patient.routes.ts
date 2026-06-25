@@ -20,7 +20,6 @@ import {
   createPatient,
   getPatientById,
   updatePatient,
-  deletePatient,
   hasNextAppointment
 } from '../../services/database/queries/patient-queries.js';
 import {
@@ -35,6 +34,7 @@ import { employeeIsActive } from '../../services/database/queries/employee-queri
 import { notifyTaskAssignment } from '../../services/messaging/task-notify.js';
 import * as imaging from '../../services/imaging/index.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES, FINANCE_ROLES } from '../../shared/auth/roles.js';
 import {
   requireRecordAge,
   getPatientCreationDate
@@ -44,26 +44,23 @@ import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-respons
 import { validate } from '../../middleware/validate.js';
 import * as patientContract from '../../shared/contracts/patient.contract.js';
 import * as PatientService from '../../services/business/PatientService.js';
-import { PatientValidationError } from '../../services/business/PatientService.js';
+import { PatientValidationError, deletePatientCascade } from '../../services/business/PatientService.js';
+import { enqueueApproval } from '../../services/approvals/approval-service.js';
 import { transliterateNameToEnglish } from '../../services/business/name-transliteration.js';
 import * as PatientPortalService from '../../services/business/PatientPortalService.js';
 import {
   getNativeTimePoint,
   updateNativeTimePoint,
   deleteNativeTimePoint,
-  getTimePointCodesForPatient,
 } from '../../services/database/queries/native-timepoint-queries.js';
 import { updatePhotoDate, updatePatientName } from '../../services/database/queries/photo-session-queries.js';
 import {
   deleteWorkingFilesForTimepoint,
-  deleteWorkingFilesForPatient,
   timepointFolderName,
 } from '../../services/imaging/photo-cleanup.service.js';
-import { purgeDolphinPatient } from '../../services/sync/cdc/dolphin-sink.js';
 import {
   renameEntry,
   hardDelete,
-  deletePatientFolder,
   entryExists,
   sanitizeName,
   FileExplorerError,
@@ -304,7 +301,7 @@ function parseLocalDate(s: string): Date | null {
  */
 router.put(
   '/patients/:personId/timepoints/:tpCode',
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: timepointParams, body: patientContract.updateTimepoint.body }),
   async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
     try {
@@ -407,7 +404,7 @@ router.put(
  */
 router.delete(
   '/patients/:personId/timepoints/:tpCode',
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: timepointParams }),
   async (req: Request<{ personId: string; tpCode: string }>, res: Response): Promise<void> => {
     try {
@@ -1150,64 +1147,30 @@ router.put(
 router.delete(
   '/patients/:personId',
   authenticate,
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: personIdParams }),
   requireRecordAge({
     resourceType: 'patient',
     operation: 'delete',
-    getRecordDate: getPatientCreationDate
+    getRecordDate: getPatientCreationDate,
+    enqueueIfRestricted: async (req, res) => {
+      const personId = parseInt((req.params as { personId: string }).personId);
+      const { requestId } = await enqueueApproval('patient.delete', { personId }, req);
+      sendData(res, patientContract.deletePatient.response, {
+        outcome: 'pending',
+        requestId,
+        message: 'Submitted for admin approval',
+      });
+    },
   }),
   async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
     try {
       const personId = parseInt(req.params.personId);
-
-      // Capture the patient's tpCodes BEFORE the delete — deletePatient's cascade
-      // (fk_time_points_tblpatients ON DELETE CASCADE) drops the timepoint rows, so
-      // afterwards we'd have no way to name the rendered working/ files to remove.
-      const tpCodes = await getTimePointCodesForPatient(personId);
-
-      await deletePatient(personId);
-      // DB cascade is authoritative; the on-share photo folder is removed after it
-      // succeeds. Best-effort + logged: a locked file on the SMB share (EBUSY) must
-      // not leave the request hanging in a "record gone but call failed" state.
-      let folderRemoved = true;
-      try {
-        await deletePatientFolder(personId);
-      } catch (folderErr) {
-        folderRemoved = false;
-        log.error('Patient record deleted but folder removal failed', {
-          personId,
-          error: (folderErr as Error).message,
-        });
-      }
-
-      // Wipe the rendered working/ gallery files (the originals folder above does NOT
-      // cover them — they live in the flat shared working/ dir). Best-effort: each file
-      // delete already swallows its own error.
-      try {
-        await deleteWorkingFilesForPatient(personId, tpCodes);
-      } catch (workingErr) {
-        log.error('Patient deleted but working/ files cleanup failed', {
-          personId,
-          error: (workingErr as Error).message,
-        });
-      }
-
-      // Finish the Dolphin wipe: the CDC sink removes the Dolphin timepoints/images
-      // (via the cascade deletes), but never the Dolphin patient row — purge it here so
-      // the patient fully disappears from Dolphin Imaging. No-op if Dolphin sync is off.
-      try {
-        await purgeDolphinPatient(personId);
-      } catch (dolphinErr) {
-        log.error('Patient deleted but Dolphin purge failed', {
-          personId,
-          error: (dolphinErr as Error).message,
-        });
-      }
+      const { folderRemoved } = await deletePatientCascade(personId);
       sendData(
         res,
         patientContract.deletePatient.response,
-        { folderRemoved },
+        { outcome: 'applied', folderRemoved },
         folderRemoved
           ? 'Patient and folder deleted successfully'
           : 'Patient deleted, but its photo folder could not be removed (a file may be open). Please delete it manually.'
@@ -1234,7 +1197,7 @@ router.delete(
 router.put(
   '/patients/:personId/estimated-cost',
   authenticate,
-  authorize(['admin', 'secretary', 'doctor']),
+  authorize(FINANCE_ROLES),
   validate({ params: personIdParams, body: patientContract.estimatedCost.body }),
   async (
     req: Request<{ personId: string }, unknown, patientContract.EstimatedCostBody>,
@@ -1313,7 +1276,7 @@ router.get(
 router.post(
   '/patients/:personId/alerts',
   authenticate,
-  authorize(['admin', 'secretary', 'doctor']),
+  authorize(CLINICAL_ROLES),
   validate({ params: personIdParams, body: patientContract.alertBody }),
   async (
     req: Request<{ personId: string }, unknown, patientContract.AlertBody>,
@@ -1371,7 +1334,7 @@ router.post(
 router.put(
   '/alerts/:alertId/status',
   authenticate,
-  authorize(['admin', 'secretary', 'doctor']),
+  authorize(CLINICAL_ROLES),
   validate({ params: alertIdParams, body: patientContract.alertStatus.body }),
   async (
     req: Request<{ alertId: string }, unknown, patientContract.AlertStatusBody>,
@@ -1402,7 +1365,7 @@ router.put(
 router.put(
   '/alerts/:alertId',
   authenticate,
-  authorize(['admin', 'secretary', 'doctor']),
+  authorize(CLINICAL_ROLES),
   validate({ params: alertIdParams, body: patientContract.alertBody }),
   async (
     req: Request<{ alertId: string }, unknown, patientContract.AlertBody>,
@@ -1473,7 +1436,7 @@ router.put(
 router.put(
   '/alerts/:alertId/snooze',
   authenticate,
-  authorize(['admin', 'secretary', 'doctor']),
+  authorize(CLINICAL_ROLES),
   validate({ params: alertIdParams, body: patientContract.alertSnooze.body }),
   async (
     req: Request<{ alertId: string }, unknown, patientContract.AlertSnoozeBody>,
@@ -1540,7 +1503,7 @@ router.get(
  */
 router.get(
   '/patients/:personId/portal',
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
     try {
       const personId = parseInt(req.params.personId, 10);
@@ -1574,7 +1537,7 @@ router.get(
  */
 router.post(
   '/patients/:personId/portal/reset-pin',
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: personIdParams }),
   async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
     try {
@@ -1599,7 +1562,7 @@ router.post(
  */
 router.post(
   '/patients/:personId/portal/enable',
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: personIdParams, body: patientContract.portalEnable.body }),
   async (
     req: Request<{ personId: string }, unknown, patientContract.PortalEnableBody>,
@@ -1630,7 +1593,7 @@ router.post(
  */
 router.post(
   '/patients/:personId/portal/unlock',
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: personIdParams }),
   async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
     try {
@@ -1657,7 +1620,7 @@ router.post(
  */
 router.get(
   '/patients/:personId/photos/visibility',
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
     try {
       const personId = parseInt(req.params.personId, 10);
@@ -1682,7 +1645,7 @@ router.get(
  */
 router.post(
   '/patients/:personId/photos/visibility',
-  authorize(['admin', 'secretary']),
+  authorize(FINANCE_ROLES),
   validate({ params: personIdParams, body: patientContract.photoVisibility.body }),
   async (
     req: Request<{ personId: string }, unknown, patientContract.PhotoVisibilityBody>,

@@ -39,6 +39,7 @@ import * as integrationsContract from '@shared/contracts/integrations.contract';
 import * as threeshapeContract from '@shared/contracts/threeshape.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
 import * as taskContract from '@shared/contracts/task.contract';
+import * as approvalsContract from '@shared/contracts/approvals.contract';
 import * as videoContract from '@shared/contracts/video.contract';
 import * as mediaContract from '@shared/contracts/media.contract';
 import * as fileExplorerContract from '@shared/contracts/file-explorer.contract';
@@ -1133,6 +1134,43 @@ export const tasksHistoryQuery = () =>
       fetchJSON<z.infer<typeof taskContract.tasksHistory.response>>('/api/tasks/history', {
         signal,
         schema: taskContract.tasksHistory.response,
+      }),
+  });
+
+// ---------------------------------------------------------------------------
+// Approvals — maker-checker queue
+// ---------------------------------------------------------------------------
+
+/** GET /api/approvals?status=pending — admin bell: pending holds + notices. */
+export const approvalsPendingQuery = () =>
+  queryOptions({
+    queryKey: qk.approvals.list(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof approvalsContract.listApprovals.response>>('/api/approvals?status=pending', {
+        signal,
+        schema: approvalsContract.listApprovals.response,
+      }),
+  });
+
+/** GET /api/approvals/history — admin audit trail. */
+export const approvalsHistoryQuery = () =>
+  queryOptions({
+    queryKey: qk.approvals.history(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof approvalsContract.approvalsHistory.response>>('/api/approvals/history', {
+        signal,
+        schema: approvalsContract.approvalsHistory.response,
+      }),
+  });
+
+/** GET /api/approvals/mine — requester badge (own rows). */
+export const myApprovalsQuery = () =>
+  queryOptions({
+    queryKey: qk.approvals.mine(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof approvalsContract.myApprovals.response>>('/api/approvals/mine', {
+        signal,
+        schema: approvalsContract.myApprovals.response,
       }),
   });
 

@@ -16,6 +16,7 @@
  */
 import { z } from 'zod';
 import { timestampString } from '../validation.js';
+import { ASSIGNABLE_ROLES } from '../auth/roles.js';
 
 // Numeric `:userId` path param (asserts digits without coercing — keeps it a string).
 const userIdParams = z.object({ userId: z.string().regex(/^\d+$/, 'Invalid user id') });
@@ -45,8 +46,8 @@ export const createUser = {
     username: z.string().min(1, 'Username and password are required'),
     password: z.string().min(6, 'Password must be at least 6 characters'),
     fullName: z.string().optional(),
-    role: z.enum(['admin', 'secretary'], {
-      message: 'Invalid role. Only admin and secretary roles are allowed.',
+    role: z.enum(ASSIGNABLE_ROLES, {
+      message: 'Invalid role.',
     }),
   }),
   response: z.object({ message: z.string() }),
@@ -62,6 +63,16 @@ export const resetPassword = {
   response: z.object({ message: z.string() }),
 } as const;
 export type ResetPasswordBody = z.infer<typeof resetPassword.body>;
+
+// PUT /api/users/:userId/role → { message }. Admin-only role change.
+export const updateRole = {
+  params: userIdParams,
+  body: z.object({
+    role: z.enum(ASSIGNABLE_ROLES, { message: 'Invalid role.' }),
+  }),
+  response: z.object({ message: z.string() }),
+} as const;
+export type UpdateRoleBody = z.infer<typeof updateRole.body>;
 
 // PUT /api/users/:userId/toggle → { message }.
 export const toggleUser = {
