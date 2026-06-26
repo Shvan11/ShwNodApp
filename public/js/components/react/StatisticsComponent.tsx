@@ -697,6 +697,10 @@ const StatisticsComponent = () => {
                     {/* Daily Data Table */}
                     <div className={styles.tableSection}>
                         <h3>Daily Breakdown</h3>
+                        <p className={styles.tableNote}>
+                            <i className="fas fa-info-circle" aria-hidden="true"></i>
+                            Per-day rows show daily expenses only. Monthly expenses (rent, utilities, subscriptions) are counted in the MONTH TOTAL, not on any single day.
+                        </p>
                         <div className={styles.tableWrapper}>
                             <table className={styles.dataTable}>
                                 <thead>

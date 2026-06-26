@@ -61,14 +61,18 @@ const VW_CTES = sql`
   vwiqd AS (
     SELECT COALESCE(v.day, e.day) AS day, v.sumiqd, e.sumexq,
            COALESCE(v.sumiqd, 0) + COALESCE(e.sumexq, 0) AS finaliqdsum,
-           ed.sumexq_daily
+           ed.sumexq_daily,
+           -- daily-only net (monthly expenses excluded) — the per-day breakdown reads this
+           COALESCE(v.sumiqd, 0) + COALESCE(ed.sumexq_daily, 0) AS finaliqdsum_daily
     FROM viqd v FULL OUTER JOIN veiq e ON v.day = e.day
     LEFT JOIN veiq_daily ed ON COALESCE(v.day, e.day) = ed.day
   ),
   vwusd AS (
     SELECT COALESCE(v.day, e.day) AS day, v.sumusd, e.sumexusd,
            COALESCE(v.sumusd, 0) + COALESCE(e.sumexusd, 0) AS finalusdsum,
-           ed.sumexusd_daily
+           ed.sumexusd_daily,
+           -- daily-only net (monthly expenses excluded) — the per-day breakdown reads this
+           COALESCE(v.sumusd, 0) + COALESCE(ed.sumexusd_daily, 0) AS finalusdsum_daily
     FROM vusd v FULL OUTER JOIN veiusd e ON v.day = e.day
     LEFT JOIN veiusd_daily ed ON COALESCE(v.day, e.day) = ed.day
   )
@@ -77,6 +81,14 @@ const VW_CTES = sql`
 /**
  * Daily cash-box totals for one month (was: ProcGrandTotal). The IQD↔USD conversion uses each
  * day's exchange rate from tblsms when present, else the supplied @Ex fallback.
+ *
+ * Every per-day figure here is DAILY-ONLY: monthly expenses (rent/utilities/subscriptions,
+ * `expenses.is_monthly = true`) are excluded from the per-day Expenses, Net (Final*Sum),
+ * Grand Total and Expected Cash. They'd otherwise dump a whole month's fixed cost onto the
+ * single day they were logged and distort the front desk's daily cash reconciliation + the
+ * daily-invoices modal. Monthly expenses still land in the month rollup via
+ * getMonthlyExpenseTotals (Statistics summary cards) and getYearlyMonthlyTotals (Monthly/Yearly
+ * tabs) — they're a month-level cost, just not a per-day one.
  */
 export async function getMonthlyGrandTotals(
   month: number,
@@ -101,17 +113,17 @@ export async function getMonthlyGrandTotals(
     SELECT
       COALESCE(wq.day, wu.day)                                       AS "Day",
       wq.sumiqd                                                      AS "SumIQD",
-      wq.sumexq                                                      AS "ExpensesIQD",
-      wq.finaliqdsum                                                 AS "FinalIQDSum",
+      wq.sumexq_daily                                                AS "ExpensesIQD",
+      wq.finaliqdsum_daily                                           AS "FinalIQDSum",
       wu.sumusd                                                      AS "SumUSD",
-      wu.sumexusd                                                    AS "ExpensesUSD",
-      wu.finalusdsum                                                 AS "FinalUSDSum",
+      wu.sumexusd_daily                                              AS "ExpensesUSD",
+      wu.finalusdsum_daily                                           AS "FinalUSDSum",
       CAST(
-        (COALESCE(wq.finaliqdsum, 0) / CAST(COALESCE(s."exchange_rate", ${ex}::int) AS float))
-        + COALESCE(wu.finalusdsum, 0) AS decimal(9, 2)
+        (COALESCE(wq.finaliqdsum_daily, 0) / CAST(COALESCE(s."exchange_rate", ${ex}::int) AS float))
+        + COALESCE(wu.finalusdsum_daily, 0) AS decimal(9, 2)
       )                                                              AS "GrandTotal",
-      (COALESCE(wq.finaliqdsum, 0)
-        + COALESCE(wu.finalusdsum * COALESCE(s."exchange_rate", ${ex}::int), 0)) AS "GrandTotalIQD",
+      (COALESCE(wq.finaliqdsum_daily, 0)
+        + COALESCE(wu.finalusdsum_daily * COALESCE(s."exchange_rate", ${ex}::int), 0)) AS "GrandTotalIQD",
       (COALESCE(dq.totaliqd, 0) + COALESCE(wq.sumexq_daily, 0) - COALESCE(dq.totalchange, 0)) AS "ExpectedCashIQD",
       (COALESCE(du.totalusd, 0) + COALESCE(wu.sumexusd_daily, 0))          AS "ExpectedCashUSD"
     FROM vwiqd wq
@@ -125,6 +137,38 @@ export async function getMonthlyGrandTotals(
   `.execute(getKysely());
 
   return rows;
+}
+
+/** A month's total expenses, split by currency (positive amounts; ALL expenses). */
+export interface MonthlyExpenseTotals {
+  IQD: number;
+  USD: number;
+}
+
+/**
+ * Total expenses for one month, split by currency — ALL expenses, including monthly
+ * (is_monthly) ones. Feeds the Statistics summary cards / MONTH TOTAL footer, where a
+ * month's fixed costs (rent/utilities) DO belong, even though getMonthlyGrandTotals now
+ * excludes them from the per-day rows. Amounts are returned positive (expenses.amount is
+ * stored positive); the report layer treats expenses as a positive total it subtracts.
+ */
+export async function getMonthlyExpenseTotals(
+  month: number,
+  year: number
+): Promise<MonthlyExpenseTotals> {
+  const start = `${year}-${pad2(month)}-01`;
+  const end = month === 12 ? `${year + 1}-01-01` : `${year}-${pad2(month + 1)}-01`;
+
+  const { rows } = await sql<MonthlyExpenseTotals>`
+    SELECT
+      COALESCE(SUM("amount") FILTER (WHERE "currency" = 'IQD'), 0) AS "IQD",
+      COALESCE(SUM("amount") FILTER (WHERE "currency" = 'USD'), 0) AS "USD"
+    FROM "expenses"
+    WHERE "expense_date" >= ${start}::date
+      AND "expense_date" <  ${end}::date
+  `.execute(getKysely());
+
+  return rows[0] ?? { IQD: 0, USD: 0 };
 }
 
 /**

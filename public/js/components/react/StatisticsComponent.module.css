@@ -437,6 +437,15 @@
     font-size: 1.2rem;
 }
 
+.tableNote {
+    margin: -0.5rem 0 1rem 0;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
 .tableWrapper {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;

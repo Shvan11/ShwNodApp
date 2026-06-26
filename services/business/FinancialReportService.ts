@@ -86,38 +86,47 @@ export interface ValidatedMonthYear {
 /**
  * Calculate monthly financial statistics from daily data
  *
- * Aggregates daily revenue, expenses, and calculates:
+ * Aggregates daily revenue and calculates:
  * - Total revenue (IQD and USD)
  * - Total expenses (IQD and USD)
  * - Net profit (revenue - expenses)
  * - Grand totals (converted using exchange rate)
  * - Cash box balance (from last day)
  *
- * @param dailyData - Daily data from ProcGrandTotal
+ * Revenue is summed from the per-day rows; expenses come from `monthlyExpenses` (the
+ * month's ALL-expenses total, including monthly/recurring ones) rather than the per-day
+ * rows — those rows are now DAILY-ONLY (monthly expenses excluded so they don't distort
+ * the per-day breakdown). The month rollup still counts monthly expenses, so net profit
+ * is unchanged from before this split.
+ *
+ * @param dailyData - Daily data from getMonthlyGrandTotals (per-day, daily-only expenses)
  * @param exchangeRate - Exchange rate for USD to IQD conversion
+ * @param monthlyExpenses - Month's total expenses by currency, ALL expenses (positive)
  * @returns Aggregated monthly statistics
  */
 export function calculateMonthlyStatistics(
   dailyData: DailyData[],
-  exchangeRate: number
+  exchangeRate: number,
+  monthlyExpenses: CurrencyAmounts
 ): MonthlyStatistics {
   let totalIQD = 0;
   let totalUSD = 0;
-  let totalExpensesIQD = 0;
-  let totalExpensesUSD = 0;
   let finalExpectedCashIQD = 0;
   let finalExpectedCashUSD = 0;
 
-  // Aggregate daily values
+  // Aggregate daily revenue + carry the running cash-box balance.
   dailyData.forEach((day) => {
     totalIQD += day.SumIQD || 0;
     totalUSD += day.SumUSD || 0;
-    totalExpensesIQD += Math.abs(day.ExpensesIQD || 0);
-    totalExpensesUSD += Math.abs(day.ExpensesUSD || 0);
     // Use the last day's Expected Cash values as the final balance
     finalExpectedCashIQD = day.ExpectedCashIQD || 0;
     finalExpectedCashUSD = day.ExpectedCashUSD || 0;
   });
+
+  // Month expenses include monthly/recurring costs (rent, utilities) — a month-level
+  // figure, not the sum of the daily-only per-day rows.
+  const totalExpensesIQD = Math.abs(monthlyExpenses.IQD || 0);
+  const totalExpensesUSD = Math.abs(monthlyExpenses.USD || 0);
 
   // Calculate net profit
   const netIQD = totalIQD - totalExpensesIQD;

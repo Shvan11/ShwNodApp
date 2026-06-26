@@ -17,6 +17,7 @@ import {
 } from '../../services/business/FinancialReportService.js';
 import {
   getMonthlyGrandTotals,
+  getMonthlyExpenseTotals,
   getYearlyMonthlyTotals,
   getDailyInvoices,
   getDoctorCommissions,
@@ -108,10 +109,16 @@ router.get('/statistics', async (req: Request<object, object, object, Statistics
     const exRate = exchangeRate ? parseInt(exchangeRate) : 1450; // Default exchange rate
 
     // Daily cash-box totals for the month (Day arrives as a 'YYYY-MM-DD' string from PG).
-    const dailyData = await getMonthlyGrandTotals(monthNum, yearNum, exRate);
+    // Per-day rows are daily-only — monthly expenses excluded so they don't distort the
+    // per-day breakdown + daily-invoices modal. The month's full expense total (incl.
+    // monthly) is fetched separately for the summary cards / net profit.
+    const [dailyData, monthlyExpenses] = await Promise.all([
+      getMonthlyGrandTotals(monthNum, yearNum, exRate),
+      getMonthlyExpenseTotals(monthNum, yearNum),
+    ]);
 
     // Delegate calculation to service layer
-    const summary = calculateMonthlyStatistics(dailyData, exRate);
+    const summary = calculateMonthlyStatistics(dailyData, exRate, monthlyExpenses);
 
     sendData(res, reports.statistics.response, {
       month: monthNum,
