@@ -8,6 +8,7 @@
 import rateLimit from 'express-rate-limit';
 import type { Request, Response, NextFunction } from 'express';
 import { log } from '../utils/logger.js';
+import { ErrorResponses } from '../utils/error-response.js';
 
 /**
  * 401 unless the portal session has a patientId.
@@ -21,10 +22,7 @@ export function authenticatePatient(
     return next();
   }
   log.warn(`Patient portal auth failed for ${req.method} ${req.path}`);
-  return res.status(401).json({
-    success: false,
-    error: 'Authentication required',
-  });
+  return ErrorResponses.unauthorized(res, 'Authentication required');
 }
 
 /**

@@ -11,6 +11,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { sql } from 'kysely';
 import { getKysely } from '../services/database/kysely.js';
 import { log } from '../utils/logger.js';
+import { ErrorResponses } from '../utils/error-response.js';
 import type { ApiErrorResponse } from '../types/index.js';
 
 /**
@@ -105,11 +106,10 @@ export function requireRecordAge(options: RecordAgeOptions) {
             await enqueueIfRestricted(req, res);
             return;
           }
-          return res.status(403).json({
-            success: false,
-            error: 'Forbidden',
-            message: `Cannot delete ${resourceType} not created today. Contact admin.`
-          });
+          return ErrorResponses.forbidden(
+            res,
+            `Cannot delete ${resourceType} not created today. Contact admin.`
+          );
         }
 
         if (operation === 'update' && restrictedFields.length > 0) {
@@ -123,12 +123,11 @@ export function requireRecordAge(options: RecordAgeOptions) {
               await enqueueIfRestricted(req, res);
               return;
             }
-            return res.status(403).json({
-              success: false,
-              error: 'Forbidden',
-              message: `Cannot edit money-related fields for ${resourceType} not created today. Contact admin.`,
-              details: { restrictedFields }
-            });
+            return ErrorResponses.forbidden(
+              res,
+              `Cannot edit money-related fields for ${resourceType} not created today. Contact admin.`,
+              { restrictedFields }
+            );
           }
         }
       }
@@ -136,12 +135,10 @@ export function requireRecordAge(options: RecordAgeOptions) {
       // Record created today - allow operation
       next();
     } catch (error) {
+      // Detail is logged, never returned — the raw error message could leak
+      // internal state (the central error-handler follows the same posture).
       log.error('Date-based auth error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Authorization check failed',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      });
+      ErrorResponses.internalError(res, 'Authorization check failed');
     }
   };
 }

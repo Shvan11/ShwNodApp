@@ -208,10 +208,14 @@ export async function getDailyAppointmentsOptimized(
       has_visit: r.hasVisit,
     }));
 
-  // Result set 2: checked-in — present IS NOT NULL, ordered by presentTime.
+  // Result set 2: checked-in — present IS NOT NULL, ordered by check-in time.
+  // Sort on the raw 24-h `present` ('HH:MM:SS') value, NOT the 12-h display
+  // string presentTime (13:45→'01:45') which would collate PM check-ins before AM.
   const checkedInAppointments = enriched
     .filter((r) => r.present !== null)
-    .sort((a, b) => (a.presentTime ?? '').localeCompare(b.presentTime ?? ''))
+    .sort((a, b) =>
+      ((a.present as string | null) ?? '').localeCompare((b.present as string | null) ?? '')
+    )
     .map((r) => ({
       appointment_id: r.appointment_id,
       person_id: r.person_id,

@@ -4,6 +4,7 @@
  */
 import multer, { type FileFilterCallback, type StorageEngine } from 'multer';
 import type { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
+import { ErrorResponses } from '../utils/error-response.js';
 
 /**
  * Extended file interface for multer uploads with memory storage
@@ -72,37 +73,22 @@ export const handleUploadError: ErrorRequestHandler = (
     const multerErr = err as MulterError;
 
     if (multerErr.code === 'LIMIT_FILE_SIZE') {
-      res.status(400).json({
-        success: false,
-        error: 'File is too large. Maximum size is 100MB.'
-      });
+      ErrorResponses.badRequest(res, 'File is too large. Maximum size is 100MB.');
       return;
     }
     if (multerErr.code === 'LIMIT_FILE_COUNT') {
-      res.status(400).json({
-        success: false,
-        error: 'Too many files. Only one file can be uploaded at a time.'
-      });
+      ErrorResponses.badRequest(res, 'Too many files. Only one file can be uploaded at a time.');
       return;
     }
     if (multerErr.code === 'LIMIT_UNEXPECTED_FILE') {
-      res.status(400).json({
-        success: false,
-        error: 'Unexpected field name. Use "pdf" as the field name.'
-      });
+      ErrorResponses.badRequest(res, 'Unexpected field name. Use "pdf" as the field name.');
       return;
     }
-    res.status(400).json({
-      success: false,
-      error: `Upload error: ${multerErr.message}`
-    });
+    ErrorResponses.badRequest(res, `Upload error: ${multerErr.message}`);
     return;
   } else if (err) {
     // Other errors (like file filter errors)
-    res.status(400).json({
-      success: false,
-      error: err.message
-    });
+    ErrorResponses.badRequest(res, err.message);
     return;
   }
   next();

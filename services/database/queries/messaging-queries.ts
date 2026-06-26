@@ -896,6 +896,22 @@ export async function getNewAppointmentMessage(
  */
 export async function resetMessagingForDate(date: string): Promise<ResetResult> {
   return withPgTransaction(async (trx) => {
+    // Snapshot the pre-reset state FIRST. These counts describe what is about to
+    // be cleared (already-sent/notified, what was wanted); measuring them after
+    // the UPDATE below would read the just-reset values and report a constant
+    // (sent_wa/notified → 0, want_wa/want_notify → total).
+    const stats = await trx
+      .selectFrom('appointments')
+      .where('app_day', '=', sql<string>`${date}::date`)
+      .select((eb) => [
+        eb.fn.countAll<number>().as('total'),
+        eb.fn.sum<number>(sql`CASE WHEN "want_wa" = true THEN 1 ELSE 0 END`).as('readyWa'),
+        eb.fn.sum<number>(sql`CASE WHEN "want_notify" = true THEN 1 ELSE 0 END`).as('readySms'),
+        eb.fn.sum<number>(sql`CASE WHEN "sent_wa" = true THEN 1 ELSE 0 END`).as('sentWa'),
+        eb.fn.sum<number>(sql`CASE WHEN "notified" = true THEN 1 ELSE 0 END`).as('notified'),
+      ])
+      .executeTakeFirst();
+
     await sql`
       DELETE FROM "message_status_history"
       WHERE "appointment_id" IN (SELECT "appointment_id" FROM "appointments" WHERE "app_day" = ${date}::date)
@@ -912,18 +928,6 @@ export async function resetMessagingForDate(date: string): Promise<ResetResult> 
 
     const smsUpd = await sql`UPDATE "sms" SET "sms_sent" = false WHERE "date" = ${date}::date`.execute(trx);
     const smsRecordsReset = Number(smsUpd.numAffectedRows ?? 0);
-
-    const stats = await trx
-      .selectFrom('appointments')
-      .where('app_day', '=', sql<string>`${date}::date`)
-      .select((eb) => [
-        eb.fn.countAll<number>().as('total'),
-        eb.fn.sum<number>(sql`CASE WHEN "want_wa" = true THEN 1 ELSE 0 END`).as('readyWa'),
-        eb.fn.sum<number>(sql`CASE WHEN "want_notify" = true THEN 1 ELSE 0 END`).as('readySms'),
-        eb.fn.sum<number>(sql`CASE WHEN "sent_wa" = true THEN 1 ELSE 0 END`).as('sentWa'),
-        eb.fn.sum<number>(sql`CASE WHEN "notified" = true THEN 1 ELSE 0 END`).as('notified'),
-      ])
-      .executeTakeFirst();
 
     return {
       resetDate: date,

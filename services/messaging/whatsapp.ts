@@ -622,9 +622,16 @@ class WhatsAppService extends EventEmitter {
       return this.clientState.initializationPromise as Promise<boolean>;
     }
 
-    if (this.circuitBreaker.getStatus().isOpen && !forceRestart) {
-      throw new Error('Circuit breaker is open, cannot initialize WhatsApp client');
-    }
+    // Do NOT short-circuit here when the breaker is OPEN. The OPEN→HALF_OPEN
+    // transition (and the actual re-probe) happens only inside
+    // circuitBreaker.execute() in performInitialization(). Gating the breaker here
+    // would mean execute() never runs again once it opens, so the breaker could
+    // never self-heal AND the scheduleReconnect() loop would dead-lock after the
+    // failure threshold (performInitialization()'s catch is the only thing that
+    // reschedules — it never runs if we throw first), leaving the client dead until
+    // a manual restart(). Let the call fall through: execute() fast-throws while
+    // genuinely OPEN (its catch reschedules) and half-opens once the cooldown
+    // elapses, so an unattended server recovers from a transient outage on its own.
 
     try {
       log.debug('Acquiring initialization lock');

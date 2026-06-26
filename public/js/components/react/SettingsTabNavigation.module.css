@@ -133,21 +133,40 @@
     }
 
     .header {
-        padding: 1rem;
+        padding: 0.75rem 1rem 0.5rem;
     }
 
     .header h2 {
-        font-size: 1.5rem;
+        font-size: 1.25rem;
     }
 
+    /* On mobile, wrapping ~17 tabs makes a ragged centered pile. Switch to a
+       single horizontal-scroll strip: one clean row the user swipes through. */
     .buttons {
-        padding: 0.5rem;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        justify-content: flex-start;
+        padding: 0 0.25rem;
         gap: 0.25rem;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; /* Firefox */
+    }
+
+    .buttons::-webkit-scrollbar {
+        display: none; /* Chrome/Safari/Edge */
     }
 
     .button {
-        padding: 0.9rem 1.2rem;
+        flex: 0 0 auto;
+        scroll-snap-align: center;
+        padding: 0.7rem 1rem;
         font-size: 0.85rem;
+    }
+
+    /* Lift suppresses cleanly on a horizontal strip — keep the bar flat on touch */
+    .button:hover:not(.disabled) {
+        transform: none;
     }
 
     .button i {
@@ -157,17 +176,13 @@
 
 @media (max-width: 480px) {
     .header h2 {
-        font-size: 1.25rem;
-    }
-
-    .buttons {
-        gap: 0.15rem;
+        font-size: 1.15rem;
     }
 
     .button {
-        padding: 0.8rem 1rem;
+        padding: 0.65rem 0.85rem;
         font-size: 0.8rem;
-        gap: 0.4rem;
+        gap: 0.35rem;
     }
 
     .label {

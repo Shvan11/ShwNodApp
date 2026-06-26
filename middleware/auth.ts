@@ -7,6 +7,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { sql } from 'kysely';
 import { getKysely } from '../services/database/kysely.js';
 import { log } from '../utils/logger.js';
+import { ErrorResponses } from '../utils/error-response.js';
 import type { AuthResult, ApiErrorResponse, SafeUser, UserRole } from '../types/index.js';
 
 /**
@@ -35,14 +36,10 @@ export function authenticate(
     return next();
   }
 
-  // Not authenticated - return 401
+  // Not authenticated - return 401. The SPA drives the login redirect off the
+  // 401 status itself (route loaders), so no `redirectTo` field is needed.
   log.warn(`Authentication failed for ${req.method} ${req.path}`);
-  return res.status(401).json({
-    success: false,
-    error: 'Authentication required',
-    message: 'Please login to continue',
-    redirectTo: '/login.html'
-  });
+  return ErrorResponses.unauthorized(res, 'Authentication required');
 }
 
 /**
@@ -58,18 +55,13 @@ export function authorize(allowedRoles: readonly UserRole[] = []) {
     next: NextFunction
   ): void | Response<ApiErrorResponse> => {
     if (!req.session || !req.session.userId) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required'
-      });
+      return ErrorResponses.unauthorized(res, 'Authentication required');
     }
 
     const userRole = req.session.userRole;
     if (!userRole) {
-      return res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions',
-        message: 'No role assigned to this session'
+      return ErrorResponses.forbidden(res, 'Insufficient permissions', {
+        reason: 'No role assigned to this session',
       });
     }
 
@@ -79,14 +71,9 @@ export function authorize(allowedRoles: readonly UserRole[] = []) {
     }
 
     if (!allowedRoles.includes(userRole)) {
-      return res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions',
-        message: `This action requires one of the following roles: ${allowedRoles.join(', ')}`,
-        details: {
-          required: allowedRoles,
-          current: userRole
-        }
+      return ErrorResponses.forbidden(res, 'Insufficient permissions', {
+        required: allowedRoles,
+        current: userRole,
       });
     }
 

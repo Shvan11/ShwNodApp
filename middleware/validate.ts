@@ -51,11 +51,28 @@ export function validate(schemas: ValidationSchemas): RequestHandler<any, any, a
         return;
       }
 
-      // Write the parsed/coerced result back. Express 5 exposes req.query as a
-      // getter-only property, so we mutate the existing object in place rather
-      // than reassigning the reference (the same approach works for params/body).
-      const target = req[key] as Record<string, unknown> | undefined;
+      // Write the parsed/coerced result back so handlers read validated,
+      // coerced, defaulted values — not the raw input.
       const parsed = result.data;
+
+      if (key === 'query') {
+        // Express 5 exposes req.query as a prototype GETTER that RE-PARSES the
+        // URL on every access (no caching). Mutating the object it returns is
+        // futile — the next read re-parses and discards the change, dropping all
+        // Zod coercion/defaults/transforms. Shadow the getter with an own data
+        // property holding the parsed result so req.query is stable and coerced.
+        Object.defineProperty(req, 'query', {
+          value: parsed,
+          writable: true,
+          configurable: true,
+          enumerable: true,
+        });
+        continue;
+      }
+
+      // params/body are real own-properties, so in-place mutation persists. Keep
+      // the existing object reference (mutate in place) rather than reassigning.
+      const target = req[key] as Record<string, unknown> | undefined;
       if (target && typeof target === 'object' && !Array.isArray(target)) {
         for (const existing of Object.keys(target)) delete target[existing];
         Object.assign(target, parsed as Record<string, unknown>);

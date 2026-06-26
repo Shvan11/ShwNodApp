@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import cn from 'classnames';
 import styles from './SettingsTabNavigation.module.css';
 
@@ -27,6 +27,22 @@ interface SettingsTabNavigationProps {
 
 const SettingsTabNavigation: React.FC<SettingsTabNavigationProps> = ({ tabs, activeTab, onTabChange, tabData }) => {
 
+    const buttonsRef = useRef<HTMLDivElement>(null);
+    const activeButtonRef = useRef<HTMLButtonElement>(null);
+
+    // On mobile the tabs are a horizontal-scroll strip — keep the active tab in
+    // view when it changes (e.g. deep-link or programmatic switch). Scrolls only
+    // the strip horizontally, never the page (no-op on desktop where it wraps).
+    useEffect(() => {
+        const container = buttonsRef.current;
+        const active = activeButtonRef.current;
+        if (!container || !active) return;
+        const cRect = container.getBoundingClientRect();
+        const aRect = active.getBoundingClientRect();
+        const delta = (aRect.left - cRect.left) - (container.clientWidth - active.clientWidth) / 2;
+        container.scrollBy({ left: delta, behavior: 'smooth' });
+    }, [activeTab]);
+
     const getTabBadge = (tabId: string): React.ReactNode => {
         const data = tabData[tabId];
         if (data && data.hasChanges) {
@@ -45,10 +61,11 @@ const SettingsTabNavigation: React.FC<SettingsTabNavigationProps> = ({ tabs, act
                 <h2>Settings</h2>
             </div>
 
-            <div className={styles.buttons}>
+            <div className={styles.buttons} ref={buttonsRef}>
                 {tabs.map(tab => (
                     <button
                         key={tab.id}
+                        ref={activeTab === tab.id ? activeButtonRef : undefined}
                         className={cn(
                             styles.button,
                             activeTab === tab.id && styles.active,

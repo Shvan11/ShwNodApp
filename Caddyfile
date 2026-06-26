@@ -32,12 +32,50 @@ local.shwan-orthodontics.com {
         -Server
     }
 
-    # (SSE streams + any WebSocket upgrades pass through the reverse_proxy above
-    # — Caddy handles both natively, so no separate matcher is needed.)
+    # WebSocket support for real-time messaging
+    @websocket {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websocket localhost:3000
 
     # Logging for debugging
     log {
         output file C:\Caddy\logs\local-clinic.log
+        level INFO
+    }
+}
+
+# LOCAL HTTPS Configuration - PRODUCTION IP (ZeroTier LAN)
+10.147.20.40 {
+    # Use Caddy's internal CA to issue a certificate for this IP
+    tls internal
+
+    # Reverse proxy to Node.js
+    reverse_proxy localhost:3000
+
+    # Enable compression
+    encode gzip
+
+    # Security headers
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-XSS-Protection "1; mode=block"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # WebSocket support for real-time messaging
+    @websocket {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websocket localhost:3000
+
+    # Logging for debugging
+    log {
+        output file C:\Caddy\logs\local-clinic-ip.log
         level INFO
     }
 }

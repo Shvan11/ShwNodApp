@@ -305,7 +305,7 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
  * Retrieves asset information (X-rays and other assets) for a given patient id.
  */
 async function getAssets(pid: number): Promise<PatientAssets> {
-  const xrayDir = patientPath(pid, 'opg');
+  const xrayDir = patientPath(pid, 'OPG');
   const assetsDir = patientPath(pid, 'assets');
 
   const xrays = (await pathExists(xrayDir)) ? await getXrays(xrayDir, pid) : [];
@@ -334,7 +334,7 @@ async function getXrays(
 
   // The details dir is the same for every xray of this patient, so read it ONCE
   // up front rather than re-running pathExists + readdir inside the per-file map.
-  const parentDetailsDirPath = patientPath(pid, 'opg/.csi_data/.version_4.4');
+  const parentDetailsDirPath = patientPath(pid, 'OPG/.csi_data/.version_4.4');
   const detailsSubDirs = (await pathExists(parentDetailsDirPath))
     ? await fs.readdir(parentDetailsDirPath)
     : [];
@@ -348,16 +348,16 @@ async function getXrays(
           xray.detailsDirName = subDir;
           const previewPath = patientPath(
             pid,
-            `opg/.csi_data/.version_4.4/${subDir}/t.png`
+            `OPG/.csi_data/.version_4.4/${subDir}/t.png`
           );
 
           if (await pathExists(previewPath)) {
-            xray.previewImagePartialPath = `/opg/.csi_data/.version_4.4/${subDir}/t.png`;
+            xray.previewImagePartialPath = `/OPG/.csi_data/.version_4.4/${subDir}/t.png`;
           }
 
           const metaFile = patientPath(
             pid,
-            `opg/.csi_data/.version_4.4/${subDir}/meta`
+            `OPG/.csi_data/.version_4.4/${subDir}/meta`
           );
           xray.date = await extractDate(metaFile);
         }
