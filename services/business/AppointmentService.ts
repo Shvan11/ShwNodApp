@@ -427,7 +427,7 @@ export async function quickCheckIn(
         appointment_id: apt.appointment_id,
         person_id: parseInt(String(person_id)),
         app_date: dateTime,
-        present: timeObject,
+        present: presentTimeString,
       },
     };
   }

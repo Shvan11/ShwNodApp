@@ -228,6 +228,8 @@ class MessageStateManager {
           this.stateKeys.MESSAGE_STATUSES,
           (statuses) => {
             const current = statuses || new Map<string, number>();
+            // Only roll back if no concurrent write has since advanced the status.
+            if (current.get(messageId) !== status) return current;
             if (oldStatus !== null) {
               current.set(messageId, oldStatus);
             } else {

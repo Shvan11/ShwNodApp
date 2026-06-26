@@ -22,8 +22,8 @@ interface SelectedDateData {
     Day?: string;
     ExpensesIQD?: number;
     ExpensesUSD?: number;
-    QasaIQD?: number;
-    QasaUSD?: number;
+    ExpectedCashIQD?: number;
+    ExpectedCashUSD?: number;
 }
 
 interface Totals {
@@ -210,12 +210,12 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                                         </div>
                                     )}
                                     <div className={`${styles.summaryItem} ${styles.highlight}`}>
-                                        <span className={styles.label}>Net IQD (Qasa):</span>
-                                        <span className={styles.value}>{formatCurrency(selectedDateObj?.QasaIQD || totals.netIQD, 'IQD')}</span>
+                                        <span className={styles.label}>Expected Cash (IQD):</span>
+                                        <span className={styles.value}>{formatCurrency(selectedDateObj?.ExpectedCashIQD || totals.netIQD, 'IQD')}</span>
                                     </div>
                                     <div className={`${styles.summaryItem} ${styles.highlight}`}>
-                                        <span className={styles.label}>Net USD (Qasa):</span>
-                                        <span className={styles.value}>{formatCurrency(selectedDateObj?.QasaUSD || totals.netUSD, 'USD')}</span>
+                                        <span className={styles.label}>Expected Cash (USD):</span>
+                                        <span className={styles.value}>{formatCurrency(selectedDateObj?.ExpectedCashUSD || totals.netUSD, 'USD')}</span>
                                     </div>
                                 </div>
                             )}

@@ -1,0 +1,58 @@
+{
+  "nav": {
+    "works": "Works",
+    "files": "Files",
+    "newAppointment": "New Appointment",
+    "appointments": "Appointments",
+    "patientInfo": "Patient Info",
+    "disabledTooltip": "Save patient first to access this section"
+  },
+  "photos": {
+    "timepoint": "timepoint",
+    "timepoints": "timepoints",
+    "labelFallback": "Photos",
+    "tooltip": "Photos",
+    "tooltipDisabled": "Save patient first to access photos"
+  },
+  "csImaging": {
+    "label": "CS Imaging",
+    "tooltip": "Open CS Imaging Trophy",
+    "tooltipDisabled": "Save patient first to access CS Imaging"
+  },
+  "folder": {
+    "label": "Open in Windows",
+    "tooltip": "Open Patient Folder",
+    "tooltipDisabled": "Save patient first to access folder",
+    "errorNotConfigured": "Patients folder path is not configured. Please check settings."
+  },
+  "moreActions": {
+    "label": "More Actions",
+    "tooltip": "More Actions",
+    "tooltipDisabled": "Save patient first to access more actions"
+  },
+  "flyout": {
+    "comparePhotos": "Compare Photos",
+    "presentation": "Presentation",
+    "xrays": "X-rays",
+    "scans": "3D Scans",
+    "threeShape": "3Shape",
+    "threeShapeTooltip": "Send patient to 3Shape & start a scan",
+    "threeShapeDisabledTooltip": "Save patient first",
+    "threeShapeSending": "Sending…",
+    "threeShapeAlt": "3Shape",
+    "dolphin": "Dolphin Imaging",
+    "dolphinTooltip": "Launch Dolphin Imaging with patient data",
+    "dolphinDisabledTooltip": "Save patient first to access Dolphin Imaging",
+    "dolphinAlt": "Dolphin",
+    "photoLayout": "Photo Layout",
+    "photoLayoutTooltip": "Lay out photos in the in-app editor",
+    "photoLayoutDisabledTooltip": "Save patient first"
+  },
+  "toast": {
+    "sendingToThreeShape": "Sending patient to 3Shape…",
+    "sentToThreeShape": "Sent to 3Shape — opening Unite on the scanner",
+    "threeShapeFailed": "Failed to send to 3Shape",
+    "csImagingFailed": "Failed to open CS Imaging: {{error}}",
+    "dolphinFailed": "Failed to open Dolphin Imaging: {{error}}"
+  }
+}

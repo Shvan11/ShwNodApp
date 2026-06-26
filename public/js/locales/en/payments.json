@@ -1,0 +1,89 @@
+{
+  "modal": {
+    "title": "Add Payment",
+    "workFallback": "Work #{{id}}"
+  },
+  "balance": {
+    "label": "Balance",
+    "discountApplied": "discount applied"
+  },
+  "exchangeRate": {
+    "noRate": "No rate for {{date}}",
+    "setRate": "Set Rate",
+    "save": "Save",
+    "display": "1 USD = {{rate}} IQD"
+  },
+  "form": {
+    "currency": "Payment Currency",
+    "usdOnly": "USD Only",
+    "iqdOnly": "IQD Only",
+    "mixed": "Mixed",
+    "entryMode": "Entry Mode",
+    "locked": "Locked",
+    "entryModeAria": "Toggle entry mode between amount and cash",
+    "amount": "Amount",
+    "cash": "Cash",
+    "date": "Date",
+    "amountLabel": "Amount to Register ({{currency}})",
+    "auto": "Auto",
+    "enterAmount": "Enter amount",
+    "payFullBalance": "Pay full balance ({{amount}})",
+    "received": "{{currency}} Received",
+    "usdReceived": "USD Received",
+    "iqdReceived": "IQD Received",
+    "change": "Change (IQD)",
+    "na": "N/A",
+    "disabledDash": "—",
+    "lockAuto": "Lock (use auto-calculated)",
+    "unlockBill": "Unlock (enter actual bill amount)",
+    "unlockReceived": "Unlock (enter actual received amount)",
+    "enterUsd": "Enter USD",
+    "enterIqd": "Enter IQD",
+    "enterBill": "Enter bill amount",
+    "collectHint": "Collect {{amount}}",
+    "overrideHint": "Enter $50, $100, etc.",
+    "autoCalculated": "Auto-calculated",
+    "override": "Override"
+  },
+  "summary": {
+    "cashIn": "Cash IN:",
+    "changeOut": "Change OUT:",
+    "register": "Register:",
+    "shortBy": "Short by {{amount}}"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "savePayment": "Save Payment",
+    "closeX": "×"
+  },
+  "success": {
+    "title": "Payment Recorded!",
+    "printReceipt": "Print Receipt",
+    "done": "Done",
+    "close": "Close"
+  },
+  "validation": {
+    "enterValidRate": "Please enter a valid exchange rate",
+    "enterAmount": "Please enter the amount to register",
+    "enterCash": "Please enter cash received (USD or IQD)",
+    "cantCalculate": "Could not calculate amount to register. Please check cash amounts.",
+    "enterAtLeastOne": "Please enter at least one currency amount received",
+    "exceedsBalance": "Amount exceeds remaining balance ({{balance}})",
+    "invalidChange": "Invalid Change: {{change}} IQD cannot exceed IQD received ({{received}} IQD)"
+  },
+  "confirm": {
+    "underpaymentMessage": "Patient has not paid enough. Amount received is less than amount to register. Continue anyway?",
+    "underpaymentTitle": "Underpayment Warning",
+    "underpaymentConfirm": "Continue"
+  },
+  "toast": {
+    "rateError": "Error setting exchange rate: {{error}}",
+    "paymentError": "Error adding payment: {{error}}",
+    "receiptSent": "Receipt sent via WhatsApp!",
+    "whatsappFailed": "Failed to send WhatsApp",
+    "whatsappError": "WhatsApp error: {{error}}",
+    "printFailed": "Failed to print receipt: {{error}}",
+    "popupBlocked": "Pop-up blocked. Please allow pop-ups for this site."
+  }
+}

@@ -20,23 +20,6 @@ export interface QRCodeResult {
 // ===========================================
 
 /**
- * Generate a QR code as a data URL
- * @param pid - Patient ID
- * @returns Object containing the QR code data URL
- */
-export async function GetQRCode(pid: string): Promise<QRCodeResult> {
-  const qrHostUrl = config.urls.qrHost || 'http://192.168.100.2:80';
-  const qstring = `${qrHostUrl}/front?code=${pid}`;
-
-  try {
-    return { qr: await QRCode.toDataURL(qstring) };
-  } catch (err) {
-    log.error('Failed to generate QR code', { error: (err as Error).message });
-    throw err;
-  }
-}
-
-/**
  * Generate a QR code for sharing a video
  * @param videoId - Video ID
  * @returns Object containing the QR code data URL and the share URL

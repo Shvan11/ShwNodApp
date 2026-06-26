@@ -612,6 +612,7 @@ export const expensesQuery = (filters: ExpenseFilters = {}) =>
       if (filters.categoryId) params.append('categoryId', String(filters.categoryId));
       if (filters.subcategoryId) params.append('subcategoryId', String(filters.subcategoryId));
       if (filters.currency) params.append('currency', filters.currency);
+      if (filters.isMonthly) params.append('isMonthly', filters.isMonthly);
       return fetchJSON<Expense[]>(`/api/expenses?${params}`, {
         signal,
         schema: expenseContract.expenseList.response,

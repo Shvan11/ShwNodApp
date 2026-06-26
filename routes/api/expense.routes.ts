@@ -48,6 +48,7 @@ type ExpenseQueryParams = {
   categoryId?: string;
   subcategoryId?: string;
   currency?: string;
+  isMonthly?: string;
   limit?: string;
   offset?: string;
 };
@@ -60,6 +61,7 @@ type ExpenseFilters = {
   categoryId?: number | null;
   subcategoryId?: number | null;
   currency?: string;
+  isMonthly?: boolean;
   limit?: number | null;
   offset?: number | null;
 };
@@ -71,6 +73,7 @@ interface ExpenseData {
   note?: string;
   categoryId?: number;
   subcategoryId?: number;
+  isMonthly?: boolean;
 }
 
 // ============================================================================
@@ -99,6 +102,11 @@ router.get(
           ? parseInt(req.query.subcategoryId)
           : null,
         currency: req.query.currency,
+        isMonthly: req.query.isMonthly === 'true'
+          ? true
+          : req.query.isMonthly === 'false'
+            ? false
+            : undefined,
         limit: req.query.limit ? parseInt(req.query.limit) : null,
         offset: req.query.offset ? parseInt(req.query.offset) : null,
       };
@@ -186,7 +194,7 @@ router.post(
     res: Response
   ): Promise<void> => {
     try {
-      const { expense_date, amount, currency, note, categoryId, subcategoryId } =
+      const { expense_date, amount, currency, note, categoryId, subcategoryId, isMonthly } =
         req.body;
 
       // Validation
@@ -209,7 +217,8 @@ router.post(
         currency: currency || 'IQD',
         note,
         categoryId: categoryId ? parseInt(String(categoryId)) : undefined,
-        subcategoryId: subcategoryId ? parseInt(String(subcategoryId)) : undefined
+        subcategoryId: subcategoryId ? parseInt(String(subcategoryId)) : undefined,
+        isMonthly: isMonthly ?? false,
       };
 
       const result = await addExpense(expenseData);
@@ -335,7 +344,7 @@ router.put(
   ): Promise<void> => {
     try {
       const { id } = req.params;
-      const { expense_date, amount, currency, note, categoryId, subcategoryId } =
+      const { expense_date, amount, currency, note, categoryId, subcategoryId, isMonthly } =
         req.body;
 
       // Validate that id is a valid number
@@ -366,7 +375,8 @@ router.put(
         currency: currency || 'IQD',
         note,
         categoryId: categoryId ? parseInt(String(categoryId)) : undefined,
-        subcategoryId: subcategoryId ? parseInt(String(subcategoryId)) : undefined
+        subcategoryId: subcategoryId ? parseInt(String(subcategoryId)) : undefined,
+        isMonthly: isMonthly ?? false,
       };
 
       const result = await updateExpense(expenseId, expenseData);

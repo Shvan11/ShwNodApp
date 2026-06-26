@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { MouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../../contexts/ToastContext';
 import { postJSON, httpErrorMessage } from '@/core/http';
 import * as threeshape from '@shared/contracts/threeshape.contract';
@@ -34,6 +35,7 @@ interface NavigationProps {
 }
 
 const Navigation = ({ personId, currentPage }: NavigationProps) => {
+    const { t } = useTranslation('navigation');
     const toast = useToast();
     const [moreActionsExpanded, setMoreActionsExpanded] = useState(false);
     const moreActionsButtonRef = useRef<HTMLDivElement>(null);
@@ -60,8 +62,8 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         enabled: hasPatient,
     });
     const photosLabel = tpData
-        ? `${tpData.length} timepoint${tpData.length === 1 ? '' : 's'}`
-        : 'Photos';
+        ? `${tpData.length} ${t(tpData.length === 1 ? 'photos.timepoint' : 'photos.timepoints')}`
+        : t('photos.labelFallback');
 
     // Patients-folder UNC: prefer the localStorage cache; only hit the API when
     // it's absent. Persist the fetched value back for next time.
@@ -76,6 +78,15 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
             localStorage.setItem('patientsFolder', folderData.patientsFolder);
         }
     }, [cachedFolder, folderData]);
+
+    // Define static navigation items inside the component so labels are reactive to language
+    const staticNavItems: NavItem[] = [
+        { key: 'works', page: 'works', label: t('nav.works'), icon: 'fas fa-tooth' },
+        { key: 'files', page: 'files', label: t('nav.files'), icon: 'fas fa-folder-tree' },
+        { key: 'new-appointment', page: 'new-appointment', label: t('nav.newAppointment'), icon: 'fas fa-plus-circle' },
+        { key: 'appointments', page: 'appointments', label: t('nav.appointments'), icon: 'fas fa-calendar-check' },
+        { key: 'patient-info', page: 'patient-info', label: t('nav.patientInfo'), icon: 'fas fa-id-card' }
+    ];
 
     const handleOpenCSImaging = () => {
         try {
@@ -99,7 +110,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
 
         } catch (err) {
             console.error('Error opening CS Imaging:', err);
-            toast.error('Failed to open CS Imaging: ' + (err instanceof Error ? err.message : 'Unknown error'));
+            toast.error(t('toast.csImagingFailed', { error: err instanceof Error ? err.message : 'Unknown error' }));
         }
     };
 
@@ -115,7 +126,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         // More-actions flyout, which closes the instant it's clicked — so without a
         // toast the click looks like it did nothing. Long duration; we clear it
         // explicitly the moment the call settles.
-        const pendingId = toast.info('Sending patient to 3Shape…', 60000);
+        const pendingId = toast.info(t('toast.sendingToThreeShape'), 60000);
         try {
             await postJSON(
                 `/api/threeshape/patients/${personId}/initiate-workflow`,
@@ -123,10 +134,10 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                 { schema: threeshape.initiateWorkflow.response }
             );
             toast.removeToast(pendingId);
-            toast.success('Sent to 3Shape — opening Unite on the scanner');
+            toast.success(t('toast.sentToThreeShape'));
         } catch (err) {
             toast.removeToast(pendingId);
-            toast.error(httpErrorMessage(err, 'Failed to send to 3Shape'));
+            toast.error(httpErrorMessage(err, t('toast.threeShapeFailed')));
         } finally {
             setSendingTo3Shape(false);
         }
@@ -141,18 +152,9 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
 
         } catch (err) {
             console.error('Error opening Dolphin Imaging:', err);
-            toast.error('Failed to open Dolphin Imaging: ' + (err instanceof Error ? err.message : 'Unknown error'));
+            toast.error(t('toast.dolphinFailed', { error: err instanceof Error ? err.message : 'Unknown error' }));
         }
     };
-
-    // Define static navigation items (Photos removed - will be its own expandable section)
-    const staticNavItems: NavItem[] = [
-        { key: 'works', page: 'works', label: 'Works', icon: 'fas fa-tooth' },
-        { key: 'files', page: 'files', label: 'Files', icon: 'fas fa-folder-tree' },
-        { key: 'new-appointment', page: 'new-appointment', label: 'New Appointment', icon: 'fas fa-plus-circle' },
-        { key: 'appointments', page: 'appointments', label: 'Appointments', icon: 'fas fa-calendar-check' },
-        { key: 'patient-info', page: 'patient-info', label: 'Patient Info', icon: 'fas fa-id-card' }
-    ];
 
     const renderNavItem = (item: NavItem, isActive = false) => {
         const isDisabled = isNewPatient;
@@ -163,7 +165,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                 <div
                     key={item.key}
                     className={className}
-                    title="Save patient first to access this section"
+                    title={t('nav.disabledTooltip')}
                 >
                     <div className="nav-item-icon">
                         <i className={item.icon} />
@@ -210,7 +212,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         e?.preventDefault();
         if (isNewPatient) return;
         if (!patientsFolder) {
-            toast.error('Patients folder path is not configured. Please check settings.');
+            toast.error(t('folder.errorNotConfigured'));
             return;
         }
         // Construct full path: PatientsFolder + PersonID
@@ -236,18 +238,18 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                         {isNewPatient ? (
                             <div
                                 className={`sidebar-nav-item photos-main-btn disabled`}
-                                title="Save patient first to access photos"
+                                title={t('photos.tooltipDisabled')}
                             >
                                 <div className="nav-item-icon">
                                     <i className="fas fa-images" />
                                 </div>
-                                <span className="nav-item-label">Photos</span>
+                                <span className="nav-item-label">{t('photos.labelFallback')}</span>
                             </div>
                         ) : (
                             <Link
                                 to={`/patient/${personId}/photos/tp0`}
                                 className={`sidebar-nav-item photos-main-btn ${isPhotosPageActive ? 'active' : ''}`}
-                                title="Photos"
+                                title={t('photos.tooltip')}
                             >
                                 <div className="nav-item-icon">
                                     <i className="fas fa-images" />
@@ -267,12 +269,12 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                         tabIndex={0}
                         onClick={handleCSImagingClick}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCSImagingClick(); } }}
-                        title={isNewPatient ? "Save patient first to access CS Imaging" : "Open CS Imaging Trophy"}
+                        title={isNewPatient ? t('csImaging.tooltipDisabled') : t('csImaging.tooltip')}
                     >
                         <div className="nav-item-icon">
                             <i className="fas fa-radiation" />
                         </div>
-                        <span className="nav-item-label">CS Imaging</span>
+                        <span className="nav-item-label">{t('csImaging.label')}</span>
                     </div>
 
                     {/* Patient Folder Button - Outside wrapper */}
@@ -282,12 +284,12 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                         tabIndex={0}
                         onClick={handleFolderClick}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleFolderClick(); } }}
-                        title={isNewPatient ? "Save patient first to access folder" : "Open Patient Folder"}
+                        title={isNewPatient ? t('folder.tooltipDisabled') : t('folder.tooltip')}
                     >
                         <div className="nav-item-icon">
                             <i className="fas fa-folder-open" />
                         </div>
-                        <span className="nav-item-label">Open in Windows</span>
+                        <span className="nav-item-label">{t('folder.label')}</span>
                     </div>
 
                     {/* More Actions Button with Flyout - ONLY this button triggers the flyout */}
@@ -299,12 +301,12 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                     >
                         <div
                             className={`sidebar-nav-item more-actions-btn ${(currentPage === 'compare' || currentPage === 'xrays' || currentPage === 'slideshow' || currentPage === 'scans') ? 'active' : ''} ${isNewPatient ? 'disabled' : ''}`}
-                            title={isNewPatient ? "Save patient first to access more actions" : "More Actions"}
+                            title={isNewPatient ? t('moreActions.tooltipDisabled') : t('moreActions.tooltip')}
                         >
                             <div className="nav-item-icon">
                                 <i className="fas fa-ellipsis-h" />
                             </div>
-                            <span className="nav-item-label">More Actions</span>
+                            <span className="nav-item-label">{t('moreActions.label')}</span>
                         </div>
                     </div>
                 </div>
@@ -327,7 +329,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             <div className="action-item-icon">
                                 <i className="fas fa-exchange-alt" />
                             </div>
-                            <span className="action-item-label">Compare Photos</span>
+                            <span className="action-item-label">{t('flyout.comparePhotos')}</span>
                         </Link>
 
                         <Link
@@ -338,7 +340,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             <div className="action-item-icon">
                                 <i className="fas fa-film" />
                             </div>
-                            <span className="action-item-label">Presentation</span>
+                            <span className="action-item-label">{t('flyout.presentation')}</span>
                         </Link>
 
                         <Link
@@ -349,7 +351,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             <div className="action-item-icon">
                                 <i className="fas fa-x-ray" />
                             </div>
-                            <span className="action-item-label">X-rays</span>
+                            <span className="action-item-label">{t('flyout.xrays')}</span>
                         </Link>
 
                         <Link
@@ -360,7 +362,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             <div className="action-item-icon">
                                 <i className="fas fa-cube" />
                             </div>
-                            <span className="action-item-label">3D Scans</span>
+                            <span className="action-item-label">{t('flyout.scans')}</span>
                         </Link>
 
                         <Link
@@ -372,12 +374,12 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                                 void handleOpen3Shape();
                                 setMoreActionsExpanded(false);
                             }}
-                            title={isNewPatient ? "Save patient first" : "Send patient to 3Shape & start a scan"}
+                            title={isNewPatient ? t('flyout.threeShapeDisabledTooltip') : t('flyout.threeShapeTooltip')}
                         >
                             <div className="action-item-icon">
-                                <img src="/images/3Shape_transparent_256x256.png" alt="3Shape" />
+                                <img src="/images/3Shape_transparent_256x256.png" alt={t('flyout.threeShapeAlt')} />
                             </div>
-                            <span className="action-item-label">{sendingTo3Shape ? 'Sending…' : '3Shape'}</span>
+                            <span className="action-item-label">{sendingTo3Shape ? t('flyout.threeShapeSending') : t('flyout.threeShape')}</span>
                         </Link>
 
                         <Link
@@ -389,12 +391,12 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                                 handleOpenDolphin();
                                 setMoreActionsExpanded(false);
                             }}
-                            title={isNewPatient ? "Save patient first to access Dolphin Imaging" : "Launch Dolphin Imaging with patient data"}
+                            title={isNewPatient ? t('flyout.dolphinDisabledTooltip') : t('flyout.dolphinTooltip')}
                         >
                             <div className="action-item-icon">
-                                <img src="/images/dolphin-logo@2x.png" alt="Dolphin" />
+                                <img src="/images/dolphin-logo@2x.png" alt={t('flyout.dolphinAlt')} />
                             </div>
-                            <span className="action-item-label">Dolphin Imaging</span>
+                            <span className="action-item-label">{t('flyout.dolphin')}</span>
                         </Link>
 
                         <Link
@@ -406,12 +408,12 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                                 setShowNativePhotoEditor(true);
                                 setMoreActionsExpanded(false);
                             }}
-                            title={isNewPatient ? "Save patient first" : "Lay out photos in the in-app editor"}
+                            title={isNewPatient ? t('flyout.photoLayoutDisabledTooltip') : t('flyout.photoLayoutTooltip')}
                         >
                             <div className="action-item-icon">
                                 <i className="fas fa-images" />
                             </div>
-                            <span className="action-item-label">Photo Layout</span>
+                            <span className="action-item-label">{t('flyout.photoLayout')}</span>
                         </Link>
                     </div>
                 </div>

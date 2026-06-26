@@ -44,8 +44,8 @@ export interface DailyData {
   SumUSD?: number;
   ExpensesIQD?: number;
   ExpensesUSD?: number;
-  QasaIQD?: number;
-  QasaUSD?: number;
+  ExpectedCashIQD?: number;
+  ExpectedCashUSD?: number;
   GrandTotal?: number;
   GrandTotalIQD?: number;
   FinalIQDSum?: number;
@@ -105,8 +105,8 @@ export function calculateMonthlyStatistics(
   let totalUSD = 0;
   let totalExpensesIQD = 0;
   let totalExpensesUSD = 0;
-  let finalQasaIQD = 0;
-  let finalQasaUSD = 0;
+  let finalExpectedCashIQD = 0;
+  let finalExpectedCashUSD = 0;
 
   // Aggregate daily values
   dailyData.forEach((day) => {
@@ -114,9 +114,9 @@ export function calculateMonthlyStatistics(
     totalUSD += day.SumUSD || 0;
     totalExpensesIQD += Math.abs(day.ExpensesIQD || 0);
     totalExpensesUSD += Math.abs(day.ExpensesUSD || 0);
-    // Use the last day's Qasa values as the final balance
-    finalQasaIQD = day.QasaIQD || 0;
-    finalQasaUSD = day.QasaUSD || 0;
+    // Use the last day's Expected Cash values as the final balance
+    finalExpectedCashIQD = day.ExpectedCashIQD || 0;
+    finalExpectedCashUSD = day.ExpectedCashUSD || 0;
   });
 
   // Calculate net profit
@@ -145,8 +145,8 @@ export function calculateMonthlyStatistics(
       IQD: Math.round(grandTotalIQD),
     },
     cashBox: {
-      IQD: finalQasaIQD,
-      USD: finalQasaUSD,
+      IQD: finalExpectedCashIQD,
+      USD: finalExpectedCashUSD,
     },
   };
 }

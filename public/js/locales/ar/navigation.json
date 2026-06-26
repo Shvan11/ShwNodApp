@@ -1,0 +1,58 @@
+{
+  "nav": {
+    "works": "الأعمال",
+    "files": "الملفات",
+    "newAppointment": "موعد جديد",
+    "appointments": "المواعيد",
+    "patientInfo": "معلومات المريض",
+    "disabledTooltip": "احفظ المريض أولاً للوصول إلى هذا القسم"
+  },
+  "photos": {
+    "timepoint": "وقت تصوير",
+    "timepoints": "أوقات تصوير",
+    "labelFallback": "الصور",
+    "tooltip": "الصور",
+    "tooltipDisabled": "احفظ المريض أولاً للوصول إلى الصور"
+  },
+  "csImaging": {
+    "label": "CS Imaging",
+    "tooltip": "فتح CS Imaging Trophy",
+    "tooltipDisabled": "احفظ المريض أولاً للوصول إلى CS Imaging"
+  },
+  "folder": {
+    "label": "فتح في Windows",
+    "tooltip": "فتح مجلد المريض",
+    "tooltipDisabled": "احفظ المريض أولاً للوصول إلى المجلد",
+    "errorNotConfigured": "مسار مجلد المرضى غير مكوَّن. يرجى التحقق من الإعدادات."
+  },
+  "moreActions": {
+    "label": "المزيد من الإجراءات",
+    "tooltip": "المزيد من الإجراءات",
+    "tooltipDisabled": "احفظ المريض أولاً للوصول إلى المزيد من الإجراءات"
+  },
+  "flyout": {
+    "comparePhotos": "مقارنة الصور",
+    "presentation": "عرض تقديمي",
+    "xrays": "أشعة سينية",
+    "scans": "مسوحات ثلاثية الأبعاد",
+    "threeShape": "3Shape",
+    "threeShapeTooltip": "إرسال المريض إلى 3Shape وبدء مسح",
+    "threeShapeDisabledTooltip": "احفظ المريض أولاً",
+    "threeShapeSending": "جارٍ الإرسال…",
+    "threeShapeAlt": "3Shape",
+    "dolphin": "Dolphin Imaging",
+    "dolphinTooltip": "تشغيل Dolphin Imaging ببيانات المريض",
+    "dolphinDisabledTooltip": "احفظ المريض أولاً للوصول إلى Dolphin Imaging",
+    "dolphinAlt": "Dolphin",
+    "photoLayout": "تخطيط الصور",
+    "photoLayoutTooltip": "ترتيب الصور في محرر التطبيق",
+    "photoLayoutDisabledTooltip": "احفظ المريض أولاً"
+  },
+  "toast": {
+    "sendingToThreeShape": "جارٍ إرسال المريض إلى 3Shape…",
+    "sentToThreeShape": "تم الإرسال إلى 3Shape — جارٍ فتح Unite على جهاز المسح",
+    "threeShapeFailed": "فشل الإرسال إلى 3Shape",
+    "csImagingFailed": "فشل فتح CS Imaging: {{error}}",
+    "dolphinFailed": "فشل فتح Dolphin Imaging: {{error}}"
+  }
+}

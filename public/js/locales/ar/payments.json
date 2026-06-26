@@ -1,0 +1,89 @@
+{
+  "modal": {
+    "title": "إضافة دفعة",
+    "workFallback": "علاج #{{id}}"
+  },
+  "balance": {
+    "label": "الرصيد",
+    "discountApplied": "الخصم"
+  },
+  "exchangeRate": {
+    "noRate": "لا يوجد سعر صرف لـ {{date}}",
+    "setRate": "تعيين السعر",
+    "save": "حفظ",
+    "display": "1 USD = {{rate}} IQD"
+  },
+  "form": {
+    "currency": "عملة الدفع",
+    "usdOnly": "دولار فقط",
+    "iqdOnly": "دينار فقط",
+    "mixed": "مختلط",
+    "entryMode": "وضع الإدخال",
+    "locked": "مقفل",
+    "entryModeAria": "تبديل وضع الإدخال بين المبلغ والنقد",
+    "amount": "تسجيل مبلغ",
+    "cash": "استلام نقد",
+    "date": "التاريخ",
+    "amountLabel": "المبلغ المسجل ({{currency}})",
+    "auto": "تلقائي",
+    "enterAmount": "أدخل المبلغ",
+    "payFullBalance": "دفع الرصيد كاملاً ({{amount}})",
+    "received": "المستلم بـ {{currency}}",
+    "usdReceived": "الدولار المستلم",
+    "iqdReceived": "الدينار المستلم",
+    "change": "الباقي (دينار)",
+    "na": "لا ينطبق",
+    "disabledDash": "—",
+    "lockAuto": "قفل (استخدام الحساب التلقائي)",
+    "unlockBill": "فتح (إدخال مبلغ الورقة الفعلي)",
+    "unlockReceived": "فتح (إدخال المبلغ المستلم الفعلي)",
+    "enterUsd": "أدخل الدولار",
+    "enterIqd": "أدخل الدينار",
+    "enterBill": "أدخل مبلغ الورقة",
+    "collectHint": "اجمع {{amount}}",
+    "overrideHint": "أدخل $50 أو $100 إلخ",
+    "autoCalculated": "محسوب تلقائياً",
+    "override": "تجاوز"
+  },
+  "summary": {
+    "cashIn": "نقد وارد:",
+    "changeOut": "باقٍ صادر:",
+    "register": "التسجيل:",
+    "shortBy": "ناقص {{amount}}"
+  },
+  "actions": {
+    "cancel": "إلغاء",
+    "saving": "جارٍ الحفظ...",
+    "savePayment": "حفظ الدفعة",
+    "closeX": "×"
+  },
+  "success": {
+    "title": "تم تسجيل الدفعة!",
+    "printReceipt": "طباعة الإيصال",
+    "done": "تم",
+    "close": "إغلاق"
+  },
+  "validation": {
+    "enterValidRate": "يرجى إدخال سعر صرف صحيح",
+    "enterAmount": "يرجى إدخال المبلغ المراد تسجيله",
+    "enterCash": "يرجى إدخال النقد المستلم (دولار أو دينار)",
+    "cantCalculate": "تعذّر حساب المبلغ المراد تسجيله. يرجى التحقق من المبالغ النقدية.",
+    "enterAtLeastOne": "يرجى إدخال مبلغ بعملة واحدة على الأقل",
+    "exceedsBalance": "المبلغ يتجاوز الرصيد المتبقي ({{balance}})",
+    "invalidChange": "باقٍ غير صحيح: {{change}} دينار لا يمكن أن يتجاوز الدينار المستلم ({{received}} دينار)"
+  },
+  "confirm": {
+    "underpaymentMessage": "لم يدفع المريض المبلغ الكافي. المبلغ المستلم أقل من المبلغ المراد تسجيله. هل تريد المتابعة؟",
+    "underpaymentTitle": "تحذير دفع ناقص",
+    "underpaymentConfirm": "متابعة"
+  },
+  "toast": {
+    "rateError": "خطأ في تعيين سعر الصرف: {{error}}",
+    "paymentError": "خطأ في إضافة الدفعة: {{error}}",
+    "receiptSent": "تم إرسال الإيصال عبر واتساب!",
+    "whatsappFailed": "فشل الإرسال عبر واتساب",
+    "whatsappError": "خطأ في واتساب: {{error}}",
+    "printFailed": "فشل طباعة الإيصال: {{error}}",
+    "popupBlocked": "تم حجب النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع."
+  }
+}

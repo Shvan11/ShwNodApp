@@ -8,8 +8,6 @@
  */
 import type { Pool } from 'pg';
 
-export type CdcOp = 'I' | 'U' | 'D';
-
 /** A destination the change feed replicates to (e.g. the raw failover replica, the portal Supabase). */
 export interface SyncSink {
   /** Must match the sink name in cdc_sink_control and the trigger's TG_ARGV. */

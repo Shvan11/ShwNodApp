@@ -120,14 +120,26 @@ async function processXrayImage(pid: string, file: string, detailsDir: string): 
   }
 
   const args = constructArgs(source, destination, pid, detailsDir);
+  const PROCESS_TIMEOUT_MS = 60_000;
 
   return new Promise((resolve, reject) => {
     const child: ChildProcess = execFile(csExport, args);
+
+    const timer = setTimeout(() => {
+      child.kill();
+      log.error('X-ray processing timed out', { file });
+      if (fs.existsSync(source)) {
+        resolve(source);
+      } else {
+        reject(new Error(`X-ray processing timed out and source file not found: ${source}`));
+      }
+    }, PROCESS_TIMEOUT_MS);
 
     child.stdout?.on('data', (data: string) => log.debug('X-ray processing stdout', { data }));
     child.stderr?.on('data', (data: string) => log.debug('X-ray processing stderr', { data }));
 
     child.on('exit', (code: number | null) => {
+      clearTimeout(timer);
       if (code === 0) {
         log.info('X-ray processed successfully', { destination });
         resolve(destination);
@@ -149,6 +161,7 @@ async function processXrayImage(pid: string, file: string, detailsDir: string): 
     });
 
     child.on('error', (error: Error) => {
+      clearTimeout(timer);
       log.error('X-ray processing command error', { error: error.message });
       // Graceful fallback - return original file if it exists
       if (fs.existsSync(source)) {

@@ -19,24 +19,6 @@ interface LockWaiter {
 }
 
 /**
- * Lock status interface
- */
-interface LockStatus {
-  activeLocks: number;
-  locks: Record<string, LockInfo & { duration: number }>;
-  totalOperations: number;
-}
-
-/**
- * State snapshot interface
- */
-interface StateSnapshot {
-  state: Record<string, unknown>;
-  locks: LockStatus;
-  timestamp: number;
-}
-
-/**
  * State validation interface
  */
 interface StateValidation {
@@ -49,27 +31,6 @@ interface StateValidation {
     [key: string]: number;
   };
   [key: string]: boolean | string[] | StateValidation['stats'];
-}
-
-/**
- * State backup interface
- */
-interface StateBackup {
-  state: Map<string, unknown>;
-  timestamp: number;
-  operations: number;
-}
-
-/**
- * State export interface
- */
-interface StateExport {
-  state: Record<string, unknown>;
-  metadata: {
-    timestamp: number;
-    operations: number;
-    size: number;
-  };
 }
 
 /**
@@ -244,58 +205,6 @@ export class StateManager {
   }
 
   /**
-   * Perform multiple atomic operations
-   */
-  async batchAtomicOperations<T extends Record<string, unknown>>(
-    operations: Record<keyof T, (currentValue: unknown) => unknown | Promise<unknown>>
-  ): Promise<T> {
-    const keys = Object.keys(operations) as Array<keyof T>;
-    const results = {} as T;
-
-    // Acquire all locks first (in sorted order to prevent deadlocks)
-    const sortedKeys = [...keys].sort() as Array<keyof T>;
-    for (const key of sortedKeys) {
-      await this.acquireLock(key as string);
-    }
-
-    try {
-      // Execute all operations
-      for (const key of keys) {
-        const currentValue = this.state.get(key as string);
-        const newValue = await operations[key](currentValue);
-        this.state.set(key as string, newValue);
-        results[key] = newValue as T[keyof T];
-      }
-
-      return results;
-    } finally {
-      // Release all locks
-      for (const key of sortedKeys) {
-        this.releaseLock(key as string);
-      }
-    }
-  }
-
-  /**
-   * Get current lock status
-   */
-  getLockStatus(): LockStatus {
-    const locks: Record<string, LockInfo & { duration: number }> = {};
-    for (const [key, lockInfo] of this.locks.entries()) {
-      locks[key] = {
-        ...lockInfo,
-        duration: Date.now() - lockInfo.acquired,
-      };
-    }
-
-    return {
-      activeLocks: this.locks.size,
-      locks,
-      totalOperations: this.operations,
-    };
-  }
-
-  /**
    * Clean up expired locks (safety mechanism)
    */
   cleanupExpiredLocks(maxAge = 30000): number {
@@ -316,27 +225,6 @@ export class StateManager {
     }
 
     return expiredKeys.length;
-  }
-
-  /**
-   * Get state snapshot for debugging
-   */
-  getSnapshot(): StateSnapshot {
-    const snapshot: Record<string, unknown> = {};
-    for (const [key, value] of this.state.entries()) {
-      try {
-        // Handle circular references and non-serializable objects
-        snapshot[key] = JSON.parse(JSON.stringify(value));
-      } catch {
-        snapshot[key] = `[Non-serializable: ${typeof value}]`;
-      }
-    }
-
-    return {
-      state: snapshot,
-      locks: this.getLockStatus(),
-      timestamp: Date.now(),
-    };
   }
 
   /**
@@ -380,87 +268,6 @@ export class StateManager {
       issues,
       stats,
     };
-  }
-
-  /**
-   * Backup current state
-   */
-  backup(): StateBackup {
-    return {
-      state: new Map(this.state),
-      timestamp: Date.now(),
-      operations: this.operations,
-    };
-  }
-
-  /**
-   * Restore state from backup
-   */
-  restore(backup: StateBackup): void {
-    if (!backup || !backup.state) {
-      throw new Error('Invalid backup data');
-    }
-
-    // Clear current state and locks
-    this.clear();
-
-    // Restore state
-    for (const [key, value] of backup.state.entries()) {
-      this.state.set(key, value);
-    }
-
-    // Restore operation counter if available
-    if (backup.operations) {
-      this.operations = backup.operations;
-    }
-
-    log.info(`State restored from backup (${backup.timestamp}), ${this.state.size} keys restored`);
-  }
-
-  /**
-   * Export state as JSON
-   */
-  exportState(): string {
-    const exportData: StateExport = {
-      state: Object.fromEntries(this.state),
-      metadata: {
-        timestamp: Date.now(),
-        operations: this.operations,
-        size: this.state.size,
-      },
-    };
-
-    return JSON.stringify(exportData, null, 2);
-  }
-
-  /**
-   * Import state from JSON
-   */
-  importState(jsonData: string): void {
-    try {
-      const importData = JSON.parse(jsonData) as StateExport;
-
-      if (!importData.state) {
-        throw new Error('Invalid state data format');
-      }
-
-      // Clear current state
-      this.clear();
-
-      // Import state
-      for (const [key, value] of Object.entries(importData.state)) {
-        this.state.set(key, value);
-      }
-
-      // Import metadata if available
-      if (importData.metadata?.operations) {
-        this.operations = importData.metadata.operations;
-      }
-
-      log.info(`State imported, ${this.state.size} keys loaded`);
-    } catch (error) {
-      throw new Error(`Failed to import state: ${(error as Error).message}`, { cause: error });
-    }
   }
 
   /**

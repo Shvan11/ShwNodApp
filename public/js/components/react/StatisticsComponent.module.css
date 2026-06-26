@@ -88,7 +88,7 @@
     padding: 1.5rem;
     background-color: var(--surface);
     border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-md);
 }
 
 .dateSelector {
@@ -225,13 +225,13 @@
     background: var(--surface);
     border-radius: 12px;
     padding: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-md);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .summaryCard:hover {
     transform: translateY(-5px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-lg);
 }
 
 .cardHeader {
@@ -240,7 +240,7 @@
     gap: 0.75rem;
     margin-bottom: 1rem;
     padding-bottom: 0.75rem;
-    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 2px solid var(--border-color);
 }
 
 .cardHeader i {
@@ -280,7 +280,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 0.5rem;
-    background-color: rgba(0, 0, 0, 0.02);
+    background-color: var(--background-secondary);
     border-radius: 6px;
 }
 
@@ -427,7 +427,7 @@
     background: var(--surface);
     border-radius: 12px;
     padding: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-md);
     margin-bottom: 2rem;
 }
 
@@ -496,21 +496,21 @@
     font-weight: bold;
 }
 
-/* Qasa (Cash Box) Columns - Highlighted for Daily Auditing */
-.qasaColumn {
+/* Expected Cash Columns - Highlighted for Daily Auditing */
+.expectedCashColumn {
     background-color: rgba(243, 156, 18, 0.1);
     font-weight: var(--font-weight-semibold);
 }
 
-.qasaIqd {
+.expectedCashIqd {
     color: var(--success-green);
 }
 
-.qasaUsd {
+.expectedCashUsd {
     color: var(--warning-orange);
 }
 
-th.qasaColumn {
+th.expectedCashColumn {
     background-color: var(--warning-color);
     color: var(--color-white);
 }
@@ -540,6 +540,7 @@ th.qasaColumn {
     }
 
     body {
+        /* stylelint-disable-next-line declaration-property-value-disallowed-list -- print is intentionally light (page background) */
         background: white;
     }
 
@@ -587,7 +588,7 @@ th.qasaColumn {
 .statisticsModalContainer {
     background: var(--surface);
     border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-xl);
     width: 1200px;
     max-width: 95vw;
     height: 85vh;
@@ -616,7 +617,7 @@ th.qasaColumn {
     gap: 1rem;
     margin-bottom: 1.5rem;
     padding: 1.5rem;
-    background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-300) 100%);
+    background: linear-gradient(135deg, var(--background-secondary) 0%, var(--surface-muted) 100%);
     border-radius: 8px;
 }
 
@@ -639,7 +640,7 @@ th.qasaColumn {
 }
 
 .statisticsInvoiceSummary .summaryItem.highlight {
-    background: rgba(255, 255, 255, 0.8);
+    background: var(--surface);
     padding: 1rem;
     border-radius: 6px;
 }
@@ -700,12 +701,12 @@ th.qasaColumn {
     position: sticky;
     top: 0;
     z-index: 10;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
 }
 
 .statisticsInvoicesTable td {
     padding: 0.75rem;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .statisticsInvoicesTable tbody tr:hover {
@@ -764,7 +765,7 @@ th.qasaColumn {
 /* Modal Footer */
 .statisticsModalFooter {
     padding: 1rem 2rem;
-    border-top: 1px solid var(--gray-200);
+    border-top: 1px solid var(--border-color);
     display: flex;
     justify-content: flex-end;
     flex-shrink: 0;
@@ -948,7 +949,7 @@ th.qasaColumn {
         border: 1px solid var(--border-color);
         border-radius: 8px;
         padding: 1rem;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        box-shadow: var(--shadow-sm);
     }
 
     .dataTable tbody tr.clickableRow:active {
@@ -960,7 +961,7 @@ th.qasaColumn {
         justify-content: space-between;
         align-items: center;
         padding: 0.625rem 0;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        border-bottom: 1px solid var(--border-color);
         text-align: right;
         min-width: 0;
         white-space: normal;
@@ -997,7 +998,7 @@ th.qasaColumn {
         word-break: normal;
     }
 
-    .dataTable .qasaColumn {
+    .dataTable .expectedCashColumn {
         background-color: rgba(243, 156, 18, 0.08);
         padding: 0.75rem;
         margin: 0.25rem -1rem;
@@ -1025,7 +1026,7 @@ th.qasaColumn {
         justify-content: space-between;
         align-items: center;
         padding: 0.625rem 0;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        border-bottom: 1px solid var(--border-color);
         text-align: right;
     }
 
@@ -1102,7 +1103,7 @@ th.qasaColumn {
         border: 1px solid var(--border-color);
         border-radius: 8px;
         padding: 1rem;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        box-shadow: var(--shadow-sm);
     }
 
     .statisticsInvoicesTable tbody td {
@@ -1110,7 +1111,7 @@ th.qasaColumn {
         justify-content: space-between;
         align-items: center;
         padding: 0.625rem 0;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        border-bottom: 1px solid var(--border-color);
         text-align: right;
     }
 
@@ -1356,7 +1357,7 @@ th.qasaColumn {
         font-size: 0.8125rem;
     }
 
-    .dataTable .qasaColumn {
+    .dataTable .expectedCashColumn {
         padding: 0.625rem;
         margin: 0.25rem -0.75rem;
         padding-left: 0.75rem;

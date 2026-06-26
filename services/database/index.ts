@@ -53,6 +53,8 @@ export interface HealthCheckResult {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+let shuttingDown = false;
+
 function getPoolStats(): PoolStats {
   const pool = getPgPool();
   const total = pool.totalCount ?? 0;
@@ -62,7 +64,7 @@ function getPoolStats(): PoolStats {
     activeConnections: Math.max(0, total - idle),
     waitingRequests: pool.waitingCount ?? 0,
     maxConnections: config.databasePg.max,
-    isShuttingDown: false,
+    isShuttingDown: shuttingDown,
   };
 }
 
@@ -164,6 +166,7 @@ export async function healthCheck(): Promise<HealthCheckResult> {
 }
 
 export async function shutdown(): Promise<void> {
+  shuttingDown = true;
   // The pg pool / Kysely instance are torn down by the ResourceManager 'pg-pool' cleanup
   // registered in kysely.ts (called from gracefulShutdown after this). Nothing to do here.
   log.info('PostgreSQL database service shutdown (pool teardown handled by ResourceManager)');

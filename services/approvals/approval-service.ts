@@ -18,7 +18,7 @@ import { sql, type Transaction } from 'kysely';
 import { getKysely, withPgTransaction, type Database } from '../database/kysely.js';
 import { normalizeRole, ROLES } from '../../shared/auth/roles.js';
 import { log } from '../../utils/logger.js';
-import { APPROVAL_ACTIONS } from './approval-actions.js';
+import { APPROVAL_ACTIONS, type ApprovalActionDef } from './approval-actions.js';
 import type { ApprovalActionType, ApprovalStatus } from '../../shared/contracts/approvals.contract.js';
 
 // Narrow session-only interface — the service only reads req.session fields, so
@@ -145,8 +145,18 @@ export async function approve(
   req: WithSession
 ): Promise<ApproveResult> {
   const reviewedBy = req.session?.username ?? 'unknown';
+  const db = getKysely();
 
-  return withPgTransaction(async (trx) => {
+  // Phase 1: Atomic claim + integrity checks in a transaction.
+  // The claim commits BEFORE apply() runs so a trx-commit failure cannot
+  // leave the row stuck at 'pending' while the write side-effect has already landed.
+  type Phase1 =
+    | { status: 'conflict' }
+    | { status: 'missing'; row: ApprovalRow }
+    | { status: 'stale'; row: ApprovalRow }
+    | { status: 'claimed'; row: ApprovalRow; action: ApprovalActionDef };
+
+  const phase1 = await withPgTransaction(async (trx): Promise<Phase1> => {
     // 1. Atomic claim — only succeeds if still pending.
     const claimRes = await sql<ApprovalRow>`
       UPDATE approval_requests
@@ -156,8 +166,7 @@ export async function approve(
     `.execute(trx);
 
     if (claimRes.rows.length === 0) {
-      // Already reviewed by someone else — no-op.
-      return { status: 'conflict' } as const;
+      return { status: 'conflict' };
     }
 
     const row = claimRes.rows[0]!;
@@ -167,7 +176,7 @@ export async function approve(
         UPDATE approval_requests SET status='failed', review_note='Unknown action_type'
         WHERE request_id=${requestId}
       `.execute(trx);
-      return { status: 'missing', row } as const;
+      return { status: 'missing', row };
     }
 
     const targetId = action.getTargetId(row.payload);
@@ -180,8 +189,7 @@ export async function approve(
         SET status='failed', review_note='Target no longer exists'
         WHERE request_id=${requestId}
       `.execute(trx);
-      const failedRow: ApprovalRow = { ...row, status: 'failed', review_note: 'Target no longer exists' };
-      return { status: 'missing', row: failedRow } as const;
+      return { status: 'missing', row: { ...row, status: 'failed', review_note: 'Target no longer exists' } };
     }
 
     // 3. Stale check — compare stored version with current row version.
@@ -193,34 +201,31 @@ export async function approve(
           SET status='stale', review_note='Target changed since request was submitted'
           WHERE request_id=${requestId}
         `.execute(trx);
-        const staleRow: ApprovalRow = { ...row, status: 'stale', review_note: 'Target changed since request was submitted' };
-        return { status: 'stale', row: staleRow } as const;
+        return { status: 'stale', row: { ...row, status: 'stale', review_note: 'Target changed since request was submitted' } };
       }
     }
 
-    // 4. Apply the write (as admin) within the same transaction.
-    // The action uses getKysely() internally; we run outside the trx isolation
-    // since actions call existing service functions that start their own queries.
-    // After the trx releases the claim row, the action runs synchronously below.
-    // (Nested trx would require SAVEPOINT support not universally safe here.)
-    // The claim UPDATE committed above prevents double-apply regardless.
-    try {
-      await action.apply(row.payload);
-    } catch (err) {
-      log.error('Approval apply() failed', { requestId, error: (err as Error).message });
-      // Downgrade from 'approved' to 'failed' — only touches our claimed row.
-      await sql`
-        UPDATE approval_requests
-        SET status='failed',
-            review_note=${`Apply error: ${(err as Error).message}`}
-        WHERE request_id=${requestId}
-      `.execute(trx);
-      const failedRow: ApprovalRow = { ...row, status: 'failed' };
-      return { status: 'missing', row: failedRow } as const;
-    }
-
-    return { status: 'approved', row: { ...row, status: 'approved', reviewed_by: reviewedBy } } as const;
+    return { status: 'claimed', row, action };
   });
+
+  if (phase1.status !== 'claimed') return phase1;
+
+  // Phase 2: Apply after the claim has committed. A failure here cannot cause
+  // double-apply because the row is already 'approved' in the DB.
+  const { row, action } = phase1;
+  try {
+    await action.apply(row.payload);
+    return { status: 'approved', row: { ...row, status: 'approved', reviewed_by: reviewedBy } };
+  } catch (err) {
+    log.error('Approval apply() failed', { requestId, error: (err as Error).message });
+    await sql`
+      UPDATE approval_requests
+      SET status='failed',
+          review_note=${`Apply error: ${(err as Error).message}`}
+      WHERE request_id=${requestId}
+    `.execute(db);
+    return { status: 'missing', row: { ...row, status: 'failed' } };
+  }
 }
 
 // ---------------------------------------------------------------------------

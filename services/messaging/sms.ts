@@ -87,7 +87,7 @@ class SmsService {
       throw new Error('Twilio client not initialized');
     }
 
-    this.sentSmsList = [];
+    const sentSmsList: SentSms[] = [];
     const smsList = (await database.getSmsMessages(date)) as SmsMessage[];
 
     for (const sms of smsList) {
@@ -100,7 +100,7 @@ class SmsService {
           });
 
           if (message) {
-            this.sentSmsList.push({ id: sms.id, sid: message.sid });
+            sentSmsList.push({ id: sms.id, sid: message.sid });
           }
         } catch (error) {
           log.error('Error sending SMS:', { error: error instanceof Error ? error.message : String(error) });
@@ -108,15 +108,15 @@ class SmsService {
       }
     }
 
-    if (this.sentSmsList.length > 0) {
-      await database.updateSmsIds(this.sentSmsList);
+    if (sentSmsList.length > 0) {
+      await database.updateSmsIds(sentSmsList);
     }
 
     // Schedule a status check in 5 min, replacing any pending check for the same
     // date so repeated sends can't stack timers.
     this.scheduleStatusCheck(date);
 
-    return this.sentSmsList;
+    return sentSmsList;
   }
 
   /**

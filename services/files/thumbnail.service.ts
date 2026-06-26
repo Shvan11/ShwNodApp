@@ -27,10 +27,6 @@ const ALLOWED_WIDTHS = new Set([120, 240, 480, 2048]);
 const THUMB_CACHE_DIR =
   process.env.THUMB_CACHE_DIR || path.join(process.cwd(), '.cache', 'thumbs');
 
-export function isAllowedThumbWidth(width: number): boolean {
-  return ALLOWED_WIDTHS.has(width);
-}
-
 async function exists(p: string): Promise<boolean> {
   try {
     await fs.access(p);

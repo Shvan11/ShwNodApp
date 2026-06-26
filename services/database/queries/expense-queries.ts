@@ -19,6 +19,7 @@ interface ExpenseFilters {
   categoryId?: number;
   subcategoryId?: number;
   currency?: string;
+  isMonthly?: boolean;
   // Optional pagination. When omitted, behavior is unchanged (all matching rows).
   limit?: number;
   offset?: number;
@@ -42,6 +43,7 @@ type Expense = {
   // section in CLAUDE.md ("DB-stored lookup values").
   category_name_ar: string | null;
   subcategory_name_ar: string | null;
+  is_monthly: boolean;
 };
 
 type ExpenseCategory = {
@@ -65,6 +67,7 @@ interface ExpenseData {
   note?: string;
   categoryId?: number;
   subcategoryId?: number;
+  isMonthly?: boolean;
 }
 
 interface ExpenseSummary {
@@ -98,6 +101,7 @@ export async function getAllExpenses(filters: ExpenseFilters = {}): Promise<Expe
       'e.note',
       'e.category_id',
       'e.subcategory_id',
+      'e.is_monthly',
       'c.category_name',
       's.subcategory_name',
       'c.category_name_ar',
@@ -119,6 +123,9 @@ export async function getAllExpenses(filters: ExpenseFilters = {}): Promise<Expe
   if (filters.currency) {
     // citext is case-insensitive; keep the trim to match LTRIM(RTRIM(...)).
     q = q.where(sql<boolean>`btrim(${sql.ref('e.currency')}) = ${filters.currency}`);
+  }
+  if (filters.isMonthly != null) {
+    q = q.where('e.is_monthly', '=', filters.isMonthly);
   }
 
   q = q.orderBy('e.expense_date', 'desc').orderBy('e.id', 'desc');
@@ -151,6 +158,7 @@ export async function getExpenseById(id: number): Promise<Expense | null> {
       'e.note',
       'e.category_id',
       'e.subcategory_id',
+      'e.is_monthly',
       'c.category_name',
       's.subcategory_name',
       'c.category_name_ar',
@@ -208,6 +216,7 @@ export async function addExpense(expenseData: ExpenseData): Promise<{ NewID: num
       note: expenseData.note || null,
       category_id: expenseData.categoryId || null,
       subcategory_id: expenseData.subcategoryId || null,
+      is_monthly: expenseData.isMonthly ?? false,
     })
     .returning('id as NewID')
     .executeTakeFirst();
@@ -236,6 +245,7 @@ export async function updateExpense(
       note: expenseData.note || null,
       category_id: expenseData.categoryId || null,
       subcategory_id: expenseData.subcategoryId || null,
+      is_monthly: expenseData.isMonthly ?? false,
     })
     .where('id', '=', id)
     .execute();

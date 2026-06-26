@@ -25,6 +25,7 @@ interface FiltersState {
   categoryId?: number | string;
   subcategoryId?: number | string;
   currency?: string;
+  isMonthly?: string;
 }
 
 /**
@@ -135,7 +136,8 @@ export default function Expenses() {
     endDate: appliedFilters.endDate,
     categoryId: appliedFilters.categoryId ?? undefined,
     subcategoryId: appliedFilters.subcategoryId ?? undefined,
-    currency: appliedFilters.currency ?? undefined
+    currency: appliedFilters.currency ?? undefined,
+    isMonthly: appliedFilters.isMonthly || undefined,
   };
 
   // Fetch expenses with applied filters

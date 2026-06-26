@@ -60,7 +60,7 @@ whatsapp-web.js) and do **not** pin `webVersion`/`webVersionCache` (see the nuan
 
 | Symptom | Root cause | Our defense |
 |---|---|---|
-| `authenticated` fires after a fresh scan but **`ready` never fires** (errors `Execution context was destroyed` / `detached Frame` in `Client.inject`/`getWWebVersion`) | WhatsApp Web **2.3000.x** navigates the page *during* injection, destroying Puppeteer's context. Library issues [#3809](https://github.com/pedroslopez/whatsapp-web.js/issues/3809), [#3181](https://github.com/pedroslopez/whatsapp-web.js/issues/3181), [#127084](https://github.com/pedroslopez/whatsapp-web.js/issues/127084); partially fixed by [PR #3811](https://github.com/pedroslopez/whatsapp-web.js/pull/3811) (in 1.34.7). | **Ready-watchdog** auto-restart (§7.1) |
+| `authenticated` fires after a fresh scan but **`ready` never fires** (errors `Execution context was destroyed` / `detached Frame` in `Client.inject`/`getWWebVersion`) | WhatsApp Web **2.3000.x** navigates the page *during* injection, destroying Puppeteer's context. Library issues [#3809](https://github.com/pedroslopez/whatsapp-web.js/issues/3809), [#3181](https://github.com/pedroslopez/whatsapp-web.js/issues/3181), [#127084](https://github.com/pedroslopez/whatsapp-web.js/issues/127084); partially fixed by [PR #3811](https://github.com/pedroslopez/whatsapp-web.js/pull/3811) (in 1.34.7). Also occurs on a **poisoned session restore** (half-written IndexedDB from an unclean shutdown). | **Ready-watchdog** → restart, then **park for manual re-link** (§7.1) |
 | `The browser is already running for …\session-client` on launch | **Puppeteer's own** Windows check ([PR #14307](https://github.com/puppeteer/puppeteer/pull/14307), active in 24.38.0): it throws if a `lockfile` is left in the profile dir, e.g. after an unclean shutdown left an orphan Chrome. | **`ensureProfileUnlocked()`** + proactive cold-start unlock (§7.2) |
 | Client dies on a network blip with **no `disconnected` event** | whatsapp-web.js doesn't fire `disconnected`/`change_state` on a plain socket drop. | **Liveness heartbeat** (§7.3) |
 | `disconnected` fires up to **3×** (reason `NAVIGATION`/`LOGOUT`) | Library behavior on phone-side logout. | Idempotent handler (state-guarded) |
@@ -115,7 +115,7 @@ States (`ClientState` in `whatsapp.ts`): **`DISCONNECTED` → `INITIALIZING` →
                  boot / on-demand / manual / reconnect
    DISCONNECTED ─────────────────────────────────────────► INITIALIZING
        ▲                                                   │   │
-       │ logout / destroy / restart        ready (auth)    │   │ QR emitted (no valid session)
+       │ logout / restart                  ready (auth)    │   │ QR emitted (no valid session)
        │                                                   │   ▼
        │                                         CONNECTED ◄┘   (QR mode: stays INITIALIZING,
        │                                            │            waits for a phone scan)
@@ -240,20 +240,33 @@ heartbeat**.
 These five mechanisms exist because of the library failures in §1. **Each one has a comment explaining the
 exact failure it defends against — do not remove them without understanding the bug.**
 
-### 7.1 Ready-watchdog — "authenticated but never ready"
+### 7.1 Ready-watchdog → manual re-link — "authenticated but never ready"
 
-On a **fresh QR link**, whatsapp-web.js frequently fires `authenticated` but **never `ready`** (the
-post-auth navigation destroys Puppeteer's injected context — §1). The session *is* persisted, so a restart
-that reloads it reaches `ready` in ~1 s.
+whatsapp-web.js frequently fires `authenticated` but **never `ready`** — on a **fresh QR link** (post-auth
+navigation destroys Puppeteer's injected context — §1) AND on a **poisoned session restore** (an unclean
+shutdown left WA Web's IndexedDB half-written, so the session loads enough to authenticate but can't finish
+syncing). `validateSessionQuality()` still rates such a session `'valid'` — the corruption isn't visible on
+disk, only at runtime — so the watchdog is the *only* detector.
 
-`handleAuthenticated()` arms a watchdog (`armReadyWatchdog`): if `ready` hasn't fired within **75 s**,
-`restart()` once to reload the saved session. Details:
-- **Fresh-link only** — gated on a QR having been shown (`!!messageState.qr` at auth time). A slow *session
-  restore* can legitimately exceed 75 s and must **not** be interrupted.
-- **Session-safe timing** — 75 s is *after* the 60 s stabilization window, so the restart can't race
-  session persistence (too-early restart → forces a re-scan).
-- **Bounded** — max 2 auto-restarts, then it logs and stops. Cleared the instant `ready` fires and on every
-  teardown path. The CONNECTED guard makes a late firing a no-op.
+`handleAuthenticated()` **always** arms a watchdog (`armReadyWatchdog`): if `ready` hasn't fired within
+**75 s** (after the 60 s stabilization window, so the restart can't race session persistence), `restart()`
+reloads the saved session — which fixes the fresh-link case in ~1 s. Bounded to **2** restarts; cleared the
+instant `ready` fires and on every teardown path; the CONNECTED guard makes a late firing a no-op.
+
+If those restarts are exhausted (it keeps authenticating but never readies → genuinely poisoned, not slow),
+the watchdog **parks for a manual re-link** (`parkForRelink`) — it does **not** wipe anything. It tears the
+dead browser down, sets `needsRelink`, and broadcasts a `needs_relink` SSE frame. `needsRelink` then gates off
+`scheduleReconnect()` and `initializeOnDemand()`, so the server stops reload-looping the dead session instead
+of thrashing forever. Cleared by a real `ready`, `restart()`, or `unlink()`.
+
+**Recovery is manual-only and goes through the library, never our own `fs`.** `unlink()` (POST
+`/api/wa/unlink`, also aliased as `/logout` — the Re-link and Logout buttons both land there) clears the
+session via whatsapp-web.js's own API: a clean `client.logout()` when the page is healthy, else `destroy()` +
+**`LocalAuth.logout()`** (the retained, initialized auth strategy's own `fs.rm(userDataDir, …)`) *after*
+`ensureProfileUnlocked()` releases the profile lock — then a fresh init shows a new QR over SSE. We never
+`fs.rm('.wwebjs_auth/…')` ourselves, and there is **no automatic session clear** (a deliberate product
+decision — a human re-links). The auth page surfaces a dedicated **"Session expired — Re-link device"** state
+(driven by the `needsRelink` / `restoring` flags on `/api/wa/initial-state`) instead of a forever-empty QR box.
 
 ### 7.2 `ensureProfileUnlocked()` — "browser is already running"
 
@@ -339,7 +352,7 @@ WebSockets are retired; all server→client realtime is **Server-Sent Events**.
   on-demand init. **`whatsappQrCode` is the single source of truth for the displayed QR.**
 - **`useWhatsAppAuth`** (`/auth` page) — derives an `authState` (`INITIALIZING` … `QR_REQUIRED` …
   `AUTHENTICATED` …) from the SSE-driven `clientReady`/`qrCode` plus REST `initial-state`. Exposes actions:
-  `handleRefreshQR` (→ `/api/wa/refresh-qr`), `handleRestart`, `handleDestroy`, `handleLogout`, `handleRetry`.
+  `handleRefreshQR` (→ `/api/wa/refresh-qr`), `handleRestart`, `handleReLink`, `handleRetry`.
   Auto-redirects to `/send` after a scan-driven `ready`.
 - **`useWhatsAppSync`** (`/send` page) — `connectionStatus` (UIState), `clientReady`, `sendingProgress`
   (`{started, finished, total, sent, failed}`), and `messageStatusUpdate`, driven by the
@@ -397,7 +410,6 @@ Mounted after the auth gate (`routes/api/whatsapp.routes.ts`).
 | POST | `/initialize` | **manual start** — bypasses `WHATSAPP_AUTO_INIT` |
 | POST | `/restart` | `forceRestart` — destroy + unlock + recreate |
 | POST | `/refresh-qr` | mint a **new** QR — fire-and-forget restart (200 immediately; new QR via SSE). Non-blocking because a QR-mode init doesn't resolve for up to `FRESH_AUTH_TIMEOUT` (90 s) |
-| POST | `/destroy` | close the browser, **keep** auth (reconnectable) |
 | POST | `/logout` | log out of WhatsApp, then restart |
 
 > **Nuance — the lifecycle ops are fire-and-forget by necessity.** `/refresh-qr` (and the manual

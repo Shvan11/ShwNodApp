@@ -163,6 +163,28 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                     </div>
                 </div>
 
+                <div className={styles.modernFilterGroup}>
+                    <label htmlFor="filter-type">
+                        <i className="fas fa-tag"></i>
+                        {t('filters.type')}
+                    </label>
+                    <div className={styles.selectWrapper}>
+                        <select
+                            id="filter-type"
+                            className={styles.modernSelect}
+                            value={filters.isMonthly || ''}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('isMonthly', e.target.value)}
+                        >
+                            <option value="">{t('filters.allTypes')}</option>
+                            {/* eslint-disable-next-line i18next/no-literal-string */}
+                            <option value="false">{t('filters.dailyOnly')}</option>
+                            {/* eslint-disable-next-line i18next/no-literal-string */}
+                            <option value="true">{t('filters.monthlyOnly')}</option>
+                        </select>
+                        <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
+                    </div>
+                </div>
+
                 <div className={styles.modernFilterActions}>
                     <button
                         type="button"

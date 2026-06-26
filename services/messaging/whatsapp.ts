@@ -107,6 +107,17 @@ export interface WhatsAppClient {
 }
 
 /**
+ * LocalAuth strategy (partial) — the bits unlink() needs. `logout()` is the
+ * library's own session-clear (`fs.rm(userDataDir, …)`); `userDataDir` is only
+ * populated after the client has initialized, so the retained instance must be
+ * the one that was actually used.
+ */
+interface LocalAuthStrategy {
+  logout(): Promise<void>;
+  userDataDir?: string;
+}
+
+/**
  * WhatsApp message interface
  */
 interface WhatsAppMessage {
@@ -499,10 +510,26 @@ class WhatsAppService extends EventEmitter {
   private wsEmitter: WebSocketEmitter | null = null;
   private messageState: typeof messageState;
 
-  // Ready watchdog: recovers the "authenticated but `ready` never fires" fresh-
-  // link stall by auto-restarting (see armReadyWatchdog).
+  // Ready watchdog: recovers the "authenticated but `ready` never fires" stall by
+  // auto-restarting; if that's exhausted, parks for a manual re-link (see
+  // armReadyWatchdog / parkForRelink).
   private readyWatchdog: ReturnType<typeof setTimeout> | null = null;
   private readyWatchdogRestarts = 0;
+
+  // Set when a session has authenticated but never reached `ready` across the
+  // watchdog's whole restart budget — i.e. the persisted session is poisoned
+  // (loads enough to authenticate, can't finish syncing; validateSessionQuality
+  // still rates it 'valid' so nothing else catches it). MANUAL-ONLY recovery: we
+  // stop all auto-reconnect/auto-init so we don't thrash reloading the dead
+  // session, and wait for an explicit Re-link (unlink()). It NEVER triggers an
+  // automatic session clear. Cleared by unlink()/restart()/a real `ready`.
+  private needsRelink = false;
+
+  // The LocalAuth instance backing the live client, retained so unlink() can call
+  // ITS OWN logout() (the library's session-clear) instead of our reaching into
+  // .wwebjs_auth with fs. userDataDir is only set after the client inits, so we
+  // must reuse this exact instance, never a fresh one.
+  private authStrategy: LocalAuthStrategy | null = null;
 
   // Liveness heartbeat: a plain network drop can kill the socket WITHOUT firing
   // `disconnected`/`change_state`, so we poll getState() to catch silent death
@@ -592,6 +619,7 @@ class WhatsAppService extends EventEmitter {
       qrCode: this.messageState.qr,
       lastError: clientStatus.lastError,
       hasClient: !!this.clientState.client,
+      needsRelink: this.needsRelink,
     };
   }
 
@@ -833,8 +861,14 @@ class WhatsAppService extends EventEmitter {
     // uncatchable kills (node --watch restarts, hard service stops) wouldn't run
     // our handlers regardless. So restoring Puppeteer's defaults can only help
     // close Chrome and matches the production (Windows service) shutdown path.
+    // Retain the auth strategy: unlink() calls its own logout() to clear the
+    // session via the library, and its userDataDir is only populated once this
+    // client initializes — so we must hold THIS instance, not construct a new one.
+    const authStrategy = new LocalAuth({ clientId: 'client' });
+    this.authStrategy = authStrategy as unknown as LocalAuthStrategy;
+
     const client = new Client({
-      authStrategy: new LocalAuth({ clientId: 'client' }),
+      authStrategy,
       puppeteer: {
         headless: true,
         timeout: 30000,
@@ -1143,29 +1177,21 @@ class WhatsAppService extends EventEmitter {
 
     log.info('Client authenticated successfully');
 
-    // A QR still in state means this auth came from a fresh scan rather than a
-    // silent session restore. Only the fresh-link path suffers the "never ready"
-    // stall and should arm the watchdog — a slow session restore can legitimately
-    // take longer than the watchdog window and must not be interrupted. Capture
-    // this BEFORE clearing the QR below.
-    const wasFreshLink = !!this.messageState.qr;
-
     await this.messageState.setQR(null);
 
     // Tell the UI the scan worked so it stops presenting the QR as if it failed,
     // even though `ready` (which marks the client usable) may still be seconds
-    // away — or, on a fresh link, may never arrive (handled by the watchdog).
+    // away — or may never arrive (handled by the watchdog below).
     this.broadcastReadyState(false, 'authenticated', 'Authenticated — finishing connection…');
 
-    // Ready watchdog. On a FRESH QR link, whatsapp-web.js frequently fires
-    // `authenticated` but never `ready`: the post-auth page navigation destroys
-    // Puppeteer's injected context ("Execution context was destroyed" /
-    // "detached Frame" in Client.inject), so the client stays unusable and the
-    // QR lingers until someone restarts. The session is already persisted by
-    // now, so a restart reloads it and `ready` fires in ~1s — automate it.
-    if (wasFreshLink) {
-      this.armReadyWatchdog();
-    }
+    // Always arm the ready watchdog. whatsapp-web.js frequently fires
+    // `authenticated` but never `ready` on both fresh QR links (post-auth
+    // navigation destroys Puppeteer's injected context) AND session restores after
+    // an unclean shutdown (Ctrl+C / service kill) — same symptom, same fix: a
+    // restart reloads the persisted session cleanly and `ready` fires in ~1s.
+    // A legitimate slow restore reaches ready well within the 75s window; if it
+    // hasn't arrived by then the client is stuck, not just slow.
+    this.armReadyWatchdog();
 
     log.info('Waiting 60s for session to stabilize...');
 
@@ -1180,9 +1206,11 @@ class WhatsAppService extends EventEmitter {
   private async handleReady(): Promise<void> {
     log.info('Client ready');
 
-    // `ready` arrived — cancel the watchdog and reset its restart budget.
+    // `ready` arrived — cancel the watchdog, reset its restart budget, and clear
+    // any "needs re-link" park (the session is demonstrably healthy now).
     this.clearReadyWatchdog();
     this.readyWatchdogRestarts = 0;
+    this.needsRelink = false;
 
     if (this.clientState.client) {
       try {
@@ -1249,9 +1277,16 @@ class WhatsAppService extends EventEmitter {
       }
 
       if (this.readyWatchdogRestarts >= READY_WATCHDOG_MAX_RESTARTS) {
+        // Restarts reload the SAME persisted session, which keeps authenticating
+        // but never reaching ready — the session is poisoned. We do NOT auto-clear
+        // it (manual-only by design): park, stop thrashing, and surface a
+        // "needs re-link" state so a human can re-scan via unlink().
         log.error(
-          'WhatsApp authenticated but never became ready after auto-restarts — leaving it for manual recovery',
+          'WhatsApp authenticated but never became ready after auto-restarts — parking for manual re-link',
           { restarts: this.readyWatchdogRestarts }
+        );
+        void this.parkForRelink('authenticated but never ready').catch((err) =>
+          log.error('parkForRelink failed', { error: (err as Error).message })
         );
         return;
       }
@@ -1270,6 +1305,168 @@ class WhatsAppService extends EventEmitter {
     if (typeof this.readyWatchdog.unref === 'function') {
       this.readyWatchdog.unref();
     }
+  }
+
+  /**
+   * Park the client for a MANUAL re-link. Called when a session authenticated but
+   * never reached `ready` across the watchdog's full restart budget — the session
+   * is poisoned and reloading it again only thrashes. We tear the dead browser
+   * down (freeing resources) but DELIBERATELY keep the session on disk — clearing
+   * it is a human decision (the Re-link button → unlink()). `needsRelink` then
+   * gates off auto-reconnect and on-demand init so nothing silently reloads the
+   * dead session; the UI shows a "session expired — re-link" state via the SSE
+   * frame below.
+   */
+  private async parkForRelink(reason: string): Promise<void> {
+    this.needsRelink = true;
+    this.clearReadyWatchdog();
+    this.stopHeartbeat();
+    this.clientState.clearReconnectTimer();
+    // Suppress the reconnect paths during teardown; `needsRelink` is the durable
+    // guard afterwards (manualDisconnect's setter is async, so it only covers the
+    // window before the flag propagates).
+    this.messageState.manualDisconnect = true;
+
+    try {
+      await this.destroyClient('relink-park');
+    } catch (error) {
+      log.error('parkForRelink: client teardown failed', { error: (error as Error).message });
+    } finally {
+      // From here on `needsRelink` blocks auto-reconnect/auto-init; release the
+      // transient manualDisconnect so unlink()/restart() can manage it normally.
+      this.messageState.manualDisconnect = false;
+    }
+
+    this.clientState.setState('ERROR', new Error(`Needs re-link: ${reason}`));
+    await this.messageState.setClientReady(false);
+    await this.messageState.setQR(null);
+    this.broadcastReadyState(
+      false,
+      'needs_relink',
+      'WhatsApp session expired — please re-link the device (scan a new QR).'
+    );
+    log.warn('WhatsApp parked for manual re-link', { reason });
+  }
+
+  /**
+   * Manual re-link: clear the stored WhatsApp session through the LIBRARY's own
+   * API (never our own fs surgery on .wwebjs_auth) and start fresh so a new QR
+   * appears. The ONLY recovery for a poisoned "authenticated but never ready"
+   * session — every other path reloads or preserves it. Triggered exclusively by
+   * an explicit user action (the Re-link / Logout button) — manual-only by design.
+   *
+   * Reliable-clear sequence:
+   *   1. If the page is healthy, client.logout() does a clean WhatsApp-side device
+   *      unlink AND clears the folder itself (Client.logout() ends in
+   *      authStrategy.logout()); on a stuck page it throws → fall through.
+   *   2. Close the browser and release the profile lock (ensureProfileUnlocked
+   *      kills any orphan Chrome bound to THIS profile) so the delete can't hit
+   *      Windows EBUSY.
+   *   3. authStrategy.logout() — the retained, initialized LocalAuth's own
+   *      fs.rm(userDataDir, {recursive, force, maxRetries}) — clears
+   *      .wwebjs_auth/session-client correctly.
+   *   4. Re-initialize → a fresh QR arrives over SSE.
+   */
+  async unlink(): Promise<{ success: boolean; error?: string }> {
+    log.warn('Manual WhatsApp re-link requested — clearing session for a fresh QR');
+    this.clearReadyWatchdog();
+    this.stopHeartbeat();
+    this.clientState.clearReconnectTimer();
+    this.clientState.destroyInProgress = true;
+    this.messageState.manualDisconnect = true;
+    this.broadcastReadyState(false, 'relinking', 'Re-linking WhatsApp — a new QR is on the way…');
+
+    // Capture the live browser PID before destroy: in QR/stuck mode
+    // clientState.browser is null, so the client's pupBrowser is the only handle
+    // ensureProfileUnlocked can use.
+    const priorProc = this.clientState.client?.pupBrowser?.process?.() ?? null;
+    let cleared = false;
+
+    try {
+      if (this.clientState.client) {
+        this.removeClientEventHandlers(this.clientState.client);
+        try {
+          // Clean path: unlinks the device on WhatsApp AND clears the folder.
+          await withTimeout(this.clientState.client.logout(), 15000, 'client.logout');
+          cleared = true;
+          log.info('Clean WhatsApp logout succeeded — device unlinked and session cleared');
+        } catch (logoutErr) {
+          log.warn('Clean logout unavailable (stuck page) — destroying + clearing via LocalAuth', {
+            error: (logoutErr as Error).message,
+          });
+          try {
+            await withTimeout(this.clientState.client.destroy(), 15000, 'client.destroy');
+          } catch (destroyErr) {
+            log.error('unlink: destroy failed — force-closing browser', {
+              error: (destroyErr as Error).message,
+            });
+            await this.forceCloseBrowser();
+          }
+        }
+        this.clientState.client = null;
+      }
+
+      // Fallback clear: release locks (kill orphan Chrome on this profile) then use
+      // the library's own session-clear. Skipped if client.logout() already did it.
+      if (!cleared) {
+        await this.ensureProfileUnlocked(priorProc);
+        if (this.authStrategy) {
+          try {
+            await this.authStrategy.logout();
+            log.info('Session cleared via LocalAuth.logout()');
+            cleared = true;
+          } catch (err) {
+            log.error('LocalAuth.logout() could not clear the session folder', {
+              error: (err as Error).message,
+            });
+          }
+        } else {
+          log.warn('unlink: no retained LocalAuth instance — nothing on disk to clear');
+          cleared = true; // nothing to clear counts as cleared
+        }
+      }
+
+      // Reset park + lifecycle guards so the fresh init below runs cleanly.
+      this.clientState.cleanup();
+      this.clientState.setState('DISCONNECTED');
+      this.needsRelink = false;
+      this.readyWatchdogRestarts = 0;
+      this.circuitBreaker.reset();
+      messageSessionManager.completeAllSessions();
+      await this.messageState.setClientReady(false);
+      await this.messageState.setQR(null);
+      await this.messageState.reset();
+    } catch (error) {
+      log.error('unlink failed', { error: (error as Error).message });
+      return { success: false, error: (error as Error).message };
+    } finally {
+      this.clientState.destroyInProgress = false;
+      this.messageState.manualDisconnect = false;
+    }
+
+    if (!cleared) {
+      // The clear genuinely failed (e.g. files still locked). Do NOT init into the
+      // same poison — stay parked so the user can retry / escalate.
+      this.needsRelink = true;
+      this.broadcastReadyState(
+        false,
+        'needs_relink',
+        'Could not clear the WhatsApp session — please retry re-linking.'
+      );
+      return {
+        success: false,
+        error: 'Could not clear the session folder (it may be locked); please retry.',
+      };
+    }
+
+    // Fire-and-forget fresh init: no session on disk → straight to QR mode.
+    // Awaiting would block past the HTTP timeout (FRESH_AUTH_TIMEOUT 90s); the QR
+    // arrives over SSE.
+    this.initialize().catch((err) => {
+      log.error('unlink: fresh init failed', { error: (err as Error).message });
+    });
+
+    return { success: true };
   }
 
   /** Stop the liveness heartbeat and reset its miss counter. */
@@ -1465,6 +1662,12 @@ class WhatsAppService extends EventEmitter {
   }
 
   private scheduleReconnect(error: Error): void {
+    // Parked for manual re-link: the session is poisoned, so reconnecting would
+    // only reload it and stall again. Wait for the user (unlink()).
+    if (this.needsRelink) {
+      log.debug('Reconnect skipped — session parked for manual re-link');
+      return;
+    }
     this.clientState.reconnectAttempts++;
 
     if (this.clientState.reconnectAttempts > this.clientState.MAX_RECONNECT_ATTEMPTS) {
@@ -1517,6 +1720,10 @@ class WhatsAppService extends EventEmitter {
 
     this.clearReadyWatchdog();
     this.stopHeartbeat();
+    // Explicit user retry — lift any re-link park so this attempt runs. (If the
+    // session is still poisoned it will re-stall and the watchdog re-parks; the
+    // session-clearing fix is unlink(), not restart, which preserves auth.)
+    this.needsRelink = false;
     this.messageState.manualDisconnect = true;
 
     try {
@@ -2212,6 +2419,13 @@ class WhatsAppService extends EventEmitter {
       return false;
     }
 
+    // Parked for manual re-link: don't auto-init into the poisoned session when a
+    // QR viewer connects. The user must explicitly Re-link (unlink()).
+    if (this.needsRelink) {
+      log.debug('On-demand init skipped — session parked for manual re-link');
+      return false;
+    }
+
     if (
       this.clientState.isState('CONNECTED') ||
       this.clientState.isState('INITIALIZING')
@@ -2280,182 +2494,6 @@ class WhatsAppService extends EventEmitter {
     } catch (error) {
       log.error('Error during graceful shutdown', error);
     }
-  }
-
-  getDetailedStatus(): Record<string, unknown> {
-    const clientStatus = this.clientState.getStatus();
-    const circuitStatus = this.circuitBreaker.getStatus();
-    const messageStats = this.messageState.dump();
-
-    return {
-      service: {
-        ready: this.isReady(),
-        state: clientStatus.state,
-        hasClient: !!this.clientState.client,
-        activeViewers: this.messageState.activeQRViewers,
-      },
-      client: clientStatus,
-      circuitBreaker: circuitStatus,
-      messageState: messageStats,
-      timestamp: Date.now(),
-    };
-  }
-
-  async forceDestroy(): Promise<void> {
-    log.warn('Force destroying WhatsApp client');
-
-    this.clientState.destroyInProgress = true;
-
-    try {
-      if (this.clientState.client) {
-        this.removeClientEventHandlers(this.clientState.client);
-      }
-
-      this.clientState.cleanup();
-
-      if (this.clientState.client) {
-        try {
-          await this.clientState.client.destroy();
-        } catch (error) {
-          log.error('Error during force destroy', error);
-        }
-        this.clientState.client = null;
-      }
-
-      await this.forceCloseBrowser();
-
-      this.clientState.setState('DISCONNECTED');
-      await this.messageState.setClientReady(false);
-      this.circuitBreaker.reset();
-    } finally {
-      this.clientState.browser = null;
-      this.clientState.page = null;
-      this.clientState.destroyInProgress = false;
-    }
-  }
-
-  async simpleDestroy(): Promise<{ success: boolean; message?: string; error?: string }> {
-    log.info(
-      'Destroying WhatsApp client - closing browser but preserving authentication'
-    );
-
-    this.clientState.destroyInProgress = true;
-    this.messageState.manualDisconnect = true;
-
-    try {
-      if (this.clientState.client) {
-        this.removeClientEventHandlers(this.clientState.client);
-
-        try {
-          await this.clientState.client.destroy();
-          log.info(
-            'WhatsApp client destroyed successfully - authentication preserved'
-          );
-        } catch (error) {
-          log.error('Error during destroy', error);
-          await this.forceCloseBrowser();
-        }
-        this.clientState.client = null;
-      }
-
-      this.clientState.cleanup();
-      this.clientState.setState('DISCONNECTED');
-      await this.messageState.setClientReady(false);
-      await this.messageState.setQR(null);
-
-      messageSessionManager.completeAllSessions();
-      this.circuitBreaker.reset();
-
-      return {
-        success: true,
-        message: 'Client destroyed - browser closed, authentication preserved',
-      };
-    } catch (error) {
-      log.error('Error during simple destruction', error);
-      await this.forceCloseBrowser();
-      return { success: false, error: 'Destroy failed: ' + (error as Error).message };
-    } finally {
-      this.clientState.browser = null;
-      this.clientState.page = null;
-      this.clientState.destroyInProgress = false;
-      this.messageState.manualDisconnect = false;
-    }
-  }
-
-  async completeLogout(): Promise<{ success: boolean; message?: string; error?: string }> {
-    log.info(
-      'Starting complete WhatsApp client logout with authentication cleanup'
-    );
-
-    this.clientState.destroyInProgress = true;
-    this.messageState.manualDisconnect = true;
-
-    try {
-      if (this.clientState.client) {
-        this.removeClientEventHandlers(this.clientState.client);
-
-        try {
-          await this.clientState.client.logout();
-          log.info(
-            'WhatsApp client logged out successfully - authentication cleared by logout()'
-          );
-        } catch (error) {
-          log.error('Error during logout', error);
-          try {
-            await this.clientState.client.destroy();
-          } catch (destroyError) {
-            log.error('Error during destroy', destroyError);
-            await this.forceCloseBrowser();
-          }
-        }
-        this.clientState.client = null;
-      }
-
-      this.clientState.cleanup();
-      this.clientState.setState('DISCONNECTED');
-      await this.messageState.setClientReady(false);
-      await this.messageState.setQR(null);
-
-      messageSessionManager.completeAllSessions();
-      this.circuitBreaker.reset();
-
-      return {
-        success: true,
-        message: 'Client logged out - authentication completely cleared',
-      };
-    } catch (error) {
-      log.error('Error during complete logout', error);
-      await this.forceCloseBrowser();
-      return { success: false, error: 'Logout failed: ' + (error as Error).message };
-    } finally {
-      this.clientState.browser = null;
-      this.clientState.page = null;
-      this.clientState.destroyInProgress = false;
-      this.messageState.manualDisconnect = false;
-    }
-  }
-
-  async healthCheck(): Promise<Record<string, unknown>> {
-    const status = this.getDetailedStatus();
-
-    if (this.clientState.client && this.clientState.isState('CONNECTED')) {
-      try {
-        const state = await this.clientState.client.getState();
-        (status as Record<string, unknown>).healthCheck = {
-          clientResponsive: true,
-          clientState: state,
-          timestamp: Date.now(),
-        };
-      } catch (error) {
-        (status as Record<string, unknown>).healthCheck = {
-          clientResponsive: false,
-          error: (error as Error).message,
-          timestamp: Date.now(),
-        };
-      }
-    }
-
-    return status;
   }
 
   async validateSessionQuality(): Promise<SessionQuality> {

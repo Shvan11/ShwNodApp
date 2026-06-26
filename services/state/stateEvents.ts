@@ -87,12 +87,6 @@ export interface BaseEventData {
   category?: string;
 }
 
-export interface QREventData extends BaseEventData {
-  category: 'qr';
-  qr?: string;
-  viewerId?: string;
-}
-
 export interface ClientEventData extends BaseEventData {
   category: 'client';
   clientId?: string;
@@ -114,13 +108,6 @@ export interface DatabaseEventData extends BaseEventData {
   error?: string;
 }
 
-export interface HealthEventData extends BaseEventData {
-  category: 'health';
-  checkName?: string;
-  healthy?: boolean;
-  details?: Record<string, unknown>;
-}
-
 export interface SystemEventData extends BaseEventData {
   category: 'system';
   source?: string;
@@ -129,11 +116,9 @@ export interface SystemEventData extends BaseEventData {
 }
 
 export type EventData =
-  | QREventData
   | ClientEventData
   | MessageEventData
   | DatabaseEventData
-  | HealthEventData
   | SystemEventData
   | BaseEventData;
 
@@ -150,16 +135,13 @@ interface EventStats {
  * Extended EventEmitter with state event helpers
  */
 interface StateEventsEmitter extends EventEmitter {
-  emitQREvent: (eventType: string, data?: Partial<QREventData>) => boolean;
   emitClientEvent: (eventType: string, data?: Partial<ClientEventData>) => boolean;
   emitMessageEvent: (eventType: string, data?: Partial<MessageEventData>) => boolean;
   emitDatabaseEvent: (eventType: string, data?: Partial<DatabaseEventData>) => boolean;
-  emitHealthEvent: (eventType: string, data?: Partial<HealthEventData>) => boolean;
   emitSystemEvent: (eventType: string, data?: Partial<SystemEventData>) => boolean;
   getEventStats: () => EventStats & { uptime: number; averageEventsPerMinute: number };
   resetEventStats: () => void;
   cleanup: () => void;
-  debugListeners?: () => Record<string, number>;
   onAny?: (eventName: string, ...args: unknown[]) => void;
 }
 
@@ -216,17 +198,6 @@ stateEvents.emit = function (eventName: string | symbol, ...args: unknown[]): bo
 // Convenience methods for common event patterns
 
 /**
- * Emit a QR code related event with standardized data structure
- */
-stateEvents.emitQREvent = function (eventType: string, data: Partial<QREventData> = {}): boolean {
-  return this.emit(eventType, {
-    ...data,
-    category: 'qr',
-    timestamp: Date.now(),
-  } as QREventData);
-};
-
-/**
  * Emit a client state change event
  */
 stateEvents.emitClientEvent = function (eventType: string, data: Partial<ClientEventData> = {}): boolean {
@@ -257,17 +228,6 @@ stateEvents.emitDatabaseEvent = function (eventType: string, data: Partial<Datab
     category: 'database',
     timestamp: Date.now(),
   } as DatabaseEventData);
-};
-
-/**
- * Emit a health monitoring event
- */
-stateEvents.emitHealthEvent = function (eventType: string, data: Partial<HealthEventData> = {}): boolean {
-  return this.emit(eventType, {
-    ...data,
-    category: 'health',
-    timestamp: Date.now(),
-  } as HealthEventData);
 };
 
 /**
@@ -344,18 +304,6 @@ if (process.env.NODE_ENV === 'development') {
     };
   }
 
-  // Add method to list all current listeners (for debugging)
-  stateEvents.debugListeners = function (): Record<string, number> {
-    const events = this.eventNames();
-    const listenerCounts: Record<string, number> = {};
-
-    events.forEach((event) => {
-      listenerCounts[event.toString()] = this.listenerCount(event);
-    });
-
-    log.debug('Current event listeners', { listenerCounts });
-    return listenerCounts;
-  };
 }
 
 // Export the enhanced event bus

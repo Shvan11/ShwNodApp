@@ -378,6 +378,7 @@ export interface Expenses {
   currency: string | null;
   expense_date: string;
   id: Generated<number>;
+  is_monthly: Generated<boolean>;
   note: string | null;
   subcategory_id: number | null;
   updated_at: Timestamp | null;

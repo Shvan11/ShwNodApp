@@ -74,32 +74,6 @@ export interface SessionStats {
 }
 
 /**
- * Mapping debug info
- */
-export interface MappingDebugInfo {
-  messageId: string;
-  appointmentId: number;
-  appointmentDate: string;
-  registeredAt: Date;
-  sentAt: Date | null;
-  failedAt: Date | null;
-  deliveryUpdates: DeliveryUpdate[];
-}
-
-/**
- * Session debug information
- */
-export interface SessionDebugInfo {
-  sessionId: string;
-  date: string;
-  status: SessionStatus;
-  startTime: Date;
-  endTime: Date | null;
-  stats: SessionStats;
-  activeMappings: MappingDebugInfo[];
-}
-
-/**
  * WhatsApp service interface (minimal for dependency)
  */
 export interface WhatsAppServiceInterface {
@@ -393,11 +367,11 @@ export class MessageSession {
    * Record message failed
    */
   recordMessageFailed(messageId: string, error: string): void {
+    this.stats.failedMessages++;
     const mapping = this.messageIdToAppointmentMap.get(messageId);
     if (mapping) {
       mapping.failedAt = new Date();
       mapping.error = error;
-      this.stats.failedMessages++;
 
       log.debug('Message failure recorded', {
         sessionId: this.sessionId,
@@ -532,28 +506,4 @@ export class MessageSession {
     return this.status === 'ACTIVE';
   }
 
-  /**
-   * Get detailed session information for debugging
-   */
-  getDebugInfo(): SessionDebugInfo {
-    return {
-      sessionId: this.sessionId,
-      date: this.date,
-      status: this.status,
-      startTime: this.startTime,
-      endTime: this.endTime,
-      stats: this.stats,
-      activeMappings: Array.from(this.messageIdToAppointmentMap.entries()).map(
-        ([messageId, mapping]) => ({
-          messageId,
-          appointmentId: mapping.appointmentId,
-          appointmentDate: mapping.appointmentDate,
-          registeredAt: mapping.registeredAt,
-          sentAt: mapping.sentAt || null,
-          failedAt: mapping.failedAt || null,
-          deliveryUpdates: mapping.deliveryUpdates || [],
-        })
-      ),
-    };
-  }
 }

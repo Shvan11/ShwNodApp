@@ -31,6 +31,7 @@ export interface ExpenseFilters {
   categoryId?: number | string;
   subcategoryId?: number | string;
   currency?: string;
+  isMonthly?: string;
 }
 
 /**
@@ -50,6 +51,7 @@ export interface Expense {
   subcategory_name_ar?: string | null;
   note?: string;
   expense_date?: string;
+  is_monthly?: boolean;
   [key: string]: unknown;
 }
 
@@ -100,6 +102,7 @@ export interface ExpenseData {
   note?: string;
   categoryId?: number;
   subcategoryId?: number;
+  isMonthly?: boolean;
   [key: string]: unknown;
 }
 

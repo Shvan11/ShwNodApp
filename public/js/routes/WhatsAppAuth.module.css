@@ -351,11 +351,13 @@
 /* High contrast mode support */
 @media (prefers-contrast: high) {
     .authContainer {
+        /* stylelint-disable-next-line declaration-property-value-disallowed-list -- forced-light a11y override under prefers-contrast: high */
         background: white;
     }
 
     .qrPlaceholder {
         border-color: var(--black);
+        /* stylelint-disable-next-line declaration-property-value-disallowed-list -- forced-light a11y override under prefers-contrast: high */
         background: white;
     }
 

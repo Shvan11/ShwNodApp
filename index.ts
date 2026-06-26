@@ -662,6 +662,28 @@ async function gracefulShutdown(signal: string): Promise<void> {
     teardownSseBroadcaster();
     teardownWhatsappSseBroadcaster();
 
+    // Tear the WhatsApp client (Puppeteer/Chrome) down FIRST, on a tight leash.
+    // A graceful client.destroy() closes Chrome and flushes WA Web's IndexedDB; if
+    // the overall 15 s shutdown watchdog (above) force-exits before that flush
+    // finishes, Puppeteer's exit handler SIGKILLs Chrome mid-write and POISONS the
+    // session ("authenticated but never ready" on next boot — docs §7.1). Done
+    // last it routinely started with too little budget left; first, the normally
+    // 1-3 s close gets the most time. The 8 s cap stops a hung Chrome from starving
+    // the CDC/DB teardown that follows (it can't flush anyway once hung). Safe to
+    // move early: nothing here depends on the WhatsApp client (sends are
+    // fire-and-forget; its SSE channel is already torn down above).
+    if (whatsappService) {
+      log.info('💬 Shutting down WhatsApp service (priority — clean session flush)...');
+      try {
+        await Promise.race([
+          whatsappService.gracefulShutdown(),
+          new Promise<void>((resolve) => setTimeout(resolve, 8000)),
+        ]);
+      } catch (error) {
+        log.warn('⚠️  WhatsApp shutdown error:', { error: (error as Error).message });
+      }
+    }
+
     // Stop accepting new connections; wait up to 5 s for in-flight requests.
     if (server) {
       log.info('🔌 Closing HTTP server...');
@@ -707,11 +729,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
       log.warn('⚠️  LocalSend shutdown error:', { error: (error as Error).message });
     }
 
-    // Clean up WhatsApp service
-    if (whatsappService) {
-      log.info('💬 Shutting down WhatsApp service...');
-      await whatsappService.gracefulShutdown();
-    }
+    // (WhatsApp client already torn down early — see the priority teardown above.)
 
     // Clean up message state
     if (messageState) {
@@ -833,19 +851,27 @@ async function initializeWhatsAppOnStartup(): Promise<void> {
         log.info('📱 No existing session - initializing WhatsApp client (will require QR scan)...');
       }
 
-      // Initialize with a timeout
-      const initPromise = whatsappService.initialize();
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Initialization timeout')), 60000)
-      );
-
-      await Promise.race([initPromise, timeoutPromise]);
-
-      if (hasExistingSession) {
-        log.info('✅ WhatsApp client initialization completed - session should be restored');
-      } else {
-        log.info('✅ WhatsApp client initialization started - waiting for QR scan');
-      }
+      // Fire-and-forget — do NOT race a short timeout. A healthy session restore
+      // can take up to SESSION_RESTORATION_TIMEOUT (120s), and the auth-
+      // stabilization window alone is 60s, so the old 60s race ALWAYS "failed" on
+      // a good restore, detached, and logged a misleading "Initialization timeout"
+      // while init actually kept running underneath. initialize() owns its own
+      // timeouts + reconnect + ready-watchdog; the SSE channel reports ready/QR.
+      // Just kick it off and log the eventual outcome.
+      whatsappService
+        .initialize()
+        .then((ready) =>
+          log.info(
+            ready
+              ? '✅ WhatsApp client connected from restored session'
+              : '✅ WhatsApp client initialized — waiting for QR scan'
+          )
+        )
+        .catch((error: Error) =>
+          log.warn('⚠️  WhatsApp initialization failed (will auto-recover):', {
+            error: error.message,
+          })
+        );
 
     } else if (currentState.state === 'CONNECTED') {
       log.info('✅ WhatsApp client already connected');

@@ -38,7 +38,7 @@ export const LOGO_EXT_MIME: Record<LogoExt, string> = {
 const FILENAME_RE = /^logo-\d+-[a-f0-9]{16}\.(?:png|jpg|webp)$/;
 
 /** Absolute path of the branding dir (`clinic1/branding`). */
-export function brandingDir(): string {
+function brandingDir(): string {
   return clinicPath(BRANDING_REL);
 }
 

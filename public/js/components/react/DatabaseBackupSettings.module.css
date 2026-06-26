@@ -79,7 +79,7 @@
     border: none;
     border-radius: 8px;
     background: var(--primary-color);
-    color: #fff;
+    color: var(--color-white);
     font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;

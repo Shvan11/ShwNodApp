@@ -11,7 +11,6 @@
  * encapsulating transformation and aggregation logic.
  */
 
-import { log } from '../../utils/logger.js';
 
 /**
  * Message status codes
@@ -75,47 +74,9 @@ export interface MessageCount {
 }
 
 /**
- * Message summary statistics
- */
-export interface MessageSummary {
-  messagesSent: number;
-  messagesDelivered: number;
-  messagesFailed: number;
-  messagesPending: number;
-}
-
-/**
  * WhatsApp messages format: [numbers, messages, ids, names]
  */
 export type WhatsAppMessagesArray = [string[], string[], string[], string[]];
-
-/**
- * Message to send object
- */
-export interface MessageToSend {
-  id: string;
-  number: string;
-  name: string;
-  message: string;
-}
-
-/**
- * Full summary statistics
- */
-export interface FullSummary extends MessageSummary {
-  totalMessages: number;
-  eligibleForMessaging: number;
-}
-
-/**
- * Message details result
- */
-export interface MessageDetails {
-  date: string;
-  messagesToSend: MessageToSend[];
-  existingMessages: TransformedMessage[];
-  summary: FullSummary;
-}
 
 /**
  * Transform message status from database format to frontend format
@@ -235,123 +196,8 @@ export function calculateMessageCount(
   return messageCount;
 }
 
-/**
- * Calculate message summary statistics
- *
- * Aggregates message status counts for dashboard/summary views
- *
- * @param messages - Array of messages with numeric status
- * @returns Summary statistics
- */
-export function calculateMessageSummary(
-  messages: TransformedMessage[]
-): MessageSummary {
-  const summary: MessageSummary = {
-    messagesSent: 0,
-    messagesDelivered: 0,
-    messagesFailed: 0,
-    messagesPending: 0,
-  };
-
-  if (!Array.isArray(messages)) {
-    return summary;
-  }
-
-  messages.forEach((msg) => {
-    if (msg.status === 0 || msg.status === 5) {
-      summary.messagesPending++;
-    } else if (msg.status === 1) {
-      summary.messagesSent++;
-    } else if (msg.status === 2 || msg.status === 3 || msg.status === 4) {
-      summary.messagesDelivered++;
-    } else if (msg.status === -1) {
-      summary.messagesFailed++;
-    }
-  });
-
-  return summary;
-}
-
-/**
- * Convert WhatsApp message arrays to objects
- *
- * WhatsApp messages come as parallel arrays: [numbers, messages, ids, names]
- * This converts them to an array of objects for easier frontend consumption
- *
- * @param whatsappMessages - Array of [numbers, messages, ids, names]
- * @returns Array of message objects
- */
-export function formatMessagesToSend(
-  whatsappMessages: WhatsAppMessagesArray | null
-): MessageToSend[] {
-  const [numbers = [], messages = [], ids = [], names = []] =
-    whatsappMessages || [[], [], [], []];
-
-  if (numbers.length === 0) {
-    return [];
-  }
-
-  return numbers.map((number, index) => ({
-    id: ids[index] || '',
-    number: number || '',
-    name: names[index] || '',
-    message: messages[index] || '',
-  }));
-}
-
-/**
- * Get message details with multi-source coordination
- *
- * Combines messages to be sent with existing message statuses and calculates summary
- *
- * @param date - Date to get details for
- * @param whatsappMessages - Messages to be sent from getWhatsAppMessages
- * @param existingMessages - Existing message statuses
- * @returns Detailed message information
- */
-export function getMessageDetails(
-  date: string,
-  whatsappMessages: WhatsAppMessagesArray | null,
-  existingMessages: TransformedMessage[] = []
-): MessageDetails {
-  const result: MessageDetails = {
-    date: date,
-    messagesToSend: [],
-    existingMessages: existingMessages,
-    summary: {
-      totalMessages: 0,
-      eligibleForMessaging: 0,
-      messagesSent: 0,
-      messagesDelivered: 0,
-      messagesFailed: 0,
-      messagesPending: 0,
-    },
-  };
-
-  // Convert WhatsApp messages to objects
-  result.messagesToSend = formatMessagesToSend(whatsappMessages);
-  result.summary.totalMessages = result.messagesToSend.length;
-  result.summary.eligibleForMessaging = result.messagesToSend.length;
-
-  // Calculate summary statistics from existing messages
-  const statusSummary = calculateMessageSummary(existingMessages);
-  result.summary.messagesSent = statusSummary.messagesSent;
-  result.summary.messagesDelivered = statusSummary.messagesDelivered;
-  result.summary.messagesFailed = statusSummary.messagesFailed;
-  result.summary.messagesPending = statusSummary.messagesPending;
-
-  log.info(
-    `Message details for ${date}: ${result.summary.totalMessages} messages to send, ${result.existingMessages.length} existing messages`
-  );
-
-  return result;
-}
-
 export default {
   transformMessageStatus,
   transformMessageStatuses,
   calculateMessageCount,
-  calculateMessageSummary,
-  formatMessagesToSend,
-  getMessageDetails,
 };

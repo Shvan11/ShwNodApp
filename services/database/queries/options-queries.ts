@@ -100,23 +100,6 @@ export async function upsertOption(optionName: string, optionValue: string): Pro
 }
 
 /**
- * Get options by name pattern (for grouped settings)
- */
-export async function getOptionsByPattern(pattern: string): Promise<Option[]> {
-  try {
-    return await getKysely()
-      .selectFrom('options')
-      .select(['option_name', 'option_value'])
-      .where('option_name', 'like', pattern)
-      .orderBy('option_name')
-      .execute();
-  } catch (error) {
-    log.error('Error fetching options by pattern', { error: (error as Error).message });
-    throw error;
-  }
-}
-
-/**
  * Bulk update multiple existing options. All updates run inside a single
  * transaction, so a SQL error on any row rolls back the whole batch (atomic) —
  * matching this function's contract. Names that match no existing row are not

@@ -46,13 +46,6 @@ type LatestWireDetails = {
   LowerWireName: string | null;
 };
 
-interface VisitDetails {
-  visitDate: string;
-  upperWireID: number | null;
-  lowerWireID: number | null;
-  others: string | null;
-  next: string | null;
-}
 
 type Visit = {
   id: number;
@@ -307,25 +300,6 @@ export async function addVisit(
     })
     .execute();
   return true;
-}
-
-/**
- * Retrieves visit details by visit id. (was: proGetVisitSum)
- */
-export async function getVisitDetailsByID(VID: number): Promise<VisitDetails | undefined> {
-  const row = await getKysely()
-    .selectFrom('visits')
-    .where('id', '=', VID)
-    .select(['visit_date', 'upper_wire_id', 'lower_wire_id', 'others', 'next_visit'])
-    .executeTakeFirst();
-  if (!row) return undefined;
-  return {
-    visitDate: row.visit_date,
-    upperWireID: row.upper_wire_id,
-    lowerWireID: row.lower_wire_id,
-    others: row.others,
-    next: row.next_visit,
-  };
 }
 
 /**

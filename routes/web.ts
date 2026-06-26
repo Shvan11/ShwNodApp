@@ -29,8 +29,22 @@ const router = Router();
 function serveSingleSPA(res: Response): void {
   const spaFile = path.join(process.cwd(), './dist/index.html');
   res.sendFile(spaFile, (err) => {
-    if (err) {
-      log.error('[SPA] Failed to serve index.html', { error: (err as Error).message });
+    if (!err) return;
+
+    // The browser aborted the request mid-send (page refresh / navigation / proxy
+    // drop). Not a server fault — the socket is already gone, so there's nothing to
+    // send and nothing to fix. Debug-level, never error, and don't touch the dead
+    // response (writing a 500 to an aborted socket just throws).
+    if ((err as NodeJS.ErrnoException).code === 'ECONNABORTED') {
+      log.debug('[SPA] index.html send aborted by client', { error: (err as Error).message });
+      return;
+    }
+
+    // A genuine failure to serve the shell (e.g. dist/index.html missing). Only
+    // send a 500 if the response hasn't started — once headers are out (mid-stream
+    // failure) we can't change the status.
+    log.error('[SPA] Failed to serve index.html', { error: (err as Error).message });
+    if (!res.headersSent) {
       res.status(500).send('Application failed to load. Please try again.');
     }
   });

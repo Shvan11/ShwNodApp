@@ -400,35 +400,3 @@ export async function cloneTemplate(
   return newTemplateId;
 }
 
-// ============================================================================
-// TEMPLATE ELEMENTS
-// ============================================================================
-
-/**
- * Get all elements for a template (deprecated - file-based templates)
- */
-export async function getTemplateElements(_templateId: number): Promise<never[]> {
-  // File-based templates don't store elements in database
-  return [];
-}
-
-/**
- * Get a single element by id (deprecated - file-based templates)
- */
-export async function getTemplateElementById(_elementId: number): Promise<null> {
-  return null;
-}
-
-// Element functions deprecated - use GrapesJS file-based templates
-export async function createTemplateElement(): Promise<never> {
-  throw new Error('Deprecated');
-}
-export async function updateTemplateElement(): Promise<never> {
-  throw new Error('Deprecated');
-}
-export async function deleteTemplateElement(): Promise<never> {
-  throw new Error('Deprecated');
-}
-export async function logTemplateUsage(): Promise<void> {
-  /* No-op */
-}

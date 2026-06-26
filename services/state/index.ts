@@ -9,11 +9,9 @@ export type { Person, StateDump } from './messageState.js';
 export { default as stateEvents, StateEventTypes } from './stateEvents.js';
 export type {
   BaseEventData,
-  QREventData,
   ClientEventData,
   MessageEventData,
   DatabaseEventData,
-  HealthEventData,
   SystemEventData,
   EventData,
   StateEventType,

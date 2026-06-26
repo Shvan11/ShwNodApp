@@ -122,7 +122,10 @@ function openDb(dbPath: string): Database.Database {
  */
 async function reconnect(): Promise<Database.Database> {
   log.warn('Forcing Archform DB reconnect');
-  db = null;
+  if (db) {
+    try { db.close(); } catch { /* ignore */ }
+    db = null;
+  }
   currentPath = null;
   return getDb();
 }

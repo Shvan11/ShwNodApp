@@ -1165,6 +1165,14 @@ export async function validateAndCreatePayment(
     );
   }
 
+  const paymentAmount = parseFloat(String(amount_paid));
+  if (paymentAmount <= 0) {
+    throw new AlignerValidationError(
+      'Payment amount must be greater than zero',
+      'INVALID_AMOUNT'
+    );
+  }
+
   // Validate payment doesn't exceed set balance
   if (aligner_set_id) {
     const setBalance = (await alignerQueries.getAlignerSetBalance(
@@ -1182,15 +1190,6 @@ export async function validateAndCreatePayment(
       throw new AlignerValidationError(
         'Set cost must be defined before accepting payments',
         'SET_COST_NOT_DEFINED'
-      );
-    }
-
-    const paymentAmount = parseFloat(String(amount_paid));
-
-    if (paymentAmount <= 0) {
-      throw new AlignerValidationError(
-        'Payment amount must be greater than zero',
-        'INVALID_AMOUNT'
       );
     }
 
@@ -1250,7 +1249,7 @@ export async function searchPatients(
   );
 
   try {
-    return alignerQueries.searchAlignerPatients(trimmedSearch, doctorId);
+    return await alignerQueries.searchAlignerPatients(trimmedSearch, doctorId);
   } catch (error) {
     log.error('Error searching aligner patients:', { error: error instanceof Error ? error.message : String(error) });
     throw error;

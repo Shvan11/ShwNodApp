@@ -62,12 +62,6 @@ async function ensureOk(res: Response, ctx: string): Promise<Response> {
   throw new ThreeShapeError('api_error', `3Shape ${ctx} failed (HTTP ${res.status}). ${body.slice(0, 200)}`.trim(), res.status);
 }
 
-/** GET /version — Bearer smoke test (200 with a valid token, 401 without). */
-export async function version(): Promise<string> {
-  const res = await ensureOk(await wsFetch('/version'), 'version');
-  return res.text();
-}
-
 /** Patient demographics for a workflow push. `integrationId` is the app's stable key. */
 export interface InitiateWorkflowPatient {
   integrationId: string;

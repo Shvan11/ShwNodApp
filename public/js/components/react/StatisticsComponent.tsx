@@ -28,8 +28,8 @@ interface DailyData {
     ExpensesUSD?: number;
     FinalIQDSum?: number;
     FinalUSDSum?: number;
-    QasaIQD?: number;
-    QasaUSD?: number;
+    ExpectedCashIQD?: number;
+    ExpectedCashUSD?: number;
 }
 
 interface CurrencyTotals {
@@ -88,9 +88,13 @@ type ViewMode = typeof VIEW_MODES[keyof typeof VIEW_MODES];
 const isCustomView = (mode: ViewMode): boolean =>
     mode === VIEW_MODES.COMMISSIONS || mode === VIEW_MODES.BREAKDOWN;
 
-// Tabs that expose per-doctor earnings / revenue breakdowns — admin-only.
+// Tabs restricted to admins: per-doctor earnings / revenue breakdowns, plus the
+// Monthly and Yearly rollups (multi-period revenue is admin-only like the others).
 const isAdminOnlyView = (mode: ViewMode): boolean =>
-    mode === VIEW_MODES.COMMISSIONS || mode === VIEW_MODES.BREAKDOWN;
+    mode === VIEW_MODES.COMMISSIONS ||
+    mode === VIEW_MODES.BREAKDOWN ||
+    mode === VIEW_MODES.MONTHLY ||
+    mode === VIEW_MODES.YEARLY;
 
 // Label + icon for each tab, rendered in the persistent page-level tab bar.
 const TAB_META: Record<ViewMode, { label: string; icon: string }> = {
@@ -524,7 +528,8 @@ const StatisticsComponent = () => {
                 </div>
             ) : statistics ? (
                 <>
-                    {/* Summary Cards — month-scoped totals */}
+                    {/* Summary Cards — month-scoped totals (admin-only) */}
+                    {isAdmin && (
                     <div className={styles.summaryCards}>
                         <div className={`${styles.summaryCard} ${styles.revenue}`}>
                             <div className={styles.cardHeader}>
@@ -577,6 +582,7 @@ const StatisticsComponent = () => {
                             </div>
                         </div>
                     </div>
+                    )}
 
                     {/* Trend chart */}
                     <div className={`${styles.chartsSection} ${styles.chartsSectionSingle}`}>
@@ -703,8 +709,8 @@ const StatisticsComponent = () => {
                                         <th>USD Expenses</th>
                                         <th>USD Net</th>
                                         <th>Grand Total (USD)</th>
-                                        <th className={styles.qasaColumn}>Qasa IQD</th>
-                                        <th className={styles.qasaColumn}>Qasa USD</th>
+                                        <th className={styles.expectedCashColumn}>Expected Cash IQD</th>
+                                        <th className={styles.expectedCashColumn}>Expected Cash USD</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -723,11 +729,12 @@ const StatisticsComponent = () => {
                                             <td data-label="USD Expenses" className={`${styles.amountCell} ${styles.negative}`}>{formatCurrency(Math.abs(day.ExpensesUSD || 0), 'USD')}</td>
                                             <td data-label="USD Net" className={styles.amountCell}>{formatCurrency(day.FinalUSDSum, 'USD')}</td>
                                             <td data-label="Grand Total" className={`${styles.amountCell} ${styles.grandTotal}`}>{formatCurrency(day.GrandTotal, 'USD')}</td>
-                                            <td data-label="Qasa IQD" className={`${styles.amountCell} ${styles.qasaColumn} ${styles.qasaIqd}`}>{formatCurrency(day.QasaIQD)}</td>
-                                            <td data-label="Qasa USD" className={`${styles.amountCell} ${styles.qasaColumn} ${styles.qasaUsd}`}>{formatCurrency(day.QasaUSD, 'USD')}</td>
+                                            <td data-label="Expected Cash IQD" className={`${styles.amountCell} ${styles.expectedCashColumn} ${styles.expectedCashIqd}`}>{formatCurrency(day.ExpectedCashIQD)}</td>
+                                            <td data-label="Expected Cash USD" className={`${styles.amountCell} ${styles.expectedCashColumn} ${styles.expectedCashUsd}`}>{formatCurrency(day.ExpectedCashUSD, 'USD')}</td>
                                         </tr>
                                     ))}
                                 </tbody>
+                                {isAdmin && (
                                 <tfoot>
                                     <tr className={styles.totalRow}>
                                         <td data-label="Period"><strong>MONTH TOTAL</strong></td>
@@ -738,9 +745,10 @@ const StatisticsComponent = () => {
                                         <td data-label="USD Expenses" className={`${styles.amountCell} ${styles.negative}`}><strong>{formatCurrency(statistics.summary.totalExpenses.USD, 'USD')}</strong></td>
                                         <td data-label="USD Net" className={styles.amountCell}><strong>{formatCurrency(statistics.summary.netProfit.USD, 'USD')}</strong></td>
                                         <td data-label="Grand Total" className={`${styles.amountCell} ${styles.grandTotal}`}><strong>{formatCurrency(statistics.summary.grandTotal.USD, 'USD')}</strong></td>
-                                        <td data-label="Cash Box Note" className={`${styles.amountCell} ${styles.qasaColumn}`} colSpan={2}><em>(Daily Values Only)</em></td>
+                                        <td data-label="Cash Box Note" className={`${styles.amountCell} ${styles.expectedCashColumn}`} colSpan={2}><em>(Daily Expenses Only)</em></td>
                                     </tr>
                                 </tfoot>
+                                )}
                             </table>
                         </div>
                     </div>

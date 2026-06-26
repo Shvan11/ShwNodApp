@@ -19,17 +19,21 @@ import enDashboard from '../locales/en/dashboard.json';
 import enExpenses from '../locales/en/expenses.json';
 import enAppointments from '../locales/en/appointments.json';
 import enWorks from '../locales/en/works.json';
+import enPayments from '../locales/en/payments.json';
+import enNavigation from '../locales/en/navigation.json';
 import arCommon from '../locales/ar/common.json';
 import arDashboard from '../locales/ar/dashboard.json';
 import arExpenses from '../locales/ar/expenses.json';
 import arAppointments from '../locales/ar/appointments.json';
 import arWorks from '../locales/ar/works.json';
+import arPayments from '../locales/ar/payments.json';
+import arNavigation from '../locales/ar/navigation.json';
 
 export const defaultNS = 'common';
 
 export const resources = {
-  en: { common: enCommon, dashboard: enDashboard, expenses: enExpenses, appointments: enAppointments, works: enWorks },
-  ar: { common: arCommon, dashboard: arDashboard, expenses: arExpenses, appointments: arAppointments, works: arWorks },
+  en: { common: enCommon, dashboard: enDashboard, expenses: enExpenses, appointments: enAppointments, works: enWorks, payments: enPayments, navigation: enNavigation },
+  ar: { common: arCommon, dashboard: arDashboard, expenses: arExpenses, appointments: arAppointments, works: arWorks, payments: arPayments, navigation: arNavigation },
 } as const;
 
 void i18n.use(initReactI18next).init({
@@ -37,7 +41,7 @@ void i18n.use(initReactI18next).init({
   lng: getStoredLanguagePreference(),
   fallbackLng: 'en',
   defaultNS,
-  ns: ['common', 'dashboard', 'expenses', 'appointments', 'works'],
+  ns: ['common', 'dashboard', 'expenses', 'appointments', 'works', 'payments', 'navigation'],
   interpolation: { escapeValue: false }, // React escapes for us
   react: { useSuspense: false }, // synchronous resources — never suspend
 });
@@ -52,6 +56,8 @@ const _arCoversEn: {
   expenses: typeof enExpenses;
   appointments: typeof enAppointments;
   works: typeof enWorks;
+  payments: typeof enPayments;
+  navigation: typeof enNavigation;
 } = resources.ar;
 void _arCoversEn;
 

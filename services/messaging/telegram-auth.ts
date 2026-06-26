@@ -182,7 +182,10 @@ export async function startLogin(phoneNumber: string): Promise<void> {
       { apiId: c.apiId, apiHash: c.apiHash },
       phone
     );
-    pending = { client, phoneNumber: phone, phoneCodeHash, createdAt: Date.now() };
+    const pendingEntry = { client, phoneNumber: phone, phoneCodeHash, createdAt: Date.now() };
+    pending = pendingEntry;
+    // Auto-teardown if the admin abandons the login without submitting a code.
+    setTimeout(() => { if (pending === pendingEntry) void cancelLogin(); }, PENDING_TTL_MS);
     log.info('[TelegramAuth] login code requested', { phone });
   } catch (err) {
     await teardown(client);

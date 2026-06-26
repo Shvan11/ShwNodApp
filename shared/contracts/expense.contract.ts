@@ -46,6 +46,7 @@ const expenseRow = z.looseObject({
   // CLAUDE.md i18n / RTL → "DB-stored lookup values").
   category_name_ar: z.string().nullable(),
   subcategory_name_ar: z.string().nullable(),
+  is_monthly: z.boolean().optional(),
 });
 
 const expenseCategoryRow = z.looseObject({
@@ -70,6 +71,7 @@ const expenseBody = z.object({
   note: z.string().optional(),
   categoryId: z.coerce.number().int().optional(),
   subcategoryId: z.coerce.number().int().optional(),
+  isMonthly: z.boolean().optional(),
 });
 export type CreateExpenseBody = z.infer<typeof expenseBody>;
 
@@ -84,6 +86,7 @@ export const expenseList = {
     categoryId: optionalPositiveIntQuery,
     subcategoryId: optionalPositiveIntQuery,
     currency: z.string().optional(),
+    isMonthly: z.enum(['true', 'false']).optional(),
     limit: optionalPositiveIntQuery,
     offset: optionalNonNegIntQuery,
   }),

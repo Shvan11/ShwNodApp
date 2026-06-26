@@ -26,12 +26,8 @@ import {
   loadUpdatedAtTables,
   lwwUpdateClause,
 } from './cdc-schema.js';
-import { getForwardWritePool, stripSslMode } from './supabase-pool.js';
+import { getForwardWritePool } from './supabase-pool.js';
 import type { SyncSink } from './types.js';
-
-// Re-exported for routes/sync-webhook.ts's status-ping pool (kept here to minimize churn; the
-// definition now lives in supabase-pool.ts alongside the shared pools).
-export { stripSslMode };
 
 export class FailoverSink implements SyncSink {
   readonly name = 'failover';

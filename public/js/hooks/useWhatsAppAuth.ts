@@ -20,6 +20,12 @@ export const AUTH_STATES = {
   CHECKING_SESSION: 'checking_session',
   QR_REQUIRED: 'qr_required',
   AUTHENTICATED: 'authenticated',
+  // A live client is restoring an existing session (0–120s); no QR is coming
+  // unless/until it either readies or is parked. Shown instead of an empty QR box.
+  RESTORING: 'restoring',
+  // The session authenticated but never reached ready across the watchdog's whole
+  // budget — it's poisoned and parked. The only fix is an explicit Re-link.
+  NEEDS_RELINK: 'needs_relink',
   ERROR: 'error',
   DISCONNECTED: 'disconnected',
 } as const;
@@ -29,7 +35,6 @@ export type AuthState = (typeof AUTH_STATES)[keyof typeof AUTH_STATES];
 // Configuration Constants
 const CONFIG = {
   CLIENT_RESTART_DELAY_MS: 2000,
-  LOGOUT_DELAY_MS: 1000,
   QR_REFRESH_DELAY_MS: 30000,
 } as const;
 
@@ -39,6 +44,8 @@ const CONFIG = {
 interface InitialStateResponse {
   qr?: string;
   clientReady?: boolean;
+  needsRelink?: boolean;
+  restoring?: boolean;
   error?: string;
   [key: string]: unknown;
 }
@@ -50,8 +57,7 @@ export interface WhatsAppAuthActions {
   handleRetry: () => void;
   handleRefreshQR: () => Promise<void>;
   handleRestart: () => Promise<void>;
-  handleDestroy: () => Promise<void>;
-  handleLogout: () => Promise<void>;
+  handleReLink: () => Promise<void>;
   fetchQRCode: () => Promise<string | null>;
 }
 
@@ -87,29 +93,34 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     // qrCode and clientReady are managed by GlobalStateContext
     if (data.clientReady) {
       setAuthState(AUTH_STATES.AUTHENTICATED);
+    } else if (data.needsRelink) {
+      // Poisoned session, parked by the server — a new QR only comes from an
+      // explicit Re-link, never from waiting.
+      setAuthState(AUTH_STATES.NEEDS_RELINK);
     } else if (data.qr) {
+      // A real QR is available — show it immediately (no CHECKING_SESSION delay).
+      setAuthState((currentState) =>
+        currentState === AUTH_STATES.AUTHENTICATED ? currentState : AUTH_STATES.QR_REQUIRED
+      );
+    } else if (data.restoring) {
+      // Live client mid-restore — show a restoring state, NOT a forever-empty QR
+      // box. If it never readies, the server parks it → needsRelink above.
       setAuthState((currentState) =>
         currentState === AUTH_STATES.QR_REQUIRED ||
         currentState === AUTH_STATES.AUTHENTICATED
           ? currentState
-          : AUTH_STATES.CHECKING_SESSION
+          : AUTH_STATES.RESTORING
       );
-
-      setTimeout(() => {
-        setAuthState((currentState) =>
-          currentState === AUTH_STATES.CHECKING_SESSION
-            ? AUTH_STATES.QR_REQUIRED
-            : currentState
-        );
-      }, 3000);
     } else if (data.error) {
       setAuthState(AUTH_STATES.ERROR);
       setError(data.error);
     } else {
-      // No QR and no clientReady — wait briefly for the client to settle.
+      // No client, no QR yet (e.g. a brand-new setup before the first QR) — settle
+      // briefly, then assume a QR is incoming.
       setAuthState((currentState) =>
         currentState === AUTH_STATES.QR_REQUIRED ||
-        currentState === AUTH_STATES.AUTHENTICATED
+        currentState === AUTH_STATES.AUTHENTICATED ||
+        currentState === AUTH_STATES.NEEDS_RELINK
           ? currentState
           : AUTH_STATES.CHECKING_SESSION
       );
@@ -196,11 +207,33 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
       void requestInitialState();
     };
 
+    // React to the WhatsApp client-ready DATA frame (distinct from the SSE
+    // transport events above) so a server-side park (needs_relink) or a re-link
+    // flips the page live, instead of waiting for the next poll.
+    const handleClientReadyFrame = (raw: unknown) => {
+      const frame = raw as { clientReady?: boolean; state?: string } | null;
+      if (!frame) return;
+      if (frame.clientReady) {
+        setAuthState(AUTH_STATES.AUTHENTICATED);
+      } else if (frame.state === 'needs_relink') {
+        setAuthState(AUTH_STATES.NEEDS_RELINK);
+      } else if (
+        frame.state === 'relinking' ||
+        frame.state === 'restarting' ||
+        frame.state === 'initializing'
+      ) {
+        setAuthState((prev) =>
+          prev === AUTH_STATES.AUTHENTICATED ? prev : AUTH_STATES.INITIALIZING
+        );
+      }
+    };
+
     sseWhatsapp.on('connecting', handleConnecting);
     sseWhatsapp.on('connected', handleConnected);
     sseWhatsapp.on('disconnected', handleDisconnected);
     sseWhatsapp.on('error', handleError);
     sseWhatsapp.on('reconnected', handleReconnected);
+    sseWhatsapp.on('whatsapp_client_ready', handleClientReadyFrame);
 
     sseWhatsapp
       .ensureConnected()
@@ -219,6 +252,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
       sseWhatsapp.off('disconnected', handleDisconnected);
       sseWhatsapp.off('error', handleError);
       sseWhatsapp.off('reconnected', handleReconnected);
+      sseWhatsapp.off('whatsapp_client_ready', handleClientReadyFrame);
       sseWhatsapp.release();
     };
   }, [requestInitialState]);
@@ -291,47 +325,24 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     }
   }, [requestInitialState, toast]);
 
-  const handleDestroy = useCallback(async () => {
-    toast.info('Closing WhatsApp browser…');
+  // "Re-link device" — the recovery for a poisoned/parked session. Clears the
+  // stored session via the library (POST /api/wa/unlink) and starts fresh; the
+  // new QR arrives over SSE (which flips authState to QR_REQUIRED on its own).
+  const handleReLink = useCallback(async () => {
+    toast.info('Re-linking WhatsApp — a new QR is on the way…');
+    setAuthState(AUTH_STATES.INITIALIZING);
+    setError(null);
     try {
-      // Non-2xx now throws (route 400/500s on failure); the success body is success:true.
-      await postJSON('/api/wa/destroy', {});
-      setAuthState(AUTH_STATES.INITIALIZING);
-      toast.success('WhatsApp browser closed');
+      await postJSON('/api/wa/unlink', {});
+      setTimeout(() => {
+        void requestInitialState();
+      }, CONFIG.CLIENT_RESTART_DELAY_MS);
     } catch (err) {
-      console.error('Destroy failed:', err);
+      console.error('Re-link failed:', err);
       setAuthState(AUTH_STATES.ERROR);
-      const message = httpErrorMessage(err, 'Destroy failed');
+      const message = httpErrorMessage(err, 'Could not re-link WhatsApp');
       setError(message);
-      toast.error(`Failed to close browser: ${message}`);
-    }
-  }, [toast]);
-
-  const handleLogout = useCallback(async () => {
-    toast.info('Logging out of WhatsApp…');
-    try {
-      // Non-2xx now throws (route 400/500s on failure); the success body is success:true.
-      await postJSON('/api/wa/logout', {});
-      setAuthState(AUTH_STATES.INITIALIZING);
-      toast.success('Logged out — restarting client');
-
-      // Re-prime initial state whether or not the follow-up restart succeeds
-      // (both branches re-prime; the catch covers a non-2xx restart too).
-      try {
-        await postJSON('/api/wa/restart', {});
-      } catch (restartError) {
-        console.warn('Restart failed:', restartError);
-      } finally {
-        setTimeout(() => {
-          void requestInitialState();
-        }, CONFIG.LOGOUT_DELAY_MS);
-      }
-    } catch (err) {
-      console.error('Logout failed:', err);
-      setAuthState(AUTH_STATES.ERROR);
-      const message = httpErrorMessage(err, 'Logout failed');
-      setError(message);
-      toast.error(`Logout failed: ${message}`);
+      toast.error(message);
     }
   }, [requestInitialState, toast]);
 
@@ -381,7 +392,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
 
   // Auto-redirect only when the user actually went through QR scan on this
   // page. If the page mounted with the client already ready, stay so the user
-  // can reach Restart / Close Browser / Logout.
+  // can reach Restart Client / Re-link.
   const sawQrStateRef = useRef(false);
   useEffect(() => {
     if (authState === AUTH_STATES.QR_REQUIRED) {
@@ -412,8 +423,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
       handleRetry,
       handleRefreshQR,
       handleRestart,
-      handleDestroy,
-      handleLogout,
+      handleReLink,
       fetchQRCode,
     },
   };

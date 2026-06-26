@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { ChangeEvent, FormEvent, FocusEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApiResponse } from '@/types/api.types';
 import styles from './PaymentModal.module.css';
@@ -97,6 +98,7 @@ const formatNumber = (num: number | string | undefined): string => {
 };
 
 const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
+    const { t } = useTranslation('payments');
     const toast = useToast();
     const confirm = useConfirm();
     const queryClient = useQueryClient();
@@ -306,7 +308,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const handleSetExchangeRate = async () => {
         const rate = parseFormattedNumber(newRateValue);
         if (!rate || rate <= 0) {
-            toast.warning('Please enter a valid exchange rate');
+            toast.warning(t('validation.enterValidRate'));
             return;
         }
 
@@ -326,7 +328,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             setNewRateValue('');
         } catch (error) {
             console.error('Error setting exchange rate:', error);
-            toast.error('Error setting exchange rate: ' + httpErrorMessage(error, 'unknown error'));
+            toast.error(t('toast.rateError', { error: httpErrorMessage(error, 'unknown error') }));
         } finally {
             setLoading(false);
         }
@@ -629,34 +631,34 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         if (entryMode === 'amount') {
             // Amount mode: Must have amount entered
             if (!amountPaid) {
-                toast.warning('Please enter the amount to register');
+                toast.warning(t('validation.enterAmount'));
                 return;
             }
         } else {
             // Cash mode: Must have cash entered (amount will be calculated)
             if (actualUSD === 0 && actualIQD === 0) {
-                toast.warning('Please enter cash received (USD or IQD)');
+                toast.warning(t('validation.enterCash'));
                 return;
             }
             // In cash mode, amountPaid should have been calculated - validate it exists
             if (!amountPaid) {
-                toast.warning('Could not calculate amount to register. Please check cash amounts.');
+                toast.warning(t('validation.cantCalculate'));
                 return;
             }
         }
 
         if (actualUSD === 0 && actualIQD === 0) {
-            toast.warning('Please enter at least one currency amount received');
+            toast.warning(t('validation.enterAtLeastOne'));
             return;
         }
 
         if (calculations.remainingBalance > 0 && amountPaid > calculations.remainingBalance) {
-            toast.error(`Amount exceeds remaining balance (${formatCurrency(calculations.remainingBalance, calculations.accountCurrency)})`);
+            toast.error(t('validation.exceedsBalance', { balance: formatCurrency(calculations.remainingBalance, calculations.accountCurrency) }));
             return;
         }
 
         if (calculations.isShort) {
-            if (!await confirm('Patient has not paid enough. Amount received is less than amount to register. Continue anyway?', { title: 'Underpayment Warning', confirmText: 'Continue' })) return;
+            if (!await confirm(t('confirm.underpaymentMessage'), { title: t('confirm.underpaymentTitle'), confirmText: t('confirm.underpaymentConfirm') })) return;
         }
 
         // Scenarios where change is not tracked (NULL):
@@ -677,7 +679,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         if (!shouldDisableChange && changeToSubmit !== null && changeToSubmit > 0) {
             // Simple case: IQD only payment
             if (actualUSD === 0 && changeToSubmit > actualIQD) {
-                toast.error(`Invalid Change: ${changeToSubmit} IQD cannot exceed IQD received (${actualIQD} IQD)`);
+                toast.error(t('validation.invalidChange', { change: changeToSubmit, received: actualIQD }));
                 return;
             }
         }
@@ -720,13 +722,13 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             postJSON<{ success: boolean; message?: string }>('/api/wa/send-receipt', { workId: workData!.work_id })
                 .then((waResult) => {
                     if (waResult.success) {
-                        toast.success('Receipt sent via WhatsApp!');
+                        toast.success(t('toast.receiptSent'));
                     } else {
-                        toast.warning(waResult.message || 'Failed to send WhatsApp');
+                        toast.warning(waResult.message || t('toast.whatsappFailed'));
                     }
                 })
                 .catch(err => {
-                    toast.error('WhatsApp error: ' + httpErrorMessage(err, 'unknown error'));
+                    toast.error(t('toast.whatsappError', { error: httpErrorMessage(err, 'unknown error') }));
                 });
 
             if (onSuccess) {
@@ -737,7 +739,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             }
         } catch (error) {
             console.error('Error adding payment:', error);
-            toast.error('Error adding payment: ' + httpErrorMessage(error, 'unknown error'));
+            toast.error(t('toast.paymentError', { error: httpErrorMessage(error, 'unknown error') }));
         } finally {
             setLoading(false);
         }
@@ -755,7 +757,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             // Create print window
             const printWindow = window.open('', '_blank', 'width=800,height=600');
             if (!printWindow) {
-                throw new Error('Pop-up blocked. Please allow pop-ups for this site.');
+                throw new Error(t('toast.popupBlocked'));
             }
 
             // Write content
@@ -771,7 +773,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             };
         } catch (err) {
             console.error('Error printing receipt:', err);
-            toast.error(`Failed to print receipt: ${(err as Error).message}`);
+            toast.error(t('toast.printFailed', { error: (err as Error).message }));
         }
     };
 
@@ -829,17 +831,17 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                         {/* Compact Header with Balance Info */}
                         <ModalHeader
                             dense
-                            title="Add Payment"
+                            title={t('modal.title')}
                             icon={<i className="fas fa-credit-card" />}
-                            subtitle={workData.type_name || `Work #${workData.work_id}`}
+                            subtitle={workData.type_name || t('modal.workFallback', { id: workData.work_id })}
                             onClose={onClose}
                             actions={
                                 <div className={styles.paymentBalanceBadge}>
-                                    <span className={styles.balanceLabel}>Balance</span>
+                                    <span className={styles.balanceLabel}>{t('balance.label')}</span>
                                     <span className={styles.balanceAmount}>{formatCurrency(calculations.remainingBalance, calculations.accountCurrency)}</span>
                                     {Number(workData.discount ?? 0) > 0 && (
                                         <span className={`${styles.balanceLabel} ${styles.discountNote}`}>
-                                            <i className="fas fa-tag"></i> {formatCurrency(Number(workData.discount), calculations.accountCurrency)} discount applied
+                                            <i className="fas fa-tag"></i> {formatCurrency(Number(workData.discount), calculations.accountCurrency)} {t('balance.discountApplied')}
                                         </span>
                                     )}
                                 </div>
@@ -850,10 +852,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                         {exchangeRateError && !exchangeRate ? (
                             <div className={styles.exchangeRateErrorCompact}>
                                 <i className="fas fa-exclamation-triangle"></i>
-                                <span>No rate for {formData.paymentDate}</span>
+                                <span>{t('exchangeRate.noRate', { date: formData.paymentDate })}</span>
                                 {!showRateInput ? (
                                     <button type="button" onClick={() => setShowRateInput(true)} className={styles.btnLink}>
-                                        Set Rate
+                                        {t('exchangeRate.setRate')}
                                     </button>
                                 ) : (
                                     <div className={styles.rateInputInline}>
@@ -868,10 +870,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                             className={styles.rateInputSmall}
                                         />
                                         <button type="button" onClick={handleSetExchangeRate} disabled={loading} className={styles.btnSmPrimary}>
-                                            {loading ? '...' : 'Save'}
+                                            {loading ? '...' : t('exchangeRate.save')}
                                         </button>
                                         <button type="button" onClick={() => { setShowRateInput(false); setNewRateValue(''); }} className={styles.btnSmGhost}>
-                                            ×
+                                            {t('actions.closeX')}
                                         </button>
                                     </div>
                                 )}
@@ -879,7 +881,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                         ) : exchangeRate ? (
                             <div className={styles.exchangeRateCompact}>
                                 <i className="fas fa-exchange-alt"></i>
-                                <span>1 USD = {formatNumber(exchangeRate)} IQD</span>
+                                <span>{t('exchangeRate.display', { rate: formatNumber(exchangeRate) })}</span>
                                 <span className={styles.rateDate}>({formData.paymentDate})</span>
                             </div>
                         ) : null}
@@ -888,7 +890,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                             {/* Row 1: Currency + Entry Mode + Date */}
                             <div className={styles.paymentRowCompact}>
                                 <div className={styles.paymentField}>
-                                    <label htmlFor="payment-currency">Payment Currency</label>
+                                    <label htmlFor="payment-currency">{t('form.currency')}</label>
                                     <select
                                         id="payment-currency"
                                         name="paymentCurrency"
@@ -896,17 +898,17 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                         onChange={handleInputChange}
                                         className={styles.selectCompact}
                                     >
-                                        <option value="USD">USD Only</option>
-                                        <option value="IQD">IQD Only</option>
-                                        <option value="MIXED">Mixed</option>
+                                        <option value="USD">{t('form.usdOnly')}</option>
+                                        <option value="IQD">{t('form.iqdOnly')}</option>
+                                        <option value="MIXED">{t('form.mixed')}</option>
                                     </select>
                                 </div>
 
                                 <div className={`${styles.paymentField} ${styles.entryModeField}`}>
-                                    <label>Entry Mode {isSameCurrencySelection && <span className={styles.lockedBadge}>Locked</span>}</label>
+                                    <label>{t('form.entryMode')} {isSameCurrencySelection && <span className={styles.lockedBadge}>{t('form.locked')}</span>}</label>
                                     <div className={`${styles.entryModeToggle} ${isSameCurrencySelection ? styles.entryModeDisabled : ''}`}>
-                                        <span className={`${styles.toggleLabel} ${entryMode === 'amount' ? styles.toggleLabelActive : ''}`}>Amount</span>
-                                        <label className={styles.entryModeSwitch} aria-label="Toggle entry mode between amount and cash">
+                                        <span className={`${styles.toggleLabel} ${entryMode === 'amount' ? styles.toggleLabelActive : ''}`}>{t('form.amount')}</span>
+                                        <label className={styles.entryModeSwitch} aria-label={t('form.entryModeAria')}>
                                             <input
                                                 type="checkbox"
                                                 checked={entryMode === 'cash'}
@@ -915,12 +917,12 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                             />
                                             <span className={styles.slider}></span>
                                         </label>
-                                        <span className={`${styles.toggleLabel} ${entryMode === 'cash' ? styles.toggleLabelActive : ''}`}>Cash</span>
+                                        <span className={`${styles.toggleLabel} ${entryMode === 'cash' ? styles.toggleLabelActive : ''}`}>{t('form.cash')}</span>
                                     </div>
                                 </div>
 
                                 <div className={styles.paymentField}>
-                                    <label htmlFor="payment-date">Date</label>
+                                    <label htmlFor="payment-date">{t('form.date')}</label>
                                     <input
                                         id="payment-date"
                                         type="date"
@@ -937,9 +939,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                 {/* Amount to Register */}
                                 <div className={`${styles.paymentField} ${styles.paymentFieldLg}`}>
                                     <label>
-                                        Amount to Register ({calculations.accountCurrency})
+                                        {t('form.amountLabel', { currency: calculations.accountCurrency })}
                                         {entryMode === 'amount' && <span className={styles.required}>*</span>}
-                                        {entryMode === 'cash' && <span className={styles.autoBadge}>Auto</span>}
+                                        {entryMode === 'cash' && <span className={styles.autoBadge}>{t('form.auto')}</span>}
                                     </label>
                                     <input
                                         type="text"
@@ -948,7 +950,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                         onBlur={() => handleMoneyInputBlur('amountToRegister')}
                                         onFocus={handleMoneyInputFocus}
                                         readOnly={entryMode === 'cash'}
-                                        placeholder={entryMode === 'cash' ? 'Auto' : 'Enter amount'}
+                                        placeholder={entryMode === 'cash' ? t('form.auto') : t('form.enterAmount')}
                                         className={`${styles.inputLg} ${entryMode === 'cash' ? styles.inputReadonly : ''}`}
                                     />
                                     {entryMode === 'amount' && calculations.remainingBalance > 0 && (
@@ -958,7 +960,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                 checked={amountEqualsBalance}
                                                 onChange={(e) => handlePayFullBalanceToggle(e.target.checked)}
                                             />
-                                            <span>Pay full balance ({formatCurrency(calculations.remainingBalance, calculations.accountCurrency)})</span>
+                                            <span>{t('form.payFullBalance', { amount: formatCurrency(calculations.remainingBalance, calculations.accountCurrency) })}</span>
                                         </label>
                                     )}
                                 </div>
@@ -967,10 +969,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                 {formData.paymentCurrency !== 'MIXED' ? (
                                     <div className={`${styles.paymentField} ${styles.paymentFieldLg}`}>
                                         <label>
-                                            {formData.paymentCurrency} Received
+                                            {t('form.received', { currency: formData.paymentCurrency })}
                                             {entryMode === 'cash' && <span className={styles.required}>*</span>}
-                                            {entryMode === 'amount' && !formData.cashOverrideEnabled && <span className={styles.autoBadge}>Auto</span>}
-                                            {entryMode === 'amount' && formData.cashOverrideEnabled && <span className={styles.overrideBadge}>Override</span>}
+                                            {entryMode === 'amount' && !formData.cashOverrideEnabled && <span className={styles.autoBadge}>{t('form.auto')}</span>}
+                                            {entryMode === 'amount' && formData.cashOverrideEnabled && <span className={styles.overrideBadge}>{t('form.override')}</span>}
                                         </label>
                                         {formData.paymentCurrency === 'USD' ? (
                                             /* USD field - check if cross-currency override is available */
@@ -991,7 +993,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                             onBlur={() => handleMoneyInputBlur('actualUSD')}
                                                             onFocus={handleMoneyInputFocus}
                                                             readOnly={isLocked}
-                                                            placeholder={entryMode === 'cash' ? 'Enter USD' : (isOverriding ? 'Enter bill amount' : 'Auto')}
+                                                            placeholder={entryMode === 'cash' ? t('form.enterUsd') : (isOverriding ? t('form.enterBill') : t('form.auto'))}
                                                             className={`${styles.inputLg} ${isLocked ? styles.inputReadonly : ''}`}
                                                         />
                                                         {canOverride && (
@@ -999,7 +1001,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                                 type="button"
                                                                 className={`${styles.lockToggleBtn} ${isOverriding ? styles.unlocked : styles.locked}`}
                                                                 onClick={handleCashOverrideToggle}
-                                                                title={isOverriding ? 'Lock (use auto-calculated)' : 'Unlock (enter actual bill amount)'}
+                                                                title={isOverriding ? t('form.lockAuto') : t('form.unlockBill')}
                                                             >
                                                                 <i className={`fas fa-${isOverriding ? 'lock-open' : 'lock'}`}></i>
                                                             </button>
@@ -1023,7 +1025,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                             onBlur={() => handleMoneyInputBlur('actualIQD')}
                                                             onFocus={handleMoneyInputFocus}
                                                             readOnly={isLockedIQD}
-                                                            placeholder={entryMode === 'cash' ? 'Enter IQD' : 'Auto'}
+                                                            placeholder={entryMode === 'cash' ? t('form.enterIqd') : t('form.auto')}
                                                             className={`${styles.inputLg} ${isLockedIQD ? styles.inputReadonly : ''}`}
                                                         />
                                                         {canOverrideIQD && (
@@ -1031,7 +1033,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                                 type="button"
                                                                 className={`${styles.lockToggleBtn} ${formData.cashOverrideEnabled ? styles.unlocked : styles.locked}`}
                                                                 onClick={handleCashOverrideToggle}
-                                                                title={formData.cashOverrideEnabled ? 'Lock (use auto-calculated)' : 'Unlock (enter actual received amount)'}
+                                                                title={formData.cashOverrideEnabled ? t('form.lockAuto') : t('form.unlockReceived')}
                                                             >
                                                                 <i className={`fas fa-${formData.cashOverrideEnabled ? 'lock-open' : 'lock'}`}></i>
                                                             </button>
@@ -1042,20 +1044,20 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                         )}
                                         {/* Suggestion hint */}
                                         {entryMode === 'amount' && calculations.suggestedUSD > 0 && formData.paymentCurrency === 'USD' && !formData.cashOverrideEnabled && (
-                                            <small className={styles.fieldHint}>Collect {formatNumber(calculations.suggestedUSD)}</small>
+                                            <small className={styles.fieldHint}>{t('form.collectHint', { amount: formatNumber(calculations.suggestedUSD) })}</small>
                                         )}
                                         {entryMode === 'amount' && formData.paymentCurrency === 'USD' && formData.cashOverrideEnabled && (
-                                            <small className={`${styles.fieldHint} ${styles.overrideHint}`}>Enter $50, $100, etc.</small>
+                                            <small className={`${styles.fieldHint} ${styles.overrideHint}`}>{t('form.overrideHint')}</small>
                                         )}
                                         {entryMode === 'amount' && calculations.suggestedIQD > 0 && formData.paymentCurrency === 'IQD' && (
-                                            <small className={styles.fieldHint}>Collect {formatNumber(calculations.suggestedIQD)}</small>
+                                            <small className={styles.fieldHint}>{t('form.collectHint', { amount: formatNumber(calculations.suggestedIQD) })}</small>
                                         )}
                                     </div>
                                 ) : (
                                     /* Mixed Payment - Two smaller fields */
                                     <div className={styles.paymentFieldGroup}>
                                         <div className={styles.paymentField}>
-                                            <label htmlFor="payment-usd-received">USD Received</label>
+                                            <label htmlFor="payment-usd-received">{t('form.usdReceived')}</label>
                                             <input
                                                 id="payment-usd-received"
                                                 type="text"
@@ -1068,7 +1070,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                             />
                                         </div>
                                         <div className={styles.paymentField}>
-                                            <label htmlFor="payment-iqd-received">IQD Received</label>
+                                            <label htmlFor="payment-iqd-received">{t('form.iqdReceived')}</label>
                                             <input
                                                 id="payment-iqd-received"
                                                 type="text"
@@ -1086,13 +1088,13 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                 {/* Change Field */}
                                 <div className={styles.paymentField}>
                                     <label>
-                                        Change (IQD)
-                                        {isChangeDisabled && <span className={styles.naBadge}>N/A</span>}
+                                        {t('form.change')}
+                                        {isChangeDisabled && <span className={styles.naBadge}>{t('form.na')}</span>}
                                     </label>
                                     {isChangeDisabled ? (
                                         <input
                                             type="text"
-                                            value="—"
+                                            value={t('form.disabledDash')}
                                             disabled
                                             className={`${styles.inputCompact} ${styles.inputDisabled}`}
                                         />
@@ -1108,7 +1110,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                         />
                                     )}
                                     {!isChangeDisabled && calculations.calculatedChange > 0 && !formData.changeManualOverride && (
-                                        <small className={`${styles.fieldHint} ${styles.fieldHintSuccess}`}>Auto-calculated</small>
+                                        <small className={`${styles.fieldHint} ${styles.fieldHintSuccess}`}>{t('form.autoCalculated')}</small>
                                     )}
                                 </div>
                             </div>
@@ -1117,7 +1119,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                             {(formData.actualUSD || formData.actualIQD) && (
                                 <div className={`${styles.paymentSummaryStrip} ${calculations.isShort ? styles.summaryWarning : styles.summarySuccess}`}>
                                     <div className={styles.summaryItem}>
-                                        <span className={styles.summaryLabel}>Cash IN:</span>
+                                        <span className={styles.summaryLabel}>{t('summary.cashIn')}</span>
                                         <span className={styles.summaryValue}>
                                             {formData.actualUSD ? `$${formatNumber(formData.actualUSD)}` : ''}
                                             {formData.actualUSD && formData.actualIQD ? ' + ' : ''}
@@ -1126,18 +1128,18 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                     </div>
                                     {!isChangeDisabled && formData.change > 0 && (
                                         <div className={styles.summaryItem}>
-                                            <span className={styles.summaryLabel}>Change OUT:</span>
+                                            <span className={styles.summaryLabel}>{t('summary.changeOut')}</span>
                                             <span className={styles.summaryValue}>{formatNumber(formData.change)} IQD</span>
                                         </div>
                                     )}
                                     <div className={`${styles.summaryItem} ${styles.summaryTotal}`}>
-                                        <span className={styles.summaryLabel}>Register:</span>
+                                        <span className={styles.summaryLabel}>{t('summary.register')}</span>
                                         <span className={styles.summaryValue}>{formatCurrency(formData.amountToRegister || 0, calculations.accountCurrency)}</span>
                                     </div>
                                     {calculations.isShort && (
                                         <div className={styles.summaryWarningText}>
                                             <i className="fas fa-exclamation-triangle"></i>
-                                            Short by {formatCurrency((parseFloat(String(formData.amountToRegister)) || 0) - calculations.totalReceived, calculations.accountCurrency)}
+                                            {t('summary.shortBy', { amount: formatCurrency((parseFloat(String(formData.amountToRegister)) || 0) - calculations.totalReceived, calculations.accountCurrency) })}
                                         </div>
                                     )}
                                 </div>
@@ -1146,13 +1148,13 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                             {/* Actions - Compact */}
                             <div className={styles.paymentActionsCompact}>
                                 <button type="button" className="btn btn-secondary" onClick={onClose}>
-                                    Cancel
+                                    {t('actions.cancel')}
                                 </button>
                                 <button type="submit" className="btn btn-primary" disabled={loading || !exchangeRate}>
                                     {loading ? (
-                                        <><i className="fas fa-spinner fa-spin"></i> Saving...</>
+                                        <><i className="fas fa-spinner fa-spin"></i> {t('actions.saving')}</>
                                     ) : (
-                                        <><i className="fas fa-check"></i> Save Payment</>
+                                        <><i className="fas fa-check"></i> {t('actions.savePayment')}</>
                                     )}
                                 </button>
                             </div>
@@ -1161,21 +1163,21 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                 ) : (
                     /* Payment Success State - Compact */
                     <>
-                        <button className={styles.modalClose} onClick={handleCloseAfterSuccess} aria-label="Close">×</button>
+                        <button className={styles.modalClose} onClick={handleCloseAfterSuccess} aria-label={t('success.close')}>{t('actions.closeX')}</button>
                         <div className={styles.paymentSuccessCompact}>
                         <div className={styles.successIcon}>
                             <i className="fas fa-check-circle"></i>
                         </div>
-                        <h2>Payment Recorded!</h2>
+                        <h2>{t('success.title')}</h2>
                         <p className={styles.successAmount}>
                             {formatCurrency(receiptData?.amountPaidToday || 0, receiptData?.currency || 'IQD')}
                         </p>
                         <div className={styles.successActions}>
                             <button onClick={handlePrint} className="btn btn-primary">
-                                <i className="fas fa-print"></i> Print Receipt
+                                <i className="fas fa-print"></i> {t('success.printReceipt')}
                             </button>
                             <button onClick={handleCloseAfterSuccess} className="btn btn-secondary">
-                                Done
+                                {t('success.done')}
                             </button>
                         </div>
                         </div>

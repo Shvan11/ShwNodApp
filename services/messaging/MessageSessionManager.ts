@@ -8,7 +8,6 @@
 import {
   MessageSession,
   SessionStats,
-  SessionDebugInfo,
   WhatsAppServiceInterface,
 } from './MessageSession.js';
 import { log } from '../../utils/logger.js';
@@ -58,38 +57,6 @@ export interface ManagerStatsSummary {
   totalSessions: number;
 }
 
-/**
- * All sessions statistics
- */
-export interface AllSessionsStats {
-  active: SessionStats[];
-  history: SessionStats[];
-  summary: ManagerStatsSummary;
-}
-
-/**
- * Manager debug statistics
- */
-export interface ManagerDebugStats {
-  activeSessionCount: number;
-  expiredSessionCount: number;
-  acceptingAcksCount: number;
-  historySize: number;
-  ackTrackingWindow: number;
-  autoExpireEnabled: boolean;
-  cleanupInterval: number;
-  maxSessionAge: number;
-  maxHistorySize: number;
-}
-
-/**
- * Manager debug information
- */
-export interface ManagerDebugInfo {
-  activeSessions: Record<string, SessionDebugInfo>;
-  sessionHistory: Record<string, SessionStats>;
-  managerStats: ManagerDebugStats;
-}
 
 // ===========================================
 // MESSAGE SESSION MANAGER CLASS
@@ -338,26 +305,6 @@ export class MessageSessionManager {
   }
 
   /**
-   * Get statistics for all sessions
-   */
-  getAllStats(): AllSessionsStats {
-    const activeStats = Array.from(this.activeSessions.values()).map((session) =>
-      session.getStats()
-    );
-    const historyStats = Array.from(this.sessionHistory.values());
-
-    return {
-      active: activeStats,
-      history: historyStats,
-      summary: {
-        activeSessions: this.activeSessions.size,
-        historicalSessions: this.sessionHistory.size,
-        totalSessions: this.activeSessions.size + this.sessionHistory.size,
-      },
-    };
-  }
-
-  /**
    * Start periodic cleanup of old sessions
    */
   private startPeriodicCleanup(): void {
@@ -461,68 +408,6 @@ export class MessageSessionManager {
     });
   }
 
-  /**
-   * Get expired sessions count
-   */
-  getExpiredSessionsCount(): number {
-    let expiredCount = 0;
-    for (const [, session] of this.activeSessions) {
-      if (session.isExpired()) {
-        expiredCount++;
-      }
-    }
-    return expiredCount;
-  }
-
-  /**
-   * Get debug information for all sessions
-   */
-  getDebugInfo(): ManagerDebugInfo {
-    const activeSessions: Record<string, SessionDebugInfo> = {};
-    let expiredCount = 0;
-    let acceptingAcksCount = 0;
-
-    for (const [date, session] of this.activeSessions) {
-      activeSessions[date] = session.getDebugInfo();
-      if (session.isExpired()) expiredCount++;
-      if (session.canAcceptAcks()) acceptingAcksCount++;
-    }
-
-    return {
-      activeSessions,
-      sessionHistory: Object.fromEntries(this.sessionHistory),
-      managerStats: {
-        activeSessionCount: this.activeSessions.size,
-        expiredSessionCount: expiredCount,
-        acceptingAcksCount: acceptingAcksCount,
-        historySize: this.sessionHistory.size,
-        ackTrackingWindow: this.ackTrackingWindow,
-        autoExpireEnabled: this.autoExpireEnabled,
-        cleanupInterval: this.cleanupInterval,
-        maxSessionAge: this.maxSessionAge,
-        maxHistorySize: this.maxHistorySize,
-      },
-    };
-  }
-
-  /**
-   * Cleanup all resources
-   */
-  destroy(): void {
-    // Clear cleanup timer
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
-      this.cleanupTimer = null;
-    }
-
-    // Complete all active sessions
-    this.completeAllSessions();
-
-    // Clear history
-    this.sessionHistory.clear();
-
-    log.info('MessageSessionManager destroyed');
-  }
 }
 
 // Export singleton instance with memory-optimized defaults for production

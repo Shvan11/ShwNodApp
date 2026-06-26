@@ -202,8 +202,8 @@ class EmailService {
       // Determine recipients
       let recipients = options.to;
 
-      // If no recipients specified or explicitly requesting employee recipients, fetch from database
-      if (!recipients || options.useEmployeeRecipients !== false) {
+      // If no recipients specified, fetch from database
+      if (!recipients) {
         const employees = await this.getEmployeeRecipients();
         if (employees.length > 0) {
           recipients = employees.map((emp) => emp.email).join(', ');

@@ -3,15 +3,6 @@ import config from '../../config/config.js';
 import ResourceManager from '../core/ResourceManager.js';
 import { log } from '../../utils/logger.js';
 
-export interface PoolStats {
-  totalConnections: number;
-  activeConnections: number;
-  waitingRequests: number;
-  maxConnections: number;
-  isShuttingDown: boolean;
-  [key: string]: number | boolean;
-}
-
 let pool: sql.ConnectionPool | null = null;
 let connectPromise: Promise<sql.ConnectionPool> | null = null;
 
@@ -56,27 +47,6 @@ export async function getPool(): Promise<sql.ConnectionPool> {
       });
   }
   return connectPromise;
-}
-
-export function getStats(): PoolStats {
-  if (!pool) {
-    return {
-      totalConnections: 0,
-      activeConnections: 0,
-      waitingRequests: 0,
-      maxConnections: 10,
-      isShuttingDown: true,
-    };
-  }
-  // tarn is the internal pool manager exposed by mssql
-  const tarn = (pool as unknown as { pool: { numUsed(): number; numFree(): number; numPendingAcquires(): number; max: number } }).pool;
-  return {
-    totalConnections: tarn.numUsed() + tarn.numFree(),
-    activeConnections: tarn.numUsed(),
-    waitingRequests: tarn.numPendingAcquires(),
-    maxConnections: tarn.max,
-    isShuttingDown: false,
-  };
 }
 
 ResourceManager.register('database-pool', null, async () => {

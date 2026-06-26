@@ -48,6 +48,8 @@ export default function WhatsAppAuth() {
       case AUTH_STATES.CONNECTING:
       case AUTH_STATES.CHECKING_SESSION:
       case AUTH_STATES.DISCONNECTED:
+      case AUTH_STATES.RESTORING:
+      case AUTH_STATES.NEEDS_RELINK:
         return <StatusDisplay authState={authState} />;
 
       case AUTH_STATES.QR_REQUIRED:

@@ -240,7 +240,9 @@ export default [
       'public/js/components/react/AppointmentForm.tsx',
       'public/js/components/react/EditAppointmentForm.tsx',
       'public/js/components/react/SimplifiedCalendarPicker.tsx',
-      'public/js/components/react/PatientAppointments.tsx'
+      'public/js/components/react/PatientAppointments.tsx',
+      'public/js/components/react/PaymentModal.tsx',
+      'public/js/components/react/Navigation.tsx'
     ],
     plugins: {
       i18next

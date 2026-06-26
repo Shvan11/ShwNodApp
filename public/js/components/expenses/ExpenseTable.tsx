@@ -65,6 +65,7 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete, writ
                         <th>{t('table.date')}</th>
                         <th>{t('table.amount')}</th>
                         <th>{t('table.currency')}</th>
+                        <th>{t('table.type')}</th>
                         <th>{t('table.category')}</th>
                         <th>{t('table.subcategory')}</th>
                         <th>{t('table.note')}</th>
@@ -91,6 +92,11 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete, writ
                                     <span className={getCurrencyClass(currencyLower)}>
                                         {currency}
                                     </span>
+                                </td>
+                                <td>
+                                    {expense.is_monthly && (
+                                        <span className={styles.monthlyBadge}>{t('table.monthly')}</span>
+                                    )}
                                 </td>
                                 <td>{category}</td>
                                 <td>{subcategory}</td>

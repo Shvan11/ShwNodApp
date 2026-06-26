@@ -12,7 +12,7 @@
 
 .controls button {
     padding: var(--spacing-sm) 12px;
-    color: white;
+    color: var(--color-white);
     border: none;
     border-radius: var(--radius-md);
     font-size: 14px;

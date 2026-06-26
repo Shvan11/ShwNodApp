@@ -178,16 +178,6 @@ function hasArabic(text: string): boolean {
   return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
 }
 
-/**
- * Determine label type from text
- */
-function getLabelType(text: string): 'UL' | 'U' | 'L' | 'custom' {
-  if (text.includes('/')) return 'UL';
-  if (text.toUpperCase().startsWith('U')) return 'U';
-  if (text.toUpperCase().startsWith('L')) return 'L';
-  return 'custom';
-}
-
 // =============================================================================
 // LABEL GENERATOR CLASS
 // =============================================================================
@@ -449,5 +439,5 @@ class AlignerLabelGenerator {
 // EXPORTS
 // =============================================================================
 
-export { AlignerLabelGenerator, getSlotPosition, getLabelType, LABELS_PER_SHEET };
+export { AlignerLabelGenerator, getSlotPosition, LABELS_PER_SHEET };
 export default new AlignerLabelGenerator();

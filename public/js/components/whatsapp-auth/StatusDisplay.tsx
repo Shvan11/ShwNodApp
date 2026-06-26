@@ -40,6 +40,22 @@ export const StatusDisplay = ({ authState }: StatusDisplayProps) => {
           message: 'Looking for saved WhatsApp authentication',
         };
 
+      case AUTH_STATES.RESTORING:
+        return {
+          icon: '⏳',
+          title: 'Restoring WhatsApp session…',
+          message:
+            'This can take up to two minutes. If it doesn\'t finish, use "Re-link Device" below to get a fresh QR code.',
+        };
+
+      case AUTH_STATES.NEEDS_RELINK:
+        return {
+          icon: '⚠️',
+          title: 'WhatsApp session expired',
+          message:
+            'The saved session can no longer connect. Click "Re-link Device" below to get a new QR code, then scan it with your phone.',
+        };
+
       case AUTH_STATES.DISCONNECTED:
         return {
           icon: '🔌',

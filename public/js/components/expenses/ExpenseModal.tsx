@@ -34,6 +34,7 @@ interface FormData {
     categoryId: string | number;
     subcategoryId: string | number;
     note: string;
+    isMonthly: boolean;
 }
 
 interface FormErrors {
@@ -63,7 +64,8 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
         currency: 'IQD',
         categoryId: '',
         subcategoryId: '',
-        note: ''
+        note: '',
+        isMonthly: false,
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
@@ -85,7 +87,8 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                     currency: (expense.currency || '').trim() || 'IQD',
                     categoryId: expense.category_id || '',
                     subcategoryId: expense.subcategory_id || '',
-                    note: expense.note || ''
+                    note: expense.note || '',
+                    isMonthly: expense.is_monthly ?? false,
                 });
                 setDisplayAmount(expense.amount ? formatNumber(expense.amount) : '');
                 setCategoryId(expense.category_id || '');
@@ -98,7 +101,8 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                     currency: 'IQD',
                     categoryId: '',
                     subcategoryId: '',
-                    note: ''
+                    note: '',
+                    isMonthly: false,
                 });
                 setDisplayAmount('');
                 setCategoryId('');
@@ -167,7 +171,8 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
             currency: formData.currency,
             note: formData.note,
             categoryId: formData.categoryId ? Number(formData.categoryId) : undefined,
-            subcategoryId: formData.subcategoryId ? Number(formData.subcategoryId) : undefined
+            subcategoryId: formData.subcategoryId ? Number(formData.subcategoryId) : undefined,
+            isMonthly: formData.isMonthly,
         };
 
         setSubmitting(true);
@@ -185,7 +190,8 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
             currency: 'IQD',
             categoryId: '',
             subcategoryId: '',
-            note: ''
+            note: '',
+            isMonthly: false,
         });
         setDisplayAmount('');
         setCategoryId('');
@@ -212,6 +218,23 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
 
                 <form onSubmit={handleSubmit}>
                     <div className={styles.modalBody}>
+                        <div className={styles.monthlyToggle}>
+                            <label className={styles.monthlyToggleLabel}>
+                                <input
+                                    type="checkbox"
+                                    checked={formData.isMonthly}
+                                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                                        setFormData(prev => ({ ...prev, isMonthly: e.target.checked }))
+                                    }
+                                    className={styles.monthlyCheckbox}
+                                />
+                                <span>{t('modal.isMonthly')}</span>
+                            </label>
+                            {formData.isMonthly && (
+                                <p className={styles.monthlyHint}>{t('modal.isMonthlyHint')}</p>
+                            )}
+                        </div>
+
                         <div className={styles.formGroup}>
                             <label htmlFor="expense-date">
                                 {t('modal.date')} <span className={styles.required}>*</span>

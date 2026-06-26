@@ -4,7 +4,7 @@
  * Phase 5 reimplementation of the reporting stored procs ProcGrandTotal /
  * ProcYearlyMonthlyTotals / ProDailyInvoices. Each proc read a chain of SQL Server views
  * (VIQD / VUSD / V_EIQ / V_EI$ / VWIQD / VWUSD) that no longer exist in PG; those views are
- * inlined here as CTEs. The dual-currency cash-box ("Qasa") math is preserved verbatim.
+ * inlined here as CTEs. The dual-currency cash-box ("Expected Cash") math is preserved verbatim.
  *
  * Consumed by routes/api/reports.routes.ts (math/aggregation stays in FinancialReportService).
  */
@@ -44,19 +44,33 @@ const VW_CTES = sql`
     SELECT "expense_date" AS day, -SUM("amount") AS sumexq
     FROM "expenses" WHERE "currency" = 'IQD' GROUP BY "expense_date"
   ),
+  veiq_daily AS (
+    -- daily-only IQD expenses (monthly excluded) — feeds Expected Cash formula only
+    SELECT "expense_date" AS day, -SUM("amount") AS sumexq_daily
+    FROM "expenses" WHERE "currency" = 'IQD' AND NOT "is_monthly" GROUP BY "expense_date"
+  ),
   veiusd AS (
     SELECT "expense_date" AS day, -SUM("amount") AS sumexusd
     FROM "expenses" WHERE "currency" = 'USD' GROUP BY "expense_date"
   ),
+  veiusd_daily AS (
+    -- daily-only USD expenses (monthly excluded) — feeds Expected Cash formula only
+    SELECT "expense_date" AS day, -SUM("amount") AS sumexusd_daily
+    FROM "expenses" WHERE "currency" = 'USD' AND NOT "is_monthly" GROUP BY "expense_date"
+  ),
   vwiqd AS (
     SELECT COALESCE(v.day, e.day) AS day, v.sumiqd, e.sumexq,
-           COALESCE(v.sumiqd, 0) + COALESCE(e.sumexq, 0) AS finaliqdsum
+           COALESCE(v.sumiqd, 0) + COALESCE(e.sumexq, 0) AS finaliqdsum,
+           ed.sumexq_daily
     FROM viqd v FULL OUTER JOIN veiq e ON v.day = e.day
+    LEFT JOIN veiq_daily ed ON COALESCE(v.day, e.day) = ed.day
   ),
   vwusd AS (
     SELECT COALESCE(v.day, e.day) AS day, v.sumusd, e.sumexusd,
-           COALESCE(v.sumusd, 0) + COALESCE(e.sumexusd, 0) AS finalusdsum
+           COALESCE(v.sumusd, 0) + COALESCE(e.sumexusd, 0) AS finalusdsum,
+           ed.sumexusd_daily
     FROM vusd v FULL OUTER JOIN veiusd e ON v.day = e.day
+    LEFT JOIN veiusd_daily ed ON COALESCE(v.day, e.day) = ed.day
   )
 `;
 
@@ -98,8 +112,8 @@ export async function getMonthlyGrandTotals(
       )                                                              AS "GrandTotal",
       (COALESCE(wq.finaliqdsum, 0)
         + COALESCE(wu.finalusdsum * COALESCE(s."exchange_rate", ${ex}::int), 0)) AS "GrandTotalIQD",
-      (COALESCE(dq.totaliqd, 0) + COALESCE(wq.sumexq, 0) - COALESCE(dq.totalchange, 0)) AS "QasaIQD",
-      (COALESCE(du.totalusd, 0) + COALESCE(wu.sumexusd, 0))          AS "QasaUSD"
+      (COALESCE(dq.totaliqd, 0) + COALESCE(wq.sumexq_daily, 0) - COALESCE(dq.totalchange, 0)) AS "ExpectedCashIQD",
+      (COALESCE(du.totalusd, 0) + COALESCE(wu.sumexusd_daily, 0))          AS "ExpectedCashUSD"
     FROM vwiqd wq
     FULL OUTER JOIN vwusd wu ON wq.day = wu.day
     LEFT JOIN "sms" s ON COALESCE(wq.day, wu.day) = s."date"

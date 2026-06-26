@@ -6,7 +6,7 @@
  * - Media sending (images, X-rays, documents)
  * - QR code authentication
  * - Client status management
- * - Client lifecycle operations (restart, destroy, logout, initialize)
+ * - Client lifecycle operations (restart, re-link, initialize)
  *
  * All routes support real-time WebSocket updates for status changes.
  */
@@ -638,22 +638,41 @@ router.get('/initial-state', async (_req: Request, res: Response): Promise<void>
       active?: boolean;
       initializing?: boolean;
       hasClient?: boolean;
+      needsRelink?: boolean;
     };
 
-    if (messageState.activeQRViewers > 0) {
+    // Don't kick on-demand init while parked for a re-link (it would no-op in the
+    // service anyway, but skip the emit entirely).
+    if (messageState.activeQRViewers > 0 && !clientStatus.needsRelink) {
       stateEvents.emit('whatsapp_initialization_requested');
     }
 
     const isClientReady = stateDump.clientReady || clientStatus.active;
     const finished = stateDump.finishedSending;
 
+    // Two distinct "no QR yet" situations, so the auth page never shows a
+    // forever-empty QR box: `needsRelink` = session poisoned, manual re-link
+    // required (parked); `restoring` = a live client mid-restore (a QR may still
+    // be moments away, or it resolves to ready).
+    const needsRelink = !!clientStatus.needsRelink;
+    const restoring =
+      !isClientReady &&
+      !needsRelink &&
+      !messageState.qr &&
+      !!clientStatus.hasClient &&
+      (clientStatus.state === 'INITIALIZING' || !!clientStatus.initializing);
+
     let html: string;
     if (isClientReady) {
       html = finished
         ? `<p>${stateDump.sentMessages} Messages Sent!</p><p>${stateDump.failedMessages} Messages Failed!</p><p>Finished</p>`
         : `<p>${stateDump.sentMessages} Messages Sent!</p><p>${stateDump.failedMessages} Messages Failed!</p><p>Sending...</p>`;
+    } else if (needsRelink) {
+      html = '<p>WhatsApp session expired — please re-link the device.</p>';
     } else if (messageState.qr && messageState.activeQRViewers > 0) {
       html = '<p>QR code ready - Please scan with WhatsApp</p>';
+    } else if (restoring) {
+      html = '<p>Restoring WhatsApp session...</p>';
     } else {
       html = '<p>Initializing the client...</p>';
     }
@@ -678,6 +697,8 @@ router.get('/initial-state', async (_req: Request, res: Response): Promise<void>
       finished,
       clientReady: isClientReady,
       initializing: clientStatus.initializing || false,
+      needsRelink,
+      restoring,
       clientStatus,
       persons: messageState.persons || [],
       qr: qrDataUrl,
@@ -765,69 +786,45 @@ router.post('/refresh-qr', (_req: Request, res: Response): void => {
 });
 
 /**
- * Destroy WhatsApp client - close browser but preserve authentication
- * POST /destroy (mounted at /api/wa)
- * This closes the browser/puppeteer but keeps authentication for reconnection
+ * Re-link the WhatsApp client.
+ * POST /unlink (mounted at /api/wa)
+ *
+ * Clears the stored session through whatsapp-web.js's OWN api (a clean
+ * client.logout() when the page is healthy, else destroy + LocalAuth.logout() —
+ * never our own fs delete of .wwebjs_auth) and starts fresh so a new QR appears.
+ * This is the only recovery for a poisoned "authenticated but never ready"
+ * session (the parked `needs_relink` state); the Re-link button lands here.
+ *
+ * FIRE-AND-FORGET (returns 200 immediately): the clear + fresh init can exceed
+ * the 30s request timeout, so the outcome is reported over `GET /api/sse/whatsapp`
+ * — a fresh QR (`whatsapp_qr_updated`) on success, or a `needs_relink`
+ * client-ready frame if the clear couldn't complete.
  */
-router.post(
-  '/destroy',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      log.info('Destroying WhatsApp client - preserving authentication');
-
-      const result = await whatsapp.simpleDestroy();
-
-      if (result.success) {
-        res.json({
-          success: true,
-          message: result.message,
-          action: 'destroy',
-          authPreserved: true
-        });
-      } else {
-        log.warn('WhatsApp destroy failed', { error: result.error });
-        ErrorResponses.badRequest(res, 'operation failed', {
-          operation: 'destroy WhatsApp client',
-          details: result.error || 'Destroy failed'
-        });
-      }
-    } catch (error) {
-      log.error('Error destroying WhatsApp client:', error);
-      ErrorResponses.internalError(res, 'Failed to destroy WhatsApp client', {
-        error: (error as Error).message
-      });
-    }
-  }
-);
-
-/**
- * Logout WhatsApp client - completely clear authentication
- * POST /logout (mounted at /api/wa)
- * This logs out from WhatsApp and removes all authentication data
- */
-router.post('/logout', async (_req: Request, res: Response): Promise<void> => {
+router.post('/unlink', (_req: Request, res: Response): void => {
   try {
-    log.info('Logging out WhatsApp client - clearing authentication');
+    log.info('WhatsApp re-link requested — clearing session for a fresh QR');
+    res.json({
+      success: true,
+      message: 'Re-linking WhatsApp — a new QR is on the way',
+      action: 'unlink_requested',
+      timestamp: Date.now()
+    });
 
-    const result = await whatsapp.completeLogout();
-
-    if (result.success) {
-      res.json({
-        success: true,
-        message: result.message,
-        action: 'logout',
-        authCleared: true
-      });
-    } else {
-      log.warn('WhatsApp logout failed', { error: result.error });
-      ErrorResponses.badRequest(res, 'operation failed', {
-        operation: 'logout WhatsApp client',
-        details: result.error || 'Logout failed'
-      });
-    }
+    setImmediate(async () => {
+      try {
+        const result = await whatsapp.unlink();
+        if (result.success) {
+          log.info('WhatsApp unlink completed — fresh init started');
+        } else {
+          log.warn('WhatsApp unlink reported failure', { error: result.error });
+        }
+      } catch (error) {
+        log.error('WhatsApp unlink failed:', (error as Error).message);
+      }
+    });
   } catch (error) {
-    log.error('Error logging out WhatsApp client:', error);
-    ErrorResponses.internalError(res, 'Failed to logout WhatsApp client', {
+    log.error('Error handling WhatsApp unlink request:', error);
+    ErrorResponses.internalError(res, 'Failed to process re-link request', {
       error: (error as Error).message
     });
   }
