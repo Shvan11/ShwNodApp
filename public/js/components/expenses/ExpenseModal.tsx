@@ -5,9 +5,12 @@
 import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCategories, useSubcategories } from '../../hooks/useExpenses';
+import { useCategories, useSubcategories, useLabs, useActiveEmployees } from '../../hooks/useExpenses';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
+import { useLookupManager } from '../../hooks/useLookupManager';
+import { qk } from '@/query/keys';
 import type { Expense, ExpenseData } from '../../hooks/useExpenses';
+import { EMPLOYEE_EXPENSE_CATEGORY, LAB_EXPENSE_CATEGORY } from '../../config/expenseCategories';
 import { formatISODate } from '../../core/utils';
 import { formatNumber } from '../../utils/formatters';
 import Modal from '../react/Modal';
@@ -33,6 +36,9 @@ interface FormData {
     currency: string;
     categoryId: string | number;
     subcategoryId: string | number;
+    // Entity sub-levels for the Lab / Employees categories (one is used per category).
+    labId: string | number;
+    employeeId: string | number;
     note: string;
     isMonthly: boolean;
 }
@@ -57,6 +63,24 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
     const [categoryId, setCategoryId] = useState<string | number>('');
     const [submitting, setSubmitting] = useState(false);
     const { subcategories } = useSubcategories(categoryId) as { subcategories: Subcategory[] };
+    const { labs } = useLabs();
+    const { employees } = useActiveEmployees();
+
+    // Right-click the Lab dropdown → "Edit labs" → manage the labs lookup inline
+    // (stacks on top of this modal). Edits refresh the shared labs feed.
+    const labLookup = useLookupManager({
+        tableKey: 'tblLabs',
+        title: t('modal.manageLabs'),
+        menuLabel: t('modal.editLabs'),
+        invalidateKeys: [qk.lookups.labs()],
+    });
+
+    // The Lab / Employees categories swap the subcategory dropdown for an entity dropdown.
+    const catNum = Number(categoryId);
+    const subLevel: 'employee' | 'lab' | 'subcategory' =
+        catNum === EMPLOYEE_EXPENSE_CATEGORY ? 'employee'
+        : catNum === LAB_EXPENSE_CATEGORY ? 'lab'
+        : 'subcategory';
 
     const [formData, setFormData] = useState<FormData>({
         expenseDate: '',
@@ -64,6 +88,8 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
         currency: 'IQD',
         categoryId: '',
         subcategoryId: '',
+        labId: '',
+        employeeId: '',
         note: '',
         isMonthly: false,
     });
@@ -87,6 +113,8 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                     currency: (expense.currency || '').trim() || 'IQD',
                     categoryId: expense.category_id || '',
                     subcategoryId: expense.subcategory_id || '',
+                    labId: expense.lab_id || '',
+                    employeeId: expense.employee_id || '',
                     note: expense.note || '',
                     isMonthly: expense.is_monthly ?? false,
                 });
@@ -101,6 +129,8 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                     currency: 'IQD',
                     categoryId: '',
                     subcategoryId: '',
+                    labId: '',
+                    employeeId: '',
                     note: '',
                     isMonthly: false,
                 });
@@ -124,7 +154,10 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
         setFormData(prev => ({
             ...prev,
             categoryId: value,
-            subcategoryId: '' // Reset subcategory when category changes
+            // Reset every sub-level when the category changes (only one applies per category).
+            subcategoryId: '',
+            labId: '',
+            employeeId: '',
         }));
     };
 
@@ -171,7 +204,10 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
             currency: formData.currency,
             note: formData.note,
             categoryId: formData.categoryId ? Number(formData.categoryId) : undefined,
-            subcategoryId: formData.subcategoryId ? Number(formData.subcategoryId) : undefined,
+            // Only the sub-level that matches the chosen category is sent.
+            subcategoryId: subLevel === 'subcategory' && formData.subcategoryId ? Number(formData.subcategoryId) : undefined,
+            labId: subLevel === 'lab' && formData.labId ? Number(formData.labId) : undefined,
+            employeeId: subLevel === 'employee' && formData.employeeId ? Number(formData.employeeId) : undefined,
             isMonthly: formData.isMonthly,
         };
 
@@ -190,6 +226,8 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
             currency: 'IQD',
             categoryId: '',
             subcategoryId: '',
+            labId: '',
+            employeeId: '',
             note: '',
             isMonthly: false,
         });
@@ -203,6 +241,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
     const modalTitle = isEditMode ? t('modal.editTitle') : t('modal.addTitle');
 
     return (
+        <>
         <Modal
             isOpen={isOpen}
             onClose={handleClose}
@@ -306,23 +345,57 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                             </select>
                         </div>
 
-                        <div className={styles.formGroup}>
-                            <label htmlFor="expense-subcategory">{t('modal.subcategory')}</label>
-                            <select
-                                id="expense-subcategory"
-                                value={String(formData.subcategoryId)}
-                                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('subcategoryId', e.target.value)}
-                                disabled={!formData.categoryId}
-                                className={styles.formInput}
-                            >
-                                <option value="">{t('modal.selectSubcategory')}</option>
-                                {subcategories.map(sub => (
-                                    <option key={sub.subcategory_id} value={sub.subcategory_id}>
-                                        {localizedName(sub.subcategory_name, sub.subcategory_name_ar)}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                        {subLevel === 'employee' ? (
+                            <div className={styles.formGroup}>
+                                <label htmlFor="expense-employee">{t('modal.employee')}</label>
+                                <select
+                                    id="expense-employee"
+                                    value={String(formData.employeeId)}
+                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('employeeId', e.target.value)}
+                                    className={styles.formInput}
+                                >
+                                    <option value="">{t('modal.selectEmployee')}</option>
+                                    {employees.map(emp => (
+                                        <option key={emp.id} value={emp.id}>{emp.employee_name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        ) : subLevel === 'lab' ? (
+                            <div className={styles.formGroup}>
+                                <label htmlFor="expense-lab">{t('modal.lab')}</label>
+                                <select
+                                    id="expense-lab"
+                                    value={String(formData.labId)}
+                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('labId', e.target.value)}
+                                    onContextMenu={labLookup.onContextMenu}
+                                    title={t('modal.editLabsHint')}
+                                    className={styles.formInput}
+                                >
+                                    <option value="">{t('modal.selectLab')}</option>
+                                    {labs.map(lab => (
+                                        <option key={lab.id} value={lab.id}>{lab.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        ) : (
+                            <div className={styles.formGroup}>
+                                <label htmlFor="expense-subcategory">{t('modal.subcategory')}</label>
+                                <select
+                                    id="expense-subcategory"
+                                    value={String(formData.subcategoryId)}
+                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('subcategoryId', e.target.value)}
+                                    disabled={!formData.categoryId}
+                                    className={styles.formInput}
+                                >
+                                    <option value="">{t('modal.selectSubcategory')}</option>
+                                    {subcategories.map(sub => (
+                                        <option key={sub.subcategory_id} value={sub.subcategory_id}>
+                                            {localizedName(sub.subcategory_name, sub.subcategory_name_ar)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
                         <div className={styles.formGroup}>
                             <label htmlFor="expense-note">{t('modal.note')}</label>
@@ -356,5 +429,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                     </div>
                 </form>
         </Modal>
+        {labLookup.overlay}
+        </>
     );
 }

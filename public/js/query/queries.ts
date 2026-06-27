@@ -421,6 +421,28 @@ export const implantManufacturersQuery = () =>
       ),
   });
 
+/** GET /api/shades — dental shade systems + values (Bridge/Veneers shade dropdowns). */
+export const shadesQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.shades(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof lookupContract.shades.response>>('/api/shades', {
+        signal,
+        schema: lookupContract.shades.response,
+      }),
+  });
+
+/** GET /api/labs — labs from the "Lab" expense subcategories (Bridge/Veneers lab dropdown). */
+export const labsQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.labs(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof lookupContract.labs.response>>('/api/labs', {
+        signal,
+        schema: lookupContract.labs.response,
+      }),
+  });
+
 /** GET /api/positions — employee-position options. */
 export const positionsQuery = () =>
   queryOptions({
@@ -611,6 +633,8 @@ export const expensesQuery = (filters: ExpenseFilters = {}) =>
       if (filters.endDate) params.append('endDate', filters.endDate);
       if (filters.categoryId) params.append('categoryId', String(filters.categoryId));
       if (filters.subcategoryId) params.append('subcategoryId', String(filters.subcategoryId));
+      if (filters.labId) params.append('labId', String(filters.labId));
+      if (filters.employeeId) params.append('employeeId', String(filters.employeeId));
       if (filters.currency) params.append('currency', filters.currency);
       if (filters.isMonthly) params.append('isMonthly', filters.isMonthly);
       return fetchJSON<Expense[]>(`/api/expenses?${params}`, {

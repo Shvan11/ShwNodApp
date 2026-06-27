@@ -44,6 +44,12 @@ interface LookupEditorProps {
     tableName: string;
     columns: ColumnConfig[];
     idColumn: string;
+    /**
+     * Fired after any successful create/update/delete. Lets a host (e.g. the
+     * right-click LookupManagerModal) refresh whatever dropdown feed consumes this
+     * table — the editor already invalidates its own `qk.adminLookups.table` key.
+     */
+    onChanged?: () => void;
 }
 
 // Pure positioner — module-scoped, takes an already-measured rect (keeps the DOM
@@ -149,7 +155,7 @@ const DeleteConfirmPopover: React.FC<DeleteConfirmPopoverProps> = ({ anchorEl, i
  * Reusable component for editing any lookup table
  * Displays items in a table with search, add, edit, and delete functionality
  */
-const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, columns, idColumn }) => {
+const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, columns, idColumn, onChanged }) => {
     const toast = useToast();
     const queryClient = useQueryClient();
     const { data: itemsData, isLoading: loading, isError, error: itemsError } =
@@ -204,6 +210,7 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
             await deleteJSON(`/api/admin/lookups/${tableKey}/${itemId}`);
             toast.success('Item deleted successfully');
             void queryClient.invalidateQueries({ queryKey: qk.adminLookups.table(tableKey) });
+            onChanged?.();
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to delete item'));
         } finally {
@@ -226,6 +233,7 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
             setModalOpen(false);
             setAnchorEl(null);
             void queryClient.invalidateQueries({ queryKey: qk.adminLookups.table(tableKey) });
+            onChanged?.();
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to save item'));
         }

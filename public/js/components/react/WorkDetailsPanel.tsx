@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getWorkTypeConfig } from '../../config/workTypeConfig';
-import { workDetailsListQuery, teethQuery, implantManufacturersQuery } from '@/query/queries';
-import WorkDetailItem, { type ImplantManufacturer } from './WorkDetailItem';
+import { workDetailsListQuery, teethQuery, implantManufacturersQuery, shadesQuery, labsQuery } from '@/query/queries';
+import WorkDetailItem, { type ImplantManufacturer, type ShadeSystemOption, type LabOption } from './WorkDetailItem';
 import { type ToothOption } from './TeethSelector';
 import styles from './WorkDetailsPanel.module.css';
 
@@ -21,7 +21,10 @@ export interface WorkDetail {
     implant_diameter?: number;
     implant_manufacturer_id?: number;
     material?: string;
+    lab_id?: number;
     lab_name?: string;
+    shade_system?: string;
+    shade?: string;
     item_cost?: number;
     start_date?: string;
     completed_date?: string;
@@ -53,6 +56,12 @@ const WorkDetailsPanel = ({ workId, typeOfWork }: WorkDetailsPanelProps) => {
     const { data: manufacturersData } = useQuery(implantManufacturersQuery());
     const implantManufacturers = (manufacturersData ?? []) as ImplantManufacturer[];
 
+    const { data: shadesData } = useQuery(shadesQuery());
+    const shadeSystems = (shadesData?.systems ?? []) as ShadeSystemOption[];
+
+    const { data: labsData } = useQuery(labsQuery());
+    const labs = (labsData ?? []) as LabOption[];
+
     const [isAdding, setIsAdding] = useState(false);
 
     return (
@@ -82,6 +91,8 @@ const WorkDetailsPanel = ({ workId, typeOfWork }: WorkDetailsPanelProps) => {
                                 detail={detail}
                                 teethOptions={teethOptions}
                                 implantManufacturers={implantManufacturers}
+                                shadeSystems={shadeSystems}
+                                labs={labs}
                             />
                         ))}
                         {isAdding && (
@@ -91,6 +102,8 @@ const WorkDetailsPanel = ({ workId, typeOfWork }: WorkDetailsPanelProps) => {
                                 detail={null}
                                 teethOptions={teethOptions}
                                 implantManufacturers={implantManufacturers}
+                                shadeSystems={shadeSystems}
+                                labs={labs}
                                 startInEdit
                                 onCloseNew={() => setIsAdding(false)}
                             />

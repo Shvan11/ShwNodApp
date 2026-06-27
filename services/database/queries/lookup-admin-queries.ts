@@ -96,6 +96,41 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
       { name: 'key_word', label: 'Keyword', type: 'nvarchar', maxLength: 255, required: false },
     ],
   },
+  tblShadeVitaClassic: {
+    tableName: 'shade_vita_classic',
+    idColumn: 'id',
+    displayColumn: 'shade',
+    displayName: 'Shade — Vita Classic',
+    icon: 'fas fa-palette',
+    idType: 'int',
+    columns: [
+      { name: 'shade', label: 'Shade', type: 'varchar', maxLength: 20, required: true },
+    ],
+  },
+  tblShade3dMaster: {
+    tableName: 'shade_3d_master',
+    idColumn: 'id',
+    displayColumn: 'shade',
+    displayName: 'Shade — 3D Master',
+    icon: 'fas fa-palette',
+    idType: 'int',
+    columns: [
+      { name: 'shade', label: 'Shade', type: 'varchar', maxLength: 20, required: true },
+    ],
+  },
+  tblLabs: {
+    tableName: 'labs',
+    idColumn: 'id',
+    displayColumn: 'lab_name',
+    displayName: 'Labs',
+    icon: 'fas fa-flask',
+    idType: 'int',
+    columns: [
+      { name: 'lab_name', label: 'Lab name', type: 'varchar', maxLength: 100, required: true },
+      // A lab in use can't be hard-deleted (work_items/expenses FK) — retire it via this flag.
+      { name: 'is_active', label: 'Active', type: 'bit', required: false },
+    ],
+  },
   tblDetail: {
     tableName: 'details',
     idColumn: 'id',
@@ -257,9 +292,9 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
     columns: [
       { name: 'subcategory_name', label: 'Name', type: 'nvarchar', maxLength: 100, required: true },
       // Optional Arabic display name — falls back to subcategory_name when blank.
-      // NOTE: rows under the "Employees" category are auto-synced from `employees`
-      // (employee-queries.ts writes only subcategory_name), so an Arabic value set
-      // here on those rows can go stale on rename — leave employee/proper-noun rows blank.
+      // NOTE: the "Lab" (7) and "Employees" (5) categories no longer use subcategories —
+      // their expenses reference labs / employees directly via expenses.lab_id /
+      // employee_id (see the labs-normalization migration). Don't re-add rows there.
       { name: 'subcategory_name_ar', label: 'Name (Arabic)', type: 'nvarchar', maxLength: 100, required: false },
       {
         name: 'category_id',

@@ -142,6 +142,10 @@ export const qk = {
     workKeywords: () => ['lookups', 'work-keywords'] as const,
     teeth: () => ['lookups', 'teeth'] as const,
     implantManufacturers: () => ['lookups', 'implant-manufacturers'] as const,
+    /** GET /api/shades — dental shade systems + values (Bridge/Veneers work items). */
+    shades: () => ['lookups', 'shades'] as const,
+    /** GET /api/labs — labs from the "Lab" expense subcategories (Bridge/Veneers work items). */
+    labs: () => ['lookups', 'labs'] as const,
     alertTypes: () => ['lookups', 'alert-types'] as const,
     wires: () => ['lookups', 'wires'] as const,
     operators: () => ['lookups', 'operators'] as const,

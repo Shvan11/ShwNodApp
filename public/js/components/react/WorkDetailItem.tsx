@@ -14,11 +14,24 @@ import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { useLookupManager } from '../../hooks/useLookupManager';
 import styles from './WorkDetailItem.module.css';
 
 export interface ImplantManufacturer {
     id: number;
     name: string;
+}
+
+/** A lab option for the Bridge/Veneers lab dropdown (a "Lab" expense subcategory). */
+export interface LabOption {
+    id: number;
+    name: string;
+}
+
+/** A dental shade system and its values, for the Bridge/Veneers shade dropdowns. */
+export interface ShadeSystemOption {
+    name: string;
+    shades: { id: number; shade: string }[];
 }
 
 /** Editable mirror of a work item — all fields as strings, matching the add/update payload. */
@@ -33,7 +46,9 @@ interface DetailDraft {
     implant_diameter: string;
     implant_manufacturer_id: string;
     material: string;
-    lab_name: string;
+    lab_id: string;
+    shade_system: string;
+    shade: string;
     item_cost: string;
     start_date: string;
     completed_date: string;
@@ -47,6 +62,8 @@ interface WorkDetailItemProps {
     detail: WorkDetail | null;
     teethOptions: ToothOption[];
     implantManufacturers: ImplantManufacturer[];
+    shadeSystems: ShadeSystemOption[];
+    labs: LabOption[];
     /** Start directly in edit mode (used for the freshly-added blank item). */
     startInEdit?: boolean;
     /** Called when a NEW item's edit finishes (saved or cancelled) so the panel can drop the draft slot. */
@@ -66,7 +83,9 @@ const buildDraft = (d: WorkDetail | null, workId: number): DetailDraft => ({
     implant_diameter: d?.implant_diameter != null ? String(d.implant_diameter) : '',
     implant_manufacturer_id: d?.implant_manufacturer_id != null ? String(d.implant_manufacturer_id) : '',
     material: d?.material ?? '',
-    lab_name: d?.lab_name ?? '',
+    lab_id: d?.lab_id != null ? String(d.lab_id) : '',
+    shade_system: d?.shade_system ?? '',
+    shade: d?.shade ?? '',
     item_cost: d?.item_cost != null ? String(d.item_cost) : '',
     start_date: d?.start_date ? String(d.start_date).split('T')[0] : '',
     completed_date: d?.completed_date ? String(d.completed_date).split('T')[0] : '',
@@ -108,6 +127,8 @@ const WorkDetailItem = ({
     detail,
     teethOptions,
     implantManufacturers,
+    shadeSystems,
+    labs,
     startInEdit = false,
     onCloseNew,
 }: WorkDetailItemProps) => {
@@ -128,6 +149,16 @@ const WorkDetailItem = ({
     const [showPermanent, setShowPermanent] = useState(true);
     const [showDeciduous, setShowDeciduous] = useState(hasDeciduousSelected);
     const [saving, setSaving] = useState(false);
+
+    // Right-click the Lab dropdown → "Edit values" → manage the labs lookup inline.
+    // Edits refresh the shared labs feed (qk.lookups.labs), which both this dropdown
+    // and the Expense modal's lab dropdown read.
+    const labLookup = useLookupManager({
+        tableKey: 'tblLabs',
+        title: 'Manage Labs',
+        menuLabel: 'Edit labs',
+        invalidateKeys: [qk.lookups.labs()],
+    });
 
     const fid = (name: string) => `wd-${detail?.id ?? 'new'}-${name}`;
     const hasField = (name: string) => config.fields.includes(name);
@@ -329,10 +360,53 @@ const WorkDetailItem = ({
                         </select>
                     </div>
                 )}
+                {hasField('shade') && (
+                    <>
+                        <div className={styles.formGroup}>
+                            <label htmlFor={fid('shade-system')}>Shade System</label>
+                            <select
+                                id={fid('shade-system')}
+                                value={draft.shade_system}
+                                onChange={(e) => setDraft({ ...draft, shade_system: e.target.value, shade: '' })}
+                            >
+                                <option value="">Select System</option>
+                                {shadeSystems.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
+                            </select>
+                        </div>
+                        <div className={styles.formGroup}>
+                            <label htmlFor={fid('shade')}>Shade</label>
+                            <select
+                                id={fid('shade')}
+                                value={draft.shade}
+                                onChange={(e) => setDraft({ ...draft, shade: e.target.value })}
+                                disabled={!draft.shade_system}
+                            >
+                                <option value="">{draft.shade_system ? 'Select Shade' : 'Select a system first'}</option>
+                                {(shadeSystems.find((s) => s.name === draft.shade_system)?.shades ?? []).map(
+                                    (sh) => <option key={sh.id} value={sh.shade}>{sh.shade}</option>
+                                )}
+                            </select>
+                        </div>
+                    </>
+                )}
                 {hasField('labName') && (
                     <div className={styles.formGroup}>
-                        <label htmlFor={fid('lab-name')}>Lab Name</label>
-                        <input id={fid('lab-name')} type="text" value={draft.lab_name} onChange={(e) => setDraft({ ...draft, lab_name: e.target.value })} placeholder="Enter lab name" />
+                        <label htmlFor={fid('lab-name')}>Lab</label>
+                        <select
+                            id={fid('lab-name')}
+                            value={draft.lab_id}
+                            onChange={(e) => setDraft({ ...draft, lab_id: e.target.value })}
+                            onContextMenu={labLookup.onContextMenu}
+                            title="Right-click to edit the lab list"
+                        >
+                            <option value="">Select Lab</option>
+                            {labs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name}</option>)}
+                            {/* Preserve a previously-selected lab that's since been deactivated (its joined name). */}
+                            {draft.lab_id && !labs.some((lab) => String(lab.id) === draft.lab_id) && (
+                                <option value={draft.lab_id}>{detail?.lab_name ?? '—'}</option>
+                            )}
+                        </select>
+                        {labLookup.overlay}
                     </div>
                 )}
             </div>

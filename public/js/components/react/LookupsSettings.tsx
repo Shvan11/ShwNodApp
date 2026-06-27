@@ -85,7 +85,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
         {
             name: 'Clinical',
             icon: 'fas fa-stethoscope',
-            keys: ['tblWorkType', 'tblKeyWord', 'tblDetail', 'tblImplantManufacturer']
+            keys: ['tblWorkType', 'tblKeyWord', 'tblDetail', 'tblImplantManufacturer', 'tblShadeVitaClassic', 'tblShade3dMaster', 'tblLabs']
         },
         {
             name: 'Patient Information',

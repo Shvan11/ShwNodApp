@@ -18,6 +18,8 @@ import {
 } from '../../services/database/queries/employee-queries.js';
 import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import { authorize } from '../../middleware/auth.js';
+import { ADMIN_ROLES } from '../../shared/auth/roles.js';
 import * as employee from '../../shared/contracts/employee.contract.js';
 import { log } from '../../utils/logger.js';
 
@@ -162,7 +164,7 @@ router.get('/positions', async (_req: Request, res: Response): Promise<void> => 
  * POST /employees
  * Add new employee
  */
-router.post('/employees', validate({ body: employee.createEmployee.body }), async (req: Request<object, object, employee.EmployeeBody>, res: Response): Promise<void> => {
+router.post('/employees', authorize(ADMIN_ROLES), validate({ body: employee.createEmployee.body }), async (req: Request<object, object, employee.EmployeeBody>, res: Response): Promise<void> => {
   try {
     const { employee_name, position, email, phone, percentage, commissionPercentage, receiveEmail, getAppointments, is_active, sort_order, appointment_color } = req.body;
 
@@ -213,7 +215,7 @@ router.post('/employees', validate({ body: employee.createEmployee.body }), asyn
  * PUT /employees/:id
  * Update employee
  */
-router.put('/employees/:id', validate({ params: employee.updateEmployee.params, body: employee.updateEmployee.body }), async (req: Request<EmployeeParams, object, employee.EmployeeBody>, res: Response): Promise<void> => {
+router.put('/employees/:id', authorize(ADMIN_ROLES), validate({ params: employee.updateEmployee.params, body: employee.updateEmployee.body }), async (req: Request<EmployeeParams, object, employee.EmployeeBody>, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { employee_name, position, email, phone, percentage, commissionPercentage, receiveEmail, getAppointments, is_active, sort_order, appointment_color } = req.body;
@@ -264,7 +266,7 @@ router.put('/employees/:id', validate({ params: employee.updateEmployee.params, 
  * DELETE /employees/:id
  * Delete employee
  */
-router.delete('/employees/:id', validate({ params: employee.deleteEmployee.params }), async (req: Request<EmployeeParams>, res: Response): Promise<void> => {
+router.delete('/employees/:id', authorize(ADMIN_ROLES), validate({ params: employee.deleteEmployee.params }), async (req: Request<EmployeeParams>, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 

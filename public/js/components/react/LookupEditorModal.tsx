@@ -136,10 +136,13 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
                 });
                 setFormData(data);
             } else {
-                // Add mode: initialize with empty values
+                // Add mode: initialize with empty values. Bit columns in the whitelist
+                // are all "Active"-style flags (labs.is_active, document_types.is_active,
+                // each DB-default true) — a new row should default ACTIVE so it shows up
+                // immediately in the dropdowns that filter on the flag (e.g. getLabs).
                 const data: FormData = {};
                 columns.forEach(col => {
-                    data[col.name] = col.type === 'bit' ? false : '';
+                    data[col.name] = col.type === 'bit' ? true : '';
                 });
                 setFormData(data);
             }

@@ -24,7 +24,8 @@ import {
   getGenders
 } from '../../services/database/queries/patient-queries.js';
 import { getAlertTypes } from '../../services/database/queries/alert-queries.js';
-import { getImplantManufacturers } from '../../services/database/queries/work-queries.js';
+import { getImplantManufacturers, getLabs } from '../../services/database/queries/work-queries.js';
+import { getShades } from '../../services/database/queries/shade-queries.js';
 import * as lookup from '../../shared/contracts/lookup.contract.js';
 
 const router = Router();
@@ -110,6 +111,36 @@ router.get('/implant-manufacturers', async (_req: Request, res: Response): Promi
   } catch (error) {
     log.error('Error fetching implant manufacturers:', error);
     ErrorResponses.internalError(res, 'Failed to fetch implant manufacturers', error as Error);
+  }
+});
+
+/**
+ * GET /shades
+ * Fetch the dental shade systems (Vita Classic + 3D Master) each with their values,
+ * for the Bridge/Veneers work-item shade dropdowns.
+ */
+router.get('/shades', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const shades = await getShades();
+    sendData(res, lookup.shades.response, shades);
+  } catch (error) {
+    log.error('Error fetching shades:', error);
+    ErrorResponses.internalError(res, 'Failed to fetch shades', error as Error);
+  }
+});
+
+/**
+ * GET /labs
+ * Fetch the labs (subcategories of the "Lab" expense category) for the
+ * Bridge/Veneers work-item lab dropdown.
+ */
+router.get('/labs', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const labs = await getLabs();
+    sendData(res, lookup.labs.response, labs);
+  } catch (error) {
+    log.error('Error fetching labs:', error);
+    ErrorResponses.internalError(res, 'Failed to fetch labs', error as Error);
   }
 });
 

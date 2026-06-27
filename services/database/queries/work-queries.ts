@@ -135,7 +135,10 @@ type WorkItem = {
   implant_manufacturer_id: number | null;
   ImplantManufacturerName: string | null;
   material: string | null;
+  lab_id: number | null;
   lab_name: string | null;
+  shade_system: string | null;
+  shade: string | null;
   item_cost: number | null;
   start_date: string | null;
   completed_date: string | null;
@@ -178,7 +181,9 @@ interface WorkItemData {
   implant_diameter?: number | null;
   implant_manufacturer_id?: number | null;
   material?: string | null;
-  lab_name?: string | null;
+  lab_id?: number | null;
+  shade_system?: string | null;
+  shade?: string | null;
   item_cost?: number | null;
   start_date?: string | null;
   completed_date?: string | null;
@@ -233,6 +238,10 @@ type ImplantManufacturer = {
   id: number;
   name: string;
 };
+
+// `type` (not `interface`) so a Lab[] is assignable to the lookup contract's
+// `z.array(z.looseObject({ id }))` sendData arg (the index-signature rule).
+type Lab = { id: number; name: string };
 
 export async function getWorksByPatient(personId: number): Promise<Work[]> {
   const db = getKysely();
@@ -423,6 +432,7 @@ export async function getWorkDetailsList(workId: number): Promise<WorkItem[]> {
     .leftJoin('work_item_teeth as wit', 'wit.work_item_id', 'wi.id')
     .leftJoin('tooth_numbers as tn', 'tn.id', 'wit.tooth_id')
     .leftJoin('implant_manufacturers as im', 'im.id', 'wi.implant_manufacturer_id')
+    .leftJoin('labs as l', 'l.id', 'wi.lab_id')
     .where('wi.work_id', '=', workId)
     .select((eb) => [
       'wi.id',
@@ -436,7 +446,10 @@ export async function getWorkDetailsList(workId: number): Promise<WorkItem[]> {
       'wi.implant_manufacturer_id',
       'im.manufacturer_name as ImplantManufacturerName',
       'wi.material',
-      'wi.lab_name',
+      'wi.lab_id',
+      'l.lab_name as lab_name',
+      'wi.shade_system',
+      'wi.shade',
       'wi.item_cost',
       'wi.start_date',
       'wi.completed_date',
@@ -456,7 +469,10 @@ export async function getWorkDetailsList(workId: number): Promise<WorkItem[]> {
       'wi.implant_manufacturer_id',
       'im.manufacturer_name',
       'wi.material',
-      'wi.lab_name',
+      'wi.lab_id',
+      'l.lab_name',
+      'wi.shade_system',
+      'wi.shade',
       'wi.item_cost',
       'wi.start_date',
       'wi.completed_date',
@@ -488,7 +504,9 @@ export async function addWorkDetail(workDetailData: WorkItemData): Promise<{ id:
         implant_diameter: numericOrNull(workDetailData.implant_diameter),
         implant_manufacturer_id: workDetailData.implant_manufacturer_id || null,
         material: workDetailData.material || null,
-        lab_name: workDetailData.lab_name || null,
+        lab_id: workDetailData.lab_id || null,
+        shade_system: workDetailData.shade_system || null,
+        shade: workDetailData.shade || null,
         item_cost: workDetailData.item_cost || null,
         start_date: (workDetailData.start_date as string | null) || null,
         completed_date: (workDetailData.completed_date as string | null) || null,
@@ -526,7 +544,9 @@ export async function updateWorkDetail(
         implant_diameter: numericOrNull(workDetailData.implant_diameter),
         implant_manufacturer_id: workDetailData.implant_manufacturer_id || null,
         material: workDetailData.material || null,
-        lab_name: workDetailData.lab_name || null,
+        lab_id: workDetailData.lab_id || null,
+        shade_system: workDetailData.shade_system || null,
+        shade: workDetailData.shade || null,
         item_cost: workDetailData.item_cost || null,
         start_date: (workDetailData.start_date as string | null) || null,
         completed_date: (workDetailData.completed_date as string | null) || null,
@@ -986,6 +1006,22 @@ export async function getImplantManufacturers(): Promise<ImplantManufacturer[]> 
     .select(['id as id', 'manufacturer_name as name'])
     .orderBy('manufacturer_name')
     .execute() as Promise<ImplantManufacturer[]>;
+}
+
+/**
+ * Active labs for the Bridge/Veneers work-item dropdown — the first-class `labs`
+ * table (managed in Settings → Lookups → Labs). Returned as `{ id, name }` like
+ * getImplantManufacturers; `work_items.lab_id` is a real FK to labs, so a lab in use
+ * can't be hard-deleted — it's retired via `is_active=false` and hidden here.
+ */
+export async function getLabs(): Promise<Lab[]> {
+  const db = getKysely();
+  return db
+    .selectFrom('labs')
+    .select(['id', 'lab_name as name'])
+    .where('is_active', '=', true)
+    .orderBy('lab_name')
+    .execute() as Promise<Lab[]>;
 }
 
 // ===== WORK TRANSFER FUNCTIONS =====

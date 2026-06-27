@@ -20,6 +20,8 @@ import {
   expenseCategoriesQuery,
   expenseSubcategoriesQuery,
   expenseSummaryQuery,
+  labsQuery,
+  employeesQuery,
 } from '@/query/queries';
 
 /**
@@ -30,6 +32,8 @@ export interface ExpenseFilters {
   endDate?: string;
   categoryId?: number | string;
   subcategoryId?: number | string;
+  labId?: number | string;
+  employeeId?: number | string;
   currency?: string;
   isMonthly?: string;
 }
@@ -49,6 +53,11 @@ export interface Expense {
   // per-language resolution via useLocalizedName. See "DB-stored lookup values".
   category_name_ar?: string | null;
   subcategory_name_ar?: string | null;
+  // Entity sub-level for the Lab (7) / Employees (5) categories (joined name for display).
+  lab_id?: number | null;
+  lab_name?: string | null;
+  employee_id?: number | null;
+  employee_name?: string | null;
   note?: string;
   expense_date?: string;
   is_monthly?: boolean;
@@ -102,6 +111,9 @@ export interface ExpenseData {
   note?: string;
   categoryId?: number;
   subcategoryId?: number;
+  // Entity sub-level for the Lab / Employees categories (mutually exclusive with subcategoryId).
+  labId?: number;
+  employeeId?: number;
   isMonthly?: boolean;
   [key: string]: unknown;
 }
@@ -154,6 +166,18 @@ export function useSubcategories(categoryId: number | string | null | undefined)
     loading: query.isLoading,
     error: query.error ? httpErrorMessage(query.error, 'Failed to fetch subcategories') : null,
   };
+}
+
+/** Active labs for the "Lab" category sub-level dropdown (id + name). */
+export function useLabs(): { labs: Array<{ id: number; name: string }>; loading: boolean } {
+  const query = useQuery(labsQuery());
+  return { labs: query.data ?? [], loading: query.isLoading };
+}
+
+/** Active employees for the "Employees" category sub-level dropdown. */
+export function useActiveEmployees(): { employees: Array<{ id: number; employee_name: string }>; loading: boolean } {
+  const query = useQuery(employeesQuery());
+  return { employees: query.data?.employees ?? [], loading: query.isLoading };
 }
 
 /**

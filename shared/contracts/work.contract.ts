@@ -80,7 +80,13 @@ const workItemFields = {
   implant_diameter: optInt,
   implant_manufacturer_id: optInt,
   material: z.string().optional(),
-  lab_name: z.string().optional(),
+  // Bridge/Veneers lab: a real FK to `labs` (the joined `lab_name` comes back on the
+  // read path). Like implant_manufacturer_id — the work item stores the id.
+  lab_id: optInt,
+  // Bridge/Veneers shade: the chosen system label ('Vita Classic' | '3D Master')
+  // and value ('A3.5' | '2M2' …), stored as text like material.
+  shade_system: z.string().optional(),
+  shade: z.string().optional(),
   item_cost: optNum,
   start_date: z.string().optional(),
   completed_date: z.string().optional(),

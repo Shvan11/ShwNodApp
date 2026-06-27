@@ -60,6 +60,9 @@ Exceptions: external URLs, system protocols (`explorer:`, `csimaging:`), securit
 - **`<Modal>`** (`public/js/components/react/Modal.tsx`) — all overlay modals render through it: portal into `#modal-root`, focus trap, scroll lock, Escape + backdrop dismiss. **Never hand-roll a `.modal-overlay` / `styles.modalOverlay` wrapper** — it won't escape stacking/clipping ancestors.
 - **`<ModalHeader>`** (`public/js/components/react/ModalHeader.tsx`) — the SSoT for modal title bars: standardizes layout, the close button, aria wiring, and is the drag grip (`data-modal-drag-handle`) that makes the modal draggable. Use it for new headers via the `title`/`icon`/`subtitle`/`actions` props (`variant`: default|danger|warning|success|info; `dense` for compact). Pass its `titleId` as the `<Modal>` `ariaLabelledBy`.
 
+### Edit-lookup-from-dropdown — `useLookupManager`
+Right-click any reference `<select>` → "Edit values" → manage that lookup table inline (modal-hosted `LookupEditor`). To add it to a dropdown: ensure the table is in `LOOKUP_TABLE_CONFIG` (`services/database/queries/lookup-admin-queries.ts`), then `const x = useLookupManager({ tableKey, invalidateKeys: [qk.lookups.<feed>()] })`, spread `x.onContextMenu` onto the `<select>`, and render `{x.overlay}` — no per-table component. `invalidateKeys` refreshes the live dropdown after an edit. First wired for labs (work-item + expense). Infra: `hooks/useLookupManager.tsx` + `LookupContextMenu`/`LookupManagerModal`.
+
 ### Shared API contracts — `shared/contracts/*.contract.ts` (cross-boundary SSoT) — MANDATORY for new/changed endpoints
 Every enveloped staff-app endpoint's request **and** response is authored once as Zod in `shared/contracts/<group>.contract.ts` and imported by both sides — Express via relative `.js`, React via the `@shared` alias. Drift becomes a server compile error *and* a client fail-loud runtime throw.
 

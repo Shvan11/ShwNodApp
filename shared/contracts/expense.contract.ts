@@ -46,6 +46,12 @@ const expenseRow = z.looseObject({
   // CLAUDE.md i18n / RTL → "DB-stored lookup values").
   category_name_ar: z.string().nullable(),
   subcategory_name_ar: z.string().nullable(),
+  // Entity sub-level for the Lab (7) / Employees (5) categories — a real FK to
+  // labs / employees (joined name for display) instead of a subcategory shadow.
+  lab_id: z.number().nullable(),
+  lab_name: z.string().nullable(),
+  employee_id: z.number().nullable(),
+  employee_name: z.string().nullable(),
   is_monthly: z.boolean().optional(),
 });
 
@@ -71,6 +77,9 @@ const expenseBody = z.object({
   note: z.string().optional(),
   categoryId: z.coerce.number().int().optional(),
   subcategoryId: z.coerce.number().int().optional(),
+  // Entity sub-level for the Lab / Employees categories (mutually exclusive with subcategoryId).
+  labId: z.coerce.number().int().optional(),
+  employeeId: z.coerce.number().int().optional(),
   isMonthly: z.boolean().optional(),
 });
 export type CreateExpenseBody = z.infer<typeof expenseBody>;
@@ -85,6 +94,8 @@ export const expenseList = {
     endDate: z.string().optional(),
     categoryId: optionalPositiveIntQuery,
     subcategoryId: optionalPositiveIntQuery,
+    labId: optionalPositiveIntQuery,
+    employeeId: optionalPositiveIntQuery,
     currency: z.string().optional(),
     isMonthly: z.enum(['true', 'false']).optional(),
     limit: optionalPositiveIntQuery,

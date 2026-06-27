@@ -79,7 +79,9 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete, writ
                         const currency = (expense.currency || '').trim();
                         const currencyLower = currency.toLowerCase();
                         const category = localizedName(expense.category_name, expense.category_name_ar) || '-';
-                        const subcategory = localizedName(expense.subcategory_name, expense.subcategory_name_ar) || '-';
+                        // Sub-level: subcategory for normal categories; the entity name for Lab/Employees expenses.
+                        const subcategory = localizedName(expense.subcategory_name, expense.subcategory_name_ar)
+                            || expense.lab_name || expense.employee_name || '-';
                         const note = expense.note || '-';
 
                         return (

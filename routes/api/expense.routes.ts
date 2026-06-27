@@ -47,6 +47,8 @@ type ExpenseQueryParams = {
   endDate?: string;
   categoryId?: string;
   subcategoryId?: string;
+  labId?: string;
+  employeeId?: string;
   currency?: string;
   isMonthly?: string;
   limit?: string;
@@ -60,6 +62,8 @@ type ExpenseFilters = {
   endDate?: string;
   categoryId?: number | null;
   subcategoryId?: number | null;
+  labId?: number | null;
+  employeeId?: number | null;
   currency?: string;
   isMonthly?: boolean;
   limit?: number | null;
@@ -73,6 +77,8 @@ interface ExpenseData {
   note?: string;
   categoryId?: number;
   subcategoryId?: number;
+  labId?: number;
+  employeeId?: number;
   isMonthly?: boolean;
 }
 
@@ -101,6 +107,8 @@ router.get(
         subcategoryId: req.query.subcategoryId
           ? parseInt(req.query.subcategoryId)
           : null,
+        labId: req.query.labId ? parseInt(req.query.labId) : null,
+        employeeId: req.query.employeeId ? parseInt(req.query.employeeId) : null,
         currency: req.query.currency,
         isMonthly: req.query.isMonthly === 'true'
           ? true
@@ -194,7 +202,7 @@ router.post(
     res: Response
   ): Promise<void> => {
     try {
-      const { expense_date, amount, currency, note, categoryId, subcategoryId, isMonthly } =
+      const { expense_date, amount, currency, note, categoryId, subcategoryId, labId, employeeId, isMonthly } =
         req.body;
 
       // Validation
@@ -218,6 +226,8 @@ router.post(
         note,
         categoryId: categoryId ? parseInt(String(categoryId)) : undefined,
         subcategoryId: subcategoryId ? parseInt(String(subcategoryId)) : undefined,
+        labId: labId ? parseInt(String(labId)) : undefined,
+        employeeId: employeeId ? parseInt(String(employeeId)) : undefined,
         isMonthly: isMonthly ?? false,
       };
 
@@ -344,7 +354,7 @@ router.put(
   ): Promise<void> => {
     try {
       const { id } = req.params;
-      const { expense_date, amount, currency, note, categoryId, subcategoryId, isMonthly } =
+      const { expense_date, amount, currency, note, categoryId, subcategoryId, labId, employeeId, isMonthly } =
         req.body;
 
       // Validate that id is a valid number
@@ -376,6 +386,8 @@ router.put(
         note,
         categoryId: categoryId ? parseInt(String(categoryId)) : undefined,
         subcategoryId: subcategoryId ? parseInt(String(subcategoryId)) : undefined,
+        labId: labId ? parseInt(String(labId)) : undefined,
+        employeeId: employeeId ? parseInt(String(employeeId)) : undefined,
         isMonthly: isMonthly ?? false,
       };
 

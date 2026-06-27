@@ -1,0 +1,27 @@
+/*
+ * Surface for the lookup-table manager modal (LookupManagerModal). Width is
+ * generous enough for the editor's table; the body scrolls so long lists never
+ * push the footer off-screen. The editor internals are styled globally by
+ * public/css/components/lookup-editor.css (the same sheet Settings uses).
+ */
+.modalContent {
+  width: min(760px, 95vw);
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+.body {
+  padding: var(--spacing-lg);
+  overflow-y: auto;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xl);
+  color: var(--text-muted);
+}

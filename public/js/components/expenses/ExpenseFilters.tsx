@@ -4,9 +4,10 @@
  */
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCategories, useSubcategories } from '../../hooks/useExpenses';
+import { useCategories, useSubcategories, useLabs, useActiveEmployees } from '../../hooks/useExpenses';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import type { ExpenseFilters as ExpenseFiltersType } from '../../hooks/useExpenses';
+import { EMPLOYEE_EXPENSE_CATEGORY, LAB_EXPENSE_CATEGORY } from '../../config/expenseCategories';
 import styles from '../../routes/Expenses.module.css';
 
 // Re-export for convenience
@@ -36,6 +37,15 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
     const localizedName = useLocalizedName();
     const { categories } = useCategories() as { categories: Category[] };
     const { subcategories } = useSubcategories(filters.categoryId) as { subcategories: Subcategory[] };
+    const { labs } = useLabs();
+    const { employees } = useActiveEmployees();
+
+    // The Lab / Employees categories filter by entity instead of subcategory.
+    const catNum = Number(filters.categoryId);
+    const subLevel: 'employee' | 'lab' | 'subcategory' =
+        catNum === EMPLOYEE_EXPENSE_CATEGORY ? 'employee'
+        : catNum === LAB_EXPENSE_CATEGORY ? 'lab'
+        : 'subcategory';
 
     // No need to set default dates here - parent component handles initialization
 
@@ -46,7 +56,10 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
     const handleCategoryChange = (value: string) => {
         onFilterChange({
             categoryId: value,
-            subcategoryId: undefined // Reset subcategory when category changes
+            // Reset every sub-level filter when the category changes.
+            subcategoryId: undefined,
+            labId: undefined,
+            employeeId: undefined,
         });
     };
 
@@ -119,29 +132,73 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                     </div>
                 </div>
 
-                <div className={styles.modernFilterGroup}>
-                    <label htmlFor="filter-subcategory">
-                        <i className="fas fa-tag"></i>
-                        {t('filters.subcategory')}
-                    </label>
-                    <div className={styles.selectWrapper}>
-                        <select
-                            id="filter-subcategory"
-                            className={styles.modernSelect}
-                            value={String(filters.subcategoryId || '')}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('subcategoryId', e.target.value)}
-                            disabled={!filters.categoryId}
-                        >
-                            <option value="">{t('filters.allSubcategories')}</option>
-                            {subcategories.map(sub => (
-                                <option key={sub.subcategory_id} value={sub.subcategory_id}>
-                                    {localizedName(sub.subcategory_name, sub.subcategory_name_ar)}
-                                </option>
-                            ))}
-                        </select>
-                        <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
+                {subLevel === 'employee' ? (
+                    <div className={styles.modernFilterGroup}>
+                        <label htmlFor="filter-employee">
+                            <i className="fas fa-user"></i>
+                            {t('filters.employee')}
+                        </label>
+                        <div className={styles.selectWrapper}>
+                            <select
+                                id="filter-employee"
+                                className={styles.modernSelect}
+                                value={String(filters.employeeId || '')}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('employeeId', e.target.value)}
+                            >
+                                <option value="">{t('filters.allEmployees')}</option>
+                                {employees.map(emp => (
+                                    <option key={emp.id} value={emp.id}>{emp.employee_name}</option>
+                                ))}
+                            </select>
+                            <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
+                        </div>
                     </div>
-                </div>
+                ) : subLevel === 'lab' ? (
+                    <div className={styles.modernFilterGroup}>
+                        <label htmlFor="filter-lab">
+                            <i className="fas fa-flask"></i>
+                            {t('filters.lab')}
+                        </label>
+                        <div className={styles.selectWrapper}>
+                            <select
+                                id="filter-lab"
+                                className={styles.modernSelect}
+                                value={String(filters.labId || '')}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('labId', e.target.value)}
+                            >
+                                <option value="">{t('filters.allLabs')}</option>
+                                {labs.map(lab => (
+                                    <option key={lab.id} value={lab.id}>{lab.name}</option>
+                                ))}
+                            </select>
+                            <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
+                        </div>
+                    </div>
+                ) : (
+                    <div className={styles.modernFilterGroup}>
+                        <label htmlFor="filter-subcategory">
+                            <i className="fas fa-tag"></i>
+                            {t('filters.subcategory')}
+                        </label>
+                        <div className={styles.selectWrapper}>
+                            <select
+                                id="filter-subcategory"
+                                className={styles.modernSelect}
+                                value={String(filters.subcategoryId || '')}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('subcategoryId', e.target.value)}
+                                disabled={!filters.categoryId}
+                            >
+                                <option value="">{t('filters.allSubcategories')}</option>
+                                {subcategories.map(sub => (
+                                    <option key={sub.subcategory_id} value={sub.subcategory_id}>
+                                        {localizedName(sub.subcategory_name, sub.subcategory_name_ar)}
+                                    </option>
+                                ))}
+                            </select>
+                            <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
+                        </div>
+                    </div>
+                )}
 
                 <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-currency">

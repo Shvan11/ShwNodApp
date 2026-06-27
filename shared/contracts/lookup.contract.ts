@@ -56,8 +56,33 @@ export const implantManufacturers = {
 } as const;
 export type ImplantManufacturersResponse = z.infer<typeof implantManufacturers.response>;
 
+// GET /api/labs — labs for the Bridge/Veneers work-item lab dropdown. Sourced from
+// the "Lab" expense category's subcategories (work-queries.ts#getLabs), so the same
+// non-null `{ id, name }` row shape as implant manufacturers.
+export const labs = {
+  response: z.array(idNameRowNN),
+} as const;
+export type LabsResponse = z.infer<typeof labs.response>;
+
 // alert_types rows are keyed by `alert_type_id`; `type_name` is NOT NULL.
 export const alertTypes = {
   response: z.array(z.looseObject({ alert_type_id: z.number(), type_name: z.string() })),
 } as const;
 export type AlertTypesResponse = z.infer<typeof alertTypes.response>;
+
+// GET /api/shades — dental shade systems each with their values, for the Bridge/
+// Veneers work-item dependent dropdown (shade-queries.ts#getShades assembles this).
+// CLOSED `z.object`: the payload is server-assembled (not a DB row with long-tail
+// fields), so it is fully modeled and is NOT a loose-response D2 marker. shade tables'
+// `shade` column + the hard-coded system `name` are both NOT NULL.
+export const shades = {
+  response: z.object({
+    systems: z.array(
+      z.object({
+        name: z.string(),
+        shades: z.array(z.object({ id: z.number(), shade: z.string() })),
+      })
+    ),
+  }),
+} as const;
+export type ShadesResponse = z.infer<typeof shades.response>;

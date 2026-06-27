@@ -134,6 +134,8 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
         note: p.note != null ? String(p.note) : undefined,
         categoryId: p.categoryId != null ? Number(p.categoryId) : undefined,
         subcategoryId: p.subcategoryId != null ? Number(p.subcategoryId) : undefined,
+        labId: p.labId != null ? Number(p.labId) : undefined,
+        employeeId: p.employeeId != null ? Number(p.employeeId) : undefined,
       });
     },
   },

@@ -118,27 +118,31 @@ export const WORK_TYPE_FIELDS: Record<number, WorkTypeFieldConfig> = {
     ],
   },
 
-  // Bridge: material, lab, teeth, notes
+  // Crown/Bridge: material, shade, lab, teeth, notes
   [WORK_TYPE_IDS.BRIDGE]: {
-    name: 'Bridge',
+    name: 'Crown/Bridge',
     icon: 'fas fa-bridge',
-    fields: ['teeth', 'material', 'labName', 'note'],
+    fields: ['teeth', 'material', 'shade', 'labName', 'note'],
     displayFields: [
       { key: 'Teeth', label: 'Teeth' },
       { key: 'material', label: 'Material' },
+      { key: 'shade_system', label: 'Shade System' },
+      { key: 'shade', label: 'Shade' },
       { key: 'lab_name', label: 'Lab' },
       { key: 'note', label: 'Notes' },
     ],
   },
 
-  // Veneers: material, lab, teeth, notes (similar to bridge)
+  // Veneers: material, shade, lab, teeth, notes (similar to bridge)
   [WORK_TYPE_IDS.VENEERS]: {
     name: 'Veneers',
     icon: 'fas fa-sparkles',
-    fields: ['teeth', 'material', 'labName', 'note'],
+    fields: ['teeth', 'material', 'shade', 'labName', 'note'],
     displayFields: [
       { key: 'Teeth', label: 'Teeth' },
       { key: 'material', label: 'Material' },
+      { key: 'shade_system', label: 'Shade System' },
+      { key: 'shade', label: 'Shade' },
       { key: 'lab_name', label: 'Lab' },
       { key: 'note', label: 'Notes' },
     ],

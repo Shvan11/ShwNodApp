@@ -18,6 +18,8 @@ interface ExpenseFilters {
   endDate?: string;
   categoryId?: number;
   subcategoryId?: number;
+  labId?: number;
+  employeeId?: number;
   currency?: string;
   isMonthly?: boolean;
   // Optional pagination. When omitted, behavior is unchanged (all matching rows).
@@ -43,6 +45,12 @@ type Expense = {
   // section in CLAUDE.md ("DB-stored lookup values").
   category_name_ar: string | null;
   subcategory_name_ar: string | null;
+  // Entity sub-level for the Lab (7) / Employees (5) categories — the sub-level is a
+  // real FK to labs / employees instead of a subcategory shadow (joined name for display).
+  lab_id: number | null;
+  lab_name: string | null;
+  employee_id: number | null;
+  employee_name: string | null;
   is_monthly: boolean;
 };
 
@@ -67,6 +75,9 @@ interface ExpenseData {
   note?: string;
   categoryId?: number;
   subcategoryId?: number;
+  // Entity sub-level for the Lab / Employees categories (mutually exclusive with subcategoryId).
+  labId?: number;
+  employeeId?: number;
   isMonthly?: boolean;
 }
 
@@ -93,6 +104,8 @@ export async function getAllExpenses(filters: ExpenseFilters = {}): Promise<Expe
     .selectFrom('expenses as e')
     .leftJoin('expense_categories as c', 'e.category_id', 'c.category_id')
     .leftJoin('expense_subcategories as s', 'e.subcategory_id', 's.subcategory_id')
+    .leftJoin('labs as l', 'e.lab_id', 'l.id')
+    .leftJoin('employees as emp', 'e.employee_id', 'emp.id')
     .select([
       'e.id',
       'e.expense_date',
@@ -101,11 +114,15 @@ export async function getAllExpenses(filters: ExpenseFilters = {}): Promise<Expe
       'e.note',
       'e.category_id',
       'e.subcategory_id',
+      'e.lab_id',
+      'e.employee_id',
       'e.is_monthly',
       'c.category_name',
       's.subcategory_name',
       'c.category_name_ar',
       's.subcategory_name_ar',
+      'l.lab_name',
+      'emp.employee_name',
     ]);
 
   if (filters.startDate) {
@@ -119,6 +136,12 @@ export async function getAllExpenses(filters: ExpenseFilters = {}): Promise<Expe
   }
   if (filters.subcategoryId) {
     q = q.where('e.subcategory_id', '=', filters.subcategoryId);
+  }
+  if (filters.labId) {
+    q = q.where('e.lab_id', '=', filters.labId);
+  }
+  if (filters.employeeId) {
+    q = q.where('e.employee_id', '=', filters.employeeId);
   }
   if (filters.currency) {
     // citext is case-insensitive; keep the trim to match LTRIM(RTRIM(...)).
@@ -149,6 +172,8 @@ export async function getExpenseById(id: number): Promise<Expense | null> {
     .selectFrom('expenses as e')
     .leftJoin('expense_categories as c', 'e.category_id', 'c.category_id')
     .leftJoin('expense_subcategories as s', 'e.subcategory_id', 's.subcategory_id')
+    .leftJoin('labs as l', 'e.lab_id', 'l.id')
+    .leftJoin('employees as emp', 'e.employee_id', 'emp.id')
     .where('e.id', '=', id)
     .select([
       'e.id',
@@ -158,11 +183,15 @@ export async function getExpenseById(id: number): Promise<Expense | null> {
       'e.note',
       'e.category_id',
       'e.subcategory_id',
+      'e.lab_id',
+      'e.employee_id',
       'e.is_monthly',
       'c.category_name',
       's.subcategory_name',
       'c.category_name_ar',
       's.subcategory_name_ar',
+      'l.lab_name',
+      'emp.employee_name',
     ])
     .executeTakeFirst();
 
@@ -216,6 +245,8 @@ export async function addExpense(expenseData: ExpenseData): Promise<{ NewID: num
       note: expenseData.note || null,
       category_id: expenseData.categoryId || null,
       subcategory_id: expenseData.subcategoryId || null,
+      lab_id: expenseData.labId || null,
+      employee_id: expenseData.employeeId || null,
       is_monthly: expenseData.isMonthly ?? false,
     })
     .returning('id as NewID')
@@ -245,6 +276,8 @@ export async function updateExpense(
       note: expenseData.note || null,
       category_id: expenseData.categoryId || null,
       subcategory_id: expenseData.subcategoryId || null,
+      lab_id: expenseData.labId || null,
+      employee_id: expenseData.employeeId || null,
       is_monthly: expenseData.isMonthly ?? false,
     })
     .where('id', '=', id)

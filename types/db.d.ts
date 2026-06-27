@@ -376,9 +376,11 @@ export interface Expenses {
   amount: number;
   category_id: number | null;
   currency: string | null;
+  employee_id: number | null;
   expense_date: string;
   id: Generated<number>;
   is_monthly: Generated<boolean>;
+  lab_id: number | null;
   note: string | null;
   subcategory_id: number | null;
   updated_at: Timestamp | null;
@@ -447,6 +449,12 @@ export interface Invoices {
 export interface Keywords {
   id: Generated<number>;
   key_word: string | null;
+}
+
+export interface Labs {
+  id: Generated<number>;
+  is_active: Generated<boolean>;
+  lab_name: string;
 }
 
 export interface MessageStatusHistory {
@@ -560,6 +568,16 @@ export interface Screws {
   state: string | null;
   updated_at: Timestamp | null;
   work_id: Generated<number | null>;
+}
+
+export interface Shade3dMaster {
+  id: Generated<number>;
+  shade: string;
+}
+
+export interface ShadeVitaClassic {
+  id: Generated<number>;
+  shade: string;
 }
 
 export interface Sms {
@@ -762,9 +780,11 @@ export interface WorkItems {
   implant_length: Numeric | null;
   implant_manufacturer_id: number | null;
   item_cost: number | null;
-  lab_name: string | null;
+  lab_id: number | null;
   material: string | null;
   note: string | null;
+  shade: string | null;
+  shade_system: string | null;
   start_date: string | null;
   updated_at: Timestamp | null;
   work_id: number;
@@ -850,6 +870,7 @@ export interface DB {
   integration_oauth_tokens: IntegrationOauthTokens;
   invoices: Invoices;
   keywords: Keywords;
+  labs: Labs;
   message_status_history: MessageStatusHistory;
   numbers: Numbers;
   old_opg: OldOpg;
@@ -863,6 +884,8 @@ export interface DB {
   private_photos: PrivatePhotos;
   referrals: Referrals;
   screws: Screws;
+  shade_3d_master: Shade3dMaster;
+  shade_vita_classic: ShadeVitaClassic;
   sms: Sms;
   staff_sessions: StaffSessions;
   stand_categories: StandCategories;
