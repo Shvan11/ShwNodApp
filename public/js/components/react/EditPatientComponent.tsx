@@ -1,4 +1,5 @@
 import { useState, ChangeEvent, FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
@@ -70,6 +71,7 @@ interface FormData {
 }
 
 const EditPatientComponent = ({ personId }: Props) => {
+    const { t } = useTranslation('patients');
     const navigate = useNavigate();
     const toast = useToast();
     const queryClient = useQueryClient();
@@ -178,7 +180,7 @@ const EditPatientComponent = ({ personId }: Props) => {
     if (patientError !== prevPatientError) {
         setPrevPatientError(patientError);
         if (patientError) {
-            setError(httpErrorMessage(patientError, 'Failed to load patient data'));
+            setError(httpErrorMessage(patientError, t('edit.toast.loadFailed')));
         }
     }
 
@@ -186,16 +188,16 @@ const EditPatientComponent = ({ personId }: Props) => {
         e.preventDefault();
 
         if (!formData.patient_name.trim()) {
-            setError('Patient Name is required');
-            toast.warning('Patient Name is required');
+            setError(t('edit.toast.nameRequired'));
+            toast.warning(t('edit.toast.nameRequired'));
             return;
         }
 
         // Use validated PersonID for API call
         const pid = validPersonId ?? formData.person_id;
         if (!pid) {
-            setError('Invalid patient ID');
-            toast.error('Invalid patient ID');
+            setError(t('edit.toast.invalidId'));
+            toast.error(t('edit.toast.invalidId'));
             return;
         }
 
@@ -206,7 +208,7 @@ const EditPatientComponent = ({ personId }: Props) => {
             await putJSON(`/api/patients/${pid}`, formData);
             queryClient.invalidateQueries({ queryKey: qk.patient.all(pid) });
 
-            toast.success('Patient updated successfully!');
+            toast.success(t('edit.toast.success'));
             // Close the form on success — return to the patient's works page
             // (same destination as Cancel). The toast persists across navigation.
             navigate(`/patient/${pid}/works`);
@@ -219,12 +221,12 @@ const EditPatientComponent = ({ personId }: Props) => {
             } | undefined;
             if ((errorData?.details?.code ?? errorData?.code) === 'DUPLICATE_PATIENT_NAME') {
                 const duplicateName = errorData?.details?.duplicateName || errorData?.duplicateName || formData.patient_name;
-                toast.error(`A patient with the name "${duplicateName}" already exists`);
-                setError(`A patient with the name "${duplicateName}" already exists. Please use a different name.`);
+                toast.error(t('edit.toast.duplicateToast', { name: duplicateName }));
+                setError(t('edit.toast.duplicateError', { name: duplicateName }));
                 return;
             }
 
-            const errorMessage = httpErrorMessage(err, 'Failed to update patient');
+            const errorMessage = httpErrorMessage(err, t('edit.toast.updateFailed'));
             setError(errorMessage);
             toast.error(errorMessage);
         } finally {
@@ -238,7 +240,7 @@ const EditPatientComponent = ({ personId }: Props) => {
     const handleTranslateName = async () => {
         const arabicName = formData.patient_name.trim();
         if (!arabicName) {
-            toast.warning('Enter the patient name first');
+            toast.warning(t('edit.toast.enterNameFirst'));
             return;
         }
         try {
@@ -253,9 +255,9 @@ const EditPatientComponent = ({ personId }: Props) => {
                 first_name: result.firstName || prev.first_name,
                 last_name: result.lastName || prev.last_name,
             }));
-            toast.success('Translated — review the name and save');
+            toast.success(t('edit.toast.translateSuccess'));
         } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to translate name'));
+            toast.error(httpErrorMessage(err, t('edit.toast.translateFailed')));
         } finally {
             setTranslating(false);
         }
@@ -274,7 +276,7 @@ const EditPatientComponent = ({ personId }: Props) => {
         return (
             <div className={styles.editPatientLoading}>
                 <i className={`fas fa-spinner fa-spin ${styles.editPatientLoadingSpinner}`}></i>
-                <p>Loading patient data...</p>
+                <p>{t('edit.loading')}</p>
             </div>
         );
     }
@@ -284,11 +286,11 @@ const EditPatientComponent = ({ personId }: Props) => {
             <div className={styles.editPatientHeader}>
                 <h2 className={styles.editPatientTitle}>
                     <i className="fas fa-user-edit"></i>
-                    Edit Patient
+                    {t('edit.title')}
                 </h2>
                 {patientData && (
                     <p className={styles.editPatientDescription}>
-                        Editing: <strong>{patientData.patient_name}</strong> (ID: {patientData.person_id})
+                        {t('edit.editingLabel')} <strong>{patientData.patient_name}</strong> {t('edit.idSuffix', { id: patientData.person_id })}
                     </p>
                 )}
             </div>
@@ -299,7 +301,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <i className="fas fa-exclamation-circle"></i>
                         {error}
                     </div>
-                    <button onClick={() => setError(null)} className={styles.editPatientErrorClose}>×</button>
+                    <button onClick={() => setError(null)} className={styles.editPatientErrorClose}><i className="fas fa-times"></i></button>
                 </div>
             )}
 
@@ -311,7 +313,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                     className="btn btn-secondary"
                     disabled={saving}
                 >
-                    <i className="fas fa-times"></i> Cancel
+                    <i className="fas fa-times"></i> {t('common.cancel')}
                 </button>
                 <button
                     type="submit"
@@ -321,11 +323,11 @@ const EditPatientComponent = ({ personId }: Props) => {
                 >
                     {saving ? (
                         <>
-                            <i className="fas fa-spinner fa-spin"></i> Saving...
+                            <i className="fas fa-spinner fa-spin"></i> {t('edit.saving')}
                         </>
                     ) : (
                         <>
-                            <i className="fas fa-save"></i> Save Changes
+                            <i className="fas fa-save"></i> {t('edit.save')}
                         </>
                     )}
                 </button>
@@ -334,7 +336,7 @@ const EditPatientComponent = ({ personId }: Props) => {
             <form id="edit-patient-form" onSubmit={handleSubmit} className={styles.editPatientForm}>
                 <div className={styles.formRow}>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-patient-name">Patient Name (Arabic) <span className={styles.requiredAsterisk}>*</span></label>
+                        <label htmlFor="edit-patient-name">{t('fields.patientNameArabic')} <span className={styles.requiredAsterisk}>*</span></label>
                         <input
                             id="edit-patient-name"
                             type="text"
@@ -348,7 +350,7 @@ const EditPatientComponent = ({ personId }: Props) => {
 
                 <div className={styles.formRow}>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-first-name">First Name</label>
+                        <label htmlFor="edit-first-name">{t('fields.firstName')}</label>
                         <input
                             id="edit-first-name"
                             type="text"
@@ -358,7 +360,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         />
                     </div>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-last-name">Last Name</label>
+                        <label htmlFor="edit-last-name">{t('fields.lastName')}</label>
                         <input
                             id="edit-last-name"
                             type="text"
@@ -376,19 +378,19 @@ const EditPatientComponent = ({ personId }: Props) => {
                         className="btn btn-sm btn-outline-primary"
                         onClick={handleTranslateName}
                         disabled={translating || !formData.patient_name.trim()}
-                        title="Suggest an English first and last name from the Arabic name using AI"
+                        title={t('edit.translateTitle')}
                     >
                         {translating ? (
-                            <><i className="fas fa-spinner fa-spin"></i> Translating…</>
+                            <><i className="fas fa-spinner fa-spin"></i> {t('edit.translating')}</>
                         ) : (
-                            <><i className="fas fa-language"></i> Translate name with AI</>
+                            <><i className="fas fa-language"></i> {t('edit.translateButton')}</>
                         )}
                     </button>
                 </div>
 
                 <div className={styles.formRow}>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-country-code">Country Code</label>
+                        <label htmlFor="edit-country-code">{t('fields.countryCode')}</label>
                         <input
                             id="edit-country-code"
                             type="text"
@@ -399,7 +401,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         />
                     </div>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-phone">Phone</label>
+                        <label htmlFor="edit-phone">{t('fields.phone')}</label>
                         <PhoneInput
                             id="edit-phone"
                             value={formData.phone}
@@ -410,7 +412,7 @@ const EditPatientComponent = ({ personId }: Props) => {
 
                 <div className={styles.formRow}>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-phone2">Phone 2</label>
+                        <label htmlFor="edit-phone2">{t('fields.phone2')}</label>
                         <PhoneInput
                             id="edit-phone2"
                             value={formData.phone2}
@@ -421,7 +423,7 @@ const EditPatientComponent = ({ personId }: Props) => {
 
                 <div className={styles.formRow}>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-email">Email</label>
+                        <label htmlFor="edit-email">{t('fields.email')}</label>
                         <input
                             id="edit-email"
                             type="email"
@@ -431,7 +433,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         />
                     </div>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-date-of-birth">Date of Birth</label>
+                        <label htmlFor="edit-date-of-birth">{t('fields.dateOfBirth')}</label>
                         <input
                             id="edit-date-of-birth"
                             type="date"
@@ -444,14 +446,14 @@ const EditPatientComponent = ({ personId }: Props) => {
 
                 <div className={styles.formRow}>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-gender">Gender</label>
+                        <label htmlFor="edit-gender">{t('fields.gender')}</label>
                         <select
                             id="edit-gender"
                             className="form-control"
                             value={formData.gender}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, gender: e.target.value})}
                         >
-                            <option value="">Select Gender</option>
+                            <option value="">{t('fields.selectGender')}</option>
                             {genders.map(gender => (
                                 <option key={gender.id} value={gender.id}>
                                     {gender.name}
@@ -460,30 +462,30 @@ const EditPatientComponent = ({ personId }: Props) => {
                         </select>
                     </div>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-language">Language</label>
+                        <label htmlFor="edit-language">{t('fields.language')}</label>
                         <select
                             id="edit-language"
                             className="form-control"
                             value={formData.language}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, language: e.target.value})}
                         >
-                            <option value="0">Kurdish</option>
-                            <option value="1">Arabic</option>
-                            <option value="2">English</option>
+                            <option value="0">{t('languages.kurdish')}</option>
+                            <option value="1">{t('languages.arabic')}</option>
+                            <option value="2">{t('languages.english')}</option>
                         </select>
                     </div>
                 </div>
 
                 <div className={styles.formRow}>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-address-id">Address/Zone</label>
+                        <label htmlFor="edit-address-id">{t('fields.addressZone')}</label>
                         <select
                             id="edit-address-id"
                             className="form-control"
                             value={formData.address_id}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, address_id: e.target.value})}
                         >
-                            <option value="">Select Address</option>
+                            <option value="">{t('fields.selectAddress')}</option>
                             {addresses.map(address => (
                                 <option key={address.id} value={address.id}>
                                     {address.name}
@@ -492,14 +494,14 @@ const EditPatientComponent = ({ personId }: Props) => {
                         </select>
                     </div>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-referral-source-id">Referral Source</label>
+                        <label htmlFor="edit-referral-source-id">{t('fields.referralSource')}</label>
                         <select
                             id="edit-referral-source-id"
                             className="form-control"
                             value={formData.referral_source_id}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, referral_source_id: e.target.value})}
                         >
-                            <option value="">Select Referral Source</option>
+                            <option value="">{t('fields.selectReferralSource')}</option>
                             {referralSources.map(source => (
                                 <option key={source.id} value={source.id}>
                                     {source.name}
@@ -511,14 +513,14 @@ const EditPatientComponent = ({ personId }: Props) => {
 
                 <div className={styles.formRow}>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-patient-type-id">Patient Type</label>
+                        <label htmlFor="edit-patient-type-id">{t('fields.patientType')}</label>
                         <select
                             id="edit-patient-type-id"
                             className="form-control"
                             value={formData.patient_type_id}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, patient_type_id: e.target.value})}
                         >
-                            <option value="">Select Patient Type</option>
+                            <option value="">{t('fields.selectPatientType')}</option>
                             {patientTypes.map(type => (
                                 <option key={type.id} value={type.id}>
                                     {type.name}
@@ -527,14 +529,14 @@ const EditPatientComponent = ({ personId }: Props) => {
                         </select>
                     </div>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-tag-id">Tag</label>
+                        <label htmlFor="edit-tag-id">{t('fields.tag')}</label>
                         <select
                             id="edit-tag-id"
                             className="form-control"
                             value={formData.tag_id}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, tag_id: e.target.value})}
                         >
-                            <option value="">Select Tag</option>
+                            <option value="">{t('fields.selectTag')}</option>
                             {tags.map(tag => (
                                 <option key={tag.id} value={tag.id}>
                                     {tag.tag}
@@ -546,7 +548,7 @@ const EditPatientComponent = ({ personId }: Props) => {
 
                 <div className={styles.formRow}>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-estimated-cost">Estimated Cost (Consultation)</label>
+                        <label htmlFor="edit-estimated-cost">{t('fields.estimatedCost')}</label>
                         <input
                             id="edit-estimated-cost"
                             type="text"
@@ -558,26 +560,26 @@ const EditPatientComponent = ({ personId }: Props) => {
                                     setFormData({...formData, estimated_cost: rawValue});
                                 }
                             }}
-                            placeholder="Cost quoted at consultation"
+                            placeholder={t('fields.estimatedCostPlaceholder')}
                         />
                     </div>
                     <div className={styles.formGroup}>
-                        <label htmlFor="edit-currency">Currency</label>
+                        <label htmlFor="edit-currency">{t('fields.currency')}</label>
                         <select
                             id="edit-currency"
                             className="form-control"
                             value={formData.currency}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, currency: e.target.value})}
                         >
-                            <option value="IQD">Iraqi Dinar (IQD)</option>
-                            <option value="USD">US Dollar (USD)</option>
-                            <option value="EUR">Euro (EUR)</option>
+                            <option value="IQD">{t('currencies.iqd')}</option>
+                            <option value="USD">{t('currencies.usd')}</option>
+                            <option value="EUR">{t('currencies.eur')}</option>
                         </select>
                     </div>
                 </div>
 
                 <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
-                    <label htmlFor="edit-notes">Notes</label>
+                    <label htmlFor="edit-notes">{t('fields.notes')}</label>
                     <textarea
                         id="edit-notes"
                         className="form-control"
@@ -594,7 +596,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         className="btn btn-secondary"
                         disabled={saving}
                     >
-                        <i className="fas fa-times"></i> Cancel
+                        <i className="fas fa-times"></i> {t('common.cancel')}
                     </button>
                     <button
                         type="submit"
@@ -603,11 +605,11 @@ const EditPatientComponent = ({ personId }: Props) => {
                     >
                         {saving ? (
                             <>
-                                <i className="fas fa-spinner fa-spin"></i> Saving...
+                                <i className="fas fa-spinner fa-spin"></i> {t('edit.saving')}
                             </>
                         ) : (
                             <>
-                                <i className="fas fa-save"></i> Save Changes
+                                <i className="fas fa-save"></i> {t('edit.save')}
                             </>
                         )}
                     </button>

@@ -37,7 +37,7 @@
         if (lang !== 'en' && lang !== 'ar') lang = 'en';
         document.documentElement.setAttribute('lang', lang);
         var p = location.pathname;
-        var rtlRoute = (p === '/' || p === '/dashboard' || p === '/expenses' || p.indexOf('/expenses/') === 0 || p === '/appointments' || /^\/patient\/[^/]+\/works\/?$/.test(p) || /^\/patient\/[^/]+\/appointments\/?$/.test(p) || /^\/patient\/[^/]+\/new-appointment\/?$/.test(p) || /^\/patient\/[^/]+\/edit-appointment(\/.*)?$/.test(p));
+        var rtlRoute = (p === '/' || p === '/dashboard' || p === '/expenses' || p.indexOf('/expenses/') === 0 || p === '/appointments' || /^\/patient\/[^/]+\/works\/?$/.test(p) || /^\/patient\/[^/]+\/appointments\/?$/.test(p) || /^\/patient\/[^/]+\/new-appointment\/?$/.test(p) || /^\/patient\/[^/]+\/edit-appointment(\/.*)?$/.test(p) || /^\/patient\/[^/]+\/patient-info\/?$/.test(p) || /^\/patient\/[^/]+\/edit-patient\/?$/.test(p) || /^\/patient\/[^/]+\/add\/?$/.test(p));
         document.documentElement.setAttribute('dir', (lang === 'ar' && rtlRoute) ? 'rtl' : 'ltr');
 
         // Arabic webfont — whitelist the font ids (default cairo), set

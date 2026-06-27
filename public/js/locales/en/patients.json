@@ -1,0 +1,148 @@
+{
+  "fields": {
+    "patientNameArabic": "Patient Name (Arabic)",
+    "fullNamePlaceholder": "الاسم الكامل",
+    "firstName": "First Name",
+    "firstNameEnglish": "First Name (English)",
+    "firstNamePlaceholder": "First name",
+    "lastName": "Last Name",
+    "lastNameEnglish": "Last Name (English)",
+    "lastNamePlaceholder": "Last name",
+    "countryCode": "Country Code",
+    "countryCodePlaceholder": "e.g., +1, +44",
+    "primaryPhone": "Primary Phone",
+    "phone": "Phone",
+    "phone2": "Phone 2",
+    "secondaryPhone": "Secondary Phone",
+    "secondaryPhonePlaceholder": "Secondary phone number",
+    "email": "Email",
+    "emailAddress": "Email Address",
+    "emailPlaceholder": "patient@example.com",
+    "dateOfBirth": "Date of Birth",
+    "gender": "Gender",
+    "selectGender": "Select Gender",
+    "language": "Language",
+    "patientType": "Patient Type",
+    "selectPatientType": "Select Patient Type",
+    "referralSource": "Referral Source",
+    "selectReferralSource": "Select Referral Source",
+    "address": "Address",
+    "addressZone": "Address/Zone",
+    "selectAddress": "Select Address",
+    "tag": "Tag",
+    "selectTag": "Select Tag",
+    "notes": "Notes",
+    "estimatedCost": "Estimated Cost (Consultation)",
+    "estimatedCostPlaceholder": "Cost quoted at consultation",
+    "currency": "Currency"
+  },
+  "languages": {
+    "kurdish": "Kurdish",
+    "arabic": "Arabic",
+    "english": "English"
+  },
+  "currencies": {
+    "iqd": "Iraqi Dinar (IQD)",
+    "usd": "US Dollar (USD)",
+    "eur": "Euro (EUR)"
+  },
+  "common": {
+    "cancel": "Cancel"
+  },
+  "add": {
+    "title": "Add New Patient",
+    "tabs": {
+      "basic": "Basic Info",
+      "contact": "Contact",
+      "personal": "Personal",
+      "medical": "Medical",
+      "additional": "Additional"
+    },
+    "notesPlaceholder": "Additional notes about the patient...",
+    "alerts": "Alerts",
+    "alertsPlaceholder": "Important alerts or warnings...",
+    "submit": "Add Patient",
+    "submitting": "Adding Patient...",
+    "toast": {
+      "loadFailed": "Failed to load form data. Please refresh the page.",
+      "nameRequired": "Patient name is required.",
+      "success": "Patient \"{{name}}\" has been successfully added. Redirecting to works page...",
+      "duplicate": "A patient with the name \"{{name}}\" already exists. Please use a different name or check existing patients.",
+      "addFailed": "Failed to add patient. Please try again.",
+      "networkError": "Network error. Please check your connection and try again."
+    }
+  },
+  "edit": {
+    "title": "Edit Patient",
+    "editingLabel": "Editing:",
+    "idSuffix": "(ID: {{id}})",
+    "loading": "Loading patient data...",
+    "translateButton": "Translate name with AI",
+    "translating": "Translating…",
+    "translateTitle": "Suggest an English first and last name from the Arabic name using AI",
+    "save": "Save Changes",
+    "saving": "Saving...",
+    "toast": {
+      "nameRequired": "Patient Name is required",
+      "invalidId": "Invalid patient ID",
+      "success": "Patient updated successfully!",
+      "duplicateToast": "A patient with the name \"{{name}}\" already exists",
+      "duplicateError": "A patient with the name \"{{name}}\" already exists. Please use a different name.",
+      "updateFailed": "Failed to update patient",
+      "enterNameFirst": "Enter the patient name first",
+      "translateSuccess": "Translated — review the name and save",
+      "translateFailed": "Failed to translate name",
+      "loadFailed": "Failed to load patient data"
+    }
+  },
+  "view": {
+    "loading": "Loading patient information...",
+    "retry": "Retry",
+    "empty": "No patient information found",
+    "idLabel": "ID: {{id}}",
+    "editPatient": "Edit Patient",
+    "addPhotos": "Add Photos",
+    "webceph": "WebCeph",
+    "alerts": {
+      "title": "Alerts",
+      "add": "Add Alert",
+      "loading": "Loading alerts...",
+      "empty": "No alerts for this patient",
+      "editTitle": "Edit alert",
+      "archiveTitle": "Archive alert"
+    },
+    "cards": {
+      "contact": "Contact Information",
+      "personal": "Personal Information",
+      "additional": "Additional Information",
+      "estimatedCost": "Estimated Cost",
+      "notes": "Notes"
+    },
+    "labels": {
+      "phone": "Phone:",
+      "phone2": "Phone 2:",
+      "email": "Email:",
+      "address": "Address:",
+      "dateOfBirth": "Date of Birth:",
+      "age": "Age:",
+      "gender": "Gender:",
+      "language": "Language:",
+      "patientType": "Patient Type:",
+      "referralSource": "Referral Source:",
+      "tag": "Tag:",
+      "dolphinId": "Dolphin ID:",
+      "dateAdded": "Date Added:",
+      "estimatedCost": "Estimated Cost:"
+    },
+    "ageValue": "{{age}} years old",
+    "costPlaceholder": "Enter cost...",
+    "editCostTitle": "Edit cost",
+    "notesEmpty": "No notes for this patient",
+    "toast": {
+      "alertDeleted": "Alert deleted",
+      "alertDeleteFailed": "Failed to delete alert",
+      "costSaved": "Cost updated successfully",
+      "costSaveFailed": "Failed to save cost"
+    }
+  }
+}

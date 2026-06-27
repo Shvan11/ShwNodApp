@@ -242,7 +242,10 @@ export default [
       'public/js/components/react/SimplifiedCalendarPicker.tsx',
       'public/js/components/react/PatientAppointments.tsx',
       'public/js/components/react/PaymentModal.tsx',
-      'public/js/components/react/Navigation.tsx'
+      'public/js/components/react/Navigation.tsx',
+      'public/js/components/react/AddPatientForm.tsx',
+      'public/js/components/react/EditPatientComponent.tsx',
+      'public/js/components/react/ViewPatientInfo.tsx'
     ],
     plugins: {
       i18next

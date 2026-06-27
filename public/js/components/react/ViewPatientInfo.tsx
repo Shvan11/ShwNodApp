@@ -1,4 +1,5 @@
 import { useState, ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import PhotoSessionDialog from './PhotoSessionDialog';
@@ -73,6 +74,7 @@ interface AlertType {
 }
 
 const ViewPatientInfo = ({ personId }: Props) => {
+    const { t } = useTranslation('patients');
     const navigate = useNavigate();
     const toast = useToast();
     const queryClient = useQueryClient();
@@ -149,6 +151,15 @@ const ViewPatientInfo = ({ personId }: Props) => {
         }
     };
 
+    // Short-month date for the alert list (defined outside JSX so the format
+    // option literals aren't flagged by the i18n ratchet; digits stay Western).
+    const formatAlertDate = (dateStr: string): string =>
+        new Date(dateStr).toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+
     const calculateAge = (dateOfBirth: string | undefined): string => {
         if (!dateOfBirth) return '-';
         try {
@@ -159,7 +170,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
             if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
                 age--;
             }
-            return `${age} years old`;
+            return t('view.ageValue', { age });
         } catch {
             return '-';
         }
@@ -167,9 +178,9 @@ const ViewPatientInfo = ({ personId }: Props) => {
 
     const getLanguageDisplay = (langId: number | undefined): string => {
         switch (langId) {
-            case 0: return 'Kurdish';
-            case 1: return 'Arabic';
-            case 2: return 'English';
+            case 0: return t('languages.kurdish');
+            case 1: return t('languages.arabic');
+            case 2: return t('languages.english');
             default: return '-';
         }
     };
@@ -208,10 +219,10 @@ const ViewPatientInfo = ({ personId }: Props) => {
 
             reloadAlerts(); // Reload alerts
             notifyTasksChanged();
-            toast.success('Alert deleted');
+            toast.success(t('view.toast.alertDeleted'));
         } catch (err) {
             console.error('Error deleting alert:', err);
-            toast.error(httpErrorMessage(err, 'Failed to delete alert'));
+            toast.error(httpErrorMessage(err, t('view.toast.alertDeleteFailed')));
         } finally {
             setDeletingAlertId(null);
         }
@@ -237,11 +248,11 @@ const ViewPatientInfo = ({ personId }: Props) => {
             });
             queryClient.invalidateQueries({ queryKey: qk.patient.all(validPersonId) });
 
-            toast.success('Cost updated successfully');
+            toast.success(t('view.toast.costSaved'));
             setEditingCost(null);
         } catch (err) {
             console.error('Error saving cost:', err);
-            toast.error(httpErrorMessage(err, 'Failed to save cost'));
+            toast.error(httpErrorMessage(err, t('view.toast.costSaveFailed')));
         } finally {
             setSavingCost(false);
         }
@@ -276,7 +287,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
         return (
             <div className={styles.patientInfoLoading}>
                 <i className={`fas fa-spinner fa-spin ${styles.patientLoadingSpinner}`}></i>
-                <p>Loading patient information...</p>
+                <p>{t('view.loading')}</p>
             </div>
         );
     }
@@ -286,7 +297,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
             <div className={styles.patientInfoError}>
                 <i className={`fas fa-exclamation-triangle ${styles.patientErrorIcon}`}></i>
                 <p>{error}</p>
-                <button onClick={() => refetchPatientInfo()}>Retry</button>
+                <button onClick={() => refetchPatientInfo()}>{t('view.retry')}</button>
             </div>
         );
     }
@@ -295,7 +306,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
         return (
             <div className={styles.patientInfoEmpty}>
                 <i className={`fas fa-user ${styles.patientEmptyIcon}`}></i>
-                <p>No patient information found</p>
+                <p>{t('view.empty')}</p>
             </div>
         );
     }
@@ -313,7 +324,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         {(patientInfo.first_name || patientInfo.last_name) && (
                             <span>{patientInfo.first_name} {patientInfo.last_name}</span>
                         )}
-                        <span className={styles.patientId}>ID: {patientInfo.person_id}</span>
+                        <span className={styles.patientId}>{t('view.idLabel', { id: patientInfo.person_id })}</span>
                     </p>
                 </div>
                 <div className={styles.patientHeaderActions}>
@@ -323,14 +334,14 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         disabled={!validPersonId}
                     >
                         <i className={`fas fa-edit ${styles.piIconGap}`}></i>
-                        Edit Patient
+                        {t('view.editPatient')}
                     </button>
                     <button
                         onClick={() => setShowPhotoSessionDialog(true)}
                         className="btn btn-secondary"
                     >
                         <i className={`fas fa-camera ${styles.piIconGap}`}></i>
-                        Add Photos
+                        {t('view.addPhotos')}
                     </button>
                     <button
                         onClick={openWebceph}
@@ -338,7 +349,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         disabled={!validPersonId}
                     >
                         <i className={`fas fa-brain ${styles.piIconGap}`}></i>
-                        WebCeph
+                        {t('view.webceph')}
                     </button>
                 </div>
             </div>
@@ -348,7 +359,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 <div className={styles.patientAlertHeader}>
                     <h3 className={styles.patientSectionTitle}>
                         <i className={`fas fa-exclamation-triangle ${styles.alertIcon} ${styles.piIconGap}`}></i>
-                        Alerts
+                        {t('view.alerts.title')}
                     </h3>
                     <button
                         onClick={() => {
@@ -359,13 +370,13 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         disabled={!validPersonId}
                     >
                         <i className={`fas fa-plus ${styles.piIconGap}`}></i>
-                        Add Alert
+                        {t('view.alerts.add')}
                     </button>
                 </div>
                 {alertsLoading ? (
                     <div className={styles.patientAlertsLoading}>
                         <i className="fas fa-spinner fa-spin"></i>
-                        Loading alerts...
+                        {t('view.alerts.loading')}
                     </div>
                 ) : alerts.length > 0 ? (
                     <div className={styles.patientAlertsList}>
@@ -375,11 +386,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                                     <span className={styles.patientAlertText}>{alert.alert_details}</span>
                                     {alert.creation_date && (
                                         <span className={styles.patientAlertDate}>
-                                            {new Date(alert.creation_date).toLocaleDateString(undefined, {
-                                                year: 'numeric',
-                                                month: 'short',
-                                                day: 'numeric'
-                                            })}
+                                            {formatAlertDate(alert.creation_date)}
                                         </span>
                                     )}
                                 </div>
@@ -390,7 +397,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                                             setShowAlertModal(true);
                                         }}
                                         className={styles.patientAlertEdit}
-                                        title="Edit alert"
+                                        title={t('view.alerts.editTitle')}
                                     >
                                         <i className="fas fa-pencil-alt"></i>
                                     </button>
@@ -398,7 +405,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                                         onClick={() => handleDeleteAlert(alert.alert_id)}
                                         disabled={deletingAlertId === alert.alert_id}
                                         className={styles.patientAlertDelete}
-                                        title="Archive alert"
+                                        title={t('view.alerts.archiveTitle')}
                                     >
                                         {deletingAlertId === alert.alert_id ? (
                                             <i className="fas fa-spinner fa-spin"></i>
@@ -412,7 +419,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                     </div>
                 ) : (
                     <div className={styles.patientAlertsEmpty}>
-                        No alerts for this patient
+                        {t('view.alerts.empty')}
                     </div>
                 )}
             </div>
@@ -423,27 +430,27 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 <div className={styles.patientInfoCard}>
                     <h3 className={styles.patientCardTitle}>
                         <i className={`fas fa-address-book ${styles.piIconGap}`}></i>
-                        Contact Information
+                        {t('view.cards.contact')}
                     </h3>
                     <div className={styles.patientInfoRows}>
                         <div className={styles.patientInfoRow}>
-                            <span className={styles.patientInfoLabel}>Phone:</span>
+                            <span className={styles.patientInfoLabel}>{t('view.labels.phone')}</span>
                             <span className={styles.patientInfoValue}>
                                 {formatPhoneDisplay(patientInfo.country_code, patientInfo.phone)}
                             </span>
                         </div>
                         {patientInfo.phone2 && (
                             <div className={styles.patientInfoRow}>
-                                <span className={styles.patientInfoLabel}>Phone 2:</span>
+                                <span className={styles.patientInfoLabel}>{t('view.labels.phone2')}</span>
                                 <span className={styles.patientInfoValue}>{formatPhoneForDisplay(patientInfo.phone2)}</span>
                             </div>
                         )}
                         <div className={styles.patientInfoRow}>
-                            <span className={styles.patientInfoLabel}>Email:</span>
+                            <span className={styles.patientInfoLabel}>{t('view.labels.email')}</span>
                             <span className={styles.patientInfoValue}>{patientInfo.email || '-'}</span>
                         </div>
                         <div className={styles.patientInfoRow}>
-                            <span className={styles.patientInfoLabel}>Address:</span>
+                            <span className={styles.patientInfoLabel}>{t('view.labels.address')}</span>
                             <span className={styles.patientInfoValue}>{patientInfo.address_name || '-'}</span>
                         </div>
                     </div>
@@ -453,29 +460,29 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 <div className={styles.patientInfoCard}>
                     <h3 className={styles.patientCardTitle}>
                         <i className={`fas fa-user ${styles.piIconGap}`}></i>
-                        Personal Information
+                        {t('view.cards.personal')}
                     </h3>
                     <div className={styles.patientInfoRows}>
                         <div className={styles.patientInfoRow}>
-                            <span className={styles.patientInfoLabel}>Date of Birth:</span>
+                            <span className={styles.patientInfoLabel}>{t('view.labels.dateOfBirth')}</span>
                             <span className={styles.patientInfoValue}>
                                 {formatDateDisplay(patientInfo.DateOfBirth)}
                             </span>
                         </div>
                         <div className={styles.patientInfoRow}>
-                            <span className={styles.patientInfoLabel}>Age:</span>
+                            <span className={styles.patientInfoLabel}>{t('view.labels.age')}</span>
                             <span className={styles.patientInfoValue}>
                                 {calculateAge(patientInfo.DateOfBirth)}
                             </span>
                         </div>
                         <div className={styles.patientInfoRow}>
-                            <span className={styles.patientInfoLabel}>Gender:</span>
+                            <span className={styles.patientInfoLabel}>{t('view.labels.gender')}</span>
                             <span className={styles.patientInfoValue}>
                                 {patientInfo.gender_display || patientInfo.gender || '-'}
                             </span>
                         </div>
                         <div className={styles.patientInfoRow}>
-                            <span className={styles.patientInfoLabel}>Language:</span>
+                            <span className={styles.patientInfoLabel}>{t('view.labels.language')}</span>
                             <span className={styles.patientInfoValue}>
                                 {getLanguageDisplay(patientInfo.language)}
                             </span>
@@ -487,31 +494,31 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 <div className={styles.patientInfoCard}>
                     <h3 className={styles.patientCardTitle}>
                         <i className={`fas fa-info-circle ${styles.piIconGap}`}></i>
-                        Additional Information
+                        {t('view.cards.additional')}
                     </h3>
                     <div className={styles.patientInfoRows}>
                         <div className={styles.patientInfoRow}>
-                            <span className={styles.patientInfoLabel}>Patient Type:</span>
+                            <span className={styles.patientInfoLabel}>{t('view.labels.patientType')}</span>
                             <span className={styles.patientInfoValue}>{patientInfo.patient_type_name || '-'}</span>
                         </div>
                         <div className={styles.patientInfoRow}>
-                            <span className={styles.patientInfoLabel}>Referral Source:</span>
+                            <span className={styles.patientInfoLabel}>{t('view.labels.referralSource')}</span>
                             <span className={styles.patientInfoValue}>{patientInfo.referral_source || '-'}</span>
                         </div>
                         {patientInfo.tag_name && (
                             <div className={styles.patientInfoRow}>
-                                <span className={styles.patientInfoLabel}>Tag:</span>
+                                <span className={styles.patientInfoLabel}>{t('view.labels.tag')}</span>
                                 <span className={`${styles.patientInfoValue} ${styles.patientTag}`}>{patientInfo.tag_name}</span>
                             </div>
                         )}
                         <div className={styles.patientInfoRow}>
-                            <span className={styles.patientInfoLabel}>Dolphin ID:</span>
+                            <span className={styles.patientInfoLabel}>{t('view.labels.dolphinId')}</span>
                             <span className={styles.patientInfoValue}>
                                 {patientInfo.DolphinId || '-'}
                             </span>
                         </div>
                         <div className={styles.patientInfoRow}>
-                            <span className={styles.patientInfoLabel}>Date Added:</span>
+                            <span className={styles.patientInfoLabel}>{t('view.labels.dateAdded')}</span>
                             <span className={styles.patientInfoValue}>
                                 {formatDateDisplay(patientInfo.date_added)}
                             </span>
@@ -523,7 +530,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 <div className={styles.patientInfoCard}>
                     <h3 className={styles.patientCardTitle}>
                         <i className={`fas fa-dollar-sign ${styles.piIconGap}`}></i>
-                        Estimated Cost
+                        {t('view.cards.estimatedCost')}
                     </h3>
                     <div className={styles.patientInfoRows}>
                         {editingCost ? (
@@ -537,7 +544,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                                             value: parseCostInput(e.target.value)
                                         })}
                                         className={styles.patientCostInput}
-                                        placeholder="Enter cost..."
+                                        placeholder={t('view.costPlaceholder')}
                                     />
                                     <select
                                         value={editingCost.currency}
@@ -594,13 +601,13 @@ const ViewPatientInfo = ({ personId }: Props) => {
                             </div>
                         ) : (
                             <div className={styles.patientInfoRow}>
-                                <span className={styles.patientInfoLabel}>Estimated Cost:</span>
+                                <span className={styles.patientInfoLabel}>{t('view.labels.estimatedCost')}</span>
                                 <span className={`${styles.patientInfoValue} ${styles.patientCostDisplay}`}>
                                     {formatCostDisplay(patientInfo.estimated_cost, patientInfo.currency)}
                                     <button
                                         onClick={handleStartEditingCost}
                                         className={styles.patientCostEditBtn}
-                                        title="Edit cost"
+                                        title={t('view.editCostTitle')}
                                     >
                                         <i className="fas fa-pencil-alt"></i>
                                     </button>
@@ -614,10 +621,10 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 <div className={`${styles.patientInfoCard} ${styles.patientNotesCard}`}>
                     <h3 className={styles.patientCardTitle}>
                         <i className={`fas fa-sticky-note ${styles.piIconGap}`}></i>
-                        Notes
+                        {t('view.cards.notes')}
                     </h3>
                     <div className={styles.patientNotesContent}>
-                        {patientInfo.notes || <span className={styles.patientNotesEmpty}>No notes for this patient</span>}
+                        {patientInfo.notes || <span className={styles.patientNotesEmpty}>{t('view.notesEmpty')}</span>}
                     </div>
                 </div>
 

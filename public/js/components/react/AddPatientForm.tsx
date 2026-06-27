@@ -7,6 +7,7 @@
  */
 
 import { useState, ChangeEvent, FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import {
@@ -77,6 +78,7 @@ interface Tab {
 }
 
 const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
+    const { t } = useTranslation('patients');
     const [formData, setFormData] = useState<FormData>({
         patientName: '',
         firstName: '',
@@ -133,7 +135,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
     if (dropdownError !== prevDropdownError) {
         setPrevDropdownError(dropdownError);
         if (dropdownError) {
-            setAlert({ show: true, message: 'Failed to load form data. Please refresh the page.', type: 'danger' });
+            setAlert({ show: true, message: t('add.toast.loadFailed'), type: 'danger' });
         }
     }
 
@@ -169,7 +171,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
         // Basic validation
         if (!formData.patientName.trim()) {
-            showAlert('Patient name is required.');
+            showAlert(t('add.toast.nameRequired'));
             return;
         }
 
@@ -184,7 +186,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
             succeeded = true;
             showAlert(
-                `Patient "${formData.patientName}" has been successfully added. Redirecting to works page...`,
+                t('add.toast.success', { name: formData.patientName }),
                 'success',
                 result.personId
             );
@@ -193,16 +195,16 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             const code = (httpErr.data as { details?: { code?: string } } | undefined)?.details?.code;
             if (httpErr.status === 409 && code === 'DUPLICATE_PATIENT_NAME') {
                 showAlert(
-                    `A patient with the name "${formData.patientName}" already exists. Please use a different name or check existing patients.`,
+                    t('add.toast.duplicate', { name: formData.patientName }),
                     'danger'
                 );
             } else if (httpErr.status) {
                 // Server responded with a non-2xx — surface its message.
-                showAlert(httpErrorMessage(error, 'Failed to add patient. Please try again.'));
+                showAlert(httpErrorMessage(error, t('add.toast.addFailed')));
             } else {
                 // Transport/parse failure (no HTTP status).
                 console.error('Error adding patient:', error);
-                showAlert('Network error. Please check your connection and try again.');
+                showAlert(t('add.toast.networkError'));
             }
         } finally {
             // On success the button stays disabled through the 1.5s redirect
@@ -219,11 +221,11 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
     };
 
     const tabs: Tab[] = [
-        { id: 'basic', label: 'Basic Info', icon: 'fas fa-user' },
-        { id: 'contact', label: 'Contact', icon: 'fas fa-address-book' },
-        { id: 'personal', label: 'Personal', icon: 'fas fa-user-circle' },
-        { id: 'medical', label: 'Medical', icon: 'fas fa-stethoscope' },
-        { id: 'additional', label: 'Additional', icon: 'fas fa-clipboard' }
+        { id: 'basic', label: t('add.tabs.basic'), icon: 'fas fa-user' },
+        { id: 'contact', label: t('add.tabs.contact'), icon: 'fas fa-address-book' },
+        { id: 'personal', label: t('add.tabs.personal'), icon: 'fas fa-user-circle' },
+        { id: 'medical', label: t('add.tabs.medical'), icon: 'fas fa-stethoscope' },
+        { id: 'additional', label: t('add.tabs.additional'), icon: 'fas fa-clipboard' }
     ];
 
     // Render Basic Information Fields
@@ -233,7 +235,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
                     <label className={styles.formLabel} htmlFor="add-patient-name">
                         <i className="fas fa-signature"></i>
-                        Patient Name (Arabic) <span className={styles.required}>*</span>
+                        {t('fields.patientNameArabic')} <span className={styles.required}>*</span>
                     </label>
                     <input
                         id="add-patient-name"
@@ -242,7 +244,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         value={formData.patientName}
                         onChange={handleInputChange}
                         className="form-control"
-                        placeholder="الاسم الكامل"
+                        placeholder={t('fields.fullNamePlaceholder')}
                         dir="rtl"
                         lang="ar"
                         required
@@ -254,7 +256,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-first-name">
                         <i className="fas fa-user"></i>
-                        First Name (English)
+                        {t('fields.firstNameEnglish')}
                     </label>
                     <input
                         id="add-first-name"
@@ -263,7 +265,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         value={formData.firstName}
                         onChange={handleInputChange}
                         className="form-control"
-                        placeholder="First name"
+                        placeholder={t('fields.firstNamePlaceholder')}
                         dir="ltr"
                         lang="en"
                     />
@@ -271,7 +273,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-last-name">
                         <i className="fas fa-user"></i>
-                        Last Name (English)
+                        {t('fields.lastNameEnglish')}
                     </label>
                     <input
                         id="add-last-name"
@@ -280,7 +282,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         value={formData.lastName}
                         onChange={handleInputChange}
                         className="form-control"
-                        placeholder="Last name"
+                        placeholder={t('fields.lastNamePlaceholder')}
                         dir="ltr"
                         lang="en"
                     />
@@ -291,7 +293,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-country-code">
                         <i className="fas fa-globe"></i>
-                        Country Code
+                        {t('fields.countryCode')}
                     </label>
                     <input
                         id="add-country-code"
@@ -300,14 +302,14 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         value={formData.countryCode}
                         onChange={handleInputChange}
                         className="form-control"
-                        placeholder="e.g., +1, +44"
+                        placeholder={t('fields.countryCodePlaceholder')}
                         maxLength={5}
                     />
                 </div>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-phone">
                         <i className="fas fa-phone"></i>
-                        Primary Phone
+                        {t('fields.primaryPhone')}
                     </label>
                     <PhoneInput
                         id="add-phone"
@@ -326,7 +328,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-phone2">
                         <i className="fas fa-phone-alt"></i>
-                        Secondary Phone
+                        {t('fields.secondaryPhone')}
                     </label>
                     <input
                         id="add-phone2"
@@ -335,13 +337,13 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         value={formData.phone2}
                         onChange={handleInputChange}
                         className="form-control"
-                        placeholder="Secondary phone number"
+                        placeholder={t('fields.secondaryPhonePlaceholder')}
                     />
                 </div>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-email">
                         <i className="fas fa-envelope"></i>
-                        Email Address
+                        {t('fields.emailAddress')}
                     </label>
                     <input
                         id="add-email"
@@ -350,7 +352,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         value={formData.email}
                         onChange={handleInputChange}
                         className="form-control"
-                        placeholder="patient@example.com"
+                        placeholder={t('fields.emailPlaceholder')}
                     />
                 </div>
             </div>
@@ -365,7 +367,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-date-of-birth">
                         <i className="fas fa-calendar"></i>
-                        Date of Birth
+                        {t('fields.dateOfBirth')}
                     </label>
                     <input
                         id="add-date-of-birth"
@@ -379,7 +381,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-gender">
                         <i className="fas fa-venus-mars"></i>
-                        Gender
+                        {t('fields.gender')}
                     </label>
                     <select
                         id="add-gender"
@@ -388,7 +390,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         onChange={handleInputChange}
                         className="form-control"
                     >
-                        <option value="">Select Gender</option>
+                        <option value="">{t('fields.selectGender')}</option>
                         {dropdownData.genders.map(gender => (
                             <option key={gender.id} value={gender.id}>
                                 {gender.name}
@@ -402,7 +404,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-language">
                         <i className="fas fa-language"></i>
-                        Language
+                        {t('fields.language')}
                     </label>
                     <select
                         id="add-language"
@@ -411,9 +413,9 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         onChange={handleInputChange}
                         className="form-control"
                     >
-                        <option value="0">Kurdish</option>
-                        <option value="1">Arabic</option>
-                        <option value="2">English</option>
+                        <option value="0">{t('languages.kurdish')}</option>
+                        <option value="1">{t('languages.arabic')}</option>
+                        <option value="2">{t('languages.english')}</option>
                     </select>
                 </div>
             </div>
@@ -427,7 +429,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-patient-type">
                         <i className="fas fa-user-tag"></i>
-                        Patient Type
+                        {t('fields.patientType')}
                     </label>
                     <select
                         id="add-patient-type"
@@ -436,7 +438,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         onChange={handleInputChange}
                         className="form-control"
                     >
-                        <option value="">Select Patient Type</option>
+                        <option value="">{t('fields.selectPatientType')}</option>
                         {dropdownData.patientTypes.map(type => (
                             <option key={type.id} value={type.id}>
                                 {type.name}
@@ -447,7 +449,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-referral-source">
                         <i className="fas fa-handshake"></i>
-                        Referral Source
+                        {t('fields.referralSource')}
                     </label>
                     <select
                         id="add-referral-source"
@@ -456,7 +458,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         onChange={handleInputChange}
                         className="form-control"
                     >
-                        <option value="">Select Referral Source</option>
+                        <option value="">{t('fields.selectReferralSource')}</option>
                         {dropdownData.referralSources.map(source => (
                             <option key={source.id} value={source.id}>
                                 {source.name}
@@ -470,7 +472,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-address">
                         <i className="fas fa-map-marker-alt"></i>
-                        Address
+                        {t('fields.address')}
                     </label>
                     <select
                         id="add-address"
@@ -479,7 +481,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         onChange={handleInputChange}
                         className="form-control"
                     >
-                        <option value="">Select Address</option>
+                        <option value="">{t('fields.selectAddress')}</option>
                         {dropdownData.addresses.map(address => (
                             <option key={address.id} value={address.id}>
                                 {address.name}
@@ -498,7 +500,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
                     <label className={styles.formLabel} htmlFor="add-notes">
                         <i className="fas fa-sticky-note"></i>
-                        Notes
+                        {t('fields.notes')}
                     </label>
                     <textarea
                         id="add-notes"
@@ -508,7 +510,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         className="form-control"
                         rows={3}
                         maxLength={100}
-                        placeholder="Additional notes about the patient..."
+                        placeholder={t('add.notesPlaceholder')}
                     />
                 </div>
             </div>
@@ -517,7 +519,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
                     <label className={styles.formLabel} htmlFor="add-alerts">
                         <i className="fas fa-exclamation-triangle"></i>
-                        Alerts
+                        {t('add.alerts')}
                     </label>
                     <textarea
                         id="add-alerts"
@@ -526,7 +528,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         onChange={handleInputChange}
                         className="form-control"
                         rows={3}
-                        placeholder="Important alerts or warnings..."
+                        placeholder={t('add.alertsPlaceholder')}
                     />
                 </div>
             </div>
@@ -554,7 +556,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         <div className={styles.addPatientFormContainer}>
             <h2 className={styles.addPatientTitle}>
                 <i className="fas fa-user-plus"></i>
-                Add New Patient
+                {t('add.title')}
             </h2>
 
             {alert.show && (
@@ -574,7 +576,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         disabled={loading}
                     >
                         <i className="fas fa-times"></i>
-                        <span>Cancel</span>
+                        <span>{t('common.cancel')}</span>
                     </button>
                     <button
                         type="submit"
@@ -584,12 +586,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         {loading ? (
                             <>
                                 <div className={styles.loadingSpinner}></div>
-                                <span>Adding Patient...</span>
+                                <span>{t('add.submitting')}</span>
                             </>
                         ) : (
                             <>
                                 <i className="fas fa-save"></i>
-                                <span>Add Patient</span>
+                                <span>{t('add.submit')}</span>
                             </>
                         )}
                     </button>
@@ -648,7 +650,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         disabled={loading}
                     >
                         <i className="fas fa-times"></i>
-                        <span>Cancel</span>
+                        <span>{t('common.cancel')}</span>
                     </button>
                     <button
                         type="submit"
@@ -658,12 +660,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         {loading ? (
                             <>
                                 <div className={styles.loadingSpinner}></div>
-                                <span>Adding Patient...</span>
+                                <span>{t('add.submitting')}</span>
                             </>
                         ) : (
                             <>
                                 <i className="fas fa-save"></i>
-                                <span>Add Patient</span>
+                                <span>{t('add.submit')}</span>
                             </>
                         )}
                     </button>

@@ -1,0 +1,148 @@
+{
+  "fields": {
+    "patientNameArabic": "اسم المريض (بالعربية)",
+    "fullNamePlaceholder": "الاسم الكامل",
+    "firstName": "الاسم الأول",
+    "firstNameEnglish": "الاسم الأول (بالإنجليزية)",
+    "firstNamePlaceholder": "الاسم الأول",
+    "lastName": "اسم العائلة",
+    "lastNameEnglish": "اسم العائلة (بالإنجليزية)",
+    "lastNamePlaceholder": "اسم العائلة",
+    "countryCode": "رمز الدولة",
+    "countryCodePlaceholder": "مثال: +1، +44",
+    "primaryPhone": "الهاتف الأساسي",
+    "phone": "الهاتف",
+    "phone2": "الهاتف الثاني",
+    "secondaryPhone": "الهاتف الثانوي",
+    "secondaryPhonePlaceholder": "رقم الهاتف الثانوي",
+    "email": "البريد الإلكتروني",
+    "emailAddress": "عنوان البريد الإلكتروني",
+    "emailPlaceholder": "patient@example.com",
+    "dateOfBirth": "تاريخ الميلاد",
+    "gender": "الجنس",
+    "selectGender": "اختر الجنس",
+    "language": "اللغة",
+    "patientType": "نوع المريض",
+    "selectPatientType": "اختر نوع المريض",
+    "referralSource": "مصدر الإحالة",
+    "selectReferralSource": "اختر مصدر الإحالة",
+    "address": "العنوان",
+    "addressZone": "العنوان/المنطقة",
+    "selectAddress": "اختر العنوان",
+    "tag": "الوسم",
+    "selectTag": "اختر الوسم",
+    "notes": "ملاحظات",
+    "estimatedCost": "التكلفة التقديرية (الاستشارة)",
+    "estimatedCostPlaceholder": "التكلفة المحددة عند الاستشارة",
+    "currency": "العملة"
+  },
+  "languages": {
+    "kurdish": "الكردية",
+    "arabic": "العربية",
+    "english": "الإنجليزية"
+  },
+  "currencies": {
+    "iqd": "الدينار العراقي (IQD)",
+    "usd": "الدولار الأمريكي (USD)",
+    "eur": "اليورو (EUR)"
+  },
+  "common": {
+    "cancel": "إلغاء"
+  },
+  "add": {
+    "title": "إضافة مريض جديد",
+    "tabs": {
+      "basic": "أساسي",
+      "contact": "الاتصال",
+      "personal": "شخصي",
+      "medical": "طبي",
+      "additional": "إضافي"
+    },
+    "notesPlaceholder": "ملاحظات إضافية حول المريض...",
+    "alerts": "التنبيهات",
+    "alertsPlaceholder": "تنبيهات أو تحذيرات مهمة...",
+    "submit": "إضافة المريض",
+    "submitting": "جارٍ إضافة المريض...",
+    "toast": {
+      "loadFailed": "فشل تحميل بيانات النموذج. يرجى تحديث الصفحة.",
+      "nameRequired": "اسم المريض مطلوب.",
+      "success": "تمت إضافة المريض \"{{name}}\" بنجاح. جارٍ التحويل إلى صفحة الأعمال...",
+      "duplicate": "يوجد مريض بالاسم \"{{name}}\" بالفعل. يرجى استخدام اسم مختلف أو التحقق من المرضى الحاليين.",
+      "addFailed": "فشل إضافة المريض. يرجى المحاولة مرة أخرى.",
+      "networkError": "خطأ في الشبكة. يرجى التحقق من اتصالك والمحاولة مرة أخرى."
+    }
+  },
+  "edit": {
+    "title": "تعديل المريض",
+    "editingLabel": "تعديل:",
+    "idSuffix": "(المعرّف: {{id}})",
+    "loading": "جارٍ تحميل بيانات المريض...",
+    "translateButton": "ترجمة الاسم بالذكاء الاصطناعي",
+    "translating": "جارٍ الترجمة…",
+    "translateTitle": "اقتراح اسم أول واسم عائلة بالإنجليزية من الاسم العربي باستخدام الذكاء الاصطناعي",
+    "save": "حفظ التغييرات",
+    "saving": "جارٍ الحفظ...",
+    "toast": {
+      "nameRequired": "اسم المريض مطلوب",
+      "invalidId": "معرّف مريض غير صالح",
+      "success": "تم تحديث المريض بنجاح!",
+      "duplicateToast": "يوجد مريض بالاسم \"{{name}}\" بالفعل",
+      "duplicateError": "يوجد مريض بالاسم \"{{name}}\" بالفعل. يرجى استخدام اسم مختلف.",
+      "updateFailed": "فشل تحديث المريض",
+      "enterNameFirst": "أدخل اسم المريض أولاً",
+      "translateSuccess": "تمت الترجمة — راجع الاسم ثم احفظ",
+      "translateFailed": "فشل ترجمة الاسم",
+      "loadFailed": "فشل تحميل بيانات المريض"
+    }
+  },
+  "view": {
+    "loading": "جارٍ تحميل معلومات المريض...",
+    "retry": "إعادة المحاولة",
+    "empty": "لم يتم العثور على معلومات المريض",
+    "idLabel": "المعرّف: {{id}}",
+    "editPatient": "تعديل المريض",
+    "addPhotos": "إضافة صور",
+    "webceph": "WebCeph",
+    "alerts": {
+      "title": "التنبيهات",
+      "add": "إضافة تنبيه",
+      "loading": "جارٍ تحميل التنبيهات...",
+      "empty": "لا توجد تنبيهات لهذا المريض",
+      "editTitle": "تعديل التنبيه",
+      "archiveTitle": "أرشفة التنبيه"
+    },
+    "cards": {
+      "contact": "معلومات الاتصال",
+      "personal": "المعلومات الشخصية",
+      "additional": "معلومات إضافية",
+      "estimatedCost": "التكلفة التقديرية",
+      "notes": "ملاحظات"
+    },
+    "labels": {
+      "phone": "الهاتف:",
+      "phone2": "الهاتف الثاني:",
+      "email": "البريد الإلكتروني:",
+      "address": "العنوان:",
+      "dateOfBirth": "تاريخ الميلاد:",
+      "age": "العمر:",
+      "gender": "الجنس:",
+      "language": "اللغة:",
+      "patientType": "نوع المريض:",
+      "referralSource": "مصدر الإحالة:",
+      "tag": "الوسم:",
+      "dolphinId": "معرّف Dolphin:",
+      "dateAdded": "تاريخ الإضافة:",
+      "estimatedCost": "التكلفة التقديرية:"
+    },
+    "ageValue": "{{age}} سنة",
+    "costPlaceholder": "أدخل التكلفة...",
+    "editCostTitle": "تعديل التكلفة",
+    "notesEmpty": "لا توجد ملاحظات لهذا المريض",
+    "toast": {
+      "alertDeleted": "تم حذف التنبيه",
+      "alertDeleteFailed": "فشل حذف التنبيه",
+      "costSaved": "تم تحديث التكلفة بنجاح",
+      "costSaveFailed": "فشل حفظ التكلفة"
+    }
+  }
+}
