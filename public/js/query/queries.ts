@@ -46,6 +46,7 @@ import * as fileExplorerContract from '@shared/contracts/file-explorer.contract'
 import * as calendarContract from '@shared/contracts/calendar.contract';
 import * as whatsappContract from '@shared/contracts/whatsapp.contract';
 import * as photoEditorContract from '@shared/contracts/photo-editor.contract';
+import * as slideshowContract from '@shared/contracts/slideshow.contract';
 import { qk } from './keys';
 import type { HttpError } from '@/core/http';
 // Type-only (erased at runtime → no import cycle with the hooks below). Stand row
@@ -908,6 +909,17 @@ export const patientFilesQuery = (id: Id, path = '', flat = false) =>
       fetchJSON<z.infer<typeof fileExplorerContract.list.response>>(
         `/api/patients/${id}/files?path=${encodeURIComponent(path)}${flat ? '&flat=1' : ''}`,
         { signal, schema: fileExplorerContract.list.response }
+      ),
+  });
+
+/** GET /api/slideshow-configs?personId= — saved per-patient sequences + generic templates. */
+export const slideshowConfigsQuery = (personId: Id) =>
+  queryOptions({
+    queryKey: qk.slideshow.list(personId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof slideshowContract.listConfigs.response>>(
+        `/api/slideshow-configs?personId=${personId}`,
+        { signal, schema: slideshowContract.listConfigs.response }
       ),
   });
 

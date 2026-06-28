@@ -11,6 +11,8 @@ import type { PointerEvent as ReactPointerEvent, SyntheticEvent } from 'react';
 import cn from 'classnames';
 import { useFullscreen } from './useFullscreen';
 import { useWakeLock } from './useWakeLock';
+import { slidePhotos } from './photoTypes';
+import AnnotationCanvas from './AnnotationCanvas';
 import type { Framing, SlideItem, SlidePhoto, TransitionStyle } from './types';
 import styles from './SlideshowPlayer.module.css';
 
@@ -59,6 +61,12 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
   const [chromeVisible, setChromeVisible] = useState(true);
   const hideTimerRef = useRef<number | undefined>(undefined);
 
+  // Annotate mode: a freehand-draw overlay that captures pointers (so swipe/tap
+  // nav is suspended) and keeps the chrome up so its toggle stays reachable. The
+  // ref mirrors the state for the stale-closure'd keyboard handler + revealChrome.
+  const [annotate, setAnnotate] = useState(false);
+  const annotateRef = useRef(false);
+
   const safeIndex = Math.min(index, slides.length - 1);
   const current = slides[safeIndex];
 
@@ -84,12 +92,24 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
   const revealChrome = () => {
     setChromeVisible(true);
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
-    hideTimerRef.current = window.setTimeout(() => setChromeVisible(false), CHROME_HIDE_MS);
+    // While annotating, keep the chrome up so the user can toggle annotate off.
+    if (!annotateRef.current) hideTimerRef.current = window.setTimeout(() => setChromeVisible(false), CHROME_HIDE_MS);
   };
 
   const hideChrome = () => {
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
     setChromeVisible(false);
+  };
+
+  const setAnnotateMode = (on: boolean) => {
+    annotateRef.current = on;
+    setAnnotate(on);
+    if (on) {
+      setChromeVisible(true);
+      if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+    } else {
+      revealChrome(); // re-arm the auto-hide
+    }
   };
 
   // Chrome starts visible (initial state); on mount, arm the auto-hide timer so it
@@ -143,17 +163,14 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slides.length]);
 
-  // Preload immediate neighbours for instant transitions.
+  // Preload immediate neighbours (every photo on each) for instant transitions.
   useEffect(() => {
     [safeIndex + 1, safeIndex - 1].forEach((i) => {
       if (i >= 0 && i < slides.length) {
-        const img = new Image();
-        img.src = slides[i].url;
-        const sec = slides[i].second;
-        if (sec) {
-          const img2 = new Image();
-          img2.src = sec.url;
-        }
+        slidePhotos(slides[i]).forEach((p) => {
+          const img = new Image();
+          img.src = p.url;
+        });
       }
     });
   }, [safeIndex, slides]);
@@ -162,10 +179,12 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
   const downRef = useRef<{ x: number; y: number; id: number; wasVisible: boolean } | null>(null);
 
   const onPointerDown = (e: ReactPointerEvent) => {
+    if (annotate) return; // the annotation canvas owns pointers in annotate mode
     downRef.current = { x: e.clientX, y: e.clientY, id: e.pointerId, wasVisible: chromeVisible };
   };
 
   const onPointerUp = (e: ReactPointerEvent) => {
+    if (annotate) return;
     const down = downRef.current;
     downRef.current = null;
     if (!down || down.id !== e.pointerId) return;
@@ -223,21 +242,20 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
     </span>
   );
 
-  // A slide renders one photo, or two side-by-side when `second` is set.
+  // A slide renders one photo, or several side-by-side when `extras` are set.
   const renderSlide = (item: SlideItem) => {
-    if (!item.second) {
+    const photos = slidePhotos(item);
+    if (photos.length === 1) {
       return <img src={item.url} alt={item.label} draggable={false} onError={handleImgError} />;
     }
     return (
       <div className={styles.pair}>
-        <div className={styles.pairItem}>
-          <img src={item.url} alt={item.label} draggable={false} onError={handleImgError} />
-          {showCaption && photoLabel(item)}
-        </div>
-        <div className={styles.pairItem}>
-          <img src={item.second.url} alt={item.second.label} draggable={false} onError={handleImgError} />
-          {showCaption && photoLabel(item.second)}
-        </div>
+        {photos.map((photo, i) => (
+          <div key={`${photo.tp}:${photo.name}-${i}`} className={styles.pairItem}>
+            <img src={photo.url} alt={photo.label} draggable={false} onError={handleImgError} />
+            {showCaption && photoLabel(photo)}
+          </div>
+        ))}
       </div>
     );
   };
@@ -256,7 +274,7 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
           {renderSlide(current)}
         </div>
 
-        {showCaption && !current.second && (
+        {showCaption && !current.extras?.length && (
           <div className={styles.caption}>
             <span className={styles.captionMain}>{current.tpDescription || 'Photo'}</span>
             <span className={styles.captionSub}>
@@ -269,6 +287,10 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
 
       {/* Gesture layer: catches taps/swipes everywhere except on chrome buttons. */}
       <div className={styles.gestureLayer} onPointerDown={onPointerDown} onPointerUp={onPointerUp} />
+
+      {/* Annotation overlay sits above the gesture layer so it captures draws.
+          Keyed by slide so each navigation remounts it with a clean canvas. */}
+      {annotate && <AnnotationCanvas key={safeIndex} />}
 
       <div className={cn(styles.chrome, !chromeVisible && styles.chromeHidden)}>
         <div className={styles.topBar}>
@@ -302,6 +324,16 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
               onClick={() => setShowCaption((c) => !c)}
             >
               <i className="fas fa-closed-captioning" />
+            </button>
+            <button
+              type="button"
+              className={cn(styles.iconBtn, annotate && styles.iconBtnActive)}
+              title={annotate ? 'Stop annotating' : 'Annotate'}
+              aria-label="Toggle annotation"
+              aria-pressed={annotate}
+              onClick={() => setAnnotateMode(!annotate)}
+            >
+              <i className="fas fa-pen" />
             </button>
             <button
               type="button"

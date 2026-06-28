@@ -353,6 +353,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         onChange={handleInputChange}
                         className="form-control"
                         placeholder={t('fields.emailPlaceholder')}
+                        dir="ltr"
                     />
                 </div>
             </div>

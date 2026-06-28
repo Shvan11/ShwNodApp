@@ -580,6 +580,15 @@ export interface ShadeVitaClassic {
   shade: string;
 }
 
+export interface SlideshowConfigs {
+  config: Json;
+  created_at: Generated<Timestamp>;
+  id: Generated<number>;
+  kind: string;
+  name: string;
+  person_id: number | null;
+}
+
 export interface Sms {
   date: string;
   email_sent: Generated<boolean>;
@@ -886,6 +895,7 @@ export interface DB {
   screws: Screws;
   shade_3d_master: Shade3dMaster;
   shade_vita_classic: ShadeVitaClassic;
+  slideshow_configs: SlideshowConfigs;
   sms: Sms;
   staff_sessions: StaffSessions;
   stand_categories: StandCategories;

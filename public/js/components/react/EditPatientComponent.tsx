@@ -430,6 +430,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                             className="form-control"
                             value={formData.email}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, email: e.target.value})}
+                            dir="ltr"
                         />
                     </div>
                     <div className={styles.formGroup}>

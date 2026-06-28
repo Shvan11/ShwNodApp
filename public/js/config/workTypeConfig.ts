@@ -56,8 +56,6 @@ export const isOrthoWork = (workTypeId: number): boolean =>
   ORTHO_WORK_TYPES.includes(workTypeId as WorkTypeId);
 export const needsDetails = (workTypeId: number): boolean =>
   DETAIL_WORK_TYPES.includes(workTypeId as WorkTypeId);
-export const needsVisits = (workTypeId: number): boolean => isOrthoWork(workTypeId);
-export const needsDiagnosis = (workTypeId: number): boolean => isOrthoWork(workTypeId);
 
 // Display field configuration
 export interface DisplayField {
@@ -223,18 +221,3 @@ export const FILLING_DEPTH_OPTIONS: readonly string[] = [
   'Deep',
   'Very Deep (Near Pulp)',
 ] as const;
-
-export default {
-  WORK_TYPE_IDS,
-  ORTHO_WORK_TYPES,
-  DETAIL_WORK_TYPES,
-  WORK_TYPE_FIELDS,
-  isOrthoWork,
-  needsDetails,
-  needsVisits,
-  needsDiagnosis,
-  getWorkTypeConfig,
-  MATERIAL_OPTIONS,
-  FILLING_TYPE_OPTIONS,
-  FILLING_DEPTH_OPTIONS,
-};

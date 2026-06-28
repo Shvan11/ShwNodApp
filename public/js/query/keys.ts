@@ -269,6 +269,15 @@ export const qk = {
     history: () => ['approvals', 'history'] as const,
     mine: () => ['approvals', 'mine'] as const,
   },
+  /**
+   * Saved slideshow configurations. `list(personId)` returns that patient's
+   * saved sequences PLUS the clinic-wide generic templates (person_id NULL), so
+   * any config write invalidates this one key.
+   */
+  slideshow: {
+    all: () => ['slideshow'] as const,
+    list: (personId: Id) => ['slideshow', normId(personId)] as const,
+  },
   /** Settings — options, email + database config, status polls. */
   settings: {
     all: () => ['settings'] as const,

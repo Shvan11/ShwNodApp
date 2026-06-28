@@ -12,21 +12,27 @@
  *  - Grip-drag a timeline chip → reorder, or drop onto another chip to pair.
  *  - ✕ removes that instance; the link-slash splits a pair back into two.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, SyntheticEvent } from 'react';
 import cn from 'classnames';
 import { useToast } from '../../../contexts/ToastContext';
 import { httpErrorMessage } from '../../../core/http';
-import { photoId } from './photoTypes';
+import { photoId, slidePhotos, slidePhotoCount, MAX_PHOTOS_PER_SLIDE } from './photoTypes';
+import SaveConfigModal from './SaveConfigModal';
+import ManageConfigsModal from './ManageConfigsModal';
+import FolderPickerModal from './FolderPickerModal';
 import type { SlideItem, SlidePhoto, Timepoint } from './types';
+import type { ConfigPayload, ConfigRow } from '@shared/contracts/slideshow.contract';
 import styles from './SlideshowBuilder.module.css';
 
 interface Props {
+  personId: number;
   timepoints: Timepoint[];
   loadingTimepoints: boolean;
   galleries: Record<string, SlidePhoto[]>;
   loadGallery: (tp: Timepoint) => Promise<SlidePhoto[]>;
   selected: SlideItem[];
+  configs: ConfigRow[];
   onAdd: (photo: SlidePhoto) => void;
   onInsertAt: (photo: SlidePhoto, index: number) => void;
   onPairPhotoOnto: (targetIndex: number, photo: SlidePhoto) => void;
@@ -36,6 +42,10 @@ interface Props {
   onUnpair: (index: number) => void;
   onClear: () => void;
   onPlay: () => void;
+  onApplyConfig: (row: ConfigRow) => void;
+  onSaveConfig: (name: string, config: ConfigPayload) => Promise<void>;
+  onRenameConfig: (id: number, name: string) => Promise<void>;
+  onDeleteConfig: (id: number) => Promise<void>;
 }
 
 /** What's being dragged: a palette photo, or an existing timeline slide. */
@@ -64,11 +74,13 @@ const formatTpDate = (dateTime: string): string =>
   dateTime ? dateTime.substring(0, 10).split('-').reverse().join('-') : '';
 
 const SlideshowBuilder = ({
+  personId,
   timepoints,
   loadingTimepoints,
   galleries,
   loadGallery,
   selected,
+  configs,
   onAdd,
   onInsertAt,
   onPairPhotoOnto,
@@ -78,11 +90,40 @@ const SlideshowBuilder = ({
   onUnpair,
   onClear,
   onPlay,
+  onApplyConfig,
+  onSaveConfig,
+  onRenameConfig,
+  onDeleteConfig,
 }: Props) => {
   const toast = useToast();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [tpLoading, setTpLoading] = useState<Record<string, boolean>>({});
   const [tpError, setTpError] = useState<Record<string, boolean>>({});
+
+  // --- Config bar (saved presentations + folder photos) ---
+  const [applyOpen, setApplyOpen] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [folderOpen, setFolderOpen] = useState(false);
+  const applyRef = useRef<HTMLDivElement>(null);
+
+  const patientConfigs = configs.filter((c) => c.kind === 'literal' && c.person_id === personId);
+  const templates = configs.filter((c) => c.kind === 'template');
+
+  // Close the Apply menu on an outside click.
+  useEffect(() => {
+    if (!applyOpen) return;
+    const onDocDown = (e: PointerEvent) => {
+      if (applyRef.current && !applyRef.current.contains(e.target as Node)) setApplyOpen(false);
+    };
+    window.addEventListener('pointerdown', onDocDown);
+    return () => window.removeEventListener('pointerdown', onDocDown);
+  }, [applyOpen]);
+
+  const applyAndClose = (row: ConfigRow): void => {
+    setApplyOpen(false);
+    onApplyConfig(row);
+  };
 
   const trayScrollRef = useRef<HTMLDivElement>(null);
   // Authoritative live drag data for the window pointer handlers.
@@ -93,16 +134,13 @@ const SlideshowBuilder = ({
   // True after a gallery drag/scroll begins, so the trailing click doesn't add.
   const suppressClickRef = useRef(false);
 
-  // How many times this photo appears in the timeline (as primary or paired second).
+  // How many times this photo appears in the timeline (across every slide's photos).
   const usedCount = (photo: SlidePhoto): number => {
     const pid = photoId(photo);
-    return selected.reduce(
-      (n, s) => n + (photoId(s) === pid ? 1 : 0) + (s.second && photoId(s.second) === pid ? 1 : 0),
-      0,
-    );
+    return selected.reduce((n, s) => n + slidePhotos(s).filter((p) => photoId(p) === pid).length, 0);
   };
   const usesFromTp = (tp: string): number =>
-    selected.reduce((n, s) => n + (s.tp === tp ? 1 : 0) + (s.second?.tp === tp ? 1 : 0), 0);
+    selected.reduce((n, s) => n + slidePhotos(s).filter((p) => p.tp === tp).length, 0);
 
   const toggleExpand = async (tp: Timepoint) => {
     const willExpand = !expanded.has(tp.tpCode);
@@ -139,10 +177,10 @@ const SlideshowBuilder = ({
 
     const canPair = (i: number): boolean => {
       const target = snapshot[i];
-      if (!target || target.second) return false; // target slide must be single
+      if (!target || slidePhotoCount(target) >= MAX_PHOTOS_PER_SLIDE) return false; // target must have room
       if (source.kind === 'chip') {
         if (source.fromIndex === i) return false; // not onto itself
-        if (source.isPair) return false; // a pair can't be a right-hand photo
+        if (source.isPair) return false; // a multi-photo slide can't be a right-hand photo
       }
       return true;
     };
@@ -230,7 +268,13 @@ const SlideshowBuilder = ({
     e.preventDefault();
     e.stopPropagation();
     const item = selected[index];
-    beginDrag({ kind: 'chip', fromIndex: index, isPair: !!item.second }, e.clientX, e.clientY, item.url, e.pointerId);
+    beginDrag(
+      { kind: 'chip', fromIndex: index, isPair: slidePhotoCount(item) > 1 },
+      e.clientX,
+      e.clientY,
+      item.url,
+      e.pointerId,
+    );
   };
 
   // Gallery thumb: tap → add (via onClick); long-press / mouse-move → drag.
@@ -292,11 +336,60 @@ const SlideshowBuilder = ({
   return (
     <div className={cn(styles.builder, drag && styles.dragging)}>
       <header className={styles.header}>
-        <div>
+        <div className={styles.headerMain}>
           <h2 className={styles.title}>Presentation Builder</h2>
           <p className={styles.hint}>
             Tap a photo to add it, drag it onto the timeline to place it, or drop one photo over another to pair them.
           </p>
+        </div>
+        <div className={styles.configBar}>
+          <div className={styles.applyWrap} ref={applyRef}>
+            <button
+              type="button"
+              className={styles.configBtn}
+              disabled={configs.length === 0}
+              aria-haspopup="menu"
+              aria-expanded={applyOpen}
+              onClick={() => setApplyOpen((o) => !o)}
+            >
+              <i className="fas fa-folder-open" /> Apply <i className={cn('fas fa-caret-down', styles.caret)} />
+            </button>
+            {applyOpen && (
+              <div className={styles.applyMenu} role="menu">
+                {patientConfigs.length > 0 && (
+                  <div className={styles.applyGroup}>
+                    <div className={styles.applyGroupLabel}>This patient</div>
+                    {patientConfigs.map((c) => (
+                      <button key={c.id} type="button" role="menuitem" className={styles.applyItem} onClick={() => applyAndClose(c)}>
+                        <i className="fas fa-clock-rotate-left" />
+                        <span className={styles.applyItemName}>{c.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {templates.length > 0 && (
+                  <div className={styles.applyGroup}>
+                    <div className={styles.applyGroupLabel}>Generic templates</div>
+                    {templates.map((c) => (
+                      <button key={c.id} type="button" role="menuitem" className={styles.applyItem} onClick={() => applyAndClose(c)}>
+                        <i className="fas fa-wand-magic-sparkles" />
+                        <span className={styles.applyItemName}>{c.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <button type="button" className={styles.configBtn} disabled={selected.length === 0} onClick={() => setSaveOpen(true)}>
+            <i className="fas fa-floppy-disk" /> Save
+          </button>
+          <button type="button" className={styles.configBtn} disabled={configs.length === 0} onClick={() => setManageOpen(true)}>
+            <i className="fas fa-sliders" /> Manage
+          </button>
+          <button type="button" className={styles.configBtn} onClick={() => setFolderOpen(true)}>
+            <i className="fas fa-images" /> Add from folder
+          </button>
         </div>
       </header>
 
@@ -381,7 +474,8 @@ const SlideshowBuilder = ({
             </span>
           ) : (
             selected.map((item, index) => {
-              const paired = !!item.second;
+              const photos = slidePhotos(item);
+              const paired = photos.length > 1;
               const isSource = drag?.kind === 'chip' && drag.fromIndex === index;
               const insertBefore = drag?.drop?.type === 'insert' && drag.drop.index === index;
               const insertAfter =
@@ -409,22 +503,22 @@ const SlideshowBuilder = ({
                   >
                     <i className="fas fa-grip-vertical" />
                   </span>
-                  <img src={item.url} alt={item.label} draggable={false} onError={handleImgError} />
-                  {item.second && (
+                  {photos.map((photo, i) => (
                     <img
-                      src={item.second.url}
-                      alt={item.second.label}
+                      key={`${photoId(photo)}-${i}`}
+                      src={photo.url}
+                      alt={photo.label}
                       draggable={false}
                       onError={handleImgError}
                     />
-                  )}
+                  ))}
                   <span className={styles.chipOrder}>{index + 1}</span>
                   {paired && (
                     <button
                       type="button"
                       className={styles.chipUnlink}
-                      title="Split into two slides"
-                      aria-label="Split paired photos"
+                      title="Split into separate slides"
+                      aria-label="Split combined photos"
                       onClick={() => onUnpair(index)}
                     >
                       <i className="fas fa-link-slash" />
@@ -467,6 +561,18 @@ const SlideshowBuilder = ({
           <img src={drag.url} alt="" draggable={false} onError={handleImgError} />
         </div>
       )}
+
+      {saveOpen && <SaveConfigModal selected={selected} onSave={onSaveConfig} onClose={() => setSaveOpen(false)} />}
+      {manageOpen && (
+        <ManageConfigsModal
+          personId={personId}
+          configs={configs}
+          onRename={onRenameConfig}
+          onDelete={onDeleteConfig}
+          onClose={() => setManageOpen(false)}
+        />
+      )}
+      {folderOpen && <FolderPickerModal personId={personId} onAdd={onAdd} onClose={() => setFolderOpen(false)} />}
     </div>
   );
 };

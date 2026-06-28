@@ -3,8 +3,6 @@
  * Common type definitions for all calendar components
  */
 
-import type { MouseEvent } from 'react';
-
 // Per-doctor colour used for card tints and the calendar legend
 export interface DoctorColor {
     fill: string; // soft card background
@@ -115,8 +113,3 @@ export interface SaveHolidayData {
     description: string;
     existingId?: number;
 }
-
-// Handler types
-export type SlotClickHandler = (slot: SlotData, event: MouseEvent<HTMLDivElement>) => void;
-export type DayClickHandler = (day: CalendarDay) => void;
-export type DayContextMenuHandler = (day: CalendarDay, event: MouseEvent<HTMLDivElement>) => void;

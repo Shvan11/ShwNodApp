@@ -54,6 +54,7 @@ import holidayRoutes from './holiday.routes.js';
 import videoRoutes from './video.routes.js';
 import standRoutes from './stand.routes.js';
 import fileExplorerRoutes from './file-explorer.routes.js';
+import slideshowRoutes from './slideshow.routes.js';
 import localsendRoutes from './localsend.routes.js';
 import telegramRoutes from './telegram.routes.js';
 import shareRoutes from './share.routes.js';
@@ -89,6 +90,7 @@ router.use('/templates', templateRouter);
 // Core entity routes
 router.use('/', patientRoutes);       // Patient management
 router.use('/', fileExplorerRoutes);  // Per-patient file explorer (/patients/:id/files*)
+router.use('/', slideshowRoutes);     // Saved slideshow configurations (/slideshow-configs*)
 router.use('/', appointmentRoutes);   // Appointment scheduling
 router.use('/', chairDisplayRoutes);  // Chair-side public display events
 router.use('/', paymentRoutes);       // Payments and invoices

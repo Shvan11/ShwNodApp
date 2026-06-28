@@ -1,0 +1,240 @@
+/* Shared surface for the slideshow config modals (Save / Manage / Apply-confirm)
+   and the patient-folder picker modal. Buttons use the global .btn classes. */
+
+.dialog {
+  width: min(480px, 100%);
+  display: flex;
+  flex-direction: column;
+  max-height: min(90vh, 720px);
+}
+
+.folderDialog {
+  width: min(640px, 100%);
+  display: flex;
+  flex-direction: column;
+  max-height: min(90vh, 720px);
+}
+
+.body {
+  padding: var(--spacing-lg);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.folderBody {
+  padding: var(--spacing-lg);
+  overflow-y: auto;
+}
+
+.lead {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+/* --- Form field --- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.input {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-light);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px var(--primary-color-translucent, rgba(0, 0, 0, 0.08));
+}
+
+/* --- Save-as-template checkbox --- */
+.checkboxRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+}
+
+.checkbox {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.checkboxText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.checkboxHint {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.disabledHint {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* --- Manage list --- */
+.group + .group {
+  margin-top: var(--spacing-lg);
+}
+
+.groupLabel {
+  margin-bottom: var(--spacing-xs);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--spacing-sm) 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-light);
+  min-height: 48px;
+}
+
+.rowMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rowName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.rowMeta {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-width: 32px;
+  height: 32px;
+  padding: 0 var(--spacing-sm);
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-color);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.iconBtn:hover:not(:disabled) {
+  border-color: var(--primary-color);
+}
+
+.iconBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.iconBtnDanger {
+  composes: iconBtn;
+  color: var(--error-color);
+}
+
+.iconBtnDanger:hover:not(:disabled) {
+  border-color: var(--error-color);
+  background: var(--error-color);
+  color: var(--color-white);
+}
+
+/* --- Inline rename / delete-confirm rows --- */
+.editForm,
+.confirmRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+}
+
+.editInput {
+  flex: 1;
+  min-width: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--primary-color);
+  border-radius: var(--radius-md);
+  background: var(--background-light);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.confirmText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+/* --- Footer --- */
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-top: 1px solid var(--border-color);
+}

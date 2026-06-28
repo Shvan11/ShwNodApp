@@ -1,0 +1,96 @@
+/* Annotation overlay. Rendered AFTER the player's .gestureLayer (both z-index 2)
+   so it sits ABOVE it and captures pointer events for drawing; the chrome stays
+   z-index 3 so its toolbar still sits above. */
+.wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  touch-action: none;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* Vertical tool pill on the left-center — clear of the top bar + bottom dots. */
+.toolbar {
+  position: absolute;
+  left: var(--spacing-lg);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+}
+
+.swatch {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.swatchActive {
+  border-color: var(--color-white);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6);
+  transform: scale(1.12);
+}
+
+.divider {
+  width: 60%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.widthBtn,
+.toolBtn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--color-white);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.widthBtn:hover,
+.toolBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.widthActive {
+  background: var(--color-white);
+}
+
+.widthDot {
+  display: block;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+.widthActive .widthDot {
+  background: var(--color-black);
+}
+
+.toolBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

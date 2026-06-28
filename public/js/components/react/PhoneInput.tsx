@@ -44,6 +44,8 @@ const PhoneInput = ({
       disabled={disabled}
       name={name}
       id={id}
+      // Keep digit groups + caret left-to-right even inside an RTL/Arabic form.
+      dir="ltr"
     />
   );
 };

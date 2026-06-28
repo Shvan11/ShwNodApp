@@ -435,19 +435,21 @@ const ViewPatientInfo = ({ personId }: Props) => {
                     <div className={styles.patientInfoRows}>
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>{t('view.labels.phone')}</span>
-                            <span className={styles.patientInfoValue}>
+                            {/* dir="ltr" keeps the number's groups in order under RTL */}
+                            <span className={styles.patientInfoValue} dir="ltr">
                                 {formatPhoneDisplay(patientInfo.country_code, patientInfo.phone)}
                             </span>
                         </div>
                         {patientInfo.phone2 && (
                             <div className={styles.patientInfoRow}>
                                 <span className={styles.patientInfoLabel}>{t('view.labels.phone2')}</span>
-                                <span className={styles.patientInfoValue}>{formatPhoneForDisplay(patientInfo.phone2)}</span>
+                                <span className={styles.patientInfoValue} dir="ltr">{formatPhoneForDisplay(patientInfo.phone2)}</span>
                             </div>
                         )}
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>{t('view.labels.email')}</span>
-                            <span className={styles.patientInfoValue}>{patientInfo.email || '-'}</span>
+                            {/* dir="ltr" keeps the address in order under RTL */}
+                            <span className={styles.patientInfoValue} dir="ltr">{patientInfo.email || '-'}</span>
                         </div>
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>{t('view.labels.address')}</span>
