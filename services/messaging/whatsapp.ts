@@ -516,6 +516,24 @@ class WhatsAppService extends EventEmitter {
   private readyWatchdog: ReturnType<typeof setTimeout> | null = null;
   private readyWatchdogRestarts = 0;
 
+  // Monotonic id for each initialization attempt. Overlapping triggers — the ready
+  // watchdog, scheduleReconnect, and EVERY open auth page's on-demand init — can
+  // start a fresh attempt while an older one is still pending. The older attempt's
+  // late completion (most damagingly its init TIMEOUT firing ~120s after it was
+  // abandoned) must NOT run cleanupFailedClient()/setState('ERROR') against the
+  // newer attempt's healthy, already-CONNECTED client — that was the observed
+  // CONNECTED→ERROR flap. performInitialization bumps this on entry; only the
+  // current epoch may mutate shared client state on failure.
+  private initEpoch = 0;
+
+  // The boot-time orphan-Chrome sweep runs only on the FIRST init since process
+  // start: a prior process generation (e.g. a service restart whose detached Chrome
+  // outlived the old node) can leave a chrome.exe bound to our profile. After boot,
+  // restart() does a TARGETED ensureProfileUnlocked(priorProc); an untargeted
+  // profile-wide kill on every restart would risk killing a concurrent attempt's
+  // live browser during an overlap.
+  private hasSweptOrphansAtBoot = false;
+
   // Set when a session has authenticated but never reached `ready` across the
   // watchdog's whole restart budget — i.e. the persisted session is poisoned
   // (loads enough to authenticate, can't finish syncing; validateSessionQuality
@@ -687,18 +705,28 @@ class WhatsAppService extends EventEmitter {
   }
 
   private async performInitialization(forceRestart = false): Promise<boolean> {
-    log.info('Starting initialization', { forceRestart });
+    // Tag this attempt. Overlapping triggers can abandon it mid-flight; its late
+    // failure must then become a no-op instead of tearing down whatever client a
+    // newer attempt has since made live (see the superseded-attempt guard below).
+    const myEpoch = ++this.initEpoch;
+    log.info('Starting initialization', { forceRestart, attempt: myEpoch });
 
     try {
-      // Cold start (boot / on-demand / reconnect): a stale `lockfile` left by a
-      // prior process (crash or unclean shutdown) makes Puppeteer refuse to launch
-      // with "browser is already running". Clear it BEFORE the launch instead of
-      // failing first and self-healing on the retry — gated on the lockfile
-      // actually existing, so a clean start pays only one stat(). The forceRestart
-      // path still has its client here (and already unlocked in restart()), so
-      // this fires only on a true cold start.
-      if (!this.clientState.client && (await this.profileLockExists())) {
-        log.warn('Stale WhatsApp profile lock detected before init — unlocking proactively');
+      // BOOT-ONLY orphan sweep: a prior PROCESS generation (e.g. a service restart
+      // whose detached Chrome grandchildren outlived the old node — node-windows
+      // doesn't reap the whole tree, and a hard/looping shutdown can skip WhatsApp's
+      // graceful destroy) can leave an orphaned chrome.exe bound to THIS LocalAuth
+      // profile. Puppeteer may launch ALONGSIDE it WITHOUT throwing "browser is
+      // already running", but the new page then authenticates yet never reaches
+      // `ready` (its in-page WA store can't open the contended profile) — and the
+      // watchdog mis-parks a healthy session. A stale `lockfile` check missed this: a
+      // LIVE orphan holds SingletonLock/Cookie/Socket + the ProcessSingleton mutex,
+      // not `lockfile`. Sweep on the FIRST init since process start ONLY — after boot,
+      // restart() does a TARGETED ensureProfileUnlocked(priorProc); an untargeted
+      // profile-wide kill on every restart would risk killing a concurrent attempt's
+      // healthy browser during an overlap.
+      if (!this.clientState.client && !this.hasSweptOrphansAtBoot) {
+        this.hasSweptOrphansAtBoot = true;
         await this.ensureProfileUnlocked();
       }
 
@@ -757,6 +785,22 @@ class WhatsAppService extends EventEmitter {
         throw new Error('Client initialization returned unexpected value');
       }
     } catch (error) {
+      // SUPERSEDED-ATTEMPT GUARD. If a newer init attempt started since ours began
+      // (the ready watchdog, scheduleReconnect, or an open auth page's on-demand init
+      // all fire independently), that newer attempt now owns this.clientState.client —
+      // possibly a healthy, already-CONNECTED one. Our late failure here is most often
+      // this attempt's init TIMEOUT firing ~120s after it was abandoned; running
+      // cleanupFailedClient()/setState('ERROR') would destroy the LIVE client and flap
+      // CONNECTED→ERROR. Bail without side effects — the attempt that superseded us
+      // owns the client and its own recovery.
+      if (this.initEpoch !== myEpoch) {
+        log.warn(
+          'Superseded WhatsApp init attempt failed — ignoring (leaving the live client intact)',
+          { attempt: myEpoch, current: this.initEpoch, error: (error as Error)?.message }
+        );
+        throw error;
+      }
+
       // A failed initialize() leaves the Puppeteer Chrome alive and holding
       // the userDataDir lock, so every subsequent retry fails with
       // "browser is already running for ...session-client". Tear it down now.
@@ -779,9 +823,14 @@ class WhatsAppService extends EventEmitter {
 
       throw error;
     } finally {
-      this.clientState.clearInitializationTimeout();
-      if (this.clientState.initializationAbortController) {
-        this.clientState.initializationAbortController = null;
+      // Only the current attempt may clear the SHARED init timer/abort controller —
+      // a superseded attempt's finally would otherwise cancel the live attempt's
+      // timeout/abort mid-flight.
+      if (this.initEpoch === myEpoch) {
+        this.clientState.clearInitializationTimeout();
+        if (this.clientState.initializationAbortController) {
+          this.clientState.initializationAbortController = null;
+        }
       }
     }
   }
@@ -1903,18 +1952,6 @@ class WhatsAppService extends EventEmitter {
       this.clientState.browser = null;
       this.clientState.page = null;
       this.clientState.destroyInProgress = false;
-    }
-  }
-
-  /** Cheap check: does Puppeteer's Windows profile `lockfile` exist? */
-  private async profileLockExists(): Promise<boolean> {
-    try {
-      const fsMod = await import('fs');
-      const pathMod = await import('path');
-      const lockPath = pathMod.default.resolve('.wwebjs_auth', 'session-client', 'lockfile');
-      return fsMod.default.existsSync(lockPath);
-    } catch {
-      return false;
     }
   }
 

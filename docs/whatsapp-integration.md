@@ -283,9 +283,11 @@ orphan one entirely.
 3. Delete the stale lock files (`lockfile`, and the Linux `Singleton*`).
 
 It runs in three places: inside `restart()` (with the prior browser's PID, captured **before** destroy —
-in QR mode `clientState.browser` is null, so the only handle is `client.pupBrowser.process()`); as a
-**proactive cold-start** step in `performInitialization` (gated on `profileLockExists()`); and as a
-**self-heal** in the init catch when the error matches `already running`/`ProcessSingleton`.
+in QR mode `clientState.browser` is null, so the only handle is `client.pupBrowser.process()`); as an
+**unconditional proactive cold-start** step in `performInitialization` (on every true cold start, i.e.
+`!clientState.client` — reaps an orphaned `chrome.exe` from a prior generation, e.g. a service restart whose
+detached Chrome outlived the old node, that would otherwise let the new page authenticate but never reach
+`ready`); and as a **self-heal** in the init catch when the error matches `already running`/`ProcessSingleton`.
 
 ### 7.3 Liveness heartbeat — silent death
 
