@@ -414,7 +414,7 @@ const PatientManagement = () => {
             <div className={styles.header}>
                 <h2>Patient Management</h2>
                 <div className={styles.headerActions}>
-                    <button type="button" onClick={() => navigate('/patient/new/edit-patient')} className="btn btn-primary">
+                    <button type="button" onClick={() => navigate('/patient/new/add')} className="btn btn-primary">
                         <i className={cn('fas fa-plus', styles.iconGap)}></i> Add New Patient
                     </button>
                 </div>

@@ -84,9 +84,9 @@ export const RTL_ROUTES: readonly string[] = ['/dashboard', '/expenses', '/appoi
  *     (`/patient/:id/new-appointment`) and the edit-appointment form
  *     (`/patient/:id/edit-appointment/:appointmentId`).
  *   - the patient demographics screens: the read-only info page
- *     (`/patient/:id/patient-info`), the edit/new-patient form
- *     (`/patient/:id/edit-patient`, incl. `/patient/new/edit-patient`) and the
- *     add-patient form (`/patient/new/add`).
+ *     (`/patient/:id/patient-info`), the edit-patient form
+ *     (`/patient/:id/edit-patient`) and the add-patient form
+ *     (`/patient/new/add`).
  */
 const RTL_ROUTE_PATTERNS: readonly RegExp[] = [
   /^\/patient\/[^/]+\/works\/?$/,

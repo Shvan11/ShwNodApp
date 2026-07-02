@@ -24,22 +24,29 @@
     background: linear-gradient(90deg, var(--primary-color), var(--secondary-color), var(--accent-color));
 }
 
-/* Form title styling */
+/* Compact header row — title and actions share it, no dedicated action bar */
+.formHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+}
+
 .addPatientTitle {
-    text-align: center;
-    margin-bottom: var(--spacing-xl);
+    margin: 0;
     color: var(--text-primary);
-    font-size: 2rem;
+    font-size: 1.5rem;
     font-weight: var(--font-weight-bold);
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
 }
 
 .addPatientTitle i {
     color: var(--primary-color);
-    font-size: 1.8rem;
+    font-size: 1.3rem;
 }
 
 /* Improved form rows with better alignment */
@@ -110,31 +117,17 @@
     border: 1px solid var(--error-100);
 }
 
-/* Beautiful form actions - spans full width */
+/* Cancel/Submit pair */
 .formActions {
-    margin-top: var(--spacing-xl);
-    padding-top: var(--spacing-lg);
-    border-top: 1px solid var(--gray-100);
     display: flex;
     gap: var(--spacing-md);
-    justify-content: center;
+    justify-content: flex-end;
     flex-wrap: wrap;
-    grid-column: 1 / -1;
 }
 
-.formActionsTop {
-    margin-top: 0;
-    margin-bottom: var(--spacing-xl);
-    padding-top: 0;
-    padding-bottom: var(--spacing-lg);
-    border-top: none;
-    border-bottom: 2px solid var(--gray-100);
-}
-
-.formActionsBottom {
-    margin-top: var(--spacing-xl);
-    padding-top: var(--spacing-lg);
-    border-top: 2px solid var(--gray-100);
+/* Bottom bar exists only for the mobile accordion (see 768px breakpoint) */
+.bottomActions {
+    display: none;
 }
 
 /* Loading spinner animation */
@@ -431,17 +424,26 @@
         gap: var(--spacing-md);
     }
 
-    .addPatientTitle {
-        font-size: 1.5rem;
+    .formHeader {
+        justify-content: center;
     }
 
-    .formActions {
+    /* On mobile the accordion is tall — actions live at the bottom instead */
+    .headerActions {
+        display: none;
+    }
+
+    .bottomActions {
+        display: flex;
         flex-direction: column;
         align-items: stretch;
         gap: var(--spacing-sm);
+        margin-top: var(--spacing-lg);
+        padding-top: var(--spacing-lg);
+        border-top: 2px solid var(--gray-100);
     }
 
-    .formActions > * {
+    .bottomActions > * {
         width: 100%;
     }
 

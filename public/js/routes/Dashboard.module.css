@@ -3,7 +3,7 @@
 .mainContent {
     min-height: calc(100vh - 120px);
     padding: 2rem 0;
-    padding-top: calc(var(--header-height) + 2rem);
+    padding-top: calc(var(--header-height) + 0.75rem);
     /* UniversalHeader height (50px) + original padding */
     background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-200) 100%);
 }
@@ -12,13 +12,14 @@
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 1rem;
+    position: relative;
 }
 
 .dashboardGrid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1.5rem;
-    margin-top: 1rem;
+    margin-top: 0.25rem;
 }
 
 .cardLink {
@@ -280,3 +281,145 @@
 [dir="rtl"] .cardLink:hover .cardFooter i {
     transform: scaleX(-1) translateX(3px);
 }
+
+/* Subtle Customization Control */
+.dashboardHeader {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+    z-index: 20;
+}
+
+.customizeButton, .resetButton {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--gray-200);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+    padding: 0;
+}
+
+.customizeButton:hover, .resetButton:hover {
+    transform: scale(1.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    color: var(--info-color);
+    border-color: var(--info-color);
+}
+
+.customizeButtonActive {
+    background: var(--info-color);
+    color: var(--color-white) !important;
+    border-color: var(--info-color) !important;
+}
+
+.customizeButtonActive:hover {
+    background: var(--info-600);
+}
+
+/* Card customization mode states */
+.cardLink.editable {
+    position: relative;
+    cursor: grab;
+    user-select: none;
+}
+
+.cardLink.editable:active {
+    cursor: grabbing;
+}
+
+.cardLink.editable .dashboardCard {
+    border: 2px dashed var(--info-color);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+.cardLink.editable .dashboardCard::before {
+    background: linear-gradient(90deg, var(--info-color), var(--info-400));
+    animation: borderPulse 2s infinite ease-in-out;
+}
+
+@keyframes borderPulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+/* Dragging state */
+.cardLink.dragging {
+    opacity: 0.35;
+    transform: scale(0.97);
+}
+
+.cardLink.dragging .dashboardCard {
+    border: 2px dashed var(--info-600);
+    background: var(--gray-100);
+}
+
+/* Controls on each card in edit mode */
+.cardControls {
+    position: absolute;
+    top: 1rem;
+    right: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    z-index: 10;
+    background: var(--surface);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-md);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--gray-200);
+}
+
+.gripHandle {
+    color: var(--gray-400);
+    font-size: 1rem;
+    cursor: grab;
+    padding: 0.15rem 0.35rem;
+    border-right: 1px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+}
+
+[dir="rtl"] .gripHandle {
+    border-right: none;
+    border-left: 1px solid var(--gray-200);
+}
+
+.gripHandle:active {
+    cursor: grabbing;
+}
+
+.actionBtn {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.actionBtn:hover:not(:disabled) {
+    background: var(--info-color);
+    color: var(--color-white);
+    border-color: var(--info-color);
+}
+
+.actionBtn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+

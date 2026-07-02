@@ -553,50 +553,59 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         }
     };
 
+    // Shared Cancel/Submit pair — rendered in the header row (desktop) and the
+    // bottom bar (mobile accordion); CSS shows exactly one of the two.
+    const renderActions = () => (
+        <>
+            <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={onCancel}
+                disabled={loading}
+            >
+                <i className="fas fa-times"></i>
+                <span>{t('common.cancel')}</span>
+            </button>
+            <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading}
+            >
+                {loading ? (
+                    <>
+                        <div className={styles.loadingSpinner}></div>
+                        <span>{t('add.submitting')}</span>
+                    </>
+                ) : (
+                    <>
+                        <i className="fas fa-save"></i>
+                        <span>{t('add.submit')}</span>
+                    </>
+                )}
+            </button>
+        </>
+    );
+
     return (
         <div className={styles.addPatientFormContainer}>
-            <h2 className={styles.addPatientTitle}>
-                <i className="fas fa-user-plus"></i>
-                {t('add.title')}
-            </h2>
-
-            {alert.show && (
-                <div className={`${styles.alert} ${alert.type === 'success' ? styles.alertSuccess : styles.alertDanger}`}>
-                    <i className={`fas ${alert.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'}`}></i>
-                    {alert.message}
-                </div>
-            )}
-
             <form onSubmit={handleSubmit} className={styles.patientForm}>
-                {/* Form Actions - Top */}
-                <div className={`${styles.formActions} ${styles.formActionsTop}`}>
-                    <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={onCancel}
-                        disabled={loading}
-                    >
-                        <i className="fas fa-times"></i>
-                        <span>{t('common.cancel')}</span>
-                    </button>
-                    <button
-                        type="submit"
-                        className="btn btn-primary"
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <>
-                                <div className={styles.loadingSpinner}></div>
-                                <span>{t('add.submitting')}</span>
-                            </>
-                        ) : (
-                            <>
-                                <i className="fas fa-save"></i>
-                                <span>{t('add.submit')}</span>
-                            </>
-                        )}
-                    </button>
+                {/* Compact header: title + actions share one row (desktop) */}
+                <div className={styles.formHeader}>
+                    <h2 className={styles.addPatientTitle}>
+                        <i className="fas fa-user-plus"></i>
+                        {t('add.title')}
+                    </h2>
+                    <div className={`${styles.formActions} ${styles.headerActions}`}>
+                        {renderActions()}
+                    </div>
                 </div>
+
+                {alert.show && (
+                    <div className={`${styles.alert} ${alert.type === 'success' ? styles.alertSuccess : styles.alertDanger}`}>
+                        <i className={`fas ${alert.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'}`}></i>
+                        {alert.message}
+                    </div>
+                )}
 
                 {/* Desktop Tabbed View */}
                 <div className={`${styles.formTabsContainer} ${styles.desktopOnly}`}>
@@ -642,34 +651,9 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                     ))}
                 </div>
 
-                {/* Form Actions - Bottom */}
-                <div className={`${styles.formActions} ${styles.formActionsBottom}`}>
-                    <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={onCancel}
-                        disabled={loading}
-                    >
-                        <i className="fas fa-times"></i>
-                        <span>{t('common.cancel')}</span>
-                    </button>
-                    <button
-                        type="submit"
-                        className="btn btn-primary"
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <>
-                                <div className={styles.loadingSpinner}></div>
-                                <span>{t('add.submitting')}</span>
-                            </>
-                        ) : (
-                            <>
-                                <i className="fas fa-save"></i>
-                                <span>{t('add.submit')}</span>
-                            </>
-                        )}
-                    </button>
+                {/* Bottom bar — mobile accordion only (submit after filling) */}
+                <div className={`${styles.formActions} ${styles.bottomActions}`}>
+                    {renderActions()}
                 </div>
             </form>
         </div>

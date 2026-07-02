@@ -66,6 +66,18 @@
       "linkText": "Add Patient"
     }
   },
+  "customize": {
+    "title": "Arrange your dashboard cards. Changes are saved automatically.",
+    "button": "Customize Layout",
+    "done": "Done",
+    "reset": "Reset Layout",
+    "description": "Personalize your dashboard layout or navigate using the cards below.",
+    "gripTitle": "Drag to reorder",
+    "moveLeft": "Move Left",
+    "moveRight": "Move Right",
+    "moveLeftLabel": "Move card left",
+    "moveRightLabel": "Move card right"
+  },
   "footer": {
     "copyright": "© {{year}} Shwan Orthodontics - All Rights Reserved"
   }
