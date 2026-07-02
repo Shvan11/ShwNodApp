@@ -433,9 +433,12 @@ export async function getWorkDetailsList(workId: number): Promise<WorkItem[]> {
     .leftJoin('tooth_numbers as tn', 'tn.id', 'wit.tooth_id')
     .leftJoin('implant_manufacturers as im', 'im.id', 'wi.implant_manufacturer_id')
     .leftJoin('labs as l', 'l.id', 'wi.lab_id')
+    .leftJoin('lab_cases as lc', 'lc.work_item_id', 'wi.id')
     .where('wi.work_id', '=', workId)
     .select((eb) => [
       'wi.id',
+      'lc.id as lab_case_id',
+      'lc.status as lab_status',
       'wi.work_id',
       'wi.filling_type',
       'wi.filling_depth',
@@ -459,6 +462,8 @@ export async function getWorkDetailsList(workId: number): Promise<WorkItem[]> {
     ])
     .groupBy([
       'wi.id',
+      'lc.id',
+      'lc.status',
       'wi.work_id',
       'wi.filling_type',
       'wi.filling_depth',

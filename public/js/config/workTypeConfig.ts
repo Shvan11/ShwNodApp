@@ -51,11 +51,20 @@ export const DETAIL_WORK_TYPES: readonly WorkTypeId[] = [
   WORK_TYPE_IDS.VENEERS, // Veneers also use material/lab like crowns
 ] as const;
 
+// Work types fabricated at an external dental lab — eligible for the lab case
+// tracker (Start Lab Flow / the /lab-tracking board).
+export const PROSTHETIC_WORK_TYPES: readonly WorkTypeId[] = [
+  WORK_TYPE_IDS.BRIDGE,
+  WORK_TYPE_IDS.VENEERS,
+] as const;
+
 // Helper functions
 export const isOrthoWork = (workTypeId: number): boolean =>
   ORTHO_WORK_TYPES.includes(workTypeId as WorkTypeId);
 export const needsDetails = (workTypeId: number): boolean =>
   DETAIL_WORK_TYPES.includes(workTypeId as WorkTypeId);
+export const isProstheticWork = (workTypeId: number): boolean =>
+  PROSTHETIC_WORK_TYPES.includes(workTypeId as WorkTypeId);
 
 // Display field configuration
 export interface DisplayField {

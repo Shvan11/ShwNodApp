@@ -15,6 +15,7 @@ const DASHBOARD_CARDS = [
   { key: 'searchPatients', icon: 'fas fa-search', link: '/patient-management' },
   { key: 'whatsapp', icon: 'fab fa-whatsapp', link: '/send' },
   { key: 'aligners', icon: 'fas fa-tooth', link: '/aligner' },
+  { key: 'labTracking', icon: 'fas fa-flask', link: '/lab-tracking' },
   { key: 'settings', icon: 'fas fa-cog', link: '/settings' },
   { key: 'videos', icon: 'fas fa-video', link: '/videos' },
   { key: 'expenses', icon: 'fas fa-money-bill-wave', link: '/expenses' },

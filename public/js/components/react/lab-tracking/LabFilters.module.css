@@ -1,0 +1,36 @@
+.bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    border: var(--border-width-thin) solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+}
+
+.select,
+.search {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--background-light);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: var(--font-size-sm);
+}
+
+.search {
+    min-width: 200px;
+    flex: 1;
+}
+
+.overdueToggle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+}

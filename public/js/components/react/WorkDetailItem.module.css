@@ -20,6 +20,28 @@
     z-index: 1;
 }
 
+/* Lab case stage badge — a clickable pill in the cardActions row that opens
+   LabCaseModal in track mode. */
+.labStageBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.125rem 0.5rem;
+    border: none;
+    border-radius: var(--radius-full);
+    background: var(--info-color);
+    color: var(--color-white);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.labStageBadgeCancelled {
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+}
+
 .chartBlock {
     margin-bottom: var(--spacing-md);
 }

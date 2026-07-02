@@ -26,6 +26,7 @@ import {
   patientShellLoader,
   patientManagementLoader,
   dailyAppointmentsLoader,
+  labTrackingLoader,
 } from './loaders';
 
 // NOTE: CSS imports moved to co-located components (Hybrid Co-location Strategy)
@@ -87,6 +88,9 @@ const TemplateManagement = lazyRoute(
   () => import('../components/templates/TemplateManagement')
 );
 const TemplateDesigner = lazyRoute(() => import('../components/templates/TemplateDesigner'));
+
+// Lazy-loaded route components - Lab case tracker
+const LabTracking = lazyRoute(() => import('../routes/LabTracking'));
 
 // Lazy-loaded route components - Aligner
 const DoctorsList = lazyRoute(() => import('../pages/aligner/DoctorsList'));
@@ -190,6 +194,17 @@ export const routesConfig: RouteObject[] = [
             <Videos />
           </RouteErrorBoundary>
         ),
+      },
+
+      // Lab case tracker board (Crown/Bridge + Veneers stage tracking)
+      {
+        path: '/lab-tracking',
+        element: (
+          <RouteErrorBoundary routeName="Lab Tracking">
+            <LabTracking />
+          </RouteErrorBoundary>
+        ),
+        loader: withPreload(LabTracking, labTrackingLoader),
       },
 
       // Patient Management (search/grid with native scroll restoration)

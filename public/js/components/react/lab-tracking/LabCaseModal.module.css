@@ -1,0 +1,231 @@
+/* Shared modal for Start Lab Flow (create) and the case timeline + stage
+   actions (track). Buttons use the global .btn classes. */
+
+.dialog {
+    width: min(560px, 100%);
+    display: flex;
+    flex-direction: column;
+    max-height: min(90vh, 760px);
+}
+
+.body {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.empty {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.formRow {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.formRow > .field {
+    flex: 1;
+    min-width: 0;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.input {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--background-light);
+    color: var(--text-primary);
+    font: inherit;
+}
+
+.input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.checkboxRow {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+}
+
+.footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--border-color);
+}
+
+/* --- Track mode: badges / meta grid --- */
+.badgeRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    align-items: center;
+}
+
+.stageBadge {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    background: var(--info-color);
+    color: var(--color-white);
+}
+
+.stageBadge[data-location='lab'] {
+    background: var(--warning-orange, var(--warning-color));
+}
+
+.stageBadge[data-location='clinic'] {
+    background: var(--primary-color);
+}
+
+.stageBadge[data-location='done'] {
+    background: var(--success-color);
+}
+
+.holdBadge,
+.rushBadge,
+.remakeBadge {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+}
+
+.holdBadge {
+    background: var(--surface-muted);
+    color: var(--text-primary);
+}
+
+.rushBadge {
+    background: var(--error-color);
+    color: var(--color-white);
+}
+
+.remakeBadge {
+    background: var(--warning-color);
+    color: var(--text-primary);
+}
+
+.metaGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm) var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--surface-elevated, var(--background-light));
+}
+
+.metaGrid > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+}
+
+.metaLabel {
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.actionsRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+}
+
+.actionForm {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--surface-elevated, var(--background-light));
+}
+
+/* --- Timeline --- */
+.timeline {
+    margin-top: var(--spacing-sm);
+}
+
+.groupLabel {
+    margin-bottom: var(--spacing-xs);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.timelineRow {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--background-light);
+    font-size: var(--font-size-sm);
+}
+
+.timelineType {
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    text-transform: capitalize;
+}
+
+.timelineStage {
+    color: var(--text-primary);
+}
+
+.timelineNote {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.timelineMeta {
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}

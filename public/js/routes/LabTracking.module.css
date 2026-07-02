@@ -1,0 +1,24 @@
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: var(--font-size-xl, 1.5rem);
+    color: var(--text-primary);
+}
+
+.stateMsg {
+    padding: var(--spacing-xl, 2rem);
+    text-align: center;
+    color: var(--text-secondary);
+}

@@ -23,6 +23,8 @@ import {
   alignerDoctorsQuery,
   templatesQuery,
   templateQuery,
+  labCasesBoardQuery,
+  labsQuery,
 } from '../query/queries';
 
 /**
@@ -599,4 +601,15 @@ export async function dailyAppointmentsLoader({
       _loaderTimestamp: Date.now(),
     };
   }
+}
+
+/**
+ * Lab tracking board loader — pre-fetches the unfiltered board + the labs
+ * lookup (the board filter dropdown). A URL that already carries filters
+ * re-fetches under the real key once the page mounts (RQ dedupes by key); this
+ * just warms the common case of landing on the page with no filters.
+ */
+export async function labTrackingLoader(): Promise<null> {
+  await Promise.all([loaderQuery(labCasesBoardQuery({})), loaderQuery(labsQuery())]);
+  return null;
 }

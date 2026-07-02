@@ -8,6 +8,7 @@ import {
     MATERIAL_OPTIONS,
     FILLING_TYPE_OPTIONS,
     FILLING_DEPTH_OPTIONS,
+    isProstheticWork,
 } from '../../config/workTypeConfig';
 import { formatNumber } from '../../utils/formatters';
 import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
@@ -15,6 +16,9 @@ import { qk } from '@/query/keys';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useLookupManager } from '../../hooks/useLookupManager';
+import LabCaseModal from './lab-tracking/LabCaseModal';
+import { labelForStage } from '../../config/labStages';
+import type { LabStage } from '@shared/contracts/lab-case.contract';
 import styles from './WorkDetailItem.module.css';
 
 export interface ImplantManufacturer {
@@ -149,6 +153,7 @@ const WorkDetailItem = ({
     const [showPermanent, setShowPermanent] = useState(true);
     const [showDeciduous, setShowDeciduous] = useState(hasDeciduousSelected);
     const [saving, setSaving] = useState(false);
+    const [labModalOpen, setLabModalOpen] = useState(false);
 
     // Right-click the Lab dropdown → "Edit values" → manage the labs lookup inline.
     // Edits refresh the shared labs feed (qk.lookups.labs), which both this dropdown
@@ -213,6 +218,23 @@ const WorkDetailItem = ({
         return (
             <div className={styles.card}>
                 <div className={styles.cardActions}>
+                    {isProstheticWork(typeOfWork) && (
+                        detail.lab_case_id ? (
+                            <button
+                                type="button"
+                                className={cn(styles.labStageBadge, detail.lab_status === 'cancelled' && styles.labStageBadgeCancelled)}
+                                onClick={() => setLabModalOpen(true)}
+                                title="Open lab case tracker"
+                            >
+                                <i className="fas fa-flask"></i>{' '}
+                                {detail.lab_status === 'cancelled' ? 'Lab: Cancelled' : labelForStage(detail.lab_status as LabStage, detail.material)}
+                            </button>
+                        ) : (
+                            <button type="button" className="btn btn-xs btn-secondary" onClick={() => setLabModalOpen(true)} title="Start Lab Flow">
+                                <i className="fas fa-flask"></i> Start Lab Flow
+                            </button>
+                        )
+                    )}
                     <button type="button" className="btn btn-xs btn-secondary" title="Edit" onClick={enterEdit}>
                         <i className="fas fa-pen"></i>
                     </button>
@@ -220,6 +242,17 @@ const WorkDetailItem = ({
                         <i className="fas fa-trash"></i>
                     </button>
                 </div>
+                {isProstheticWork(typeOfWork) && (
+                    <LabCaseModal
+                        isOpen={labModalOpen}
+                        onClose={() => setLabModalOpen(false)}
+                        workId={workId}
+                        workItemId={detail.id}
+                        labCaseId={detail.lab_case_id ?? null}
+                        prefillLabId={detail.lab_id ?? null}
+                        prefillMaterial={detail.material ?? null}
+                    />
+                )}
 
                 {teethIds.length > 0 && (
                     <div className={styles.chartBlock}>

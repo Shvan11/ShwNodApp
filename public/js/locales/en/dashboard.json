@@ -25,6 +25,11 @@
       "description": "Manage aligner sets and delivery batches",
       "linkText": "Manage Aligners"
     },
+    "labTracking": {
+      "title": "Lab Case Tracker",
+      "description": "Track Crown/Bridge and Veneers cases through the dental lab",
+      "linkText": "Open Lab Tracker"
+    },
     "settings": {
       "title": "Settings",
       "description": "System settings and preferences",

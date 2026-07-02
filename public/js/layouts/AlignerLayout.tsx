@@ -32,9 +32,18 @@ function AlignerLayout() {
     }
   };
 
+  const activeMode = getActiveMode();
+
+  // All-sets locks the shell to the viewport so the table's internal scroller
+  // is the only vertical scrollbar (page + table both scrolling = double bar).
+  const containerClass =
+    activeMode === 'all-sets'
+      ? `${styles.container} ${styles.containerViewportLocked}`
+      : styles.container;
+
   return (
-    <div className={styles.container}>
-      <AlignerModeToggle activeMode={getActiveMode()} styles={styles} />
+    <div className={containerClass}>
+      <AlignerModeToggle activeMode={activeMode} styles={styles} />
       <Outlet />
     </div>
   );

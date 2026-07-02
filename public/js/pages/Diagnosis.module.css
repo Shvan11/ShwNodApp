@@ -12,22 +12,16 @@
 }
 
 /* ===== HEADER ===== */
+/* Single compact row: back button + title. Patient/work identity lives in the
+   PatientShell breadcrumb; actions live in the footer row. */
 .diagnosisHeader {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: var(--spacing-lg) var(--spacing-xl);
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-xl);
     background: var(--background-primary);
     border-bottom: 1px solid var(--border-color);
     box-shadow: var(--shadow-sm);
-    gap: var(--spacing-lg);
-}
-
-.diagnosisHeaderContent {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-    flex: 1;
 }
 
 .btnBack {
@@ -50,13 +44,9 @@
     transform: translateX(-2px);
 }
 
-.diagnosisHeaderInfo {
-    flex: 1;
-}
-
-.diagnosisHeaderInfo h1 {
+.diagnosisTitle {
     margin: 0;
-    font-size: var(--font-size-2xl);
+    font-size: var(--font-size-xl);
     font-weight: var(--font-weight-bold);
     color: var(--text-primary);
     display: flex;
@@ -64,48 +54,8 @@
     gap: var(--spacing-sm);
 }
 
-.diagnosisHeaderInfo h1 i {
+.diagnosisTitle i {
     color: var(--primary-color);
-}
-
-.diagnosisMeta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-lg);
-    margin-top: var(--spacing-sm);
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-}
-
-.diagnosisMeta span {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
-.diagnosisMeta i {
-    color: var(--text-secondary);
-    opacity: 0.7;
-}
-
-.patientName {
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-}
-
-.workType {
-    color: var(--success-color);
-    font-weight: var(--font-weight-medium);
-}
-
-.workId {
-    font-family: monospace;
-    font-weight: var(--font-weight-medium);
-}
-
-.diagnosisHeaderActions {
-    display: flex;
-    gap: var(--spacing-md);
 }
 
 /* ===== TAB NAVIGATION ===== */
@@ -152,7 +102,7 @@
 .diagnosisContent {
     flex: 1;
     overflow-y: auto;
-    padding: var(--spacing-xl);
+    padding: var(--spacing-md) var(--spacing-xl);
 }
 
 .diagnosisTabContent {
@@ -256,7 +206,7 @@
     display: flex;
     justify-content: flex-end;
     gap: var(--spacing-md);
-    padding: var(--spacing-lg) var(--spacing-xl);
+    padding: var(--spacing-sm) var(--spacing-xl);
     background: var(--background-primary);
     border-top: 1px solid var(--border-color);
     box-shadow: var(--shadow-md);
@@ -323,17 +273,6 @@
 
 /* ===== RESPONSIVE DESIGN ===== */
 @media (max-width: 1024px) {
-    .diagnosisHeader {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: var(--spacing-md);
-    }
-
-    .diagnosisHeaderActions {
-        width: 100%;
-        justify-content: flex-end;
-    }
-
     .formGrid {
         grid-template-columns: 1fr;
     }
@@ -349,11 +288,7 @@
 
 @media (max-width: 768px) {
     .diagnosisHeader {
-        padding: var(--spacing-md);
-    }
-
-    .diagnosisHeaderInfo h1 {
-        font-size: var(--font-size-xl);
+        padding: var(--spacing-sm) var(--spacing-md);
     }
 
     .diagnosisContent {
@@ -373,18 +308,13 @@
         flex: 1;
     }
 
-    .diagnosisMeta {
-        flex-direction: column;
-        gap: var(--spacing-xs);
-    }
-
     .diagnosisTabs {
         padding: 0 var(--spacing-md);
     }
 }
 
 @media (max-width: 480px) {
-    .diagnosisHeaderInfo h1 {
+    .diagnosisTitle {
         font-size: var(--font-size-lg);
     }
 
@@ -407,16 +337,8 @@
 }
 
 /* ===== RTL SUPPORT ===== */
-[dir="rtl"] .diagnosisHeaderContent {
-    flex-direction: row-reverse;
-}
-
 [dir="rtl"] .btnBack:hover {
     transform: translateX(2px);
-}
-
-[dir="rtl"] .diagnosisMeta {
-    flex-direction: row-reverse;
 }
 
 [dir="rtl"] .cephSection h3 {
@@ -429,4 +351,6 @@
 .deleteButton {
     background-color: var(--error-color);
     color: var(--color-white);
+    /* Push the destructive action to the far start, away from Cancel/Save */
+    margin-inline-end: auto;
 }

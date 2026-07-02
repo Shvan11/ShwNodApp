@@ -6,7 +6,7 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import styles from './Diagnosis.module.css';
 import { formatISODate } from '../core/utils';
 import { postJSON, deleteJSON, httpErrorMessage } from '@/core/http';
-import { patientInfoQuery, worksQuery, diagnosisQuery } from '@/query/queries';
+import { worksQuery, diagnosisQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 
 /**
@@ -67,13 +67,6 @@ interface DiagnosisData {
     c_percent_lafh: string;
 }
 
-interface PatientInfo {
-    patient_name?: string;
-    name?: string;
-    person_id?: number;
-    [key: string]: unknown;
-}
-
 interface WorkInfo {
     work_id: number;
     type_name?: string;
@@ -100,13 +93,9 @@ const Diagnosis = () => {
     const [activeTab, setActiveTab] = useState<TabId>('general');
     const [diagnosisExists, setDiagnosisExists] = useState(false);
 
-    // Patient info + works reads on useQuery (the patientShellLoader prefetched
-    // patientInfo, so it resolves from cache instantly). Loose contracts model
-    // only key fields, so cast each to its concrete local type.
-    const { data: patientData, isLoading: patientLoading } = useQuery({
-        ...patientInfoQuery(personId ?? ''),
-        enabled: !!personId,
-    });
+    // Works read on useQuery (patient identity lives in the PatientShell
+    // breadcrumb, so this page only needs the work row). Loose contracts model
+    // only key fields, so cast to the concrete local type.
     const { data: worksData, isLoading: worksLoading } = useQuery({
         ...worksQuery(personId ?? ''),
         enabled: !!personId,
@@ -118,16 +107,14 @@ const Diagnosis = () => {
         diagnosisQuery(workId ?? '')
     );
 
-    // PatientInfo / WorkInfo are loose local adapter shapes (index signature + a
-    // `name` alias the wire doesn't model), so a single structural assertion is the
-    // honest bridge — no `unknown` laundering.
-    const patientInfo = (patientData ?? null) as PatientInfo | null;
+    // WorkInfo is a loose local adapter shape (index signature), so a single
+    // structural assertion is the honest bridge — no `unknown` laundering.
     const works = (worksData ?? null) as WorkInfo[] | null;
     const workInfo = works
         ? works.find(w => w.work_id === parseInt(workId || '0')) ?? null
         : null;
 
-    const loading = patientLoading || worksLoading || diagnosisLoading;
+    const loading = worksLoading || diagnosisLoading;
 
     const [diagnosisData, setDiagnosisData] = useState<DiagnosisData>({
         work_id: parseInt(workId || '0'),
@@ -286,91 +273,21 @@ const Diagnosis = () => {
 
     return (
         <div className={styles.diagnosisPage}>
-            {/* Page Header */}
+            {/* Page Header — single compact row; patient/work identity lives in
+                the PatientShell breadcrumb, actions live in the footer */}
             <div className={styles.diagnosisHeader}>
-                <div className={styles.diagnosisHeaderContent}>
-                    <button
-                        type="button"
-                        className={styles.btnBack}
-                        onClick={handleCancel}
-                        title="Back to work"
-                    >
-                        <i className="fas fa-arrow-left"></i>
-                    </button>
-                    <div className={styles.diagnosisHeaderInfo}>
-                        <h1>
-                            <i className="fas fa-stethoscope"></i>
-                            Diagnosis & Treatment Plan
-                        </h1>
-                        <div className={styles.diagnosisMeta}>
-                            {patientInfo && (
-                                <span className={styles.patientName}>
-                                    <i className="fas fa-user"></i>
-                                    {patientInfo.patient_name || patientInfo.name}
-                                </span>
-                            )}
-                            {workInfo && (
-                                <span className={styles.workType}>
-                                    <i className="fas fa-tooth"></i>
-                                    {workInfo.type_name || 'Treatment'}
-                                </span>
-                            )}
-                            <span className={styles.workId}>
-                                <i className="fas fa-hashtag"></i>
-                                Work ID: {workId}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                <div className={styles.diagnosisHeaderActions}>
-                    <button
-                        type="button"
-                        className={styles.btnCancel}
-                        onClick={handleCancel}
-                        disabled={saving || deleting}
-                    >
-                        <i className="fas fa-times"></i>
-                        Cancel
-                    </button>
-                    {diagnosisExists && (
-                        <button
-                            type="button"
-                            className={`btn-delete ${styles.deleteButton}`}
-                            onClick={handleReset}
-                            disabled={saving || deleting}
-                        >
-                            {deleting ? (
-                                <>
-                                    <i className="fas fa-spinner fa-spin"></i>
-                                    Deleting...
-                                </>
-                            ) : (
-                                <>
-                                    <i className="fas fa-trash"></i>
-                                    Reset Diagnosis
-                                </>
-                            )}
-                        </button>
-                    )}
-                    <button
-                        type="button"
-                        className={styles.btnSave}
-                        onClick={handleSave}
-                        disabled={saving || deleting}
-                    >
-                        {saving ? (
-                            <>
-                                <i className="fas fa-spinner fa-spin"></i>
-                                Saving...
-                            </>
-                        ) : (
-                            <>
-                                <i className="fas fa-save"></i>
-                                Save Diagnosis
-                            </>
-                        )}
-                    </button>
-                </div>
+                <button
+                    type="button"
+                    className={styles.btnBack}
+                    onClick={handleCancel}
+                    title="Back to work"
+                >
+                    <i className="fas fa-arrow-left"></i>
+                </button>
+                <h1 className={styles.diagnosisTitle}>
+                    <i className="fas fa-stethoscope"></i>
+                    Diagnosis & Treatment Plan
+                </h1>
             </div>
 
             {/* Tab Navigation */}
@@ -983,13 +900,33 @@ const Diagnosis = () => {
                 )}
             </div>
 
-            {/* Sticky Footer with Actions */}
+            {/* Sticky Footer — the single actions row */}
             <div className={styles.diagnosisFooter}>
+                {diagnosisExists && (
+                    <button
+                        type="button"
+                        className={`btn-delete ${styles.deleteButton}`}
+                        onClick={handleReset}
+                        disabled={saving || deleting}
+                    >
+                        {deleting ? (
+                            <>
+                                <i className="fas fa-spinner fa-spin"></i>
+                                Deleting...
+                            </>
+                        ) : (
+                            <>
+                                <i className="fas fa-trash"></i>
+                                Reset Diagnosis
+                            </>
+                        )}
+                    </button>
+                )}
                 <button
                     type="button"
                     className={styles.btnCancel}
                     onClick={handleCancel}
-                    disabled={saving}
+                    disabled={saving || deleting}
                 >
                     <i className="fas fa-times"></i>
                     Cancel
@@ -998,7 +935,7 @@ const Diagnosis = () => {
                     type="button"
                     className={styles.btnSave}
                     onClick={handleSave}
-                    disabled={saving}
+                    disabled={saving || deleting}
                 >
                     {saving ? (
                         <>

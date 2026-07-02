@@ -64,6 +64,7 @@ import threeshapeRoutes from './threeshape.routes.js';
 import taskRoutes from './task.routes.js';
 import monitoringRoutes from './monitoring.routes.js';
 import approvalRoutes from './approval.routes.js';
+import labCaseRoutes from './lab-case.routes.js';
 
 // Import template routes (already modular)
 import templateRouter from '../template-api.js';
@@ -168,5 +169,8 @@ router.use('/', monitoringRoutes);
 
 // Approvals — maker-checker approval/notice queue (/api/approvals*)
 router.use('/', approvalRoutes);
+
+// Lab case tracker — prosthetic case stage tracking (/api/lab-cases*)
+router.use('/', labCaseRoutes);
 
 export default router;

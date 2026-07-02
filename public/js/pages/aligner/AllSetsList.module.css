@@ -7,6 +7,8 @@
     gap: var(--spacing-sm);
     margin-bottom: var(--spacing-sm);
     align-items: center;
+    /* Chrome row in the viewport-locked shell: never yield height to the table */
+    flex-shrink: 0;
 }
 
 .filterContainer .patientFilterBox {
@@ -132,6 +134,8 @@
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
+    /* Chrome row in the viewport-locked shell: never yield height to the table */
+    flex-shrink: 0;
 }
 
 .legendTitle {
@@ -203,12 +207,19 @@
     font-weight: normal;
 }
 
-/* Table Container */
+/* Table Container — in the viewport-locked aligner shell this is a flex child
+   that takes exactly the space left under the filters/legend and scrolls
+   internally (the page itself doesn't scroll, so this is the only vertical
+   scrollbar). min-height: 0 lets it shrink below its content height. */
 .tableContainer {
     background-color: var(--surface);
     border-radius: var(--radius-lg);
     overflow: auto;
-    max-height: calc(100vh - 160px);
+    flex: 1 1 auto;
+    /* Scroll containers have no automatic flex minimum, so without a floor a
+       very short window would crush this pane to 0px. Below the floor the
+       shell scrolls instead (containerViewportLocked overflow: auto). */
+    min-height: 10rem;
     box-shadow: var(--shadow-sm);
 }
 

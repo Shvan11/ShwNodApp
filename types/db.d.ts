@@ -451,6 +451,38 @@ export interface Keywords {
   key_word: string | null;
 }
 
+export interface LabCaseEvents {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  event_type: string;
+  from_status: string | null;
+  id: Generated<number>;
+  lab_case_id: number;
+  note: string | null;
+  occurred_at: Generated<Timestamp>;
+  to_status: string | null;
+}
+
+export interface LabCases {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  delivered_at: Timestamp | null;
+  delivered_by: string | null;
+  due_date: string | null;
+  id: Generated<number>;
+  is_on_hold: Generated<boolean>;
+  is_rush: Generated<boolean>;
+  lab_id: number | null;
+  material: string | null;
+  note: string | null;
+  person_id: number;
+  remake_count: Generated<number>;
+  sent_at: Generated<Timestamp>;
+  status: Generated<string>;
+  status_changed_at: Generated<Timestamp>;
+  work_item_id: number;
+}
+
 export interface Labs {
   id: Generated<number>;
   is_active: Generated<boolean>;
@@ -879,6 +911,8 @@ export interface DB {
   integration_oauth_tokens: IntegrationOauthTokens;
   invoices: Invoices;
   keywords: Keywords;
+  lab_case_events: LabCaseEvents;
+  lab_cases: LabCases;
   labs: Labs;
   message_status_history: MessageStatusHistory;
   numbers: Numbers;

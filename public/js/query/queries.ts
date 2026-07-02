@@ -47,6 +47,7 @@ import * as calendarContract from '@shared/contracts/calendar.contract';
 import * as whatsappContract from '@shared/contracts/whatsapp.contract';
 import * as photoEditorContract from '@shared/contracts/photo-editor.contract';
 import * as slideshowContract from '@shared/contracts/slideshow.contract';
+import * as labCaseContract from '@shared/contracts/lab-case.contract';
 import { qk } from './keys';
 import type { HttpError } from '@/core/http';
 // Type-only (erased at runtime → no import cycle with the hooks below). Stand row
@@ -1208,6 +1209,41 @@ export const myApprovalsQuery = () =>
       fetchJSON<z.infer<typeof approvalsContract.myApprovals.response>>('/api/approvals/mine', {
         signal,
         schema: approvalsContract.myApprovals.response,
+      }),
+  });
+
+// ---------------------------------------------------------------------------
+// Lab case tracker — prosthetic case stage tracking
+// ---------------------------------------------------------------------------
+
+/** GET /api/lab-cases?… — the board/list (work-card badge + /lab-tracking board). */
+export const labCasesBoardQuery = (filters: labCaseContract.ListLabCasesQuery = {}) =>
+  queryOptions({
+    queryKey: qk.labCases.board(filters),
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams();
+      if (filters.status) params.set('status', filters.status);
+      if (filters.labId) params.set('labId', String(filters.labId));
+      if (filters.overdue) params.set('overdue', filters.overdue);
+      if (filters.q) params.set('q', filters.q);
+      if (filters.from) params.set('from', filters.from);
+      if (filters.to) params.set('to', filters.to);
+      const qs = params.toString();
+      return fetchJSON<z.infer<typeof labCaseContract.listLabCases.response>>(
+        `/api/lab-cases${qs ? `?${qs}` : ''}`,
+        { signal, schema: labCaseContract.listLabCases.response }
+      );
+    },
+  });
+
+/** GET /api/lab-cases/:id — one case + its event timeline (LabCaseModal track mode). */
+export const labCaseQuery = (id: Id) =>
+  queryOptions({
+    queryKey: qk.labCases.byId(id),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof labCaseContract.getLabCase.response>>(`/api/lab-cases/${id}`, {
+        signal,
+        schema: labCaseContract.getLabCase.response,
       }),
   });
 

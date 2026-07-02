@@ -5,6 +5,30 @@
     padding: var(--spacing-md);
 }
 
+/* All-sets route: the shell fills exactly the viewport below the fixed header
+   and the table becomes the single vertical scroller (flex child with
+   overflow:auto). Without this the table's own max-height scroller sat inside
+   a taller page → two vertical scrollbars. */
+.containerViewportLocked {
+    height: calc(100vh - var(--header-height));
+    display: flex;
+    flex-direction: column;
+    /* auto, not hidden: on a very short window the fixed chrome rows (toggle +
+       filters + legend, all flex-shrink: 0) can exceed the shell by themselves —
+       hidden would clip the table unreachable; auto degrades to a shell
+       scrollbar instead. In the normal case content fits exactly → no bar. */
+    overflow: auto;
+}
+
+/* The locked shell never scrolls, so the toggle needs no sticky — and must not
+   have it: overflow:hidden makes the shell the sticky scrollport, so a
+   top offset would push the toggle DOWN from its natural position (it sits
+   less than --header-height from the shell's top edge), opening a gap under
+   the universal header. */
+.containerViewportLocked .modeToggle {
+    position: static;
+}
+
 /* View Mode Toggle */
 .modeToggle {
     display: flex;
@@ -13,9 +37,11 @@
     justify-content: center;
     padding: 0.5rem 1rem;
     position: sticky;
-    top: 50px;
+    top: var(--header-height);
     z-index: 100;
     background-color: var(--gray-100);
+    /* Chrome row in the viewport-locked all-sets shell: keep full height */
+    flex-shrink: 0;
 }
 
 .modeBtn {
@@ -57,5 +83,14 @@
 
     .modeBtn {
         width: 100%;
+    }
+
+    /* Mobile stacks the toggle + filters tall; a viewport-locked shell would
+       leave the card list a cramped inner pane. Natural page scroll instead —
+       still a single scrollbar since the table has no max-height cap. */
+    .containerViewportLocked {
+        height: auto;
+        display: block;
+        overflow: visible;
     }
 }

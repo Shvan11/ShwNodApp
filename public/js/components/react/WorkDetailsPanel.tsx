@@ -29,8 +29,11 @@ export interface WorkDetail {
     start_date?: string;
     completed_date?: string;
     note?: string;
+    /** Set once "Start Lab Flow" has been used on this item (Crown/Bridge, Veneers). */
+    lab_case_id?: number | null;
+    lab_status?: string | null;
     // Allow dynamic access for work type display fields
-    [key: string]: string | number | number[] | undefined;
+    [key: string]: string | number | number[] | null | undefined;
 }
 
 interface WorkDetailsPanelProps {

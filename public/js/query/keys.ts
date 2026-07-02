@@ -270,6 +270,15 @@ export const qk = {
     mine: () => ['approvals', 'mine'] as const,
   },
   /**
+   * Lab case tracker. `all()` is the shared prefix — any case write invalidates
+   * both the board and (via the work-card badge) `qk.work.detailsList(workId)`.
+   */
+  labCases: {
+    all: () => ['lab-cases'] as const,
+    board: (filters: object = {}) => ['lab-cases', 'board', filters] as const,
+    byId: (id: Id) => ['lab-cases', 'by-id', normId(id)] as const,
+  },
+  /**
    * Saved slideshow configurations. `list(personId)` returns that patient's
    * saved sequences PLUS the clinic-wide generic templates (person_id NULL), so
    * any config write invalidates this one key.

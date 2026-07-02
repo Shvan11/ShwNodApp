@@ -1,0 +1,73 @@
+.board {
+    display: flex;
+    gap: var(--spacing-md);
+    overflow-x: auto;
+    padding-bottom: var(--spacing-sm);
+    align-items: flex-start;
+}
+
+.column {
+    flex: 0 0 280px;
+    display: flex;
+    flex-direction: column;
+    border: var(--border-width-thin) solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-elevated, var(--background-light));
+    max-height: calc(100vh - 260px);
+}
+
+.columnHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 2px solid var(--border-color);
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+}
+
+.columnHeader[data-location='lab'] {
+    border-bottom-color: var(--warning-orange, var(--warning-color));
+}
+
+.columnHeader[data-location='clinic'] {
+    border-bottom-color: var(--primary-color);
+}
+
+.columnTitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.columnCount {
+    flex-shrink: 0;
+    min-width: 20px;
+    padding: 0 6px;
+    border-radius: var(--radius-full);
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    text-align: center;
+}
+
+.columnBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm);
+    overflow-y: auto;
+}
+
+.columnBodyAtLab {
+    background: color-mix(in srgb, var(--warning-orange, var(--warning-color)) 4%, transparent);
+}
+
+.empty {
+    padding: var(--spacing-xl, 2rem);
+    text-align: center;
+    color: var(--text-secondary);
+}
