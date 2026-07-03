@@ -174,53 +174,67 @@ class WebCephService {
       userApiPass: this.userApiPassword ? 'SET' : 'MISSING',
     });
 
+    // Retry ONLY transient failures: network errors, HTTP 5xx, and unparseable
+    // bodies (gateway HTML error pages). A parsed non-5xx API rejection is
+    // deterministic — e.g. "Record dates already exist", "no matching photo
+    // class" — so retrying it just burns the 30 req/min rate limit and adds
+    // seconds of latency; those throw immediately. (Caveat: a retried multipart
+    // upload may re-send an already-consumed form-data stream — pre-existing,
+    // but now only reachable on a genuine transient failure.)
     let lastError: Error | undefined;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      let status: number | undefined;
+      let textResponse: string | undefined;
       try {
         const response: Response = await fetch(url, {
           ...options,
           headers,
         });
+        status = response.status;
+        textResponse = await response.text();
+        log.debug('[WebCeph] Response received', { status });
+      } catch (error) {
+        lastError = error as Error; // network failure — transient
+      }
 
-        log.debug('[WebCeph] Response received', { status: response.status });
-
-        // Get response text first
-        const textResponse = await response.text();
-
-        // Try to parse as JSON
-        let data: WebCephApiResponse;
+      if (textResponse !== undefined && status !== undefined) {
+        let data: WebCephApiResponse | undefined;
         try {
           data = JSON.parse(textResponse);
         } catch {
-          log.error('[WebCeph] Failed to parse JSON response', { response: textResponse.substring(0, 200) });
-          throw new Error(`Invalid JSON response from WebCeph API`);
+          log.error('[WebCeph] Failed to parse JSON response', { status, response: textResponse.substring(0, 200) });
         }
 
-        // Check for API errors
-        if (data.detail) {
-          throw new Error(data.detail);
+        if (data !== undefined && status < 500) {
+          // Structured, non-5xx response: definitive — success or fail-fast.
+          if (data.detail) {
+            throw new Error(data.detail);
+          }
+          if (data.error) {
+            throw new Error(data.message || data.error);
+          }
+          if (status >= 400 && data.result !== 'success') {
+            throw new Error(JSON.stringify(data));
+          }
+          return data;
         }
 
-        if (data.error) {
-          throw new Error(data.message || data.error);
-        }
+        lastError = new Error(
+          data === undefined
+            ? 'Invalid JSON response from WebCeph API'
+            : data.detail || data.error || data.message || `WebCeph API returned HTTP ${status}`
+        );
+      }
 
-        if (!response.ok && data.result !== 'success') {
-          throw new Error(JSON.stringify(data));
-        }
+      log.error('[WebCeph] API request failed (transient)', {
+        attempt,
+        maxRetries: this.maxRetries,
+        status,
+        error: lastError?.message,
+      });
 
-        return data;
-      } catch (error) {
-        lastError = error as Error;
-        log.error('[WebCeph] API request failed', {
-          attempt,
-          maxRetries: this.maxRetries,
-          error: lastError.message,
-        });
-
-        if (attempt < this.maxRetries) {
-          await new Promise((resolve) => setTimeout(resolve, this.retryDelay * attempt));
-        }
+      if (attempt < this.maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, this.retryDelay * attempt));
       }
     }
 
@@ -390,8 +404,10 @@ class WebCephService {
       errors.push('Patient ID must be 6-20 characters or empty for auto-generation');
     }
 
-    if (!patientData.firstName && !patientData.lastName) {
-      errors.push('At least first name or last name is required');
+    // WebCeph is Latin-script only — it needs the patient's English
+    // first/last name (the Arabic patient_name is never sent).
+    if (!patientData.firstName?.trim() && !patientData.lastName?.trim()) {
+      errors.push('An English first or last name is required by WebCeph — set the patient\'s English name first');
     }
 
     if (patientData.firstName && patientData.firstName.length > 50) {

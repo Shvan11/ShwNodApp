@@ -166,8 +166,10 @@ story.jpg
 public/fontawesome/
 credentials.json
 tokens/
-credentials.json
 pngwing.com.png
+
+# Generated lint output
+eslint-report.json
 
 # MCP Configuration (may contain sensitive connection strings)
 .mcp.json

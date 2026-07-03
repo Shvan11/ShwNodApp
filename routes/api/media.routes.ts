@@ -92,6 +92,20 @@ interface FileRequest extends Omit<Request<object, object, media.UploadImageBody
 // ==============================
 
 /**
+ * Look up a patient's stored WebCeph id. `undefined` = no such patient;
+ * `{ webcephPatientId: null }` = patient exists but isn't in WebCeph yet.
+ */
+async function findPatientWebcephId(personId: number): Promise<{ webcephPatientId: string | null } | undefined> {
+  const db = getKysely();
+  const { rows } = await sql<{ webcephPatientId: string | null }>`
+    SELECT "web_ceph_patient_id" AS "webcephPatientId"
+    FROM "patients"
+    WHERE "person_id" = ${personId}
+  `.execute(db);
+  return rows[0];
+}
+
+/**
  * Create patient in WebCeph
  * POST /webceph/create-patient
  * Body: { personId, patientData }
@@ -105,10 +119,25 @@ router.post('/webceph/create-patient', validate({ body: media.createPatient.body
       return;
     }
 
-    // Validate patient data
+    // Validate patient data — put the reasons in the message itself, since
+    // that's what httpErrorMessage surfaces in the UI (details are invisible).
     const validation = webcephService.validatePatientData(patientData);
     if (!validation.valid) {
-      ErrorResponses.invalidParameter(res, 'patientData', { errors: validation.errors });
+      ErrorResponses.badRequest(res, validation.errors.join(' • '), { errors: validation.errors });
+      return;
+    }
+
+    // Confirm the local row exists BEFORE the external call — otherwise a bogus
+    // personId creates a WebCeph patient the 0-row UPDATE below never records
+    // (an orphan WebCeph will then reject re-creating as "already exists").
+    // A stored id means a stale tab is re-posting a patient that's already there.
+    const patientRow = await findPatientWebcephId(personId);
+    if (!patientRow) {
+      ErrorResponses.notFound(res, 'Patient');
+      return;
+    }
+    if (patientRow.webcephPatientId) {
+      ErrorResponses.badRequest(res, 'This patient is already in WebCeph. Close and reopen the WebCeph dialog to see the link.');
       return;
     }
 
@@ -145,16 +174,25 @@ router.post('/webceph/create-patient', validate({ body: media.createPatient.body
  */
 router.post('/webceph/upload-image', uploadImage, validate({ body: media.uploadImage.body }), async (req: FileRequest, res: Response): Promise<void> => {
   try {
-    const { patient_id, recordDate, targetClass } = req.body;
+    const { personId, recordDate, targetClass } = req.body;
 
     if (!req.file) {
       ErrorResponses.missingParameter(res, 'image');
       return;
     }
 
+    // Resolve the WebCeph patient id from the DB (same as upload-from-file) —
+    // never trust a client-derived id, which could target the wrong WebCeph
+    // patient if it ever diverges from the stored one.
+    const webcephPatientId = (await findPatientWebcephId(personId))?.webcephPatientId;
+    if (!webcephPatientId) {
+      ErrorResponses.badRequest(res, 'This patient has not been created in WebCeph yet.');
+      return;
+    }
+
     // Step 1: Create a new record for this date (if it doesn't exist)
     try {
-      await webcephService.addNewRecord(patient_id, recordDate);
+      await webcephService.addNewRecord(webcephPatientId, recordDate);
       log.info(`[WebCeph] Record created or already exists`);
     } catch (error) {
       const err = error as Error;
@@ -167,7 +205,7 @@ router.post('/webceph/upload-image', uploadImage, validate({ body: media.uploadI
 
     // Step 2: Upload the image to the record
     const uploadData = {
-      patientID: patient_id,
+      patientID: webcephPatientId,
       recordHash: recordDate,
       targetClass,
       image: req.file.buffer,
@@ -176,17 +214,17 @@ router.post('/webceph/upload-image', uploadImage, validate({ body: media.uploadI
       overwrite: true
     };
 
-    // Validate upload data
+    // Validate upload data — reasons go in the message (see create-patient).
     const uploadValidation = webcephService.validateUploadData(uploadData);
     if (!uploadValidation.valid) {
-      ErrorResponses.invalidParameter(res, 'uploadData', { errors: uploadValidation.errors });
+      ErrorResponses.badRequest(res, uploadValidation.errors.join(' • '), { errors: uploadValidation.errors });
       return;
     }
 
     // Upload to WebCeph
     const result = await webcephService.uploadImage(uploadData);
 
-    log.info(`[WebCeph] Image uploaded successfully for patient: ${patient_id}`);
+    log.info(`[WebCeph] Image uploaded successfully for patient: ${webcephPatientId}`);
 
     sendData(res, media.uploadImage.response, {
       big: result.big,
@@ -217,13 +255,7 @@ router.post('/webceph/upload-from-file', validate({ body: media.uploadFromFile.b
     // The WebCeph patient id was stored (person_id padded to 6) when the patient
     // was created in WebCeph. Read it back rather than re-deriving, and refuse if
     // the patient isn't in WebCeph yet (the upload UI only shows post-create).
-    const db = getKysely();
-    const { rows } = await sql<{ webcephPatientId: string | null }>`
-      SELECT "web_ceph_patient_id" AS "webcephPatientId"
-      FROM "patients"
-      WHERE "person_id" = ${personId}
-    `.execute(db);
-    const webcephPatientId = rows[0]?.webcephPatientId;
+    const webcephPatientId = (await findPatientWebcephId(personId))?.webcephPatientId;
     if (!webcephPatientId) {
       ErrorResponses.badRequest(res, 'This patient has not been created in WebCeph yet.');
       return;
@@ -268,9 +300,10 @@ router.post('/webceph/upload-from-file', validate({ body: media.uploadFromFile.b
       overwrite: true
     };
 
+    // Reasons go in the message (see create-patient).
     const uploadValidation = webcephService.validateUploadData(uploadData);
     if (!uploadValidation.valid) {
-      ErrorResponses.invalidParameter(res, 'uploadData', { errors: uploadValidation.errors });
+      ErrorResponses.badRequest(res, uploadValidation.errors.join(' • '), { errors: uploadValidation.errors });
       return;
     }
 

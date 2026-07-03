@@ -37,12 +37,13 @@ export type CreateWebCephPatientBody = z.infer<typeof createPatient.body>;
 
 // POST /api/webceph/upload-image → { big, thumbnail, link }. Multipart body, so
 // `validate({ body })` runs AFTER the multer middleware (which populates the text
-// fields onto req.body). The client appends `patient_id` to match this contract +
-// the handler's destructure — previously it sent a stray `patientID` the handler
-// never read, which is why `validate()` was deferred; the field names are now aligned.
+// fields onto req.body — strings, hence `intId`'s coercion). Like upload-from-file,
+// the client sends only `personId` and the server resolves the WebCeph patient id
+// from `patients.web_ceph_patient_id` — the browser never supplies the WebCeph id
+// itself (a client-derived id could silently target the wrong WebCeph patient).
 export const uploadImage = {
   body: z.object({
-    patient_id: z.string(),
+    personId: intId,
     recordDate: z.string(),
     targetClass: z.string(),
   }),

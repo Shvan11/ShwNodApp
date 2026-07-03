@@ -79,8 +79,8 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
         imageFile: null,
     });
 
-    // WebCeph's patient ID is the person_id padded to a 6-char minimum — the SAME
-    // value used at create time (the server reads it back from the DB on upload).
+    // WebCeph's patient ID is the person_id padded to a 6-char minimum. Only sent
+    // at create time — both upload paths resolve it server-side from the DB.
     const webcephPatientID = String(personId).padStart(6, '0');
 
     // Create-patient inputs come from the already-loaded `/info` payload:
@@ -88,19 +88,27 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
     const genderName = patientInfo?.gender_display || '';
     const birthday = patientInfo?.DateOfBirth ? formatISODate(patientInfo.DateOfBirth) : '';
 
-    // WebCeph rejects empty gender/DOB with a cryptic error — list what's missing
-    // and block the request before anything is sent.
+    // WebCeph is Latin-script only — the create call needs the English
+    // first/last name, not the Arabic patient_name.
+    const hasEnglishName = Boolean(patientInfo?.first_name?.trim() || patientInfo?.last_name?.trim());
+
+    // WebCeph rejects an empty name/gender/DOB with a cryptic error — list
+    // what's missing and block the request before anything is sent.
     const webcephMissingFields = [
+        !hasEnglishName && 'an English name',
         !genderName && 'gender',
         !birthday && 'date of birth',
     ].filter(Boolean) as string[];
+    const webcephMissingList = webcephMissingFields.length > 1
+        ? `${webcephMissingFields.slice(0, -1).join(', ')} and ${webcephMissingFields[webcephMissingFields.length - 1]}`
+        : webcephMissingFields[0];
 
     const handleCreateWebcephPatient = async () => {
         if (!patientInfo) return;
 
         if (webcephMissingFields.length > 0) {
             setWebcephError(
-                `Cannot create in WebCeph: this patient is missing ${webcephMissingFields.join(' and ')}. ` +
+                `Cannot create in WebCeph: this patient is missing ${webcephMissingList}. ` +
                 `Set ${webcephMissingFields.length > 1 ? 'these fields' : 'this field'} in Edit Patient first.`
             );
             return;
@@ -187,7 +195,7 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
 
             const formDataObj = new FormData();
             formDataObj.append('image', uploadData.imageFile);
-            formDataObj.append('patient_id', webcephPatientID);
+            formDataObj.append('personId', String(personId));
             formDataObj.append('recordDate', uploadData.recordDate);
             formDataObj.append('targetClass', uploadData.targetClass);
 
@@ -262,7 +270,7 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
                         {webcephMissingFields.length > 0 && (
                             <p className={styles.createWarn}>
                                 <i className="fas fa-exclamation-triangle" />{' '}
-                                Requires {webcephMissingFields.join(' and ')} — set {webcephMissingFields.length > 1 ? 'them' : 'it'} in Edit Patient first.
+                                Requires {webcephMissingList} — set {webcephMissingFields.length > 1 ? 'them' : 'it'} in Edit Patient first.
                             </p>
                         )}
                     </div>
