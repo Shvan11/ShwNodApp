@@ -46,14 +46,14 @@ import * as patientContract from '../../shared/contracts/patient.contract.js';
 import * as PatientService from '../../services/business/PatientService.js';
 import { PatientValidationError, deletePatientCascade } from '../../services/business/PatientService.js';
 import { enqueueApproval } from '../../services/approvals/approval-service.js';
-import { transliterateNameToEnglish } from '../../services/business/name-transliteration.js';
+import { transliterateNameToEnglish, transliterateNameForBackfill } from '../../services/business/name-transliteration.js';
 import * as PatientPortalService from '../../services/business/PatientPortalService.js';
 import {
   getNativeTimePoint,
   updateNativeTimePoint,
   deleteNativeTimePoint,
 } from '../../services/database/queries/native-timepoint-queries.js';
-import { updatePhotoDate, updatePatientName } from '../../services/database/queries/photo-session-queries.js';
+import { updatePhotoDate, fillMissingPatientName } from '../../services/database/queries/photo-session-queries.js';
 import {
   deleteWorkingFilesForTimepoint,
   timepointFolderName,
@@ -938,12 +938,12 @@ router.get(
  * Transliterate an Arabic patient name into English on demand.
  * POST /patients/transliterate-name
  *
- * Powers the Edit Patient form's "Translate with AI" button. Best-effort and
- * bounded (the underlying Gemini call is capped at 8s with no retries): returns
- * empty strings when the model is unconfigured/unavailable or can't produce a
- * clean Latin first+last, so the UI falls back to manual entry. No DB write —
- * the user reviews the suggestion and saves the form themselves. Registered
- * before POST /patients so the literal path can never be shadowed.
+ * Powers the Edit Patient form's "Translate with AI" button. Bounded fail-fast
+ * (a single Gemini attempt capped at 10s — a user is waiting): 400s with the
+ * real reason when the model is unconfigured/unavailable or can't produce a
+ * clean Latin first+last, so the UI surfaces it and falls back to manual entry.
+ * No DB write — the user reviews the suggestion and saves the form themselves.
+ * Registered before POST /patients so the literal path can never be shadowed.
  */
 router.post(
   '/patients/transliterate-name',
@@ -1035,18 +1035,17 @@ router.post(
 
       // English first/last not supplied → auto-fill by romanizing the Arabic patientName
       // with Gemini, AFTER responding so the create request never blocks on the API call.
-      // Fire-and-forget: on success it fills the missing field(s); a translate failure just
-      // logs and leaves the name for manual entry later (the catch is error containment for
-      // the detached promise, not a fallback path).
+      // Fire-and-forget with spaced retries (transliterateNameForBackfill) so a transient
+      // Gemini timeout/overload still fills the name minutes later. Because a retried success
+      // can be late, fillMissingPatientName only writes columns STILL empty — a name typed
+      // manually in the meantime is never clobbered. A final failure just logs and leaves the
+      // name for manual entry (the catch is error containment for the detached promise, not a
+      // fallback path).
       if (!processedData.firstName || !processedData.lastName) {
         void (async () => {
           try {
-            const { firstName, lastName } = await transliterateNameToEnglish(processedData.patientName);
-            await updatePatientName(
-              String(result.personId),
-              processedData.firstName || firstName,
-              processedData.lastName || lastName
-            );
+            const { firstName, lastName } = await transliterateNameForBackfill(processedData.patientName);
+            await fillMissingPatientName(String(result.personId), firstName, lastName);
           } catch (err) {
             log.warn('Background name transliteration failed', {
               personId: result.personId,

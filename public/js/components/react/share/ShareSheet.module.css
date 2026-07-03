@@ -1,20 +1,20 @@
 /* Share chooser — compact target picker, styled to match the share modals. */
 
+/*
+ * Like the share modals it opens, this sheet can be launched from inside the
+ * PhotoSwipe lightbox (--pswp-root-z-index: 100000), so the overlay must
+ * out-stack it or the chooser renders behind the images.
+ */
+.overlay {
+  z-index: 100010;
+}
+
 .modal {
   width: min(420px, 92vw);
   padding: var(--spacing-xl);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
-}
-
-.title {
-  margin: 0;
-  font-size: var(--font-size-lg);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  color: var(--text-primary);
 }
 
 .targetList {

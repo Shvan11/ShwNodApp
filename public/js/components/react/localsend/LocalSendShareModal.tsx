@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Modal from '../Modal';
+import ModalHeader from '../ModalHeader';
 import { useToast } from '@/contexts/ToastContext';
 import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
 import * as localsend from '@shared/contracts/localsend.contract';
@@ -105,11 +106,14 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
     if (open) transferIdRef.current = null;
   }, [open]);
 
-  // Poll the active transfer ~every second until it settles.
+  // Poll the active transfer ~every second until it settles. `pin-required` is
+  // settled server-side too — a PIN retry starts a NEW transfer — so don't keep
+  // polling (it would 404 forever once the record is pruned).
   useEffect(() => {
     const id = transferIdRef.current;
     if (!id) return;
-    if (transfer && TERMINAL.includes(transfer.status)) return;
+    if (transfer && (TERMINAL.includes(transfer.status) || transfer.status === 'pin-required'))
+      return;
 
     const tick = async (): Promise<void> => {
       try {
@@ -218,9 +222,13 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
       contentClassName={styles.modal}
       overlayClassName={styles.overlay}
     >
-      <h3 id="localsend-title" className={styles.title}>
-        <i className="fas fa-share-nodes" aria-hidden="true" /> Share to device
-      </h3>
+      <ModalHeader
+        variant="info"
+        titleId="localsend-title"
+        icon={<i className="fas fa-share-nodes" aria-hidden="true" />}
+        title="Share to device"
+        onClose={onClose}
+      />
 
       {!enabled && (
         <p className={styles.notice}>

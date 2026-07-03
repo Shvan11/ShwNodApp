@@ -20,6 +20,7 @@
  * degrade gracefully — the rest keep working and probe-by-IP always works.
  */
 import dgram from 'dgram';
+import net from 'net';
 import os from 'os';
 import crypto from 'crypto';
 import { createReadStream } from 'fs';
@@ -74,6 +75,10 @@ interface Transfer {
   files: TransferFile[];
   error?: string;
   canceled: boolean;
+  /** Aborts the in-flight prepare/upload request the moment cancel() is called. */
+  abort: AbortController;
+  /** Receiver endpoint (+ session once accepted), for the best-effort protocol cancel. */
+  remote?: { base: string; agent?: https.Agent; sessionId?: string };
   settledAt?: number;
 }
 
@@ -260,7 +265,10 @@ class LocalSendService {
     this.sockets.clear();
     await Promise.all(closing);
 
-    for (const t of this.transfers.values()) t.canceled = true;
+    for (const t of this.transfers.values()) {
+      t.canceled = true;
+      t.abort.abort();
+    }
     this.transfers.clear();
     this.devices.clear();
     this.started = false;
@@ -338,7 +346,11 @@ class LocalSendService {
    * and WSL2 dev, where multicast can't reach the physical network.
    */
   async probe(ip: string): Promise<LocalSendDevice> {
-    const url = `https://${ip}:${MULTICAST_PORT}/api/localsend/v2/info`;
+    // Defense-in-depth behind the contract's IP validation: the value is
+    // interpolated into a URL, so a host/port/path here would be an SSRF.
+    if (net.isIP(ip) === 0) throw new Error('Not a valid IP address');
+    const host = ip.includes(':') ? `[${ip}]` : ip; // bracket IPv6 for the URL
+    const url = `https://${host}:${MULTICAST_PORT}/api/localsend/v2/info`;
     const res = await this.timedFetch(url, { agent: this.httpsAgent }, 8000);
     if (!res.ok) {
       throw new Error(`Device at ${ip} did not respond (HTTP ${res.status})`);
@@ -389,11 +401,15 @@ class LocalSendService {
       deviceAlias: dev.alias,
       files,
       canceled: false,
+      abort: new AbortController(),
     };
     this.transfers.set(id, transfer);
 
     // Detached — do NOT await. Errors are captured onto the transfer record.
     void this.runTransfer(transfer, dev, pin).catch((err) => {
+      // A cancel() abort surfaces here as an AbortError — the record is already
+      // settled as 'canceled'; don't overwrite it with 'failed'.
+      if (transfer.canceled) return;
       transfer.status = 'failed';
       transfer.error = (err as Error).message;
       transfer.settledAt = Date.now();
@@ -423,10 +439,24 @@ class LocalSendService {
   cancel(id: string): boolean {
     const t = this.transfers.get(id);
     if (!t) return false;
+    const wasActive =
+      t.status === 'pending' || t.status === 'sending' || t.status === 'pin-required';
     t.canceled = true;
-    if (t.status === 'pending' || t.status === 'sending' || t.status === 'pin-required') {
+    if (wasActive) {
       t.status = 'canceled';
       t.settledAt = Date.now();
+      // Kill the in-flight HTTP request NOW — mid-file this stops the bytes, and
+      // during the Accept dialog the dropped prepare-upload dismisses it.
+      t.abort.abort();
+      // Once the receiver accepted (sessionId known), also send the protocol
+      // cancel so its progress UI doesn't sit on a dangling session.
+      const r = t.remote;
+      if (r?.sessionId) {
+        const url = `${r.base}/cancel?sessionId=${encodeURIComponent(r.sessionId)}`;
+        void this.timedFetch(url, { method: 'POST', agent: r.agent }, 10_000).catch(() => {
+          /* best effort */
+        });
+      }
     }
     return true;
   }
@@ -439,6 +469,7 @@ class LocalSendService {
   ): Promise<void> {
     const base = `${dev.protocol}://${dev.ip}:${dev.port}/api/localsend/v2`;
     const agent = dev.protocol === 'https' ? this.httpsAgent : undefined;
+    transfer.remote = { base, agent };
 
     // ── prepare-upload (blocks on the receiver's Accept dialog) ──
     const fileMap: Record<string, unknown> = {};
@@ -461,7 +492,8 @@ class LocalSendService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ info: this.selfInfo(), files: fileMap }),
       },
-      PREPARE_TIMEOUT_MS
+      PREPARE_TIMEOUT_MS,
+      transfer.abort.signal
     );
 
     if (transfer.canceled) return;
@@ -486,6 +518,12 @@ class LocalSendService {
       transfer.settledAt = Date.now();
       return;
     }
+    if (prepRes.status === 409) {
+      throw new Error(`${dev.alias} is busy with another transfer — try again in a moment`);
+    }
+    if (prepRes.status === 429) {
+      throw new Error(`${dev.alias} is rate-limiting requests — try again in a moment`);
+    }
     if (!prepRes.ok) {
       throw new Error(`prepare-upload failed (HTTP ${prepRes.status})`);
     }
@@ -497,6 +535,7 @@ class LocalSendService {
     if (!prep.sessionId || !prep.files) {
       throw new Error('prepare-upload returned an unexpected payload');
     }
+    transfer.remote.sessionId = prep.sessionId;
 
     transfer.status = 'sending';
 
@@ -522,14 +561,28 @@ class LocalSendService {
         f.sentBytes += chunk.length;
       });
 
-      const upRes = await this.timedFetch(
-        uploadUrl,
-        { method: 'POST', agent, body: stream },
-        UPLOAD_TIMEOUT_MS
-      );
-      if (!upRes.ok) {
+      try {
+        const upRes = await this.timedFetch(
+          uploadUrl,
+          {
+            method: 'POST',
+            agent,
+            body: stream,
+            // The size is known — advertise it instead of chunked encoding
+            // (strict third-party receivers reject chunked uploads).
+            headers: { 'Content-Length': String(f.totalBytes) },
+          },
+          UPLOAD_TIMEOUT_MS,
+          transfer.abort.signal
+        );
+        if (!upRes.ok) {
+          throw new Error(`upload of "${f.name}" failed (HTTP ${upRes.status})`);
+        }
+      } catch (err) {
+        stream.destroy(); // don't leak the fd on abort/timeout/error
+        if (transfer.canceled) return; // cancel() already settled the record
         f.status = 'failed';
-        throw new Error(`upload of "${f.name}" failed (HTTP ${upRes.status})`);
+        throw err;
       }
       f.status = 'completed';
       f.sentBytes = f.totalBytes;
@@ -545,19 +598,29 @@ class LocalSendService {
     transfer.settledAt = Date.now();
   }
 
-  /** node-fetch wrapped in an AbortController timeout (v3 dropped `timeout`). */
+  /**
+   * node-fetch wrapped in an AbortController timeout (v3 dropped `timeout`).
+   * An optional external `signal` (a transfer's cancel) also aborts the request.
+   */
   private async timedFetch(
     url: string,
     opts: Parameters<typeof fetch>[1],
-    timeoutMs: number
+    timeoutMs: number,
+    signal?: AbortSignal
   ): ReturnType<typeof fetch> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     timer.unref();
+    const onAbort = (): void => controller.abort();
+    if (signal) {
+      if (signal.aborted) controller.abort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+    }
     try {
       return await fetch(url, { ...opts, signal: controller.signal });
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
     }
   }
 

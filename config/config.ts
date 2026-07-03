@@ -40,6 +40,12 @@ const envSchema = z
     PG_USER: z.string().optional(),
     PG_PASSWORD: z.string().optional(),
     PG_DUMP_PATH: z.string().optional(),
+    // Optional block, but a malformed port must fail loud: parseInt garbage → NaN
+    // → dgram binds an ephemeral port and discovery silently finds nothing.
+    LOCALSEND_PORT: z.preprocess(
+      (v) => (v === '' || v == null ? undefined : v),
+      z.coerce.number().int().min(1).max(65535).optional()
+    ),
   })
   .refine(
     (env) => !!env.DATABASE_URL || !!(env.PG_HOST && env.PG_DATABASE && env.PG_USER),

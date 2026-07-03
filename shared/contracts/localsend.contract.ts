@@ -72,14 +72,16 @@ export type TransferState = TransferStatus['status'];
 
 // GET /api/localsend/devices[?rescan=1] → { enabled, devices[] }.
 export const devices = {
-  query: z.object({ rescan: z.coerce.boolean().optional() }),
+  query: z.object({ rescan: z.stringbool().optional() }),
   response: z.object({ enabled: z.boolean(), devices: z.array(device) }),
 } as const;
 export type DevicesResponse = z.infer<typeof devices.response>;
 
 // POST /api/localsend/probe → { device }. Manual add / WSL-dev fallback.
 export const probe = {
-  body: z.object({ ip: z.string().min(1) }),
+  // A literal IP only — the value is interpolated into the probe URL server-side,
+  // so anything looser (host, port, path) would hand staff sessions an SSRF.
+  body: z.object({ ip: z.union([z.ipv4(), z.ipv6()]) }),
   response: z.object({ device }),
 } as const;
 export type ProbeBody = z.infer<typeof probe.body>;

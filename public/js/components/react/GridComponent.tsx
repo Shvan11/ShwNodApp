@@ -13,7 +13,8 @@ import styles from './GridComponent.module.css';
 import EditTimepointModal from './EditTimepointModal';
 import DeleteTimepointModal from './DeleteTimepointModal';
 import TimepointActionsMenu, { type DeleteScope, type FolderState } from './TimepointActionsMenu';
-import LocalSendShareModal, { type ShareSource } from './localsend/LocalSendShareModal';
+import ShareSheet from './share/ShareSheet';
+import type { ShareSource } from './localsend/LocalSendShareModal';
 import { encodeRelPath, buildWorkingContentUrl } from './files/fileHelpers';
 import type { PhotoViewCode } from '@shared/photo-views';
 import sseAppointments from '../../services/sse-appointments';
@@ -939,7 +940,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 onCancel={() => setDeleteTp(null)}
             />
 
-            <LocalSendShareModal
+            <ShareSheet
                 open={!!shareSources}
                 sources={shareSources ?? []}
                 onClose={() => setShareSources(null)}

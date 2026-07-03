@@ -6,6 +6,7 @@
  * appointment/visit lists used to suggest session dates. None of these touch
  * DolphinPlatform.
  */
+import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { getActiveWID } from './patient-queries.js';
@@ -57,19 +58,33 @@ export async function getPatientForPhotoSession(
 }
 
 /**
- * Set a patient's English first/last name. Used by the photo-session guard to ensure Dolphin
- * receives a Latin-script name — Dolphin's patient-name columns are varchar/Latin1 and corrupt
- * Arabic to '?', so a patient with no English name must supply one before photos can sync.
+ * Fill a patient's English first/last name — but ONLY the columns still empty. Feeds the
+ * create-patient background transliteration (Dolphin's patient-name columns are varchar/Latin1
+ * and corrupt Arabic to '?', so patients need a Latin name for the sync to be searchable).
+ * That backfill can land minutes late on Gemini retries, so it must never clobber a name the
+ * front desk typed in the meantime: each column keeps its existing non-empty value atomically,
+ * and the WHERE skips the write entirely (no updated_at/CDC churn) when both are already set.
  */
-export async function updatePatientName(
+export async function fillMissingPatientName(
   personId: string,
   firstName: string,
   lastName: string
 ): Promise<void> {
   await getKysely()
     .updateTable('patients')
-    .set({ first_name: firstName, last_name: lastName })
+    .set({
+      first_name: sql<string>`coalesce(nullif(first_name, ''), ${firstName})`,
+      last_name: sql<string>`coalesce(nullif(last_name, ''), ${lastName})`,
+    })
     .where('person_id', '=', parseInt(personId, 10))
+    .where((eb) =>
+      eb.or([
+        eb('first_name', 'is', null),
+        eb('first_name', '=', ''),
+        eb('last_name', 'is', null),
+        eb('last_name', '=', ''),
+      ])
+    )
     .execute();
 }
 

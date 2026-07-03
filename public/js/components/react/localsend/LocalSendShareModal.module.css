@@ -17,15 +17,6 @@
   gap: var(--spacing-md);
 }
 
-.title {
-  margin: 0;
-  font-size: var(--font-size-lg);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  color: var(--text-primary);
-}
-
 .notice {
   margin: 0;
   font-size: var(--font-size-sm);

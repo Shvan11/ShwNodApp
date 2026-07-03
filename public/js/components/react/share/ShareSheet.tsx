@@ -8,6 +8,7 @@
  */
 import { useState } from 'react';
 import Modal from '../Modal';
+import ModalHeader from '../ModalHeader';
 import LocalSendShareModal, { type ShareSource } from '../localsend/LocalSendShareModal';
 import TelegramShareModal from './TelegramShareModal';
 import styles from './ShareSheet.module.css';
@@ -69,11 +70,15 @@ const ShareSheet = ({ open, sources, onClose }: Props) => {
       onClose={onClose}
       ariaLabelledBy="share-sheet-title"
       contentClassName={styles.modal}
+      overlayClassName={styles.overlay}
     >
-      <h3 id="share-sheet-title" className={styles.title}>
-        <i className="fas fa-share-nodes" aria-hidden="true" /> Share{' '}
-        {sources.length === 1 ? '1 file' : `${sources.length} files`}
-      </h3>
+      <ModalHeader
+        variant="info"
+        titleId="share-sheet-title"
+        icon={<i className="fas fa-share-nodes" aria-hidden="true" />}
+        title={sources.length === 1 ? 'Share 1 file' : `Share ${sources.length} files`}
+        onClose={onClose}
+      />
 
       <ul className={styles.targetList}>
         {TARGETS.map((t) => (
