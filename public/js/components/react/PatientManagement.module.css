@@ -262,6 +262,47 @@
     font-size: var(--font-size-xs);
 }
 
+/* Desktop sorts via the clickable column headers; the segmented control stays
+   as the mobile fallback (the card view hides <thead>). */
+@media (min-width: 769px) {
+    .sortControls {
+        display: none;
+    }
+}
+
+/* Clickable sort header: inherits the th typography, shows direction inline. */
+.thSortBtn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-weight: inherit;
+    color: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    transition: color var(--transition-base);
+}
+
+.thSortBtn:hover {
+    color: var(--primary-color);
+}
+
+.table th[aria-sort] .thSortBtn {
+    color: var(--primary-color);
+}
+
+/* Faint sort glyph on inactive-but-sortable columns */
+.thSortIdle {
+    opacity: 0.35;
+}
+
+.thSortBtn:hover .thSortIdle {
+    opacity: 0.7;
+}
+
 .refreshingBadge {
     margin-left: var(--spacing-sm);
     color: var(--primary-color);
@@ -359,6 +400,7 @@
     cursor: pointer;
     color: var(--primary-color);
     font-weight: bold;
+    text-decoration: none;
     transition: color var(--transition-base);
 }
 
@@ -388,6 +430,43 @@
     width: 36px;
     height: 36px;
     font-size: var(--font-size-md);
+}
+
+/* Row action icons: neutral at rest (four colored buttons repeated per row is
+   visually loud at 100 rows), semantic color revealed on hover/focus. Scoped
+   under .actionButtons to outrank the global .btn variants deterministically. */
+.actionButtons .rowActionBtn {
+    background: transparent;
+    border: var(--border-width-thin) solid var(--gray-300);
+    color: var(--text-secondary);
+}
+
+.actionButtons .rowActionSuccess:hover,
+.actionButtons .rowActionSuccess:focus-visible {
+    color: var(--success-600);
+    border-color: var(--success-500);
+    background-color: var(--success-50);
+}
+
+.actionButtons .rowActionPrimary:hover,
+.actionButtons .rowActionPrimary:focus-visible {
+    color: var(--blue-600);
+    border-color: var(--blue-500);
+    background-color: var(--blue-50);
+}
+
+.actionButtons .rowActionWarning:hover,
+.actionButtons .rowActionWarning:focus-visible {
+    color: var(--warning-600);
+    border-color: var(--warning-500);
+    background-color: var(--warning-50);
+}
+
+.actionButtons .rowActionDanger:hover,
+.actionButtons .rowActionDanger:focus-visible {
+    color: var(--error-600);
+    border-color: var(--error-500);
+    background-color: var(--error-50);
 }
 
 /* ===================================
@@ -480,6 +559,49 @@
 .advancedFiltersContent {
     padding: var(--spacing-lg);
     background-color: var(--background-primary);
+}
+
+/* Active-filter chips shown while the panel is collapsed */
+.filterChips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    padding: 0 var(--spacing-lg) var(--spacing-md);
+    background-color: var(--background-secondary);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.filterChip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background-color: var(--surface);
+    border: var(--border-width-thin) solid var(--gray-300);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+}
+
+.filterChipRemove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.filterChipRemove:hover {
+    background-color: var(--error-50);
+    color: var(--error-600);
 }
 
 .advancedFiltersGrid {
@@ -585,6 +707,12 @@
     /* Advanced Filters Responsive */
     .advancedFiltersGrid {
         grid-template-columns: 1fr;
+    }
+
+    /* Landing target for the post-search scrollIntoView: clear the fixed
+       two-row mobile header instead of sliding under it. */
+    .resultsSummary {
+        scroll-margin-top: 100px;
     }
 
     /* Table responsive - Card View */

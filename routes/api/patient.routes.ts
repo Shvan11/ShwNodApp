@@ -649,10 +649,16 @@ router.get(
       // General search (phone or id). Honours the same nameStartsWith flag as
       // the name fields: prefix match (index-seekable) when set, substring
       // otherwise — substring stays the default so "last 4 digits" search works.
+      // An all-digit query also matches person_id exactly: the client's
+      // "Phone/ID" combobox offers ID jumps, so the built list must honour IDs too.
       if (searchQuery.trim()) {
-        const searchPattern = `${namePrefix}${searchQuery.trim()}%`;
+        const q = searchQuery.trim();
+        const searchPattern = `${namePrefix}${q}%`;
+        const phoneMatch = sql`(p."phone"::text ILIKE ${searchPattern} OR p."phone2"::text ILIKE ${searchPattern})`;
         whereConditions.push(
-          sql`(p."phone"::text ILIKE ${searchPattern} OR p."phone2"::text ILIKE ${searchPattern})`
+          /^\d+$/.test(q) && Number.isSafeInteger(Number(q))
+            ? sql`(${phoneMatch} OR p."person_id" = ${Number(q)})`
+            : phoneMatch
         );
       }
 
@@ -757,6 +763,11 @@ router.get(
           order === 'desc'
             ? sql`ORDER BY "last_visit" DESC NULLS LAST`
             : sql`ORDER BY "last_visit" ASC NULLS LAST`;
+      } else if (sortBy === 'id') {
+        orderByClause =
+          order === 'desc'
+            ? sql`ORDER BY p."person_id" DESC`
+            : sql`ORDER BY p."person_id" ASC`;
       } else {
         orderByClause =
           order === 'desc'

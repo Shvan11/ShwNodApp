@@ -11,7 +11,7 @@
 import type { LoaderFunctionArgs } from 'react-router-dom';
 import { fetchJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { dailyAppointments } from '@shared/contracts/appointment.contract';
-import { patientPhones, patientSearch, tagOptions, typeOptions } from '@shared/contracts/patient.contract';
+import { patientPhones, tagOptions, typeOptions } from '@shared/contracts/patient.contract';
 import * as workContract from '@shared/contracts/work.contract';
 import { queryClient } from '../query/client';
 import { loaderQuery } from '../query/loaderQuery';
@@ -403,7 +403,6 @@ export interface PatientManagementLoaderResult {
   keywords: SelectOption[];
   tags: SelectOption[];
   patientTypes: SelectOption[];
-  searchResults: PatientData[] | null;
   error?: string;
   _loaderTimestamp: number;
 }
@@ -417,7 +416,6 @@ export async function patientManagementLoader({
   request,
 }: LoaderFunctionArgs): Promise<PatientManagementLoaderResult> {
   const { signal } = request;
-  const url = new URL(request.url);
 
   if (import.meta.env.DEV) console.log('[Loader] Pre-fetching patient management filter data');
 
@@ -454,58 +452,14 @@ export async function patientManagementLoader({
       label: pt.type,
     }));
 
-    // Check if we have search params and need to execute search
-    const hasSearchParams =
-      url.searchParams.has('patientName') ||
-      url.searchParams.has('firstName') ||
-      url.searchParams.has('lastName') ||
-      url.searchParams.has('q') ||
-      url.searchParams.has('workTypes') ||
-      url.searchParams.has('keywords') ||
-      url.searchParams.has('tags');
-
-    let searchResults: PatientData[] | null = null;
-
-    if (hasSearchParams) {
-      if (import.meta.env.DEV) console.log('[Loader] Search params detected - fetching results');
-
-      // Build search query from URL params
-      const searchParams = new URLSearchParams();
-      const paramsToCopy = [
-        'patientName',
-        'firstName',
-        'lastName',
-        'q',
-        'workTypes',
-        'keywords',
-        'tags',
-        'sortBy',
-        'order',
-      ];
-      paramsToCopy.forEach((param) => {
-        const value = url.searchParams.get(param);
-        if (value) searchParams.set(param, value);
-      });
-
-      // Non-2xx → empty results (old behavior); a network/abort error rejects → outer catch.
-      const data = await fetchJSON<{ patients?: PatientData[] } | PatientData[]>(
-        `/api/patients/search?${searchParams.toString()}`,
-        { signal, schema: patientSearch.response } // Validate the boundary (audit H11)
-      ).catch((err: unknown) => {
-        if (typeof (err as HttpError).status === 'number') return [] as PatientData[];
-        throw err;
-      });
-      // Handle new paginated response format
-      searchResults = Array.isArray(data) ? data : data.patients || [];
-    }
-
+    // NOTE: the component handles its own searching (sessionStorage restore +
+    // `?search=` deep link); the loader only prefetches the dropdown data.
     return {
       allPatients,
       workTypes,
       keywords,
       tags,
       patientTypes,
-      searchResults, // Will be null if no search params, or array if search executed
       _loaderTimestamp: Date.now(),
     };
   } catch (error) {
@@ -517,7 +471,6 @@ export async function patientManagementLoader({
       keywords: [],
       tags: [],
       patientTypes: [],
-      searchResults: null,
       error: error instanceof Error ? error.message : 'Unknown error',
       _loaderTimestamp: Date.now(),
     };

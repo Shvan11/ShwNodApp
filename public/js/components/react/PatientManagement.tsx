@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, ChangeEvent } from 'react';
-import { useNavigate, useLoaderData } from 'react-router-dom';
+import { useNavigate, useLoaderData, Link } from 'react-router-dom';
 import Select, { MultiValue } from 'react-select';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
@@ -170,6 +170,20 @@ const PatientManagement = () => {
     // `?search=` deep-link takes priority over restore and forces a fresh search,
     // so it suppresses the restore flag.
     const isRestoring = useRef(!!savedState && !urlSearchParam);
+    // One-shot suppressor for the debounced auto-search: Show All clears the
+    // criteria itself and fetches explicitly, so the clearing must not ALSO
+    // schedule a debounced fetch (double request + loading flicker).
+    const skipAutoSearchRef = useRef(false);
+    // Non-reactive mirror of hasSearched: lets the auto-search effect refresh to
+    // "all patients" when the last criterion is cleared, without adding
+    // hasSearched to its deps (which would echo an extra search after the first).
+    const hasSearchedRef = useRef(!!savedState?.hasSearched);
+    // Latest executeSearch for the debounce timer. Keeping the callback out of
+    // the effect deps means a completed search (which recreates executeSearch via
+    // currentOffset) can't re-trigger the effect and fire a duplicate request.
+    const executeSearchRef = useRef<(overrideSort?: SortConfig | null, loadMore?: boolean) => Promise<void>>(async () => {});
+    // Results block, for the scroll-into-view after an explicit search on mobile.
+    const resultsRef = useRef<HTMLDivElement | null>(null);
 
     // --- 3. Persistence Logic ---
     // Save state whenever relevant data changes
@@ -248,15 +262,12 @@ const PatientManagement = () => {
             params.append('offset', offset.toString());
             params.append('limit', '100');
 
-            const data = await fetchJSON<Patient[] | { patients?: Patient[]; totalCount?: number; hasMore?: boolean }>(
+            const data = await fetchJSON<{ patients: Patient[]; totalCount?: number; hasMore?: boolean }>(
                 `/api/patients/search?${params.toString()}`,
                 { signal: abortController.signal, schema: patientSearchContract.response }
             );
 
-            // Handle both new format {patients, totalCount, hasMore} and legacy array format
-            const patientsArray: Patient[] = Array.isArray(data) ? data : (data.patients || []);
-            const total = Array.isArray(data) ? patientsArray.length : (data.totalCount || patientsArray.length);
-            const more = Array.isArray(data) ? false : (data.hasMore || false);
+            const patientsArray = data.patients;
 
             if (loadMore) {
                 // Append to existing results
@@ -266,10 +277,11 @@ const PatientManagement = () => {
                 setPatients(patientsArray);
             }
 
-            setTotalCount(total);
-            setHasMore(more);
+            setTotalCount(data.totalCount ?? patientsArray.length);
+            setHasMore(data.hasMore ?? false);
             setCurrentOffset(offset + patientsArray.length);
             setHasSearched(true);
+            hasSearchedRef.current = true;
         } catch (err) {
             if (err instanceof Error && err.name !== 'AbortError') {
                 toast.error(httpErrorMessage(err, 'Failed to search patients'));
@@ -287,7 +299,16 @@ const PatientManagement = () => {
         executeSearch(null, true);
     }, [executeSearch]);
 
+    // Keep the ref pointing at the latest executeSearch so the debounce timer
+    // below always calls the current closure without depending on its identity.
+    useEffect(() => {
+        executeSearchRef.current = executeSearch;
+    });
+
     // --- Auto-Search Effect ---
+    // Deps are the search criteria ONLY (not executeSearch): a completed search
+    // recreates executeSearch (currentOffset dep), and having it here used to
+    // fire a second, identical request 500ms after every search.
     useEffect(() => {
         const hasInputs = searchPatientName || searchFirstName || searchLastName || searchTerm ||
                           selectedWorkTypes.length > 0 || selectedKeywords.length > 0 || selectedTags.length > 0 ||
@@ -300,23 +321,51 @@ const PatientManagement = () => {
             return;
         }
 
-        if (hasInputs) {
+        // SKIP the run caused by Show All clearing the criteria — it fetches itself.
+        if (skipAutoSearchRef.current) {
+            skipAutoSearchRef.current = false;
+            return;
+        }
+
+        // With criteria: debounced re-search. Without criteria but with results
+        // showing (last chip/field just cleared): refresh to the unfiltered list
+        // instead of leaving a stale filtered table behind.
+        if (hasInputs || hasSearchedRef.current) {
             if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
             searchDebounceRef.current = setTimeout(() => {
-                executeSearch();
+                executeSearchRef.current();
             }, 500);
         }
 
         return () => {
             if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
         };
-    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentCustomDate, hasFinalPhotos, executeSearch]);
+    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentCustomDate, hasFinalPhotos]);
 
     // --- Handlers ---
 
-    const handleSearchBtnClick = () => executeSearch();
+    // After an explicit search on a phone, the results render below the long
+    // search form — bring them into view. Double rAF waits out the re-render
+    // so the results block exists before we scroll. No-op on desktop.
+    const scrollToResultsOnMobile = () => {
+        if (!window.matchMedia('(max-width: 768px)').matches) return;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }));
+    };
+
+    const handleSearchBtnClick = async () => {
+        await executeSearch();
+        scrollToResultsOnMobile();
+    };
 
     const handleReset = () => {
+        // Kill any pending debounce / in-flight search — its response must not
+        // repopulate the page we just emptied. The abort skips that search's
+        // loading cleanup, so clear the flag here.
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        abortControllerRef.current?.abort();
+        setLoading(false); setLoadingMore(false);
         sessionStorage.removeItem('pm_search_state');
         setSearchPatientName(''); setSearchFirstName(''); setSearchLastName(''); setSearchTerm('');
         setNameStartsWith(false);
@@ -325,6 +374,9 @@ const PatientManagement = () => {
         setHasFinalPhotos(false);
         setPatients([]); setHasSearched(false); setShowFilters(false);
         setSortConfig({ key: 'name', direction: 'asc' });
+        // Reset means "back to the empty page" — the criteria clearing above must
+        // not read as "last filter removed → refresh all patients".
+        hasSearchedRef.current = false;
     };
 
     const handleSortToggle = (key: string) => {
@@ -341,32 +393,46 @@ const PatientManagement = () => {
         executeSearch(newSort);
     };
 
-    const handleShowAll = () => {
-        // Clear inputs and filters, reset pagination
+    const handleShowAll = async () => {
+        // Clearing criteria re-runs the auto-search effect; suppress that run
+        // (this handler fetches explicitly). Only arm the flag when something
+        // actually changes, or it would linger and swallow the next real search.
+        const hadCriteria = !!(searchPatientName || searchFirstName || searchLastName || searchTerm ||
+            selectedWorkTypes.length || selectedKeywords.length || selectedTags.length ||
+            selectedPatientTypes.length || lastAppointmentFilter || hasFinalPhotos || nameStartsWith);
+        if (hadCriteria) skipAutoSearchRef.current = true;
+
+        // Clear inputs and filters, reset pagination AND sort — the fetch below is
+        // name-ascending, so sortConfig must match or the sort toggle lies and a
+        // subsequent Load More would paginate with the stale sort (duplicate rows).
         setSearchPatientName(''); setSearchFirstName(''); setSearchLastName(''); setSearchTerm('');
         setNameStartsWith(false);
         setSelectedWorkTypes([]); setSelectedKeywords([]); setSelectedTags([]); setSelectedPatientTypes([]);
         setLastAppointmentFilter(''); setLastAppointmentCustomDate(''); setHasFinalPhotos(false);
         setCurrentOffset(0);
+        setSortConfig({ key: 'name', direction: 'asc' });
+        // Kill any pending debounce / in-flight filtered search — a late response
+        // would overwrite the unfiltered list this handler is about to fetch.
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        abortControllerRef.current?.abort();
         setLoading(true);
-        fetchJSON<Patient[] | { patients?: Patient[]; totalCount?: number; hasMore?: boolean }>(`/api/patients/search?q=&sortBy=name&order=asc&limit=100&offset=0`, { schema: patientSearchContract.response })
-            .then(data => {
-                // Handle both new format {patients, totalCount, hasMore} and legacy array format
-                const patientsArray: Patient[] = Array.isArray(data) ? data : (data.patients || []);
-                const total = Array.isArray(data) ? patientsArray.length : (data.totalCount || patientsArray.length);
-                const more = Array.isArray(data) ? false : (data.hasMore || false);
-
-                setPatients(patientsArray);
-                setTotalCount(total);
-                setHasMore(more);
-                setCurrentOffset(patientsArray.length);
-                setHasSearched(true);
-                setLoading(false);
-            })
-            .catch((err) => {
-                setLoading(false);
-                toast.error(httpErrorMessage(err, 'Failed to load all patients'));
-            });
+        try {
+            const data = await fetchJSON<{ patients: Patient[]; totalCount?: number; hasMore?: boolean }>(
+                `/api/patients/search?sortBy=name&order=asc&limit=100&offset=0`,
+                { schema: patientSearchContract.response }
+            );
+            setPatients(data.patients);
+            setTotalCount(data.totalCount ?? data.patients.length);
+            setHasMore(data.hasMore ?? false);
+            setCurrentOffset(data.patients.length);
+            setHasSearched(true);
+            hasSearchedRef.current = true;
+            scrollToResultsOnMobile();
+        } catch (err) {
+            toast.error(httpErrorMessage(err, 'Failed to load all patients'));
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleQuickCheckin = async (e: React.MouseEvent<HTMLButtonElement>, patient: Patient) => {
@@ -408,6 +474,29 @@ const PatientManagement = () => {
     };
 
     const handleJumpToPatient = (personId: number) => navigate(`/patient/${personId}/works`);
+
+    const activeFilterCount = selectedWorkTypes.length + selectedKeywords.length + selectedTags.length +
+        selectedPatientTypes.length + (lastAppointmentFilter ? 1 : 0) + (hasFinalPhotos ? 1 : 0);
+
+    const lastAppointmentChipLabel = lastAppointmentFilter === 'custom'
+        ? `Before ${lastAppointmentCustomDate || '…'}`
+        : (LAST_APPOINTMENT_OPTIONS.find(o => o.value === lastAppointmentFilter)?.label ?? lastAppointmentFilter);
+
+    // Sortable column header: click toggles/flips the sort, aria-sort reflects it.
+    const renderSortableTh = (colKey: string, label: string) => {
+        const active = sortConfig.key === colKey;
+        return (
+            <th aria-sort={active ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : undefined}>
+                <button type="button" className={styles.thSortBtn} onClick={() => handleSortToggle(colKey)}>
+                    {label}
+                    <i
+                        className={cn('fas', active ? (sortConfig.direction === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down') : cn('fa-sort', styles.thSortIdle), styles.sortIcon)}
+                        aria-hidden="true"
+                    ></i>
+                </button>
+            </th>
+        );
+    };
 
     return (
         <div className={styles.page}>
@@ -470,15 +559,67 @@ const PatientManagement = () => {
 
             <div className={styles.searchForm}>
                 <button type="button" onClick={handleSearchBtnClick} className="btn btn-primary" disabled={loading}><i className={cn('fas fa-search', styles.iconGap)}></i>Search</button>
-                <button type="button" onClick={handleShowAll} className="btn btn-secondary" disabled={loading}><i className={cn('fas fa-list', styles.iconGap)}></i>Show All</button>
-                <button type="button" onClick={handleReset} className="btn btn-secondary" disabled={loading}><i className={cn('fas fa-redo', styles.iconGap)}></i>Reset</button>
+                <button type="button" onClick={handleShowAll} className="btn btn-light" disabled={loading}><i className={cn('fas fa-list', styles.iconGap)}></i>Show All</button>
+                <button type="button" onClick={handleReset} className="btn btn-light" disabled={loading}><i className={cn('fas fa-redo', styles.iconGap)}></i>Reset</button>
             </div>
 
             <div className={styles.advancedFilters}>
                 <div className={styles.advancedFiltersHeader} role="button" tabIndex={0} onClick={() => setShowFilters(!showFilters)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowFilters(!showFilters); } }}>
-                    <h4><i className={cn('fas fa-filter', styles.iconGap)}></i>Filters {(selectedWorkTypes.length + selectedKeywords.length + selectedTags.length + selectedPatientTypes.length + (lastAppointmentFilter ? 1 : 0) + (hasFinalPhotos ? 1 : 0) > 0) && <span className={styles.filterBadge}>{selectedWorkTypes.length + selectedKeywords.length + selectedTags.length + selectedPatientTypes.length + (lastAppointmentFilter ? 1 : 0) + (hasFinalPhotos ? 1 : 0)}</span>}</h4>
+                    <h4><i className={cn('fas fa-filter', styles.iconGap)}></i>Filters {activeFilterCount > 0 && <span className={styles.filterBadge}>{activeFilterCount}</span>}</h4>
                     <i className={`fas fa-chevron-${showFilters ? 'up' : 'down'}`}></i>
                 </div>
+                {!showFilters && activeFilterCount > 0 && (
+                    <div className={styles.filterChips}>
+                        {selectedWorkTypes.map(o => (
+                            <span key={`wt-${o.value}`} className={styles.filterChip}>
+                                {o.label}
+                                <button type="button" className={styles.filterChipRemove} aria-label={`Remove work type filter: ${o.label}`} onClick={() => setSelectedWorkTypes(prev => prev.filter(x => x.value !== o.value))}>
+                                    <i className="fas fa-times" aria-hidden="true"></i>
+                                </button>
+                            </span>
+                        ))}
+                        {selectedKeywords.map(o => (
+                            <span key={`kw-${o.value}`} className={styles.filterChip}>
+                                {o.label}
+                                <button type="button" className={styles.filterChipRemove} aria-label={`Remove keyword filter: ${o.label}`} onClick={() => setSelectedKeywords(prev => prev.filter(x => x.value !== o.value))}>
+                                    <i className="fas fa-times" aria-hidden="true"></i>
+                                </button>
+                            </span>
+                        ))}
+                        {selectedTags.map(o => (
+                            <span key={`tag-${o.value}`} className={styles.filterChip}>
+                                {o.label}
+                                <button type="button" className={styles.filterChipRemove} aria-label={`Remove tag filter: ${o.label}`} onClick={() => setSelectedTags(prev => prev.filter(x => x.value !== o.value))}>
+                                    <i className="fas fa-times" aria-hidden="true"></i>
+                                </button>
+                            </span>
+                        ))}
+                        {selectedPatientTypes.map(o => (
+                            <span key={`pt-${o.value}`} className={styles.filterChip}>
+                                {o.label}
+                                <button type="button" className={styles.filterChipRemove} aria-label={`Remove patient type filter: ${o.label}`} onClick={() => setSelectedPatientTypes(prev => prev.filter(x => x.value !== o.value))}>
+                                    <i className="fas fa-times" aria-hidden="true"></i>
+                                </button>
+                            </span>
+                        ))}
+                        {lastAppointmentFilter && (
+                            <span className={styles.filterChip}>
+                                {lastAppointmentChipLabel}
+                                <button type="button" className={styles.filterChipRemove} aria-label="Remove last appointment filter" onClick={() => { setLastAppointmentFilter(''); setLastAppointmentCustomDate(''); }}>
+                                    <i className="fas fa-times" aria-hidden="true"></i>
+                                </button>
+                            </span>
+                        )}
+                        {hasFinalPhotos && (
+                            <span className={styles.filterChip}>
+                                Has Final Photos
+                                <button type="button" className={styles.filterChipRemove} aria-label="Remove has final photos filter" onClick={() => setHasFinalPhotos(false)}>
+                                    <i className="fas fa-times" aria-hidden="true"></i>
+                                </button>
+                            </span>
+                        )}
+                    </div>
+                )}
                 {showFilters && (
                     <div className={styles.advancedFiltersContent}>
                         <div className={styles.advancedFiltersGrid}>
@@ -561,7 +702,7 @@ const PatientManagement = () => {
             </div>
 
             {hasSearched && (
-                <div className={styles.resultsSummary}>
+                <div className={styles.resultsSummary} ref={resultsRef}>
                     <div className={styles.summaryCard}>
                         <h3>Results</h3>
                         <span className={styles.summaryValue}>
@@ -602,34 +743,41 @@ const PatientManagement = () => {
             {hasSearched && (
                 <div className={cn(styles.tableContainer, loading && styles.tableLoadingOverlay)}>
                     <table className={styles.table}>
-                        <thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Date</th><th>Last Visit</th><th>Tag</th><th>Actions</th></tr></thead>
+                        <thead>
+                            <tr>
+                                {renderSortableTh('id', 'ID')}
+                                {renderSortableTh('name', 'Name')}
+                                <th>Phone</th>
+                                {renderSortableTh('date', 'Added')}
+                                {renderSortableTh('lastVisit', 'Last Visit')}
+                                <th>Tag</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             {patients.map(p => (
                                 <tr key={p.person_id}>
                                     <td data-label="ID">{p.person_id}</td>
                                     <td data-label="Name">
-                                        <span
+                                        <Link
+                                            to={`/patient/${p.person_id}/works`}
                                             className={styles.patientNameLink}
-                                            role="button"
-                                            tabIndex={0}
-                                            onClick={() => navigate(`/patient/${p.person_id}/works`)}
-                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/patient/${p.person_id}/works`); } }}
                                             title="View Patient"
                                         >
                                             {p.patient_name}
-                                        </span>
+                                        </Link>
                                         {p.first_name && <div>{p.first_name} {p.last_name}</div>}
                                     </td>
                                     <td data-label="Phone"><PhoneDisplay phone={p.phone} /> {!p.phone && '-'}</td>
-                                    <td data-label="Date">{p.date_added ? formatDate(p.date_added) : '-'}</td>
+                                    <td data-label="Added">{p.date_added ? formatDate(p.date_added) : '-'}</td>
                                     <td data-label="Last Visit">{p.last_visit ? formatDate(p.last_visit) : '-'}</td>
                                     <td data-label="Tag">{p.TagName ? <span className={styles.tagBadge}>{p.TagName}</span> : '-'}</td>
                                     <td data-label="Actions">
                                         <div className={styles.actionButtons}>
-                                            <button onClick={(e) => handleQuickCheckin(e, p)} className="btn btn-icon btn-outline-success" title="Quick Check-in"><i className="fas fa-user-check"></i></button>
-                                            <button onClick={() => navigate(`/patient/${p.person_id}/works`)} className="btn btn-icon btn-outline-primary" title="View Patient"><i className="fas fa-eye"></i></button>
-                                            <button onClick={() => navigate(`/patient/${p.person_id}/edit-patient`)} className="btn btn-icon btn-outline-warning" title="Edit Patient"><i className="fas fa-edit"></i></button>
-                                            <button onClick={() => handleDeleteClick(p)} className="btn btn-icon btn-outline-danger" title="Delete Patient"><i className="fas fa-trash"></i></button>
+                                            <button onClick={(e) => handleQuickCheckin(e, p)} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionSuccess)} title="Quick Check-in" aria-label={`Quick check-in ${p.patient_name}`}><i className="fas fa-user-check" aria-hidden="true"></i></button>
+                                            <button onClick={() => navigate(`/patient/${p.person_id}/works`)} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionPrimary)} title="View Patient" aria-label={`View ${p.patient_name}`}><i className="fas fa-eye" aria-hidden="true"></i></button>
+                                            <button onClick={() => navigate(`/patient/${p.person_id}/edit-patient`)} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionWarning)} title="Edit Patient" aria-label={`Edit ${p.patient_name}`}><i className="fas fa-edit" aria-hidden="true"></i></button>
+                                            <button onClick={() => handleDeleteClick(p)} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionDanger)} title="Delete Patient" aria-label={`Delete ${p.patient_name}`}><i className="fas fa-trash" aria-hidden="true"></i></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -642,7 +790,7 @@ const PatientManagement = () => {
                         <div className={styles.loadMoreContainer}>
                             <button
                                 onClick={handleLoadMore}
-                                className={cn('btn btn-secondary', styles.loadMoreBtn)}
+                                className={cn('btn btn-light', styles.loadMoreBtn)}
                                 disabled={loadingMore}
                             >
                                 {loadingMore ? (
@@ -684,7 +832,7 @@ const PatientManagement = () => {
                                 This cannot be undone.
                             </p>
                             <div className={styles.deleteModalActions}>
-                                <button onClick={() => setShowDeleteConfirm(false)} className="btn btn-secondary" disabled={deleting}>Cancel</button>
+                                <button onClick={() => setShowDeleteConfirm(false)} className="btn btn-light" disabled={deleting}>Cancel</button>
                                 <button onClick={handleDeleteConfirm} className="btn btn-danger" disabled={deleting}>{deleting ? 'Deleting…' : 'Delete'}</button>
                             </div>
                         </div>
