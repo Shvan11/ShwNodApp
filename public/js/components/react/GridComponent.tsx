@@ -5,13 +5,14 @@ import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { reportClientError, describeHttpError } from '@/core/error-reporter';
 import { qk } from '@/query/keys';
-import { timepointsQuery, galleryQuery, photoVisibilityQuery } from '@/query/queries';
+import { timepointsQuery, galleryQuery, photoVisibilityQuery, patientInfoQuery } from '@/query/queries';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
 import tpStyles from './TimePointsSelector.module.css';
 import styles from './GridComponent.module.css';
 import EditTimepointModal from './EditTimepointModal';
 import DeleteTimepointModal from './DeleteTimepointModal';
+import PhotoSessionDialog from './PhotoSessionDialog';
 import TimepointActionsMenu, { type DeleteScope, type FolderState } from './TimepointActionsMenu';
 import ShareSheet from './share/ShareSheet';
 import type { ShareSource } from './localsend/LocalSendShareModal';
@@ -64,6 +65,20 @@ interface CachedShareBlob {
     fetchId: number;
 }
 
+// Anonymize: the three extra-oral views (Profile / Rest / Smile) get a black bar
+// over the eyes. The eye position is a heuristic for standard clinical extra-oral
+// framing (head cropped roughly crown-to-chin): the eye line sits a bit above the
+// vertical centre, so the bar spans the 33%–50% height band, full photo width
+// (covers the eye on a profile shot regardless of which way the patient faces).
+const EXTRA_ORAL_VIEWS: ReadonlySet<string> = new Set(['i10', 'i12', 'i13']);
+const ANON_BAR_TOP = 0.33;    // fraction of photo height where the bar starts
+const ANON_BAR_HEIGHT = 0.17; // fraction of photo height the bar covers
+
+// Fullscreen presentation mode: 'native' = element Fullscreen API on the gallery
+// wrapper; 'overlay' = CSS fixed-overlay fallback where the API is unavailable
+// or refused (e.g. iPhone Safari).
+type FsMode = 'off' | 'native' | 'overlay';
+
 
 const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const navigate = useNavigate();
@@ -82,6 +97,12 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     // as in the prior Promise.all where gallery threw and visibility .catch→null'd).
     const galleryQ = useQuery({ ...galleryQuery(personId ?? '', tpCode), enabled: !!personId });
     const visibilityQ = useQuery({ ...photoVisibilityQuery(personId ?? ''), enabled: !!personId });
+    // Patient name for the New Photo Session dialog (shared cache — Navigation
+    // on this page already fetches it).
+    const { data: patientInfo } = useQuery({
+        ...patientInfoQuery(personId ?? ''),
+        enabled: !!personId,
+    });
     // Gallery keyed by view code ({ i10: {...}|null, … }); null = unrendered slot.
     const gallery = galleryQ.data;
     const loading = !!personId && galleryQ.isLoading;
@@ -103,6 +124,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const menuTpRef = useRef<string | null>(null);
     const [editTp, setEditTp] = useState<LegacyTimepoint | null>(null);
     const [deleteTp, setDeleteTp] = useState<LegacyTimepoint | null>(null);
+    // "New session" dialog (also reachable from Navigation + Patient Info).
+    const [showNewSession, setShowNewSession] = useState(false);
     const [deleteScope, setDeleteScope] = useState<DeleteScope>('all');
     const [savingTp, setSavingTp] = useState(false);
     const [deletingTp, setDeletingTp] = useState(false);
@@ -131,6 +154,68 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     }
     const componentRef = useRef<HTMLDivElement>(null);
     const isSharingRef = useRef(false);
+
+    // Anonymize toggle (session-local, never persisted). Ref mirror so PhotoSwipe
+    // callbacks (outside React's tree) read fresh state — same pattern as
+    // privateNamesRef above.
+    const [anonymize, setAnonymize] = useState(false);
+    const anonymizeRef = useRef(anonymize);
+    useEffect(() => {
+        anonymizeRef.current = anonymize;
+    }, [anonymize]);
+
+    // Fullscreen presentation mode. The wrapper div (controls + grid only) is the
+    // fullscreen element, so the rest of the app disappears; the ref mirror lets
+    // the lightbox-creation effect pick the right appendToEl without re-running.
+    const [fsMode, setFsMode] = useState<FsMode>('off');
+    const fsActive = fsMode !== 'off';
+    const fsModeRef = useRef(fsMode);
+    useEffect(() => {
+        fsModeRef.current = fsMode;
+    }, [fsMode]);
+    const fsWrapRef = useRef<HTMLDivElement>(null);
+
+    const enterFullscreen = () => {
+        const el = fsWrapRef.current;
+        if (!el) return;
+        if (el.requestFullscreen) {
+            // Success is observed via the fullscreenchange listener below;
+            // rejection (permission / unsupported) falls back to the CSS overlay.
+            el.requestFullscreen().catch(() => setFsMode('overlay'));
+        } else {
+            setFsMode('overlay');
+        }
+    };
+
+    const exitFullscreen = () => {
+        if (document.fullscreenElement) {
+            void document.exitFullscreen().catch(() => { /* already exiting */ });
+        }
+        setFsMode('off');
+    };
+
+    // Track native fullscreen transitions (Esc, browser UI, or our own calls).
+    useEffect(() => {
+        const onFsChange = () => {
+            const native = !!document.fullscreenElement && document.fullscreenElement === fsWrapRef.current;
+            setFsMode((prev) => (native ? 'native' : prev === 'native' ? 'off' : prev));
+        };
+        document.addEventListener('fullscreenchange', onFsChange);
+        return () => document.removeEventListener('fullscreenchange', onFsChange);
+    }, []);
+
+    // Escape exits the CSS-overlay fallback (native mode gets this from the
+    // browser). Skipped while the lightbox is open so Esc closes that first.
+    useEffect(() => {
+        if (fsMode !== 'overlay') return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape') return;
+            if (document.querySelector('.pswp--open')) return;
+            setFsMode('off');
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [fsMode]);
 
     // Pre-cached blob for native sharing (mobile only)
     // Stores: { url, blob, fetchId } - fetchId prevents race conditions
@@ -321,6 +406,11 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             pswpModule: () => import('photoswipe'),
             bgOpacity: 0.9,
             showHideOpacity: true,
+            // While the gallery wrapper is the native-fullscreen element, the
+            // lightbox must mount INSIDE it — anything appended to document.body
+            // sits under the top-layer fullscreen element and is invisible.
+            // (The fsMode effect below keeps this in sync on later toggles.)
+            appendToEl: fsModeRef.current === 'native' && fsWrapRef.current ? fsWrapRef.current : undefined,
             // The LocalSend share modal opens OVER the still-open lightbox
             // (portaled into #modal-root, z-index above pswp). PhotoSwipe's
             // default focus trap (trapFocus:true) installs a focusin handler
@@ -546,6 +636,34 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             });
         });
 
+        // Anonymize inside the lightbox too — otherwise clicking a barred photo
+        // while presenting would reveal the eyes full-screen. The slide's
+        // .pswp__zoom-wrap is auto-sized (its img child is absolutely positioned),
+        // so %-based geometry resolves to 0; instead the bar is (re)positioned in
+        // displayed-image PIXELS on every imageSizeChange (initial load, zoom
+        // level change, resize). Mid-gesture the wrap's pan/zoom transform carries
+        // the bar in sync automatically.
+        lightboxInstance.on('imageSizeChange', ({ slide, width, height }) => {
+            const container = slide?.container;
+            if (!container) return;
+            const fileName = getFileNameFromUrl(slide.data?.src ?? '');
+            const view = fileName.match(/\.(i\d+)$/i)?.[1]?.toLowerCase();
+            const wanted = anonymizeRef.current && !!view && EXTRA_ORAL_VIEWS.has(view);
+            let bar = container.querySelector<HTMLDivElement>('.pswp__anon-bar');
+            if (!wanted) {
+                bar?.remove();
+                return;
+            }
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.className = 'pswp__anon-bar';
+                container.appendChild(bar);
+            }
+            bar.style.top = `${Math.round(height * ANON_BAR_TOP)}px`;
+            bar.style.width = `${Math.round(width)}px`;
+            bar.style.height = `${Math.round(height * ANON_BAR_HEIGHT)}px`;
+        });
+
         // Pre-fetch the current slide's blob for the native share sheet (mobile only).
         if ('share' in navigator && 'canShare' in navigator) {
             lightboxInstance.on('firstUpdate', () => {
@@ -570,6 +688,15 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [gallery]);
+
+    // Keep the lightbox's mount target in step with fullscreen toggles. Options
+    // are read afresh on every open (each open constructs a new PhotoSwipe core),
+    // so mutating them here applies to the next click without a rebuild.
+    useEffect(() => {
+        const lb = lightboxRef.current;
+        if (!lb) return;
+        lb.options.appendToEl = fsMode === 'native' && fsWrapRef.current ? fsWrapRef.current : undefined;
+    }, [fsMode]);
 
     // Hold the appointments SSE stream open while this grid is mounted — it also
     // carries `photos_rendered`, fired when a background photo-editor save finishes.
@@ -782,7 +909,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                             <button
                                 type="button"
                                 className={tpStyles.kebab}
-                                aria-label="Time point actions"
+                                aria-label="Photo session actions"
                                 aria-haspopup="menu"
                                 aria-expanded={menuFor?.tp.tp_code === timepoint.tp_code}
                                 onClick={(e) => openTimepointMenu(e, timepoint)}
@@ -791,6 +918,14 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                             </button>
                         </div>
                     ))}
+                    <button
+                        type="button"
+                        className={tpStyles.addTab}
+                        onClick={() => setShowNewSession(true)}
+                    >
+                        <i className="fas fa-plus" aria-hidden="true"></i>
+                        <span>New session</span>
+                    </button>
                 </div>
             )}
 
@@ -811,8 +946,46 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                               ? 'This session has no photos yet.'
                               : 'Select a photo session above to view its photos.'}
                     </p>
+                    {noSessions && (
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => setShowNewSession(true)}
+                        >
+                            <i className="fas fa-plus" aria-hidden="true"></i> New Photo Session
+                        </button>
+                    )}
                 </div>
             ) : (
+            <div
+                ref={fsWrapRef}
+                className={[
+                    styles.fsWrapper,
+                    fsActive ? styles.fsActive : '',
+                    fsMode === 'overlay' ? styles.fsOverlay : '',
+                ].filter(Boolean).join(' ')}
+            >
+            <div className={styles.layoutControls}>
+                <button
+                    type="button"
+                    className={`${styles.layoutToolBtn} ${anonymize ? styles.layoutToolBtnActive : ''}`}
+                    onClick={() => setAnonymize((a) => !a)}
+                    aria-pressed={anonymize}
+                    title={anonymize ? 'Remove the eye bars' : 'Anonymize — cover the eyes on extra-oral photos'}
+                    aria-label={anonymize ? 'Remove the eye bars' : 'Anonymize extra-oral photos'}
+                >
+                    <i className="fas fa-user-secret" aria-hidden="true"></i>
+                </button>
+                <button
+                    type="button"
+                    className={styles.layoutToolBtn}
+                    onClick={fsActive ? exitFullscreen : enterFullscreen}
+                    title={fsActive ? 'Exit full screen' : 'Full screen'}
+                    aria-label={fsActive ? 'Exit full screen' : 'View layout full screen'}
+                >
+                    <i className={`fas ${fsActive ? 'fa-compress' : 'fa-expand'}`} aria-hidden="true"></i>
+                </button>
+            </div>
             <div
                 id="dolph_gallery"
                 className={`pswp-gallery ${styles.galleryPadded}`}
@@ -867,6 +1040,12 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                     // stay unmarked for a cleaner grid; visibility is toggled in the lightbox.
                     const isHidden = privateNames.has(image.name.toLowerCase());
 
+                    // Anonymize bar: an SVG whose viewBox is the photo's natural size and
+                    // preserveAspectRatio="xMidYMid meet" — the exact geometry of the
+                    // img's object-fit: contain — so the rect lands on the photo itself,
+                    // letterboxing included, with zero layout measurement.
+                    const showAnonBar = anonymize && !!cell.view && EXTRA_ORAL_VIEWS.has(cell.view);
+
                     return (
                         <a
                             key={`dolph_gallery-${cell.id}`}
@@ -885,6 +1064,22 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                 decoding="async"
                                 className={styles.galleryImage}
                             />
+                            {showAnonBar && (
+                                <svg
+                                    className={styles.anonBar}
+                                    viewBox={`0 0 ${image.width} ${image.height}`}
+                                    preserveAspectRatio="xMidYMid meet"
+                                    aria-hidden="true"
+                                    focusable="false"
+                                >
+                                    <rect
+                                        x={0}
+                                        y={Math.round(image.height * ANON_BAR_TOP)}
+                                        width={image.width}
+                                        height={Math.round(image.height * ANON_BAR_HEIGHT)}
+                                    />
+                                </svg>
+                            )}
                             <span className={styles.typeLabel} aria-hidden="true">
                                 {cell.alt}
                             </span>
@@ -900,6 +1095,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                         </a>
                     );
                 })}
+            </div>
             </div>
             )}
 
@@ -945,6 +1141,23 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 sources={shareSources ?? []}
                 onClose={() => setShareSources(null)}
             />
+
+            {showNewSession && personId && (
+                <PhotoSessionDialog
+                    personId={String(personId)}
+                    patientInfo={patientInfo ?? null}
+                    onClose={() => setShowNewSession(false)}
+                    onPrepared={({ tpCode: newTp, tpName, tpDate }) => {
+                        setShowNewSession(false);
+                        // Refresh the tab strip now — the new session should show even
+                        // if the user backs out of the editor without rendering.
+                        void queryClient.invalidateQueries({ queryKey: qk.patient.timepoints(personId) });
+                        navigate(
+                            `/patient/${personId}/photo-editor/tp${newTp}?tpName=${encodeURIComponent(tpName)}&date=${tpDate}`
+                        );
+                    }}
+                />
+            )}
         </div>
     );
 };

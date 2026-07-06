@@ -546,8 +546,9 @@ export interface UpdateWorkInput {
  * Extracted from PUT /updatework so the route is a thin mapper. Enforces, in order:
  * date-field coercion, status-change validation, the secretary financial-field edit
  * time window (editable only on the work's creation day), the total_required >=
- * already-paid guard (was DB CHECK CK_MoreThanTotalW), and the admin-only discount
- * rules. On failure throws WorkUpdateError (route → 400/403/404/409) or, from
+ * already-paid guard (was DB CHECK CK_MoreThanTotalW), and the discount rules
+ * (non-admin changes divert to the approval queue via the forbidden throw).
+ * On failure throws WorkUpdateError (route → 400/403/404/409) or, from
  * validateDiscount, WorkValidationError (→ 400 with its code).
  */
 export async function validateAndUpdateWork(
@@ -657,8 +658,10 @@ export async function validateAndUpdateWork(
   }
 
   // ===== DISCOUNT FIELDS PERMISSION + VALIDATION =====
-  // discount and discount_date are admin-only (financial concession); discount_reason
-  // is editable by any authenticated user.
+  // discount and discount_date apply directly only for admin; for other roles the
+  // forbidden throw below is caught by PUT /updatework and diverted into the
+  // approval queue (action 'work.discount'). discount_reason is editable by any
+  // authenticated user.
   const discountAdminFields = ['discount', 'discount_date'] as const;
   const hasDiscountFieldInPayload = discountAdminFields.some((field) =>
     Object.prototype.hasOwnProperty.call(workData, field)
@@ -682,12 +685,9 @@ export async function validateAndUpdateWork(
       moneyFieldsChanged = true;
     }
 
-    if ((discountChanged || discountDateChanged) && userRole !== 'admin') {
-      throw new WorkUpdateError('forbidden', 'Only admin can add or edit discount.', {
-        restrictedFields: [...discountAdminFields],
-      });
-    }
-
+    // Amount validation runs BEFORE the role gate: a Front-Desk over-limit
+    // discount must 400 immediately, not sit in the approval queue only to
+    // fail when the admin hits Approve.
     if (discountChanged) {
       try {
         validateDiscount(
@@ -705,6 +705,12 @@ export async function validateAndUpdateWork(
         }
         throw err;
       }
+    }
+
+    if ((discountChanged || discountDateChanged) && userRole !== 'admin') {
+      throw new WorkUpdateError('forbidden', 'Discount changes require admin approval.', {
+        restrictedFields: [...discountAdminFields],
+      });
     }
   }
 

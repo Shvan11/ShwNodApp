@@ -64,7 +64,7 @@ const RenameFolderModal = ({ personId, targetName, onClose, onRenamed }: Props) 
 
   return (
     <Modal isOpen onClose={onClose} contentClassName={styles.dialog} ariaLabelledBy="rename-folder-title">
-      <ModalHeader title="Rename a folder to this timepoint" titleId="rename-folder-title" onClose={onClose} />
+      <ModalHeader title="Rename a folder to this session" titleId="rename-folder-title" onClose={onClose} />
 
       <div className={styles.body}>
         <p className={styles.lead}>

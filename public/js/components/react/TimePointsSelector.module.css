@@ -116,6 +116,32 @@
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
+/* "New session" tile at the end of the strip. */
+.addTab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 2px dashed var(--gray-300);
+    border-radius: var(--radius-lg);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.addTab:hover {
+    border-color: var(--indigo-500);
+    color: var(--indigo-500);
+    background: rgba(99, 102, 241, 0.06);
+    transform: translateY(-2px);
+}
+
 .tabIcon {
     display: flex;
     align-items: center;

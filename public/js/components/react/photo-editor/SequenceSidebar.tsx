@@ -263,7 +263,7 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
             className={styles.actionBtn}
             onClick={() => setShowRename(true)}
             disabled={uploading || moving || !defaultFolder}
-            title="Rename an existing patient folder to this timepoint's folder"
+            title="Rename an existing patient folder to this session's folder"
           >
             <i className="fas fa-folder-tree" aria-hidden="true" /> Rename folder
           </button>

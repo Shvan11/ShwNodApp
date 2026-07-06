@@ -8,8 +8,8 @@
     "disabledTooltip": "Save patient first to access this section"
   },
   "photos": {
-    "timepoint": "timepoint",
-    "timepoints": "timepoints",
+    "session": "photo session",
+    "sessions": "photo sessions",
     "labelFallback": "Photos",
     "tooltip": "Photos",
     "tooltipDisabled": "Save patient first to access photos"
@@ -44,9 +44,9 @@
     "dolphinTooltip": "Launch Dolphin Imaging with patient data",
     "dolphinDisabledTooltip": "Save patient first to access Dolphin Imaging",
     "dolphinAlt": "Dolphin",
-    "photoLayout": "Photo Layout",
-    "photoLayoutTooltip": "Lay out photos in the in-app editor",
-    "photoLayoutDisabledTooltip": "Save patient first"
+    "newPhotoSession": "New Photo Session",
+    "newPhotoSessionTooltip": "Create a new photo session and open the photo editor",
+    "newPhotoSessionDisabledTooltip": "Save patient first"
   },
   "toast": {
     "sendingToThreeShape": "Sending patient to 3Shape…",

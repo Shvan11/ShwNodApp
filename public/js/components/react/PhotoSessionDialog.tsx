@@ -15,8 +15,8 @@ import type { PhotoPrepareResult } from '../../types/api.types';
 interface Props {
     personId?: string;
     patientInfo: {
-        first_name?: string;
-        patient_name?: string;
+        first_name?: string | null;
+        patient_name?: string | null;
     } | null;
     onClose: () => void;
     /** Called once a timepoint is prepared, to hand off to the in-app editor. */
@@ -243,11 +243,11 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                         </div>
                     ) : (
                     <>
-                    {/* Timepoint Type */}
+                    {/* Session Type */}
                     <div className={styles.formGroup}>
-                        <label htmlFor="photo-session-timepoint-type">Timepoint Type</label>
+                        <label htmlFor="photo-session-type">Session Type</label>
                         <select
-                            id="photo-session-timepoint-type"
+                            id="photo-session-type"
                             value={timepointType}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setTimepointType(e.target.value)}
                             className={styles.formSelect}

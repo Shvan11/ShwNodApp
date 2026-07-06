@@ -8,8 +8,8 @@
     "disabledTooltip": "احفظ المريض أولاً للوصول إلى هذا القسم"
   },
   "photos": {
-    "timepoint": "وقت تصوير",
-    "timepoints": "أوقات تصوير",
+    "session": "جلسة تصوير",
+    "sessions": "جلسات تصوير",
     "labelFallback": "الصور",
     "tooltip": "الصور",
     "tooltipDisabled": "احفظ المريض أولاً للوصول إلى الصور"
@@ -44,9 +44,9 @@
     "dolphinTooltip": "تشغيل Dolphin Imaging ببيانات المريض",
     "dolphinDisabledTooltip": "احفظ المريض أولاً للوصول إلى Dolphin Imaging",
     "dolphinAlt": "Dolphin",
-    "photoLayout": "تخطيط الصور",
-    "photoLayoutTooltip": "ترتيب الصور في محرر التطبيق",
-    "photoLayoutDisabledTooltip": "احفظ المريض أولاً"
+    "newPhotoSession": "جلسة تصوير جديدة",
+    "newPhotoSessionTooltip": "إنشاء جلسة تصوير جديدة وفتح محرر الصور",
+    "newPhotoSessionDisabledTooltip": "احفظ المريض أولاً"
   },
   "toast": {
     "sendingToThreeShape": "جارٍ إرسال المريض إلى 3Shape…",

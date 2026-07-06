@@ -79,7 +79,7 @@ const TimepointActionsMenu = ({
                 disabled={folderState !== 'present'}
                 title={
                     folderState === 'absent'
-                        ? 'No original photos folder for this time point'
+                        ? 'No original photos folder for this photo session'
                         : undefined
                 }
             >
@@ -110,7 +110,7 @@ const TimepointActionsMenu = ({
                 <i className="fas fa-crop-simple" aria-hidden="true"></i>
                 <span className={styles.itemText}>
                     Cropped photos only
-                    <small className={styles.hint}>Keeps time point &amp; originals</small>
+                    <small className={styles.hint}>Keeps session &amp; originals</small>
                 </span>
             </button>
             <button
@@ -121,7 +121,7 @@ const TimepointActionsMenu = ({
             >
                 <i className="fas fa-eraser" aria-hidden="true"></i>
                 <span className={styles.itemText}>
-                    Cropped + time point
+                    Cropped + session
                     <small className={styles.hint}>Keeps original photos</small>
                 </span>
             </button>
@@ -134,7 +134,7 @@ const TimepointActionsMenu = ({
                 <i className="fas fa-trash" aria-hidden="true"></i>
                 <span className={styles.itemText}>
                     Everything
-                    <small className={styles.hint}>Originals + cropped + time point</small>
+                    <small className={styles.hint}>Originals + cropped + session</small>
                 </span>
             </button>
         </div>,

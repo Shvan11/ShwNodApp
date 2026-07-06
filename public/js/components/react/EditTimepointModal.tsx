@@ -57,7 +57,7 @@ const EditTimepointModal = ({ isOpen, timepoint, saving, onClose, onSave }: Prop
             ariaLabelledBy="edit-tp-title"
         >
             <form onSubmit={handleSubmit}>
-                <ModalHeader title="Edit Time Point" titleId="edit-tp-title" onClose={onClose} closeLabel="Close modal" />
+                <ModalHeader title="Edit Photo Session" titleId="edit-tp-title" onClose={onClose} closeLabel="Close modal" />
 
                 <div className={styles.modalBody}>
                     <label className={styles.field}>

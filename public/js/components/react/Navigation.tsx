@@ -62,7 +62,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
         enabled: hasPatient,
     });
     const photosLabel = tpData
-        ? `${tpData.length} ${t(tpData.length === 1 ? 'photos.timepoint' : 'photos.timepoints')}`
+        ? `${tpData.length} ${t(tpData.length === 1 ? 'photos.session' : 'photos.sessions')}`
         : t('photos.labelFallback');
 
     // Patients-folder UNC: prefer the localStorage cache; only hit the API when
@@ -408,12 +408,12 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                                 setShowNativePhotoEditor(true);
                                 setMoreActionsExpanded(false);
                             }}
-                            title={isNewPatient ? t('flyout.photoLayoutDisabledTooltip') : t('flyout.photoLayoutTooltip')}
+                            title={isNewPatient ? t('flyout.newPhotoSessionDisabledTooltip') : t('flyout.newPhotoSessionTooltip')}
                         >
                             <div className="action-item-icon">
-                                <i className="fas fa-images" />
+                                <i className="fas fa-camera" />
                             </div>
-                            <span className="action-item-label">{t('flyout.photoLayout')}</span>
+                            <span className="action-item-label">{t('flyout.newPhotoSession')}</span>
                         </Link>
                     </div>
                 </div>

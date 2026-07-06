@@ -87,7 +87,10 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     getTargetId: (p) => Number(p.workId),
     getPersonId: (p) => (p.person_id != null ? Number(p.person_id) : undefined),
     getVersion: (id) => getUpdatedAt('works', 'work_id', id),
-    summarize: (p) => `Apply discount on work #${p.workId}`,
+    summarize: (p) =>
+      p.discount != null && Number(p.discount) > 0
+        ? `Apply discount on work #${p.workId}`
+        : `Remove discount on work #${p.workId}`,
     apply: async (p) => {
       const { workId, ...workData } = p;
       await validateAndUpdateWork({ workId: Number(workId), userRole: 'admin', workData });

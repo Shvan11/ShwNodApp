@@ -306,11 +306,8 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         : null,
                     discount_reason: discountNum > 0 ? (formData.discount_reason || null) : null
                 };
-                // Non-admin: don't send discount/discount_date so backend doesn't 403
-                if (!isAdmin) {
-                    delete updatePayload.discount;
-                    delete updatePayload.discount_date;
-                }
+                // Non-admin discount changes are diverted server-side into the
+                // admin approval queue (outcome 'pending' below) — send them as-is.
                 const updateResult = await putJSON<{ outcome: string }>('/api/updatework', updatePayload, { schema: workContract.updateWork.response });
                 if (updateResult.outcome === 'pending') {
                     toast.success('Submitted for admin approval');
@@ -761,7 +758,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                         Discount
                                         {!isAdmin && (
                                             <small className={`${styles.formHint} ${styles.adminHint}`}>
-                                                <i className="fas fa-lock"></i> Admin only
+                                                <i className="fas fa-user-check"></i> Requires admin approval
                                             </small>
                                         )}
                                     </label>
@@ -769,7 +766,6 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                         id="work-discount"
                                         type="text"
                                         value={displayValues.discount}
-                                        disabled={!isAdmin}
                                         onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                             const numericValue = parseFormattedNumber(e.target.value) || 0;
                                             setFormData({ ...formData, discount: numericValue });
@@ -796,10 +792,10 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                         id="work-discount-date"
                                         type="date"
                                         value={formData.discount_date}
-                                        disabled={!isAdmin || formData.discount <= 0}
+                                        disabled={formData.discount <= 0}
                                         onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, discount_date: e.target.value })}
                                     />
-                                    {isAdmin && formData.discount > 0 && !formData.discount_date && (
+                                    {formData.discount > 0 && !formData.discount_date && (
                                         <small className={styles.formHint}>
                                             Will default to today if left blank
                                         </small>

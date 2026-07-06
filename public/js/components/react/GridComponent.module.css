@@ -8,6 +8,141 @@
   overflow-x: hidden;
 }
 
+/* ==== Layout tools (fullscreen presentation + anonymize) ==== */
+
+/* Wraps the controls bar + grid; it is the fullscreen element, so entering
+   fullscreen shows ONLY the layout. Positioning context for the floating
+   controls while fullscreen. */
+.fsWrapper {
+  position: relative;
+}
+
+/* Belt-and-braces for the one frame between the fullscreen transition and the
+   React state flip that applies .fsActive. Always-dark presentation surface —
+   literal black by design, both themes. */
+.fsWrapper:fullscreen {
+  background: #000;
+}
+
+.fsActive {
+  background: #000;
+  overflow-y: auto;
+}
+
+/* CSS fallback when the element Fullscreen API is unavailable/refused
+   (e.g. iPhone Safari): a fixed overlay over the whole app. */
+.fsOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-index-modal);
+}
+
+/* Slim right-aligned toolbar above the grid; aligned to the grid's width. */
+.layoutControls {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-xs);
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-lg) var(--spacing-xs) var(--spacing-lg);
+}
+
+.layoutToolBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 30px;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.layoutToolBtn:hover {
+  background: var(--surface-muted);
+  color: var(--text-primary);
+}
+
+/* Anonymize toggle ON — red privacy accent, matching the visibility badge. */
+.layoutToolBtnActive,
+.layoutToolBtnActive:hover {
+  background: var(--error-50);
+  border-color: var(--error-color);
+  color: var(--error-color);
+}
+
+/* While fullscreen the controls float top-right over the black backdrop. */
+.fsActive .layoutControls {
+  position: absolute;
+  top: var(--spacing-md);
+  inset-inline-end: var(--spacing-md);
+  width: auto;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  z-index: 3;
+}
+
+.fsActive .layoutToolBtn {
+  width: 42px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: var(--color-white);
+}
+
+.fsActive .layoutToolBtn:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.fsActive .layoutToolBtnActive,
+.fsActive .layoutToolBtnActive:hover {
+  background: rgba(220, 53, 69, 0.85);
+  border-color: transparent;
+}
+
+/* Anonymize eye bar over a grid cell. The SVG's viewBox is the photo's natural
+   size with preserveAspectRatio "meet" — the same geometry as the img's
+   object-fit: contain — so the rect tracks the photo, letterboxing included. */
+.anonBar {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  transition: transform 0.2s ease;
+}
+
+.anonBar rect {
+  fill: #000;
+}
+
+/* Mirror the img's hover/focus lift so the bar stays glued to the eyes. */
+.galleryCell:hover .anonBar,
+.galleryCell:focus-visible .anonBar {
+  transform: scale(1.05);
+}
+
+/* Anonymize bar inside the lightbox. Geometry (top/width/height in displayed-
+   image pixels) is set by the imageSizeChange handler; z-index lifts it above
+   the z:auto img/placeholder siblings regardless of append order. PhotoSwipe
+   renders outside this component's DOM tree, hence :global. */
+:global(.pswp__anon-bar) {
+  position: absolute;
+  /*rtl:ignore*/
+  left: 0;
+  top: 0;
+  background: #000;
+  pointer-events: none;
+  z-index: 1;
+}
+
 /* Photo gallery grid */
 .galleryPadded {
   display: grid;
@@ -18,8 +153,21 @@
   width: 100%;
   max-width: 900px;
   margin: 0 auto;
-  height: calc(100vh - 120px);
+  height: calc(100vh - 158px);
   overflow: hidden;
+}
+
+/* Fullscreen: the grid fills the screen height; wider cap so the photos grow
+   with the taller viewport, still centred. */
+.fsActive .galleryPadded {
+  height: 100%;
+  max-width: 1200px;
+  padding: var(--spacing-lg);
+}
+
+/* Photos sit directly on the black backdrop — no light letterbox slabs. */
+.fsActive .galleryImage {
+  background-color: transparent;
 }
 
 .galleryPadded a {
@@ -238,6 +386,13 @@
     overflow-y: auto;
     gap: 12px;
     padding: 0 var(--spacing-md) var(--spacing-md) var(--spacing-md);
+  }
+
+  /* Single-column stack is taller than the screen — let the fullscreen
+     wrapper scroll it instead of clipping at 100%. */
+  .fsActive .galleryPadded {
+    height: auto;
+    padding-top: 56px; /* clear the floating controls */
   }
 
   .galleryPadded a,

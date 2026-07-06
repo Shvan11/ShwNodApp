@@ -374,7 +374,7 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
       <header className={styles.topbar}>
         <div className={styles.leftCluster}>
           <div className={styles.titleBlock}>
-            <span className={styles.tpName}>{tpName || 'Timepoint'}</span>
+            <span className={styles.tpName}>{tpName || 'Photo session'}</span>
             {tpDate && <span className={styles.tpDate}>{tpDate}</span>}
             <span className={styles.count}>{placedCount}/8 placed</span>
           </div>
@@ -480,7 +480,7 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
           <h2 className={styles.confirmTitle}>Remove photo?</h2>
           <p className={styles.confirmText}>
             This removes the cropped{' '}
-            <strong>{removeTarget ? labelForView(removeTarget) : ''}</strong> photo from this timepoint. The
+            <strong>{removeTarget ? labelForView(removeTarget) : ''}</strong> photo from this session. The
             original photo is kept and returns to the Sequence Files panel.
           </p>
           <div className={styles.confirmActions}>

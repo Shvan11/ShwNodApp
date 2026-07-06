@@ -35,15 +35,15 @@ const SCOPE_CONFIG: Record<DeleteScope, { title: string; confirmLabel: string; l
         lines: [
             { removed: true, text: 'Modified (cropped) photos will be deleted' },
             { removed: false, text: 'Original photos are kept' },
-            { removed: false, text: 'Time point entry is kept' },
+            { removed: false, text: 'Photo session entry is kept' },
         ],
     },
     entry: {
-        title: 'Delete cropped photos + time point',
-        confirmLabel: 'Delete time point',
+        title: 'Delete cropped photos + session',
+        confirmLabel: 'Delete photo session',
         lines: [
             { removed: true, text: 'Modified (cropped) photos will be deleted' },
-            { removed: true, text: 'The time point entry will be removed' },
+            { removed: true, text: 'The photo session entry will be removed' },
             { removed: false, text: 'Original photos are kept in their folder' },
         ],
     },
@@ -53,7 +53,7 @@ const SCOPE_CONFIG: Record<DeleteScope, { title: string; confirmLabel: string; l
         lines: [
             { removed: true, text: 'Original photos will be permanently deleted' },
             { removed: true, text: 'Modified (cropped) photos will be deleted' },
-            { removed: true, text: 'The time point entry will be removed' },
+            { removed: true, text: 'The photo session entry will be removed' },
         ],
     },
 };
@@ -63,7 +63,7 @@ const DeleteTimepointModal = ({ isOpen, timepoint, scope, deleting, onConfirm, o
 
     const cfg = SCOPE_CONFIG[scope];
     const date = (timepoint.tpDateTime ?? '').substring(0, 10).split('-').reverse().join('-');
-    const label = `${timepoint.tpDescription || 'this time point'}${date ? ` (${date})` : ''}`;
+    const label = `${timepoint.tpDescription || 'this photo session'}${date ? ` (${date})` : ''}`;
 
     return (
         <Modal
