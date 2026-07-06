@@ -3,6 +3,7 @@
  * Displays message status for selected date
  */
 
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { MESSAGE_STATUS, type MessageStatusValue } from '../../utils/whatsapp-send-constants';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import styles from '../../routes/WhatsAppSend.module.css';
@@ -38,6 +39,8 @@ function StatusTicks({ status }: { status: MessageStatusValue }) {
 
 export interface MessageItem {
   status: MessageStatusValue;
+  appointmentId?: number;
+  errorMessage?: string;
   timeSent?: string;
   sentAt?: string;
   timestamp?: string;
@@ -72,6 +75,8 @@ interface MessageStatusTableProps {
   MESSAGE_STATUS_CLASS: Record<MessageStatusValue, string>;
   escapeHtml: (text: string) => string;
   summary: MessageSummary;
+  /** Right-click on a row — opens the resend/copy context menu (owner: page). */
+  onRowContextMenu?: (event: ReactMouseEvent, msg: MessageItem) => void;
 }
 
 export default function MessageStatusTable({
@@ -83,6 +88,7 @@ export default function MessageStatusTable({
   MESSAGE_STATUS_CLASS,
   escapeHtml,
   summary,
+  onRowContextMenu,
 }: MessageStatusTableProps) {
   if (loading) {
     return (
@@ -171,7 +177,11 @@ export default function MessageStatusTable({
                 messageText.substring(0, 50) + (messageText.length > 50 ? '...' : '');
 
               return (
-                <tr key={`${rawPhone || 'na'}-${timeSent}-${index}`} className={`status-row ${statusClass}`}>
+                <tr
+                  key={`${rawPhone || 'na'}-${timeSent}-${index}`}
+                  className={`status-row ${statusClass}`}
+                  onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, msg) : undefined}
+                >
                   <td className={styles.patientName}>
                     <div dangerouslySetInnerHTML={{ __html: escapeHtml(patientName) }} />
                   </td>
@@ -183,6 +193,11 @@ export default function MessageStatusTable({
                       <StatusTicks status={msg.status} />
                       {statusText}
                     </span>
+                    {msg.errorMessage && (
+                      <div className={styles.errorReason} title={msg.errorMessage}>
+                        {msg.errorMessage}
+                      </div>
+                    )}
                   </td>
                   <td className={styles.timeSent}>{timeSent}</td>
                   <td className={styles.messagePreview} title={messageText}>

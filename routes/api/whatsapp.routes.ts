@@ -25,6 +25,8 @@ import messageState from '../../services/state/messageState.js';
 import stateEvents from '../../services/state/stateEvents.js';
 import { getReceiptData } from '../../services/templates/receipt-service.js';
 import { getAppointmentForNotification } from '../../services/database/queries/appointment-queries.js';
+import { getNewAppointmentMessage } from '../../services/database/queries/messaging-queries.js';
+import { toDateOnly } from '../../utils/date.js';
 
 // Utilities
 import config from '../../config/config.js';
@@ -116,6 +118,22 @@ router.get(
             'WhatsApp client is not ready. Please wait for initialization to complete.',
           clientStatus: status as Record<string, unknown>,
           requiresRestart: status.circuitBreakerOpen
+        });
+        return;
+      }
+
+      // One batch at a time — a second click while a batch runs used to start a
+      // parallel loop that double-sent patients. Raw (un-enveloped) response,
+      // like the started case below; the client checks `alreadyInProgress`.
+      if (whatsapp.isBatchSending()) {
+        log.warn('WhatsApp batch send rejected - a batch is already in progress', {
+          date: dateparam
+        });
+        res.json({
+          success: true,
+          alreadyInProgress: true,
+          message: 'A sending batch is already in progress',
+          date: dateparam
         });
         return;
       }
@@ -391,6 +409,87 @@ Thank you.`;
       res.json({
         success: false,
         message: 'Internal error'
+      });
+    }
+  }
+);
+
+/**
+ * Re-send the reminder message for a single appointment.
+ * POST /resend-appointment (mounted at /api/wa)
+ * Body: { appointmentId: number }
+ *
+ * Powers the right-click → "Re-send" action on the /send status table (retry a
+ * failed number without resending the whole day). Rebuilds the same reminder
+ * text the batch sender uses, sends it, re-marks the appointment as sent, and
+ * re-registers the new message id for live delivery ticks. Enveloped response
+ * (consumed via the funnel with { schema }), unlike the legacy raw routes.
+ */
+router.post(
+  '/resend-appointment',
+  validate({ body: waContract.resendAppointment.body }),
+  async (
+    req: Request<unknown, unknown, waContract.ResendAppointmentBody>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { appointmentId } = req.body;
+
+      log.info(`WhatsApp reminder resend request - appointment_id: ${appointmentId}`);
+
+      if (!whatsapp.isReady()) {
+        sendError(res, 503, 'WhatsApp is not connected', { service: 'WhatsApp' });
+        return;
+      }
+
+      const appointment = await getAppointmentForNotification(appointmentId);
+      if (!appointment) {
+        ErrorResponses.notFound(res, 'Appointment');
+        return;
+      }
+
+      const built = await getNewAppointmentMessage(appointment.person_id, appointmentId);
+      if (!built || built.result === -1 || !built.message) {
+        ErrorResponses.notFound(res, 'Appointment message');
+        return;
+      }
+      if (built.result === -2 || !built.phone) {
+        ErrorResponses.badRequest(res, 'Patient has no valid phone number', {
+          details: 'Use "Copy message" and send it manually instead.'
+        });
+        return;
+      }
+
+      const appointmentDay = toDateOnly(appointment.app_date);
+      const result = await whatsapp.sendMessage(
+        built.phone,
+        built.message,
+        appointment.patient_name,
+        appointmentId,
+        appointmentDay
+      );
+
+      if (!result.success) {
+        log.error(`Reminder resend failed for appointment ${appointmentId}: ${result.error}`);
+        sendError(res, 502, result.error || 'Failed to send message', {
+          service: 'WhatsApp'
+        });
+        return;
+      }
+
+      log.info(
+        `Reminder resent for appointment ${appointmentId} - MessageID: ${result.messageId}`
+      );
+      sendData(res, waContract.resendAppointment.response, {
+        appointmentId,
+        messageId: result.messageId as string
+      });
+    } catch (error) {
+      log.error(
+        `Error resending appointment reminder: ${(error as Error).message}`
+      );
+      ErrorResponses.internalError(res, 'Failed to resend message', {
+        error: (error as Error).message
       });
     }
   }

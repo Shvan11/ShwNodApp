@@ -47,6 +47,13 @@ export interface Message {
   MessageText?: string;
   status: MessageStatusValue;
   SentAt?: string;
+  /** Present on every transformed row — drives the right-click resend/copy actions. */
+  appointmentId?: number;
+  patientName?: string;
+  name?: string;
+  phone?: string;
+  /** Humanized failure reason overlaid from the live send state (failed rows). */
+  errorMessage?: string;
   [key: string]: unknown;
 }
 

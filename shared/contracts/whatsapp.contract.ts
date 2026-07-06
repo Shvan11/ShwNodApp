@@ -58,6 +58,21 @@ export const qr = { response: z.looseObject({}) } as const;
 export const sendByDateQuery = z.object({ date: z.string().optional() });
 export type SendByDateQuery = z.infer<typeof sendByDateQuery>;
 
+// POST /api/wa/resend-appointment — { appointmentId }. Re-sends the reminder
+// message for ONE appointment (right-click → "Re-send" on the /send status
+// table). UNLIKE the raw apiClient endpoints above, this is consumed through
+// the funnel (postJSON with `{ schema }`), so the response IS modeled: the
+// handler answers via sendData (enveloped) and failures ride sendError.
+export const resendAppointment = {
+  body: z.object({ appointmentId: z.coerce.number() }),
+  response: z.object({
+    appointmentId: z.number(),
+    messageId: z.string(),
+  }),
+} as const;
+export type ResendAppointmentBody = z.infer<typeof resendAppointment.body>;
+export type ResendAppointmentResponse = z.infer<typeof resendAppointment.response>;
+
 // GET + PUT /api/wa/group-settings — config for the daily-appointments PDF posted
 // to the staff WhatsApp group, persisted in the `options` table. UNLIKE the raw
 // apiClient endpoints above, these are consumed through the funnel (fetchJSON /

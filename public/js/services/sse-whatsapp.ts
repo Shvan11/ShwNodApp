@@ -24,6 +24,7 @@ const WIRE_EVENTS = [
   'whatsapp_sending_started',
   'whatsapp_sending_progress',
   'whatsapp_sending_finished',
+  'whatsapp_send_unconfirmed',
 ] as const;
 
 class SseWhatsapp {

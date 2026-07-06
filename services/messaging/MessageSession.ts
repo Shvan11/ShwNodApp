@@ -87,6 +87,9 @@ export interface WhatsAppServiceInterface {
 export class MessageSession {
   public readonly sessionId: string;
   public readonly date: string;
+  /** Whether the daily appointments PDF has already been posted to the staff
+   *  group during this session — a re-clicked Send must not repost it. */
+  public pdfPosted = false;
   public status: SessionStatus;
   public startTime: Date;
   public endTime: Date | null;
@@ -304,6 +307,38 @@ export class MessageSession {
     });
 
     return true;
+  }
+
+  /**
+   * Re-register an appointment under a NEW message id (a manual per-patient
+   * resend). registerMessage() refuses appointments this session already
+   * processed, which is right for the batch loop but wrong for an explicit
+   * resend — acks for the new message would never reach the row. Drop the old
+   * mapping first, then register normally.
+   */
+  registerResend(
+    messageId: string,
+    appointmentId: number,
+    appointmentDate: Date | string
+  ): boolean {
+    if (this.status !== 'ACTIVE') {
+      return false;
+    }
+
+    const oldMessageId = this.appointmentIdToMessageMap.get(appointmentId);
+    if (oldMessageId) {
+      this.messageIdToAppointmentMap.delete(oldMessageId);
+      this.appointmentIdToMessageMap.delete(appointmentId);
+    }
+    this.processedAppointments.delete(appointmentId);
+
+    try {
+      return this.registerMessage(messageId, appointmentId, appointmentDate);
+    } catch {
+      // Date-mismatch or lifecycle throw — the resend is still sent; only the
+      // live ack tracking is lost, which the caller logs.
+      return false;
+    }
   }
 
   /**

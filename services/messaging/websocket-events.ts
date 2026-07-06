@@ -23,6 +23,10 @@ export const InternalEmitterEvents = {
   WHATSAPP_SENDING_STARTED: 'whatsapp_sending_started',
   WHATSAPP_SENDING_PROGRESS: 'whatsapp_sending_progress',
   WHATSAPP_SENDING_FINISHED: 'whatsapp_sending_finished',
+  /** A batch reported "sent" but ZERO delivery acks arrived in the watch
+   *  window — the WhatsApp socket was silently dead and the messages almost
+   *  certainly never left this machine. The UI must warn loudly. */
+  WHATSAPP_SEND_UNCONFIRMED: 'whatsapp_send_unconfirmed',
 } as const;
 
 export type InternalEmitterEvent = (typeof InternalEmitterEvents)[keyof typeof InternalEmitterEvents];

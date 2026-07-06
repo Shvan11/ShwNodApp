@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useDateManager } from '../hooks/useDateManager';
 import { useWhatsAppSync } from '../hooks/useWhatsAppSync';
@@ -10,9 +11,13 @@ import GroupSettings from '../components/whatsapp-send/GroupSettings';
 import ConnectionStatus from '../components/whatsapp-send/ConnectionStatus';
 import ProgressBar from '../components/whatsapp-send/ProgressBar';
 import ActionButtons from '../components/whatsapp-send/ActionButtons';
-import MessageStatusTable from '../components/whatsapp-send/MessageStatusTable';
-import { API_ENDPOINTS } from '../utils/whatsapp-send-constants';
+import MessageStatusTable, { type MessageItem } from '../components/whatsapp-send/MessageStatusTable';
+import LookupContextMenu, { type LookupMenuItem } from '../components/react/LookupContextMenu';
+import { API_ENDPOINTS, MESSAGE_STATUS } from '../utils/whatsapp-send-constants';
 import { APIClient } from '../utils/whatsapp-api-client';
+import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import * as messagingContract from '@shared/contracts/messaging.contract';
+import * as waContract from '@shared/contracts/whatsapp.contract';
 
 // WhatsApp send page styles - CSS Module
 import styles from './WhatsAppSend.module.css';
@@ -20,6 +25,39 @@ import styles from './WhatsAppSend.module.css';
 import type { WhatsAppResetResponse, EmailResponse } from '@/types/api.types';
 
 const apiClient = new APIClient();
+
+/**
+ * Copy text to the clipboard. navigator.clipboard needs a secure context
+ * (https / localhost); the textarea+execCommand path covers plain-http LAN use.
+ */
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // fall through to the legacy path
+  }
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Gap between bulk resends — mirrors the batch sender's per-message spacing. */
+const BULK_RESEND_GAP_MS = 2000;
 
 export default function WhatsAppSend() {
   // Toast notifications (unified global system)
@@ -34,6 +72,7 @@ export default function WhatsAppSend() {
     clientReady,
     sendingProgress,
     messageStatusUpdate,
+    unconfirmedSend,
     requestInitialState
   } = useWhatsAppSync(currentDate);
 
@@ -59,6 +98,27 @@ export default function WhatsAppSend() {
   // UI state
   const [resetConfirm, setResetConfirm] = useState(false);
   const [emailConfirm, setEmailConfirm] = useState(false);
+
+  const sendingInProgress = sendingProgress.started && !sendingProgress.finished;
+
+  // Right-click context menu on a status-table row (resend / copy fallbacks)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; msg: MessageItem } | null>(
+    null
+  );
+  const [bulkResending, setBulkResending] = useState(false);
+
+  // Zero-ack batch warning from the server: the last batch reported "sent" but
+  // WhatsApp never confirmed a single message — surface it loudly and refresh.
+  useEffect(() => {
+    if (!unconfirmedSend) return;
+    toast.error(
+      unconfirmedSend.message ||
+        'WhatsApp did not confirm the last batch — the messages were most likely NOT delivered.',
+      30000
+    );
+    void refreshMessageStatus();
+    void refreshMessageCount();
+  }, [unconfirmedSend, toast, refreshMessageStatus, refreshMessageCount]);
 
   // Handle date change
   const handleDateChange = useCallback((newDate: string) => {
@@ -134,12 +194,167 @@ export default function WhatsAppSend() {
     }
 
     try {
-      await apiClient.get(API_ENDPOINTS.WA_SEND(currentDate));
-      toast.success('Messages sending started');
+      const result = await apiClient.get<{ alreadyInProgress?: boolean }>(
+        API_ENDPOINTS.WA_SEND(currentDate)
+      );
+      if (result.alreadyInProgress) {
+        toast.warning('A sending batch is already in progress — wait for it to finish');
+      } else {
+        toast.success('Messages sending started');
+      }
     } catch (error) {
       toast.error(`Failed to start sending: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }, [clientReady, currentDate, toast]);
+
+  // ---- Row context menu: re-send / copy fallbacks ----------------------------
+
+  const handleRowContextMenu = useCallback((event: ReactMouseEvent, msg: MessageItem) => {
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY, msg });
+  }, []);
+
+  /** Re-send one appointment's reminder; returns true on success. */
+  const resendOne = useCallback(
+    async (appointmentId: number, name: string, notify: boolean): Promise<boolean> => {
+      try {
+        await postJSON(
+          API_ENDPOINTS.WA_RESEND,
+          { appointmentId },
+          { schema: waContract.resendAppointment.response }
+        );
+        if (notify) toast.success(`Reminder re-sent to ${name}`);
+        return true;
+      } catch (error) {
+        if (notify) {
+          toast.error(`Re-send to ${name} failed: ${httpErrorMessage(error, 'Unknown error')}`);
+        }
+        return false;
+      }
+    },
+    [toast]
+  );
+
+  const handleResendRow = useCallback(
+    async (msg: MessageItem) => {
+      if (msg.appointmentId == null) return;
+      const name = msg.patientName || msg.name || 'patient';
+      await resendOne(msg.appointmentId, name, true);
+      await refreshMessageStatus();
+      await refreshMessageCount();
+    },
+    [resendOne, refreshMessageStatus, refreshMessageCount]
+  );
+
+  // Failed rows only (ack ERROR) — the "re-send to those failed numbers alone" path.
+  const failedMessages = messages.filter(
+    (m) => m.status === MESSAGE_STATUS.FAILED && m.appointmentId != null
+  );
+
+  const handleResendAllFailed = useCallback(async () => {
+    if (bulkResending || failedMessages.length === 0) return;
+    setBulkResending(true);
+    toast.info(`Re-sending ${failedMessages.length} failed message(s)…`);
+    let sent = 0;
+    try {
+      for (let i = 0; i < failedMessages.length; i++) {
+        const m = failedMessages[i];
+        const name = m.patientName || m.name || 'patient';
+        if (await resendOne(m.appointmentId as number, name, false)) sent++;
+        if (i < failedMessages.length - 1) await sleep(BULK_RESEND_GAP_MS);
+      }
+    } finally {
+      setBulkResending(false);
+    }
+    if (sent === failedMessages.length) {
+      toast.success(`Re-sent all ${sent} failed message(s)`);
+    } else {
+      toast.warning(`Re-sent ${sent} of ${failedMessages.length} failed message(s) — check the table for reasons`);
+    }
+    await refreshMessageStatus();
+    await refreshMessageCount();
+  }, [bulkResending, failedMessages, resendOne, toast, refreshMessageStatus, refreshMessageCount]);
+
+  const handleCopyMessage = useCallback(
+    async (msg: MessageItem) => {
+      if (msg.appointmentId == null) return;
+      try {
+        const data = await fetchJSON<messagingContract.MessageTextResponse>(
+          API_ENDPOINTS.MESSAGE_TEXT(msg.appointmentId),
+          { schema: messagingContract.messageText.response }
+        );
+        const ok = await copyToClipboard(data.message);
+        if (ok) toast.success('Message text copied — paste it into WhatsApp to send manually');
+        else toast.error('Could not copy to clipboard');
+      } catch (error) {
+        toast.error(`Failed to fetch message text: ${httpErrorMessage(error, 'Unknown error')}`);
+      }
+    },
+    [toast]
+  );
+
+  const handleCopyPhone = useCallback(
+    async (msg: MessageItem) => {
+      const rawPhone = msg.phone || msg.phoneNumber || msg.mobile || '';
+      // Prefer the server's country-coded form; fall back to the raw row value.
+      let phone = rawPhone;
+      if (msg.appointmentId != null) {
+        try {
+          const data = await fetchJSON<messagingContract.MessageTextResponse>(
+            API_ENDPOINTS.MESSAGE_TEXT(msg.appointmentId),
+            { schema: messagingContract.messageText.response }
+          );
+          if (data.phone) phone = `+${data.phone}`;
+        } catch {
+          // keep raw
+        }
+      }
+      if (!phone) {
+        toast.error('No phone number on this row');
+        return;
+      }
+      const ok = await copyToClipboard(phone);
+      if (ok) toast.success(`Phone number copied: ${phone}`);
+      else toast.error('Could not copy to clipboard');
+    },
+    [toast]
+  );
+
+  const contextMenuItems: LookupMenuItem[] = contextMenu
+    ? [
+        {
+          key: 'resend',
+          label: 'Re-send message',
+          icon: 'fa-paper-plane',
+          disabled: !clientReady || sendingInProgress || bulkResending || contextMenu.msg.appointmentId == null,
+          onClick: () => void handleResendRow(contextMenu.msg),
+        },
+        ...(failedMessages.length > 0
+          ? [
+              {
+                key: 'resend-failed',
+                label: `Re-send all failed (${failedMessages.length})`,
+                icon: 'fa-rotate-right',
+                disabled: !clientReady || sendingInProgress || bulkResending,
+                onClick: () => void handleResendAllFailed(),
+              },
+            ]
+          : []),
+        {
+          key: 'copy-message',
+          label: 'Copy message text',
+          icon: 'fa-copy',
+          disabled: contextMenu.msg.appointmentId == null,
+          onClick: () => void handleCopyMessage(contextMenu.msg),
+        },
+        {
+          key: 'copy-phone',
+          label: 'Copy phone number',
+          icon: 'fa-phone',
+          onClick: () => void handleCopyPhone(contextMenu.msg),
+        },
+      ]
+    : [];
 
   // Check for auth completion redirect
   useEffect(() => {
@@ -153,8 +368,6 @@ export default function WhatsAppSend() {
       requestInitialState();
     }
   }, [requestInitialState]);
-
-  const sendingInProgress = sendingProgress.started && !sendingProgress.finished;
 
   return (
     <div id="app">
@@ -230,10 +443,21 @@ export default function WhatsAppSend() {
               MESSAGE_STATUS_CLASS={MESSAGE_STATUS_CLASS}
               escapeHtml={escapeHtml}
               summary={summary}
+              onRowContextMenu={handleRowContextMenu}
             />
           </div>
         </section>
       </main>
+
+      {/* Right-click resend/copy menu on a status row */}
+      {contextMenu && (
+        <LookupContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenuItems}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
 
       {/* Toast Notifications now handled globally by ToastProvider in App.tsx */}
     </div>

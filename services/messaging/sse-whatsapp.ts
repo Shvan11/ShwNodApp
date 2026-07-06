@@ -52,6 +52,7 @@ function ensureInitialized(emitter: EventEmitter): void {
     [InternalEmitterEvents.WHATSAPP_SENDING_STARTED, 'whatsapp_sending_started'],
     [InternalEmitterEvents.WHATSAPP_SENDING_PROGRESS, 'whatsapp_sending_progress'],
     [InternalEmitterEvents.WHATSAPP_SENDING_FINISHED, 'whatsapp_sending_finished'],
+    [InternalEmitterEvents.WHATSAPP_SEND_UNCONFIRMED, 'whatsapp_send_unconfirmed'],
   ];
 
   for (const [internal, wireName] of wire) {

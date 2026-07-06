@@ -193,6 +193,16 @@ export class MessageSessionManager {
   }
 
   /**
+   * Get the still-valid active session for a date, if any. Used by the ad-hoc
+   * resend path to register the new message id for live ack tracking.
+   */
+  getActiveSession(date: Date | string): MessageSession | null {
+    const normalizedDate = date instanceof Date ? toDateOnly(date) : date;
+    const session = this.activeSessions.get(normalizedDate);
+    return session && session.isValid() ? session : null;
+  }
+
+  /**
    * Get appointment ID for a message across all active sessions
    */
   getAppointmentIdForMessage(messageId: string): MessageLookupResult | null {

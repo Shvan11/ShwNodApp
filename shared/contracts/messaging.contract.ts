@@ -65,6 +65,22 @@ export const reset = {
   }),
 } as const;
 
+// GET /api/messaging/message-text/:appointmentId → the reminder text that
+// is/would be sent for one appointment. Powers the right-click "Copy message"
+// fallback for manual sending; `phone` is country-coded (no '+'), null when the
+// stored phone fails validation (the copy fallback is precisely for that case).
+export const messageText = {
+  params: z.object({ appointmentId: z.coerce.number() }),
+  response: z.object({
+    appointmentId: z.number(),
+    patientName: z.string(),
+    phone: z.string().nullable(),
+    message: z.string(),
+  }),
+} as const;
+export type MessageTextParams = z.infer<typeof messageText.params>;
+export type MessageTextResponse = z.infer<typeof messageText.response>;
+
 // Shared `:date` path param for the messaging endpoints. Type-only.
 export const dateParams = z.object({ date: z.string() });
 export type DateParams = z.infer<typeof dateParams>;

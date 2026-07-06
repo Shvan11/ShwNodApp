@@ -7,6 +7,7 @@ import * as messagingQueries from '../database/queries/messaging-queries.js';
 import { InternalEmitterEvents } from './websocket-events.js';
 import { messageSessionManager, type MessageLookupResult } from './MessageSessionManager.js';
 import { type MessageSession } from './MessageSession.js';
+import { humanizeWhatsAppError, isConnectionStallError } from './whatsapp-errors.js';
 import { log } from '../../utils/logger.js';
 import { PhoneFormatter } from '../../utils/phoneFormatter.js';
 import pdfGenerator from '../pdf/appointment-pdf-generator.js';
@@ -554,6 +555,23 @@ class WhatsAppService extends EventEmitter {
   // (see startHeartbeat).
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private heartbeatMisses = 0;
+
+  // Bound every page round-trip in the send paths. Puppeteer's own protocol
+  // timeout is 180s, which serialized a whole batch behind one frozen call
+  // (observed 2026-07-05: three sends each stalled ~3min on a half-dead page).
+  private readonly SEND_MESSAGE_TIMEOUT_MS = 60000;
+
+  // One batch at a time. /api/wa/send is fire-and-forget, so an impatient
+  // second click used to start a PARALLEL loop over the same eligibility query
+  // — observed double-sending the same patients (2026-07-05 20:33).
+  private batchSendActive = false;
+
+  // Ad-hoc sends (per-patient resend, receipts) aren't registered in a batch
+  // MessageSession, so their acks used to be dropped by handleMessageAck. Track
+  // recent ad-hoc messageId → appointment here so delivery ticks still land in
+  // the DB + SSE. In-memory, pruned by size; scale is a handful/day.
+  private adhocMessages = new Map<string, { appointmentId: number; trackedAt: number }>();
+  private readonly ADHOC_MESSAGES_MAX = 500;
 
   private eventHandlers: {
     onQR: (qr: string) => Promise<void>;
@@ -1614,6 +1632,29 @@ class WhatsAppService extends EventEmitter {
     });
 
     if (!messageInfo) {
+      // Ad-hoc sends (per-patient resend, receipts) aren't in a batch session —
+      // persist their acks via the bounded ad-hoc map instead of dropping them.
+      const adhoc = this.adhocMessages.get(messageId);
+      if (adhoc) {
+        try {
+          await messagingQueries.updateSingleMessageStatus(messageId, ack);
+          if (this.wsEmitter) {
+            this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_MESSAGE_STATUS, {
+              messageId,
+              appointmentId: adhoc.appointmentId,
+              status: ack,
+            });
+          }
+        } catch (error) {
+          log.error('Error updating ad-hoc message status', {
+            messageId,
+            appointmentId: adhoc.appointmentId,
+            error: (error as Error).message,
+          });
+        }
+        return;
+      }
+
       log.debug(
         'Message not found in any active session - may be from previous session or external message',
         {
@@ -2091,8 +2132,10 @@ class WhatsAppService extends EventEmitter {
       const pdfResult = await pdfGenerator.generateAppointmentPDF(date);
 
       // Locate the target group by exact chat name (no direct name→id lookup in
-      // whatsapp-web.js, so scan the chat list).
-      const chats = await client.getChats();
+      // whatsapp-web.js, so scan the chat list). Bounded: on a frozen page an
+      // un-timeouted getChats() hung the whole send() before the per-patient
+      // loop even started (observed 2026-07-05 21:02).
+      const chats = await withTimeout(client.getChats(), 30000, 'getChats (group PDF)');
       const group = chats.find((chat) => chat.isGroup && chat.name?.trim() === groupName);
       if (!group) {
         log.warn('Appointments WhatsApp group not found — skipping group PDF', {
@@ -2116,7 +2159,11 @@ class WhatsAppService extends EventEmitter {
       });
       const caption = `Daily Appointments — ${formattedDate}\nTotal: ${pdfResult.appointmentCount}`;
 
-      await client.sendMessage(group.id._serialized, media, { caption });
+      await withTimeout(
+        client.sendMessage(group.id._serialized, media, { caption }),
+        this.SEND_MESSAGE_TIMEOUT_MS,
+        'sendMessage (group PDF)'
+      );
 
       log.info('Posted appointments PDF to WhatsApp group', {
         date,
@@ -2132,20 +2179,48 @@ class WhatsAppService extends EventEmitter {
     }
   }
 
+  /** Whether a batch send loop is currently running (route-level guard). */
+  isBatchSending(): boolean {
+    return this.batchSendActive;
+  }
+
   async send(date: string): Promise<SendResult[] | void> {
     if (!this.isReady()) {
       throw new Error('WhatsApp client not ready to send messages');
     }
 
+    // One batch at a time — a second concurrent loop double-sends patients.
+    if (this.batchSendActive) {
+      log.warn('Rejecting batch send — another batch is already in progress', { date });
+      throw new Error('A message batch is already being sent');
+    }
+    this.batchSendActive = true;
+
+    try {
+      return await this.sendBatch(date);
+    } finally {
+      this.batchSendActive = false;
+    }
+  }
+
+  private async sendBatch(date: string): Promise<SendResult[] | void> {
     return this.circuitBreaker.execute(async () => {
       log.info(`Starting message sending session for date: ${date}`);
 
-      // Post the full appointment list (as PDF) to the staff group. Done once per
-      // batch, before the per-patient loop, so it fires even when no patient
-      // reminders are pending. Best-effort: never let a group failure abort sends.
-      await this.sendAppointmentsPdfToGroup(date);
-
       const session = messageSessionManager.startSession(date, this);
+
+      // Post the full appointment list (as PDF) to the staff group — once per
+      // session, so a re-clicked/reset resend doesn't spam the group (observed
+      // four copies on 2026-07-05). Still fires when no patient reminders are
+      // pending. Best-effort: never let a group failure abort sends.
+      if (!session.pdfPosted) {
+        session.pdfPosted = true;
+        await this.sendAppointmentsPdfToGroup(date);
+      }
+
+      // Ack baseline for the zero-ack watchdog below: the session may already
+      // hold acks from an earlier batch on the same date.
+      const acksBeforeBatch = session.getStats().deliveryStatusUpdates;
 
       try {
         const [numbers, messages, ids, names] = await getWhatsAppMessages(date);
@@ -2176,6 +2251,14 @@ class WhatsAppService extends EventEmitter {
         }
 
         const results: SendResult[] = [];
+        // Early abort on a dead connection: two consecutive stall-type
+        // failures (60s page timeouts) mean every further send is doomed —
+        // each would burn another minute and be misleadingly recorded. Stop,
+        // warn, restart; the unattempted remainder keeps its eligibility
+        // flags, so the next Send picks it up cleanly.
+        const MAX_CONSECUTIVE_STALLS = 2;
+        let consecutiveStalls = 0;
+        let abortedByStalls = false;
         for (let i = 0; i < numbers.length; i++) {
           if (!this.isReady()) {
             throw new Error('Client disconnected during sending');
@@ -2191,6 +2274,7 @@ class WhatsAppService extends EventEmitter {
               session
             );
             results.push(result);
+            consecutiveStalls = 0;
 
             if (i < numbers.length - 1) {
               await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -2198,6 +2282,24 @@ class WhatsAppService extends EventEmitter {
           } catch (error) {
             log.error(`Error sending message to ${numbers[i]}`, error);
             results.push({ success: false, error: (error as Error).message });
+
+            if (isConnectionStallError((error as Error).message)) {
+              consecutiveStalls += 1;
+              if (consecutiveStalls >= MAX_CONSECUTIVE_STALLS) {
+                abortedByStalls = true;
+                log.error('Aborting batch — consecutive connection stalls, connection is dead', {
+                  date,
+                  stalls: consecutiveStalls,
+                  attempted: i + 1,
+                  remaining: numbers.length - i - 1,
+                });
+                break;
+              }
+            } else {
+              // Per-recipient failure (e.g. not on WhatsApp) — not a
+              // connection signal, keep going.
+              consecutiveStalls = 0;
+            }
           }
         }
 
@@ -2219,12 +2321,97 @@ class WhatsAppService extends EventEmitter {
           sessionStats: session.getStats(),
         });
 
+        if (abortedByStalls) {
+          // The connection is confirmed dead — don't wait for the ack
+          // watchdog (it would fire a second warning + restart later): warn
+          // now and restart now. The remainder was never attempted and stays
+          // eligible for the next Send.
+          const sentOk = results.filter((r) => r.success).length;
+          const remaining = numbers.length - results.length;
+          if (this.wsEmitter) {
+            this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SEND_UNCONFIRMED, {
+              date,
+              sentCount: sentOk,
+              message:
+                `WhatsApp stopped responding — sending for ${date} was aborted ` +
+                `(${remaining} message(s) not attempted). WhatsApp is restarting automatically. ` +
+                `Verify on the phone whether the ${sentOk} earlier message(s) really delivered, ` +
+                'then press Send again for the rest.',
+            });
+          }
+          void this.restart().catch((err) => {
+            log.error('Stall-abort restart failed', { error: (err as Error).message });
+          });
+        } else {
+          this.armAckSilenceWatchdog(
+            date,
+            session,
+            acksBeforeBatch,
+            results.filter((r) => r.success).length
+          );
+        }
+
         return results;
       } catch (error) {
         messageSessionManager.completeSession(date);
         throw error;
       }
     }, 'send-messages');
+  }
+
+  /**
+   * Detect the "shown as sent but never delivered" zombie: sendMessage()
+   * resolves even when the WhatsApp socket is silently dead (WA Web just queues
+   * the message locally), and getState() keeps answering CONNECTED — so neither
+   * the send loop nor the heartbeat notices. What a dead socket CANNOT produce
+   * is server acks: a healthy connection acks within seconds. So after a batch
+   * of ≥3 "sent" messages, wait 90s; if not a single ack arrived, the batch
+   * almost certainly never left this machine → warn the UI loudly and restart
+   * the client (same recovery the heartbeat uses; session/auth preserved).
+   *
+   * The DB "sent" flags are deliberately NOT auto-cleared: the queued messages
+   * MAY still flush after reconnect, so un-marking could double-send. The
+   * warning tells the user to Reset + resend once they've confirmed on the
+   * phone that nothing went out.
+   */
+  private armAckSilenceWatchdog(
+    date: string,
+    session: MessageSession,
+    acksBeforeBatch: number,
+    sentCount: number
+  ): void {
+    const ACK_SILENCE_WINDOW_MS = 90000;
+    const MIN_SENT_FOR_SIGNAL = 3;
+
+    if (sentCount < MIN_SENT_FOR_SIGNAL) return;
+
+    const timer = setTimeout(() => {
+      const acksNow = session.getStats().deliveryStatusUpdates;
+      if (acksNow > acksBeforeBatch) return; // acks flowing — healthy
+
+      if (this.messageState.manualDisconnect || this.clientState.destroyInProgress) return;
+
+      log.error(
+        'ZERO delivery acks after batch — WhatsApp connection was silently dead; messages were queued locally, not delivered. Restarting client.',
+        { date, sentCount, windowMs: ACK_SILENCE_WINDOW_MS }
+      );
+
+      if (this.wsEmitter) {
+        this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SEND_UNCONFIRMED, {
+          date,
+          sentCount,
+          message:
+            `WhatsApp did not confirm any of the ${sentCount} messages sent for ${date} — ` +
+            'they were most likely NOT delivered. WhatsApp is being restarted automatically; ' +
+            'verify on the phone, then Reset the date and send again.',
+        });
+      }
+
+      void this.restart().catch((err) => {
+        log.error('Ack-silence watchdog restart failed', { error: (err as Error).message });
+      });
+    }, ACK_SILENCE_WINDOW_MS);
+    timer.unref();
   }
 
   private async sendSingleMessage(
@@ -2240,7 +2427,13 @@ class WhatsAppService extends EventEmitter {
     const chatId = `${cleanNumber}@c.us`;
 
     try {
-      const sentMessage = await this.clientState.client!.sendMessage(chatId, message);
+      // Bounded: Puppeteer's 180s protocol timeout serialized whole batches
+      // behind one frozen page call; 60s is ample for a healthy send.
+      const sentMessage = await withTimeout(
+        this.clientState.client!.sendMessage(chatId, message),
+        this.SEND_MESSAGE_TIMEOUT_MS,
+        `sendMessage ${cleanNumber}`
+      );
 
       log.debug(`Message sent to ${number} (normalized: ${cleanNumber})`);
 
@@ -2287,16 +2480,21 @@ class WhatsAppService extends EventEmitter {
 
       return { success: true, messageId: sentMessage.id.id };
     } catch (error) {
+      // Everything user-facing gets the humanized reason; the raw library
+      // message stays in the error log (the send() loop logs it).
+      const friendlyError = humanizeWhatsAppError((error as Error).message);
+
       if (session) {
-        session.recordMessageFailed('', (error as Error).message);
+        session.recordMessageFailed('', friendlyError);
       }
 
       const person: StatePersonType = {
         messageId: `error_${Date.now()}_${number}`,
+        appointmentId,
         name,
         number,
         success: '&times;',
-        error: (error as Error).message,
+        error: friendlyError,
       };
 
       await this.messageState.addPerson(person);
@@ -2308,13 +2506,20 @@ class WhatsAppService extends EventEmitter {
 
   /**
    * Public method for sending a single WhatsApp message
-   * Used by routes for ad-hoc message sending (receipts, patient messages)
+   * Used by routes for ad-hoc message sending (receipts, patient messages,
+   * per-patient reminder resends).
+   *
+   * When `appointmentId` is provided the appointment is marked sent in the DB;
+   * `appointmentDay` (the appointment's YYYY-MM-DD) additionally re-registers
+   * the new message id into that date's active MessageSession — so a manual
+   * resend keeps getting live delivery ticks like the original batch send.
    */
   async sendMessage(
     number: string,
     message: string,
     name: string,
-    appointmentId?: number | null
+    appointmentId?: number | null,
+    appointmentDay?: string | null
   ): Promise<SendResult> {
     if (!this.isReady()) {
       return { success: false, error: 'WhatsApp client not ready' };
@@ -2325,7 +2530,11 @@ class WhatsAppService extends EventEmitter {
     const chatId = `${cleanNumber}@c.us`;
 
     try {
-      const sentMessage = await this.clientState.client!.sendMessage(chatId, message);
+      const sentMessage = await withTimeout(
+        this.clientState.client!.sendMessage(chatId, message),
+        this.SEND_MESSAGE_TIMEOUT_MS,
+        `sendMessage ${cleanNumber}`
+      );
 
       log.debug(`Message sent to ${number} (normalized: ${cleanNumber})`);
 
@@ -2339,6 +2548,19 @@ class WhatsAppService extends EventEmitter {
             `Failed to mark appointment ${appointmentId} as sent`,
             dbError
           );
+        }
+
+        // Keep delivery ticks flowing: prefer the date's active batch session
+        // (re-registering supersedes the original message id), else fall back
+        // to the ad-hoc map handleMessageAck consults.
+        const activeSession = appointmentDay
+          ? messageSessionManager.getActiveSession(appointmentDay)
+          : null;
+        const registered = activeSession
+          ? activeSession.registerResend(sentMessage.id.id, appointmentId, appointmentDay!)
+          : false;
+        if (!registered) {
+          this.trackAdhocMessage(sentMessage.id.id, appointmentId);
         }
       }
 
@@ -2354,19 +2576,37 @@ class WhatsAppService extends EventEmitter {
 
       return { success: true, messageId: sentMessage.id.id };
     } catch (error) {
+      const friendlyError = humanizeWhatsAppError((error as Error).message);
+      log.error('Ad-hoc WhatsApp send failed', {
+        number,
+        appointmentId,
+        error: (error as Error).message,
+      });
+
       const person: StatePersonType = {
         messageId: `error_${Date.now()}_${number}`,
+        appointmentId: appointmentId ?? undefined,
         name,
         number,
         success: '&times;',
-        error: (error as Error).message,
+        error: friendlyError,
       };
 
       await this.messageState.addPerson(person);
       this.emit('MessageFailed', person);
 
-      return { success: false, error: (error as Error).message };
+      return { success: false, error: friendlyError };
     }
+  }
+
+  /** Remember an ad-hoc message id so its acks can be persisted (bounded map). */
+  private trackAdhocMessage(messageId: string, appointmentId: number): void {
+    if (this.adhocMessages.size >= this.ADHOC_MESSAGES_MAX) {
+      // Drop the oldest entry (Map preserves insertion order).
+      const oldest = this.adhocMessages.keys().next().value;
+      if (oldest) this.adhocMessages.delete(oldest);
+    }
+    this.adhocMessages.set(messageId, { appointmentId, trackedAt: Date.now() });
   }
 
   async report(date: string): Promise<{ success: boolean; messagesChecked: number }> {

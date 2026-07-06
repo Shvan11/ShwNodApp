@@ -42,6 +42,16 @@ interface InitialStateResponse {
 }
 
 /**
+ * Server-detected zero-ack batch: messages reported "sent" but WhatsApp never
+ * confirmed a single one — almost certainly not delivered.
+ */
+export interface UnconfirmedSendData {
+  date?: string;
+  sentCount?: number;
+  message?: string;
+}
+
+/**
  * Return type for useWhatsAppSync hook
  */
 export interface UseWhatsAppSyncReturn {
@@ -49,6 +59,7 @@ export interface UseWhatsAppSyncReturn {
   clientReady: boolean;
   sendingProgress: SendingProgress;
   messageStatusUpdate: MessageStatusUpdateData | null;
+  unconfirmedSend: UnconfirmedSendData | null;
   requestInitialState: (dateToRequest?: string) => void;
 }
 
@@ -69,6 +80,7 @@ export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
   const [messageStatusUpdate, setMessageStatusUpdate] = useState<MessageStatusUpdateData | null>(
     null
   );
+  const [unconfirmedSend, setUnconfirmedSend] = useState<UnconfirmedSendData | null>(null);
 
   const currentDateRef = useRef(currentDate);
   const lastRequestedDateRef = useRef<string | null>(null);
@@ -163,6 +175,10 @@ export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
       }));
     };
 
+    const handleSendUnconfirmed = (data: unknown) => {
+      setUnconfirmedSend((data as UnconfirmedSendData) ?? {});
+    };
+
     sseWhatsapp.on('connecting', handleConnecting);
     sseWhatsapp.on('connected', handleConnected);
     sseWhatsapp.on('disconnected', handleDisconnected);
@@ -172,6 +188,7 @@ export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
     sseWhatsapp.on('whatsapp_sending_started', handleSendingStarted);
     sseWhatsapp.on('whatsapp_sending_progress', handleSendingProgress);
     sseWhatsapp.on('whatsapp_sending_finished', handleSendingFinished);
+    sseWhatsapp.on('whatsapp_send_unconfirmed', handleSendUnconfirmed);
 
     sseWhatsapp
       .ensureConnected()
@@ -194,6 +211,7 @@ export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
       sseWhatsapp.off('whatsapp_sending_started', handleSendingStarted);
       sseWhatsapp.off('whatsapp_sending_progress', handleSendingProgress);
       sseWhatsapp.off('whatsapp_sending_finished', handleSendingFinished);
+      sseWhatsapp.off('whatsapp_send_unconfirmed', handleSendUnconfirmed);
       sseWhatsapp.release();
       lastRequestedDateRef.current = null;
     };
@@ -213,6 +231,7 @@ export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
     clientReady,
     sendingProgress,
     messageStatusUpdate,
+    unconfirmedSend,
     requestInitialState,
   };
 }

@@ -853,12 +853,13 @@ export async function getNewAppointmentMessage(
   if (!row || !row.patientName) {
     return { result: -1, phone: null, message: null, countryCode: null };
   }
-  if (!isValidPhone(row.phone)) {
-    return { result: -2, phone: null, message: null, countryCode: null };
-  }
 
+  // The message text doesn't depend on the phone, so an invalid phone still
+  // yields the built message (result -2, phone null) — the copy-to-clipboard
+  // fallback needs the text precisely when the number can't be sent to.
+  const phoneValid = isValidPhone(row.phone);
   const cc = row.countryCode || '964';
-  const formattedPhone = formatPhone(row.phone, cc);
+  const formattedPhone = phoneValid ? formatPhone(row.phone!, cc) : null;
   const appDay = row.appDay as unknown as string;
   const appDate = row.appDate as unknown as Date;
   const dd = daysFromToday(appDay);
@@ -886,7 +887,7 @@ export async function getNewAppointmentMessage(
     }
   }
 
-  return { result: 0, phone: formattedPhone, message, countryCode: cc };
+  return { result: phoneValid ? 0 : -2, phone: formattedPhone, message, countryCode: cc };
 }
 
 /**

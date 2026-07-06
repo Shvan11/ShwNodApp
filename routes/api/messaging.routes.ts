@@ -16,7 +16,10 @@ import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
 import * as messagingQueries from '../../services/database/queries/messaging-queries.js';
 import { getWhatsAppMessages } from '../../services/database/queries/messaging-queries.js';
+import { getAppointmentForNotification } from '../../services/database/queries/appointment-queries.js';
+import messageState from '../../services/state/messageState.js';
 import { sendSuccess, sendData, ErrorResponses } from '../../utils/error-response.js';
+import { validate } from '../../middleware/validate.js';
 import {
   transformMessageStatuses,
   calculateMessageCount
@@ -90,7 +93,27 @@ router.get(
       // Convert database message format to service layer format
       if (result && result.messages) {
         const dbMessages = (result.messages as DatabaseMessageStatus[]).map(convertToDatabaseMessage);
-        const transformedMessages = transformMessageStatuses(dbMessages);
+        let transformedMessages = transformMessageStatuses(dbMessages);
+
+        // Overlay the in-memory failure reasons from the live send state (the DB
+        // has no error column — a protocol/"not on WhatsApp" failure only exists
+        // in messageState.persons). Latest failure per appointment wins; rows
+        // that have since been sent/delivered (status 1-4) skip stale reasons.
+        const errorByAppointment = new Map<number, string>();
+        for (const person of messageState.persons) {
+          if (person.error && typeof person.appointmentId === 'number') {
+            errorByAppointment.set(person.appointmentId, person.error);
+          }
+        }
+        if (errorByAppointment.size > 0) {
+          transformedMessages = transformedMessages.map((m) => {
+            if (m.status >= 1 && m.status <= 4) return m;
+            const reason =
+              m.appointmentId != null ? errorByAppointment.get(m.appointmentId) : undefined;
+            return reason ? { ...m, errorMessage: reason } : m;
+          });
+        }
+
         // Envelope the payload (audit M5); the transformed list rides `data.messages`,
         // which the raw APIClient consumer reads via its `data.data.messages` branch.
         sendData(res, messaging.status.response, {
@@ -156,6 +179,50 @@ router.get(
     } catch (error) {
       log.error('Error getting message count:', error);
       ErrorResponses.internalError(res, (error as Error).message, error as Error);
+    }
+  }
+);
+
+/**
+ * Get the reminder message text (and target phone) for one appointment.
+ * GET /message-text/:appointmentId
+ *
+ * Powers the right-click → "Copy message" fallback on the /send status table:
+ * when WhatsApp can't reach a number, the user copies the exact reminder text
+ * and sends it manually. The text is built even when the stored phone is
+ * invalid (that's the case the fallback exists for) — `phone` is then null.
+ */
+router.get(
+  '/message-text/:appointmentId',
+  validate({ params: messaging.messageText.params }),
+  async (req: Request<messaging.MessageTextParams>, res: Response): Promise<void> => {
+    try {
+      const { appointmentId } = req.params;
+
+      const appointment = await getAppointmentForNotification(appointmentId);
+      if (!appointment) {
+        ErrorResponses.notFound(res, 'Appointment');
+        return;
+      }
+
+      const built = await messagingQueries.getNewAppointmentMessage(
+        appointment.person_id,
+        appointmentId
+      );
+      if (!built || built.result === -1 || !built.message) {
+        ErrorResponses.notFound(res, 'Appointment message');
+        return;
+      }
+
+      sendData(res, messaging.messageText.response, {
+        appointmentId,
+        patientName: appointment.patient_name,
+        phone: built.phone,
+        message: built.message
+      });
+    } catch (error) {
+      log.error('Error building appointment message text:', error);
+      ErrorResponses.internalError(res, 'Failed to build message text', error as Error);
     }
   }
 );
