@@ -109,13 +109,7 @@ router.get(
       log.info('Fetching all aligner sets from v_allsets');
       const sets = await alignerQueries.getAllAlignerSets();
 
-      sendData(res, contract.allSets.response, {
-        sets: sets || [],
-        count: sets ? sets.length : 0,
-        noNextBatchCount: sets
-          ? sets.filter((s) => s.NextBatchPresent === 'False').length
-          : 0
-      });
+      sendData(res, contract.allSets.response, { sets: sets || [] });
     } catch (error) {
       log.error('Error fetching all aligner sets:', error);
       ErrorResponses.internalError(

@@ -174,10 +174,6 @@
     background-color: var(--error-color);
 }
 
-.legendDot.purple {
-    background-color: var(--purple-500);
-}
-
 .inactiveSetsToggle {
     margin-left: auto;
     display: flex;
@@ -401,6 +397,12 @@
     margin-left: 4px;
 }
 
+/* Next Appointment "Today" Badge */
+.badgeApptToday {
+    background-color: var(--success-100);
+    color: var(--success-700);
+}
+
 /* Notes Text */
 .notes {
     color: var(--text-secondary);
@@ -432,7 +434,7 @@
 
 .btnClearFilters {
     margin-top: var(--spacing-md);
-    background: rgba(255, 255, 255, 0.2);
+    background: transparent;
     color: var(--text-secondary);
     border: 1px solid var(--gray-300);
     padding: 0.6rem 1.2rem;

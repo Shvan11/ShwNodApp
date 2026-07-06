@@ -1,36 +1,88 @@
 // AllSetsList.tsx - Simple list view of all aligner sets from v_allsets
-import React, { useState, useEffect, type ChangeEvent, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { httpErrorMessage } from '@/core/http';
 import { alignerAllSetsQuery } from '@/query/queries';
+import { isClosedWorkStatus } from '@shared/contracts/aligner.contract';
 import type * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './AllSetsList.module.css';
 
 // Row shape comes from the shared contract (single source of truth, drift-checked
 // against the schema the all-sets read validates with). The validated read
-// guarantees `is_last`/`SetIsActive` are booleans, so the numeric (0/1) fallbacks
-// the old local copy carried are gone.
+// guarantees `is_last`/`SetIsActive`/`NextBatchPresent` are booleans.
 type AlignerSetView = alignerContract.AlignerSetView;
 
-type SortColumn = 'patient_name' | 'doctor_name' | 'set_sequence' | 'batch_sequence' | 'LabStatus' | 'NextDueDate' | 'notes';
+const SORT_COLUMNS = [
+    'patient_name',
+    'doctor_name',
+    'set_sequence',
+    'batch_sequence',
+    'LabStatus',
+    'NextDueDate',
+    'NextAppointment',
+    'notes',
+] as const;
+type SortColumn = (typeof SORT_COLUMNS)[number];
 type SortDirection = 'asc' | 'desc';
+
+/** One place decides what the "Next Batch Status" badge means, so the badge and
+ *  the legend counts can never disagree. */
+type NextBatchState = 'no_batches' | 'final' | 'ready' | 'pending' | 'not_created';
+const getNextBatchState = (set: AlignerSetView): NextBatchState => {
+    if (set.LabStatus === 'no_batches') return 'no_batches';
+    // Final batch delivered = treatment complete (flag shown in Active Batch column)
+    if (set.is_last === true && set.delivered_to_patient_date) return 'final';
+    if (set.NextBatchPresent) return 'ready';
+    if (set.LabStatus === 'needs_mfg') return 'pending';
+    return 'not_created';
+};
+
+const formatDate = (dateString: string): string => {
+    // Date-only strings must not round-trip through Date: new Date('YYYY-MM-DD')
+    // parses as UTC midnight, so local getters render a day early west of UTC.
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+    if (dateOnly) return `${dateOnly[3]}-${dateOnly[2]}-${dateOnly[1]}`;
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${day}-${month}-${date.getFullYear()}`;
+};
 
 const AllSetsList: React.FC = () => {
     const navigate = useNavigate();
     const toast = useToast();
-    const { data, isLoading: loading, error } = useQuery(alignerAllSetsQuery());
+    const { data, isLoading: loading, error, refetch } = useQuery(alignerAllSetsQuery());
     const sets: AlignerSetView[] = data?.sets ?? [];
-    const [filter, setFilter] = useState<string>('');
-    const [showOnlyNoNextBatch, setShowOnlyNoNextBatch] = useState<boolean>(false);
-    const [showOnlyInLab, setShowOnlyInLab] = useState<boolean>(false);
-    const [showOnlyNeedsMfg, setShowOnlyNeedsMfg] = useState<boolean>(false);
-    const [selectedDoctor, setSelectedDoctor] = useState<string>('all');
-    const [showFinished, setShowFinished] = useState<boolean>(false);
-    const [showInactiveSets, setShowInactiveSets] = useState<boolean>(false);
-    const [sortColumn, setSortColumn] = useState<SortColumn>('NextDueDate');
-    const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+    // Filters + sort live in the URL so they survive navigating to a patient and
+    // back, and a filtered view can be bookmarked. Defaults are unset params.
+    const [searchParams, setSearchParams] = useSearchParams();
+    const filter = searchParams.get('q') ?? '';
+    const selectedDoctor = searchParams.get('dr') ?? 'all';
+    const showOnlyNoNextBatch = searchParams.get('noNext') === '1';
+    const showOnlyInLab = searchParams.get('lab') === '1';
+    const showOnlyNeedsMfg = searchParams.get('mfg') === '1';
+    const showFinished = searchParams.get('finished') === '1';
+    const showInactiveSets = searchParams.get('inactive') === '1';
+    const rawSort = searchParams.get('sort') as SortColumn | null;
+    const sortColumn: SortColumn = rawSort && SORT_COLUMNS.includes(rawSort) ? rawSort : 'NextDueDate';
+    const sortDirection: SortDirection = searchParams.get('dir') === 'desc' ? 'desc' : 'asc';
+
+    const updateParams = (updates: Record<string, string | null>): void => {
+        setSearchParams(
+            (prev) => {
+                const next = new URLSearchParams(prev);
+                for (const [key, value] of Object.entries(updates)) {
+                    if (value === null || value === '') next.delete(key);
+                    else next.set(key, value);
+                }
+                return next;
+            },
+            { replace: true }
+        );
+    };
 
     // Surface a load failure as a toast (preserves the previous on-error UX).
     useEffect(() => {
@@ -44,69 +96,59 @@ const AllSetsList: React.FC = () => {
         navigate(`/aligner/patient/${set.work_id}`);
     };
 
-    const formatDate = (dateString: string | null): string => {
-        if (!dateString) return 'N/A';
-        const date = new Date(dateString);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}-${month}-${year}`;
-    };
-
-    // Get unique doctors from sets
-    const getUniqueDoctors = (): { id: number; name: string }[] => {
-        const doctorMap = new Map<number, string>();
-        sets.forEach(set => {
-            if (!doctorMap.has(set.aligner_dr_id)) {
-                doctorMap.set(set.aligner_dr_id, set.doctor_name);
-            }
-        });
-        return Array.from(doctorMap.entries()).map(([id, name]) => ({ id, name }));
+    // Render the patient's next scheduled appointment (highlights today's)
+    const renderNextAppointment = (set: AlignerSetView): ReactNode => {
+        if (!set.NextAppointment) {
+            return <span className={styles.notesEmpty}>—</span>;
+        }
+        const appt = new Date(set.NextAppointment);
+        const now = new Date();
+        const isToday =
+            appt.getFullYear() === now.getFullYear() &&
+            appt.getMonth() === now.getMonth() &&
+            appt.getDate() === now.getDate();
+        if (isToday) {
+            const time = appt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            return (
+                <span className={`${styles.badge} ${styles.badgeApptToday}`}>
+                    <i className="fas fa-calendar-day"></i> Today {time}
+                </span>
+            );
+        }
+        return <span>{formatDate(set.NextAppointment)}</span>;
     };
 
     // Check if patient is waiting for next batch (previously delivered, but no next batch)
     const isWaitingForNextBatch = (set: AlignerSetView): boolean => {
-        return set.NextBatchPresent === 'False' && !!set.delivered_to_patient_date;
+        return !set.NextBatchPresent && !!set.delivered_to_patient_date;
     };
 
     // Render next batch status badge (combined status + readiness)
     const renderBatchStateBadge = (set: AlignerSetView): ReactNode => {
-        const isFinal = set.is_last === true;
-
-        // No batches exist
-        if (set.LabStatus === 'no_batches') {
-            return <span className={`${styles.badge} ${styles.badgeNoBatch}`}>No Batches</span>;
+        switch (getNextBatchState(set)) {
+            case 'no_batches':
+                return <span className={`${styles.badge} ${styles.badgeNoBatch}`}>No Batches</span>;
+            case 'final':
+                return <span className={`${styles.badge} ${styles.badgeNa}`}>—</span>;
+            case 'ready':
+                return (
+                    <span className={`${styles.badge} ${styles.badgeNextReady}`}>
+                        <i className="fas fa-check-circle"></i> Ready (In Lab)
+                    </span>
+                );
+            case 'pending':
+                return (
+                    <span className={`${styles.badge} ${styles.badgePendingMfg}`}>
+                        Pending (Needs Mfg)
+                    </span>
+                );
+            case 'not_created':
+                return (
+                    <span className={`${styles.badge} ${styles.badgeNextWarning}`}>
+                        <i className="fas fa-exclamation-triangle"></i> Not Created
+                    </span>
+                );
         }
-
-        // Final batch delivered = treatment complete (flag shown in Active Batch column)
-        if (isFinal && set.delivered_to_patient_date) {
-            return <span className={`${styles.badge} ${styles.badgeNa}`}>—</span>;
-        }
-
-        // Next batch is manufactured and ready in lab
-        if (set.NextBatchPresent === 'True') {
-            return (
-                <span className={`${styles.badge} ${styles.badgeNextReady}`}>
-                    <i className="fas fa-check-circle"></i> Ready (In Lab)
-                </span>
-            );
-        }
-
-        // Next batch needs manufacturing
-        if (set.LabStatus === 'needs_mfg') {
-            return (
-                <span className={`${styles.badge} ${styles.badgePendingMfg}`}>
-                    Pending (Needs Mfg)
-                </span>
-            );
-        }
-
-        // All batches delivered but not final = next batch not created yet
-        return (
-            <span className={`${styles.badge} ${styles.badgeNextWarning}`}>
-                <i className="fas fa-exclamation-triangle"></i> Not Created
-            </span>
-        );
     };
 
     const getFilteredSets = (): AlignerSetView[] => {
@@ -119,12 +161,12 @@ const AllSetsList: React.FC = () => {
 
         // Filter by finished/discontinued status (hide by default)
         if (!showFinished) {
-            filtered = filtered.filter(s => s.WorkStatus !== 2 && s.WorkStatus !== 3);
+            filtered = filtered.filter(s => !isClosedWorkStatus(s.WorkStatus));
         }
 
         // Filter by doctor
         if (selectedDoctor !== 'all') {
-            filtered = filtered.filter(s => s.aligner_dr_id === parseInt(selectedDoctor));
+            filtered = filtered.filter(s => s.aligner_dr_id === Number(selectedDoctor));
         }
 
         // Filter by no next batch if toggle is on
@@ -159,10 +201,9 @@ const AllSetsList: React.FC = () => {
     // Handle column header click for sorting
     const handleSort = (column: SortColumn): void => {
         if (sortColumn === column) {
-            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+            updateParams({ sort: column, dir: sortDirection === 'asc' ? 'desc' : 'asc' });
         } else {
-            setSortColumn(column);
-            setSortDirection('asc');
+            updateParams({ sort: column, dir: null });
         }
     };
 
@@ -178,7 +219,7 @@ const AllSetsList: React.FC = () => {
             if (bVal == null) return -1;
 
             // Handle date columns
-            if (sortColumn === 'NextDueDate') {
+            if (sortColumn === 'NextDueDate' || sortColumn === 'NextAppointment') {
                 aVal = new Date(aVal as string).getTime();
                 bVal = new Date(bVal as string).getTime();
             }
@@ -199,10 +240,19 @@ const AllSetsList: React.FC = () => {
         });
     };
 
-    // Render sortable header
+    // Render sortable header (keyboard-operable, announces sort state)
     const renderSortableHeader = (label: string, column: SortColumn): ReactNode => (
         <th
             onClick={() => handleSort(column)}
+            onKeyDown={(e: KeyboardEvent<HTMLTableCellElement>) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleSort(column);
+                }
+            }}
+            tabIndex={0}
+            scope="col"
+            aria-sort={sortColumn === column ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
             className={styles.sortableHeader}
         >
             <span>{label}</span>
@@ -229,30 +279,55 @@ const AllSetsList: React.FC = () => {
         );
     }
 
+    // A failed load with nothing cached must not masquerade as an empty clinic.
+    if (error && !data) {
+        return (
+            <div className={styles.emptyPatients}>
+                <i className="fas fa-exclamation-triangle"></i>
+                <h3>Failed to load aligner sets</h3>
+                <p>{httpErrorMessage(error, 'Please check your connection and try again.')}</p>
+                <button className={styles.btnClearFilters} onClick={() => void refetch()}>
+                    Retry
+                </button>
+            </div>
+        );
+    }
+
     const filteredSets = sortSets(getFilteredSets());
-    const uniqueDoctors = getUniqueDoctors();
 
     // Count different patient categories (excluding inactive sets and finished/discontinued if hidden)
     const baseSets = showInactiveSets ? sets : sets.filter(s => s.SetIsActive === true);
-    const activeSets = showFinished ? baseSets : baseSets.filter(s => s.WorkStatus !== 2 && s.WorkStatus !== 3);
+    const activeSets = showFinished ? baseSets : baseSets.filter(s => !isClosedWorkStatus(s.WorkStatus));
 
-    // Count by next batch status
-    const noBatchesCount = activeSets.filter(s => s.LabStatus === 'no_batches').length;
+    // Doctor dropdown: only doctors with currently visible sets, alphabetical.
+    // Keep the active selection listed even if its rows are filtered out, so the
+    // select never silently shows a blank value.
+    const doctorMap = new Map<number, string>();
+    activeSets.forEach(set => {
+        if (!doctorMap.has(set.aligner_dr_id)) {
+            doctorMap.set(set.aligner_dr_id, set.doctor_name);
+        }
+    });
+    if (selectedDoctor !== 'all' && !doctorMap.has(Number(selectedDoctor))) {
+        const sel = sets.find(s => s.aligner_dr_id === Number(selectedDoctor));
+        if (sel) doctorMap.set(sel.aligner_dr_id, sel.doctor_name);
+    }
+    const uniqueDoctors = Array.from(doctorMap.entries())
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+    // Legend counts derive from the same state machine as the badges.
+    const stateCounts: Record<NextBatchState, number> = {
+        no_batches: 0, final: 0, ready: 0, pending: 0, not_created: 0,
+    };
+    activeSets.forEach(s => { stateCounts[getNextBatchState(s)]++; });
+    const lastBatchCount = activeSets.filter(s => s.is_last === true).length;
+    const finishedCount = baseSets.filter(s => isClosedWorkStatus(s.WorkStatus)).length;
+    const inactiveSetsCount = sets.filter(s => s.SetIsActive !== true).length;
+    const noNextBatchCount = activeSets.filter(isWaitingForNextBatch).length;
+    // Toggle counts mirror their filter predicates (LabStatus), not the badge state.
     const pendingManufactureCount = activeSets.filter(s => s.LabStatus === 'needs_mfg').length;
     const pendingDeliveryCount = activeSets.filter(s => s.LabStatus === 'in_lab').length;
-    const lastBatchCount = activeSets.filter(s => s.is_last === true).length;
-    const finishedCount = baseSets.filter(s => s.WorkStatus === 2 || s.WorkStatus === 3).length;
-    const inactiveSetsCount = sets.filter(s => s.SetIsActive !== true).length;
-    const noNextBatchCount = activeSets.filter(s => s.NextBatchPresent === 'False' && s.delivered_to_patient_date).length;
-    // Count sets that are "Not Created" - all batches delivered but not marked as final
-    const notCreatedCount = activeSets.filter(s =>
-        s.batch_sequence &&
-        !(s.is_last === true) &&
-        s.NextBatchPresent === 'False' &&
-        s.LabStatus === 'all_delivered'
-    ).length;
-    // Count sets with next batch ready in lab
-    const readyInLabCount = activeSets.filter(s => s.NextBatchPresent === 'True').length;
 
     return (
         <>
@@ -264,12 +339,13 @@ const AllSetsList: React.FC = () => {
                         type="text"
                         placeholder="Filter by patient or doctor..."
                         value={filter}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => setFilter(e.target.value)}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => updateParams({ q: e.target.value || null })}
                     />
                     {filter && (
                         <button
                             className={styles.clearFilterBtn}
-                            onClick={() => setFilter('')}
+                            aria-label="Clear filter"
+                            onClick={() => updateParams({ q: null })}
                         >
                             <i className="fas fa-times"></i>
                         </button>
@@ -280,7 +356,8 @@ const AllSetsList: React.FC = () => {
                 <div className={styles.doctorFilter}>
                     <select
                         value={selectedDoctor}
-                        onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedDoctor(e.target.value)}
+                        onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                            updateParams({ dr: e.target.value === 'all' ? null : e.target.value })}
                         className={styles.doctorFilterSelect}
                     >
                         <option value="all">All Doctors</option>
@@ -299,7 +376,8 @@ const AllSetsList: React.FC = () => {
                         <input
                             type="checkbox"
                             checked={showFinished}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setShowFinished(e.target.checked)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                                updateParams({ finished: e.target.checked ? '1' : null })}
                         />
                         <i className="fas fa-check-circle"></i>
                         <span>Finished ({finishedCount})</span>
@@ -310,7 +388,8 @@ const AllSetsList: React.FC = () => {
                         <input
                             type="checkbox"
                             checked={showOnlyNoNextBatch}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setShowOnlyNoNextBatch(e.target.checked)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                                updateParams({ noNext: e.target.checked ? '1' : null })}
                         />
                         <i className="fas fa-exclamation-triangle"></i>
                         <span>No Next ({noNextBatchCount})</span>
@@ -321,10 +400,8 @@ const AllSetsList: React.FC = () => {
                         <input
                             type="checkbox"
                             checked={showOnlyInLab}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                setShowOnlyInLab(e.target.checked);
-                                if (e.target.checked) setShowOnlyNeedsMfg(false);
-                            }}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                                updateParams(e.target.checked ? { lab: '1', mfg: null } : { lab: null })}
                         />
                         <i className="fas fa-box"></i>
                         <span>In Lab ({pendingDeliveryCount})</span>
@@ -335,10 +412,8 @@ const AllSetsList: React.FC = () => {
                         <input
                             type="checkbox"
                             checked={showOnlyNeedsMfg}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                setShowOnlyNeedsMfg(e.target.checked);
-                                if (e.target.checked) setShowOnlyInLab(false);
-                            }}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                                updateParams(e.target.checked ? { mfg: '1', lab: null } : { mfg: null })}
                         />
                         <i className="fas fa-cog"></i>
                         <span>Needs Mfg ({pendingManufactureCount})</span>
@@ -350,26 +425,27 @@ const AllSetsList: React.FC = () => {
             <div className={styles.statusLegend}>
                 <span className={styles.legendTitle}>Next Batch:</span>
                 <span className={styles.legendItem}>
-                    <span className={`${styles.legendDot} ${styles.gray}`}></span> No Batches ({noBatchesCount})
+                    <span className={`${styles.legendDot} ${styles.gray}`}></span> No Batches ({stateCounts.no_batches})
                 </span>
                 <span className={styles.legendItem}>
-                    <span className={`${styles.legendDot} ${styles.green}`}></span> Ready ({readyInLabCount})
+                    <span className={`${styles.legendDot} ${styles.green}`}></span> Ready ({stateCounts.ready})
                 </span>
                 <span className={styles.legendItem}>
-                    <span className={`${styles.legendDot} ${styles.amber}`}></span> Pending ({pendingManufactureCount})
+                    <span className={`${styles.legendDot} ${styles.amber}`}></span> Pending ({stateCounts.pending})
                 </span>
                 <span className={styles.legendItem}>
                     <i className={`fas fa-flag-checkered ${styles.legendFlagFinal}`}></i> Final ({lastBatchCount})
                 </span>
                 <span className={styles.legendItem}>
-                    <span className={`${styles.legendDot} ${styles.red}`}></span> Not Created ({notCreatedCount})
+                    <span className={`${styles.legendDot} ${styles.red}`}></span> Not Created ({stateCounts.not_created})
                 </span>
                 {inactiveSetsCount > 0 && (
                     <label className={styles.inactiveSetsToggle}>
                         <input
                             type="checkbox"
                             checked={showInactiveSets}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setShowInactiveSets(e.target.checked)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                                updateParams({ inactive: e.target.checked ? '1' : null })}
                         />
                         <span>Include inactive sets ({inactiveSetsCount})</span>
                     </label>
@@ -390,13 +466,7 @@ const AllSetsList: React.FC = () => {
                     {(filter || showOnlyNoNextBatch || showOnlyInLab || showOnlyNeedsMfg || selectedDoctor !== 'all') && (
                         <button
                             className={styles.btnClearFilters}
-                            onClick={() => {
-                                setFilter('');
-                                setShowOnlyNoNextBatch(false);
-                                setShowOnlyInLab(false);
-                                setShowOnlyNeedsMfg(false);
-                                setSelectedDoctor('all');
-                            }}
+                            onClick={() => updateParams({ q: null, noNext: null, lab: null, mfg: null, dr: null })}
                         >
                             Clear Filters
                         </button>
@@ -413,7 +483,8 @@ const AllSetsList: React.FC = () => {
                                 {renderSortableHeader('Active Batch', 'batch_sequence')}
                                 {renderSortableHeader('Next Batch Status', 'LabStatus')}
                                 {renderSortableHeader('Next Due', 'NextDueDate')}
-                                {renderSortableHeader('notes', 'notes')}
+                                {renderSortableHeader('Next Appt', 'NextAppointment')}
+                                {renderSortableHeader('Notes', 'notes')}
                             </tr>
                         </thead>
                         <tbody>
@@ -422,7 +493,7 @@ const AllSetsList: React.FC = () => {
                                 let rowClass = '';
 
                                 // Keep green tint for finished/discontinued patients
-                                if (set.WorkStatus === 2 || set.WorkStatus === 3) {
+                                if (isClosedWorkStatus(set.WorkStatus)) {
                                     rowClass = styles.completedWorkRow;
                                 }
                                 // Gray muted for sets without any batches
@@ -457,6 +528,10 @@ const AllSetsList: React.FC = () => {
                                 <tr
                                     key={`${set.person_id}-${set.aligner_set_id}`}
                                     onClick={() => handlePatientClick(set)}
+                                    onKeyDown={(e: KeyboardEvent<HTMLTableRowElement>) => {
+                                        if (e.key === 'Enter') handlePatientClick(set);
+                                    }}
+                                    tabIndex={0}
                                     className={rowClass}
                                 >
                                     <td data-label="Patient">
@@ -480,6 +555,9 @@ const AllSetsList: React.FC = () => {
                                     <td data-label="Status">{renderBatchStateBadge(set)}</td>
                                     <td data-label="Next Due">
                                         {set.NextDueDate ? formatDate(set.NextDueDate) : '—'}
+                                    </td>
+                                    <td data-label="Next Appt">
+                                        {renderNextAppointment(set)}
                                     </td>
                                     <td data-label="Notes">
                                         {set.notes ? (

@@ -196,10 +196,13 @@ export const alignerSetForMatchRow = z.looseObject({
 });
 export type AlignerSetForMatch = z.infer<typeof alignerSetForMatchRow>;
 
+/** `works.status` values that close out a treatment (2 = Finished, 3 = Discontinued). */
+export const CLOSED_WORK_STATUSES = [2, 3] as const;
+export const isClosedWorkStatus = (status: number | null): boolean =>
+  status !== null && (CLOSED_WORK_STATUSES as readonly number[]).includes(status);
+
 /** v_allsets view row — joined shape for AllSetsList.tsx (different from alignerSetRow).
- *  PG `date` columns (creation_date, manufacture_date, etc.) are already strings.
- *  BatchCreationDate (timestamp) and WorkStatusName are not read by the UI; they
- *  pass through via looseObject. */
+ *  PG `date` columns (delivered_to_patient_date, NextDueDate) are already strings. */
 export const allSetsRow = z.looseObject({
   person_id: z.number(),
   work_id: z.number(),
@@ -214,11 +217,11 @@ export const allSetsRow = z.looseObject({
   WorkStatus: z.number().nullable(),
   delivered_to_patient_date: z.string().nullable(),
   NextDueDate: z.string().nullable(),
-  NextBatchPresent: z.string().nullable(),
+  // PG timestamp: Date on the server (dev-parse), ISO string on the client.
+  NextAppointment: timestampString.nullable(),
+  NextBatchPresent: z.boolean(),
   LabStatus: z.string().nullable(),
   notes: z.string().nullable(),
-  creation_date: z.string().nullable(),
-  manufacture_date: z.string().nullable(),
 });
 export type AlignerSetView = z.infer<typeof allSetsRow>;
 
@@ -242,7 +245,7 @@ export type AlignerPatient = z.infer<typeof alignerPatientRow>;
 // ===========================================================================
 // READS — inline-literal `{ <array>, count, … }` containers built in the
 // handler. Closed `z.object` container (exactly the keys the handler builds) +
-// modeled row arrays. `count`/`noNextBatchCount` always present.
+// modeled row arrays. `count` present where the handler builds it.
 // ===========================================================================
 
 // GET /api/aligner/doctors — doctors with unread counts.
@@ -251,8 +254,9 @@ export const alignerDoctors = {
 } as const;
 
 // GET /api/aligner/all-sets — v_allsets view rows (allSetsRow, not alignerSetRow).
+// No count fields: the client derives every count from `sets` itself.
 export const allSets = {
-  response: z.object({ sets: z.array(allSetsRow), count: z.number(), noNextBatchCount: z.number() }),
+  response: z.object({ sets: z.array(allSetsRow) }),
 } as const;
 
 // GET /api/aligner/patients/all — all aligner patients (all doctors).

@@ -183,7 +183,7 @@ async function pathExists(path: string): Promise<boolean> {
  * Retrieves patient information for a given patient id.
  * Returns full patient details with all related lookup values.
  */
-export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets> {
+export async function getInfos(PID: number): Promise<(PatientInfo & PatientAssets) | null> {
   // The patient row and the asset bundle are independent reads — issue them
   // concurrently rather than serially.
   const rowPromise = getKysely()
@@ -258,8 +258,11 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
 
   const [row, assets] = await Promise.all([rowPromise, getAssets(PID)]);
 
-  const patientInfo: PatientInfo = row
-    ? {
+  // No patient row = not found. Returning a stub here would defeat the caller's
+  // not-found guard (assets always has keys), ending in a contract-parse 500.
+  if (!row) return null;
+
+  const patientInfo: PatientInfo = {
         person_id: row.person_id,
         patient_name: row.patient_name,
         first_name: row.first_name,
@@ -295,8 +298,7 @@ export async function getInfos(PID: number): Promise<PatientInfo & PatientAssets
                 alertSeverity: row.alert_severity as number,
               }
             : null,
-      }
-    : ({} as PatientInfo);
+  };
 
   return { ...patientInfo, ...assets };
 }

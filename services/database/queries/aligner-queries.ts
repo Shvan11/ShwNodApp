@@ -102,18 +102,15 @@ type AlignerSetFromView = {
   set_sequence: number | null;
   SetIsActive: boolean;
   batch_sequence: number | null;
-  creation_date: string | null;
-  BatchCreationDate: Date | null;
-  manufacture_date: string | null;
   delivered_to_patient_date: string | null;
   NextDueDate: string | null;
+  NextAppointment: Date | null;
   notes: string | null;
   is_last: boolean | null;
-  NextBatchPresent: string | null;
+  NextBatchPresent: boolean;
   LabStatus: string | null;
   doctor_name: string;
   WorkStatus: number | null;
-  WorkStatusName: string | null;
 };
 
 interface AlignerSetData {
@@ -468,10 +465,11 @@ export async function deleteDoctor(drID: number): Promise<void> {
  *   - "latest batch" per set: ROW_NUMBER() OVER (PARTITION BY aligner_set_id
  *     ORDER BY active-first, batch_sequence DESC) = 1
  *   - NextDueDate: batch_expiry_date of the latest DELIVERED batch
- *   - NextBatchPresent ('True'/'False'): a manufactured-but-undelivered batch exists
- *     beyond the last delivered sequence
+ *   - NextBatchPresent: a manufactured-but-undelivered batch exists beyond the
+ *     last delivered sequence
  *   - LabStatus: no_batches / in_lab / needs_mfg / all_delivered
  *   - the view itself filters type_of_work IN (19,20,21)
+ * No ORDER BY beyond patient_name: AllSetsList sorts client-side, unconditionally.
  */
 export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
   try {
@@ -483,12 +481,8 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
           .selectFrom('aligner_batches')
           .select((_eb) => [
             'aligner_set_id',
-            'aligner_batch_id',
             'batch_sequence',
-            'creation_date',
-            'manufacture_date',
             'delivered_to_patient_date',
-            'batch_expiry_date',
             'notes',
             'is_last',
             sql<number>`row_number() over (partition by "aligner_set_id" order by case when "is_active" = true then 0 else 1 end, "batch_sequence" desc)`.as(
@@ -503,7 +497,6 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
       .leftJoin('lb', (join) =>
         join.onRef('s.aligner_set_id', '=', 'lb.aligner_set_id').on('lb.RowNum', '=', 1)
       )
-      .leftJoin('work_statuses as ws', 'w.status', 'ws.status_id')
       .where((eb) =>
         eb.or([
           eb('w.type_of_work', '=', 19),
@@ -520,9 +513,6 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
         's.set_sequence as set_sequence',
         's.is_active as SetIsActive',
         'lb.batch_sequence as batch_sequence',
-        's.creation_date as creation_date',
-        eb.ref('lb.creation_date').$castTo<Date | null>().as('BatchCreationDate'),
-        'lb.manufacture_date as manufacture_date',
         'lb.delivered_to_patient_date as delivered_to_patient_date',
         // NextDueDate: batch_expiry_date of the latest DELIVERED batch
         eb
@@ -534,10 +524,19 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
           .limit(1)
           .$castTo<string | null>()
           .as('NextDueDate'),
+        // NextAppointment: earliest upcoming appointment for the patient (today included,
+        // so the front desk sees "coming in today"). Served by ix_pid_all (person_id, app_date).
+        eb
+          .selectFrom('appointments as ap')
+          .whereRef('ap.person_id', '=', 'w.person_id')
+          .where('ap.app_date', '>=', sql<Date>`current_date`)
+          .select((e) => e.fn.min('ap.app_date').as('next_app'))
+          .$castTo<Date | null>()
+          .as('NextAppointment'),
         'lb.notes as notes',
         'lb.is_last as is_last',
         // NextBatchPresent: a manufactured-but-undelivered batch beyond the last delivered seq?
-        sql<string>`case when exists (
+        sql<boolean>`exists (
           select 1 from "aligner_batches" "ReadyBatch"
           where "ReadyBatch"."aligner_set_id" = ${eb.ref('s.aligner_set_id')}
             and "ReadyBatch"."manufacture_date" is not null
@@ -546,7 +545,7 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
               (select max("b2"."batch_sequence") from "aligner_batches" "b2"
                where "b2"."aligner_set_id" = ${eb.ref('s.aligner_set_id')}
                  and "b2"."delivered_to_patient_date" is not null), 0)
-        ) then 'True' else 'False' end`.as('NextBatchPresent'),
+        )`.as('NextBatchPresent'),
         // LabStatus
         sql<string>`case
           when not exists (select 1 from "aligner_batches" "b2" where "b2"."aligner_set_id" = ${eb.ref('s.aligner_set_id')}) then 'no_batches'
@@ -555,26 +554,7 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
           else 'all_delivered' end`.as('LabStatus'),
         'ad.doctor_name as doctor_name',
         'w.status as WorkStatus',
-        'ws.status_name as WorkStatusName',
       ])
-      .orderBy(sql`case when "s"."is_active" = true then 0 else 1 end`)
-      .orderBy(
-        sql`case when (case when exists (
-          select 1 from "aligner_batches" "ReadyBatch"
-          where "ReadyBatch"."aligner_set_id" = "s"."aligner_set_id"
-            and "ReadyBatch"."manufacture_date" is not null
-            and "ReadyBatch"."delivered_to_patient_date" is null
-            and "ReadyBatch"."batch_sequence" > coalesce(
-              (select max("b2"."batch_sequence") from "aligner_batches" "b2"
-               where "b2"."aligner_set_id" = "s"."aligner_set_id"
-                 and "b2"."delivered_to_patient_date" is not null), 0)
-        ) then 'True' else 'False' end) = 'False' then 0 else 1 end`
-      )
-      .orderBy(
-        sql`(select b."batch_expiry_date" from "aligner_batches" b
-          where b."aligner_set_id" = "s"."aligner_set_id" and b."delivered_to_patient_date" is not null
-          order by b."batch_sequence" desc limit 1) asc`
-      )
       .orderBy('p.patient_name')
       .execute();
 

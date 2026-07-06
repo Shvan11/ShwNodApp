@@ -56,7 +56,8 @@ const UniversalHeader = () => {
     // loader resolves, so on a slow load a nav click otherwise looks dead — this
     // drives a spinner on the specific button whose destination is loading.
     const pendingPath = navigation.location?.pathname ?? null;
-    const pendingPatientCode = pendingPath?.match(/\/patient\/(\d+)/)?.[1] ?? null;
+    // Anchored: /aligner/patient/:workId carries a WORK id, not a patient code.
+    const pendingPatientCode = pendingPath?.match(/^\/patient\/(\d+)/)?.[1] ?? null;
     // GlobalState already fetches /api/auth/me and exposes the user, so the
     // header reads it from there instead of making its own duplicate request.
     const { user } = useGlobalState();
@@ -69,7 +70,9 @@ const UniversalHeader = () => {
 
     // Patient code from the URL (/patient/:code/...). Tells us whether we're
     // *currently* on a patient page and drives the last-sub-view persistence.
-    const patientCode = location.pathname.match(/\/patient\/(\d+)/)?.[1] ?? null;
+    // Anchored: /aligner/patient/:workId carries a WORK id, not a patient code —
+    // matching it fetched a nonexistent patient and poisoned the sticky tab.
+    const patientCode = location.pathname.match(/^\/patient\/(\d+)/)?.[1] ?? null;
 
     // Sticky patient tab: keep the last-opened patient as a clickable tab even after
     // navigating away (Dashboard/Appointments/Search), until a different patient is
