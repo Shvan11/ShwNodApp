@@ -154,3 +154,26 @@ export const threeshapeWebhookDelete = {
   response: z.object({ ok: z.boolean() }),
 } as const;
 export type ThreeShapeWebhookDeleteParams = z.infer<typeof threeshapeWebhookDelete.params>;
+
+// ── Google Drive (aligner PDF storage, OAuth) ──
+// The interactive connect flow itself is browser redirects under
+// /api/admin/google-drive (auth-url/callback); these endpoints just surface
+// status + disconnect. Closed z.object — the status is built field-for-field
+// from the OAuth token store.
+
+// GET /api/integrations/google-drive/status — connection status (no live Drive call).
+export const googleDriveStatus = {
+  response: z.object({
+    configured: z.boolean(),
+    connected: z.boolean(),
+    folderConfigured: z.boolean(),
+    expiresAt: z.string().nullable(),
+    scope: z.string().nullable(),
+  }),
+} as const;
+export type GoogleDriveStatusResponse = z.infer<typeof googleDriveStatus.response>;
+
+// POST /api/integrations/google-drive/disconnect — clear the stored tokens.
+export const googleDriveDisconnect = {
+  response: z.object({ ok: z.boolean() }),
+} as const;

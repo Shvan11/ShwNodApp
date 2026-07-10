@@ -310,6 +310,8 @@ export const qk = {
     integrationsThreeShapeStatus: () => ['settings', 'integrations-3shape-status'] as const,
     /** GET /api/integrations/gemini/status — Gemini (Google GenAI) integration status. */
     integrationsGeminiStatus: () => ['settings', 'integrations-gemini-status'] as const,
+    /** GET /api/integrations/google-drive/status — Google Drive (aligner PDF storage) integration status. */
+    integrationsGoogleDriveStatus: () => ['settings', 'integrations-google-drive-status'] as const,
     /** GET /api/wa/group-settings — WhatsApp daily-list group posting config. */
     whatsappGroupSettings: () => ['settings', 'whatsapp-group-settings'] as const,
   },

@@ -854,13 +854,18 @@ const PatientSets: React.FC = () => {
                 }
             }
 
-            // Navigate to the specific set folder
-            const setFolderHandle = await navigateToSetFolder(
-                baseHandle,
-                set.aligner_dr_id || 0,
-                patient?.person_id || 0,
-                set.set_sequence ?? 0
-            );
+            // Navigate to the specific set folder. Without a real doctor/patient id
+            // there's no correct subfolder to resolve to — skip navigation rather
+            // than silently landing in a bogus "0/..." path, and open the picker
+            // at the base folder instead.
+            const setFolderHandle = (set.aligner_dr_id && patient?.person_id)
+                ? await navigateToSetFolder(
+                    baseHandle,
+                    set.aligner_dr_id,
+                    patient.person_id,
+                    set.set_sequence ?? 0
+                )
+                : null;
 
             // Open file picker starting in the set folder
             type FilePickerOptions = {
@@ -955,7 +960,10 @@ const PatientSets: React.FC = () => {
 
             // Route returns { success, message, data } but the FE just reloads sets to
             // pick up the new URL; non-2xx throws.
-            await postFormData(`/api/aligner/sets/${setId}/upload-pdf`, formData);
+            // 120s to match the server's timeouts.long on this route — the default
+            // 30s funnel timeout would abort large PDFs client-side while the
+            // upload was still completing server-side.
+            await postFormData(`/api/aligner/sets/${setId}/upload-pdf`, formData, { timeoutMs: 120000 });
 
             // Show success message
             toast.success('PDF uploaded successfully!');

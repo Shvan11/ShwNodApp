@@ -409,6 +409,12 @@ async function initializeApplication(): Promise<AppInitResult> {
     const driveInitialized = driveClient.initialize();
     if (driveInitialized) {
       log.info('✅ Google Drive client initialized successfully');
+      // A DB-stored refresh token (connected via Settings → Integrations) takes
+      // precedence over the env-configured one — apply it before any upload runs.
+      const usedStoredCredentials = await driveClient.loadStoredCredentials();
+      if (usedStoredCredentials) {
+        log.info('📁 Using Google Drive credentials from Settings → Integrations');
+      }
     } else {
       log.info('⚠️  Google Drive not configured. PDF upload will be disabled.');
       log.info('💡 To enable PDF uploads, configure Google Drive credentials in .env');

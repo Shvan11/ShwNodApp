@@ -4,10 +4,15 @@
  */
 import { Router, type Request, type Response } from 'express';
 import { log } from '../utils/logger.js';
-import driveClient from '../services/google-drive/google-drive-client.js';
+import { authorize } from '../middleware/auth.js';
+import { ADMIN_ROLES } from '../shared/auth/roles.js';
 import driveUploadService from '../services/google-drive/drive-upload.js';
+import * as googleDriveOAuth from '../services/google-drive/oauth.js';
 
 const router = Router();
+
+// Every route in this file is admin-only.
+router.use(authorize(ADMIN_ROLES));
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -17,26 +22,41 @@ const router = Router();
 // surface, so kept as a local type rather than a contract export).
 type OAuthCallbackQuery = {
   code?: string;
+  state?: string;
+  error?: string;
 };
 
+// Kept at this existing path (not /api/auth/google-drive/*, the convention used by
+// 3Shape) — it's the redirect URI already registered against this Google Cloud
+// OAuth client; moving it would require a matching change in Google Cloud Console.
+const GOOGLE_DRIVE_SETTINGS_URL = '/settings/integrations';
+const GOOGLE_DRIVE_STATE_TTL_MS = 10 * 60 * 1000; // login → callback round-trip window
+
 /**
- * Get Google Drive authorization URL
- * Use this to get the OAuth URL for initial setup
+ * GET /api/admin/google-drive/auth-url — generate state, stash in the session, and
+ * 302 to Google's consent screen. (Full-page redirect, not a JSON endpoint — the
+ * Settings → Integrations "Connect" button navigates here directly.)
  */
 router.get(
   '/api/admin/google-drive/auth-url',
-  (_req: Request, res: Response): void => {
+  (req: Request, res: Response): void => {
+    if (!googleDriveOAuth.isConfigured()) {
+      res.status(503).json({ success: false, error: 'Google Drive is not configured on this server.' });
+      return;
+    }
     try {
-      if (!driveClient.oauth2Client) {
-        driveClient.initialize();
-      }
-
-      const authUrl = driveClient.getAuthUrl();
-
-      res.json({
-        success: true,
-        authUrl: authUrl,
-        message: 'Visit this URL to authorize the application'
+      const state = googleDriveOAuth.generateState();
+      const url = googleDriveOAuth.buildAuthorizeUrl(state);
+      req.session.googleDrive = { state, createdAt: Date.now() };
+      // Persist the state BEFORE redirecting — the callback (a fresh request after
+      // the round-trip to Google) must read it back from the store.
+      req.session.save((err) => {
+        if (err) {
+          log.error('[GoogleDrive] failed to persist OAuth session', { error: err.message });
+          res.status(500).json({ success: false, error: 'Could not start Google Drive sign-in.' });
+          return;
+        }
+        res.redirect(url);
       });
     } catch (error) {
       log.error('Error generating auth URL', { error: (error as Error).message });
@@ -49,8 +69,8 @@ router.get(
 );
 
 /**
- * OAuth callback handler
- * Exchanges the authorization code for tokens
+ * GET /api/admin/google-drive/callback — exchange the code for tokens, persist
+ * them, and redirect back to the Settings → Integrations card with a flag.
  */
 router.get(
   '/api/admin/google-drive/callback',
@@ -58,129 +78,39 @@ router.get(
     req: Request<unknown, unknown, unknown, OAuthCallbackQuery>,
     res: Response
   ): Promise<void> => {
+    const back = (params: string): void => res.redirect(`${GOOGLE_DRIVE_SETTINGS_URL}?${params}`);
+    const fail = (reason: string): void => back(`googleDrive=error&reason=${encodeURIComponent(reason)}`);
+
+    const { code, state, error: oauthError } = req.query;
+
+    // One-shot: consume the stashed state regardless of outcome.
+    const pending = req.session.googleDrive;
+    delete req.session.googleDrive;
+
+    if (oauthError) {
+      log.warn('[GoogleDrive] authorize returned an error', { error: oauthError });
+      fail(oauthError);
+      return;
+    }
+    if (!pending || !state || state !== pending.state) {
+      fail('invalid_state');
+      return;
+    }
+    if (Date.now() - pending.createdAt > GOOGLE_DRIVE_STATE_TTL_MS) {
+      fail('expired');
+      return;
+    }
+    if (!code) {
+      fail('missing_code');
+      return;
+    }
+
     try {
-      const { code } = req.query;
-
-      if (!code) {
-        res.status(400).send('Authorization code not provided');
-        return;
-      }
-
-      const tokens = await driveClient.getTokensFromCode(code);
-
-      res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Google Drive Authorization Success</title>
-                <style>
-                    body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                        max-width: 800px;
-                        margin: 50px auto;
-                        padding: 20px;
-                        background: #f5f5f5;
-                    }
-                    .container {
-                        background: white;
-                        padding: 30px;
-                        border-radius: 12px;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                    }
-                    h1 { color: #00897B; }
-                    .token-box {
-                        background: #f9f9f9;
-                        border: 1px solid #ddd;
-                        border-radius: 6px;
-                        padding: 15px;
-                        margin: 20px 0;
-                        font-family: 'Courier New', monospace;
-                        word-break: break-all;
-                    }
-                    .success { color: #43A047; }
-                    .instructions {
-                        background: #E3F2FD;
-                        padding: 15px;
-                        border-radius: 6px;
-                        margin: 20px 0;
-                    }
-                    code {
-                        background: #f5f5f5;
-                        padding: 2px 6px;
-                        border-radius: 3px;
-                        font-family: 'Courier New', monospace;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h1 class="success">✓ Authorization Successful!</h1>
-                    <p>Your Google Drive has been successfully authorized.</p>
-
-                    <div class="instructions">
-                        <h3>Next Steps:</h3>
-                        <ol>
-                            <li>Copy the refresh token below</li>
-                            <li>Add it to your <code>.env</code> file as <code>GOOGLE_DRIVE_REFRESH_TOKEN</code></li>
-                            <li>Restart your application</li>
-                        </ol>
-                    </div>
-
-                    <h3>Refresh Token:</h3>
-                    <div class="token-box">
-                        ${tokens.refresh_token || 'No refresh token received. You may already have one configured.'}
-                    </div>
-
-                    <h3>Environment Variable:</h3>
-                    <div class="token-box">
-                        GOOGLE_DRIVE_REFRESH_TOKEN=${tokens.refresh_token || 'YOUR_TOKEN_HERE'}
-                    </div>
-
-                    ${
-                      tokens.access_token
-                        ? `
-                        <p style="font-size: 0.9em; color: #666;">
-                            <strong>Note:</strong> The access token will be automatically refreshed when needed.
-                            You only need to save the refresh token.
-                        </p>
-                    `
-                        : ''
-                    }
-                </div>
-            </body>
-            </html>
-        `);
+      await googleDriveOAuth.exchangeCode(code);
+      back('googleDrive=connected');
     } catch (error) {
       log.error('Error in OAuth callback', { error: (error as Error).message });
-      res.status(500).send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Authorization Error</title>
-                <style>
-                    body {
-                        font-family: sans-serif;
-                        max-width: 600px;
-                        margin: 50px auto;
-                        padding: 20px;
-                    }
-                    .error {
-                        background: #ffebee;
-                        border: 1px solid #ef5350;
-                        border-radius: 6px;
-                        padding: 20px;
-                        color: #c62828;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="error">
-                    <h1>Authorization Failed</h1>
-                    <p>${(error as Error).message}</p>
-                </div>
-            </body>
-            </html>
-        `);
+      fail('exchange_failed');
     }
   }
 );
@@ -204,44 +134,8 @@ router.get(
   }
 );
 
-/**
- * Get Google Drive configuration status
- */
-router.get(
-  '/api/admin/google-drive/status',
-  (_req: Request, res: Response): void => {
-    try {
-      const isInitialized = driveClient.isInitialized();
-      const config = {
-        clientId:
-          !!process.env.GOOGLE_DRIVE_CLIENT_ID ||
-          !!process.env.GOOGLE_CLIENT_ID,
-        clientSecret:
-          !!process.env.GOOGLE_DRIVE_CLIENT_SECRET ||
-          !!process.env.GOOGLE_CLIENT_SECRET,
-        refreshToken: !!process.env.GOOGLE_DRIVE_REFRESH_TOKEN,
-        folderId: !!process.env.GOOGLE_DRIVE_FOLDER_ID
-      };
-
-      res.json({
-        success: true,
-        initialized: isInitialized,
-        configuration: config,
-        ready:
-          isInitialized &&
-          config.clientId &&
-          config.clientSecret &&
-          config.refreshToken &&
-          config.folderId
-      });
-    } catch (error) {
-      log.error('Error checking status', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        error: (error as Error).message
-      });
-    }
-  }
-);
+// Full configuration + connection status now lives at the contracted
+// GET /api/integrations/google-drive/status (routes/api/integrations.routes.ts),
+// which backs the Settings → Integrations card.
 
 export default router;

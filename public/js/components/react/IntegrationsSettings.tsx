@@ -16,6 +16,7 @@ import {
   integrationsTelegramStatusQuery,
   integrationsThreeShapeStatusQuery,
   integrationsGeminiStatusQuery,
+  integrationsGoogleDriveStatusQuery,
 } from '@/query/queries';
 import { qk } from '@/query/keys';
 import * as integrations from '@shared/contracts/integrations.contract';
@@ -218,6 +219,55 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
     }
   }, [toast, queryClient]);
 
+  // ── Google Drive (aligner PDF storage, OAuth) ──
+  const { data: gdData, isLoading: gdLoading } = useQuery(integrationsGoogleDriveStatusQuery());
+  const gdStatus = (gdData as integrations.GoogleDriveStatusResponse | undefined) ?? null;
+  const [gdBusy, setGdBusy] = useState(false);
+
+  // Handle the one-shot ?googleDrive=connected|error flag the OAuth callback
+  // redirects back with: toast, refresh status, then strip it from the URL.
+  const gdOauthFlagHandled = useRef(false);
+  useEffect(() => {
+    if (gdOauthFlagHandled.current) return;
+    const flag = searchParams.get('googleDrive');
+    if (!flag) return;
+    gdOauthFlagHandled.current = true;
+    if (flag === 'connected') {
+      toast.success('Google Drive connected');
+    } else {
+      const reason = searchParams.get('reason');
+      toast.error(reason ? `Google Drive connection failed: ${reason}` : 'Google Drive connection failed');
+    }
+    void queryClient.invalidateQueries({ queryKey: qk.settings.integrationsGoogleDriveStatus() });
+    const next = new URLSearchParams(searchParams);
+    next.delete('googleDrive');
+    next.delete('reason');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, toast, queryClient]);
+
+  // Start OAuth: full-page navigation to the server route, which 302s to Google.
+  // External-provider redirect — a sanctioned exception to the SPA-only nav rule.
+  const connectGoogleDrive = useCallback((): void => {
+    window.location.href = '/api/admin/google-drive/auth-url';
+  }, []);
+
+  const disconnectGoogleDrive = useCallback(async (): Promise<void> => {
+    setGdBusy(true);
+    try {
+      await postJSON(
+        '/api/integrations/google-drive/disconnect',
+        {},
+        { schema: integrations.googleDriveDisconnect.response }
+      );
+      toast.success('Google Drive disconnected');
+      await queryClient.invalidateQueries({ queryKey: qk.settings.integrationsGoogleDriveStatus() });
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to disconnect Google Drive'));
+    } finally {
+      setGdBusy(false);
+    }
+  }, [toast, queryClient]);
+
   // ── Gemini (Google GenAI) ──
   const { data: gmData, isLoading: gmLoading } = useQuery(integrationsGeminiStatusQuery());
   const gmStatus = (gmData as integrations.GeminiStatusResponse | undefined) ?? null;
@@ -307,6 +357,17 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
       ? 'Connected'
       : 'Not connected';
 
+  const gdHealth: 'ok' | 'warn' | 'off' = !gdStatus?.configured
+    ? 'off'
+    : gdStatus.connected
+      ? 'ok'
+      : 'warn';
+  const gdHealthLabel = !gdStatus?.configured
+    ? 'Not configured'
+    : gdStatus.connected
+      ? 'Connected'
+      : 'Not connected';
+
   const health: 'ok' | 'warn' | 'off' = !status?.configured
     ? 'off'
     : status.authorized
@@ -326,7 +387,7 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
             <i className="fas fa-plug" aria-hidden="true" /> Integrations
           </h3>
           <p className={styles.description}>
-            Manage authentication for external services. More integrations (WhatsApp, Google) will
+            Manage authentication for external services. More integrations (WhatsApp) will
             appear here.
           </p>
         </div>
@@ -554,6 +615,82 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
                 className={styles.dangerBtn}
                 onClick={() => void disconnectThreeShape()}
                 disabled={tsBusy}
+              >
+                Disconnect
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Google Drive card ── */}
+      <div className={`${styles.card} ${styles[gdHealth]}`}>
+        <div className={styles.cardHeader}>
+          <span className={styles.serviceName}>
+            <i className="fab fa-google-drive" aria-hidden="true" /> Google Drive
+          </span>
+          <span className={`${styles.badge} ${styles[gdHealth]}`}>
+            <span className={styles.dot} />
+            {gdLoading && !gdStatus ? 'Checking…' : gdHealthLabel}
+          </span>
+        </div>
+        <p className={styles.serviceDescription}>
+          Stores uploaded aligner-set PDFs. Connect the Google account that owns the target
+          Drive folder — reconnect here whenever uploads start failing with an authorization error.
+        </p>
+
+        {gdStatus && !gdStatus.configured && (
+          <div className={styles.notice}>
+            Google Drive is not configured. Set <code>GOOGLE_DRIVE_CLIENT_ID</code> and{' '}
+            <code>GOOGLE_DRIVE_CLIENT_SECRET</code> (or the shared <code>GOOGLE_CLIENT_ID</code> /{' '}
+            <code>GOOGLE_CLIENT_SECRET</code>) in the server environment, then refresh.
+          </div>
+        )}
+
+        {gdStatus?.configured && !gdStatus.folderConfigured && (
+          <div className={styles.notice}>
+            <code>GOOGLE_DRIVE_FOLDER_ID</code> is not set — connecting will succeed, but uploads
+            will fail until a destination folder is configured.
+          </div>
+        )}
+
+        {gdStatus?.configured && (
+          <dl className={styles.rows}>
+            <div className={styles.row}>
+              <dt>Status</dt>
+              <dd>
+                {gdStatus.connected ? (
+                  <span className={styles.okText}>Connected</span>
+                ) : (
+                  'Not connected'
+                )}
+              </dd>
+            </div>
+            {gdStatus.connected && gdStatus.expiresAt && (
+              <div className={styles.row}>
+                <dt>Access token expires</dt>
+                <dd>{new Date(gdStatus.expiresAt).toLocaleString()}</dd>
+              </div>
+            )}
+          </dl>
+        )}
+
+        {gdStatus?.configured && (
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={connectGoogleDrive}
+              disabled={gdBusy}
+            >
+              {gdStatus.connected ? 'Reconnect' : 'Connect'}
+            </button>
+            {gdStatus.connected && (
+              <button
+                type="button"
+                className={styles.dangerBtn}
+                onClick={() => void disconnectGoogleDrive()}
+                disabled={gdBusy}
               >
                 Disconnect
               </button>

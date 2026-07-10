@@ -6,6 +6,10 @@ import { drive, drive_v3 } from '@googleapis/drive';
 import { OAuth2Client, type Credentials } from 'google-auth-library';
 import config from '../../config/config.js';
 import { log } from '../../utils/logger.js';
+import {
+  getGoogleDriveTokens,
+  saveGoogleDriveTokens,
+} from '../database/queries/google-drive-queries.js';
 
 // OAuth2 client type (drive() accepts this as its `auth`)
 type OAuth2ClientType = OAuth2Client;
@@ -64,6 +68,12 @@ class GoogleDriveClient {
   public drive: drive_v3.Drive | null = null;
   public initialized = false;
 
+  // De-dupes concurrent findOrCreateFolder calls for the same (parent, name) pair
+  // within this process — without it, two uploads racing for the same
+  // not-yet-created patient folder can each miss the list check and create a
+  // duplicate folder.
+  private folderCreationInFlight = new Map<string, Promise<string>>();
+
   /**
    * Initialize the Google Drive client with OAuth2 credentials
    */
@@ -80,12 +90,33 @@ class GoogleDriveClient {
       // Create OAuth2 client
       this.oauth2Client = new OAuth2Client(clientId, clientSecret, redirectUri);
 
-      // Set refresh token if available
+      // Set refresh token if available (env fallback — loadStoredCredentials()
+      // overrides this with the DB-stored token, if one has been connected via
+      // Settings → Integrations).
       if (refreshToken) {
         this.oauth2Client.setCredentials({
           refresh_token: refreshToken,
         });
       }
+
+      // Persist a rotated/newly-issued refresh token so a future restart picks it
+      // up without re-running the consent flow. Google only emits refresh_token on
+      // the initial grant (or an occasional rotation), never on a plain access-token
+      // refresh, so this fires rarely — best-effort, never throws into caller code.
+      this.oauth2Client.on('tokens', (tokens: Credentials) => {
+        if (!tokens.refresh_token) return;
+        saveGoogleDriveTokens({
+          accessToken: tokens.access_token || '',
+          refreshToken: tokens.refresh_token,
+          tokenType: tokens.token_type || 'Bearer',
+          scope: tokens.scope ?? null,
+          expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : new Date(Date.now() + 3600_000),
+        }).catch((error: unknown) => {
+          log.error('Failed to persist rotated Google Drive refresh token', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      });
 
       // Initialize Drive API
       this.drive = drive({
@@ -111,10 +142,29 @@ class GoogleDriveClient {
   }
 
   /**
+   * Load a DB-stored refresh token (Settings → Integrations connect flow), if one
+   * exists, and apply it — taking precedence over the env-configured token so a
+   * reconnect through the UI takes effect immediately, no restart required.
+   * @returns Whether DB-stored credentials were found and applied
+   */
+  async loadStoredCredentials(): Promise<boolean> {
+    if (!this.oauth2Client) return false;
+    const tokens = await getGoogleDriveTokens();
+    if (!tokens?.refreshToken) return false;
+    this.oauth2Client.setCredentials({
+      refresh_token: tokens.refreshToken,
+      access_token: tokens.accessToken || undefined,
+      expiry_date: tokens.expiresAt.getTime(),
+    });
+    return true;
+  }
+
+  /**
    * Generate OAuth2 authorization URL
+   * @param state - Anti-CSRF state, verified by the callback against the session
    * @returns Authorization URL
    */
-  getAuthUrl(): string {
+  getAuthUrl(state: string): string {
     if (!this.oauth2Client) {
       throw new Error('OAuth2 client not initialized');
     }
@@ -127,6 +177,7 @@ class GoogleDriveClient {
       access_type: 'offline',
       scope: scopes,
       prompt: 'consent', // Force consent screen to get refresh token
+      state,
     });
   }
 
@@ -266,6 +317,20 @@ class GoogleDriveClient {
    * @returns Folder ID
    */
   async findOrCreateFolder(folderName: string, parentFolderId: string): Promise<string> {
+    const lockKey = `${parentFolderId}::${folderName}`;
+    const inFlight = this.folderCreationInFlight.get(lockKey);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const promise = this.findOrCreateFolderUncached(folderName, parentFolderId).finally(() => {
+      this.folderCreationInFlight.delete(lockKey);
+    });
+    this.folderCreationInFlight.set(lockKey, promise);
+    return promise;
+  }
+
+  private async findOrCreateFolderUncached(folderName: string, parentFolderId: string): Promise<string> {
     if (!this.initialized || !this.drive) {
       throw new Error('Google Drive client not initialized');
     }

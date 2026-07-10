@@ -174,9 +174,11 @@ async function updateDatabaseWithPdf(
  *
  * Multi-step workflow:
  * 1. Fetch set information (patient, work, sequence)
- * 2. Delete old PDF from Drive if exists (best-effort)
- * 3. Upload new PDF to Google Drive
- * 4. Update database with new PDF metadata
+ * 2. Upload new PDF to Google Drive
+ * 3. Update database with new PDF metadata
+ * 4. Delete old PDF from Drive if it existed (best-effort, only after the
+ *    new file + DB row are safely in place — otherwise a failed upload
+ *    leaves the DB pointing at an already-deleted file)
  *
  * @param setId - Aligner set id
  * @param file - Uploaded file object
@@ -196,11 +198,9 @@ export async function uploadPdfForSet(
     const setInfo = await getSetInfo(setId);
     const patientName =
       setInfo.patient_name || `${setInfo.first_name} ${setInfo.last_name}`;
+    const previousDriveFileId = setInfo.drive_file_id;
 
-    // Step 2: Delete old file from Drive if exists (best-effort)
-    await deleteOldPdfFromDrive(setInfo.drive_file_id);
-
-    // Step 3: Upload to Google Drive
+    // Step 2: Upload to Google Drive
     const uploadResult = await driveUploadService.uploadPdfForSet(
       {
         buffer: file.buffer,
@@ -225,8 +225,11 @@ export async function uploadPdfForSet(
 
     log.info(`PDF uploaded to Drive: ${driveResult.fileName}`);
 
-    // Step 4: Update database with new PDF metadata
+    // Step 3: Update database with new PDF metadata
     await updateDatabaseWithPdf(setId, driveResult, uploaderEmail);
+
+    // Step 4: Delete the old file from Drive now that the new one is live (best-effort)
+    await deleteOldPdfFromDrive(previousDriveFileId);
 
     log.info(`PDF upload workflow completed successfully for set ${setId}`);
 

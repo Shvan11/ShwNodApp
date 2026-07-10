@@ -26,6 +26,7 @@ import {
 import * as threeShapeOAuth from '../../services/threeshape/oauth.js';
 import * as threeShapeClient from '../../services/threeshape/client.js';
 import { sendThreeShapeError } from '../../services/threeshape/route-helpers.js';
+import * as googleDriveOAuth from '../../services/google-drive/oauth.js';
 import * as integrations from '../../shared/contracts/integrations.contract.js';
 
 const router = Router();
@@ -232,5 +233,30 @@ router.delete(
     }
   }
 );
+
+// ── Google Drive (aligner PDF storage) ──
+
+// GET /api/integrations/google-drive/status — connection status (the connect flow
+// itself is the browser redirect at /api/admin/google-drive/auth-url).
+router.get('/google-drive/status', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const status = await googleDriveOAuth.getStatus();
+    sendData(res, integrations.googleDriveStatus.response, status);
+  } catch (err) {
+    log.error('[Integrations] google-drive status failed', { error: (err as Error).message });
+    ErrorResponses.internalError(res, 'Failed to read Google Drive status');
+  }
+});
+
+// POST /api/integrations/google-drive/disconnect — clear the stored tokens.
+router.post('/google-drive/disconnect', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    await googleDriveOAuth.disconnect();
+    sendData(res, integrations.googleDriveDisconnect.response, { ok: true });
+  } catch (err) {
+    log.error('[Integrations] google-drive disconnect failed', { error: (err as Error).message });
+    ErrorResponses.internalError(res, 'Failed to disconnect Google Drive');
+  }
+});
 
 export default router;

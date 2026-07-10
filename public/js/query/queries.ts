@@ -1378,6 +1378,17 @@ export const integrationsGeminiStatusQuery = () =>
       ),
   });
 
+/** GET /api/integrations/google-drive/status — Google Drive (aligner PDF storage) integration status. */
+export const integrationsGoogleDriveStatusQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.integrationsGoogleDriveStatus(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof integrationsContract.googleDriveStatus.response>>(
+        '/api/integrations/google-drive/status',
+        { signal, schema: integrationsContract.googleDriveStatus.response }
+      ),
+  });
+
 /** GET /api/threeshape/patients/:id/cases — patient's 3Shape cases (live). retry off:
  *  a not-connected / unreachable error is actionable, not transient. */
 export const threeShapeCasesQuery = (personId: number | string) =>

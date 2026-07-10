@@ -6,6 +6,7 @@ import { Readable } from 'stream';
 import config from '../../config/config.js';
 import driveClient from './google-drive-client.js';
 import { log } from '../../utils/logger.js';
+import { isInvalidGrantError, handleInvalidGrant } from './oauth.js';
 
 // ===========================================
 // TYPES
@@ -128,6 +129,13 @@ class DriveUploadService {
       };
     } catch (error) {
       log.error('Error uploading PDF to Google Drive', { error: (error as Error).message });
+      if (isInvalidGrantError(error)) {
+        await handleInvalidGrant();
+        throw new Error(
+          'Google Drive authorization has expired or was revoked. Reconnect it in Settings → Integrations, then try uploading again.',
+          { cause: error }
+        );
+      }
       throw new Error(`Failed to upload PDF: ${(error as Error).message}`, { cause: error });
     }
   }
@@ -172,9 +180,10 @@ class DriveUploadService {
         fields: 'id, name',
       });
       return rootFolderId;
-    } catch {
+    } catch (error) {
       throw new Error(
-        `Cannot access Google Drive folder (${rootFolderId}). Please ensure the folder exists and is shared with the service account.`
+        `Cannot access Google Drive folder (${rootFolderId}): ${(error as Error).message}. Please ensure the folder exists and is shared with the connected Google account (Settings → Integrations).`,
+        { cause: error }
       );
     }
   }

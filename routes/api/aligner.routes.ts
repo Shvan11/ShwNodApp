@@ -878,7 +878,7 @@ router.post(
         ErrorResponses.badRequest(res, 'Invalid aligner set ID');
         return;
       }
-      const uploaderEmail = 'staff@shwan.local';
+      const uploaderEmail = req.session?.username || 'unknown';
 
       // Validate file exists
       if (!req.file) {
