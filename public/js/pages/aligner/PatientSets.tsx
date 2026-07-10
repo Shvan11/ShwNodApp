@@ -811,6 +811,12 @@ const PatientSets: React.FC = () => {
     };
 
     // Quick PDF URL handlers
+    const handleStartEditPdfUrlManual = (set: AlignerSet, e: MouseEvent<HTMLButtonElement>): void => {
+        e.stopPropagation();
+        setEditingPdfUrlForSet(set.aligner_set_id);
+        setQuickPdfUrlValue(set.set_pdf_url || '');
+    };
+
     const handleStartEditPdfUrl = async (set: AlignerSet, e: MouseEvent<HTMLButtonElement>): Promise<void> => {
         e.stopPropagation();
 
@@ -1577,18 +1583,28 @@ const PatientSets: React.FC = () => {
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <button
-                                                    className="action-icon-btn edit btn-medium"
-                                                    onClick={(e: MouseEvent<HTMLButtonElement>) => handleStartEditPdfUrl(set, e)}
-                                                    title={set.set_pdf_url ? "Edit PDF URL" : "Add PDF URL"}
-                                                    disabled={uploadingPdf}
-                                                >
-                                                    {uploadingPdf ? (
-                                                        <i className="fas fa-spinner fa-spin"></i>
-                                                    ) : (
-                                                        <i className={set.set_pdf_url ? "fas fa-edit" : "fas fa-plus"}></i>
-                                                    )}
-                                                </button>
+                                                <div className="flex-gap-sm">
+                                                    <button
+                                                        className="action-icon-btn edit btn-medium"
+                                                        onClick={(e: MouseEvent<HTMLButtonElement>) => handleStartEditPdfUrl(set, e)}
+                                                        title={set.set_pdf_url ? "Replace PDF (upload file)" : "Upload PDF"}
+                                                        disabled={uploadingPdf}
+                                                    >
+                                                        {uploadingPdf ? (
+                                                            <i className="fas fa-spinner fa-spin"></i>
+                                                        ) : (
+                                                            <i className={set.set_pdf_url ? "fas fa-edit" : "fas fa-plus"}></i>
+                                                        )}
+                                                    </button>
+                                                    <button
+                                                        className="action-icon-btn edit btn-medium"
+                                                        onClick={(e: MouseEvent<HTMLButtonElement>) => handleStartEditPdfUrlManual(set, e)}
+                                                        title="Enter PDF link manually"
+                                                        disabled={uploadingPdf}
+                                                    >
+                                                        <i className="fas fa-link"></i>
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                         <div className="set-info-item grid-col-full-flex">

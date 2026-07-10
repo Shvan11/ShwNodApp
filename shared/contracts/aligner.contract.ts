@@ -73,6 +73,13 @@ const clearableInt = z
 const clearableNum = z
   .preprocess((v) => (v === '' || v === null ? null : v), z.coerce.number().nullable())
   .optional();
+// Same clearable contract for strings: a plain `z.string().optional()` rejects
+// `null` outright, which broke updateSet whenever the caller round-tripped a
+// GET row (alignerSetRow types notes/type/set_url/set_video/currency nullable)
+// or explicitly cleared a field — both send `null`, not `''`.
+const clearableStr = z
+  .preprocess((v) => (v === '' ? null : v), z.string().nullable())
+  .optional();
 
 // One print label (GenerateLabelsBody.labels[]). The handler does its own per-label
 // `!text`/`!patientName` 400s, so these stay plain `z.string()` (empty reaches the
@@ -377,10 +384,14 @@ export type CreateSetBody = z.infer<typeof createSet.body>;
 
 // PUT /api/aligner/sets/:setId — fully enumerated (mirrors SetUpdateData; all
 // optional — the query only writes fields that are present, so an omitted field
-// is left untouched, never nulled). set_cost/days are clearable*: a blanked form
-// field arrives as null and clears the column (strings clear via '' → || null).
-// sendSuccess(null) — no response key.
-// set_pdf_url is deliberately absent: AlignerPdfService owns that column.
+// is left untouched, never nulled). set_cost/days/notes/type/set_url/set_video/
+// set_pdf_url/currency are all clearable*: a blanked/cleared field arrives as
+// null (or '') and clears the column — callers may also round-trip a GET row
+// verbatim (alignerSetRow types these nullable), so `null` must be accepted,
+// not just ''. set_pdf_url here is for the MANUAL "paste a link" quick-edit
+// (PatientSets' inline PDF-URL editor) — the dedicated upload/delete-pdf
+// endpoints remain the Drive-managed path and separately own `drive_file_id`;
+// the two don't conflict (whichever wrote last wins, same as set_url/set_video).
 export const updateSet = {
   body: z.object({
     aligner_dr_id: optInt,
@@ -388,15 +399,16 @@ export const updateSet = {
     TotalAligners: optInt,
     RemainingAligners: optInt,
     set_cost: clearableNum,
-    notes: z.string().optional(),
+    notes: clearableStr,
     set_sequence: optInt,
-    type: z.string().optional(),
+    type: clearableStr,
     upper_aligners_count: optInt,
     lower_aligners_count: optInt,
     days: clearableInt,
-    set_url: z.string().optional(),
-    set_video: z.string().optional(),
-    currency: z.string().optional(),
+    set_url: clearableStr,
+    set_video: clearableStr,
+    set_pdf_url: clearableStr,
+    currency: clearableStr,
   }),
 } as const;
 export type UpdateSetBody = z.infer<typeof updateSet.body>;

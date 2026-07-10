@@ -110,16 +110,17 @@ export interface SetUpdateData {
   RemainingAligners?: number;
   // Clearable on update: null = clear the column, undefined = leave unchanged.
   set_cost?: number | null;
-  notes?: string;
+  notes?: string | null;
   set_sequence?: number;
-  type?: string;
+  type?: string | null;
   upper_aligners_count?: number;
   lower_aligners_count?: number;
   // Clearable on update: null = clear the column, undefined = leave unchanged.
   days?: number | null;
-  set_url?: string;
-  set_video?: string;
-  currency?: string;
+  set_url?: string | null;
+  set_video?: string | null;
+  set_pdf_url?: string | null;
+  currency?: string | null;
 }
 
 /**
