@@ -37,9 +37,13 @@ import {
 
 const router = Router();
 
-// Every appointment route is clinical (book/check-in/edit/delete) — gate the
-// whole router rather than each route individually.
-router.use(authenticate, authorize(CLINICAL_ROLES));
+// Every appointment route is clinical (book/check-in/edit/delete), but the
+// gate is attached PER ROUTE, never via a pathless router.use(): this router
+// is mounted at the /api root (routes/api/index.ts), so a router-level gate
+// would also run for every /api/* request merely passing through to a
+// later-mounted router — it once 403'd the entire API for a session carrying
+// a stale role.
+const clinicalOnly = [authenticate, authorize(CLINICAL_ROLES)];
 
 // WebSocket emitter will be injected to avoid circular imports
 let wsEmitter: EventEmitter | null = null;
@@ -85,6 +89,7 @@ type AppointmentResult = {
  */
 router.get(
   '/appointment-details',
+  clinicalOnly,
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const db = getKysely();
@@ -119,6 +124,7 @@ router.get(
  */
 router.get(
   '/getDailyAppointments',
+  clinicalOnly,
   async (
     req: Request<unknown, unknown, unknown, AppointmentQueryParams>,
     res: Response
@@ -166,6 +172,7 @@ router.get(
  */
 router.post(
   '/updateAppointmentState',
+  clinicalOnly,
   validate({ body: appointment.updateAppointmentState.body }),
   async (
     req: Request<unknown, unknown, appointment.AppointmentStateBody>,
@@ -238,6 +245,7 @@ router.post(
  */
 router.post(
   '/undoAppointmentState',
+  clinicalOnly,
   validate({ body: appointment.undoAppointmentState.body }),
   async (
     req: Request<unknown, unknown, appointment.AppointmentStateBody>,
@@ -305,6 +313,7 @@ router.post(
  */
 router.post(
   '/appointments',
+  clinicalOnly,
   validate({ body: appointment.createAppointment.body }),
   async (
     req: Request<unknown, unknown, appointment.CreateAppointmentBody>,
@@ -379,6 +388,7 @@ router.post(
  */
 router.get(
   '/patient-appointments/:personId',
+  clinicalOnly,
   async (
     req: Request<{ personId: string }>,
     res: Response
@@ -424,6 +434,7 @@ router.get(
  */
 router.get(
   '/appointments/:appointmentId',
+  clinicalOnly,
   async (
     req: Request<{ appointmentId: string }>,
     res: Response
@@ -473,6 +484,7 @@ router.get(
  */
 router.put(
   '/appointments/:appointmentId',
+  clinicalOnly,
   validate({ params: appointment.updateAppointment.params, body: appointment.updateAppointment.body }),
   async (
     req: Request<{ appointmentId: string }, unknown, appointment.UpdateAppointmentBody>,
@@ -516,6 +528,7 @@ router.put(
  */
 router.delete(
   '/appointments/:appointmentId',
+  clinicalOnly,
   validate({ params: appointment.deleteAppointment.params }),
   async (
     req: Request<{ appointmentId: string }>,
@@ -557,6 +570,7 @@ router.delete(
  */
 router.post(
   '/appointments/quick-checkin',
+  clinicalOnly,
   validate({ body: appointment.quickCheckin.body }),
   async (
     req: Request<unknown, unknown, QuickCheckInBody>,

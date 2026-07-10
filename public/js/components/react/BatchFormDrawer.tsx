@@ -25,7 +25,6 @@ interface ComputedFields {
 }
 
 interface FormErrors {
-    batch_sequence?: string;
     upper_aligner_count?: string;
     lower_aligner_count?: string;
     is_active?: string;
@@ -128,11 +127,17 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             upperStart = batch.upper_aligner_start_sequence ?? 1;
             lowerStart = batch.lower_aligner_start_sequence ?? 1;
         } else if (existingBatches.length > 0) {
-            const lastBatch = existingBatches.reduce((latest, b) =>
-                (b.batch_sequence > latest.batch_sequence) ? b : latest
-            );
-            upperStart = (lastBatch.upper_aligner_end_sequence || 0) + 1;
-            lowerStart = (lastBatch.lower_aligner_end_sequence || 0) + 1;
+            // Mirror the server (createBatch): next start = MAX(end) over ALL
+            // batches + 1, per arch — the latest batch alone won't do, it may
+            // have no aligners for one arch (null end) while an earlier one does.
+            const upperEnds = existingBatches
+                .map(b => b.upper_aligner_end_sequence)
+                .filter((v): v is number => v != null);
+            const lowerEnds = existingBatches
+                .map(b => b.lower_aligner_end_sequence)
+                .filter((v): v is number => v != null);
+            upperStart = (upperEnds.length > 0 ? Math.max(...upperEnds) : 0) + 1;
+            lowerStart = (lowerEnds.length > 0 ? Math.max(...lowerEnds) : 0) + 1;
         } else {
             upperStart = 1;
             lowerStart = 1;
@@ -163,10 +168,6 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
 
     const validate = (): { valid: boolean; errors: FormErrors } => {
         const newErrors: FormErrors = {};
-
-        if (!formData.batch_sequence || formData.batch_sequence === '') {
-            newErrors.batch_sequence = 'Batch sequence is required';
-        }
 
         // Validate active batch must have delivery date (check batch prop, not formData)
         if (formData.is_active && !batch?.delivered_to_patient_date) {
@@ -402,22 +403,18 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                     {/* Basic Info Section - Full Width */}
                     <div className="form-section form-section-compact">
                         <h3 className="section-heading-tight">Basic Information</h3>
+                        {/* Read-only: the server numbers batches itself (MAX+1 on create,
+                            resequenced on edit/delete) and ignores any client value. */}
                         <div className="form-field">
-                            <label htmlFor="BatchSequence">
-                                Batch Sequence <span className="required">*</span>
-                            </label>
+                            <label htmlFor="BatchSequence">Batch Sequence (Auto)</label>
                             <input
                                 type="number"
                                 id="BatchSequence"
                                 name="batch_sequence"
                                 value={formData.batch_sequence}
-                                onChange={handleChange}
-                                className={errors.batch_sequence ? 'error' : ''}
-                                min="1"
+                                readOnly
+                                className="readonly"
                             />
-                            {errors.batch_sequence && (
-                                <span className="error-message">{errors.batch_sequence}</span>
-                            )}
                         </div>
 
                     </div>

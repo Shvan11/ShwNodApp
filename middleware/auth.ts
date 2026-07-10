@@ -8,6 +8,7 @@ import { sql } from 'kysely';
 import { getKysely } from '../services/database/kysely.js';
 import { log } from '../utils/logger.js';
 import { ErrorResponses } from '../utils/error-response.js';
+import { normalizeRole } from '../shared/auth/roles.js';
 import type { AuthResult, ApiErrorResponse, SafeUser, UserRole } from '../types/index.js';
 
 /**
@@ -32,6 +33,24 @@ export function authenticate(
   next: NextFunction
 ): void | Response<ApiErrorResponse> {
   if (req.session && req.session.userId) {
+    // A session minted before a role rename can carry a role value the
+    // registry no longer knows (e.g. the pre-rename 'secretary'). Such a
+    // session can never pass any authorize() gate, yet `rolling: true`
+    // refreshes its expiry on every request — including the rejected ones —
+    // so it would otherwise strand the workstation on 403s forever. Treat it
+    // as an invalid session: destroy it and 401, which the SPA answers with
+    // a redirect to the login page (fresh session, current role).
+    if (normalizeRole(req.session.userRole) === undefined) {
+      const staleRole = String(req.session.userRole);
+      log.warn(
+        `Stale session role '${staleRole}' for user ${req.session.userId} on ${req.method} ${req.path} - forcing re-login`
+      );
+      req.session.destroy(err => {
+        if (err) log.error('Failed to destroy stale-role session:', err);
+        ErrorResponses.unauthorized(res, 'Your session is no longer valid. Please log in again.');
+      });
+      return;
+    }
     // User is authenticated
     return next();
   }

@@ -678,10 +678,12 @@ const PatientSets: React.FC = () => {
                 {
                     batchId: batch.aligner_batch_id,
                     batchNumber: batch.batch_sequence,
-                    upperStart: batch.upper_aligner_start_sequence || 0,
-                    upperEnd: batch.upper_aligner_end_sequence || 0,
-                    lowerStart: batch.lower_aligner_start_sequence || 0,
-                    lowerEnd: batch.lower_aligner_end_sequence || 0
+                    // ?? null, not || 0: start 0 is a real template sequence,
+                    // null means the batch has no aligners for that arch
+                    upperStart: batch.upper_aligner_start_sequence ?? null,
+                    upperEnd: batch.upper_aligner_end_sequence ?? null,
+                    lowerStart: batch.lower_aligner_start_sequence ?? null,
+                    lowerEnd: batch.lower_aligner_end_sequence ?? null
                 },
                 {
                     code: String(patient.person_id),

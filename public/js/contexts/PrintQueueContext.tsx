@@ -8,13 +8,16 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { buildLabelsFromRanges } from '../utils/aligner-labels';
 
-// Types for the print queue
+// Types for the print queue.
+// Sequence bounds are null when the batch has no aligners for that arch —
+// 0 is a REAL start (template batches number from 0), so don't `|| 0` them.
 export interface PrintQueueBatch {
-    upperStart?: number;
-    upperEnd?: number;
-    lowerStart?: number;
-    lowerEnd?: number;
+    upperStart?: number | null;
+    upperEnd?: number | null;
+    lowerStart?: number | null;
+    lowerEnd?: number | null;
     batchId: number | string;
     batchNumber?: number;
 }
@@ -95,36 +98,17 @@ const PrintQueueContext = createContext<PrintQueueContextValue | undefined>(unde
 const STORAGE_KEY = 'labelPrintQueue';
 
 /**
- * Build default labels from batch upper/lower ranges
+ * Build default label texts from batch upper/lower ranges — same
+ * sequence-keyed builder as LabelPreviewModal, so a template batch's
+ * sequence 0 is kept and U/L pair by actual sequence number.
  */
 function buildDefaultLabels(batch: PrintQueueBatch): string[] {
-    const labels: string[] = [];
-    const upperStart = batch.upperStart || 0;
-    const upperEnd = batch.upperEnd || 0;
-    const lowerStart = batch.lowerStart || 0;
-    const lowerEnd = batch.lowerEnd || 0;
-
-    // Create combined labels where sequences match
-    const maxUpper = upperEnd - upperStart + 1;
-    const maxLower = lowerEnd - lowerStart + 1;
-    const maxSequence = Math.max(maxUpper, maxLower);
-
-    for (let i = 0; i < maxSequence; i++) {
-        const upperSeq = upperStart + i;
-        const lowerSeq = lowerStart + i;
-        const hasUpper = upperSeq <= upperEnd && upperStart > 0;
-        const hasLower = lowerSeq <= lowerEnd && lowerStart > 0;
-
-        if (hasUpper && hasLower) {
-            labels.push(`U${upperSeq}/L${lowerSeq}`);
-        } else if (hasUpper) {
-            labels.push(`U${upperSeq}`);
-        } else if (hasLower) {
-            labels.push(`L${lowerSeq}`);
-        }
-    }
-
-    return labels;
+    return buildLabelsFromRanges(
+        batch.upperStart,
+        batch.upperEnd,
+        batch.lowerStart,
+        batch.lowerEnd
+    ).map(label => label.text);
 }
 
 /**

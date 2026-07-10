@@ -31,6 +31,7 @@ export type AlignerErrorCode =
   | 'BATCH_NOT_DELIVERED'
   | 'BATCH_NOT_MANUFACTURED'
   | 'INVALID_DATE_ORDER'
+  | 'SEQUENCE_LOCKED'
   | 'VALIDATION_ERROR'
   | 'MISSING_DOCTOR_NAME'
   | 'EMAIL_ALREADY_EXISTS'
@@ -93,6 +94,10 @@ export interface SetCreateData {
   type?: string;
   upper_aligners_count?: number;
   lower_aligners_count?: number;
+  days?: number;
+  set_url?: string;
+  set_video?: string;
+  currency?: string;
 }
 
 /**
@@ -103,12 +108,18 @@ export interface SetUpdateData {
   is_active?: boolean;
   TotalAligners?: number;
   RemainingAligners?: number;
-  set_cost?: number;
+  // Clearable on update: null = clear the column, undefined = leave unchanged.
+  set_cost?: number | null;
   notes?: string;
   set_sequence?: number;
   type?: string;
   upper_aligners_count?: number;
   lower_aligners_count?: number;
+  // Clearable on update: null = clear the column, undefined = leave unchanged.
+  days?: number | null;
+  set_url?: string;
+  set_video?: string;
+  currency?: string;
 }
 
 /**
@@ -346,17 +357,22 @@ export async function validateAndUpdateSet(
     });
   }
 
-  // Sanitize numeric fields - convert empty strings to undefined
+  // Sanitize set_cost but keep the null/undefined distinction: null means "clear
+  // the column" (blanked form field, via the contract's clearableNum), undefined
+  // means "not provided — leave unchanged". Only '' collapses to undefined.
   const sanitizedData: SetUpdateData = {
     ...setData,
-    set_cost: setData.set_cost !== undefined && setData.set_cost !== null && String(setData.set_cost) !== ''
-      ? Number(setData.set_cost)
-      : undefined,
+    set_cost: setData.set_cost === null
+      ? null
+      : setData.set_cost !== undefined && String(setData.set_cost) !== ''
+        ? Number(setData.set_cost)
+        : undefined,
   };
 
   // Re-enforce the dropped CK_MoreThanTotalW invariant in TS: a set's cost must never
   // drop below what's already been paid for it, otherwise the set becomes overpaid.
-  if (sanitizedData.set_cost !== undefined) {
+  // A clear (null) is exempt, as it always was: NULL means "no cost set", not zero.
+  if (sanitizedData.set_cost !== undefined && sanitizedData.set_cost !== null) {
     const balance = await alignerQueries.getAlignerSetBalance(parseInt(String(setId)));
     const alreadyPaid = Number(balance?.TotalPaid ?? 0);
     if (Number(sanitizedData.set_cost) < alreadyPaid) {
@@ -563,6 +579,7 @@ function mapBatchUpdateError(message: string): AlignerErrorCode | null {
     return 'LOWER_ALIGNER_LIMIT_EXCEEDED';
   if (message === 'Cannot set is_active: batch must be delivered first')
     return 'BATCH_NOT_DELIVERED';
+  if (message.includes('would be renumbered')) return 'SEQUENCE_LOCKED';
   if (
     message.startsWith('Template flag') ||
     message.includes('requires upper_aligner_count') ||
@@ -693,6 +710,19 @@ export async function validateAndDeleteBatch(
     log.info(`Aligner batch ${batchId} deleted successfully`);
   } catch (error) {
     log.error('Error deleting aligner batch:', { error: error instanceof Error ? error.message : String(error) });
+    // Translate the query layer's business-rule Errors into typed 400s (same
+    // convention as mapBatchUpdateError for updates).
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === 'Aligner batch not found') {
+      throw new AlignerValidationError(message, 'BATCH_NOT_FOUND', {
+        batchId: parseInt(String(batchId)),
+      });
+    }
+    if (message.includes('would be renumbered')) {
+      throw new AlignerValidationError(message, 'SEQUENCE_LOCKED', {
+        batchId: parseInt(String(batchId)),
+      });
+    }
     throw error;
   }
 }

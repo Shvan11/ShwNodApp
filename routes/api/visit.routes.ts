@@ -27,9 +27,13 @@ import { log } from '../../utils/logger.js';
 
 const router = Router();
 
-// Every visit/wire route is clinical (visit CRUD, wire tracking) — gate the
-// whole router rather than each route individually.
-router.use(authenticate, authorize(CLINICAL_ROLES));
+// Every visit/wire route is clinical (visit CRUD, wire tracking), but the
+// gate is attached PER ROUTE, never via a pathless router.use(): this router
+// is mounted at the /api root (routes/api/index.ts), so a router-level gate
+// would also run for every /api/* request merely passing through to a
+// later-mounted router — it once 403'd the entire API for a session carrying
+// a stale role.
+const clinicalOnly = [authenticate, authorize(CLINICAL_ROLES)];
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -47,6 +51,7 @@ type VisitQueryParams = visit.VisitQueryParams;
  */
 router.get(
   '/getWires',
+  clinicalOnly,
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const wires = await getWires();
@@ -65,6 +70,7 @@ router.get(
  */
 router.get(
   '/getlatestwires',
+  clinicalOnly,
   validate({ query: visit.latestWires.query }),
   async (
     req: Request<unknown, unknown, unknown, VisitQueryParams>,
@@ -100,6 +106,7 @@ router.get(
  */
 router.get(
   '/getvisitsbywork',
+  clinicalOnly,
   validate({ query: visit.visitsByWork.query }),
   async (
     req: Request<unknown, unknown, unknown, VisitQueryParams>,
@@ -131,6 +138,7 @@ router.get(
  */
 router.get(
   '/getvisitbyid',
+  clinicalOnly,
   validate({ query: visit.visitById.query }),
   async (
     req: Request<unknown, unknown, unknown, VisitQueryParams>,
@@ -167,6 +175,7 @@ router.get(
  */
 router.post(
   '/addvisitbywork',
+  clinicalOnly,
   validate({ body: visit.addVisit.body }),
   async (
     req: Request<unknown, unknown, visit.AddVisitBody>,
@@ -202,6 +211,7 @@ router.post(
  */
 router.put(
   '/updatevisitbywork',
+  clinicalOnly,
   validate({ body: visit.updateVisit.body }),
   async (
     req: Request<unknown, unknown, visit.UpdateVisitBody>,
@@ -241,6 +251,7 @@ router.put(
  */
 router.delete(
   '/deletevisitbywork',
+  clinicalOnly,
   validate({ body: visit.deleteVisit.body }),
   async (
     req: Request<unknown, unknown, visit.DeleteVisitBody>,

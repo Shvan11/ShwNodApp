@@ -62,6 +62,18 @@ const optNum = z
   .preprocess((v) => (v === '' || v === null ? undefined : v), z.coerce.number().optional())
   .optional();
 
+// Clearable numerics — for PARTIAL-update bodies only. The form always sends the
+// field and uses '' for "user blanked it", so '' (and null) must survive as null
+// ("clear the column"), distinct from an absent key ("leave unchanged"). optInt/
+// optNum can't be used there: they collapse '' to undefined, making a clear
+// indistinguishable from an omission.
+const clearableInt = z
+  .preprocess((v) => (v === '' || v === null ? null : v), z.coerce.number().int().nullable())
+  .optional();
+const clearableNum = z
+  .preprocess((v) => (v === '' || v === null ? null : v), z.coerce.number().nullable())
+  .optional();
+
 // One print label (GenerateLabelsBody.labels[]). The handler does its own per-label
 // `!text`/`!patientName` 400s, so these stay plain `z.string()` (empty reaches the
 // handler's specific message) — modeled, not opaque, so the handler can read them.
@@ -338,6 +350,9 @@ export type AddPaymentBody = z.infer<typeof addPayment.body>;
 
 // POST /api/aligner/sets — fully enumerated (mirrors SetCreateData). SetFormDrawer
 // sends a subset; numeric fields are strings/'' → coerced via optInt/optNum.
+// days/set_url/set_video/currency are form fields the query persists — they must
+// be enumerated here or the strict body strips them and they save as NULL.
+// set_pdf_url is deliberately absent: AlignerPdfService owns that column.
 export const createSet = {
   body: z.object({
     work_id: intId,
@@ -351,25 +366,37 @@ export const createSet = {
     type: z.string().optional(),
     upper_aligners_count: optInt,
     lower_aligners_count: optInt,
+    days: optInt,
+    set_url: z.string().optional(),
+    set_video: z.string().optional(),
+    currency: z.string().optional(),
   }),
   response: z.object({ setId: z.number() }),
 } as const;
 export type CreateSetBody = z.infer<typeof createSet.body>;
 
 // PUT /api/aligner/sets/:setId — fully enumerated (mirrors SetUpdateData; all
-// optional). sendSuccess(null) — no response key.
+// optional — the query only writes fields that are present, so an omitted field
+// is left untouched, never nulled). set_cost/days are clearable*: a blanked form
+// field arrives as null and clears the column (strings clear via '' → || null).
+// sendSuccess(null) — no response key.
+// set_pdf_url is deliberately absent: AlignerPdfService owns that column.
 export const updateSet = {
   body: z.object({
     aligner_dr_id: optInt,
     is_active: z.boolean().optional(),
     TotalAligners: optInt,
     RemainingAligners: optInt,
-    set_cost: optNum,
+    set_cost: clearableNum,
     notes: z.string().optional(),
     set_sequence: optInt,
     type: z.string().optional(),
     upper_aligners_count: optInt,
     lower_aligners_count: optInt,
+    days: clearableInt,
+    set_url: z.string().optional(),
+    set_video: z.string().optional(),
+    currency: z.string().optional(),
   }),
 } as const;
 export type UpdateSetBody = z.infer<typeof updateSet.body>;

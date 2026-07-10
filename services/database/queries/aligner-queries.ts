@@ -13,7 +13,8 @@
  * `withPgTransaction()`. The four batch stored procedures (usp_CreateAlignerBatch /
  * usp_UpdateAlignerBatch / usp_UpdateBatchStatus / usp_DeleteAlignerBatch) are reimplemented as
  * transactional TS write paths here (`createBatch` / `updateBatch` / `updateBatchStatus` /
- * `deleteBatch`); `resequenceBatches()` is the verbatim port of the procs' resequencing CTEs.
+ * `deleteBatch`); `resequenceBatches()` ports the procs' resequencing CTEs (ordering deliberately
+ * changed to the existing batch_sequence — see its doc comment).
  * `createNote` folds in trg_AlignerNotes_DoctorActivity (Doctor-note → activity flag).
  *
  * The batch procs only adjust `tblAlignerSets.Remaining{Upper,Lower}Aligners`, which touches none
@@ -123,6 +124,7 @@ interface AlignerSetData {
   aligner_dr_id: number;
   set_url?: string | null;
   set_pdf_url?: string | null;
+  set_video?: string | null;
   set_cost?: number | null;
   currency?: string | null;
   notes?: string | null;
@@ -788,6 +790,7 @@ export async function createAlignerSet(setData: AlignerSetData): Promise<number 
     aligner_dr_id,
     set_url,
     set_pdf_url,
+    set_video,
     set_cost,
     currency,
     notes,
@@ -824,6 +827,7 @@ export async function createAlignerSet(setData: AlignerSetData): Promise<number 
           aligner_dr_id,
           set_url: set_url || null,
           set_pdf_url: set_pdf_url || null,
+          set_video: set_video || null,
           set_cost: set_cost ?? null,
           currency: currency || null,
           notes: notes || null,
@@ -871,9 +875,6 @@ export async function updateAlignerSet(
     is_active,
   } = setData;
 
-  const newUpperCount = upper_aligners_count ?? 0;
-  const newLowerCount = lower_aligners_count ?? 0;
-
   try {
     await withPgTransaction(async (trx) => {
       // Lock the set row and re-read its live counts INSIDE the transaction: a
@@ -884,6 +885,7 @@ export async function updateAlignerSet(
         .selectFrom('aligner_sets')
         .where('aligner_set_id', '=', setId)
         .select([
+          'work_id',
           'upper_aligners_count',
           'lower_aligners_count',
           'remaining_upper_aligners',
@@ -894,6 +896,11 @@ export async function updateAlignerSet(
       if (!currentSet) {
         throw new Error(`Aligner set ${setId} not found`);
       }
+
+      // Partial update: an omitted count means "unchanged" — default to the
+      // current value so the remaining_* delta below is zero, never a wipe to 0.
+      const newUpperCount = upper_aligners_count ?? currentSet.upper_aligners_count ?? 0;
+      const newLowerCount = lower_aligners_count ?? currentSet.lower_aligners_count ?? 0;
 
       // How many aligners are already assigned to batches (total - remaining).
       const usedUpper =
@@ -913,6 +920,19 @@ export async function updateAlignerSet(
         );
       }
 
+      // Activating this set implies deactivating any sibling — the partial unique
+      // index ix_tblalignersets_oneactiveperwork allows one active set per work
+      // (same convention as createAlignerSet and updateBatch).
+      if (is_active === true) {
+        await trx
+          .updateTable('aligner_sets')
+          .set({ is_active: false })
+          .where('work_id', '=', currentSet.work_id)
+          .where('aligner_set_id', '<>', setId)
+          .where('is_active', '=', true)
+          .execute();
+      }
+
       // aligner_dr_id is NOT NULL. Only assign it when a real doctor id is supplied;
       // otherwise omit the column so the UPDATE leaves the existing value intact,
       // rather than binding NULL/'' — which throw 23502 / 22P02 under PG. (The old
@@ -922,26 +942,30 @@ export async function updateAlignerSet(
         rawDrId === null || rawDrId === undefined || rawDrId === ''
           ? undefined
           : Number(rawDrId);
+      // Partial update: only fields present in the input are written. An absent
+      // field must leave the column untouched — writing unconditional defaults
+      // here is what used to wipe set_sequence/days/set_url/set_video/currency
+      // to NULL (and flip archived sets active) on every edit.
       await trx
         .updateTable('aligner_sets')
         .set((eb) => ({
-          set_sequence: set_sequence ?? null,
-          type: type || null,
           remaining_upper_aligners: sql<number>`${eb.ref('remaining_upper_aligners')} + (${newUpperCount} - ${eb.ref('upper_aligners_count')})`,
           remaining_lower_aligners: sql<number>`${eb.ref('remaining_lower_aligners')} + (${newLowerCount} - ${eb.ref('lower_aligners_count')})`,
           upper_aligners_count: newUpperCount,
           lower_aligners_count: newLowerCount,
-          days: toIntOr(days, null),
+          ...(set_sequence !== undefined ? { set_sequence } : {}),
+          ...(type !== undefined ? { type: type || null } : {}),
+          ...(days !== undefined ? { days: toIntOr(days, null) } : {}),
           ...(drId !== undefined && Number.isFinite(drId)
             ? { aligner_dr_id: drId }
             : {}),
-          set_url: set_url || null,
-          set_pdf_url: set_pdf_url || null,
-          set_video: set_video || null,
-          set_cost: set_cost ?? null,
-          currency: currency || null,
-          notes: notes || null,
-          is_active: is_active !== undefined ? is_active : true,
+          ...(set_url !== undefined ? { set_url: set_url || null } : {}),
+          ...(set_pdf_url !== undefined ? { set_pdf_url: set_pdf_url || null } : {}),
+          ...(set_video !== undefined ? { set_video: set_video || null } : {}),
+          ...(set_cost !== undefined ? { set_cost } : {}),
+          ...(currency !== undefined ? { currency: currency || null } : {}),
+          ...(notes !== undefined ? { notes: notes || null } : {}),
+          ...(is_active !== undefined ? { is_active } : {}),
         }))
         .where('aligner_set_id', '=', setId)
         .execute();
@@ -1337,23 +1361,41 @@ export async function createBatch(batchData: BatchData): Promise<number | null> 
 }
 
 /**
- * Recompute batch_sequence + Upper/lower_aligner_start_sequence for all batches in a set, ordered by
- * (manufacture_date, aligner_batch_id). Verbatim port of the resequencing CTEs in the delete/update procs.
+ * Recompute batch_sequence + Upper/lower_aligner_start_sequence for all batches in a set.
+ *
+ * Ordering is by the EXISTING (batch_sequence, aligner_batch_id) — a stable compaction that
+ * preserves relative order and only closes gaps/recomputes starts. The SQL Server procs
+ * ordered by manufacture_date, but under PG that key is a trap: NULLs sort LAST on ASC
+ * (SQL Server sorted them FIRST), so an unmanufactured first batch would be reordered
+ * BEHIND any manufactured later batch — dethroning a template batch and re-anchoring the
+ * FIRST_VALUE(has_*_template) numbering on a batch with no template. Nothing that changes
+ * manufacture_date triggers a resequence anyway (updateBatchStatus never calls this), so
+ * the date carried no signal here — only the corruption risk.
  */
 async function resequenceBatches(trx: PgTransaction, setId: number): Promise<void> {
+  // Two-phase renumber: uq_batchsequence_alignersetid is NOT deferrable and PG
+  // checks it per-row DURING the statement, so a direct shift (2→1, 3→2, …) can
+  // hit 23505 if the heap yields the higher row first. Phase 1 parks every row
+  // that must move on its (unique) negative target; phase 2 flips the parked
+  // rows positive. Neither phase can collide: parked values are negative,
+  // final values are only ever claimed after their previous holder was parked.
   await sql`
     WITH ordered AS (
-      SELECT "aligner_batch_id", ROW_NUMBER() OVER (ORDER BY "manufacture_date", "aligner_batch_id") AS newseq
+      SELECT "aligner_batch_id", ROW_NUMBER() OVER (ORDER BY "batch_sequence", "aligner_batch_id") AS newseq
       FROM "aligner_batches" WHERE "aligner_set_id" = ${setId}
     )
-    UPDATE "aligner_batches" b SET "batch_sequence" = o.newseq
+    UPDATE "aligner_batches" b SET "batch_sequence" = -o.newseq
     FROM ordered o WHERE b."aligner_batch_id" = o."aligner_batch_id" AND b."batch_sequence" <> o.newseq
+  `.execute(trx);
+  await sql`
+    UPDATE "aligner_batches" SET "batch_sequence" = -"batch_sequence"
+    WHERE "aligner_set_id" = ${setId} AND "batch_sequence" < 0
   `.execute(trx);
 
   await sql`
     WITH ordered AS (
       SELECT "aligner_batch_id", "upper_aligner_count", "lower_aligner_count", "has_upper_template", "has_lower_template",
-             ROW_NUMBER() OVER (ORDER BY "manufacture_date", "aligner_batch_id") AS rownum
+             ROW_NUMBER() OVER (ORDER BY "batch_sequence", "aligner_batch_id") AS rownum
       FROM "aligner_batches" WHERE "aligner_set_id" = ${setId}
     ),
     cumulative AS (
@@ -1449,6 +1491,31 @@ export async function updateBatch(
     const countsChanged = upper !== (old.upper_aligner_count ?? 0) || lower !== (old.lower_aligner_count ?? 0);
     const templateChanged = newHasU !== oldHasU || newHasL !== oldHasL;
     const daysChanged = toIntOr(days, null) !== (old.days ?? null);
+
+    // Renumbering guard: a count/template change resequences every LATER batch's
+    // start sequences. If one of those is already manufactured/delivered, its
+    // physical aligners carry printed labels the renumber would silently orphan —
+    // refuse instead. (Message text is mapped to a 400 in AlignerService's
+    // mapBatchUpdateError — keep them in sync.)
+    if (countsChanged || templateChanged) {
+      const lockedLater = await trx
+        .selectFrom('aligner_batches')
+        .select('batch_sequence')
+        .where('aligner_set_id', '=', aligner_set_id)
+        .where('batch_sequence', '>', old.batch_sequence)
+        .where((eb) => eb.or([
+          eb('manufacture_date', 'is not', null),
+          eb('delivered_to_patient_date', 'is not', null),
+        ]))
+        .orderBy('batch_sequence')
+        .limit(1)
+        .executeTakeFirst();
+      if (lockedLater) {
+        throw new Error(
+          `Cannot change counts or template: batch #${lockedLater.batch_sequence} is already manufactured/delivered and would be renumbered. Undo its status first.`
+        );
+      }
+    }
 
     await trx
       .updateTable('aligner_batches')
@@ -1621,10 +1688,32 @@ export async function deleteBatch(batchId: number): Promise<void> {
   await withPgTransaction(async (trx) => {
     const batch = await trx
       .selectFrom('aligner_batches')
-      .select(['aligner_set_id', 'upper_aligner_count', 'lower_aligner_count', 'has_upper_template', 'has_lower_template'])
+      .select(['aligner_set_id', 'batch_sequence', 'upper_aligner_count', 'lower_aligner_count', 'has_upper_template', 'has_lower_template'])
       .where('aligner_batch_id', '=', batchId)
       .executeTakeFirst();
     if (!batch) throw new Error('Aligner batch not found');
+
+    // Renumbering guard — same rule as updateBatch: deleting a batch shifts every
+    // later batch's sequence + starts; refuse while a later batch is already
+    // manufactured/delivered (printed labels would be orphaned). Message text is
+    // mapped to a 400 in AlignerService — keep them in sync.
+    const lockedLater = await trx
+      .selectFrom('aligner_batches')
+      .select('batch_sequence')
+      .where('aligner_set_id', '=', batch.aligner_set_id)
+      .where('batch_sequence', '>', batch.batch_sequence)
+      .where((eb) => eb.or([
+        eb('manufacture_date', 'is not', null),
+        eb('delivered_to_patient_date', 'is not', null),
+      ]))
+      .orderBy('batch_sequence')
+      .limit(1)
+      .executeTakeFirst();
+    if (lockedLater) {
+      throw new Error(
+        `Cannot delete this batch: batch #${lockedLater.batch_sequence} is already manufactured/delivered and would be renumbered. Undo its status first.`
+      );
+    }
 
     await trx.deleteFrom('aligner_batches').where('aligner_batch_id', '=', batchId).execute();
 

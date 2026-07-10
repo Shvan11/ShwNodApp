@@ -27,9 +27,13 @@ import * as media from '../../shared/contracts/media.contract.js';
 
 const router = Router();
 
-// All photo/x-ray (WebCeph) routes are clinical — gate the whole router
-// rather than each route individually.
-router.use(authenticate, authorize(CLINICAL_ROLES));
+// All photo/x-ray (WebCeph) routes are clinical. The gate is scoped to
+// '/webceph' — this router's whole namespace — because the router is mounted
+// at the /api root (routes/api/index.ts): a pathless use() would also run for
+// every /api/* request merely passing through to a later-mounted router (it
+// once 403'd the entire API for a session carrying a stale role). Keep any
+// new route in this file under /webceph/* or give it its own gate.
+router.use('/webceph', authenticate, authorize(CLINICAL_ROLES));
 
 // In-memory upload with a hard size cap so an oversized/abusive body can't
 // balloon RAM. X-ray/photo formats (.dcm/.pano/JPEG) sit well under 50MB;
