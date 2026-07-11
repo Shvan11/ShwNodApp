@@ -50,6 +50,10 @@ import session from 'express-session';
 import pgSession from 'connect-pg-simple';
 import { getPgPool } from './services/database/kysely.js';
 import driveClient from './services/google-drive/google-drive-client.js';
+import {
+  isDoctorEmailListSyncEnabled,
+  scheduleDoctorEmailListSync,
+} from './services/cloudflare/doctor-email-list.js';
 import messageState from './services/state/messageState.js';
 import { MessageStatus } from './services/messaging/message-status.js';
 import { InternalEmitterEvents } from './services/messaging/websocket-events.js';
@@ -418,6 +422,14 @@ async function initializeApplication(): Promise<AppInitResult> {
     } else {
       log.info('⚠️  Google Drive not configured. PDF upload will be disabled.');
       log.info('💡 To enable PDF uploads, configure Google Drive credentials in .env');
+    }
+
+    // Cloudflare Zero Trust: reconcile the aligner-portal Access email list with
+    // aligner_doctors at boot — heals any sync missed while Cloudflare was
+    // unreachable during a doctor edit. Fire-and-forget; never blocks startup.
+    if (isDoctorEmailListSyncEnabled()) {
+      log.info('☁️  Cloudflare doctor email-list sync enabled — reconciling at boot');
+      scheduleDoctorEmailListSync('boot reconcile');
     }
 
     // Connect WhatsApp service to WebSocket emitter

@@ -15,6 +15,7 @@
 
 import { log } from '../../utils/logger.js';
 import * as alignerQueries from '../database/queries/aligner-queries.js';
+import { scheduleDoctorEmailListSync } from '../cloudflare/doctor-email-list.js';
 
 /**
  * Aligner error codes
@@ -940,6 +941,7 @@ export async function validateAndCreateDoctor(
     log.info(
       `Aligner doctor created successfully: Dr ${newDrID} - ${doctor_name}`
     );
+    scheduleDoctorEmailListSync(`doctor ${newDrID} created`);
     return newDrID;
   } catch (error) {
     log.error('Error creating aligner doctor:', { error: error instanceof Error ? error.message : String(error) });
@@ -988,6 +990,7 @@ export async function validateAndUpdateDoctor(
     log.info(
       `Aligner doctor updated successfully: Dr ${drID} - ${doctor_name}`
     );
+    scheduleDoctorEmailListSync(`doctor ${drID} updated`);
   } catch (error) {
     log.error('Error updating aligner doctor:', { error: error instanceof Error ? error.message : String(error) });
     throw error;
@@ -1023,6 +1026,7 @@ export async function validateAndDeleteDoctor(
   try {
     await alignerQueries.deleteDoctor(parseInt(String(drID)));
     log.info(`Aligner doctor deleted successfully: Dr ${drID}`);
+    scheduleDoctorEmailListSync(`doctor ${drID} deleted`);
   } catch (error) {
     log.error('Error deleting aligner doctor:', { error: error instanceof Error ? error.message : String(error) });
     throw error;

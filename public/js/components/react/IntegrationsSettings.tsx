@@ -17,6 +17,7 @@ import {
   integrationsThreeShapeStatusQuery,
   integrationsGeminiStatusQuery,
   integrationsGoogleDriveStatusQuery,
+  integrationsCloudflareListStatusQuery,
 } from '@/query/queries';
 import { qk } from '@/query/keys';
 import * as integrations from '@shared/contracts/integrations.contract';
@@ -338,6 +339,49 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
       setGmBusy(false);
     }
   }, [toast, queryClient]);
+
+  // ── Cloudflare Access (aligner-portal doctor allow-list) ──
+  const { data: cfData, isLoading: cfLoading } = useQuery(integrationsCloudflareListStatusQuery());
+  const cfStatus = (cfData as integrations.CloudflareListStatusResponse | undefined) ?? null;
+  const [cfBusy, setCfBusy] = useState(false);
+
+  const syncCloudflareList = useCallback(async (): Promise<void> => {
+    setCfBusy(true);
+    try {
+      const result = await postJSON<integrations.CloudflareListStatusResponse>(
+        '/api/integrations/cloudflare-list/sync',
+        {},
+        { schema: integrations.cloudflareListSync.response }
+      );
+      const outcome = result.lastSync;
+      if (outcome?.ok && !outcome.skipped) {
+        toast.success(`Doctor emails synced — ${outcome.emailCount} on the portal allow-list`);
+      } else if (outcome?.skipped) {
+        toast.warning('Nothing to sync — no aligner doctor has an email set');
+      } else {
+        toast.error(outcome?.error || 'Sync failed');
+      }
+      // The POST returns the same shape as the status GET — write it into the cache.
+      queryClient.setQueryData(qk.settings.integrationsCloudflareListStatus(), result);
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to sync the doctor email list'));
+    } finally {
+      setCfBusy(false);
+    }
+  }, [toast, queryClient]);
+
+  const cfHealth: 'ok' | 'warn' | 'off' = !cfStatus?.configured
+    ? 'off'
+    : cfStatus.lastSync && !cfStatus.lastSync.ok
+      ? 'warn'
+      : 'ok';
+  const cfHealthLabel = !cfStatus?.configured
+    ? 'Not configured'
+    : !cfStatus.lastSync
+      ? 'Configured'
+      : cfStatus.lastSync.ok
+        ? 'Active'
+        : 'Last sync failed';
 
   const gmHealth: 'ok' | 'warn' | 'off' = gmStatus?.configured ? 'ok' : 'off';
   const gmHealthLabel = !gmStatus?.configured
@@ -795,6 +839,78 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
               {gmTest.ok ? '✓ ' : '✗ '}
               {gmTest.msg}
             </span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Cloudflare Access (aligner portal) card ── */}
+      <div className={`${styles.card} ${styles[cfHealth]}`}>
+        <div className={styles.cardHeader}>
+          <span className={styles.serviceName}>
+            <i className="fab fa-cloudflare" aria-hidden="true" /> Aligner Portal Access (Cloudflare)
+          </span>
+          <span className={`${styles.badge} ${styles[cfHealth]}`}>
+            <span className={styles.dot} />
+            {cfLoading && !cfStatus ? 'Checking…' : cfHealthLabel}
+          </span>
+        </div>
+        <p className={styles.serviceDescription}>
+          Controls which partner doctors can open the external aligner portal. Doctor emails
+          (Settings → Aligner Doctors) are mirrored into the Cloudflare Access allow-list
+          automatically whenever a doctor is added, edited or deleted — use Sync now after a
+          failed run or to verify the setup.
+        </p>
+
+        {cfStatus && !cfStatus.configured && (
+          <div className={styles.notice}>
+            Cloudflare sync is not configured. Set <code>CLOUDFLARE_API_TOKEN</code>,{' '}
+            <code>CLOUDFLARE_ACCOUNT_ID</code> and <code>CLOUDFLARE_DOCTOR_EMAIL_LIST_ID</code> in
+            the server environment, then refresh.
+          </div>
+        )}
+
+        {cfStatus?.configured && (
+          <dl className={styles.rows}>
+            <div className={styles.row}>
+              <dt>Last sync</dt>
+              <dd>
+                {cfStatus.lastSync
+                  ? `${new Date(cfStatus.lastSync.at).toLocaleString()} · ${cfStatus.lastSync.trigger}`
+                  : 'Not run since server start'}
+              </dd>
+            </div>
+            {cfStatus.lastSync && (
+              <div className={styles.row}>
+                <dt>Result</dt>
+                <dd>
+                  {cfStatus.lastSync.ok ? (
+                    cfStatus.lastSync.skipped ? (
+                      <span className={styles.warnText}>Skipped — no doctor emails to push</span>
+                    ) : (
+                      <span className={styles.okText}>
+                        {cfStatus.lastSync.emailCount} email
+                        {cfStatus.lastSync.emailCount === 1 ? '' : 's'} on the allow-list
+                      </span>
+                    )
+                  ) : (
+                    <span className={styles.warnText}>{cfStatus.lastSync.error || 'Failed'}</span>
+                  )}
+                </dd>
+              </div>
+            )}
+          </dl>
+        )}
+
+        {cfStatus?.configured && (
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={() => void syncCloudflareList()}
+              disabled={cfBusy}
+            >
+              {cfBusy ? 'Syncing…' : 'Sync now'}
+            </button>
           </div>
         )}
       </div>

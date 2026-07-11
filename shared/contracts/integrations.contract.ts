@@ -177,3 +177,36 @@ export type GoogleDriveStatusResponse = z.infer<typeof googleDriveStatus.respons
 export const googleDriveDisconnect = {
   response: z.object({ ok: z.boolean() }),
 } as const;
+
+// ── Cloudflare Zero Trust (aligner-portal Access email list) ──
+// The server mirrors aligner_doctors.doctor_email into the Zero Trust list the
+// external portal's Access policy references ("Emails in list"). Sync runs
+// automatically on doctor create/update/delete + at boot; these endpoints
+// surface status and a manual trigger. Closed z.object — the DTO is built
+// field-for-field by services/cloudflare/doctor-email-list.ts.
+
+// Outcome of one sync run.
+export const cloudflareListSyncResult = z.object({
+  at: z.string(),
+  ok: z.boolean(),
+  trigger: z.string(),
+  emailCount: z.number().nullable(),
+  skipped: z.boolean(),
+  error: z.string().nullable(),
+});
+export type CloudflareListSyncResult = z.infer<typeof cloudflareListSyncResult>;
+
+// GET /api/integrations/cloudflare-list/status — configuration + last run outcome.
+export const cloudflareListStatus = {
+  response: z.object({
+    configured: z.boolean(),
+    lastSync: cloudflareListSyncResult.nullable(),
+  }),
+} as const;
+export type CloudflareListStatusResponse = z.infer<typeof cloudflareListStatus.response>;
+
+// POST /api/integrations/cloudflare-list/sync — push the doctor emails now;
+// returns the refreshed status (the run's outcome lands in lastSync).
+export const cloudflareListSync = {
+  response: cloudflareListStatus.response,
+} as const;

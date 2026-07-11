@@ -1389,6 +1389,17 @@ export const integrationsGoogleDriveStatusQuery = () =>
       ),
   });
 
+/** GET /api/integrations/cloudflare-list/status — aligner-portal Access email-list sync status. */
+export const integrationsCloudflareListStatusQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.integrationsCloudflareListStatus(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof integrationsContract.cloudflareListStatus.response>>(
+        '/api/integrations/cloudflare-list/status',
+        { signal, schema: integrationsContract.cloudflareListStatus.response }
+      ),
+  });
+
 /** GET /api/threeshape/patients/:id/cases — patient's 3Shape cases (live). retry off:
  *  a not-connected / unreachable error is actionable, not transient. */
 export const threeShapeCasesQuery = (personId: number | string) =>

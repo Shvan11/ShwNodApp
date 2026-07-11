@@ -190,7 +190,7 @@ Use `import type { … }` for type-only imports.
 
 ## Environment
 
-Boot **requires** (validated in `config/config.ts`, throws if missing): `MACHINE_PATH`, `SESSION_SECRET`, and the PostgreSQL block (`PG_HOST`/`PG_PORT`/`PG_DATABASE`/`PG_USER`/`PG_PASSWORD`, or `DATABASE_URL`). `PORT` defaults to 3000. Optional service blocks (Telegram, Twilio, Google Drive, WebCeph, Gemini, Supabase sync, LocalSend) disable when blank. Legacy `DB_*` (SQL Server) vars feed only the Dolphin sink, not boot. `.env.example` documents every block by category; per-machine WSL overrides go in `.env.development`.
+Boot **requires** (validated in `config/config.ts`, throws if missing): `MACHINE_PATH`, `SESSION_SECRET`, and the PostgreSQL block (`PG_HOST`/`PG_PORT`/`PG_DATABASE`/`PG_USER`/`PG_PASSWORD`, or `DATABASE_URL`). `PORT` defaults to 3000. Optional service blocks (Telegram, Twilio, Google Drive, WebCeph, Gemini, Supabase sync, LocalSend, Cloudflare Zero Trust list sync) disable when blank. Legacy `DB_*` (SQL Server) vars feed only the Dolphin sink, not boot. `.env.example` documents every block by category; per-machine WSL overrides go in `.env.development`.
 
 ---
 

@@ -27,6 +27,11 @@ import * as threeShapeOAuth from '../../services/threeshape/oauth.js';
 import * as threeShapeClient from '../../services/threeshape/client.js';
 import { sendThreeShapeError } from '../../services/threeshape/route-helpers.js';
 import * as googleDriveOAuth from '../../services/google-drive/oauth.js';
+import {
+  getDoctorEmailListSyncStatus,
+  isDoctorEmailListSyncEnabled,
+  runDoctorEmailListSyncNow,
+} from '../../services/cloudflare/doctor-email-list.js';
 import * as integrations from '../../shared/contracts/integrations.contract.js';
 
 const router = Router();
@@ -257,6 +262,28 @@ router.post('/google-drive/disconnect', async (_req: Request, res: Response): Pr
     log.error('[Integrations] google-drive disconnect failed', { error: (err as Error).message });
     ErrorResponses.internalError(res, 'Failed to disconnect Google Drive');
   }
+});
+
+// ── Cloudflare Zero Trust (aligner-portal Access email list) ──
+
+// GET /api/integrations/cloudflare-list/status — sync configuration + last outcome.
+router.get('/cloudflare-list/status', (_req: Request, res: Response): void => {
+  sendData(res, integrations.cloudflareListStatus.response, getDoctorEmailListSyncStatus());
+});
+
+// POST /api/integrations/cloudflare-list/sync — push the doctor emails now. The run
+// itself never throws (failures land in lastSync.error), so a 200 with ok:false is
+// the expected "sync failed" shape — the client reads lastSync, not the HTTP status.
+router.post('/cloudflare-list/sync', async (_req: Request, res: Response): Promise<void> => {
+  if (!isDoctorEmailListSyncEnabled()) {
+    ErrorResponses.badRequest(
+      res,
+      'Cloudflare list sync is not configured — set the CLOUDFLARE_* variables in the server environment.'
+    );
+    return;
+  }
+  await runDoctorEmailListSyncNow('manual (Settings)');
+  sendData(res, integrations.cloudflareListSync.response, getDoctorEmailListSyncStatus());
 });
 
 export default router;

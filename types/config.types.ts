@@ -176,6 +176,20 @@ export interface LocalSendConfig {
   multicast: string;
 }
 
+/**
+ * Cloudflare Zero Trust configuration — syncs aligner_doctors emails into the
+ * Access email list gating the external aligner portal. All three blank →
+ * sync disabled (see services/cloudflare/doctor-email-list.ts).
+ */
+export interface CloudflareZeroTrustConfig {
+  /** API token with Account → Zero Trust → Edit permission. */
+  apiToken?: string;
+  /** Cloudflare account ID (the hex segment in dashboard URLs). */
+  accountId?: string;
+  /** Zero Trust list (type Email) referenced by the Access policy's "Emails in list" rule. */
+  doctorEmailListId?: string;
+}
+
 // ===========================================
 // MAIN CONFIG
 // ===========================================
@@ -197,6 +211,7 @@ export interface AppConfig {
   webceph: WebCephConfig;
   threeshape: ThreeShapeConfig;
   localsend: LocalSendConfig;
+  cloudflare: CloudflareZeroTrustConfig;
   /** Path to the `pg_dump` binary for the database-backup download (defaults to 'pg_dump' on PATH). */
   pgDumpPath: string;
   cs_export?: string;

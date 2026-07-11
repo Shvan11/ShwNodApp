@@ -168,6 +168,13 @@ const config: AppConfig = {
     alias: process.env.LOCALSEND_ALIAS || 'Shwan Clinic Server',
     multicast: process.env.LOCALSEND_MULTICAST || '224.0.0.167',
   },
+  // Cloudflare Zero Trust — syncs aligner_doctors emails into the Access email
+  // list gating the external aligner portal. All three blank → sync disabled.
+  cloudflare: {
+    apiToken: process.env.CLOUDFLARE_API_TOKEN,
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+    doctorEmailListId: process.env.CLOUDFLARE_DOCTOR_EMAIL_LIST_ID,
+  },
   cs_export: process.env.CS_EXPORT,
   gram_session: process.env.GRAM_SESSION,
 };
