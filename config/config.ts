@@ -171,7 +171,7 @@ const config: AppConfig = {
   // Cloudflare Zero Trust — syncs aligner_doctors emails into the Access email
   // list gating the external aligner portal. All three blank → sync disabled.
   cloudflare: {
-    apiToken: process.env.CLOUDFLARE_API_TOKEN,
+    apiToken: process.env.CLOUDFLARE_ZT_API_TOKEN,
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
     doctorEmailListId: process.env.CLOUDFLARE_DOCTOR_EMAIL_LIST_ID,
   },

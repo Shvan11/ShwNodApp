@@ -863,7 +863,7 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
 
         {cfStatus && !cfStatus.configured && (
           <div className={styles.notice}>
-            Cloudflare sync is not configured. Set <code>CLOUDFLARE_API_TOKEN</code>,{' '}
+            Cloudflare sync is not configured. Set <code>CLOUDFLARE_ZT_API_TOKEN</code> (or <code>CLOUDFLARE_API_TOKEN</code>),{' '}
             <code>CLOUDFLARE_ACCOUNT_ID</code> and <code>CLOUDFLARE_DOCTOR_EMAIL_LIST_ID</code> in
             the server environment, then refresh.
           </div>
