@@ -34,30 +34,13 @@ import type {
     AlignerSet,
     AlignerBatch,
     AlignerNote,
+    AlignerPhoto,
 } from './aligner.types';
 import type { PaymentSaveData } from '@/types/api.types';
 import { fetchJSON, postJSON, putJSON, patchJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
 import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './PatientSets.module.css';
-
-// Page-specific types
-interface AlignerPhoto {
-    path: string;
-    file_name: string;
-    file_size: number | null;
-    mime_type: string | null;
-    uploaded_at: string | null;
-    view_url: string;
-}
-
-const isImage = (photo: AlignerPhoto): boolean => {
-    if (photo.mime_type) {
-        return photo.mime_type.startsWith('image/');
-    }
-    const ext = photo.file_name.split('.').pop()?.toLowerCase();
-    return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'].includes(ext || '');
-};
 
 const getFileIconClass = (photo: AlignerPhoto): string => {
     const ext = photo.file_name.split('.').pop()?.toLowerCase();
@@ -249,7 +232,7 @@ const PatientSets: React.FC = () => {
 
     const loadPhotos = async (setId: number): Promise<void> => {
         try {
-            const data = await fetchJSON<{ photos: AlignerPhoto[] }>(`/api/aligner/sets/${setId}/photos`);
+            const data = await fetchJSON<{ photos: AlignerPhoto[] }>(`/api/aligner/sets/${setId}/photos`, { schema: alignerContract.getSetPhotos.response });
             setPhotosData(prev => ({ ...prev, [setId]: data.photos || [] }));
         } catch (error) {
             console.error('Error loading photos:', error);
@@ -1956,6 +1939,14 @@ const PatientSets: React.FC = () => {
                                                                             key={photo.path} 
                                                                             className="aligner-photo-card"
                                                                             onClick={() => setViewerPhoto(photo)}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                                                    e.preventDefault();
+                                                                                    setViewerPhoto(photo);
+                                                                                }
+                                                                            }}
+                                                                            role="button"
+                                                                            tabIndex={0}
                                                                             title={`View ${photo.file_name}`}
                                                                         >
                                                                             <button
@@ -1995,6 +1986,14 @@ const PatientSets: React.FC = () => {
                                                                             key={photo.path} 
                                                                             className="aligner-photo-card"
                                                                             onClick={() => window.open(photo.view_url, '_blank')}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                                                    e.preventDefault();
+                                                                                    window.open(photo.view_url, '_blank');
+                                                                                }
+                                                                            }}
+                                                                            role="button"
+                                                                            tabIndex={0}
                                                                             title={`Download ${photo.file_name}`}
                                                                         >
                                                                             <button

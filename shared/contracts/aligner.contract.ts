@@ -191,6 +191,17 @@ export const alignerNoteRow = z.looseObject({
 });
 export type AlignerNote = z.infer<typeof alignerNoteRow>;
 
+/** Case attachment (photo or scan file) living in R2 storage. */
+export const alignerPhotoRow = z.looseObject({
+  path: z.string(),
+  file_name: z.string(),
+  file_size: z.number().int().nullable(),
+  mime_type: z.string().nullable(),
+  uploaded_at: z.string().nullable(),
+  view_url: z.string(),
+});
+export type AlignerPhoto = z.infer<typeof alignerPhotoRow>;
+
 /** Patient record from the Archform SQLite database. */
 export const archformPatientRow = z.looseObject({
   Id: z.number(),
@@ -306,6 +317,11 @@ export const batchesBySetId = {
 // GET /api/aligner/notes/:setId — notes for a set.
 export const notesBySetId = {
   response: z.object({ notes: z.array(alignerNoteRow), count: z.number() }),
+} as const;
+
+// GET /api/aligner/sets/:setId/photos — photos for a set.
+export const getSetPhotos = {
+  response: z.object({ photos: z.array(alignerPhotoRow) }),
 } as const;
 
 // GET /api/aligner/notes/:noteId/status — { isRead } (or 404).

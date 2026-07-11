@@ -22,6 +22,7 @@ import type {
     AlignerNote,
     ArchformPatient,
     AlignerSetForMatch,
+    AlignerPhoto,
 } from '@shared/contracts/aligner.contract';
 
 export type {
@@ -31,6 +32,7 @@ export type {
     AlignerNote,
     ArchformPatient,
     AlignerSetForMatch,
+    AlignerPhoto,
 };
 
 /**
