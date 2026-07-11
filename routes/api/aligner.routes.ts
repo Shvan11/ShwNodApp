@@ -24,6 +24,7 @@ import {
   handleUploadError
 } from '../../middleware/upload.js';
 import driveUploadService from '../../services/google-drive/drive-upload.js';
+import { listPhotosForSet, deletePhotoForSet } from '../../services/imaging/aligner-photo.service.js';
 import { sendSuccess, sendData, ErrorResponses } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import { log } from '../../utils/logger.js';
@@ -945,6 +946,62 @@ router.delete(
       }
       log.error('Error deleting PDF:', error);
       ErrorResponses.internalError(res, 'Failed to delete PDF', error as Error);
+    }
+  }
+);
+
+// ============================================================================
+// ALIGNER PHOTOS UPLOADED VIA PORTAL
+// ============================================================================
+
+/**
+ * List photos for an aligner set (staff page)
+ */
+router.get(
+  '/aligner/sets/:setId/photos',
+  validate({ params: contract.setIdParams }),
+  async (req: Request<{ setId: string }>, res: Response): Promise<void> => {
+    try {
+      const setId = parseInt(req.params.setId, 10);
+      if (!Number.isInteger(setId) || setId <= 0) {
+        ErrorResponses.badRequest(res, 'Invalid aligner set ID');
+        return;
+      }
+
+      const photos = await listPhotosForSet(setId);
+      res.json({ success: true, photos });
+    } catch (error) {
+      log.error('Error listing R2 photos:', error);
+      ErrorResponses.internalError(res, 'Failed to retrieve set photos', error as Error);
+    }
+  }
+);
+
+/**
+ * Delete a photo from an aligner set (staff page)
+ */
+router.delete(
+  '/aligner/sets/:setId/photos',
+  validate({ params: contract.setIdParams }),
+  async (req: Request<{ setId: string }>, res: Response): Promise<void> => {
+    try {
+      const setId = parseInt(req.params.setId, 10);
+      if (!Number.isInteger(setId) || setId <= 0) {
+        ErrorResponses.badRequest(res, 'Invalid aligner set ID');
+        return;
+      }
+
+      const path = req.query.path as string;
+      if (!path) {
+        ErrorResponses.badRequest(res, 'Photo path is required');
+        return;
+      }
+
+      await deletePhotoForSet(setId, path);
+      sendSuccess(res, 'Photo deleted successfully');
+    } catch (error) {
+      log.error('Error deleting R2 photo:', error);
+      ErrorResponses.internalError(res, 'Failed to delete photo', error as Error);
     }
   }
 );

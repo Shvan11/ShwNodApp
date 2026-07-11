@@ -2431,3 +2431,190 @@
         padding: 0.25rem 0 0;
     }
 }
+
+/* ============================================================================
+   ALIGNER SET PHOTOS (Uploaded via Portal)
+   ============================================================================ */
+
+.aligner-photos-container {
+    margin-top: 1.5rem;
+    background: var(--gray-50, #f8f9fa);
+    border: 1px solid var(--gray-200, #e9ecef);
+    border-radius: var(--radius-lg, 8px);
+    padding: 1.25rem;
+}
+
+.aligner-photos-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--gray-200, #e9ecef);
+    padding-bottom: 0.5rem;
+}
+
+.aligner-photos-header h5 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--blue-800, #1e3a8a);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.aligner-photos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.aligner-photo-card {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: var(--radius-md, 6px);
+    overflow: hidden;
+    border: 1px solid var(--gray-200, #e9ecef);
+    cursor: pointer;
+    background: var(--color-white, #fff);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.aligner-photo-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.aligner-photo-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.aligner-file-icon-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gray-100, #f8f9fa);
+    color: var(--gray-700, #495057);
+    font-size: 2.5rem;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.aligner-photo-card:hover .aligner-file-icon-placeholder {
+    background: var(--gray-200, #e9ecef);
+    color: var(--primary-color, #00897B);
+}
+
+.aligner-photo-delete-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(220, 38, 38, 0.9);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-size: 0.8rem;
+    z-index: 2;
+}
+
+.aligner-photo-card:hover .aligner-photo-delete-btn {
+    opacity: 1;
+}
+
+.aligner-photo-delete-btn:hover {
+    background: rgb(220, 38, 38);
+    transform: scale(1.1);
+}
+
+.aligner-photo-info-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 4px 8px;
+    font-size: 0.72rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* Fullscreen Aligner Photo Viewer */
+.aligner-photo-viewer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999999; /* Higher than regular modal */
+}
+
+.aligner-photo-viewer-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 2.2rem;
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.aligner-photo-viewer-close:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.aligner-photo-viewer-content {
+    max-width: 90%;
+    max-height: 85%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.aligner-photo-viewer-image {
+    max-width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    border-radius: 6px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.aligner-photo-viewer-details {
+    margin-top: 1.5rem;
+    color: white;
+    text-align: center;
+}
+
+.aligner-photo-viewer-filename {
+    font-size: 1.15rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.aligner-photo-viewer-meta {
+    font-size: 0.85rem;
+    color: var(--gray-400, #cbd5e0);
+}
+

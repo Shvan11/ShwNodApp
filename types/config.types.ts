@@ -190,6 +190,16 @@ export interface CloudflareZeroTrustConfig {
   doctorEmailListId?: string;
 }
 
+/**
+ * Cloudflare R2 bucket configuration (for aligner case photos).
+ */
+export interface R2Config {
+  accountId?: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  bucketName?: string;
+}
+
 // ===========================================
 // MAIN CONFIG
 // ===========================================
@@ -212,6 +222,7 @@ export interface AppConfig {
   threeshape: ThreeShapeConfig;
   localsend: LocalSendConfig;
   cloudflare: CloudflareZeroTrustConfig;
+  r2: R2Config;
   /** Path to the `pg_dump` binary for the database-backup download (defaults to 'pg_dump' on PATH). */
   pgDumpPath: string;
   cs_export?: string;

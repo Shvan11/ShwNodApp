@@ -175,6 +175,12 @@ const config: AppConfig = {
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
     doctorEmailListId: process.env.CLOUDFLARE_DOCTOR_EMAIL_LIST_ID,
   },
+  r2: {
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    bucketName: process.env.R2_BUCKET_NAME || 'aligner-portal-files',
+  },
   cs_export: process.env.CS_EXPORT,
   gram_session: process.env.GRAM_SESSION,
 };

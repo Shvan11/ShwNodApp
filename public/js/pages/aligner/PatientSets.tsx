@@ -42,6 +42,48 @@ import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './PatientSets.module.css';
 
 // Page-specific types
+interface AlignerPhoto {
+    path: string;
+    file_name: string;
+    file_size: number | null;
+    mime_type: string | null;
+    uploaded_at: string | null;
+    view_url: string;
+}
+
+const isImage = (photo: AlignerPhoto): boolean => {
+    if (photo.mime_type) {
+        return photo.mime_type.startsWith('image/');
+    }
+    const ext = photo.file_name.split('.').pop()?.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'].includes(ext || '');
+};
+
+const getFileIconClass = (photo: AlignerPhoto): string => {
+    const ext = photo.file_name.split('.').pop()?.toLowerCase();
+    switch (ext) {
+        case 'zip':
+        case 'rar':
+        case '7z':
+        case 'tar':
+        case 'gz':
+            return 'fas fa-file-archive';
+        case 'stl':
+        case 'ply':
+        case 'obj':
+        case '3ds':
+        case 'fbx':
+            return 'fas fa-cube';
+        case 'pdf':
+            return 'fas fa-file-pdf';
+        case 'doc':
+        case 'docx':
+            return 'fas fa-file-word';
+        default:
+            return 'fas fa-file';
+    }
+};
+
 interface Patient {
     person_id: number;
     patient_name?: string;
@@ -114,8 +156,25 @@ const PatientSets: React.FC = () => {
     const [expandedSets, setExpandedSets] = useState<Record<number, boolean>>({});
     const [batchesData, setBatchesData] = useState<Record<number, AlignerBatch[]>>({});
     const [notesData, setNotesData] = useState<Record<number, AlignerNote[]>>({});
+    const [photosData, setPhotosData] = useState<Record<number, AlignerPhoto[]>>({});
+    const [viewerPhoto, setViewerPhoto] = useState<AlignerPhoto | null>(null);
     const [expandedCommunication, setExpandedCommunication] = useState<Record<number, boolean>>({});
     const [loading, setLoading] = useState<boolean>(false);
+
+    // Close fullscreen photo viewer with Escape key
+    useEffect(() => {
+        const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setViewerPhoto(null);
+            }
+        };
+        if (viewerPhoto) {
+            window.addEventListener('keydown', handleKeyDown);
+        }
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [viewerPhoto]);
 
     // Self-managed data loaders. Declared above the drawer hooks + mount effects
     // that reference them so every reference is a backward one (a forward reference
@@ -138,6 +197,9 @@ const PatientSets: React.FC = () => {
                 }
                 if (!notesData[setId]) {
                     await loadNotes(setId, workIdParam);
+                }
+                if (!photosData[setId]) {
+                    await loadPhotos(setId);
                 }
                 setExpandedSets(prev => ({ ...prev, [setId]: true }));
                 setExpandedCommunication(prev => ({ ...prev, [setId]: true }));
@@ -182,6 +244,30 @@ const PatientSets: React.FC = () => {
         } catch (error) {
             console.error('Error loading notes:', error);
             setNotesData(prev => ({ ...prev, [setId]: [] }));
+        }
+    };
+
+    const loadPhotos = async (setId: number): Promise<void> => {
+        try {
+            const data = await fetchJSON<{ photos: AlignerPhoto[] }>(`/api/aligner/sets/${setId}/photos`);
+            setPhotosData(prev => ({ ...prev, [setId]: data.photos || [] }));
+        } catch (error) {
+            console.error('Error loading photos:', error);
+            setPhotosData(prev => ({ ...prev, [setId]: [] }));
+        }
+    };
+
+    const handleDeletePhoto = async (setId: number, path: string): Promise<void> => {
+        if (!window.confirm('Are you sure you want to delete this photo?')) {
+            return;
+        }
+        try {
+            await deleteJSON(`/api/aligner/sets/${setId}/photos?path=${encodeURIComponent(path)}`);
+            toast.success('Photo deleted successfully');
+            await loadPhotos(setId);
+        } catch (error) {
+            console.error('Error deleting photo:', error);
+            toast.error('Failed to delete photo: ' + httpErrorMessage(error, 'unknown error'));
         }
     };
 
@@ -343,6 +429,10 @@ const PatientSets: React.FC = () => {
 
         if (!notesData[setId]) {
             await loadNotes(setId, patient?.workid || 0);
+        }
+
+        if (!photosData[setId]) {
+            await loadPhotos(setId);
         }
 
         setExpandedSets(prev => ({ ...prev, [setId]: true }));
@@ -1830,6 +1920,64 @@ const PatientSets: React.FC = () => {
                                         </div>
                                     )}
 
+                                    {/* Portal Photos Section */}
+                                    {expandedSets[set.aligner_set_id] && (
+                                        <div className="aligner-photos-container">
+                                            <div className="aligner-photos-header">
+                                                <h5>
+                                                    <i className="fas fa-folder-open"></i>
+                                                    Portal Photos & Scans ({photosData[set.aligner_set_id]?.length || 0})
+                                                </h5>
+                                            </div>
+                                            {!photosData[set.aligner_set_id] ? (
+                                                <div className="loading">
+                                                    <div className="spinner"></div>
+                                                    <p>Loading files...</p>
+                                                </div>
+                                            ) : photosData[set.aligner_set_id].length === 0 ? (
+                                                <p className="empty-state">No photos or scan files uploaded by the doctor yet</p>
+                                            ) : (
+                                                <div className="aligner-photos-grid">
+                                                    {photosData[set.aligner_set_id].map((photo) => (
+                                                        <div 
+                                                            key={photo.path} 
+                                                            className="aligner-photo-card"
+                                                            onClick={() => {
+                                                                if (isImage(photo)) {
+                                                                    setViewerPhoto(photo);
+                                                                } else {
+                                                                    window.open(photo.view_url, '_blank');
+                                                                }
+                                                            }}
+                                                            title={isImage(photo) ? `View ${photo.file_name}` : `Download ${photo.file_name}`}
+                                                        >
+                                                            <button
+                                                                className="aligner-photo-delete-btn"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDeletePhoto(set.aligner_set_id, photo.path);
+                                                                }}
+                                                                title="Delete File"
+                                                            >
+                                                                <i className="fas fa-trash"></i>
+                                                            </button>
+                                                            {isImage(photo) ? (
+                                                                <img src={photo.view_url} alt={photo.file_name} />
+                                                            ) : (
+                                                                <div className="aligner-file-icon-placeholder">
+                                                                    <i className={getFileIconClass(photo)}></i>
+                                                                </div>
+                                                            )}
+                                                            <div className="aligner-photo-info-overlay" title={photo.file_name}>
+                                                                {photo.file_name}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {/* Communication Section */}
                                     <div className="communication-section">
                                         <button
@@ -2053,6 +2201,41 @@ const PatientSets: React.FC = () => {
                 patient={patient}
                 doctorName={labelModalData.set?.AlignerDoctorName ?? undefined}
             />
+
+            {viewerPhoto && (
+                <div 
+                    className="aligner-photo-viewer-overlay" 
+                    onClick={() => setViewerPhoto(null)}
+                    role="dialog" 
+                    aria-modal="true"
+                >
+                    <button 
+                        className="aligner-photo-viewer-close" 
+                        onClick={() => setViewerPhoto(null)}
+                        aria-label="Close viewer"
+                    >
+                        <i className="fas fa-times"></i>
+                    </button>
+                    <div 
+                        className="aligner-photo-viewer-content" 
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <img 
+                            src={viewerPhoto.view_url} 
+                            alt={viewerPhoto.file_name} 
+                            className="aligner-photo-viewer-image" 
+                        />
+                        <div className="aligner-photo-viewer-details">
+                            <div className="aligner-photo-viewer-filename">{viewerPhoto.file_name}</div>
+                            {viewerPhoto.uploaded_at && (
+                                <div className="aligner-photo-viewer-meta">
+                                    Uploaded: {formatDate(viewerPhoto.uploaded_at)}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
