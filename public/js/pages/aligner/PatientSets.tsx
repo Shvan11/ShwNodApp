@@ -1923,58 +1923,104 @@ const PatientSets: React.FC = () => {
                                     {/* Portal Photos Section */}
                                     {expandedSets[set.aligner_set_id] && (
                                         <div className="aligner-photos-container">
-                                            <div className="aligner-photos-header">
-                                                <h5>
-                                                    <i className="fas fa-folder-open"></i>
-                                                    Portal Photos & Scans ({photosData[set.aligner_set_id]?.length || 0})
-                                                </h5>
-                                            </div>
-                                            {!photosData[set.aligner_set_id] ? (
-                                                <div className="loading">
-                                                    <div className="spinner"></div>
-                                                    <p>Loading files...</p>
-                                                </div>
-                                            ) : photosData[set.aligner_set_id].length === 0 ? (
-                                                <p className="empty-state">No photos or scan files uploaded by the doctor yet</p>
-                                            ) : (
-                                                <div className="aligner-photos-grid">
-                                                    {photosData[set.aligner_set_id].map((photo) => (
-                                                        <div 
-                                                            key={photo.path} 
-                                                            className="aligner-photo-card"
-                                                            onClick={() => {
-                                                                if (isImage(photo)) {
-                                                                    setViewerPhoto(photo);
-                                                                } else {
-                                                                    window.open(photo.view_url, '_blank');
-                                                                }
-                                                            }}
-                                                            title={isImage(photo) ? `View ${photo.file_name}` : `Download ${photo.file_name}`}
-                                                        >
-                                                            <button
-                                                                className="aligner-photo-delete-btn"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleDeletePhoto(set.aligner_set_id, photo.path);
-                                                                }}
-                                                                title="Delete File"
-                                                            >
-                                                                <i className="fas fa-trash"></i>
-                                                            </button>
-                                                            {isImage(photo) ? (
-                                                                <img src={photo.view_url} alt={photo.file_name} />
+                                            {(() => {
+                                                const allAttachments = photosData[set.aligner_set_id];
+                                                if (!allAttachments) {
+                                                    return (
+                                                        <div className="loading">
+                                                            <div className="spinner"></div>
+                                                            <p>Loading files...</p>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                const imagePhotos = allAttachments.filter(p => p.path.includes('/photos/') || !p.path.includes('/files/'));
+                                                const fileAttachments = allAttachments.filter(p => p.path.includes('/files/'));
+
+                                                return (
+                                                    <>
+                                                        {/* Clinical Photos Sub-section */}
+                                                        <div style={{ marginBottom: '1.5rem' }}>
+                                                            <div className="aligner-photos-header">
+                                                                <h5>
+                                                                    <i className="fas fa-camera"></i>
+                                                                    Portal Photos ({imagePhotos.length})
+                                                                </h5>
+                                                            </div>
+                                                            {imagePhotos.length === 0 ? (
+                                                                <p className="empty-state">No photos uploaded by the doctor yet</p>
                                                             ) : (
-                                                                <div className="aligner-file-icon-placeholder">
-                                                                    <i className={getFileIconClass(photo)}></i>
+                                                                <div className="aligner-photos-grid">
+                                                                    {imagePhotos.map((photo) => (
+                                                                        <div 
+                                                                            key={photo.path} 
+                                                                            className="aligner-photo-card"
+                                                                            onClick={() => setViewerPhoto(photo)}
+                                                                            title={`View ${photo.file_name}`}
+                                                                        >
+                                                                            <button
+                                                                                className="aligner-photo-delete-btn"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    handleDeletePhoto(set.aligner_set_id, photo.path);
+                                                                                }}
+                                                                                title="Delete File"
+                                                                            >
+                                                                                <i className="fas fa-trash"></i>
+                                                                            </button>
+                                                                            <img src={photo.view_url} alt={photo.file_name} />
+                                                                            <div className="aligner-photo-info-overlay" title={photo.file_name}>
+                                                                                {photo.file_name}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
                                                                 </div>
                                                             )}
-                                                            <div className="aligner-photo-info-overlay" title={photo.file_name}>
-                                                                {photo.file_name}
-                                                            </div>
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            )}
+
+                                                        {/* Scan Files Sub-section */}
+                                                        <div>
+                                                            <div className="aligner-photos-header">
+                                                                <h5>
+                                                                    <i className="fas fa-cube"></i>
+                                                                    Portal Scan Files ({fileAttachments.length})
+                                                                </h5>
+                                                            </div>
+                                                            {fileAttachments.length === 0 ? (
+                                                                <p className="empty-state">No scan files uploaded by the doctor yet</p>
+                                                            ) : (
+                                                                <div className="aligner-photos-grid">
+                                                                    {fileAttachments.map((photo) => (
+                                                                        <div 
+                                                                            key={photo.path} 
+                                                                            className="aligner-photo-card"
+                                                                            onClick={() => window.open(photo.view_url, '_blank')}
+                                                                            title={`Download ${photo.file_name}`}
+                                                                        >
+                                                                            <button
+                                                                                className="aligner-photo-delete-btn"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    handleDeletePhoto(set.aligner_set_id, photo.path);
+                                                                                }}
+                                                                                title="Delete File"
+                                                                            >
+                                                                                <i className="fas fa-trash"></i>
+                                                                            </button>
+                                                                            <div className="aligner-file-icon-placeholder">
+                                                                                <i className={getFileIconClass(photo)}></i>
+                                                                            </div>
+                                                                            <div className="aligner-photo-info-overlay" title={photo.file_name}>
+                                                                                {photo.file_name}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </>
+                                                );
+                                            })()}
                                         </div>
                                     )}
 
