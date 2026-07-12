@@ -65,6 +65,8 @@ import taskRoutes from './task.routes.js';
 import monitoringRoutes from './monitoring.routes.js';
 import approvalRoutes from './approval.routes.js';
 import labCaseRoutes from './lab-case.routes.js';
+import portalActivityRoutes from './portal-activity.routes.js';
+import announcementRoutes from './announcement.routes.js';
 
 // Import template routes (already modular)
 import templateRouter from '../template-api.js';
@@ -172,5 +174,11 @@ router.use('/', approvalRoutes);
 
 // Lab case tracker — prosthetic case stage tracking (/api/lab-cases*)
 router.use('/', labCaseRoutes);
+
+// Portal activity — the staff header bell over portal-written aligner flags (/api/portal-activity*)
+router.use('/', portalActivityRoutes);
+
+// Doctor announcements — staff-composed + auto batch events for the aligner portal (/api/announcements*)
+router.use('/', announcementRoutes);
 
 export default router;

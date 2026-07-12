@@ -71,7 +71,9 @@ function makeCsrf(cookieName: string, skipCsrfProtection: (req: Request) => bool
 //    token can exist yet (login CSRF is low-risk; credentials are still required).
 //  - `/api/chair-display/*` — fired via navigator.sendBeacon, which cannot set a
 //    header; behind the auth gate and non-damaging (kiosk patient-load hints).
-//  - `/api/portal*` — owned by the portal instance below (its own session/cookie).
+//  - `/api/portal` + `/api/portal/*` — owned by the portal instance below (its
+//    own session/cookie). Segment-bounded to mirror the `/api/portal` mount:
+//    staff routes like /api/portal-activity must stay under STAFF CSRF.
 const staff = makeCsrf('shwan.csrf', (req) => {
   const p = req.originalUrl.split('?')[0];
   return (
@@ -80,7 +82,8 @@ const staff = makeCsrf('shwan.csrf', (req) => {
     // session, no CSRF token); the endpoint authenticates via its own shared secret.
     p === '/api/integrations/3shape/webhook' ||
     p.startsWith('/api/chair-display/') ||
-    p.startsWith('/api/portal')
+    p === '/api/portal' ||
+    p.startsWith('/api/portal/')
   );
 });
 

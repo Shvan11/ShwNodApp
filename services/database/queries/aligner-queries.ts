@@ -35,6 +35,10 @@ type PgTransaction = Transaction<Database>;
 import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 import type { AlignerPatient } from '../../../shared/contracts/aligner.contract.js';
+import {
+  insertBatchAutoAnnouncement,
+  deleteBatchAutoAnnouncement,
+} from './announcement-queries.js';
 
 // ==============================
 // TYPE DEFINITIONS
@@ -1626,7 +1630,12 @@ export async function updateBatchStatus(
       if (batch.delivered_to_patient_date && newManufactureDate > batch.delivered_to_patient_date) {
         throw new Error('Cannot set manufacture date later than the delivery date');
       }
-      await trx.updateTable('aligner_batches').set({ manufacture_date: newManufactureDate }).where('aligner_batch_id', '=', batchId).execute();      return { ...base, message: manufactured ? 'Manufacture date updated' : 'Batch marked as manufactured' };
+      await trx.updateTable('aligner_batches').set({ manufacture_date: newManufactureDate }).where('aligner_batch_id', '=', batchId).execute();
+      // Portal banner: first-time manufacture only — a date correction must not re-announce.
+      if (!manufactured) {
+        await insertBatchAutoAnnouncement(trx, { batchId, setId, batchSequence, event: 'batch_manufactured' });
+      }
+      return { ...base, message: manufactured ? 'Manufacture date updated' : 'Batch marked as manufactured' };
     }
 
     if (action === 'DELIVER') {
@@ -1641,6 +1650,10 @@ export async function updateBatchStatus(
         throw new Error('Cannot deliver: delivery date cannot be earlier than the manufacture date');
       }
       await trx.updateTable('aligner_batches').set({ delivered_to_patient_date: newDeliveryDate }).where('aligner_batch_id', '=', batchId).execute();
+      // Portal banner: first-time delivery only — a date correction must not re-announce.
+      if (!delivered) {
+        await insertBatchAutoAnnouncement(trx, { batchId, setId, batchSequence, event: 'batch_delivered' });
+      }
 
       const maxSeq = await trx
         .selectFrom('aligner_batches')
@@ -1668,11 +1681,15 @@ export async function updateBatchStatus(
 
     if (action === 'UNDO_MANUFACTURE') {
       if (delivered) throw new Error('Cannot undo manufacture: batch already delivered. Undo delivery first.');
-      await trx.updateTable('aligner_batches').set({ manufacture_date: null }).where('aligner_batch_id', '=', batchId).execute();      return { ...base, message: 'Manufacture undone' };
+      await trx.updateTable('aligner_batches').set({ manufacture_date: null }).where('aligner_batch_id', '=', batchId).execute();
+      await deleteBatchAutoAnnouncement(trx, batchId, 'batch_manufactured');
+      return { ...base, message: 'Manufacture undone' };
     }
 
     if (action === 'UNDO_DELIVERY') {
-      await trx.updateTable('aligner_batches').set({ delivered_to_patient_date: null, is_active: false }).where('aligner_batch_id', '=', batchId).execute();      return { ...base, message: 'Delivery undone (batch deactivated)' };
+      await trx.updateTable('aligner_batches').set({ delivered_to_patient_date: null, is_active: false }).where('aligner_batch_id', '=', batchId).execute();
+      await deleteBatchAutoAnnouncement(trx, batchId, 'batch_delivered');
+      return { ...base, message: 'Delivery undone (batch deactivated)' };
     }
 
     throw new Error('Invalid action. Must be MANUFACTURE, DELIVER, UNDO_MANUFACTURE, or UNDO_DELIVERY');

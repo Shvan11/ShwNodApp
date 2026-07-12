@@ -209,10 +209,15 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     // Skip staff session entirely on portal paths — portalSession runs there
     // and overwriting req.session would waste a session-store read per request.
+    // Segment-bounded on purpose (mirrors Express's own `app.use('/api/portal')`
+    // mount semantics): a broad startsWith('/api/portal') would also swallow
+    // staff routes like /api/portal-activity, which would then reach
+    // authenticate() with no staff session and 401 every request.
     app.use((req, res, next) => {
       if (req.path === '/portal'
         || req.path.startsWith('/portal/')
-        || req.path.startsWith('/api/portal')
+        || req.path === '/api/portal'
+        || req.path.startsWith('/api/portal/')
         || req.path.startsWith('/api/aligner-portal')) {
         return next();
       }
