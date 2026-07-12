@@ -66,6 +66,7 @@ export interface AlignerActivityFlags {
   is_read: Generated<boolean | null>;
   read_at: Timestamp | null;
   related_record_id: number | null;
+  source: Generated<string>;
   updated_at: Timestamp | null;
 }
 
@@ -277,6 +278,30 @@ export interface Diagnoses {
   treatment_plan: string;
   updated_at: Timestamp | null;
   work_id: number;
+}
+
+export interface DoctorAnnouncementReads {
+  announcement_id: number;
+  dr_id: number;
+  read_at: Generated<Timestamp>;
+  read_id: Generated<number>;
+  updated_at: Timestamp | null;
+}
+
+export interface DoctorAnnouncements {
+  announcement_id: Generated<number>;
+  announcement_type: Generated<string>;
+  auto_event: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  expires_at: Timestamp | null;
+  is_dismissible: Generated<boolean>;
+  link_text: string | null;
+  link_url: string | null;
+  message: string;
+  related_batch_id: number | null;
+  target_doctor_id: number | null;
+  title: string;
 }
 
 export interface DocumentTemplates {
@@ -894,6 +919,8 @@ export interface DB {
   cities: Cities;
   details: Details;
   diagnoses: Diagnoses;
+  doctor_announcement_reads: DoctorAnnouncementReads;
+  doctor_announcements: DoctorAnnouncements;
   document_templates: DocumentTemplates;
   document_types: DocumentTypes;
   dolphin_sync_map: DolphinSyncMap;
