@@ -262,6 +262,17 @@ export const qk = {
     list: () => ['tasks', 'list'] as const,
     history: () => ['tasks', 'history'] as const,
   },
+  /** Portal activity — the staff header bell over portal-written aligner flags. */
+  portalActivity: {
+    all: () => ['portal-activity'] as const,
+    list: () => ['portal-activity', 'list'] as const,
+  },
+  /** Doctor announcements (aligner portal): management list + per-row receipts. */
+  announcements: {
+    all: () => ['announcements'] as const,
+    list: (includeExpired: boolean) => ['announcements', 'list', includeExpired] as const,
+    receipts: (id: Id) => ['announcements', 'receipts', normId(id)] as const,
+  },
   /** Maker-checker approval / notice queue. */
   approvals: {
     all: () => ['approvals'] as const,

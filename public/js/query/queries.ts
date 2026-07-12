@@ -39,6 +39,8 @@ import * as integrationsContract from '@shared/contracts/integrations.contract';
 import * as threeshapeContract from '@shared/contracts/threeshape.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
 import * as taskContract from '@shared/contracts/task.contract';
+import * as portalActivityContract from '@shared/contracts/portal-activity.contract';
+import * as announcementContract from '@shared/contracts/announcement.contract';
 import * as approvalsContract from '@shared/contracts/approvals.contract';
 import * as videoContract from '@shared/contracts/video.contract';
 import * as mediaContract from '@shared/contracts/media.contract';
@@ -1173,6 +1175,43 @@ export const tasksHistoryQuery = () =>
         signal,
         schema: taskContract.tasksHistory.response,
       }),
+  });
+
+// ---------------------------------------------------------------------------
+// Portal activity + doctor announcements (aligner portal)
+// ---------------------------------------------------------------------------
+
+/** GET /api/portal-activity — portal-originated aligner flags (header bell). */
+export const portalActivityQuery = () =>
+  queryOptions({
+    queryKey: qk.portalActivity.list(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof portalActivityContract.portalActivityFeed.response>>('/api/portal-activity', {
+        signal,
+        schema: portalActivityContract.portalActivityFeed.response,
+      }),
+  });
+
+/** GET /api/announcements — doctor-announcement management list. */
+export const announcementsQuery = (includeExpired = false) =>
+  queryOptions({
+    queryKey: qk.announcements.list(includeExpired),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof announcementContract.listAnnouncements.response>>(
+        `/api/announcements${includeExpired ? '?includeExpired=true' : ''}`,
+        { signal, schema: announcementContract.listAnnouncements.response }
+      ),
+  });
+
+/** GET /api/announcements/:id/receipts — who has read/dismissed one. */
+export const announcementReceiptsQuery = (announcementId: number) =>
+  queryOptions({
+    queryKey: qk.announcements.receipts(announcementId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof announcementContract.announcementReceipts.response>>(
+        `/api/announcements/${announcementId}/receipts`,
+        { signal, schema: announcementContract.announcementReceipts.response }
+      ),
   });
 
 // ---------------------------------------------------------------------------

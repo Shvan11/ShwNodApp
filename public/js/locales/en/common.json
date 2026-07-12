@@ -16,6 +16,27 @@
     "label": "Language",
     "description": "Display language for this app. Saved on this PC only."
   },
+  "portalActivity": {
+    "title": "Portal activity",
+    "markAll": "Mark all read",
+    "markRead": "Mark read",
+    "empty": "No portal activity",
+    "openCase": "Open aligner case",
+    "set": "Set {{seq}}",
+    "dr": "Dr. {{name}}",
+    "doctorFallback": "A doctor",
+    "patientFallback": "a patient",
+    "markFailed": "Failed to mark activity read",
+    "event": {
+      "noteOne": "{{doctor}} added a note for {{patient}}",
+      "noteMany": "{{doctor}} added {{count}} notes for {{patient}}",
+      "photoOne": "{{doctor}} uploaded a photo for {{patient}}",
+      "photoMany": "{{doctor}} uploaded {{count}} photos for {{patient}}",
+      "fileOne": "{{doctor}} uploaded a file for {{patient}}",
+      "fileMany": "{{doctor}} uploaded {{count}} files for {{patient}}",
+      "days": "{{doctor}} changed wear days for {{patient}}"
+    }
+  },
   "user": {
     "menuAria": "Account menu for {{name}}",
     "changePassword": "Change password",

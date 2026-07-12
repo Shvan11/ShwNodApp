@@ -16,6 +16,27 @@
     "label": "اللغة",
     "description": "لغة عرض التطبيق. تُحفظ على هذا الجهاز فقط."
   },
+  "portalActivity": {
+    "title": "نشاط البوابة",
+    "markAll": "تعليم الكل كمقروء",
+    "markRead": "تعليم كمقروء",
+    "empty": "لا يوجد نشاط من البوابة",
+    "openCase": "فتح حالة التقويم الشفاف",
+    "set": "المجموعة {{seq}}",
+    "dr": "د. {{name}}",
+    "doctorFallback": "طبيب",
+    "patientFallback": "مريض",
+    "markFailed": "تعذّر تعليم النشاط كمقروء",
+    "event": {
+      "noteOne": "{{doctor}} أضاف ملاحظة للمريض {{patient}}",
+      "noteMany": "{{doctor}} أضاف {{count}} ملاحظات للمريض {{patient}}",
+      "photoOne": "{{doctor}} رفع صورة للمريض {{patient}}",
+      "photoMany": "{{doctor}} رفع {{count}} صور للمريض {{patient}}",
+      "fileOne": "{{doctor}} رفع ملفًا للمريض {{patient}}",
+      "fileMany": "{{doctor}} رفع {{count}} ملفات للمريض {{patient}}",
+      "days": "{{doctor}} غيّر أيام الارتداء للمريض {{patient}}"
+    }
+  },
   "user": {
     "menuAria": "قائمة الحساب لـ {{name}}",
     "changePassword": "تغيير كلمة المرور",

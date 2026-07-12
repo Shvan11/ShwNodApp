@@ -44,6 +44,14 @@ const DoctorsList: React.FC = () => {
                 <div className={styles.sectionInfo}>
                     <span>{doctors.length} doctor{doctors.length !== 1 ? 's' : ''}</span>
                     <Link
+                        to="/aligner/announcements"
+                        className={styles.btnManageDoctors}
+                        title="Compose and manage portal announcements"
+                    >
+                        <i className="fas fa-bullhorn"></i>
+                        Announcements
+                    </Link>
+                    <Link
                         to="/settings/alignerDoctors"
                         className={styles.btnManageDoctors}
                         title="Manage aligner doctors and portal access"

@@ -1,0 +1,224 @@
+/* PortalActivityBell — header bell + popover for doctor-portal activity.
+   Mirrors TasksBell.module.css: white icon button in the header band, portaled
+   surface-card popover (position:fixed set inline off the bell rect). Logical
+   props throughout for RTL. */
+
+.wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.bellBtn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-white);
+    font-size: var(--font-size-lg);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.bellBtn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.badge {
+    position: absolute;
+    top: 2px;
+    inset-inline-end: 2px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--radius-full);
+    background: var(--primary-color);
+    color: var(--color-white);
+    font-size: 11px;
+    font-weight: var(--font-weight-bold);
+    line-height: 18px;
+    text-align: center;
+}
+
+.popover {
+    width: 380px;
+    max-width: calc(100vw - 24px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    z-index: var(--z-index-popover);
+    overflow: hidden;
+}
+
+.popHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-light);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-heading);
+}
+
+.popCount {
+    display: inline-block;
+    margin-inline-start: var(--spacing-xs);
+    padding: 0 var(--spacing-sm);
+    border-radius: var(--radius-full);
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.markAllBtn {
+    border: 1px solid var(--primary-color);
+    background: transparent;
+    color: var(--primary-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}
+
+.markAllBtn:hover {
+    background: var(--primary-color);
+    color: var(--color-white);
+}
+
+.list {
+    max-height: min(60vh, 480px);
+    overflow-y: auto;
+}
+
+.empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xl);
+    color: var(--text-muted);
+}
+
+.empty i {
+    font-size: 1.75rem;
+    color: var(--text-muted);
+}
+
+/* One grouped event */
+.item {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.item:last-child {
+    border-bottom: none;
+}
+
+.itemUnread {
+    background: var(--primary-50);
+}
+
+.typeIcon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-full);
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.itemUnread .typeIcon {
+    background: var(--primary-100);
+    color: var(--primary-700);
+}
+
+/* The whole body is the click-through to the aligner case. */
+.itemBody {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border: none;
+    background: transparent;
+    padding: 0;
+    text-align: start;
+    cursor: pointer;
+}
+
+.itemBody:disabled {
+    cursor: default;
+}
+
+.itemText {
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.itemUnread .itemText {
+    font-weight: var(--font-weight-semibold);
+}
+
+.itemDesc {
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.itemMeta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-top: 2px;
+}
+
+.setTag {
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    padding: 1px var(--spacing-xs);
+    font-size: var(--font-size-xs);
+}
+
+.age {
+    margin-inline-start: auto;
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+}
+
+.actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.actions button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+}
+
+.actions button:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+}

@@ -6,6 +6,7 @@ import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { patientInfoQuery, brandingQuery } from '@/query/queries';
 import { ROLES } from '@shared/auth/roles';
 import TasksBell from './TasksBell';
+import PortalActivityBell from './PortalActivityBell';
 import ApprovalsBell from './ApprovalsBell';
 import MyApprovalsBadge from './MyApprovalsBadge';
 import ThemeToggle from './ThemeToggle';
@@ -324,6 +325,9 @@ const UniversalHeader = () => {
                 <div className="header-right">
                     {/* App-wide tasks bell */}
                     <TasksBell />
+
+                    {/* Doctor-portal activity (uploads / notes / days changes) */}
+                    <PortalActivityBell />
 
                     {/* Maker-checker approval queue: admin sees all pending holds + notices;
                         front-desk sees their own submissions and their outcome. */}

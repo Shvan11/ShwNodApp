@@ -245,7 +245,8 @@ export default [
       'public/js/components/react/Navigation.tsx',
       'public/js/components/react/AddPatientForm.tsx',
       'public/js/components/react/EditPatientComponent.tsx',
-      'public/js/components/react/ViewPatientInfo.tsx'
+      'public/js/components/react/ViewPatientInfo.tsx',
+      'public/js/components/react/PortalActivityBell.tsx'
     ],
     plugins: {
       i18next

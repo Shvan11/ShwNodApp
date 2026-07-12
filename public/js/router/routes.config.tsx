@@ -99,6 +99,7 @@ const PatientSets = lazyRoute(() => import('../pages/aligner/PatientSets'));
 const SearchPatient = React.lazy(() => import('../pages/aligner/SearchPatient'));
 const AllSetsList = React.lazy(() => import('../pages/aligner/AllSetsList'));
 const ArchformMatcher = React.lazy(() => import('../pages/aligner/ArchformMatcher'));
+const Announcements = React.lazy(() => import('../pages/aligner/Announcements'));
 
 // Lazy-loaded route components - Patient
 const PatientShell = lazyRoute(() => import('../components/react/PatientShell'));
@@ -365,6 +366,15 @@ export const routesConfig: RouteObject[] = [
               </RouteErrorBoundary>
             ),
             // No loader - loads data in component
+          },
+          {
+            path: 'announcements',
+            element: (
+              <RouteErrorBoundary routeName="Announcements">
+                <Announcements />
+              </RouteErrorBoundary>
+            ),
+            // No loader - list + doctors load in component (includeExpired toggle)
           },
           {
             path: '*',
