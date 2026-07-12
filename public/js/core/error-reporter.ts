@@ -15,6 +15,7 @@
  */
 import { postJSON } from './http';
 import type { HttpError } from './http';
+import { isChunkFetchMessage } from './chunk-reload';
 import type { ReportClientErrorBody } from '@shared/contracts/monitoring.contract';
 
 /** What a feed supplies — the transport fills in url/userAgent/at. */
@@ -26,10 +27,6 @@ const SEEN_TTL_MS = 30_000;
 const MAX_REPORTS_PER_LOAD = 50;
 const recent = new Map<string, number>();
 let sent = 0;
-
-/** Chunk-load failures self-heal via a one-time reload (see App.tsx) — never a bug. */
-const CHUNK_ERROR_RE =
-  /dynamically imported module|Importing a module script failed|Failed to fetch dynamically|error loading dynamically imported module/i;
 
 function safeStringify(value: unknown, max: number): string | undefined {
   if (value === undefined || value === null) return undefined;
@@ -107,8 +104,10 @@ let installed = false;
 /**
  * Install window-level handlers for the errors React can't catch — uncaught sync
  * throws (event handlers, timers) and unhandled promise rejections (async paths).
- * Idempotent; call once at boot. The chunk-load reload guard in App.tsx keeps its
- * own listeners — here we only *report*, and skip the chunk errors it self-heals.
+ * Idempotent; call once at boot. The chunk self-heal (core/chunk-reload.ts) keeps
+ * its own listeners — here we only *report*, skipping the fetch-type chunk
+ * messages it owns. Persistent chunk failures stay visible regardless: they
+ * terminate in an error boundary, which reports them directly.
  */
 export function installGlobalErrorReporting(): void {
   if (installed || typeof window === 'undefined') return;
@@ -119,7 +118,7 @@ export function installGlobalErrorReporting(): void {
     // empty message — ignore; we only want real JS exceptions.
     if (!event.error && !event.message) return;
     const message = event.message || String((event.error as Error | undefined)?.message ?? 'Uncaught error');
-    if (CHUNK_ERROR_RE.test(message)) return;
+    if (isChunkFetchMessage(message)) return;
     reportClientError({
       source: 'window-error',
       message,
@@ -130,8 +129,8 @@ export function installGlobalErrorReporting(): void {
   window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
     const reason = event.reason as (Error & HttpError) | undefined;
     const message = String(reason?.message ?? reason ?? 'Unhandled rejection');
-    // Self-healing chunk-load rejections are handled in App.tsx — not bugs.
-    if (CHUNK_ERROR_RE.test(message)) return;
+    // Self-healing chunk-load rejections are owned by core/chunk-reload.ts.
+    if (isChunkFetchMessage(message)) return;
     // An HttpError React Query already surfaced inline isn't worth double-reporting
     // unless it's a high-value one (5xx / contract drift).
     if (reason && typeof reason === 'object' && 'status' in reason && !isReportableHttpError(reason)) return;

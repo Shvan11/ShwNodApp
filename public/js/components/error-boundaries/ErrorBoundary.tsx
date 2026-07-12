@@ -12,6 +12,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { useNavigate, useLocation, type NavigateFunction } from 'react-router-dom';
 import { reportClientError } from '../../core/error-reporter';
+import { selfHealChunkError } from '../../core/chunk-reload';
 import styles from './ErrorBoundary.module.css';
 
 interface ErrorBoundaryProps {
@@ -63,6 +64,15 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       error,
       errorInfo,
     });
+
+    // Failed lazy-chunk imports land HERE, not in the window listeners — React
+    // captures the import rejection and re-throws it during render. One guarded
+    // reload self-heals a stale tab; when the reload is already spent, fall
+    // through and report: a chunk that still fails after reloading is an
+    // incident (bad deploy, asset-route regression), not deploy noise.
+    if (selfHealChunkError(String(error?.message ?? ''), 'render-boundary') === 'reloading') {
+      return;
+    }
 
     // Ship to prod error reporting so a render crash lands in the server logs
     // instead of dying in this user's console (fire-and-forget; never throws).

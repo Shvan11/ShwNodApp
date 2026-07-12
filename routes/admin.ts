@@ -11,8 +11,17 @@ import * as googleDriveOAuth from '../services/google-drive/oauth.js';
 
 const router = Router();
 
-// Every route in this file is admin-only.
-router.use(authorize(ADMIN_ROLES));
+// Every route in this file is admin-only — but the gate MUST stay path-scoped.
+// This router is mounted at the app ROOT (index.ts), not under /api/admin, so
+// the Google OAuth callback keeps its redirect URL as registered in Google
+// Cloud Console — which means every request no earlier route handled falls
+// through it (all /dist assets and the SPA catch-all mount AFTER it). A
+// pathless router.use(authorize(...)) here gates the ENTIRE app: the
+// 2026-07-11 deploy shipped exactly that, 403'ing every page + asset for
+// non-admin staff and 401'ing the public portal's shared /assets chunks.
+// House rule for root-mounted routers: path-scoped or per-route gates only
+// (see routes/api/appointment.routes.ts).
+router.use('/api/admin', authorize(ADMIN_ROLES));
 
 // ============================================================================
 // TYPE DEFINITIONS

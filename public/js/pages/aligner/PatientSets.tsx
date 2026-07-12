@@ -445,8 +445,11 @@ const PatientSets: React.FC = () => {
         });
     };
 
+    // Delivered = server-computed sum over batches with a delivery date (net of
+    // templates, matching the set totals). total-minus-remaining is wrong here:
+    // remaining_* is consumed when a batch is created, not when it's delivered.
     const calculateProgress = (set: AlignerSet): number => {
-        const delivered = set.upper_aligners_count + set.lower_aligners_count - set.remaining_upper_aligners - set.remaining_lower_aligners;
+        const delivered = set.DeliveredAligners ?? 0;
         const total = set.upper_aligners_count + set.lower_aligners_count;
         return total > 0 ? Math.round((delivered / total) * 100) : 0;
     };
@@ -1366,7 +1369,7 @@ const PatientSets: React.FC = () => {
                     <div className="aligner-sets">
                         {alignerSets.map((set) => {
                             const progress = calculateProgress(set);
-                            const delivered = set.upper_aligners_count + set.lower_aligners_count - set.remaining_upper_aligners - set.remaining_lower_aligners;
+                            const delivered = set.DeliveredAligners ?? 0;
                             const total = set.upper_aligners_count + set.lower_aligners_count;
 
                             return (

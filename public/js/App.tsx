@@ -54,6 +54,7 @@ import { GlobalErrorBoundary } from './components/error-boundaries/GlobalErrorBo
 import routesConfig from './router/routes.config';
 import { queryClient } from './query/client';
 import { installGlobalErrorReporting } from './core/error-reporter';
+import { installChunkSelfHealing } from './core/chunk-reload';
 
 // ===================================
 // REACT QUERY (audit M7/M8)
@@ -65,55 +66,17 @@ import { installGlobalErrorReporting } from './core/error-reporter';
 // refetchOnWindowFocus) are documented there.
 
 // ===================================
-// STALE-CHUNK / TRANSIENT-FETCH RECOVERY
+// STALE-CHUNK RECOVERY + ERROR REPORTING
 // ===================================
 //
-// Route components are lazy-loaded code-split chunks (e.g. DailyAppointments-*.js).
-// A chunk fetch can fail for two reasons:
-//   1. Stale tab after a redeploy — the open page references old hashed filenames
-//      that no longer exist on disk, so the request 404s.
-//   2. A transient network blip (QUIC idle-timeout / packet loss / DNS hiccup on
-//      the LAN) drops the fetch mid-flight.
-// Either way the dynamic import rejects and the page breaks until a manual reload.
-// A one-time reload re-fetches a fresh index.html (with current chunk hashes) and
-// re-establishes the connection. Guarded via sessionStorage so a genuinely-missing
-// asset can never cause a reload loop.
+// Chunk-load self-healing (the guarded one-time reload on failed lazy imports)
+// lives in core/chunk-reload.ts — the error boundaries call into the same
+// module for the render-path failures the window listeners can never see
+// (React.lazy re-throws the import failure during render). Everything else
+// browser-side that breaks is reported via core/error-reporter.ts, which skips
+// only the fetch-type chunk messages the self-heal owns.
 if (typeof window !== 'undefined') {
-  const RELOAD_FLAG = 'shwan_chunk_reload_ts';
-  const RELOAD_COOLDOWN_MS = 10_000;
-
-  const reloadOnce = (reason: string): void => {
-    const last = Number(sessionStorage.getItem(RELOAD_FLAG) || 0);
-    const now = Date.now();
-    if (now - last < RELOAD_COOLDOWN_MS) {
-      // Already reloaded moments ago and the chunk still won't load — the asset
-      // is genuinely gone. Stop, and let the ErrorBoundary show its fallback.
-      console.error(`[App] Module load still failing after reload (${reason}); not reloading again.`);
-      return;
-    }
-    sessionStorage.setItem(RELOAD_FLAG, String(now));
-    console.warn(`[App] Reloading once to recover from a failed module load (${reason}).`);
-    window.location.reload();
-  };
-
-  // Vite dispatches this on the window when its preload helper (used by lazy
-  // route imports) fails to fetch a chunk. preventDefault() stops Vite rethrowing.
-  window.addEventListener('vite:preloadError', (event: Event) => {
-    event.preventDefault();
-    reloadOnce('vite:preloadError');
-  });
-
-  // Fallback: some chunk-load failures surface only as an unhandled rejection.
-  window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
-    const msg = String(event.reason?.message ?? event.reason ?? '');
-    if (/dynamically imported module|Importing a module script failed|Failed to fetch dynamically|error loading dynamically imported module/i.test(msg)) {
-      reloadOnce('unhandledrejection');
-    }
-  });
-
-  // Report uncaught window errors + unhandled rejections (the classes React error
-  // boundaries can't catch) to prod error reporting. Self-healing chunk-load errors
-  // above are skipped inside the reporter.
+  installChunkSelfHealing();
   installGlobalErrorReporting();
 }
 

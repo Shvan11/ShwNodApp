@@ -49,8 +49,9 @@ function lazyRoute<T extends React.ComponentType<any>>(
   // Fire-and-forget: warm the browser's module cache. React.lazy reuses the
   // same in-flight module promise when it renders, so there's no double fetch.
   // Swallow rejections here — this is a speculative warm-up; a genuinely
-  // unloadable chunk still surfaces on the render path (React.lazy → Suspense),
-  // where App.tsx's vite:preloadError / unhandledrejection self-heal handles it.
+  // unloadable chunk still surfaces on the render path (React.lazy → Suspense →
+  // error boundary), where the chunk self-heal (core/chunk-reload.ts) reloads
+  // once and reports persistent failures.
   // Without this, a failed preload would log spurious [client-error] noise.
   Component.preload = () => {
     void factory().catch(() => {});

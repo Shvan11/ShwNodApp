@@ -143,6 +143,7 @@ export const alignerSetRow = z.looseObject({
   creation_date: z.string().nullish(),
   TotalBatches: z.number().optional(),
   DeliveredBatches: z.number().optional(),
+  DeliveredAligners: z.number().optional(),
   TotalPaid: z.number().nullish(),
   Balance: z.number().nullish(),
   PaymentStatus: z.string().nullish(),

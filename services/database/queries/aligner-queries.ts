@@ -92,6 +92,7 @@ type AlignerSetWithDetails = AlignerSet & {
   AlignerDoctorName: string | null;
   TotalBatches: number;
   DeliveredBatches: number;
+  DeliveredAligners: number;
   TotalPaid: number | null;
   Balance: number | null;
   PaymentStatus: string | null;
@@ -649,6 +650,18 @@ export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSet
         eb.fn
           .sum(sql<number>`case when "b"."delivered_to_patient_date" is not null then 1 else 0 end`)
           .as('DeliveredBatches'),
+        // Treatment aligners actually delivered to the patient, net of templates
+        // (set upper/lower_aligners_count also exclude templates, so the progress
+        // numerator and denominator stay consistent). NOT total-minus-remaining:
+        // remaining_* is decremented when a batch is CREATED, not delivered.
+        eb.fn
+          .sum(
+            sql<number>`case when "b"."delivered_to_patient_date" is not null
+              then ("b"."upper_aligner_count" - case when "b"."has_upper_template" then 1 else 0 end)
+                 + ("b"."lower_aligner_count" - case when "b"."has_lower_template" then 1 else 0 end)
+              else 0 end`
+          )
+          .as('DeliveredAligners'),
         // vw_AlignerSetPayments inlined: TotalPaid / Balance / PaymentStatus.
         // All three derive from the single ip.tp paid-to-date join above.
         eb.fn.coalesce(eb.ref('ip.tp'), sql<number>`0`).$castTo<number | null>().as('TotalPaid'),
@@ -694,6 +707,7 @@ export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSet
       AlignerDoctorName: r.AlignerDoctorName,
       TotalBatches: Number(r.TotalBatches) || 0,
       DeliveredBatches: Number(r.DeliveredBatches) || 0,
+      DeliveredAligners: Number(r.DeliveredAligners) || 0,
       TotalPaid: r.TotalPaid,
       Balance: r.Balance,
       PaymentStatus: r.PaymentStatus,

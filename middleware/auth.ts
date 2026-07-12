@@ -79,6 +79,11 @@ export function authorize(allowedRoles: readonly UserRole[] = []) {
 
     const userRole = req.session.userRole;
     if (!userRole) {
+      // req.originalUrl, not req.path — under a path-scoped router.use() Express
+      // strips the mount prefix from req.path, which hides the /api/admin context.
+      log.warn(
+        `Authorization denied (no role on session) for user ${req.session.userId} on ${req.method} ${req.originalUrl}`
+      );
       return ErrorResponses.forbidden(res, 'Insufficient permissions', {
         reason: 'No role assigned to this session',
       });
@@ -90,6 +95,13 @@ export function authorize(allowedRoles: readonly UserRole[] = []) {
     }
 
     if (!allowedRoles.includes(userRole)) {
+      // Log every denial — sendError doesn't log, so these were invisible
+      // server-side. A burst of them (especially on non-API paths) is the
+      // loudest signal of a route-mount/gating regression. originalUrl, not
+      // req.path: path-scoped mounts strip their prefix from req.path.
+      log.warn(
+        `Authorization denied for ${req.method} ${req.originalUrl}: user ${req.session.userId} (role '${userRole}') requires [${allowedRoles.join(', ')}]`
+      );
       return ErrorResponses.forbidden(res, 'Insufficient permissions', {
         required: allowedRoles,
         current: userRole,
