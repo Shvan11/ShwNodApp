@@ -122,8 +122,11 @@ const PatientSets: React.FC = () => {
     // Determine if we came from doctor browse or direct search
     const isFromDoctorBrowse = doctorId !== undefined;
 
-    // Initialize patient from loader data (already validated in loader)
-    const initialPatient: Patient | null = loaderData?.patient && loaderData?.work ? {
+    // Patient view-model derived from loader data (already validated in loader).
+    // Derived, not useState: navigating patient→patient on this same route (e.g.
+    // via the Portal-Activity bell) re-runs the loader without remounting, and a
+    // useState initializer would freeze the first patient's name.
+    const patient: Patient | null = loaderData?.patient && loaderData?.work ? {
         person_id: (loaderData.patient.person_id as number) ?? 0,
         patient_name: loaderData.patient.patient_name as string | undefined,
         first_name: loaderData.patient.first_name as string | undefined,
@@ -132,8 +135,6 @@ const PatientSets: React.FC = () => {
         WorkType: loaderData.work.type_name as string | undefined,
         workid: parseInt(workId || '0'),
     } : null;
-
-    const [patient] = useState<Patient | null>(initialPatient);
     const [alignerSets, setAlignerSets] = useState<AlignerSet[]>([]);
     const [doctors, setDoctors] = useState<AlignerDoctorWithAliases[]>([]);
     const [expandedSets, setExpandedSets] = useState<Record<number, boolean>>({});
