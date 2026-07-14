@@ -23,6 +23,7 @@ const TYPE_ICON: Record<PortalActivityRow['activity_type'], string> = {
     DaysChanged: 'fa-calendar-day',
     PhotoUploaded: 'fa-camera',
     FileUploaded: 'fa-file-arrow-up',
+    CaseSubmitted: 'fa-folder-plus',
 };
 
 function relAge(iso: string): string {
@@ -149,6 +150,8 @@ const PortalActivityBell = () => {
                 return g.count === 1 ? t('portalActivity.event.fileOne', vars) : t('portalActivity.event.fileMany', vars);
             case 'DaysChanged':
                 return t('portalActivity.event.days', vars);
+            case 'CaseSubmitted':
+                return t('portalActivity.event.caseSubmitted', vars);
         }
     };
 

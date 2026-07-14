@@ -34,7 +34,8 @@
       "photoMany": "{{doctor}} uploaded {{count}} photos for {{patient}}",
       "fileOne": "{{doctor}} uploaded a file for {{patient}}",
       "fileMany": "{{doctor}} uploaded {{count}} files for {{patient}}",
-      "days": "{{doctor}} changed wear days for {{patient}}"
+      "days": "{{doctor}} changed wear days for {{patient}}",
+      "caseSubmitted": "{{doctor}} submitted a new case for {{patient}}"
     }
   },
   "user": {

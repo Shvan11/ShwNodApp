@@ -45,6 +45,10 @@ const MIME_BY_EXT: Record<string, string> = {
   gif: 'image/gif',
   heic: 'image/heic',
   heif: 'image/heif',
+  // 3D scan files (portal-submitted cases land these under sets/{id}/files/)
+  zip: 'application/zip',
+  stl: 'model/stl',
+  ply: 'model/ply',
 };
 
 function mimeFromKey(key: string): string | null {

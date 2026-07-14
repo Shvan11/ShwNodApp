@@ -34,7 +34,8 @@
       "photoMany": "{{doctor}} رفع {{count}} صور للمريض {{patient}}",
       "fileOne": "{{doctor}} رفع ملفًا للمريض {{patient}}",
       "fileMany": "{{doctor}} رفع {{count}} ملفات للمريض {{patient}}",
-      "days": "{{doctor}} غيّر أيام الارتداء للمريض {{patient}}"
+      "days": "{{doctor}} غيّر أيام الارتداء للمريض {{patient}}",
+      "caseSubmitted": "{{doctor}} أرسل حالة جديدة للمريض {{patient}}"
     }
   },
   "user": {

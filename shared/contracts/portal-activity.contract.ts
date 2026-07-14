@@ -15,8 +15,12 @@
 import { z } from 'zod';
 import { intId, timestampString, optionalPositiveIntQuery } from '../validation.js';
 
-// The widened ck_activitytype set (migrations/pg/1782800000000_…).
-export const PORTAL_ACTIVITY_TYPES = ['DaysChanged', 'DoctorNote', 'PhotoUploaded', 'FileUploaded'] as const;
+// The widened ck_activitytype set (migrations/pg/1782800000000_… + the
+// portal-case-submissions migration that adds 'CaseSubmitted'). 'CaseSubmitted'
+// is written ONLY by the service-role cases function (the portal's authenticated
+// INSERT policy deliberately still caps at the first four — a browser client
+// cannot forge a case submission); the staff bell only ever reads these rows.
+export const PORTAL_ACTIVITY_TYPES = ['DaysChanged', 'DoctorNote', 'PhotoUploaded', 'FileUploaded', 'CaseSubmitted'] as const;
 export type PortalActivityType = (typeof PORTAL_ACTIVITY_TYPES)[number];
 
 // A feed row: the flag + server-joined context (set → work → patient, doctor).
