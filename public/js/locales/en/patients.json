@@ -82,6 +82,14 @@
     "translateTitle": "Suggest an English first and last name from the Arabic name using AI",
     "save": "Save Changes",
     "saving": "Saving...",
+    "delete": {
+      "button": "Delete Patient",
+      "confirmTitle": "Confirm Delete",
+      "confirmQuestion": "Are you sure you want to delete {{name}}?",
+      "warning": "This permanently deletes the patient record and the patient's entire photo folder on the share (all photos and files). This cannot be undone.",
+      "confirm": "Delete",
+      "deleting": "Deleting…"
+    },
     "toast": {
       "nameRequired": "Patient Name is required",
       "invalidId": "Invalid patient ID",
@@ -92,7 +100,11 @@
       "enterNameFirst": "Enter the patient name first",
       "translateSuccess": "Translated — review the name and save",
       "translateFailed": "Failed to translate name",
-      "loadFailed": "Failed to load patient data"
+      "loadFailed": "Failed to load patient data",
+      "deletePending": "Submitted for admin approval",
+      "deleteSuccess": "Patient and photo folder deleted",
+      "deleteFolderWarning": "Patient deleted, but its photo folder could not be removed.",
+      "deleteFailed": "Delete failed"
     }
   },
   "view": {

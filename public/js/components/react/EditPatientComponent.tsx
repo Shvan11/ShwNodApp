@@ -4,9 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import PhoneInput from './PhoneInput';
+import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import styles from './EditPatientComponent.module.css';
 import { formatISODate } from '../../core/utils';
-import { putJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { putJSON, postJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import * as patientContract from '@shared/contracts/patient.contract';
 import { qk } from '@/query/keys';
 import {
@@ -78,6 +80,8 @@ const EditPatientComponent = ({ personId }: Props) => {
     const [saving, setSaving] = useState(false);
     const [translating, setTranslating] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     // Patient record read — populates the form via the effect below. Each
     // dropdown read is its own independent query, so one lookup failing can't
@@ -272,6 +276,42 @@ const EditPatientComponent = ({ personId }: Props) => {
         }
     };
 
+    // Delete the patient (cascade + photo folder). Mirrors the PatientManagement
+    // flow: the backend gates by role/record-age and returns outcome 'pending' when
+    // a same-day-only user's delete is routed to admin approval instead of applied.
+    const handleDeleteConfirm = async () => {
+        if (deleting) return;
+        const pid = validPersonId ?? formData.person_id;
+        if (!pid) {
+            toast.error(t('edit.toast.invalidId'));
+            return;
+        }
+        setDeleting(true);
+        try {
+            const data = await deleteJSON<{ outcome: string; folderRemoved?: boolean }>(
+                `/api/patients/${pid}`,
+                { schema: patientContract.deletePatient.response }
+            );
+            setShowDeleteConfirm(false);
+            if (data.outcome === 'pending') {
+                toast.success(t('edit.toast.deletePending'));
+                return;
+            }
+            queryClient.invalidateQueries({ queryKey: qk.patient.all(pid) });
+            if (data.folderRemoved === false) {
+                toast.warning(t('edit.toast.deleteFolderWarning'));
+            } else {
+                toast.success(t('edit.toast.deleteSuccess'));
+            }
+            // The patient no longer exists — leave the edit form for the patient list.
+            navigate('/patient-management');
+        } catch (err) {
+            toast.error(httpErrorMessage(err, t('edit.toast.deleteFailed')));
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className={styles.editPatientLoading}>
@@ -307,6 +347,14 @@ const EditPatientComponent = ({ personId }: Props) => {
 
             {/* Top action buttons */}
             <div className={styles.topActions}>
+                <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className={`btn btn-danger ${styles.deleteBtnPush}`}
+                    disabled={saving || deleting}
+                >
+                    <i className="fas fa-trash"></i> {t('edit.delete.button')}
+                </button>
                 <button
                     type="button"
                     onClick={handleCancel}
@@ -616,6 +664,33 @@ const EditPatientComponent = ({ personId }: Props) => {
                     </button>
                 </div>
             </form>
+
+            <Modal
+                isOpen={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                ariaLabelledBy="edit-patient-delete-modal-title"
+            >
+                <ModalHeader
+                    variant="danger"
+                    title={t('edit.delete.confirmTitle')}
+                    titleId="edit-patient-delete-modal-title"
+                    onClose={() => setShowDeleteConfirm(false)}
+                />
+                <div className={styles.deleteModalContent}>
+                    <p>{t('edit.delete.confirmQuestion', { name: patientData?.patient_name ?? formData.patient_name })}</p>
+                    <p className={styles.deleteModalWarning}>
+                        <i className="fas fa-exclamation-triangle"></i> {t('edit.delete.warning')}
+                    </p>
+                    <div className={styles.deleteModalActions}>
+                        <button onClick={() => setShowDeleteConfirm(false)} className="btn btn-light" disabled={deleting}>
+                            {t('common.cancel')}
+                        </button>
+                        <button onClick={handleDeleteConfirm} className="btn btn-danger" disabled={deleting}>
+                            {deleting ? t('edit.delete.deleting') : t('edit.delete.confirm')}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };
