@@ -20,6 +20,8 @@
 import { sql, type Kysely } from 'kysely';
 import { getKysely, withPgTransaction, type Database } from '../kysely.js';
 import { toDateOnly } from '../../../utils/date.js';
+import { WORK_STATUS } from '../../../shared/treatment-taxonomy.js';
+import { recomputePatientType, recomputePatientTypeForWork } from './patient-type-classifier.js';
 
 /**
  * Normalize a form-supplied numeric value for a nullable numeric column.
@@ -37,12 +39,11 @@ function numericOrNull(value: number | string | null | undefined): number | null
  * 1 = Active (ongoing treatment)
  * 2 = Finished (completed successfully)
  * 3 = Discontinued (abandoned by patient)
+ *
+ * Moved to the cross-boundary SSoT (shared/treatment-taxonomy.ts, shared with the
+ * patient-type classifier); re-exported here for the existing importers.
  */
-export const WORK_STATUS = {
-  ACTIVE: 1,
-  FINISHED: 2,
-  DISCONTINUED: 3,
-} as const;
+export { WORK_STATUS };
 
 type WorkStatusType = (typeof WORK_STATUS)[keyof typeof WORK_STATUS];
 
@@ -589,35 +590,39 @@ export async function deleteWorkDetail(
 export async function addWork(workData: WorkData): Promise<{ work_id: number } | null> {
   const status = workData.status || WORK_STATUS.ACTIVE;
 
-  const db = getKysely();
-  const inserted = await db
-    .insertInto('works')
-    .values({
-      person_id: workData.person_id,
-      // total_required / type_of_work are NOT NULL in the PG schema; the WorkData type
-      // allows them optional, so keep the legacy `?? null` runtime (PG enforces NOT NULL).
-      total_required: numOrNull(workData.total_required) as number,
-      currency: workData.currency || null,
-      type_of_work: numOrNull(workData.type_of_work) as number,
-      notes: workData.notes || null,
-      status: status,
-      start_date: (workData.start_date as string | null) || null,
-      debond_date: (workData.debond_date as string | null) || null,
-      f_photo_date: (workData.f_photo_date as string | null) || null,
-      i_photo_date: (workData.i_photo_date as string | null) || null,
-      estimated_duration: numOrNull(workData.estimated_duration),
-      dr_id: workData.dr_id,
-      notes_date: (workData.notes_date as string | null) || null,
-      keyword_id_1: numOrNull(workData.keyword_id_1),
-      keyword_id_2: numOrNull(workData.keyword_id_2),
-      keyword_id_3: numOrNull(workData.keyword_id_3),
-      keyword_id_4: numOrNull(workData.keyword_id_4),
-      keyword_id_5: numOrNull(workData.keyword_id_5),
-    })
-    .returning('work_id')
-    .executeTakeFirst();
+  // Wrapped so the insert + the derived patient-type recompute commit together.
+  return withPgTransaction(async (trx) => {
+    const inserted = await trx
+      .insertInto('works')
+      .values({
+        person_id: workData.person_id,
+        // total_required / type_of_work are NOT NULL in the PG schema; the WorkData type
+        // allows them optional, so keep the legacy `?? null` runtime (PG enforces NOT NULL).
+        total_required: numOrNull(workData.total_required) as number,
+        currency: workData.currency || null,
+        type_of_work: numOrNull(workData.type_of_work) as number,
+        notes: workData.notes || null,
+        status: status,
+        start_date: (workData.start_date as string | null) || null,
+        debond_date: (workData.debond_date as string | null) || null,
+        f_photo_date: (workData.f_photo_date as string | null) || null,
+        i_photo_date: (workData.i_photo_date as string | null) || null,
+        estimated_duration: numOrNull(workData.estimated_duration),
+        dr_id: workData.dr_id,
+        notes_date: (workData.notes_date as string | null) || null,
+        keyword_id_1: numOrNull(workData.keyword_id_1),
+        keyword_id_2: numOrNull(workData.keyword_id_2),
+        keyword_id_3: numOrNull(workData.keyword_id_3),
+        keyword_id_4: numOrNull(workData.keyword_id_4),
+        keyword_id_5: numOrNull(workData.keyword_id_5),
+      })
+      .returning('work_id')
+      .executeTakeFirst();
 
-  return inserted ? { work_id: inserted.work_id } : null;
+    if (!inserted) return null;
+    await recomputePatientType(trx, workData.person_id);
+    return { work_id: inserted.work_id };
+  });
 }
 
 export async function updateWork(
@@ -662,12 +667,23 @@ export async function updateWork(
     return { success: true, rowCount: 0 };
   }
 
+  // Presence-keyed (matching the hasOwnProperty field filter above, NOT
+  // value-changed): only the classification inputs (status / type_of_work) can
+  // move the derived patient type, so recompute only when one of them is present.
+  const affectsClassification =
+    Object.prototype.hasOwnProperty.call(updateValues, 'status') ||
+    Object.prototype.hasOwnProperty.call(updateValues, 'type_of_work');
+
   return withPgTransaction(async (trx) => {
     const result = await trx
       .updateTable('works')
       .set(updateValues as never)
       .where('work_id', '=', workId)
       .executeTakeFirst();
+
+    if (affectsClassification) {
+      await recomputePatientTypeForWork(trx, workId);
+    }
 
     return { success: true, rowCount: Number(result.numUpdatedRows) };
   });
@@ -681,6 +697,7 @@ export async function finishWork(workId: number): Promise<{ success: boolean; ro
       .where('work_id', '=', workId)
       .executeTakeFirst();
 
+    await recomputePatientTypeForWork(trx, workId);
     return { success: true, rowCount: Number(result.numUpdatedRows) };
   });
 }
@@ -695,6 +712,7 @@ export async function discontinueWork(
       .where('work_id', '=', workId)
       .executeTakeFirst();
 
+    await recomputePatientTypeForWork(trx, workId);
     return { success: true, rowCount: Number(result.numUpdatedRows) };
   });
 }
@@ -709,11 +727,22 @@ export async function reactivateWork(
       .where('work_id', '=', workId)
       .executeTakeFirst();
 
+    await recomputePatientTypeForWork(trx, workId);
     return { success: true, rowCount: Number(result.numUpdatedRows) };
   });
 }
 
-export async function addWorkWithInvoice(
+/**
+ * Insert a FINISHED work + its full-payment invoice on a CALLER-SUPPLIED executor
+ * (transaction). Extracted from addWorkWithInvoice so the intake auto-create
+ * (PatientService.createPatientWithIntake) can run the same insert inside its own
+ * patient-insert transaction — Kysely transactions don't nest, so the caller owns
+ * the `withPgTransaction`. Does NOT recompute the patient type: the caller does
+ * that once, after all of its works writes. status is hard-coded to 2 (Finished),
+ * matching the original VALUES list.
+ */
+export async function insertWorkWithInvoice(
+  trx: Kysely<Database>,
   workData: WorkData
 ): Promise<{ workId: number; invoiceId: number }> {
   const today = toDateOnly(new Date());
@@ -722,51 +751,56 @@ export async function addWorkWithInvoice(
     workData.currency === 'USD' || workData.currency === 'EUR' ? totalRequired : 0;
   const iqdReceived = workData.currency === 'IQD' ? totalRequired : 0;
 
-  // Atomic work + invoice insert (the original ran one BEGIN/COMMIT TRANSACTION batch).
-  // status is hard-coded to 2 (Finished) here, matching the original VALUES list.
-  return getKysely()
-    .transaction()
-    .execute(async (trx) => {
-      const work = await trx
-        .insertInto('works')
-        .values({
-          person_id: workData.person_id,
-          total_required: numOrNull(workData.total_required) as number,
-          currency: workData.currency || null,
-          type_of_work: numOrNull(workData.type_of_work) as number,
-          notes: workData.notes || null,
-          status: WORK_STATUS.FINISHED,
-          start_date: (workData.start_date as string | null) || null,
-          debond_date: (workData.debond_date as string | null) || null,
-          f_photo_date: (workData.f_photo_date as string | null) || null,
-          i_photo_date: (workData.i_photo_date as string | null) || null,
-          estimated_duration: numOrNull(workData.estimated_duration),
-          dr_id: workData.dr_id,
-          notes_date: (workData.notes_date as string | null) || null,
-          keyword_id_1: numOrNull(workData.keyword_id_1),
-          keyword_id_2: numOrNull(workData.keyword_id_2),
-          keyword_id_3: numOrNull(workData.keyword_id_3),
-          keyword_id_4: numOrNull(workData.keyword_id_4),
-          keyword_id_5: numOrNull(workData.keyword_id_5),
-        })
-        .returning('work_id')
-        .executeTakeFirstOrThrow();
+  const work = await trx
+    .insertInto('works')
+    .values({
+      person_id: workData.person_id,
+      total_required: numOrNull(workData.total_required) as number,
+      currency: workData.currency || null,
+      type_of_work: numOrNull(workData.type_of_work) as number,
+      notes: workData.notes || null,
+      status: WORK_STATUS.FINISHED,
+      start_date: (workData.start_date as string | null) || null,
+      debond_date: (workData.debond_date as string | null) || null,
+      f_photo_date: (workData.f_photo_date as string | null) || null,
+      i_photo_date: (workData.i_photo_date as string | null) || null,
+      estimated_duration: numOrNull(workData.estimated_duration),
+      dr_id: workData.dr_id,
+      notes_date: (workData.notes_date as string | null) || null,
+      keyword_id_1: numOrNull(workData.keyword_id_1),
+      keyword_id_2: numOrNull(workData.keyword_id_2),
+      keyword_id_3: numOrNull(workData.keyword_id_3),
+      keyword_id_4: numOrNull(workData.keyword_id_4),
+      keyword_id_5: numOrNull(workData.keyword_id_5),
+    })
+    .returning('work_id')
+    .executeTakeFirstOrThrow();
 
-      const invoice = await trx
-        .insertInto('invoices')
-        .values({
-          work_id: work.work_id,
-          amount_paid: totalRequired ?? 0,
-          date_of_payment: today,
-          usd_received: usdReceived ?? 0,
-          iqd_received: iqdReceived ?? 0,
-          change: null,
-        })
-        .returning('invoice_id')
-        .executeTakeFirstOrThrow();
+  const invoice = await trx
+    .insertInto('invoices')
+    .values({
+      work_id: work.work_id,
+      amount_paid: totalRequired ?? 0,
+      date_of_payment: today,
+      usd_received: usdReceived ?? 0,
+      iqd_received: iqdReceived ?? 0,
+      change: null,
+    })
+    .returning('invoice_id')
+    .executeTakeFirstOrThrow();
 
-      return { workId: work.work_id, invoiceId: invoice.invoice_id };
-    });
+  return { workId: work.work_id, invoiceId: invoice.invoice_id };
+}
+
+export async function addWorkWithInvoice(
+  workData: WorkData
+): Promise<{ workId: number; invoiceId: number }> {
+  // Atomic work + invoice insert + the derived patient-type recompute.
+  return withPgTransaction(async (trx) => {
+    const result = await insertWorkWithInvoice(trx, workData);
+    await recomputePatientType(trx, workData.person_id);
+    return result;
+  });
 }
 
 export async function deleteWork(
@@ -843,13 +877,25 @@ export async function deleteWork(
     };
   }
 
-  // If no dependencies, proceed with deletion
-  const result = await db.deleteFrom('works').where('work_id', '=', workId).executeTakeFirst();
+  // If no dependencies, proceed with deletion. Read the owning patient BEFORE the
+  // delete (the row is about to vanish) so we can reclassify them afterwards; the
+  // delete + the recompute commit atomically.
+  const owner = await db
+    .selectFrom('works')
+    .select('person_id')
+    .where('work_id', '=', workId)
+    .executeTakeFirst();
+
+  const rowCount = await withPgTransaction(async (trx) => {
+    const result = await trx.deleteFrom('works').where('work_id', '=', workId).executeTakeFirst();
+    if (owner) await recomputePatientType(trx, owner.person_id);
+    return Number(result.numDeletedRows);
+  });
 
   return {
     canDelete: true,
     success: true,
-    rowCount: Number(result.numDeletedRows),
+    rowCount,
   };
 }
 
@@ -1158,6 +1204,10 @@ export async function transferWork(
       .where('work_id', '=', workId)
       .execute();
 
+    // The work moved between two patients — both may cross a classification
+    // boundary (source loses it, target gains it), so reclassify both in-trx.
+    await recomputePatientType(trx, sourcePatientId);
+    await recomputePatientType(trx, targetPatientId);
   });
 
   return {

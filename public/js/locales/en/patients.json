@@ -24,6 +24,7 @@
     "language": "Language",
     "patientType": "Patient Type",
     "selectPatientType": "Select Patient Type",
+    "patientTypeDerived": "Automatically set from the patient's treatments",
     "referralSource": "Referral Source",
     "selectReferralSource": "Select Referral Source",
     "address": "Address",
@@ -45,6 +46,23 @@
     "iqd": "Iraqi Dinar (IQD)",
     "usd": "US Dollar (USD)",
     "eur": "Euro (EUR)"
+  },
+  "intake": {
+    "label": "Intake",
+    "kinds": {
+      "regular": "Regular",
+      "xray": "X-ray referral",
+      "consult": "Consult"
+    },
+    "xrayType": "X-ray Type",
+    "xrayTypes": {
+      "opg": "OPG",
+      "cbct": "CBCT",
+      "cephalo": "Cephalometric"
+    },
+    "fee": "Fee",
+    "feePlaceholder": "Amount charged",
+    "feeRequired": "Enter a fee greater than 0 for an X-ray or Consult intake."
   },
   "common": {
     "cancel": "Cancel"

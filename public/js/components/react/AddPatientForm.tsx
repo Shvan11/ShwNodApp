@@ -12,13 +12,28 @@ import { useQuery } from '@tanstack/react-query';
 import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import {
     referralSourcesQuery,
-    patientTypesQuery,
     addressesQuery,
     gendersQuery,
 } from '@/query/queries';
 import * as patientContract from '@shared/contracts/patient.contract';
+import { WORK_TYPE_IDS } from '@shared/treatment-taxonomy';
 import PhoneInput from './PhoneInput';
 import styles from './AddPatientForm.module.css';
+
+// Intake selector — Regular (no auto-work) / X-ray (imaging work) / Consult work.
+type IntakeKind = 'regular' | 'xray' | 'consult';
+
+// The three intake choices, in display order. Module-scoped so the string values
+// aren't user-facing JSX literals (labels are t()-keyed via `intake.kinds.<kind>`).
+const INTAKE_KINDS: readonly IntakeKind[] = ['regular', 'xray', 'consult'];
+
+// The three imaging work types offered by the X-ray intake (static, no fetch);
+// labels are t()-keyed. Kept here (not shared) — it's a UI presentation list.
+const XRAY_TYPE_OPTIONS = [
+    { id: WORK_TYPE_IDS.OPG, labelKey: 'intake.xrayTypes.opg' },
+    { id: WORK_TYPE_IDS.CBCT, labelKey: 'intake.xrayTypes.cbct' },
+    { id: WORK_TYPE_IDS.CEPHALO, labelKey: 'intake.xrayTypes.cephalo' },
+] as const;
 
 interface Props {
     onSuccess: (personId: number) => void;
@@ -37,7 +52,6 @@ interface FormData {
     gender: string;
     addressID: string;
     referralSourceID: string;
-    patientTypeID: string;
     language: string;
     notes: string;
     alerts: string;
@@ -58,7 +72,6 @@ interface DropdownItem {
 
 interface DropdownData {
     referralSources: DropdownItem[];
-    patientTypes: DropdownItem[];
     addresses: DropdownItem[];
     genders: DropdownItem[];
 }
@@ -91,30 +104,35 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         gender: '',
         addressID: '',
         referralSourceID: '',
-        patientTypeID: '',
         language: '0',
         notes: '',
         alerts: ''
     });
 
+    // Intake selector (basic tab). 'regular' = no auto-work; 'xray'/'consult' auto-create
+    // a FINISHED work + full-payment invoice, so the classifier types the patient at create.
+    const [intakeKind, setIntakeKind] = useState<IntakeKind>('regular');
+    const [xrayWorkTypeId, setXrayWorkTypeId] = useState<string>(String(WORK_TYPE_IDS.OPG));
+    const [intakeFee, setIntakeFee] = useState<string>('');
+    const [intakeCurrency, setIntakeCurrency] = useState<'IQD' | 'USD'>('IQD');
+
     const [loading, setLoading] = useState(false);
     const [alert, setAlert] = useState<Alert>({ show: false, message: '', type: 'danger' });
 
-    // Lookup dropdowns — loaded once via React Query.
+    // Lookup dropdowns — loaded once via React Query. (Patient type is no longer a
+    // manual pick — it's derived from works — so its lookup is gone from this form.)
     const referralSourcesQ = useQuery(referralSourcesQuery());
-    const patientTypesQ = useQuery(patientTypesQuery());
     const addressesQ = useQuery(addressesQuery());
     const gendersQ = useQuery(gendersQuery());
 
     const dropdownData: DropdownData = {
         referralSources: referralSourcesQ.data ?? [],
-        patientTypes: patientTypesQ.data ?? [],
         addresses: addressesQ.data ?? [],
         genders: gendersQ.data ?? [],
     };
 
     const dropdownError =
-        referralSourcesQ.isError || patientTypesQ.isError || addressesQ.isError || gendersQ.isError;
+        referralSourcesQ.isError || addressesQ.isError || gendersQ.isError;
 
     // Tab state for desktop view
     const [activeTab, setActiveTab] = useState('basic');
@@ -175,14 +193,34 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             return;
         }
 
+        // Intake (X-ray/Consult) requires a positive fee — the auto-work carries a
+        // full-payment invoice for it.
+        const feeNum = Number(intakeFee);
+        if (intakeKind !== 'regular' && (!Number.isFinite(feeNum) || feeNum <= 0)) {
+            showAlert(t('intake.feeRequired'));
+            return;
+        }
+
+        // Build the explicit request payload: the flat patient fields + an `intake`
+        // block ONLY when a non-regular intake is chosen (numbers coerced by the
+        // contract). The bare `formData` also carries `alerts`, which the strict
+        // create body strips.
+        const intake =
+            intakeKind === 'xray'
+                ? { kind: 'xray' as const, workTypeId: Number(xrayWorkTypeId), fee: feeNum, currency: intakeCurrency }
+                : intakeKind === 'consult'
+                    ? { kind: 'consult' as const, fee: feeNum, currency: intakeCurrency }
+                    : undefined;
+        const payload = intake ? { ...formData, intake } : formData;
+
         setLoading(true);
         hideAlert();
 
         let succeeded = false;
         try {
-            // Success body is the flat `{ success, personId, message }` (no `data`
-            // key), so the envelope unwrap is a passthrough — `personId` is read off it.
-            const result = await postJSON<{ personId: number }>('/api/patients', formData, { schema: patientContract.createPatient.response });
+            // Success body is the flat `{ success, personId, workId?, invoiceId?, message }`
+            // (no `data` key), so the envelope unwrap is a passthrough — `personId` is read off it.
+            const result = await postJSON<patientContract.CreatePatientResponse>('/api/patients', payload, { schema: patientContract.createPatient.response });
 
             succeeded = true;
             showAlert(
@@ -318,6 +356,90 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                     />
                 </div>
             </div>
+
+            {/* Intake selector — determines the patient's first work (which auto-types
+                them): Regular = none; X-ray = imaging work; Consult = consult work. */}
+            <div className={styles.formRow}>
+                <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
+                    <label className={styles.formLabel}>
+                        <i className="fas fa-clipboard-check"></i>
+                        {t('intake.label')}
+                    </label>
+                    <div className={styles.intakeRadios}>
+                        {INTAKE_KINDS.map((kind) => (
+                            <label
+                                key={kind}
+                                className={`${styles.intakeRadioLabel} ${intakeKind === kind ? styles.intakeRadioLabelActive : ''}`}
+                            >
+                                <input
+                                    type="radio"
+                                    name="intakeKind"
+                                    value={kind}
+                                    checked={intakeKind === kind}
+                                    onChange={() => setIntakeKind(kind)}
+                                />
+                                {t(`intake.kinds.${kind}`)}
+                            </label>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {intakeKind !== 'regular' && (
+                <div className={`${styles.formRow} ${styles.intakeConditional}`}>
+                    {intakeKind === 'xray' && (
+                        <div className={styles.formGroup}>
+                            <label className={styles.formLabel} htmlFor="add-xray-type">
+                                <i className="fas fa-x-ray"></i>
+                                {t('intake.xrayType')}
+                            </label>
+                            <select
+                                id="add-xray-type"
+                                value={xrayWorkTypeId}
+                                onChange={(e) => setXrayWorkTypeId(e.target.value)}
+                                className="form-control"
+                            >
+                                {XRAY_TYPE_OPTIONS.map((o) => (
+                                    <option key={o.id} value={o.id}>{t(o.labelKey)}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    <div className={styles.formGroup}>
+                        <label className={styles.formLabel} htmlFor="add-intake-fee">
+                            <i className="fas fa-money-bill"></i>
+                            {t('intake.fee')} <span className={styles.required}>*</span>
+                        </label>
+                        <input
+                            id="add-intake-fee"
+                            type="text"
+                            inputMode="numeric"
+                            value={intakeFee}
+                            onChange={(e) => {
+                                const raw = e.target.value.replace(/,/g, '');
+                                if (raw === '' || /^\d+$/.test(raw)) setIntakeFee(raw);
+                            }}
+                            className="form-control"
+                            placeholder={t('intake.feePlaceholder')}
+                        />
+                    </div>
+                    <div className={styles.formGroup}>
+                        <label className={styles.formLabel} htmlFor="add-intake-currency">
+                            <i className="fas fa-coins"></i>
+                            {t('fields.currency')}
+                        </label>
+                        <select
+                            id="add-intake-currency"
+                            value={intakeCurrency}
+                            onChange={(e) => setIntakeCurrency(e.target.value as 'IQD' | 'USD')}
+                            className="form-control"
+                        >
+                            <option value="IQD">{t('currencies.iqd')}</option>
+                            <option value="USD">{t('currencies.usd')}</option>
+                        </select>
+                    </div>
+                </div>
+            )}
         </div>
     );
 
@@ -423,30 +545,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         </div>
     );
 
-    // Render Medical Information Fields
+    // Render Medical Information Fields. (Patient type is no longer set here — it is
+    // derived from the patient's works; the intake selector on the Basic tab seeds
+    // the first work.)
     const renderMedicalInfo = () => (
         <div className={styles.tabContentSection}>
             <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                    <label className={styles.formLabel} htmlFor="add-patient-type">
-                        <i className="fas fa-user-tag"></i>
-                        {t('fields.patientType')}
-                    </label>
-                    <select
-                        id="add-patient-type"
-                        name="patientTypeID"
-                        value={formData.patientTypeID}
-                        onChange={handleInputChange}
-                        className="form-control"
-                    >
-                        <option value="">{t('fields.selectPatientType')}</option>
-                        {dropdownData.patientTypes.map(type => (
-                            <option key={type.id} value={type.id}>
-                                {type.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-referral-source">
                         <i className="fas fa-handshake"></i>

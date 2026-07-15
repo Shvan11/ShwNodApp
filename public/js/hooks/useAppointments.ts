@@ -22,6 +22,7 @@ export interface Appointment {
   person_id?: number;
   patient_name?: string;
   patient_type?: string | null;
+  patient_type_id?: number | null;
   app_date?: string | null;
   app_detail?: string | null;
   apptime?: string | null;

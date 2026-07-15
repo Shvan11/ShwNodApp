@@ -167,7 +167,8 @@ export async function getDailyAppointmentsOptimized(
     .where('a.app_day', '=', sql<string>`${dateStr}::date`)
     .select([
       'a.appointment_id', 'a.person_id', 'a.app_detail', 'a.present', 'a.seated', 'a.dismissed',
-      'a.app_date', 'a.app_cost', 'a.dr_id', 'p.patient_name', 'pt.patient_type', 'pt.patient_type_name_ar',
+      'a.app_date', 'a.app_cost', 'a.dr_id', 'p.patient_name', 'p.patient_type_id',
+      'pt.patient_type', 'pt.patient_type_name_ar',
       sql<boolean>`EXISTS(SELECT 1 FROM "alerts" al WHERE al."person_id"=p."person_id" AND al."status"='active' AND (al."expires_at" IS NULL OR al."expires_at" >= CURRENT_DATE))`.as('hasActiveAlert'),
       sql<boolean>`COALESCE((SELECT (w."type_of_work" IN (1,2,11,19,20)) FROM "works" w WHERE w."person_id"=a."person_id" AND w."status"=1 LIMIT 1), false)`.as('isOrthoVisit'),
       sql<boolean>`EXISTS(SELECT 1 FROM "works" w2 JOIN "visits" vis ON vis."work_id"=w2."work_id" WHERE w2."person_id"=a."person_id" AND vis."visit_date"=${dateStr}::date)`.as('hasVisit'),
@@ -201,6 +202,7 @@ export async function getDailyAppointmentsOptimized(
       app_detail: r.app_detail,
       app_date: r.appDate,
       patient_type: r.patient_type,
+      patient_type_id: r.patient_type_id,
       patient_type_name_ar: r.patient_type_name_ar,
       patient_name: r.patient_name,
       hasActiveAlert: r.hasActiveAlert,
@@ -228,6 +230,7 @@ export async function getDailyAppointmentsOptimized(
       app_cost: r.app_cost,
       apptime: r.apptime,
       patient_type: r.patient_type,
+      patient_type_id: r.patient_type_id,
       patient_type_name_ar: r.patient_type_name_ar,
       patient_name: r.patient_name,
       hasActiveAlert: r.hasActiveAlert,
@@ -256,11 +259,12 @@ export interface AppointmentNotificationRow {
 }
 
 /**
- * Insert an appointment (+ AppoPatientType trigger). Returns the new appointmentID.
+ * Insert an appointment. Returns the new appointmentID.
  *
  * Replaces the raw T-SQL inserts in AppointmentService (which used `CAST(.. AS datetime2)`,
- * `SCOPE_IDENTITY()` and `GETDATE()` — none valid in PG). AppoPatientType: when the new
- * appointment has a real (non-midnight) time and the patient is type 4, promote them to type 3.
+ * `SCOPE_IDENTITY()` and `GETDATE()` — none valid in PG). The legacy AppoPatientType
+ * transition (timed appointment promotes a Consult patient to New) is GONE: patient type
+ * is now derived from a patient's works by classifyPatient(), not their appointments.
  *
  * @param app_date ISO datetime string ('YYYY-MM-DDTHH:MM:SS'); bound to the `timestamp` column.
  * @param present optional 'HH:MM:SS' check-in time (quick check-in path).
@@ -272,35 +276,19 @@ export async function createAppointment(data: {
   dr_id: number | null;
   present?: string | null;
 }): Promise<number> {
-  return withPgTransaction(async (trx) => {
-    const row = await trx
-      .insertInto('appointments')
-      .values({
-        person_id: data.person_id,
-        app_date: data.app_date,
-        app_detail: data.app_detail,
-        dr_id: data.dr_id,
-        present: data.present ?? null,
-      })
-      .returning('appointment_id')
-      .executeTakeFirstOrThrow();
+  const row = await getKysely()
+    .insertInto('appointments')
+    .values({
+      person_id: data.person_id,
+      app_date: data.app_date,
+      app_detail: data.app_detail,
+      dr_id: data.dr_id,
+      present: data.present ?? null,
+    })
+    .returning('appointment_id')
+    .executeTakeFirstOrThrow();
 
-    // AppoPatientType: promote a type-4 patient to type 3 on a timed appointment.
-    const timePart = data.app_date.includes('T') ? data.app_date.split('T')[1] : data.app_date.split(' ')[1];
-    const isMidnightAppt = !timePart || /^00:00(:00)?/.test(timePart);
-    if (!isMidnightAppt) {
-      const patient = await trx
-        .selectFrom('patients')
-        .select('patient_type_id')
-        .where('person_id', '=', data.person_id)
-        .executeTakeFirst();
-      if (patient?.patient_type_id === 4) {
-        await trx.updateTable('patients').set({ patient_type_id: 3 }).where('person_id', '=', data.person_id).execute();
-      }
-    }
-
-    return row.appointment_id;
-  });
+  return row.appointment_id;
 }
 
 export interface AppointmentWithPhone {

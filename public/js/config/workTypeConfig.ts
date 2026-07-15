@@ -3,42 +3,18 @@
  * Defines features and fields for each work type
  */
 
-// Work Type IDs from tblWorkType
-export const WORK_TYPE_IDS = {
-  ORTHO_BRACES: 1,
-  ORTHO_PHASE1: 2,
-  SCALING: 3,
-  FILLING: 4,
-  ENDO: 5,
-  BLEACHING: 6,
-  EXO: 7,
-  GINGIVECTOMY: 8,
-  VENEERS: 9,
-  SURGERY: 10,
-  RELAPSE: 11,
-  RETAINER: 12,
-  OTHER: 13,
-  OPG: 14,
-  IMPLANT: 15,
-  BRIDGE: 17,
-  CBCT: 18,
-  ORTHO_ALIGNERS: 19,
-  ORTHO_MIXED: 20,
-  ALIGNER_LAB: 21,
-  CEPHALO: 22,
-} as const;
+// Work-type ids + the ortho grouping now live in the cross-boundary SSoT
+// (shared/treatment-taxonomy.ts, shared with the server + the patient-type
+// classifier). Re-exported here so existing frontend importers keep working; the
+// detail/prosthetic groupings + field configs below stay local.
+import { WORK_TYPE_IDS, ORTHO_WORK_TYPE_IDS, type WorkTypeId } from '@shared/treatment-taxonomy';
 
-export type WorkTypeId = (typeof WORK_TYPE_IDS)[keyof typeof WORK_TYPE_IDS];
+export { WORK_TYPE_IDS };
+export type { WorkTypeId };
 
-// Ortho-related work types that need visits and diagnosis
-// Note: Aligner Lab (21) is NOT included - it's lab work, not patient treatment
-export const ORTHO_WORK_TYPES: readonly WorkTypeId[] = [
-  WORK_TYPE_IDS.ORTHO_BRACES, // 1
-  WORK_TYPE_IDS.ORTHO_PHASE1, // 2
-  WORK_TYPE_IDS.RELAPSE, // 11
-  WORK_TYPE_IDS.ORTHO_ALIGNERS, // 19
-  WORK_TYPE_IDS.ORTHO_MIXED, // 20
-] as const;
+// Ortho-related work types that need visits and diagnosis (re-export under the
+// legacy name). Aligner Lab (21) is NOT included — it's lab work, not treatment.
+export const ORTHO_WORK_TYPES: readonly number[] = ORTHO_WORK_TYPE_IDS;
 
 // Work types that need detail records (work items)
 export const DETAIL_WORK_TYPES: readonly WorkTypeId[] = [

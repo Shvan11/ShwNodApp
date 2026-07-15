@@ -13,7 +13,7 @@
  * are wrapped as `sql<string>` to satisfy the static type without changing emitted SQL.
  */
 import { sql } from 'kysely';
-import { getKysely, withPgTransaction } from '../kysely.js';
+import { getKysely } from '../kysely.js';
 import { toDateOnly } from '../../../utils/date.js';
 
 // type definitions
@@ -159,57 +159,29 @@ export async function getLatestExchangeRate(): Promise<number | null> {
 export async function addInvoice(invoiceData: InvoiceData): Promise<{ invoice_id: number }[]> {
   const { workid, amountPaid, paymentDate, usdReceived, iqdReceived, change } = invoiceData;
 
-  // Wrapped so the patient_type trigger (patient-type transition on the FIRST payment for a work)
-  // commits atomically with the invoice. The old function-based overpayment CHECK
-  // (CK_MoreThanTotal: SUM(amount_paid) <= total_required) is re-enforced upstream in
-  // PaymentService.validateAndCreateInvoice — the sole caller — which rejects a payment
-  // that exceeds the remaining balance (total_required - discount - TotalPaid) before this
-  // runs. Aligner-set payments are likewise guarded in AlignerService.validateAndCreateAlignerPayment.
-  const invoice_id = await withPgTransaction(async (trx) => {
-    const row = await trx
-      .insertInto('invoices')
-      .values({
-        work_id: workid,
-        amount_paid: amountPaid,
-        date_of_payment: sql<string>`${paymentDate}`,
-        usd_received: usdReceived,
-        iqd_received: iqdReceived,
-        change: change,
-      })
-      .returning('invoice_id')
-      .executeTakeFirstOrThrow();
+  // The old function-based overpayment CHECK (CK_MoreThanTotal: SUM(amount_paid) <=
+  // total_required) is re-enforced upstream in PaymentService.validateAndCreateInvoice —
+  // the sole caller — which rejects a payment exceeding the remaining balance
+  // (total_required - discount - TotalPaid) before this runs. Aligner-set payments are
+  // likewise guarded in AlignerService.validateAndCreateAlignerPayment.
+  //
+  // No patient-type side effect: an invoice doesn't change the patient's works, and the
+  // patient type is now DERIVED from works by classifyPatient() — the legacy first-payment
+  // Active/Not-Ortho transition is gone.
+  const row = await getKysely()
+    .insertInto('invoices')
+    .values({
+      work_id: workid,
+      amount_paid: amountPaid,
+      date_of_payment: sql<string>`${paymentDate}`,
+      usd_received: usdReceived,
+      iqd_received: iqdReceived,
+      change: change,
+    })
+    .returning('invoice_id')
+    .executeTakeFirstOrThrow();
 
-    // patient_type trigger: only on the work's first invoice.
-    const cnt = await trx
-      .selectFrom('invoices')
-      .select((eb) => eb.fn.countAll<number>().as('n'))
-      .where('work_id', '=', workid)
-      .executeTakeFirst();
-
-    if (Number(cnt?.n ?? 0) === 1) {
-      const work = await trx
-        .selectFrom('works')
-        .select(['person_id', 'type_of_work'])
-        .where('work_id', '=', workid)
-      .executeTakeFirst();
-      if (work) {
-        const patient = await trx
-          .selectFrom('patients')
-          .select('patient_type_id')
-          .where('person_id', '=', work.person_id)
-          .executeTakeFirst();
-        const typ = patient?.patient_type_id ?? null;
-        if (typ === 3 || typ === 4 || typ === 5 || typ === 6) {
-          const newType = work.type_of_work === 1 ? 1 : 5;
-          await trx.updateTable('patients').set({ patient_type_id: newType }).where('person_id', '=', work.person_id).execute();
-        }
-      }
-    }
-
-    return row.invoice_id;
-  });
-
-  return [{ invoice_id }];
+  return [{ invoice_id: row.invoice_id }];
 }
 
 /**

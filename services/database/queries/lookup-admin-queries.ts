@@ -148,18 +148,11 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
       },
     ],
   },
-  tblPatientType: {
-    tableName: 'patient_types',
-    idColumn: 'id',
-    displayColumn: 'patient_type',
-    displayName: 'Patient Types',
-    icon: 'fas fa-user-tag',
-    idType: 'int',
-    columns: [
-      { name: 'patient_type', label: 'Patient type', type: 'varchar', maxLength: 50, required: false },
-      { name: 'patient_type_name_ar', label: 'Patient type (Arabic)', type: 'nvarchar', maxLength: 50, required: false },
-    ],
-  },
+  // NB: patient_types is intentionally NOT a managed lookup — its ids are now
+  // code-coupled to the works-derived classifier (shared/treatment-taxonomy.ts).
+  // Staff CRUD on those rows would corrupt classifyPatient(), so the table is
+  // excluded from LOOKUP_TABLE_CONFIG (and the Lookups admin UI). The read-only
+  // GET /api/patient-types feed still exists for display + the search filter.
   tblTagOptions: {
     tableName: 'tag_options',
     idColumn: 'id',

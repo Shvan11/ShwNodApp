@@ -111,6 +111,11 @@ const EditPatientComponent = ({ personId }: Props) => {
     const patientTypes: PatientType[] = patientTypesData ?? [];
     const tags: Tag[] = tagsData ?? [];
 
+    // Derived patient-type label for the read-only display (id→name map). Empty when
+    // the type isn't set/loaded yet.
+    const patientTypeLabel =
+        patientTypes.find((pt) => String(pt.id) === String(formData.patient_type_id))?.name ?? '';
+
     // Loading screen shows only while the patient record is in flight (a missing
     // personId resolves immediately to "not loading").
     const loading = !!personId && patientLoading;
@@ -563,19 +568,17 @@ const EditPatientComponent = ({ personId }: Props) => {
                 <div className={styles.formRow}>
                     <div className={styles.formGroup}>
                         <label htmlFor="edit-patient-type-id">{t('fields.patientType')}</label>
-                        <select
+                        {/* Read-only: patient type is DERIVED from the patient's works
+                            (classifyPatient) — no longer a manual pick. Shown for context. */}
+                        <input
                             id="edit-patient-type-id"
+                            type="text"
                             className="form-control"
-                            value={formData.patient_type_id}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, patient_type_id: e.target.value})}
-                        >
-                            <option value="">{t('fields.selectPatientType')}</option>
-                            {patientTypes.map(type => (
-                                <option key={type.id} value={type.id}>
-                                    {type.name}
-                                </option>
-                            ))}
-                        </select>
+                            value={patientTypeLabel}
+                            readOnly
+                            disabled
+                            title={t('fields.patientTypeDerived')}
+                        />
                     </div>
                     <div className={styles.formGroup}>
                         <label htmlFor="edit-tag-id">{t('fields.tag')}</label>

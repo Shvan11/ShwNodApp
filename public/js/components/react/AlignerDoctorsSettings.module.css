@@ -64,25 +64,40 @@
     cursor: not-allowed;
 }
 
-/* Doctor Form Container */
-.formContainer {
-    background: var(--gray-50);
-    border: 2px solid var(--gray-200);
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.formHeader {
-    margin-bottom: 1.5rem;
-}
-
-.formHeader h3 {
-    color: var(--primary-color);
-    font-size: 1.3rem;
+/* Aligner Doctor Modal - content styles; overlay + portal handled by <Modal> */
+.modal {
+    background: var(--surface);
+    margin: 0;
+    padding: 0;
+    border-radius: var(--radius-xl);
+    width: 90%;
+    max-width: 600px;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-light);
+    animation: modalSlideIn 0.3s var(--easing-ease-out);
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modalBody {
+    padding: var(--spacing-xl);
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
 }
 
 .form {
@@ -130,13 +145,16 @@
     border-color: var(--primary-color);
 }
 
-/* Form actions */
-.formActions {
+/* Modal footer actions */
+.modalFooter {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-top: 1px solid var(--border-light);
     display: flex;
-    gap: 1rem;
     justify-content: flex-end;
-    padding-top: 1rem;
-    border-top: 1px solid var(--gray-200);
+    gap: var(--spacing-md);
+    background: var(--surface-elevated);
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+    flex-shrink: 0;
 }
 
 .btnCancel {
@@ -425,8 +443,20 @@
         max-width: 150px;
     }
 
-    .formActions {
+    .modal {
+        width: 95%;
+        margin: 0;
+    }
+
+    .modalBody {
+        padding: var(--spacing-md);
+    }
+
+    .modalFooter {
         flex-direction: column;
+        gap: var(--spacing-sm);
+        padding: var(--spacing-md);
+        border-radius: 0 0 var(--radius-xl) var(--radius-xl);
     }
 
     .btnCancel,

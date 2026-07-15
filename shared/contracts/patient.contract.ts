@@ -31,6 +31,7 @@
 import { z } from 'zod';
 import { idParams, numericParam, intId, optionalDateString, dateString, timestampString } from '../validation.js';
 import { withPendingOutcome } from './approvals.contract.js';
+import { XRAY_WORK_TYPE_IDS } from '../treatment-taxonomy.js';
 
 /** A `<select>`-backed id on the CREATE body: '' (nothing chosen) → undefined (so
  *  the service's `toInt` yields NULL, not 0); a chosen value (form string / number)
@@ -275,7 +276,33 @@ export const deleteTimepoint = {
 // PATIENT CRUD
 // ===========================================================================
 
-// POST /api/patients — fully enumerated (camelCase, ids→number) → { personId }.
+/** Intake selector (basic tab). The front-desk choice on a NEW patient:
+ *  - 'xray'    → auto-creates a FINISHED imaging work (14/18/22) + full-payment invoice
+ *  - 'consult' → auto-creates a FINISHED Consult work (23) + invoice
+ *  (absent = 'Regular', no auto-work.) The auto-work's dr_id = the 'Clinic'
+ *  pseudo-doctor. Fees arrive as form strings → z.coerce.number(); the currency
+ *  drives the invoice's usd/iqd split. patient_type is DERIVED afterwards. */
+const intakeSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('xray'),
+    // Restricted to the imaging work types (OPG/CBCT/Cephalo); form sends a string id.
+    workTypeId: z.coerce
+      .number()
+      .refine((v) => XRAY_WORK_TYPE_IDS.includes(v), { message: 'workTypeId must be an x-ray work type' }),
+    fee: z.coerce.number().positive('Fee must be greater than 0'),
+    currency: z.enum(['IQD', 'USD', 'EUR']),
+  }),
+  z.object({
+    kind: z.literal('consult'),
+    fee: z.coerce.number().positive('Fee must be greater than 0'),
+    currency: z.enum(['IQD', 'USD', 'EUR']),
+  }),
+]);
+export type PatientIntake = z.infer<typeof intakeSchema>;
+
+// POST /api/patients — fully enumerated (camelCase, ids→number). `patientTypeID` is
+// GONE (type is derived from works); an optional `intake` auto-creates the first work.
+// → { personId, workId?, invoiceId? } (the ids present only on an intake create).
 export const createPatient = {
   body: z.object({
     patientName: z.string().min(1, 'Patient name is required'),
@@ -288,17 +315,22 @@ export const createPatient = {
     gender: optionalSelectId,
     addressID: optionalSelectId,
     referralSourceID: optionalSelectId,
-    patientTypeID: optionalSelectId,
     tagID: optionalSelectId,
     notes: z.string().optional(),
     language: z.string().optional(),
     countryCode: z.string().optional(),
     estimatedCost: optionalSelectAmount,
     currency: z.string().optional(),
+    intake: intakeSchema.optional(),
   }),
-  response: z.object({ personId: z.number() }),
+  response: z.object({
+    personId: z.number(),
+    workId: z.number().optional(),
+    invoiceId: z.number().optional(),
+  }),
 } as const;
 export type CreatePatientBody = z.infer<typeof createPatient.body>;
+export type CreatePatientResponse = z.infer<typeof createPatient.response>;
 
 // PUT /api/patients/:personId — fully enumerated (snake_case, ids stay strings:
 // spread straight into UpdatePatientData → toInt). sendSuccess(null), no resp key.
@@ -314,7 +346,8 @@ export const updatePatient = {
     gender: z.string().optional(),
     address_id: z.string().optional(),
     referral_source_id: z.string().optional(),
-    patient_type_id: z.string().optional(),
+    // patient_type_id removed — derived from works. A plain z.object strips it if an
+    // older client still posts it (patientByIdRow keeps it for read-only display).
     tag_id: z.string().optional(),
     notes: z.string().optional(),
     language: z.string().optional(),

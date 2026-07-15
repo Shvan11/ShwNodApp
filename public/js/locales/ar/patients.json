@@ -24,6 +24,7 @@
     "language": "اللغة",
     "patientType": "نوع المريض",
     "selectPatientType": "اختر نوع المريض",
+    "patientTypeDerived": "يُحدَّد تلقائيًا من علاجات المريض",
     "referralSource": "مصدر الإحالة",
     "selectReferralSource": "اختر مصدر الإحالة",
     "address": "العنوان",
@@ -45,6 +46,23 @@
     "iqd": "الدينار العراقي (IQD)",
     "usd": "الدولار الأمريكي (USD)",
     "eur": "اليورو (EUR)"
+  },
+  "intake": {
+    "label": "نوع الاستقبال",
+    "kinds": {
+      "regular": "عادي",
+      "xray": "إحالة أشعة",
+      "consult": "استشارة"
+    },
+    "xrayType": "نوع الأشعة",
+    "xrayTypes": {
+      "opg": "OPG",
+      "cbct": "CBCT",
+      "cephalo": "أشعة سيفالومترية"
+    },
+    "fee": "الرسوم",
+    "feePlaceholder": "المبلغ المستحق",
+    "feeRequired": "أدخل رسومًا أكبر من 0 لاستقبال الأشعة أو الاستشارة."
   },
   "common": {
     "cancel": "إلغاء"

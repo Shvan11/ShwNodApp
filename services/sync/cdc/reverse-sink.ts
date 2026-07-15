@@ -23,7 +23,8 @@
  */
 import pg from 'pg';
 import type { Pool } from 'pg';
-import { getPgPool } from '../../database/kysely.js';
+import { getPgPool, getKysely } from '../../database/kysely.js';
+import { recomputePatientType } from '../../database/queries/patient-type-classifier.js';
 import config from '../../../config/config.js';
 import { log } from '../../../utils/logger.js';
 import {
@@ -178,11 +179,53 @@ export class ReverseSink implements SyncSink {
       `INSERT INTO ${qIdent(table)} (${colList}) VALUES (${placeholders}) ${conflict}`,
       cols.map((c) => row[c])
     );
+
+    // A portal works change (new case / edit) arrived via reverse CDC, bypassing the
+    // query-layer classifier hooks. Reclassify the owning patient — person_id is already
+    // in the fetched Supabase row.
+    if (table === 'works') {
+      await this.recomputeWorksPatientType(row['person_id']);
+    }
   }
 
   async remove(table: string, pk: string): Promise<void> {
     const pkCol = await this.pkFor(table);
     if (!pkCol) return;
+    // For a works delete, capture the owning patient BEFORE the local DELETE (the row
+    // is about to vanish) so we can reclassify them afterwards.
+    let worksPersonId: unknown = null;
+    if (table === 'works') {
+      const owner = await getKysely()
+        .selectFrom('works')
+        .select('person_id')
+        .where('work_id', '=', Number(pk))
+        .executeTakeFirst();
+      worksPersonId = owner?.person_id ?? null;
+    }
     await this.applyLocal(`DELETE FROM ${qIdent(table)} WHERE ${qIdent(pkCol)} = $1`, [pk]);
+    if (table === 'works' && worksPersonId != null) {
+      await this.recomputeWorksPatientType(worksPersonId);
+    }
+  }
+
+  /**
+   * Recompute a patient's derived type after a reverse works upsert/delete. Runs on the
+   * NORMAL app pool via getKysely() — NOT the reverse write pool — so it carries no
+   * `app.cdc_origin='reverse'` tag: set_updated_at + cdc_capture fire and the new
+   * patient_type_id forwards to the mirror on the next forward drain. Log-only: never
+   * throw into the drain loop (idempotent + at-least-once safe; the backfill is the
+   * correctness backstop).
+   */
+  private async recomputeWorksPatientType(personIdRaw: unknown): Promise<void> {
+    const personId = Number(personIdRaw);
+    if (!Number.isFinite(personId) || personId <= 0) return;
+    try {
+      await recomputePatientType(getKysely(), personId);
+    } catch (e) {
+      log.error('[cdc:reverse] patient-type recompute failed', {
+        personId,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
   }
 }

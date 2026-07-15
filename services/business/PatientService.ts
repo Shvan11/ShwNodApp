@@ -12,7 +12,13 @@
  */
 
 import { log } from '../../utils/logger.js';
-import { getInfos, deletePatient } from '../database/queries/patient-queries.js';
+import { getInfos, deletePatient, insertPatientRow, type PatientData } from '../database/queries/patient-queries.js';
+import { insertWorkWithInvoice } from '../database/queries/work-queries.js';
+import { recomputePatientType } from '../database/queries/patient-type-classifier.js';
+import { getKysely, withPgTransaction } from '../database/kysely.js';
+import { WORK_TYPE_IDS } from '../../shared/treatment-taxonomy.js';
+import type { PatientIntake } from '../../shared/contracts/patient.contract.js';
+import { toDateOnly } from '../../utils/date.js';
 import {
   getTimePoints,
   getTimePointImgs,
@@ -270,6 +276,78 @@ export async function getPatientPayments(
     log.error(`Error fetching payments for patient ${pid}:`, { error: error instanceof Error ? error.message : String(error) });
     throw new Error('Failed to fetch patient payments', { cause: error });
   }
+}
+
+/**
+ * Thrown when an intake create needs the 'Clinic' pseudo-doctor but no active one
+ * exists. The route maps its `code` to a 422 with an actionable message rather than
+ * a generic 500 — the fix is a deployment/config action, not a client retry.
+ */
+export class IntakeConfigError extends Error {
+  public readonly code = 'CLINIC_DOCTOR_MISSING' as const;
+  constructor(message: string) {
+    super(message);
+    this.name = 'IntakeConfigError';
+  }
+}
+
+/**
+ * Resolve the 'Clinic' pseudo-doctor's employee id (the dr_id stamped on auto-created
+ * intake works). `employee_name` is citext, so the match is case-insensitive — the
+ * same by-name convention the appointment form uses. Missing → typed 422.
+ */
+async function resolveClinicDoctorId(): Promise<number> {
+  const row = await getKysely()
+    .selectFrom('employees')
+    .select('id')
+    .where('employee_name', '=', 'Clinic')
+    .where('is_active', '=', true)
+    .executeTakeFirst();
+  if (!row) {
+    throw new IntakeConfigError(
+      "This intake needs an active employee named 'Clinic' (the pseudo-doctor for X-ray/Consult intake works). Create one in Settings → Employees, then try again."
+    );
+  }
+  return row.id;
+}
+
+/**
+ * Create a patient and, when an intake selector value is supplied, auto-create the
+ * matching FINISHED intake work (X-ray imaging or Consult) + its full-payment invoice
+ * — all in ONE transaction, so a duplicate name or any failure rolls the whole thing
+ * back (no orphan work/invoice). The derived patient type is recomputed from the new
+ * work inside the same txn (classifyPatient). A 'Regular' intake (none) just inserts
+ * the patient, seeded NEW_NO_WORKS by insertPatientRow.
+ */
+export async function createPatientWithIntake(
+  patientData: PatientData,
+  intake?: PatientIntake
+): Promise<{ personId: number; workId?: number; invoiceId?: number }> {
+  // Resolve the Clinic pseudo-doctor BEFORE opening the txn so a misconfigured
+  // deployment fails fast with an actionable 422 (only needed for an intake work).
+  const clinicId = intake ? await resolveClinicDoctorId() : null;
+
+  return withPgTransaction(async (trx) => {
+    const { personId } = await insertPatientRow(trx, patientData);
+
+    if (!intake || clinicId == null) {
+      return { personId };
+    }
+
+    const { workId, invoiceId } = await insertWorkWithInvoice(trx, {
+      person_id: personId,
+      type_of_work: intake.kind === 'xray' ? intake.workTypeId : WORK_TYPE_IDS.CONSULT,
+      total_required: intake.fee,
+      currency: intake.currency,
+      dr_id: clinicId,
+      start_date: toDateOnly(new Date()),
+    });
+
+    // Derive + materialize the patient type from the just-created intake work.
+    await recomputePatientType(trx, personId);
+
+    return { personId, workId, invoiceId };
+  });
 }
 
 /**

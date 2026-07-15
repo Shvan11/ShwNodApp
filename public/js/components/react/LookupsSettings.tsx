@@ -90,7 +90,9 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
         {
             name: 'Patient Information',
             icon: 'fas fa-user',
-            keys: ['tblPatientType', 'tblTagOptions', 'tblReferrals', 'tblAddress', 'tblAlertTypes']
+            // patient_types is deliberately absent — its ids are code-coupled to the
+            // works-derived classifier, so it's no longer staff-editable.
+            keys: ['tblTagOptions', 'tblReferrals', 'tblAddress', 'tblAlertTypes']
         },
         {
             name: 'Templates',

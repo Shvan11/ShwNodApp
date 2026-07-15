@@ -14,6 +14,7 @@ import type { Transaction } from 'kysely';
 import { getKysely, withPgTransaction, type Database } from '../kysely.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { getActiveWID } from './patient-queries.js';
+import { recomputePatientType, recomputePatientTypeForWork } from './patient-type-classifier.js';
 
 // type definitions
 interface VisitSummary {
@@ -126,23 +127,25 @@ function buildVisitSummary(v: {
 
 /**
  * Set the work's f_photo_date + mark it finished (status=2). Folds in trigPTypeandFinished:
- * when f_photo_date transitions from NULL to a value, also delete the patient's carried wires and,
- * for orthodontic work (type_of_work=1), set the patient type to 2 (finished ortho).
+ * when f_photo_date transitions from NULL to a value, also delete the patient's carried wires.
+ * The derived patient type is then recomputed centrally (classifyPatient) — the old hardcoded
+ * "ortho work finished → patient_type_id=2" write is gone.
  */
 async function markWorkFinished(trx: Transaction<Database>, workId: number, visitDate: string): Promise<void> {
   const w = await trx
     .selectFrom('works')
-    .select(['f_photo_date', 'person_id', 'type_of_work'])
+    .select(['f_photo_date', 'person_id'])
     .where('work_id', '=', workId)
     .executeTakeFirst();
   const wasNull = !w?.f_photo_date;
   await trx.updateTable('works').set({ f_photo_date: visitDate, status: 2 }).where('work_id', '=', workId).execute();
   if (wasNull && w) {
     await trx.deleteFrom('carried_wires').where('person_id', '=', w.person_id).execute();
-    if (w.type_of_work === 1) {
-      await trx.updateTable('patients').set({ patient_type_id: 2 }).where('person_id', '=', w.person_id).execute();
-    }
   }
+  // Recompute UNCONDITIONALLY: this always flips the work to status=2, and a re-tick
+  // on a reactivated work has wasNull=false but still moves the classification
+  // (status 1→2). No-op guard inside recomputePatientType handles unchanged cases.
+  if (w) await recomputePatientType(trx, w.person_id);
 }
 
 // ── tblwork photo roll-up (replaces the PhotoInsert / MyTrigger / PhotoDelete triggers) ──
@@ -176,6 +179,8 @@ async function applyPhotoUpdate(
     await markWorkFinished(trx, workId, visitDate);
   } else if (oldF.f_photo && !newF.f_photo) {
     await trx.updateTable('works').set({ f_photo_date: null, status: 1 }).where('work_id', '=', workId).execute();
+    // Un-ticking the final photo reactivates the work (status 1) → reclassify.
+    await recomputePatientTypeForWork(trx, workId);
   }
   if (!oldF.appliance_removed && newF.appliance_removed) {
     await trx.updateTable('works').set({ debond_date: visitDate }).where('work_id', '=', workId).execute();
@@ -191,7 +196,11 @@ async function applyPhotoDelete(
   f: PhotoFlags
 ): Promise<void> {
   if (f.i_photo) await trx.updateTable('works').set({ i_photo_date: null }).where('work_id', '=', workId).execute();
-  if (f.f_photo) await trx.updateTable('works').set({ f_photo_date: null, status: 1 }).where('work_id', '=', workId).execute();
+  if (f.f_photo) {
+    await trx.updateTable('works').set({ f_photo_date: null, status: 1 }).where('work_id', '=', workId).execute();
+    // Deleting a final-photo visit reactivates the work (status 1) → reclassify.
+    await recomputePatientTypeForWork(trx, workId);
+  }
   if (f.appliance_removed) await trx.updateTable('works').set({ debond_date: null }).where('work_id', '=', workId).execute();
 }
 

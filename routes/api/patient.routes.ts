@@ -17,7 +17,6 @@ import { isUniqueViolation } from '../../utils/pg-errors.js';
 import { getKysely } from '../../services/database/kysely.js';
 import {
   getPatientsPhones,
-  createPatient,
   getPatientById,
   updatePatient,
   hasNextAppointment
@@ -44,7 +43,7 @@ import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-respons
 import { validate } from '../../middleware/validate.js';
 import * as patientContract from '../../shared/contracts/patient.contract.js';
 import * as PatientService from '../../services/business/PatientService.js';
-import { PatientValidationError, deletePatientCascade } from '../../services/business/PatientService.js';
+import { PatientValidationError, IntakeConfigError, deletePatientCascade } from '../../services/business/PatientService.js';
 import { enqueueApproval } from '../../services/approvals/approval-service.js';
 import { transliterateNameToEnglish, transliterateNameForBackfill } from '../../services/business/name-transliteration.js';
 import * as PatientPortalService from '../../services/business/PatientPortalService.js';
@@ -998,7 +997,9 @@ router.post(
         return;
       }
 
-      // Trim string values and prepare data for createPatient
+      // Trim string values and prepare data for createPatientWithIntake. patientTypeID
+      // is GONE — patient type is derived from works; the optional `intake` selector
+      // (X-ray/Consult) auto-creates the patient's first work + invoice.
       const processedData: {
         patientName: string;
         firstName?: string;
@@ -1010,7 +1011,6 @@ router.post(
         gender?: number;
         addressID?: number;
         referralSourceID?: number;
-        patientTypeID?: number;
         tagID?: number;
         notes?: string;
         language?: string;
@@ -1030,7 +1030,6 @@ router.post(
         gender: patientData.gender,
         addressID: patientData.addressID,
         referralSourceID: patientData.referralSourceID,
-        patientTypeID: patientData.patientTypeID,
         tagID: patientData.tagID,
         notes: patientData.notes?.trim() || undefined,
         language: patientData.language?.trim() || undefined,
@@ -1039,10 +1038,15 @@ router.post(
         currency: patientData.currency?.trim() || undefined
       };
 
-      // Create the patient
-      const result = await createPatient(processedData);
+      // Create the patient (+ intake work/invoice when an intake selector is set).
+      const result = await PatientService.createPatientWithIntake(processedData, patientData.intake);
 
-      sendData(res, patientContract.createPatient.response, { personId: result.personId }, 'Patient created successfully');
+      sendData(
+        res,
+        patientContract.createPatient.response,
+        { personId: result.personId, workId: result.workId, invoiceId: result.invoiceId },
+        'Patient created successfully'
+      );
 
       // English first/last not supplied → auto-fill by romanizing the Arabic patientName
       // with Gemini, AFTER responding so the create request never blocks on the API call.
@@ -1079,6 +1083,14 @@ router.post(
           code: 'DUPLICATE_PATIENT_NAME',
           existingPatientId: err.existingPatientId
         });
+        return;
+      }
+
+      // Intake requested but the 'Clinic' pseudo-doctor is missing → actionable 422
+      // (a deployment/config fix, not a client retry).
+      if (error instanceof IntakeConfigError) {
+        log.warn('Intake create blocked: Clinic pseudo-doctor missing');
+        ErrorResponses.unprocessable(res, error.message, { code: error.code });
         return;
       }
 

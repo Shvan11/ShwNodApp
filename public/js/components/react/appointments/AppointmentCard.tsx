@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../../hooks/useLocalizedName';
+import { PATIENT_TYPE_IDS } from '@shared/treatment-taxonomy';
 import type { DoctorColor } from '../calendar.types';
 import styles from './AppointmentCard.module.css';
 
@@ -11,6 +12,7 @@ export interface DailyAppointment {
     dr_id?: number | null;
     patient_name?: string;
     patient_type?: string | null;
+    patient_type_id?: number | null;
     patient_type_name_ar?: string | null;
     Phone?: string | null;
     apptime?: string | null;
@@ -265,10 +267,11 @@ const AppointmentCard = ({
                         {appointment.hasActiveAlert && (
                             <i className={`fas fa-bell ${styles.alertIcon}`} title={t('card.activeAlert')}></i>
                         )}
-                        {/* "Active" is the overwhelming default — badging it on every
-                            row is noise. Only surface the exceptional types (New,
-                            Walk in, …). */}
-                        {appointment.patient_type && appointment.patient_type.toLowerCase() !== 'active' && (
+                        {/* Active Ortho is the overwhelming default — badging it on
+                            every row is noise. Hide it by TYPE ID (rename-proof), and
+                            surface every other type (X-ray, Consult, Former Patient,
+                            Aligner Lab, Active Non-Ortho, …). */}
+                        {appointment.patient_type && appointment.patient_type_id !== PATIENT_TYPE_IDS.ACTIVE_ORTHO && (
                             <span className={styles.patientTypeBadge}>
                                 <i className="fas fa-tag"></i>
                                 {localizedName(appointment.patient_type, appointment.patient_type_name_ar)}

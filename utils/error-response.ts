@@ -160,6 +160,11 @@ export const ErrorResponses = {
   conflict: (res: Response, error: string, details: Record<string, unknown> | null = null) =>
     sendError(res, 409, error, details),
 
+  // 422 Unprocessable Entity — the request is well-formed but a required server-side
+  // precondition isn't met (e.g. the 'Clinic' pseudo-doctor is missing).
+  unprocessable: (res: Response, error: string, details: Record<string, unknown> | null = null) =>
+    sendError(res, 422, error, details),
+
   // 500 Internal Server Error
   internalError: (res: Response, error: string = 'Internal server error', details: Error | Record<string, unknown> | null = null) =>
     sendError(res, 500, error, details),

@@ -5,6 +5,8 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { alignerDoctorsAdminQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
+import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import styles from './AlignerDoctorsSettings.module.css';
 import type { AlignerDoctor } from '../../pages/aligner/aligner.types';
 
@@ -150,15 +152,20 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
                 </button>
             </div>
 
-            {showAddForm && (
-                <div className={styles.formContainer}>
-                    <div className={styles.formHeader}>
-                        <h3>
-                            <i className={editingId ? 'fas fa-edit' : 'fas fa-plus'}></i>
-                            {editingId ? 'Edit Doctor' : 'Add New Doctor'}
-                        </h3>
-                    </div>
-                    <form onSubmit={handleSubmit} className={styles.form}>
+            <Modal
+                isOpen={showAddForm}
+                onClose={handleCancel}
+                contentClassName={styles.modal}
+                ariaLabelledBy="aligner-doctor-modal-title"
+            >
+                <ModalHeader
+                    titleId="aligner-doctor-modal-title"
+                    icon={<i className={editingId ? 'fas fa-edit' : 'fas fa-plus'} />}
+                    title={editingId ? 'Edit Doctor' : 'Add New Doctor'}
+                    onClose={handleCancel}
+                />
+                <form onSubmit={handleSubmit} className={styles.form}>
+                    <div className={styles.modalBody}>
                         <div className={styles.formGroup}>
                             <label htmlFor="DoctorName">
                                 Doctor Name <span className={styles.required}>*</span>
@@ -207,20 +214,20 @@ const AlignerDoctorsSettings = ({ onChangesUpdate: _onChangesUpdate }: AlignerDo
                                 placeholder="C:\Aligner_Sets\Labels\logo.png"
                             />
                         </div>
+                    </div>
 
-                        <div className={styles.formActions}>
-                            <button type="button" onClick={handleCancel} className={styles.btnCancel}>
-                                <i className="fas fa-times"></i>
-                                Cancel
-                            </button>
-                            <button type="submit" className={styles.btnSave}>
-                                <i className="fas fa-save"></i>
-                                {editingId ? 'Update Doctor' : 'Add Doctor'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
+                    <div className={styles.modalFooter}>
+                        <button type="button" onClick={handleCancel} className={styles.btnCancel}>
+                            <i className="fas fa-times"></i>
+                            Cancel
+                        </button>
+                        <button type="submit" className={styles.btnSave}>
+                            <i className="fas fa-save"></i>
+                            {editingId ? 'Update Doctor' : 'Add Doctor'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
 
             <div className={styles.list}>
                 {doctors.length === 0 ? (

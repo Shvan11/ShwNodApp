@@ -8,11 +8,11 @@ import { getTimePointImgs } from '../database/queries/timepoint-queries.js';
 import { getLatestVisitsSum } from '../database/queries/visit-queries.js';
 import { getActiveWork } from '../database/queries/work-queries.js';
 import { getPatientById } from '../database/queries/patient-queries.js';
+import { ORTHO_WORK_TYPE_IDS } from '../../shared/treatment-taxonomy.js';
 import { log } from '../../utils/logger.js';
 
-// Mirror of public/js/config/workTypeConfig.ts ORTHO_WORK_TYPES — visit notes
-// only show for active orthodontic work on the chair-side display.
-const ORTHO_WORK_TYPE_IDS: ReadonlySet<number> = new Set([1, 2, 11, 19, 20]);
+// Visit notes only show for active orthodontic work on the chair-side display.
+const ORTHO_WORK_TYPE_SET: ReadonlySet<number> = new Set(ORTHO_WORK_TYPE_IDS);
 const CHAIR_DISPLAY_INTRAORAL_EXTS = ['.i20', '.i22', '.i21'] as const;
 
 export interface ChairPatientPayload {
@@ -51,7 +51,7 @@ export async function buildChairPatientPayload(
     });
 
     const activeWork = await getActiveWork(personId);
-    const isOrtho = !!(activeWork && ORTHO_WORK_TYPE_IDS.has(activeWork.type_of_work as number));
+    const isOrtho = !!(activeWork && ORTHO_WORK_TYPE_SET.has(activeWork.type_of_work as number));
     const [latestVisit, patientRecord] = await Promise.all([
       isOrtho ? getLatestVisitsSum(personId) : Promise.resolve(null),
       getPatientById(personId),

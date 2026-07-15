@@ -8,15 +8,16 @@
  * "latest future appointment" subquery. `patient_name`/`currency`/`country_code` are
  * `citext`, so the duplicate-name check stays case-insensitive (matches Arabic_CI_AS).
  */
-import { sql } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import * as readline from 'node:readline';
-import { getKysely, withPgTransaction } from '../kysely.js';
+import { getKysely, withPgTransaction, type Database } from '../kysely.js';
 import { patientPath } from '../../files/clinic-paths.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 import { isUniqueViolation } from '../../../utils/pg-errors.js';
+import { PATIENT_TYPE_IDS } from '../../../shared/treatment-taxonomy.js';
 
 // The `genders` lookup table was dissolved (immutable Male/Female domain, enforced by the
 // existing CHECK on patients.gender). The int→label mapping lives here; any UI translation
@@ -79,7 +80,7 @@ type PatientPhone = {
   phone: string | null;
 };
 
-interface PatientData {
+export interface PatientData {
   patientName: string;
   phone?: string;
   firstName?: string;
@@ -90,7 +91,8 @@ interface PatientData {
   email?: string;
   addressID?: string | number;
   referralSourceID?: string | number;
-  patientTypeID?: string | number;
+  // patient_type is DERIVED from works (classifyPatient), never picked on create —
+  // a new patient is seeded NEW_NO_WORKS and reclassified after any intake work.
   notes?: string;
   language?: string | number;
   countryCode?: string;
@@ -146,7 +148,7 @@ interface UpdatePatientData {
   gender?: string | number;
   address_id?: string | number;
   referral_source_id?: string | number;
-  patient_type_id?: string | number;
+  // patient_type_id is DERIVED from works (classifyPatient) — not editable here.
   notes?: string;
   language?: string | number;
   country_code?: string;
@@ -434,22 +436,27 @@ export async function getActiveWID(PID: number): Promise<number | null> {
 }
 
 /**
- * Creates a new patient record in the database.
+ * Insert a patient row on a CALLER-SUPPLIED executor. Extracted from createPatient so
+ * the intake auto-create (PatientService.createPatientWithIntake) can run it inside the
+ * same transaction as its intake work — a duplicate name then rolls the whole intake
+ * back, so no orphan work/invoice is left behind.
+ *
+ * `patient_type_id` is seeded to NEW_NO_WORKS: patient type is DERIVED from works
+ * (classifyPatient) from here on, recomputed after any intake work — never picked here.
+ *
+ * Duplicate names are rejected by the unique index ix_name_id (citext patient_name →
+ * case-insensitive, matching Arabic_CI_AS). We let the INSERT hit it rather than
+ * pre-checking with a racy SELECT, matching how updatePatient's caller handles it.
  */
-export async function createPatient(patientData: PatientData): Promise<CreatePatientResult> {
-  const db = getKysely();
-
+export async function insertPatientRow(
+  executor: Kysely<Database>,
+  patientData: PatientData
+): Promise<CreatePatientResult> {
   const toInt = (v: string | number | undefined): number | null =>
     v ? parseInt(String(v), 10) : null;
 
-  // Duplicate names are rejected by the unique index ix_name_id (on the citext
-  // patient_name column → case-insensitive, matching Arabic_CI_AS). We let the
-  // INSERT hit it rather than pre-checking with a SELECT, which was racy: two
-  // concurrent creates could both pass the SELECT and then one would throw an
-  // unhandled pg error. This mirrors how updatePatient's caller handles the
-  // same constraint.
   try {
-    const inserted = await db
+    const inserted = await executor
       .insertInto('patients')
       .values({
         patient_name: patientData.patientName,
@@ -462,7 +469,7 @@ export async function createPatient(patientData: PatientData): Promise<CreatePat
         email: patientData.email || null,
         address_id: toInt(patientData.addressID),
         referral_source_id: toInt(patientData.referralSourceID),
-        patient_type_id: toInt(patientData.patientTypeID),
+        patient_type_id: PATIENT_TYPE_IDS.NEW_NO_WORKS,
         notes: patientData.notes || null,
         language: patientData.language ? parseInt(String(patientData.language), 10) : 0,
         country_code: patientData.countryCode || null,
@@ -475,10 +482,11 @@ export async function createPatient(patientData: PatientData): Promise<CreatePat
     return { personId: inserted.person_id };
   } catch (error) {
     if (isUniqueViolation(error, 'ix_name_id')) {
-      // Recover the existing patient's id for the API contract — only on the
-      // (rare) conflict path, and no longer racy: we're reporting an
-      // already-committed duplicate, not gating the insert.
-      const existing = await db
+      // Recover the existing patient's id for the API contract. Read on a FRESH
+      // connection (getKysely()), NOT `executor`: inside a transaction the failed
+      // INSERT has left it aborted, and the duplicate row is already committed so the
+      // base pool sees it. Reporting an already-committed duplicate, not gating a race.
+      const existing = await getKysely()
         .selectFrom('patients')
         .select('person_id')
         .where('patient_name', '=', patientData.patientName)
@@ -492,6 +500,13 @@ export async function createPatient(patientData: PatientData): Promise<CreatePat
     }
     throw error;
   }
+}
+
+/**
+ * Creates a new patient record in the database (no intake work).
+ */
+export async function createPatient(patientData: PatientData): Promise<CreatePatientResult> {
+  return insertPatientRow(getKysely(), patientData);
 }
 
 /**
@@ -600,7 +615,7 @@ export async function updatePatient(
         gender: toInt(patientData.gender),
         address_id: toInt(patientData.address_id),
         referral_source_id: toInt(patientData.referral_source_id),
-        patient_type_id: toInt(patientData.patient_type_id),
+        // patient_type_id intentionally NOT written — derived from works (classifyPatient).
         notes: patientData.notes || null,
         language: patientData.language ? parseInt(String(patientData.language), 10) : 0,
         country_code: patientData.country_code || null,
