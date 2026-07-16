@@ -5,6 +5,7 @@ import { adminLookupTablesQuery } from '@/query/queries';
 import LookupEditor from './LookupEditor';
 import HolidayEditor from './HolidayEditor';
 import CostPresetsSettings from './CostPresetsSettings';
+import PatientTypesReadOnly from './PatientTypesReadOnly';
 
 // Import component-specific CSS
 import '../../../css/components/lookup-editor.css';
@@ -13,6 +14,11 @@ import '../../../css/components/lookup-editor.css';
 // not the generic /api/admin/lookups CRUD (Decimal Amount column isn't
 // representable in the generic lookup-admin whitelist).
 const COST_PRESETS_TABLE_KEY = 'tblEstimatedCostPresets';
+
+// Synthetic READ-ONLY entry for patient types — the rows are code-coupled to the
+// works-derived classifier so they aren't staff-editable; shown for reference via
+// the /api/patient-types feed, not the generic lookup CRUD.
+const PATIENT_TYPES_TABLE_KEY = 'patientTypesReadOnly';
 
 // Types
 interface ReferenceConfig {
@@ -69,7 +75,17 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
         idColumn: 'PresetID',
         columns: [],
     };
-    const tables = data ? [...(data as TableConfig[]), costPresetsEntry] : [];
+    // Append the synthetic READ-ONLY patient-types entry (derived-not-editable).
+    const patientTypesEntry: TableConfig = {
+        key: PATIENT_TYPES_TABLE_KEY,
+        displayName: 'Patient Types (read-only)',
+        icon: 'fas fa-user-tag',
+        idColumn: 'id',
+        columns: [],
+    };
+    const tables = data
+        ? [...(data as TableConfig[]), costPresetsEntry, patientTypesEntry]
+        : [];
 
     const toggleTable = (tableKey: string): void => {
         setExpandedTable(expandedTable === tableKey ? null : tableKey);
@@ -90,9 +106,9 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
         {
             name: 'Patient Information',
             icon: 'fas fa-user',
-            // patient_types is deliberately absent — its ids are code-coupled to the
-            // works-derived classifier, so it's no longer staff-editable.
-            keys: ['tblTagOptions', 'tblReferrals', 'tblAddress', 'tblAlertTypes']
+            // patient_types is code-coupled to the works-derived classifier, so it's not
+            // staff-editable — it appears here only as a READ-ONLY reference table.
+            keys: ['tblTagOptions', 'tblReferrals', 'tblAddress', 'tblAlertTypes', PATIENT_TYPES_TABLE_KEY]
         },
         {
             name: 'Templates',
@@ -185,6 +201,8 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
                                                     />
                                                 ) : table.key === COST_PRESETS_TABLE_KEY ? (
                                                     <CostPresetsSettings />
+                                                ) : table.key === PATIENT_TYPES_TABLE_KEY ? (
+                                                    <PatientTypesReadOnly />
                                                 ) : (
                                                     <LookupEditor
                                                         tableKey={table.key}
@@ -245,6 +263,8 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
                                                     />
                                                 ) : table.key === COST_PRESETS_TABLE_KEY ? (
                                                     <CostPresetsSettings />
+                                                ) : table.key === PATIENT_TYPES_TABLE_KEY ? (
+                                                    <PatientTypesReadOnly />
                                                 ) : (
                                                     <LookupEditor
                                                         tableKey={table.key}

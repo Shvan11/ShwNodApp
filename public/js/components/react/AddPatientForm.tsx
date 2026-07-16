@@ -35,6 +35,15 @@ const XRAY_TYPE_OPTIONS = [
     { id: WORK_TYPE_IDS.CEPHALO, labelKey: 'intake.xrayTypes.cephalo' },
 ] as const;
 
+// Preset intake fees (IQD) the front desk rarely overrides: a Consult is free (0),
+// and OPG/Cephalo are 25,000 IQD. CBCT is priced per case, so it has no preset and
+// starts blank. Selecting a kind/x-ray type seeds the fee from here.
+const CONSULT_DEFAULT_FEE_IQD = 0;
+const XRAY_DEFAULT_FEE_IQD: Partial<Record<number, number>> = {
+    [WORK_TYPE_IDS.OPG]: 25000,
+    [WORK_TYPE_IDS.CEPHALO]: 25000,
+};
+
 interface Props {
     onSuccess: (personId: number) => void;
     onCancel: () => void;
@@ -79,7 +88,6 @@ interface DropdownData {
 interface ExpandedSections {
     basic: boolean;
     contact: boolean;
-    personal: boolean;
     medical: boolean;
     additional: boolean;
 }
@@ -110,10 +118,11 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
     });
 
     // Intake selector (basic tab). 'regular' = no auto-work; 'xray'/'consult' auto-create
-    // a FINISHED work + full-payment invoice, so the classifier types the patient at create.
-    const [intakeKind, setIntakeKind] = useState<IntakeKind>('regular');
+    // a FINISHED work (+ invoice when priced), so the classifier types the patient at create.
+    // Defaults to 'consult' (fee pre-filled 0/free) — the most common new-patient workflow.
+    const [intakeKind, setIntakeKind] = useState<IntakeKind>('consult');
     const [xrayWorkTypeId, setXrayWorkTypeId] = useState<string>(String(WORK_TYPE_IDS.OPG));
-    const [intakeFee, setIntakeFee] = useState<string>('');
+    const [intakeFee, setIntakeFee] = useState<string>(String(CONSULT_DEFAULT_FEE_IQD));
     const [intakeCurrency, setIntakeCurrency] = useState<'IQD' | 'USD'>('IQD');
 
     const [loading, setLoading] = useState(false);
@@ -141,7 +150,6 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
     const [expandedSections, setExpandedSections] = useState<ExpandedSections>({
         basic: true,
         contact: false,
-        personal: false,
         medical: false,
         additional: false
     });
@@ -170,6 +178,29 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         setFormData(prev => ({ ...prev, phone: value }));
     };
 
+    // Selecting an intake kind seeds its preset fee (Consult = free/0; X-ray = the
+    // selected imaging type's preset) so the fee rarely needs retyping; currency
+    // resets to IQD, the currency the presets are quoted in.
+    const handleIntakeKindChange = (kind: IntakeKind) => {
+        setIntakeKind(kind);
+        if (kind === 'consult') {
+            setIntakeFee(String(CONSULT_DEFAULT_FEE_IQD));
+            setIntakeCurrency('IQD');
+        } else if (kind === 'xray') {
+            setIntakeFee(String(XRAY_DEFAULT_FEE_IQD[Number(xrayWorkTypeId)] ?? ''));
+            setIntakeCurrency('IQD');
+        } else {
+            setIntakeFee('');
+        }
+    };
+
+    // Changing the x-ray type re-seeds its preset fee (OPG/Cephalo = 25,000; CBCT blank).
+    const handleXrayTypeChange = (idStr: string) => {
+        setXrayWorkTypeId(idStr);
+        setIntakeFee(String(XRAY_DEFAULT_FEE_IQD[Number(idStr)] ?? ''));
+        setIntakeCurrency('IQD');
+    };
+
     const showAlert = (message: string, type: 'danger' | 'success' = 'danger', personId: number | null = null) => {
         setAlert({ show: true, message, type });
 
@@ -193,10 +224,15 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             return;
         }
 
-        // Intake (X-ray/Consult) requires a positive fee — the auto-work carries a
-        // full-payment invoice for it.
+        // X-ray intake must be priced (> 0 → its auto-work carries a full-payment
+        // invoice). Consult may be FREE (>= 0, default 0) — a 0-fee consult creates
+        // the work with no invoice.
         const feeNum = Number(intakeFee);
-        if (intakeKind !== 'regular' && (!Number.isFinite(feeNum) || feeNum <= 0)) {
+        if (intakeKind === 'xray' && (!Number.isFinite(feeNum) || feeNum <= 0)) {
+            showAlert(t('intake.feeRequired'));
+            return;
+        }
+        if (intakeKind === 'consult' && (!Number.isFinite(feeNum) || feeNum < 0)) {
             showAlert(t('intake.feeRequired'));
             return;
         }
@@ -261,7 +297,6 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
     const tabs: Tab[] = [
         { id: 'basic', label: t('add.tabs.basic'), icon: 'fas fa-user' },
         { id: 'contact', label: t('add.tabs.contact'), icon: 'fas fa-address-book' },
-        { id: 'personal', label: t('add.tabs.personal'), icon: 'fas fa-user-circle' },
         { id: 'medical', label: t('add.tabs.medical'), icon: 'fas fa-stethoscope' },
         { id: 'additional', label: t('add.tabs.additional'), icon: 'fas fa-clipboard' }
     ];
@@ -357,6 +392,45 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 </div>
             </div>
 
+            {/* Personal details (date of birth / gender) — merged into the Basic tab
+                so the core "who is this patient" fields live in one place. */}
+            <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel} htmlFor="add-date-of-birth">
+                        <i className="fas fa-calendar"></i>
+                        {t('fields.dateOfBirth')}
+                    </label>
+                    <input
+                        id="add-date-of-birth"
+                        type="date"
+                        name="dateOfBirth"
+                        value={formData.dateOfBirth}
+                        onChange={handleInputChange}
+                        className="form-control"
+                    />
+                </div>
+                <div className={styles.formGroup}>
+                    <label className={styles.formLabel} htmlFor="add-gender">
+                        <i className="fas fa-venus-mars"></i>
+                        {t('fields.gender')}
+                    </label>
+                    <select
+                        id="add-gender"
+                        name="gender"
+                        value={formData.gender}
+                        onChange={handleInputChange}
+                        className="form-control"
+                    >
+                        <option value="">{t('fields.selectGender')}</option>
+                        {dropdownData.genders.map(gender => (
+                            <option key={gender.id} value={gender.id}>
+                                {gender.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
             {/* Intake selector — determines the patient's first work (which auto-types
                 them): Regular = none; X-ray = imaging work; Consult = consult work. */}
             <div className={styles.formRow}>
@@ -376,8 +450,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                                     name="intakeKind"
                                     value={kind}
                                     checked={intakeKind === kind}
-                                    onChange={() => setIntakeKind(kind)}
+                                    onChange={() => handleIntakeKindChange(kind)}
                                 />
+                                <i
+                                    className={`${intakeKind === kind ? 'fas fa-circle-check' : 'far fa-circle'} ${styles.intakeRadioMark}`}
+                                    aria-hidden="true"
+                                ></i>
                                 {t(`intake.kinds.${kind}`)}
                             </label>
                         ))}
@@ -396,7 +474,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                             <select
                                 id="add-xray-type"
                                 value={xrayWorkTypeId}
-                                onChange={(e) => setXrayWorkTypeId(e.target.value)}
+                                onChange={(e) => handleXrayTypeChange(e.target.value)}
                                 className="form-control"
                             >
                                 {XRAY_TYPE_OPTIONS.map((o) => (
@@ -477,49 +555,6 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         placeholder={t('fields.emailPlaceholder')}
                         dir="ltr"
                     />
-                </div>
-            </div>
-
-        </div>
-    );
-
-    // Render Personal Information Fields
-    const renderPersonalInfo = () => (
-        <div className={styles.tabContentSection}>
-            <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                    <label className={styles.formLabel} htmlFor="add-date-of-birth">
-                        <i className="fas fa-calendar"></i>
-                        {t('fields.dateOfBirth')}
-                    </label>
-                    <input
-                        id="add-date-of-birth"
-                        type="date"
-                        name="dateOfBirth"
-                        value={formData.dateOfBirth}
-                        onChange={handleInputChange}
-                        className="form-control"
-                    />
-                </div>
-                <div className={styles.formGroup}>
-                    <label className={styles.formLabel} htmlFor="add-gender">
-                        <i className="fas fa-venus-mars"></i>
-                        {t('fields.gender')}
-                    </label>
-                    <select
-                        id="add-gender"
-                        name="gender"
-                        value={formData.gender}
-                        onChange={handleInputChange}
-                        className="form-control"
-                    >
-                        <option value="">{t('fields.selectGender')}</option>
-                        {dropdownData.genders.map(gender => (
-                            <option key={gender.id} value={gender.id}>
-                                {gender.name}
-                            </option>
-                        ))}
-                    </select>
                 </div>
             </div>
 
@@ -646,8 +681,6 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 return renderBasicInfo();
             case 'contact':
                 return renderContactInfo();
-            case 'personal':
-                return renderPersonalInfo();
             case 'medical':
                 return renderMedicalInfo();
             case 'additional':

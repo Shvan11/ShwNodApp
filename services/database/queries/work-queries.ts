@@ -733,24 +733,13 @@ export async function reactivateWork(
 }
 
 /**
- * Insert a FINISHED work + its full-payment invoice on a CALLER-SUPPLIED executor
- * (transaction). Extracted from addWorkWithInvoice so the intake auto-create
- * (PatientService.createPatientWithIntake) can run the same insert inside its own
- * patient-insert transaction — Kysely transactions don't nest, so the caller owns
- * the `withPgTransaction`. Does NOT recompute the patient type: the caller does
- * that once, after all of its works writes. status is hard-coded to 2 (Finished),
- * matching the original VALUES list.
+ * Insert a FINISHED work row on a caller-supplied executor and return its id. Shared
+ * by insertWorkWithInvoice + insertIntakeWork. status is hard-coded to 2 (Finished).
  */
-export async function insertWorkWithInvoice(
+async function insertFinishedWorkRow(
   trx: Kysely<Database>,
   workData: WorkData
-): Promise<{ workId: number; invoiceId: number }> {
-  const today = toDateOnly(new Date());
-  const totalRequired = numOrNull(workData.total_required);
-  const usdReceived =
-    workData.currency === 'USD' || workData.currency === 'EUR' ? totalRequired : 0;
-  const iqdReceived = workData.currency === 'IQD' ? totalRequired : 0;
-
+): Promise<number> {
   const work = await trx
     .insertInto('works')
     .values({
@@ -775,21 +764,80 @@ export async function insertWorkWithInvoice(
     })
     .returning('work_id')
     .executeTakeFirstOrThrow();
+  return work.work_id;
+}
 
+/**
+ * Insert a full-payment invoice for a work on a caller-supplied executor. The whole
+ * `total_required` is booked as received in the work's currency. NOT valid for a
+ * zero fee — the invoices table forbids a zero/no-cash row
+ * (chk_invoice_amountpaidpositive / chk_invoice_mustreceivecash); callers must skip
+ * this for a free work.
+ */
+async function insertFullPaymentInvoice(
+  trx: Kysely<Database>,
+  workId: number,
+  totalRequired: number,
+  currency: string | null | undefined
+): Promise<number> {
+  const usdReceived = currency === 'USD' || currency === 'EUR' ? totalRequired : 0;
+  const iqdReceived = currency === 'IQD' ? totalRequired : 0;
   const invoice = await trx
     .insertInto('invoices')
     .values({
-      work_id: work.work_id,
-      amount_paid: totalRequired ?? 0,
-      date_of_payment: today,
-      usd_received: usdReceived ?? 0,
-      iqd_received: iqdReceived ?? 0,
+      work_id: workId,
+      amount_paid: totalRequired,
+      date_of_payment: toDateOnly(new Date()),
+      usd_received: usdReceived,
+      iqd_received: iqdReceived,
       change: null,
     })
     .returning('invoice_id')
     .executeTakeFirstOrThrow();
+  return invoice.invoice_id;
+}
 
-  return { workId: work.work_id, invoiceId: invoice.invoice_id };
+/**
+ * Insert a FINISHED work + its full-payment invoice on a CALLER-SUPPLIED executor
+ * (transaction). Extracted from addWorkWithInvoice so the intake auto-create
+ * (PatientService.createPatientWithIntake) can run the same insert inside its own
+ * patient-insert transaction — Kysely transactions don't nest, so the caller owns
+ * the `withPgTransaction`. Does NOT recompute the patient type: the caller does
+ * that once, after all of its works writes. status is hard-coded to 2 (Finished),
+ * matching the original VALUES list.
+ */
+export async function insertWorkWithInvoice(
+  trx: Kysely<Database>,
+  workData: WorkData
+): Promise<{ workId: number; invoiceId: number }> {
+  const workId = await insertFinishedWorkRow(trx, workData);
+  const invoiceId = await insertFullPaymentInvoice(
+    trx,
+    workId,
+    numOrNull(workData.total_required) ?? 0,
+    workData.currency
+  );
+  return { workId, invoiceId };
+}
+
+/**
+ * Insert an intake auto-work (FINISHED) and, ONLY when it carries a positive fee, its
+ * full-payment invoice. A FREE intake (fee 0/null — e.g. a free Consult) inserts the
+ * work ALONE: a $0 service has no payment, and the invoices table forbids a zero/
+ * no-cash row. Returns invoiceId only when an invoice was created. Caller-supplied
+ * executor + no patient-type recompute, same contract as insertWorkWithInvoice.
+ */
+export async function insertIntakeWork(
+  trx: Kysely<Database>,
+  workData: WorkData
+): Promise<{ workId: number; invoiceId?: number }> {
+  const workId = await insertFinishedWorkRow(trx, workData);
+  const totalRequired = numOrNull(workData.total_required);
+  if (!totalRequired || totalRequired <= 0) {
+    return { workId }; // free intake → work only, no invoice
+  }
+  const invoiceId = await insertFullPaymentInvoice(trx, workId, totalRequired, workData.currency);
+  return { workId, invoiceId };
 }
 
 export async function addWorkWithInvoice(

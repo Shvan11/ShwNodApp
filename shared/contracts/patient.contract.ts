@@ -277,8 +277,9 @@ export const deleteTimepoint = {
 // ===========================================================================
 
 /** Intake selector (basic tab). The front-desk choice on a NEW patient:
- *  - 'xray'    → auto-creates a FINISHED imaging work (14/18/22) + full-payment invoice
- *  - 'consult' → auto-creates a FINISHED Consult work (23) + invoice
+ *  - 'xray'    → auto-creates a FINISHED imaging work (14/18/22) + full-payment invoice (fee > 0)
+ *  - 'consult' → auto-creates a FINISHED Consult work (23); a paid consult (fee > 0)
+ *    also gets a full-payment invoice, a FREE consult (fee 0) gets the work alone.
  *  (absent = 'Regular', no auto-work.) The auto-work's dr_id = the 'Clinic'
  *  pseudo-doctor. Fees arrive as form strings → z.coerce.number(); the currency
  *  drives the invoice's usd/iqd split. patient_type is DERIVED afterwards. */
@@ -294,7 +295,9 @@ const intakeSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('consult'),
-    fee: z.coerce.number().positive('Fee must be greater than 0'),
+    // A Consult may be FREE — 0 is allowed (a 0-fee consult creates the work with no
+    // invoice, since the invoices table forbids a zero/no-cash payment row).
+    fee: z.coerce.number().min(0, 'Fee cannot be negative'),
     currency: z.enum(['IQD', 'USD', 'EUR']),
   }),
 ]);

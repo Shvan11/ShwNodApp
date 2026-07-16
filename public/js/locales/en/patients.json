@@ -72,7 +72,6 @@
     "tabs": {
       "basic": "Basic Info",
       "contact": "Contact",
-      "personal": "Personal",
       "medical": "Medical",
       "additional": "Additional"
     },

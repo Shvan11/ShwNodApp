@@ -13,7 +13,7 @@
 
 import { log } from '../../utils/logger.js';
 import { getInfos, deletePatient, insertPatientRow, type PatientData } from '../database/queries/patient-queries.js';
-import { insertWorkWithInvoice } from '../database/queries/work-queries.js';
+import { insertIntakeWork } from '../database/queries/work-queries.js';
 import { recomputePatientType } from '../database/queries/patient-type-classifier.js';
 import { getKysely, withPgTransaction } from '../database/kysely.js';
 import { WORK_TYPE_IDS } from '../../shared/treatment-taxonomy.js';
@@ -314,10 +314,11 @@ async function resolveClinicDoctorId(): Promise<number> {
 /**
  * Create a patient and, when an intake selector value is supplied, auto-create the
  * matching FINISHED intake work (X-ray imaging or Consult) + its full-payment invoice
- * — all in ONE transaction, so a duplicate name or any failure rolls the whole thing
- * back (no orphan work/invoice). The derived patient type is recomputed from the new
- * work inside the same txn (classifyPatient). A 'Regular' intake (none) just inserts
- * the patient, seeded NEW_NO_WORKS by insertPatientRow.
+ * (a FREE Consult, fee 0, gets the work with NO invoice — see insertIntakeWork) — all
+ * in ONE transaction, so a duplicate name or any failure rolls the whole thing back
+ * (no orphan work/invoice). The derived patient type is recomputed from the new work
+ * inside the same txn (classifyPatient). A 'Regular' intake (none) just inserts the
+ * patient, seeded NEW_NO_WORKS by insertPatientRow.
  */
 export async function createPatientWithIntake(
   patientData: PatientData,
@@ -334,7 +335,7 @@ export async function createPatientWithIntake(
       return { personId };
     }
 
-    const { workId, invoiceId } = await insertWorkWithInvoice(trx, {
+    const { workId, invoiceId } = await insertIntakeWork(trx, {
       person_id: personId,
       type_of_work: intake.kind === 'xray' ? intake.workTypeId : WORK_TYPE_IDS.CONSULT,
       total_required: intake.fee,

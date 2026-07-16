@@ -488,29 +488,67 @@
 .intakeRadios {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
 }
 
+/* Segmented control: the whole label IS the toggle. The native radio is kept in the
+   DOM for keyboard/AT semantics but visually hidden — a bare radio dot beside an
+   already-highlighted card reads as dead UI. Selection is shown by the filled active
+   state + the check icon (.intakeRadioMark). */
 .intakeRadioLabel {
     display: inline-flex;
     align-items: center;
     gap: var(--spacing-xs);
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-lg);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     cursor: pointer;
     font-size: var(--font-size-sm);
-    color: var(--text-primary);
-    transition: border-color 0.2s ease, background 0.2s ease;
+    font-weight: var(--font-weight-medium);
+    color: var(--text-secondary);
+    background: var(--surface);
+    user-select: none;
+    transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+/* Visually-hidden native radio (kept focusable for keyboard arrow-key navigation). */
+.intakeRadioLabel input[type="radio"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.intakeRadioMark {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted, var(--text-secondary));
 }
 
 .intakeRadioLabel:hover {
     border-color: var(--primary-color);
+    color: var(--text-primary);
+}
+
+/* Keyboard focus ring (the native input's outline is gone once it's hidden). */
+.intakeRadioLabel:focus-within {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
 }
 
 .intakeRadioLabelActive {
     border-color: var(--primary-color);
-    background: var(--surface-hover);
+    background: var(--primary-50);
+    color: var(--primary-color);
+    font-weight: var(--font-weight-semibold);
+}
+
+.intakeRadioLabelActive .intakeRadioMark {
+    color: var(--primary-color);
 }
 
 .intakeConditional {
