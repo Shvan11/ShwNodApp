@@ -37,18 +37,21 @@ interface SortConfig {
     direction: 'asc' | 'desc';
 }
 
-interface LastAppointmentOption {
-    value: string;
-    label: string;
-}
-
-const LAST_APPOINTMENT_OPTIONS: LastAppointmentOption[] = [
+const LAST_APPOINTMENT_OPTIONS: SelectOption[] = [
     { value: '', label: 'Any time' },
     { value: '1month', label: 'More than 1 month ago' },
     { value: '3months', label: 'More than 3 months ago' },
     { value: '6months', label: 'More than 6 months ago' },
     { value: '1year', label: 'More than 1 year ago' },
-    { value: 'custom', label: 'Before specific date...' },
+    { value: 'custom', label: 'Custom date range...' },
+];
+
+type FinalPhotosFilter = '' | 'has' | 'none';
+
+const FINAL_PHOTOS_OPTIONS: { value: FinalPhotosFilter; label: string }[] = [
+    { value: '', label: 'Any' },
+    { value: 'has', label: 'Has final photos' },
+    { value: 'none', label: 'No final photos' },
 ];
 
 interface SavedState {
@@ -67,10 +70,15 @@ interface SavedState {
     selectedTags: SelectOption[];
     selectedPatientTypes: SelectOption[];
     lastAppointmentFilter: string;
-    lastAppointmentCustomDate: string;
-    hasFinalPhotos: boolean;
+    lastAppointmentFrom: string;
+    lastAppointmentTo: string;
+    finalPhotos: FinalPhotosFilter;
+    hasDebt: boolean;
     showFilters: boolean;
     sortConfig: SortConfig;
+    /** Legacy keys (pre date-range / tri-state) — read once for migration. */
+    lastAppointmentCustomDate?: string;
+    hasFinalPhotos?: boolean;
 }
 
 interface LoaderData {
@@ -146,8 +154,12 @@ const PatientManagement = () => {
     const [selectedTags, setSelectedTags] = useState<SelectOption[]>(savedState?.selectedTags || []);
     const [selectedPatientTypes, setSelectedPatientTypes] = useState<SelectOption[]>(savedState?.selectedPatientTypes || []);
     const [lastAppointmentFilter, setLastAppointmentFilter] = useState(savedState?.lastAppointmentFilter || '');
-    const [lastAppointmentCustomDate, setLastAppointmentCustomDate] = useState(savedState?.lastAppointmentCustomDate || '');
-    const [hasFinalPhotos, setHasFinalPhotos] = useState(savedState?.hasFinalPhotos || false);
+    const [lastAppointmentFrom, setLastAppointmentFrom] = useState(savedState?.lastAppointmentFrom || '');
+    // Legacy migration: the old single custom date meant "before X" ⇒ range with only a To bound.
+    const [lastAppointmentTo, setLastAppointmentTo] = useState(savedState?.lastAppointmentTo ?? savedState?.lastAppointmentCustomDate ?? '');
+    // Legacy migration: the old boolean checkbox maps to the 'has' tri-state.
+    const [finalPhotos, setFinalPhotos] = useState<FinalPhotosFilter>(savedState?.finalPhotos ?? (savedState?.hasFinalPhotos ? 'has' : ''));
+    const [hasDebt, setHasDebt] = useState(savedState?.hasDebt || false);
     const [showFilters, setShowFilters] = useState(savedState?.showFilters || false);
     const [sortConfig, setSortConfig] = useState<SortConfig>(savedState?.sortConfig || { key: 'name', direction: 'asc' });
 
@@ -205,8 +217,10 @@ const PatientManagement = () => {
                 selectedTags,
                 selectedPatientTypes,
                 lastAppointmentFilter,
-                lastAppointmentCustomDate,
-                hasFinalPhotos,
+                lastAppointmentFrom,
+                lastAppointmentTo,
+                finalPhotos,
+                hasDebt,
                 showFilters,
                 sortConfig
             };
@@ -218,7 +232,7 @@ const PatientManagement = () => {
     }, [
         patients, hasSearched, totalCount, hasMore, currentOffset, searchPatientName, searchFirstName, searchLastName, searchTerm,
         nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes,
-        lastAppointmentFilter, lastAppointmentCustomDate, hasFinalPhotos, showFilters, sortConfig
+        lastAppointmentFilter, lastAppointmentFrom, lastAppointmentTo, finalPhotos, hasDebt, showFilters, sortConfig
     ]);
 
     // --- Search Logic ---
@@ -248,14 +262,14 @@ const PatientManagement = () => {
             if (selectedKeywords.length > 0) params.append('keywords', selectedKeywords.map(kw => kw.value).join(','));
             if (selectedTags.length > 0) params.append('tags', selectedTags.map(tag => tag.value).join(','));
             if (selectedPatientTypes.length > 0) params.append('patientTypes', selectedPatientTypes.map(pt => pt.value).join(','));
-            if (lastAppointmentFilter) {
-                if (lastAppointmentFilter === 'custom' && lastAppointmentCustomDate) {
-                    params.append('lastAppointment', lastAppointmentCustomDate);
-                } else if (lastAppointmentFilter !== 'custom') {
-                    params.append('lastAppointment', lastAppointmentFilter);
-                }
+            if (lastAppointmentFilter === 'custom') {
+                if (lastAppointmentFrom) params.append('lastAppointmentFrom', lastAppointmentFrom);
+                if (lastAppointmentTo) params.append('lastAppointmentTo', lastAppointmentTo);
+            } else if (lastAppointmentFilter) {
+                params.append('lastAppointment', lastAppointmentFilter);
             }
-            if (hasFinalPhotos) params.append('hasFinalPhotos', 'true');
+            if (finalPhotos) params.append('finalPhotos', finalPhotos);
+            if (hasDebt) params.append('hasDebt', 'true');
 
             params.append('sortBy', currentSort.key);
             params.append('order', currentSort.direction);
@@ -292,7 +306,7 @@ const PatientManagement = () => {
                 setLoadingMore(false);
             }
         }
-    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentCustomDate, hasFinalPhotos, sortConfig, currentOffset, toast]);
+    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentFrom, lastAppointmentTo, finalPhotos, hasDebt, sortConfig, currentOffset, toast]);
 
     // --- Load More Handler ---
     const handleLoadMore = useCallback(() => {
@@ -312,7 +326,7 @@ const PatientManagement = () => {
     useEffect(() => {
         const hasInputs = searchPatientName || searchFirstName || searchLastName || searchTerm ||
                           selectedWorkTypes.length > 0 || selectedKeywords.length > 0 || selectedTags.length > 0 ||
-                          selectedPatientTypes.length > 0 || lastAppointmentFilter || hasFinalPhotos;
+                          selectedPatientTypes.length > 0 || lastAppointmentFilter || finalPhotos || hasDebt;
 
         // SKIP search if we just restored data from storage
         // This ensures the "cached view" remains stable and we don't flash a loading spinner unnecessarily
@@ -340,7 +354,7 @@ const PatientManagement = () => {
         return () => {
             if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
         };
-    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentCustomDate, hasFinalPhotos]);
+    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentFrom, lastAppointmentTo, finalPhotos, hasDebt]);
 
     // --- Handlers ---
 
@@ -370,8 +384,8 @@ const PatientManagement = () => {
         setSearchPatientName(''); setSearchFirstName(''); setSearchLastName(''); setSearchTerm('');
         setNameStartsWith(false);
         setSelectedWorkTypes([]); setSelectedKeywords([]); setSelectedTags([]);
-        setSelectedPatientTypes([]); setLastAppointmentFilter(''); setLastAppointmentCustomDate('');
-        setHasFinalPhotos(false);
+        setSelectedPatientTypes([]); setLastAppointmentFilter(''); setLastAppointmentFrom(''); setLastAppointmentTo('');
+        setFinalPhotos(''); setHasDebt(false);
         setPatients([]); setHasSearched(false); setShowFilters(false);
         setSortConfig({ key: 'name', direction: 'asc' });
         // Reset means "back to the empty page" — the criteria clearing above must
@@ -399,7 +413,7 @@ const PatientManagement = () => {
         // actually changes, or it would linger and swallow the next real search.
         const hadCriteria = !!(searchPatientName || searchFirstName || searchLastName || searchTerm ||
             selectedWorkTypes.length || selectedKeywords.length || selectedTags.length ||
-            selectedPatientTypes.length || lastAppointmentFilter || hasFinalPhotos || nameStartsWith);
+            selectedPatientTypes.length || lastAppointmentFilter || finalPhotos || hasDebt || nameStartsWith);
         if (hadCriteria) skipAutoSearchRef.current = true;
 
         // Clear inputs and filters, reset pagination AND sort — the fetch below is
@@ -408,7 +422,8 @@ const PatientManagement = () => {
         setSearchPatientName(''); setSearchFirstName(''); setSearchLastName(''); setSearchTerm('');
         setNameStartsWith(false);
         setSelectedWorkTypes([]); setSelectedKeywords([]); setSelectedTags([]); setSelectedPatientTypes([]);
-        setLastAppointmentFilter(''); setLastAppointmentCustomDate(''); setHasFinalPhotos(false);
+        setLastAppointmentFilter(''); setLastAppointmentFrom(''); setLastAppointmentTo('');
+        setFinalPhotos(''); setHasDebt(false);
         setCurrentOffset(0);
         setSortConfig({ key: 'name', direction: 'asc' });
         // Kill any pending debounce / in-flight filtered search — a late response
@@ -476,10 +491,13 @@ const PatientManagement = () => {
     const handleJumpToPatient = (personId: number) => navigate(`/patient/${personId}/works`);
 
     const activeFilterCount = selectedWorkTypes.length + selectedKeywords.length + selectedTags.length +
-        selectedPatientTypes.length + (lastAppointmentFilter ? 1 : 0) + (hasFinalPhotos ? 1 : 0);
+        selectedPatientTypes.length + (lastAppointmentFilter ? 1 : 0) + (finalPhotos ? 1 : 0) + (hasDebt ? 1 : 0);
 
     const lastAppointmentChipLabel = lastAppointmentFilter === 'custom'
-        ? `Before ${lastAppointmentCustomDate || '…'}`
+        ? (lastAppointmentFrom && lastAppointmentTo ? `Last visit ${lastAppointmentFrom} – ${lastAppointmentTo}`
+            : lastAppointmentFrom ? `Last visit after ${lastAppointmentFrom}`
+            : lastAppointmentTo ? `Last visit before ${lastAppointmentTo}`
+            : 'Last visit range…')
         : (LAST_APPOINTMENT_OPTIONS.find(o => o.value === lastAppointmentFilter)?.label ?? lastAppointmentFilter);
 
     // Sortable column header: click toggles/flips the sort, aria-sort reflects it.
@@ -605,15 +623,23 @@ const PatientManagement = () => {
                         {lastAppointmentFilter && (
                             <span className={styles.filterChip}>
                                 {lastAppointmentChipLabel}
-                                <button type="button" className={styles.filterChipRemove} aria-label="Remove last appointment filter" onClick={() => { setLastAppointmentFilter(''); setLastAppointmentCustomDate(''); }}>
+                                <button type="button" className={styles.filterChipRemove} aria-label="Remove last appointment filter" onClick={() => { setLastAppointmentFilter(''); setLastAppointmentFrom(''); setLastAppointmentTo(''); }}>
                                     <i className="fas fa-times" aria-hidden="true"></i>
                                 </button>
                             </span>
                         )}
-                        {hasFinalPhotos && (
+                        {finalPhotos && (
                             <span className={styles.filterChip}>
-                                Has Final Photos
-                                <button type="button" className={styles.filterChipRemove} aria-label="Remove has final photos filter" onClick={() => setHasFinalPhotos(false)}>
+                                {finalPhotos === 'has' ? 'Has Final Photos' : 'No Final Photos'}
+                                <button type="button" className={styles.filterChipRemove} aria-label="Remove final photos filter" onClick={() => setFinalPhotos('')}>
+                                    <i className="fas fa-times" aria-hidden="true"></i>
+                                </button>
+                            </span>
+                        )}
+                        {hasDebt && (
+                            <span className={styles.filterChip}>
+                                Has Unpaid Balance
+                                <button type="button" className={styles.filterChipRemove} aria-label="Remove unpaid balance filter" onClick={() => setHasDebt(false)}>
                                     <i className="fas fa-times" aria-hidden="true"></i>
                                 </button>
                             </span>
@@ -673,28 +699,50 @@ const PatientManagement = () => {
                                     inputId="pm-filter-last-appointment"
                                     options={LAST_APPOINTMENT_OPTIONS}
                                     value={LAST_APPOINTMENT_OPTIONS.find(o => o.value === lastAppointmentFilter) || LAST_APPOINTMENT_OPTIONS[0]}
-                                    onChange={(option) => setLastAppointmentFilter(option?.value || '')}
+                                    onChange={(option) => setLastAppointmentFilter(String(option?.value ?? ''))}
                                     classNamePrefix="react-select"
                                     isClearable
                                 />
                                 {lastAppointmentFilter === 'custom' && (
-                                    <input
-                                        type="date"
-                                        value={lastAppointmentCustomDate}
-                                        onChange={(e) => setLastAppointmentCustomDate(e.target.value)}
-                                        className={`form-control ${styles.customDateInput}`}
-                                    />
+                                    <div className={styles.dateRangeInputs}>
+                                        <input
+                                            type="date"
+                                            aria-label="Last appointment from"
+                                            value={lastAppointmentFrom}
+                                            onChange={(e) => setLastAppointmentFrom(e.target.value)}
+                                            className={`form-control ${styles.customDateInput}`}
+                                        />
+                                        <span className={styles.dateRangeSeparator}>to</span>
+                                        <input
+                                            type="date"
+                                            aria-label="Last appointment to"
+                                            value={lastAppointmentTo}
+                                            onChange={(e) => setLastAppointmentTo(e.target.value)}
+                                            className={`form-control ${styles.customDateInput}`}
+                                        />
+                                    </div>
                                 )}
+                            </div>
+                            <div className={styles.filterGroup}>
+                                <label htmlFor="pm-filter-final-photos">Final Photos</label>
+                                <Select
+                                    inputId="pm-filter-final-photos"
+                                    options={FINAL_PHOTOS_OPTIONS}
+                                    value={FINAL_PHOTOS_OPTIONS.find(o => o.value === finalPhotos) || FINAL_PHOTOS_OPTIONS[0]}
+                                    onChange={(option) => setFinalPhotos(option?.value ?? '')}
+                                    classNamePrefix="react-select"
+                                    isClearable
+                                />
                             </div>
                         </div>
                         <div className={styles.checkboxFilters}>
                             <label className={styles.checkboxLabel}>
                                 <input
                                     type="checkbox"
-                                    checked={hasFinalPhotos}
-                                    onChange={(e) => setHasFinalPhotos(e.target.checked)}
+                                    checked={hasDebt}
+                                    onChange={(e) => setHasDebt(e.target.checked)}
                                 />
-                                <span>Has Final Photos</span>
+                                <span>Has unpaid balance</span>
                             </label>
                         </div>
                     </div>

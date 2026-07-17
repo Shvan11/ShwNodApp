@@ -64,8 +64,6 @@ import {
   sanitizeName,
   FileExplorerError,
 } from '../../services/files/file-explorer.service.js';
-import type { PatientSearchQuery } from '../../types/api.types.js';
-
 const router = Router();
 
 // ============================================================================
@@ -555,13 +553,15 @@ router.get(
 // ============================================================================
 
 /**
- * Search patients by name, phone, id, work type, keywords, and tags
- * GET /patients/search?q={query}&patientName={name}&firstName={first}&lastName={last}&workTypes={ids}&keywords={ids}&tags={ids}
+ * Search patients by name, phone, id, work type, keywords, tags, patient type,
+ * last-appointment age/date-range, final-photo presence, and unpaid balance.
+ * GET /patients/search — query params are the contract's `patientSearch.query`.
  */
 router.get(
   '/patients/search',
+  validate({ query: patientContract.patientSearch.query }),
   async (
-    req: Request<unknown, unknown, unknown, PatientSearchQuery & { q?: string }>,
+    req: Request<unknown, unknown, unknown, patientContract.PatientSearchQuery>,
     res: Response
   ): Promise<void> => {
     try {
@@ -574,18 +574,18 @@ router.get(
       const tagsParam = req.query.tags || '';
       const patientTypesParam = req.query.patientTypes || '';
       const lastAppointmentParam = req.query.lastAppointment || '';
-      const hasFinalPhotos = req.query.hasFinalPhotos === 'true';
+      const lastAppointmentFrom = req.query.lastAppointmentFrom || '';
+      const lastAppointmentTo = req.query.lastAppointmentTo || '';
+      const finalPhotos = req.query.finalPhotos || '';
+      const hasDebt = req.query.hasDebt === 'true';
       const nameStartsWith = req.query.nameStartsWith === 'true';
 
       const sortBy = req.query.sortBy || 'name';
       const order = req.query.order || 'asc';
 
-      // Pagination parameters
-      const limit = Math.min(
-        parseInt(req.query.limit as string) || 100,
-        500
-      ); // Max 500
-      const offset = parseInt(req.query.offset as string) || 0;
+      // Pagination (validated + coerced by the contract). Max 500 per page.
+      const limit = Math.min(req.query.limit ?? 100, 500);
+      const offset = req.query.offset ?? 0;
 
       // Parse comma-separated IDs into arrays
       const workTypeIds = workTypesParam
@@ -698,44 +698,69 @@ router.get(
         );
       }
 
-      // Filter by last appointment date
-      if (lastAppointmentParam) {
-        let dateCondition: RawBuilder<unknown>;
-        switch (lastAppointmentParam) {
-          case '1month':
-            dateCondition = sql`(LOCALTIMESTAMP - interval '1 month')`;
-            break;
-          case '3months':
-            dateCondition = sql`(LOCALTIMESTAMP - interval '3 months')`;
-            break;
-          case '6months':
-            dateCondition = sql`(LOCALTIMESTAMP - interval '6 months')`;
-            break;
-          case '1year':
-            dateCondition = sql`(LOCALTIMESTAMP - interval '1 year')`;
-            break;
-          default:
-            // Custom date (ISO format)
-            dateCondition = sql`${lastAppointmentParam}::timestamp`;
-        }
+      // Filter by last appointment. The correlated MAX is an index-only probe on
+      // ix_pid_all (person_id, app_date); a NULL max (patient with no
+      // appointments) fails every comparison, so such patients are excluded —
+      // same semantics as the old EXISTS-over-GROUP-BY, without scanning the
+      // whole appointments table per condition.
+      const latestAppointment = sql`(
+        SELECT MAX(a."app_date") FROM "appointments" a
+        WHERE a."person_id" = p."person_id"
+      )`;
 
-        whereConditions.push(sql`EXISTS (
-          SELECT 1 FROM (
-            SELECT "person_id", MAX("app_date") AS "LatestApp"
-            FROM "appointments"
-            GROUP BY "person_id"
-          ) la
-          WHERE la."person_id" = p."person_id"
-          AND la."LatestApp" < ${dateCondition}
-        )`);
+      // Presets: "more than N ago".
+      if (lastAppointmentParam) {
+        const presetIntervals: Record<string, RawBuilder<unknown>> = {
+          '1month': sql`interval '1 month'`,
+          '3months': sql`interval '3 months'`,
+          '6months': sql`interval '6 months'`,
+          '1year': sql`interval '1 year'`,
+        };
+        whereConditions.push(
+          sql`${latestAppointment} < (LOCALTIMESTAMP - ${presetIntervals[lastAppointmentParam]})`
+        );
       }
 
-      // Filter by has final photos (local timepoint with 'Final' in description)
-      if (hasFinalPhotos) {
-        whereConditions.push(sql`EXISTS (
+      // Custom range: last appointment on/after From and/or on/before To (each
+      // bound optional). app_date is a timestamp, so "on/before To" means
+      // strictly before the following midnight.
+      if (lastAppointmentFrom) {
+        whereConditions.push(sql`${latestAppointment} >= ${lastAppointmentFrom}::date`);
+      }
+      if (lastAppointmentTo) {
+        whereConditions.push(sql`${latestAppointment} < (${lastAppointmentTo}::date + 1)`);
+      }
+
+      // Filter by final-photo presence (tri-state: absent | 'has' | 'none').
+      // A patient "has final photos" when EITHER marker is set: a 'Final' time
+      // point (Dolphin imaging) or a work's f_photo_date (the Works form field).
+      // The two overlap ~98% in practice but each catches rows the other misses.
+      if (finalPhotos) {
+        const hasFinalPhotosCondition = sql`(EXISTS (
                 SELECT 1 FROM "time_points" tp
                 WHERE tp."person_id" = p."person_id"
                 AND tp."tp_description" LIKE '%Final%'
+            ) OR EXISTS (
+                SELECT 1 FROM "works" wf
+                WHERE wf."person_id" = p."person_id"
+                AND wf."f_photo_date" IS NOT NULL
+            ))`;
+        whereConditions.push(
+          finalPhotos === 'has' ? hasFinalPhotosCondition : sql`NOT ${hasFinalPhotosCondition}`
+        );
+      }
+
+      // Filter by outstanding balance on any work: total_required − discount −
+      // Σ invoices.amount_paid > 0 — the same remaining-balance formula
+      // PaymentService enforces on payment creation. Per-work, so the dual
+      // currencies never mix; ix_works_personid + ix_wid_date_sum (work_id
+      // INCLUDE amount_paid) keep both probes index-only.
+      if (hasDebt) {
+        whereConditions.push(sql`EXISTS (
+                SELECT 1 FROM "works" wd
+                WHERE wd."person_id" = p."person_id"
+                AND wd."total_required" - COALESCE(wd."discount", 0) > COALESCE(
+                    (SELECT SUM(i."amount_paid") FROM "invoices" i WHERE i."work_id" = wd."work_id"), 0)
             )`);
       }
 
@@ -746,16 +771,14 @@ router.get(
       // Determine ORDER BY clause
       let orderByClause: RawBuilder<unknown> = sql`ORDER BY p."patient_name" ASC`;
       if (sortBy === 'date') {
-        // Reference the output alias, not p."date_added": SELECT DISTINCT
-        // requires every ORDER BY expression to appear in the select list, and
-        // date_added is exposed there only as the to_char(...)'d alias. The
-        // alias is a 'YYYY-MM-DD' string, which sorts correctly by day.
+        // References the to_char(...)'d select-list alias — a 'YYYY-MM-DD'
+        // string, which sorts correctly by day.
         orderByClause =
           order === 'desc'
             ? sql`ORDER BY "date_added" DESC NULLS LAST`
             : sql`ORDER BY "date_added" ASC NULLS LAST`;
       } else if (sortBy === 'lastVisit') {
-        // Same alias-reference rule as date_added: the last_visit subquery is
+        // Same alias-reference as date_added: the last_visit subquery is
         // exposed only as its select-list alias, a 'YYYY-MM-DD' string that
         // sorts correctly by day. Patients with no appointments sort last.
         orderByClause =
@@ -775,19 +798,22 @@ router.get(
       }
 
       // First, get the total count of matching patients.
-      // No JOINs here: every filter references p.* directly or via EXISTS
-      // subqueries, so the 5 lookup-table joins added nothing to the count.
+      // No JOINs here: every filter references p.* directly or via EXISTS /
+      // correlated subqueries, so the lookup-table joins add nothing to the count.
       const countResult = await sql<{ totalCount: number | string }>`
-            SELECT COUNT(DISTINCT p."person_id") as "totalCount"
+            SELECT COUNT(*) as "totalCount"
             FROM "patients" p
             ${whereClause}
         `.execute(db);
 
       const totalCount = Number(countResult.rows[0]?.totalCount ?? 0);
 
-      // Now get the paginated results
+      // Now get the paginated results. No DISTINCT: patients is keyed by
+      // person_id and every join below is on the target table's PK (at most one
+      // row each), so rows can't multiply — DISTINCT only forced the planner to
+      // dedupe over the whole select list (subselects included) for nothing.
       const { rows: patients } = await sql<PatientSearchResult>`
-            SELECT DISTINCT
+            SELECT
                     p."person_id", p."patient_name", p."first_name", p."last_name",
                     p."phone", p."phone2", p."email", p."date_of_birth", p."gender",
                     p."address_id", p."referral_source_id", p."patient_type_id", p."tag_id",

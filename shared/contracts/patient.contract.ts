@@ -29,7 +29,16 @@
  *    `optionalDateString`/plain string; no `timestampString` needed.
  */
 import { z } from 'zod';
-import { idParams, numericParam, intId, optionalDateString, dateString, timestampString } from '../validation.js';
+import {
+  idParams,
+  numericParam,
+  intId,
+  optionalDateString,
+  dateString,
+  timestampString,
+  optionalPositiveIntQuery,
+  optionalNonNegIntQuery,
+} from '../validation.js';
 import { withPendingOutcome } from './approvals.contract.js';
 import { XRAY_WORK_TYPE_IDS } from '../treatment-taxonomy.js';
 
@@ -212,13 +221,40 @@ export type PatientPhonesResponse = z.infer<typeof patientPhones.response>;
 
 // GET /api/patients/search — { patients, totalCount?, hasMore? }. TIGHTENED (N13):
 // the rows assert the stable ids the consumers key on.
+// Query is fully enumerated (SSoT — the route validates + z.infers from it; the
+// client builds these params in PatientManagement.executeSearch). The id lists
+// stay comma-separated strings (the route splits/parses them); boolean flags use
+// the 'true' string convention. `lastAppointment` presets ("more than N ago")
+// are mutually exclusive with the `lastAppointmentFrom`/`To` custom range
+// client-side, but the server treats them as independent AND conditions.
 export const patientSearch = {
+  query: z.object({
+    q: z.string().optional(),
+    patientName: z.string().optional(),
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+    nameStartsWith: z.enum(['true', 'false']).optional(),
+    workTypes: z.string().optional(),
+    keywords: z.string().optional(),
+    tags: z.string().optional(),
+    patientTypes: z.string().optional(),
+    lastAppointment: z.enum(['1month', '3months', '6months', '1year']).optional(),
+    lastAppointmentFrom: optionalDateString,
+    lastAppointmentTo: optionalDateString,
+    finalPhotos: z.enum(['has', 'none']).optional(),
+    hasDebt: z.enum(['true', 'false']).optional(),
+    sortBy: z.enum(['name', 'date', 'lastVisit', 'id']).optional(),
+    order: z.enum(['asc', 'desc']).optional(),
+    limit: optionalPositiveIntQuery,
+    offset: optionalNonNegIntQuery,
+  }),
   response: z.object({
     patients: z.array(z.looseObject({ person_id: z.number(), patient_name: z.string() })),
     totalCount: z.number().optional(),
     hasMore: z.boolean().optional(),
   }),
 } as const;
+export type PatientSearchQuery = z.infer<typeof patientSearch.query>;
 export type PatientSearchResponse = z.infer<typeof patientSearch.response>;
 
 // GET /api/patients/tag-options — [{ id, tag }] (tag_options.tag is NOT NULL).
@@ -226,9 +262,10 @@ export const tagOptions = {
   response: z.array(z.looseObject({ id: z.number(), tag: z.string() })),
 } as const;
 
-// GET /api/patients/type-options — [{ id, type }].
+// GET /api/patients/type-options — [{ id, type }] (both fields consumed by the
+// patient-management loader's react-select mapping).
 export const typeOptions = {
-  response: z.array(z.looseObject({ id: z.number() })),
+  response: z.array(z.looseObject({ id: z.number(), type: z.string().nullable() })),
 } as const;
 
 // GET /api/patients/:personId — single patient (raw `patients` columns) + active

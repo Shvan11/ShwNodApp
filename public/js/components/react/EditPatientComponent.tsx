@@ -111,11 +111,6 @@ const EditPatientComponent = ({ personId }: Props) => {
     const patientTypes: PatientType[] = patientTypesData ?? [];
     const tags: Tag[] = tagsData ?? [];
 
-    // Derived patient-type label for the read-only display (id→name map). Empty when
-    // the type isn't set/loaded yet.
-    const patientTypeLabel =
-        patientTypes.find((pt) => String(pt.id) === String(formData.patient_type_id))?.name ?? '';
-
     // Loading screen shows only while the patient record is in flight (a missing
     // personId resolves immediately to "not loading").
     const loading = !!personId && patientLoading;
@@ -144,6 +139,13 @@ const EditPatientComponent = ({ personId }: Props) => {
         currency: 'IQD',
         tag_id: ''
     });
+
+    // Derived patient-type label for the read-only display (id→name map). Empty when
+    // the type isn't set/loaded yet. Must stay below the `formData` declaration —
+    // `.find()` runs its callback synchronously, so referencing `formData` above it
+    // would hit the temporal dead zone once `patientTypes` is non-empty.
+    const patientTypeLabel =
+        patientTypes.find((pt) => String(pt.id) === String(formData.patient_type_id))?.name ?? '';
 
     // Populate the form when the patient record arrives (or is refetched after a
     // save). Mirrors the old loadPatientData population exactly — same field

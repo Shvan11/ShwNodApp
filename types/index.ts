@@ -42,7 +42,6 @@ export type {
   PaginationQuery,
   DateRangeQuery,
   SearchQuery,
-  PatientSearchQuery,
   AppointmentQuery,
 
   // Auth types

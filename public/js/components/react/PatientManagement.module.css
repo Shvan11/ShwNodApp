@@ -101,36 +101,6 @@
 }
 
 /* ===================================
-   MESSAGES (Error & Success)
-   =================================== */
-.errorMessage {
-    background-color: var(--error-50);
-    color: var(--error-600);
-    padding: var(--spacing-md);
-    border-radius: var(--radius-lg);
-    margin-bottom: var(--spacing-md);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.errorClose {
-    background: transparent;
-    border: none;
-    font-size: var(--font-size-2xl);
-    cursor: pointer;
-    color: var(--error-600);
-}
-
-.successMessage {
-    background-color: var(--success-100);
-    color: var(--success-800);
-    padding: var(--spacing-md);
-    border-radius: var(--radius-lg);
-    margin-bottom: var(--spacing-md);
-}
-
-/* ===================================
    LOADING & EMPTY STATES
    =================================== */
 .loadingContainer {
@@ -833,4 +803,22 @@
 
 .customDateInput {
     margin-top: var(--spacing-sm);
+}
+
+/* From/To pair under the "Custom date range..." last-appointment option. */
+.dateRangeInputs {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.dateRangeInputs .customDateInput {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.dateRangeSeparator {
+    margin-top: var(--spacing-sm);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
 }

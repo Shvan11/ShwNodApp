@@ -64,17 +64,8 @@ export default function Dashboard() {
     // Prevent page navigation when customize/arrange mode is active
     if (isCustomizeMode) return;
 
-    // Special handling for Patient Management - restore last search
-    if (link === '/patient-management') {
-      const lastSearch = sessionStorage.getItem('lastPatientSearch');
-      if (lastSearch) {
-        navigate(`/patient-management?${lastSearch}`);
-      } else {
-        navigate(link);
-      }
-    }
     // Special handling for Appointments - restore last date or default to today
-    else if (link === '/appointments') {
+    if (link === '/appointments') {
       const lastDate = sessionStorage.getItem('lastAppointmentDate');
       if (lastDate) {
         navigate(`/appointments?date=${lastDate}`);
