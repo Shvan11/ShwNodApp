@@ -26,6 +26,8 @@ import {
   approve,
   reject,
   acknowledge,
+  approveAll,
+  acknowledgeAll,
 } from '../../services/approvals/approval-service.js';
 import { log } from '../../utils/logger.js';
 
@@ -79,6 +81,48 @@ router.get(
     } catch (error) {
       log.error('Error fetching own approvals:', error);
       ErrorResponses.internalError(res, 'Failed to fetch your approvals', error as Error);
+    }
+  }
+);
+
+// POST /api/approvals/approve-all — admin-only. Bulk-approve every pending hold.
+router.post(
+  '/approvals/approve-all',
+  authenticate,
+  authorize(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const result = await approveAll(req);
+      sendData(
+        res,
+        approvalsContract.approveAll.response,
+        result,
+        `Approved ${result.approved} of ${result.total}`
+      );
+    } catch (error) {
+      log.error('Error approving all requests:', error);
+      ErrorResponses.internalError(res, 'Failed to approve all requests', error as Error);
+    }
+  }
+);
+
+// POST /api/approvals/acknowledge-all — admin-only. Clear every pending notice.
+router.post(
+  '/approvals/acknowledge-all',
+  authenticate,
+  authorize(ADMIN_ROLES),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const result = await acknowledgeAll(req);
+      sendData(
+        res,
+        approvalsContract.acknowledgeAll.response,
+        result,
+        `Cleared ${result.cleared} notice(s)`
+      );
+    } catch (error) {
+      log.error('Error acknowledging all notices:', error);
+      ErrorResponses.internalError(res, 'Failed to clear notices', error as Error);
     }
   }
 );

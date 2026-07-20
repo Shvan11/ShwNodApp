@@ -144,7 +144,7 @@ const TasksBell = () => {
 
     const openPatient = (personId: number) => {
         setOpen(false);
-        navigate(`/patient/${personId}/photos/tp0`);
+        navigate(`/patient/${personId}/works`);
     };
 
     const openEdit = (t: TaskRow) => { setEditTask(t); setFormOpen(true); setOpen(false); };

@@ -127,8 +127,8 @@ const UniversalHeader = () => {
         !onPatientRoute && currentPatient != null && String(currentPatient.code) === pendingPatientCode;
 
     // Remember the last patient sub-view (works/photos/diagnosis/visits/payments…)
-    // so the header's patient button returns there instead of always jumping to
-    // photos. Keyed per patient code; stores pathname + search to preserve deep
+    // so the header's patient button returns there instead of always jumping to a
+    // default. Keyed per patient code; stores pathname + search to preserve deep
     // state (e.g. the active timepoint slot).
     const patientViewKey = (code: string | number) => `lastPatientView:${code}`;
 
@@ -141,9 +141,11 @@ const UniversalHeader = () => {
 
     const navigateToPatient = (patientCode: string | number) => {
         // Return to the patient's last-viewed section (works, diagnosis, visits,
-        // payments, photos…) if we've recorded one; otherwise default to photos.
+        // payments, photos…) if we've recorded one; otherwise default to works
+        // (the patient's main treatment overview), matching the router's bare
+        // /patient/:code redirect.
         const lastView = sessionStorage.getItem(patientViewKey(patientCode));
-        navigate(lastView ?? `/patient/${patientCode}/photos/tp0`);
+        navigate(lastView ?? `/patient/${patientCode}/works`);
     };
 
     const closePatientTab = () => {

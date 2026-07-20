@@ -63,6 +63,9 @@ export const approvalRow = z.looseObject({
   target_table: z.string(),
   target_id: z.number(),
   person_id: z.number().nullable(),
+  // Resolved via LEFT JOIN patients on the list reads; absent (optional) on the
+  // approve/reject/acknowledge RETURNING * responses, which don't join.
+  patient_name: z.string().nullable().optional(),
   summary: z.string(),
   requested_by: z.string(),
   requested_at: timestampString,
@@ -104,3 +107,20 @@ export const acknowledgeRequest = {
   params: idParams('id'),
   response: approvalRow,
 } as const;
+
+// POST /api/approvals/approve-all — admin-only. Bulk-approve every pending hold.
+// `skipped` counts rows that couldn't apply (target changed/removed since request).
+export const approveAll = {
+  response: z.object({
+    approved: z.number(),
+    skipped: z.number(),
+    total: z.number(),
+  }),
+} as const;
+export type ApproveAllResult = z.infer<typeof approveAll.response>;
+
+// POST /api/approvals/acknowledge-all — admin-only. Clear every pending notice.
+export const acknowledgeAll = {
+  response: z.object({ cleared: z.number() }),
+} as const;
+export type AcknowledgeAllResult = z.infer<typeof acknowledgeAll.response>;

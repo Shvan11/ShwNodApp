@@ -130,6 +130,22 @@
     font-size: var(--font-size-xs);
 }
 
+.patientTag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 160px;
+    background: var(--primary-50, #eff6ff);
+    color: var(--primary-700, #1d4ed8);
+    border-radius: var(--radius-sm);
+    padding: 1px var(--spacing-xs);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .statusTag {
     border-radius: var(--radius-sm);
     padding: 1px var(--spacing-xs);

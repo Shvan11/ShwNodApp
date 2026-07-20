@@ -184,7 +184,7 @@ const TasksHistory = () => {
                                                 <button
                                                     type="button"
                                                     className={styles.patientLink}
-                                                    onClick={() => navigate(`/patient/${r.person_id}/photos/tp0`)}
+                                                    onClick={() => navigate(`/patient/${r.person_id}/works`)}
                                                 >
                                                     {r.patient_name ?? `#${r.person_id}`}
                                                 </button>

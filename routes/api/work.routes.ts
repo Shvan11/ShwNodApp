@@ -45,7 +45,7 @@ import {
 } from '../../middleware/time-based-auth.js';
 import { sendSuccess, sendData, sendError, ErrorResponses } from '../../utils/error-response.js';
 import * as workContract from '../../shared/contracts/work.contract.js';
-import { enqueueApproval, recordNotice } from '../../services/approvals/approval-service.js';
+import { enqueueApproval, recordNotice, resolveApprovalPersonId } from '../../services/approvals/approval-service.js';
 import { log } from '../../utils/logger.js';
 import {
   validateAndCreateWork,
@@ -421,14 +421,19 @@ router.delete(
   ): Promise<void> => {
     try {
       const { workId } = req.body;
+      const workIdNum = parseInt(String(workId));
+
+      // Resolve the patient BEFORE deleting — the notice fires post-delete, when
+      // the work row (and its person_id) is already gone.
+      const personId = await resolveApprovalPersonId('work.delete', workIdNum);
 
       // workId validated + coerced to a positive int by workContract.deleteWork.body.
-      const result = await validateAndDeleteWork(parseInt(String(workId)));
+      const result = await validateAndDeleteWork(workIdNum);
 
       // DeleteResult.rowsAffected is optional; on the success path it's the deleted
       // row count — coerce a (type-only) undefined to 0 to satisfy the strict contract.
       // Notify tier: same-day admin-visible FYI; recordNotice no-ops for admin callers.
-      await recordNotice('work.delete', { workId: req.body.workId }, req);
+      await recordNotice('work.delete', { workId: workIdNum, person_id: personId }, req);
       sendData(res, workContract.deleteWork.response, { outcome: 'applied', rowsAffected: result.rowsAffected ?? 0 }, 'Work deleted successfully');
     } catch (error) {
       // Handle validation errors from service layer (expected business-rule

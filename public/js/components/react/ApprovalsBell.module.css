@@ -130,6 +130,29 @@
     letter-spacing: 0.05em;
 }
 
+/* Per-section bulk action ("Approve all" / "Clear all"), right-aligned in the label */
+.bulkBtn {
+    margin-inline-start: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    padding: 1px var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    text-transform: none;
+    letter-spacing: 0;
+    cursor: pointer;
+}
+
+.bulkBtn:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+}
+
 /* Row */
 .item {
     display: flex;

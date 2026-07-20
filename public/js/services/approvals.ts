@@ -5,7 +5,11 @@
  * Mutations are here + the cross-app change signal.
  */
 import { postJSON } from '@/core/http';
-import type { ApprovalRow } from '@shared/contracts/approvals.contract';
+import type {
+    ApprovalRow,
+    ApproveAllResult,
+    AcknowledgeAllResult,
+} from '@shared/contracts/approvals.contract';
 
 export type { ApprovalRow };
 
@@ -27,4 +31,14 @@ export function rejectRequest(id: number, note?: string): Promise<ApprovalRow> {
 
 export function acknowledgeRequest(id: number): Promise<ApprovalRow> {
   return postJSON<ApprovalRow>(`/api/approvals/${id}/acknowledge`, {});
+}
+
+/** Admin: approve every pending hold at once. */
+export function approveAllRequests(): Promise<ApproveAllResult> {
+  return postJSON<ApproveAllResult>('/api/approvals/approve-all', {});
+}
+
+/** Admin: acknowledge (clear) every pending notice at once. */
+export function acknowledgeAllNotices(): Promise<AcknowledgeAllResult> {
+  return postJSON<AcknowledgeAllResult>('/api/approvals/acknowledge-all', {});
 }

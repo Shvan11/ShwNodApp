@@ -30,8 +30,16 @@ export interface ApprovalActionDef {
   pkColumn: string;
   /** Extract the target row's integer PK from the stored validated payload. */
   getTargetId: (payload: Record<string, unknown>) => number;
-  /** Extract the patient context id (for navigation chip in the bell), if available. */
-  getPersonId?: (payload: Record<string, unknown>) => number | undefined;
+  /**
+   * Resolve the patient (`person_id`) this action relates to by querying the
+   * target row — powers the patient name + navigation chip in the bell. Runs at
+   * enqueue/notice time; for holds the target row still exists so the lookup
+   * succeeds. Returns `null` for non-patient-linked actions (expenses). Because
+   * a delete-notice fires AFTER the row is gone, those routes resolve the id
+   * BEFORE deleting and pass it in the payload, which the service prefers over
+   * this lookup.
+   */
+  resolvePersonId?: (targetId: number) => Promise<number | null>;
   /**
    * Fetch the target row's current `updated_at` value (ISO string) as a version
    * stamp captured at enqueue time. Returns `null` for tables without `updated_at`
@@ -63,6 +71,26 @@ async function getUpdatedAt(table: string, pk: string, id: number): Promise<stri
   return row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at);
 }
 
+/** person_id owning a work row (works.person_id is NOT NULL). */
+async function personIdFromWork(workId: number): Promise<number | null> {
+  const res = await sql<{ person_id: number }>`
+    SELECT person_id FROM works WHERE work_id = ${workId} LIMIT 1
+  `.execute(getKysely());
+  return res.rows[0]?.person_id ?? null;
+}
+
+/** person_id owning an invoice, via its parent work (invoices.work_id → works.person_id). */
+async function personIdFromInvoice(invoiceId: number): Promise<number | null> {
+  const res = await sql<{ person_id: number }>`
+    SELECT w.person_id
+    FROM invoices i
+    JOIN works w ON w.work_id = i.work_id
+    WHERE i.invoice_id = ${invoiceId}
+    LIMIT 1
+  `.execute(getKysely());
+  return res.rows[0]?.person_id ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -72,7 +100,7 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     targetTable: 'works',
     pkColumn: 'work_id',
     getTargetId: (p) => Number(p.workId),
-    getPersonId: (p) => (p.person_id != null ? Number(p.person_id) : undefined),
+    resolvePersonId: (id) => personIdFromWork(id),
     getVersion: (id) => getUpdatedAt('works', 'work_id', id),
     summarize: (p) => `Edit work #${p.workId}`,
     apply: async (p) => {
@@ -85,7 +113,7 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     targetTable: 'works',
     pkColumn: 'work_id',
     getTargetId: (p) => Number(p.workId),
-    getPersonId: (p) => (p.person_id != null ? Number(p.person_id) : undefined),
+    resolvePersonId: (id) => personIdFromWork(id),
     getVersion: (id) => getUpdatedAt('works', 'work_id', id),
     summarize: (p) =>
       p.discount != null && Number(p.discount) > 0
@@ -101,7 +129,7 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     targetTable: 'works',
     pkColumn: 'work_id',
     getTargetId: (p) => Number(p.workId),
-    getPersonId: (p) => (p.person_id != null ? Number(p.person_id) : undefined),
+    resolvePersonId: (id) => personIdFromWork(id),
     getVersion: (id) => getUpdatedAt('works', 'work_id', id),
     summarize: (p) => `Delete work #${p.workId}`,
     apply: async (p) => {
@@ -113,7 +141,7 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     targetTable: 'invoices',
     pkColumn: 'invoice_id',
     getTargetId: (p) => Number(p.invoiceId),
-    getPersonId: () => undefined,
+    resolvePersonId: (id) => personIdFromInvoice(id),
     // invoices has no updated_at — skip stale-detection
     getVersion: async () => null,
     summarize: (p) => `Delete invoice #${p.invoiceId}`,
@@ -126,7 +154,7 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     targetTable: 'expenses',
     pkColumn: 'id',
     getTargetId: (p) => Number(p.id),
-    getPersonId: () => undefined,
+    // expenses aren't patient-linked — no person_id (no resolvePersonId).
     getVersion: (id) => getUpdatedAt('expenses', 'id', id),
     summarize: (p) => `Edit expense #${p.id}`,
     apply: async (p) => {
@@ -147,7 +175,7 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     targetTable: 'expenses',
     pkColumn: 'id',
     getTargetId: (p) => Number(p.id),
-    getPersonId: () => undefined,
+    // expenses aren't patient-linked — no person_id (no resolvePersonId).
     getVersion: (id) => getUpdatedAt('expenses', 'id', id),
     summarize: (p) => `Delete expense #${p.id}`,
     apply: async (p) => {
@@ -159,7 +187,7 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     targetTable: 'patients',
     pkColumn: 'person_id',
     getTargetId: (p) => Number(p.personId),
-    getPersonId: (p) => Number(p.personId),
+    resolvePersonId: async (id) => id,
     getVersion: (id) => getUpdatedAt('patients', 'person_id', id),
     summarize: (p) => `Delete patient #${p.personId}`,
     apply: async (p) => {

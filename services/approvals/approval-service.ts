@@ -45,7 +45,37 @@ type ApprovalRow = {
   reviewed_by: string | null;
   reviewed_at: Date | null;
   review_note: string | null;
+  // Present only on the list reads (LEFT JOIN patients); absent on RETURNING * rows.
+  patient_name?: string | null;
 };
+
+// ---------------------------------------------------------------------------
+// Person-id resolution
+// ---------------------------------------------------------------------------
+
+/** Read an explicit person id off the payload (`person_id` or `personId`), if any. */
+function payloadPersonId(payload: Record<string, unknown>): number | null {
+  const raw = payload.person_id ?? payload.personId;
+  const n = Number(raw);
+  return raw != null && Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * Resolve the patient this action relates to. Prefers an explicit id in the
+ * payload (delete-notice routes capture it before the row is gone), else queries
+ * the live target row via the action's `resolvePersonId`. Never throws.
+ */
+export async function resolveApprovalPersonId(
+  actionType: ApprovalActionType,
+  targetId: number,
+  payload: Record<string, unknown> = {}
+): Promise<number | null> {
+  const fromPayload = payloadPersonId(payload);
+  if (fromPayload != null) return fromPayload;
+  const action = APPROVAL_ACTIONS[actionType];
+  if (!action?.resolvePersonId) return null;
+  return action.resolvePersonId(targetId).catch(() => null);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -100,7 +130,7 @@ export async function enqueueApproval(
 
   const requestedBy = req.session?.username ?? 'unknown';
   const targetId = action.getTargetId(payload);
-  const personId = action.getPersonId?.(payload) ?? null;
+  const personId = await resolveApprovalPersonId(actionType, targetId, payload);
   const summary = action.summarize(payload);
   const targetVersion = await action.getVersion(targetId).catch(() => null);
 
@@ -270,7 +300,7 @@ export async function recordNotice(
 
   const requestedBy = req.session?.username ?? 'unknown';
   const targetId = action.getTargetId(payload);
-  const personId = action.getPersonId?.(payload) ?? null;
+  const personId = await resolveApprovalPersonId(actionType, targetId, payload);
   const summary = action.summarize(payload);
 
   const db = getKysely();
@@ -315,6 +345,56 @@ export async function acknowledge(
 }
 
 // ---------------------------------------------------------------------------
+// Bulk operations
+// ---------------------------------------------------------------------------
+
+/**
+ * Admin: approve every currently-pending hold, oldest first. Each row runs through
+ * the same single-row `approve()` (atomic claim → stale/missing checks → apply), so a
+ * row that changed or vanished since it was enqueued is skipped, never mis-applied.
+ * One bad row is logged and skipped rather than aborting the batch. Returns how many
+ * applied vs. were skipped.
+ */
+export async function approveAll(
+  req: WithSession
+): Promise<{ approved: number; skipped: number; total: number }> {
+  const db = getKysely();
+  const res = await sql<{ request_id: number }>`
+    SELECT request_id FROM approval_requests
+    WHERE kind = 'approval' AND status = 'pending'
+    ORDER BY requested_at ASC
+  `.execute(db);
+  const ids = res.rows.map((r) => r.request_id);
+
+  let approved = 0;
+  for (const id of ids) {
+    try {
+      const result = await approve(id, req);
+      if (result.status === 'approved') approved += 1;
+    } catch (err) {
+      log.error('approveAll: row failed', { requestId: id, error: (err as Error).message });
+    }
+  }
+  return { approved, skipped: ids.length - approved, total: ids.length };
+}
+
+/**
+ * Admin: acknowledge every currently-pending notice in one statement (clears the
+ * FYI section of the bell). Returns how many rows were cleared.
+ */
+export async function acknowledgeAll(req: WithSession): Promise<{ cleared: number }> {
+  const reviewedBy = req.session?.username ?? 'unknown';
+  const db = getKysely();
+  const res = await sql<{ request_id: number }>`
+    UPDATE approval_requests
+    SET status = 'acknowledged', reviewed_by = ${reviewedBy}, reviewed_at = LOCALTIMESTAMP
+    WHERE kind = 'notice' AND status = 'pending'
+    RETURNING request_id
+  `.execute(db);
+  return { cleared: res.rows.length };
+}
+
+// ---------------------------------------------------------------------------
 // Read helpers
 // ---------------------------------------------------------------------------
 
@@ -322,12 +402,14 @@ export async function acknowledge(
 export async function listApprovals(status: ApprovalStatus = 'pending'): Promise<ApprovalRow[]> {
   const db = getKysely();
   const res = await sql<ApprovalRow>`
-    SELECT request_id, kind, action_type, target_table, target_id, person_id,
-           summary, requested_by, requested_at, status,
-           reviewed_by, reviewed_at, review_note
-    FROM approval_requests
-    WHERE status = ${status}
-    ORDER BY requested_at DESC
+    SELECT ar.request_id, ar.kind, ar.action_type, ar.target_table, ar.target_id, ar.person_id,
+           ar.summary, ar.requested_by, ar.requested_at, ar.status,
+           ar.reviewed_by, ar.reviewed_at, ar.review_note,
+           p.patient_name
+    FROM approval_requests ar
+    LEFT JOIN patients p ON p.person_id = ar.person_id
+    WHERE ar.status = ${status}
+    ORDER BY ar.requested_at DESC
     LIMIT 200
   `.execute(db);
   return res.rows;
@@ -337,12 +419,14 @@ export async function listApprovals(status: ApprovalStatus = 'pending'): Promise
 export async function listHistory(): Promise<ApprovalRow[]> {
   const db = getKysely();
   const res = await sql<ApprovalRow>`
-    SELECT request_id, kind, action_type, target_table, target_id, person_id,
-           summary, requested_by, requested_at, status,
-           reviewed_by, reviewed_at, review_note
-    FROM approval_requests
-    WHERE status <> 'pending'
-    ORDER BY requested_at DESC
+    SELECT ar.request_id, ar.kind, ar.action_type, ar.target_table, ar.target_id, ar.person_id,
+           ar.summary, ar.requested_by, ar.requested_at, ar.status,
+           ar.reviewed_by, ar.reviewed_at, ar.review_note,
+           p.patient_name
+    FROM approval_requests ar
+    LEFT JOIN patients p ON p.person_id = ar.person_id
+    WHERE ar.status <> 'pending'
+    ORDER BY ar.requested_at DESC
     LIMIT 500
   `.execute(db);
   return res.rows;
@@ -352,12 +436,14 @@ export async function listHistory(): Promise<ApprovalRow[]> {
 export async function listMine(username: string): Promise<ApprovalRow[]> {
   const db = getKysely();
   const res = await sql<ApprovalRow>`
-    SELECT request_id, kind, action_type, target_table, target_id, person_id,
-           summary, requested_by, requested_at, status,
-           reviewed_by, reviewed_at, review_note
-    FROM approval_requests
-    WHERE requested_by = ${username}
-    ORDER BY requested_at DESC
+    SELECT ar.request_id, ar.kind, ar.action_type, ar.target_table, ar.target_id, ar.person_id,
+           ar.summary, ar.requested_by, ar.requested_at, ar.status,
+           ar.reviewed_by, ar.reviewed_at, ar.review_note,
+           p.patient_name
+    FROM approval_requests ar
+    LEFT JOIN patients p ON p.person_id = ar.person_id
+    WHERE ar.requested_by = ${username}
+    ORDER BY ar.requested_at DESC
     LIMIT 200
   `.execute(db);
   return res.rows;

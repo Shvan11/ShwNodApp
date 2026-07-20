@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { httpErrorMessage } from '@/core/http';
 import { approvalsPendingQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
@@ -10,6 +11,8 @@ import {
     approveRequest,
     rejectRequest,
     acknowledgeRequest,
+    approveAllRequests,
+    acknowledgeAllNotices,
     notifyApprovalsChanged,
     APPROVALS_CHANGED_EVENT,
     REFRESH_MS,
@@ -47,6 +50,7 @@ function relAge(iso: string | null): string {
 const ApprovalsBell = () => {
     const navigate = useNavigate();
     const toast = useToast();
+    const confirm = useConfirm();
     const queryClient = useQueryClient();
 
     const [open, setOpen] = useState(false);
@@ -129,9 +133,32 @@ const ApprovalsBell = () => {
     const handleAcknowledge = (row: ApprovalRow) =>
         runAction(() => acknowledgeRequest(row.request_id), 'Failed to acknowledge');
 
+    const handleApproveAll = async () => {
+        const n = holds.length;
+        const ok = await confirm(
+            `Approve all ${n} pending request${n === 1 ? '' : 's'}? Each change is applied immediately and cannot be undone.`,
+            { title: 'Approve all', confirmText: 'Approve all', danger: true },
+        );
+        if (!ok) return;
+        await runAction(async () => {
+            const r = await approveAllRequests();
+            if (r.skipped > 0) {
+                toast.warning(`Approved ${r.approved}; ${r.skipped} skipped (changed or removed since the request).`);
+            } else {
+                toast.success(`Approved ${r.approved} request${r.approved === 1 ? '' : 's'}.`);
+            }
+        }, 'Failed to approve all');
+    };
+
+    const handleClearAllNotices = () =>
+        runAction(async () => {
+            const r = await acknowledgeAllNotices();
+            toast.success(`Cleared ${r.cleared} notice${r.cleared === 1 ? '' : 's'}.`);
+        }, 'Failed to clear notices');
+
     const openPatient = (personId: number) => {
         setOpen(false);
-        navigate(`/patient/${personId}/photos/tp0`);
+        navigate(`/patient/${personId}/works`);
     };
 
     const toggleOpen = () => {
@@ -182,6 +209,14 @@ const ApprovalsBell = () => {
                                     <div className={styles.section}>
                                         <div className={styles.sectionLabel}>
                                             <i className="fas fa-pause-circle" aria-hidden="true" /> Holds
+                                            <button
+                                                type="button"
+                                                className={styles.bulkBtn}
+                                                onClick={() => void handleApproveAll()}
+                                                title="Approve all pending requests"
+                                            >
+                                                <i className="fas fa-check-double" aria-hidden="true" /> Approve all
+                                            </button>
                                         </div>
                                         {holds.map((row) => (
                                             <div key={row.request_id} className={styles.item}>
@@ -194,8 +229,9 @@ const ApprovalsBell = () => {
                                                                 type="button"
                                                                 className={styles.patientChip}
                                                                 onClick={() => { if (row.person_id != null) openPatient(row.person_id); }}
+                                                                title={`Open ${row.patient_name ?? `patient #${row.person_id}`} → Works`}
                                                             >
-                                                                <i className="fas fa-user" aria-hidden="true" /> Patient #{row.person_id}
+                                                                <i className="fas fa-user" aria-hidden="true" /> {row.patient_name ?? `Patient #${row.person_id}`}
                                                             </button>
                                                         )}
                                                         <span className={styles.typeTag}>
@@ -268,6 +304,14 @@ const ApprovalsBell = () => {
                                     <div className={styles.section}>
                                         <div className={styles.sectionLabel}>
                                             <i className="fas fa-info-circle" aria-hidden="true" /> Notices
+                                            <button
+                                                type="button"
+                                                className={styles.bulkBtn}
+                                                onClick={() => void handleClearAllNotices()}
+                                                title="Clear all notices"
+                                            >
+                                                <i className="fas fa-check-double" aria-hidden="true" /> Clear all
+                                            </button>
                                         </div>
                                         {notices.map((row) => (
                                             <div key={row.request_id} className={styles.item}>
@@ -280,8 +324,9 @@ const ApprovalsBell = () => {
                                                                 type="button"
                                                                 className={styles.patientChip}
                                                                 onClick={() => { if (row.person_id != null) openPatient(row.person_id); }}
+                                                                title={`Open ${row.patient_name ?? `patient #${row.person_id}`} → Works`}
                                                             >
-                                                                <i className="fas fa-user" aria-hidden="true" /> Patient #{row.person_id}
+                                                                <i className="fas fa-user" aria-hidden="true" /> {row.patient_name ?? `Patient #${row.person_id}`}
                                                             </button>
                                                         )}
                                                         <span className={styles.typeTag}>

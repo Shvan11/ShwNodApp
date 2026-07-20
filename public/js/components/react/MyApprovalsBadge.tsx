@@ -156,6 +156,15 @@ const MyApprovalsBadge = () => {
                                         <div className={styles.itemBody}>
                                             <div className={styles.itemText}>{row.summary}</div>
                                             <div className={styles.itemMeta}>
+                                                {(row.patient_name || row.person_id != null) && (
+                                                    <span
+                                                        className={styles.patientTag}
+                                                        title={row.patient_name ?? `Patient #${row.person_id}`}
+                                                    >
+                                                        <i className="fas fa-user" aria-hidden="true" />
+                                                        {row.patient_name ?? `Patient #${row.person_id}`}
+                                                    </span>
+                                                )}
                                                 <span className={styles.typeTag}>
                                                     {ACTION_LABELS[row.action_type] ?? row.action_type}
                                                 </span>

@@ -52,7 +52,7 @@ import {
   validateAndCreateInvoice,
   PaymentValidationError
 } from '../../services/business/PaymentService.js';
-import { enqueueApproval, recordNotice } from '../../services/approvals/approval-service.js';
+import { enqueueApproval, recordNotice, resolveApprovalPersonId } from '../../services/approvals/approval-service.js';
 
 const router = Router();
 
@@ -473,8 +473,13 @@ router.delete(
         return;
       }
 
+      const invoiceIdNum = parseInt(invoiceId);
+      // Resolve the patient BEFORE deleting — the notice fires post-delete, when
+      // the invoice→work→person link is already gone.
+      const personId = await resolveApprovalPersonId('invoice.delete', invoiceIdNum);
+
       const result = await sql`
-        DELETE FROM "invoices" WHERE "invoice_id" = ${parseInt(invoiceId)}
+        DELETE FROM "invoices" WHERE "invoice_id" = ${invoiceIdNum}
       `.execute(getKysely());
       const rowsAffected = Number(result.numAffectedRows ?? 0n);
 
@@ -484,7 +489,7 @@ router.delete(
       }
 
       // Notify tier: same-day admin-visible FYI; recordNotice no-ops for admin callers.
-      await recordNotice('invoice.delete', { invoiceId: parseInt(invoiceId) }, req);
+      await recordNotice('invoice.delete', { invoiceId: invoiceIdNum, person_id: personId }, req);
       sendData(res, deleteInvoice.response, { outcome: 'applied', rowsAffected }, 'Invoice deleted successfully');
     } catch (error) {
       log.error('Error deleting invoice:', error);
