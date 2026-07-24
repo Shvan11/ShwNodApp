@@ -183,6 +183,14 @@ eslint-report.json
 data/*.db
 data/*.json
 data/reverse-sync-state.json
+# (data/*.json already covers data/tv-display.settings.json — the waiting-room
+#  TV's per-deployment settings, machine config rather than source.)
+
+# Waiting-room TV signage media — clinic content dropped in by staff, including
+# large videos (hundreds of MB). Machine-local like patient files; only the
+# staff-facing note stays tracked so a fresh deployment gets the folder + README.
+tv-media/*
+!tv-media/README.txt
 
 # Archived historical migrations (kept locally for reference, not tracked)
 migrations/archive/

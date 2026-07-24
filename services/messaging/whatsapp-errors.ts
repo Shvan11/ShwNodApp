@@ -22,6 +22,21 @@ export function isConnectionStallError(raw: string | null | undefined): boolean 
 }
 
 /**
+ * whatsapp-web.js resolved a send WITHOUT throwing but handed back no usable
+ * message object/id. This means WhatsApp Web renamed/reshaped an internal field
+ * again (cf. the `_serialized` -> `$1` break) and the library needs updating.
+ * Like a stall it is a GLOBAL failure — every send in the batch hits it, not one
+ * recipient — so the batch aborts early. Unlike a stall, a client restart won't
+ * fix a library-version mismatch, so the caller must NOT restart on this.
+ */
+export const MALFORMED_SEND_RESULT_ERROR =
+  'WhatsApp returned an empty send result (whatsapp-web.js may need updating)';
+
+export function isMalformedSendResultError(raw: string | null | undefined): boolean {
+  return (raw ?? '').trim() === MALFORMED_SEND_RESULT_ERROR;
+}
+
+/**
  * Map a raw send error to a human-readable failure reason.
  * Falls back to the raw message when no signature matches.
  */
@@ -48,6 +63,12 @@ export function humanizeWhatsAppError(raw: string | null | undefined): string {
 
   if (/not ready|client not ready|disconnected during/i.test(msg)) {
     return 'WhatsApp is not connected';
+  }
+
+  // The library returned no message id — WhatsApp Web changed and the app needs
+  // an update. The message MAY have gone out, so tell the user to verify.
+  if (isMalformedSendResultError(msg)) {
+    return 'WhatsApp returned an unexpected result — the message may have been sent. Verify on the phone before resending; the app may need an update.';
   }
 
   // Minified WhatsApp Web internals throw single-letter errors (observed: "t").

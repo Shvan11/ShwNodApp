@@ -67,6 +67,7 @@ import approvalRoutes from './approval.routes.js';
 import labCaseRoutes from './lab-case.routes.js';
 import portalActivityRoutes from './portal-activity.routes.js';
 import announcementRoutes from './announcement.routes.js';
+import tvDisplayRoutes from './tv-display.routes.js';
 
 // Import template routes (already modular)
 import templateRouter from '../template-api.js';
@@ -180,5 +181,9 @@ router.use('/', portalActivityRoutes);
 
 // Doctor announcements — staff-composed + auto batch events for the aligner portal (/api/announcements*)
 router.use('/', announcementRoutes);
+
+// Waiting-room TV signage — Settings → TV Display (/api/tv-display*). The TV's
+// own session-less endpoints are mounted pre-auth in index.ts (/tv-display).
+router.use('/', tvDisplayRoutes);
 
 export default router;

@@ -24,6 +24,7 @@ import SupabaseStatusSettings from './SupabaseStatusSettings';
 import DolphinStatusSettings from './DolphinStatusSettings';
 import IntegrationsSettings from './IntegrationsSettings';
 import DatabaseBackupSettings from './DatabaseBackupSettings';
+import TvDisplaySettings from './TvDisplaySettings';
 
 // Types
 interface SettingsTabComponentProps {
@@ -135,6 +136,16 @@ const tabs: TabConfig[] = [
         icon: 'fas fa-database',
         component: DolphinStatusSettings,
         description: 'Live status of the legacy Dolphin Imaging SQL Server sink'
+    },
+    {
+        id: 'tvDisplay',
+        label: 'TV Display',
+        icon: 'fas fa-tv',
+        component: TvDisplaySettings,
+        description: 'Waiting-room screen: schedule, playback options and media',
+        // Deliberately available to every staff role — reception runs the
+        // waiting-room screen day to day. Access is enforced server-side in
+        // routes/api/tv-display.routes.ts (authorize); the two must move together.
     },
     {
         id: 'integrations',

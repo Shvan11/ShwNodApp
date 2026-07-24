@@ -34,6 +34,7 @@ import * as userManagementContract from '@shared/contracts/user-management.contr
 import * as emailApiContract from '@shared/contracts/email-api.contract';
 import * as settingsContract from '@shared/contracts/settings.contract';
 import * as brandingContract from '@shared/contracts/branding.contract';
+import * as tvDisplayContract from '@shared/contracts/tv-display.contract';
 import * as telegramContract from '@shared/contracts/telegram.contract';
 import * as integrationsContract from '@shared/contracts/integrations.contract';
 import * as threeshapeContract from '@shared/contracts/threeshape.contract';
@@ -1337,6 +1338,23 @@ export const brandingQuery = () =>
         schema: brandingContract.getBranding.response,
       }),
     staleTime: 5 * 60 * 1000,
+  });
+
+/**
+ * GET /api/tv-display — waiting-room signage state: settings, the media folder's
+ * contents, and liveness (when the TV last fetched the slideshow / the LG daemon
+ * last fetched settings). The liveness half is only meaningful while the tab is
+ * open, so this refetches on an interval rather than caching — see the tab.
+ */
+export const tvDisplayQuery = () =>
+  queryOptions({
+    queryKey: qk.tvDisplay(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof tvDisplayContract.getState.response>>('/api/tv-display', {
+        signal,
+        schema: tvDisplayContract.getState.response,
+      }),
+    staleTime: 0,
   });
 
 /** GET /api/email/config — SMTP configuration. */

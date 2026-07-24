@@ -345,6 +345,13 @@ export const qk = {
   dailyInvoices: (date: string) => ['daily-invoices', date] as const,
   /** Clinic branding (header logo + display name) — header + General settings. */
   branding: () => ['branding'] as const,
+  /**
+   * Waiting-room TV signage (Settings → TV Display) — settings + media folder +
+   * liveness under ONE key: every mutation returns the whole refreshed state,
+   * and a media write can rename other files (reorder renumbers prefixes), so
+   * nothing finer-grained would be safe to invalidate on its own.
+   */
+  tvDisplay: () => ['tv-display'] as const,
   /** Media — photo-type taxonomy + WebCeph patient link (WebCeph modal). */
   media: {
     photoTypes: () => ['media', 'photo-types'] as const,

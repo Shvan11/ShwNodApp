@@ -44,6 +44,7 @@ import lookupRoutes from './routes/api/lookup.routes.js';
 import lookupAdminRoutes from './routes/api/lookup-admin.routes.js';
 import holidayRoutes from './routes/api/holiday.routes.js';
 import publicVideoRoutes from './routes/public/video.routes.js';
+import tvDisplayRoutes from './routes/public/tv-display.routes.js';
 import portalRoutes from './routes/portal.js';
 import whatsappService from './services/messaging/whatsapp.js';
 import session from 'express-session';
@@ -311,6 +312,11 @@ async function initializeApplication(): Promise<AppInitResult> {
     app.use('/api', costPresetRoutes);
     app.use('/api', lookupRoutes);
     app.use('/v', publicVideoRoutes); // Public video sharing (no auth - educational content)
+    // Waiting-room TV signage slideshow (no auth - the TV browser has no session;
+    // serves only signage content dropped into the tv-media folder, never PHI).
+    // Self-contained feature: see routes/public/tv-display.routes.ts. Remove by
+    // deleting that file + this mount.
+    app.use('/tv-display', tvDisplayRoutes);
     app.use('/api/portal', portalRoutes); // Patient portal (own session, own auth)
 
     // Serve login page BEFORE auth check (public access)

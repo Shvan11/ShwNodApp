@@ -7,7 +7,12 @@ import * as messagingQueries from '../database/queries/messaging-queries.js';
 import { InternalEmitterEvents } from './websocket-events.js';
 import { messageSessionManager, type MessageLookupResult } from './MessageSessionManager.js';
 import { type MessageSession } from './MessageSession.js';
-import { humanizeWhatsAppError, isConnectionStallError } from './whatsapp-errors.js';
+import {
+  humanizeWhatsAppError,
+  isConnectionStallError,
+  isMalformedSendResultError,
+  MALFORMED_SEND_RESULT_ERROR,
+} from './whatsapp-errors.js';
 import { log } from '../../utils/logger.js';
 import { PhoneFormatter } from '../../utils/phoneFormatter.js';
 import pdfGenerator from '../pdf/appointment-pdf-generator.js';
@@ -2259,6 +2264,10 @@ class WhatsAppService extends EventEmitter {
         const MAX_CONSECUTIVE_STALLS = 2;
         let consecutiveStalls = 0;
         let abortedByStalls = false;
+        // Same 2-in-a-row debounce for malformed library results (see the catch
+        // block) so a lone anomaly can't nuke a whole batch.
+        let consecutiveMalformed = 0;
+        let abortedByMalformed = false;
         for (let i = 0; i < numbers.length; i++) {
           if (!this.isReady()) {
             throw new Error('Client disconnected during sending');
@@ -2275,6 +2284,7 @@ class WhatsAppService extends EventEmitter {
             );
             results.push(result);
             consecutiveStalls = 0;
+            consecutiveMalformed = 0;
 
             if (i < numbers.length - 1) {
               await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -2283,7 +2293,21 @@ class WhatsAppService extends EventEmitter {
             log.error(`Error sending message to ${numbers[i]}`, error);
             results.push({ success: false, error: (error as Error).message });
 
-            if (isConnectionStallError((error as Error).message)) {
+            if (isMalformedSendResultError((error as Error).message)) {
+              // Systemic library break (WhatsApp Web changed shape) — every send
+              // will hit it. Abort once it repeats; a restart can't fix a
+              // version mismatch, so this path deliberately does NOT restart.
+              consecutiveMalformed += 1;
+              if (consecutiveMalformed >= MAX_CONSECUTIVE_STALLS) {
+                abortedByMalformed = true;
+                log.error('Aborting batch — WhatsApp returned malformed send results; whatsapp-web.js likely needs updating', {
+                  date,
+                  attempted: i + 1,
+                  remaining: numbers.length - i - 1,
+                });
+                break;
+              }
+            } else if (isConnectionStallError((error as Error).message)) {
               consecutiveStalls += 1;
               if (consecutiveStalls >= MAX_CONSECUTIVE_STALLS) {
                 abortedByStalls = true;
@@ -2296,9 +2320,10 @@ class WhatsAppService extends EventEmitter {
                 break;
               }
             } else {
-              // Per-recipient failure (e.g. not on WhatsApp) — not a
-              // connection signal, keep going.
+              // Per-recipient failure (e.g. not on WhatsApp) — not a systemic
+              // signal, keep going.
               consecutiveStalls = 0;
+              consecutiveMalformed = 0;
             }
           }
         }
@@ -2342,6 +2367,24 @@ class WhatsAppService extends EventEmitter {
           void this.restart().catch((err) => {
             log.error('Stall-abort restart failed', { error: (err as Error).message });
           });
+        } else if (abortedByMalformed) {
+          // The library returned unusable results — the app needs updating.
+          // Don't restart (a version mismatch survives it) and don't arm the
+          // ack watchdog (the batch was aborted, so ack silence is expected,
+          // not a zombie-send). Just warn the user clearly.
+          const sentOk = results.filter((r) => r.success).length;
+          const remaining = numbers.length - results.length;
+          if (this.wsEmitter) {
+            this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SEND_UNCONFIRMED, {
+              date,
+              sentCount: sentOk,
+              message:
+                `WhatsApp sending for ${date} was aborted — WhatsApp changed and the ` +
+                `app needs updating (${remaining} message(s) not attempted). Verify on ` +
+                `the phone whether the ${sentOk} earlier message(s) delivered, then ` +
+                'contact support before resending.',
+            });
+          }
         } else {
           this.armAckSilenceWatchdog(
             date,
@@ -2434,6 +2477,14 @@ class WhatsAppService extends EventEmitter {
         this.SEND_MESSAGE_TIMEOUT_MS,
         `sendMessage ${cleanNumber}`
       );
+
+      // Resolved without throwing but no usable message id: WhatsApp Web changed
+      // an internal shape and the library needs updating (cf. _serialized -> $1).
+      // The message was likely already dispatched — surface it as a distinct,
+      // batch-aborting signal so we don't fire the whole list at a broken lib.
+      if (!sentMessage?.id?.id) {
+        throw new Error(MALFORMED_SEND_RESULT_ERROR);
+      }
 
       log.debug(`Message sent to ${number} (normalized: ${cleanNumber})`);
 
@@ -2535,6 +2586,12 @@ class WhatsAppService extends EventEmitter {
         this.SEND_MESSAGE_TIMEOUT_MS,
         `sendMessage ${cleanNumber}`
       );
+
+      // See sendSingleMessage: a resolved-but-empty result means the library
+      // needs updating. Fail cleanly (the caller is a human who can verify).
+      if (!sentMessage?.id?.id) {
+        throw new Error(MALFORMED_SEND_RESULT_ERROR);
+      }
 
       log.debug(`Message sent to ${number} (normalized: ${cleanNumber})`);
 
