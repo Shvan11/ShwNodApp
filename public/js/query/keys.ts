@@ -186,12 +186,14 @@ export const qk = {
   },
   /** Financial statistics / reports (StatisticsComponent). */
   reports: {
-    statistics: (month: number, year: number, rate: number) =>
-      ['reports', 'statistics', month, year, rate] as const,
-    yearly: (startMonth: number, startYear: number, rate: number) =>
-      ['reports', 'yearly', startMonth, startYear, rate] as const,
-    multiYear: (startYear: number, endYear: number, rate: number) =>
-      ['reports', 'multi-year', startYear, endYear, rate] as const,
+    // No rate in these keys: the server resolves the period's exchange rate from `sms`
+    // (it used to be a client-supplied constant), so month/year fully identify the read.
+    statistics: (month: number, year: number) =>
+      ['reports', 'statistics', month, year] as const,
+    yearly: (startMonth: number, startYear: number) =>
+      ['reports', 'yearly', startMonth, startYear] as const,
+    multiYear: (startYear: number, endYear: number) =>
+      ['reports', 'multi-year', startYear, endYear] as const,
     /** GET /api/statistics/commissions?startDate=&endDate= — per-doctor commission. */
     commissions: (startDate: string, endDate: string) =>
       ['reports', 'commissions', startDate, endDate] as const,
@@ -347,9 +349,9 @@ export const qk = {
   branding: () => ['branding'] as const,
   /**
    * Waiting-room TV signage (Settings → TV Display) — settings + media folder +
-   * liveness under ONE key: every mutation returns the whole refreshed state,
-   * and a media write can rename other files (reorder renumbers prefixes), so
-   * nothing finer-grained would be safe to invalidate on its own.
+   * playlist + liveness under ONE key: every mutation returns the whole refreshed
+   * state (an upload appends to the playlist, a delete prunes it), so nothing
+   * finer-grained would be safe to invalidate on its own.
    */
   tvDisplay: () => ['tv-display'] as const,
   /** Media — photo-type taxonomy + WebCeph patient link (WebCeph modal). */

@@ -19,10 +19,9 @@ import { log } from '../../utils/logger.js';
 import { sql } from 'kysely';
 import { getKysely } from '../../services/database/kysely.js';
 import {
-  getActiveWorkForInvoice,
   getCurrentExchangeRate,
   getPaymentHistoryByWorkId,
-  getExchangeRateForDate,
+  getExchangeRateAsOf,
   updateExchangeRateForDate,
   listExchangeRates
 } from '../../services/database/queries/payment-queries.js';
@@ -37,7 +36,6 @@ import { validate } from '../../middleware/validate.js';
 import {
   paymentHistory,
   workForReceipt,
-  activeWorkForInvoice,
   currentExchangeRate,
   exchangeRateForDate,
   exchangeRates,
@@ -178,36 +176,6 @@ router.get(
   }
 );
 
-/**
- * Get active work items for invoice creation
- * GET /api/getActiveWorkForInvoice?PID={patientId}
- */
-router.get(
-  '/getActiveWorkForInvoice',
-  async (
-    req: Request<unknown, unknown, unknown, PaymentQueryParams>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { PID } = req.query;
-      if (!PID) {
-        ErrorResponses.missingParameter(res, 'PID');
-        return;
-      }
-
-      const workData = await getActiveWorkForInvoice(parseInt(PID, 10));
-      sendData(res, activeWorkForInvoice.response, workData);
-    } catch (error) {
-      log.error('Error getting active work for invoice:', error);
-      ErrorResponses.internalError(
-        res,
-        (error as Error).message,
-        error as Error
-      );
-    }
-  }
-);
-
 // ============================================================================
 // EXCHANGE RATE ROUTES
 // ============================================================================
@@ -244,8 +212,14 @@ router.get(
 );
 
 /**
- * Get exchange rate for a specific date
+ * Get the exchange rate IN FORCE on a specific date
  * GET /api/getExchangeRateForDate?date={date}
+ *
+ * Carries the last known rate forward when the date itself has none — nobody entering
+ * today's rate yet is not a reason to refuse every payment (the rate didn't reset at
+ * midnight). `rateDate` names the day the returned rate was recorded and
+ * `isCarriedForward` flags the substitution so the UI can offer to set the real one.
+ * 404 only when no rate has EVER been recorded.
  */
 router.get(
   '/getExchangeRateForDate',
@@ -261,14 +235,21 @@ router.get(
         return;
       }
 
-      const exchangeRate = await getExchangeRateForDate(date);
+      // Returns the exact-date rate when there is one (it sorts first), else the
+      // most recent earlier rate — one round trip covers both.
+      const rate = await getExchangeRateAsOf(date);
 
-      if (exchangeRate === null || exchangeRate === undefined) {
+      if (!rate) {
         ErrorResponses.notFound(res, `Exchange rate for ${date}`, { date });
         return;
       }
 
-      sendData(res, exchangeRateForDate.response, { exchangeRate, date });
+      sendData(res, exchangeRateForDate.response, {
+        exchangeRate: rate.exchangeRate,
+        date,
+        rateDate: rate.rateDate,
+        isCarriedForward: rate.rateDate !== date,
+      });
     } catch (error) {
       log.error('Error getting exchange rate for date:', error);
       ErrorResponses.internalError(
@@ -369,8 +350,8 @@ router.post(
  * Validation Rules:
  * 1. At least one currency amount (USD or IQD) must be > 0
  * 2. currency amounts cannot be negative
- * 3. For same-currency payments: change is set to NULL (not tracked)
- * 4. For cross-currency payments: change is validated and saved
+ * 3. For same-currency payments with no change: change is set to NULL (not tracked)
+ * 4. Any change actually handed back is validated and saved, same- or cross-currency
  * 5. change cannot exceed IQD received (simple case)
  * 6. For USD payments: change validated against total IQD value at exchange rate
  */

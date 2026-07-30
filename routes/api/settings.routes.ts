@@ -410,14 +410,37 @@ router.post(
         `Application restart requested. reason: ${reason || 'Manual restart'}`
       );
 
-      // Send response before restarting (then process.exit in the setTimeout
-      // below — the envelope is flushed first; behavior preserved).
+      // Answer before tearing anything down, so the envelope reaches the client
+      // while the HTTP server is still accepting writes.
       sendData(res, settings.restart.response, { message: 'Application restart initiated' });
 
-      // Give time for response to be sent
+      // Then run the SAME teardown a SIGTERM would: SSE broadcasters, the
+      // WhatsApp/Puppeteer client, the CDC sinks, LocalSend, the PG pool and the
+      // ResourceManager tasks — in that order, under its own 15 s watchdog —
+      // finishing with process.exit(0), which is what the service manager
+      // restarts on. A bare process.exit() here skipped every one of those:
+      // Chrome was orphaned (poisoning the WhatsApp session on next boot) and
+      // CDC capture was left switched on, the exact failure mode a hard exit
+      // caused via SIGHUP before.
+      //
+      // Imported dynamically: index.ts pulls in this router at boot, so a static
+      // import would close a module cycle. By the time a request can arrive,
+      // index.js is fully evaluated, and this resolves from cache.
       setTimeout(() => {
-        log.info('Restarting application...');
-        process.exit(0); // This will trigger the process manager to restart
+        void (async () => {
+          log.info('Restarting application...');
+          try {
+            const { gracefulShutdown } = await import('../../index.js');
+            await gracefulShutdown('api-restart');
+          } catch (error) {
+            // Never leave the process wedged: if teardown can't even start, fall
+            // back to the abrupt exit so the service manager still restarts us.
+            log.error('Graceful shutdown failed during restart; exiting hard', {
+              error: (error as Error).message,
+            });
+            process.exit(0);
+          }
+        })();
       }, 1000);
     } catch (error) {
       log.error('Error initiating restart:', error);

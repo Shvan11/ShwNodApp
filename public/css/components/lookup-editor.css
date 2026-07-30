@@ -4,23 +4,6 @@
  * Styles for the lookup table management interface in Settings
  */
 
-/* Main container */
-.lookups-settings {
-    padding: var(--spacing-md);
-}
-
-.lookups-settings .settings-section {
-    background: var(--background-primary);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
-}
-
-.lookups-settings .section-description {
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-lg);
-    font-size: var(--font-size-sm);
-}
-
 /* Loading state */
 .lookup-loading {
     display: flex;
@@ -35,104 +18,6 @@
 .lookup-loading i {
     font-size: var(--font-size-2xl);
     color: var(--primary-color);
-}
-
-/* Group headers */
-.lookup-group {
-    margin-bottom: var(--spacing-xl);
-}
-
-.lookup-group:last-child {
-    margin-bottom: 0;
-}
-
-.lookup-group-header {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-md);
-    padding-bottom: var(--spacing-sm);
-    border-bottom: 1px solid var(--border-color);
-}
-
-.lookup-group-header i {
-    color: var(--primary-color);
-}
-
-/* Accordion */
-.lookup-accordion {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-}
-
-.lookup-accordion-item {
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    transition: box-shadow 0.2s ease;
-}
-
-.lookup-accordion-item:hover {
-    box-shadow: var(--shadow-sm);
-}
-
-.lookup-accordion-item.expanded {
-    box-shadow: var(--shadow-md);
-}
-
-.lookup-accordion-header {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--spacing-md) var(--spacing-lg);
-    background: var(--background-secondary);
-    border: none;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.lookup-accordion-header:hover {
-    background: var(--background-tertiary);
-}
-
-.lookup-accordion-item.expanded .lookup-accordion-header {
-    background: var(--primary-color);
-    color: var(--color-white);
-}
-
-.accordion-title {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    font-weight: var(--font-weight-medium);
-}
-
-.accordion-title i {
-    width: 20px;
-    text-align: center;
-}
-
-.accordion-title-text {
-    font-size: var(--font-size-base);
-}
-
-.accordion-chevron {
-    transition: transform 0.2s ease;
-}
-
-.lookup-accordion-item.expanded .accordion-chevron {
-    transform: rotate(180deg);
-}
-
-.lookup-accordion-content {
-    padding: var(--spacing-lg);
-    background: var(--background-primary);
-    border-top: 1px solid var(--border-color);
 }
 
 /* Editor toolbar */
@@ -198,7 +83,12 @@
 .lookup-table-container {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    overflow: hidden;
+    /* Must be `auto`, not `hidden`: `th` is nowrap and the id/actions columns are
+       fixed-width, so a multi-column table (Document Types is ~860px) exceeds a
+       phone viewport. `hidden` clipped the overflow away with no way to reach the
+       Actions buttons; scrolling keeps them reachable. Still clips to the radius,
+       since a scroll container clips to its padding box. */
+    overflow-x: auto;
 }
 
 .lookup-table {
@@ -369,6 +259,9 @@
     border-radius: var(--radius-md);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.1);
     width: 280px;
+    /* Mirrors the `padding` in LookupEditor.tsx#calculatePosition, which clamps
+       `left` against this same effective width. */
+    max-width: calc(100vw - 16px);
     animation: popoverSlideIn 0.15s ease-out;
 }
 
@@ -630,32 +523,9 @@
     .lookup-table td {
         padding: var(--spacing-xs) var(--spacing-sm);
     }
-
-    .lookup-accordion-header {
-        padding: var(--spacing-sm) var(--spacing-md);
-    }
-
-    .accordion-title-text {
-        font-size: var(--font-size-sm);
-    }
-
-    /* Popover responsive */
-    .lookup-editor-popover {
-        width: calc(100vw - 24px);
-        left: 12px !important;
-        right: 12px;
-    }
 }
 
 @media (max-width: 480px) {
-    .lookups-settings .settings-section {
-        padding: var(--spacing-md);
-    }
-
-    .lookup-accordion-content {
-        padding: var(--spacing-md);
-    }
-
     /* Stack action buttons vertically on very small screens */
     .actions-cell {
         flex-direction: column;
@@ -665,12 +535,6 @@
     .btn-icon {
         width: 28px;
         height: 28px;
-    }
-
-    /* Popover responsive */
-    .delete-confirm-popover {
-        width: calc(100vw - 24px);
-        left: 12px !important;
     }
 
     .popover-actions {

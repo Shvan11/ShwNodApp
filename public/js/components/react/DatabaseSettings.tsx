@@ -63,6 +63,9 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
     const [seededConfigData, setSeededConfigData] = useState<unknown>(null);
     if (configData?.config && configData !== seededConfigData) {
         setSeededConfigData(configData);
+        // `getDatabaseConfig.response` types `config` as `z.unknown()` on purpose —
+        // the DB config is a free-form map validated field-by-field server-side by
+        // DatabaseConfigService — so a single assertion off `unknown` is required.
         setConfig(configData.config as DatabaseConfig);
     }
 

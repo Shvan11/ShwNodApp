@@ -7,6 +7,10 @@
  *
  * Resilience / anti-bloat (identical guarantees per sink):
  *  - Destination down → applies throw, the cycle logs and retries next tick; rows are NOT deleted.
+ *  - Destination down AT START → sink.init() throws, so the engine retries the start on a backoff
+ *    rather than abandoning the sink for the whole process lifetime. Boot order is NOT a given: the
+ *    Dolphin SQL Server is a Windows DELAYED auto-start service and comes up ~2min AFTER this app,
+ *    so a one-shot start left that sink dead on every boot while capture kept filling change_log.
  *  - Coalescing (UNIQUE(sink,tbl,pk)) bounds the backlog to distinct rows touched, not writes.
  *  - Circuit breaker: backlog past maxBacklog disables this sink's capture and flags it stale
  *    (full reload required), protecting the local disk during a pathological outage.
@@ -31,8 +35,14 @@ interface ChangeRow {
   changed_at_text: string;
 }
 
+/** A sink whose destination is not reachable yet retries its start on this backoff (doubling). */
+const START_RETRY_MIN_MS = 5_000;
+const START_RETRY_MAX_MS = 300_000;
+
 export class CdcEngine {
   private timer: NodeJS.Timeout | null = null;
+  private retryTimer: NodeJS.Timeout | null = null;
+  private retryDelayMs = 0;
   private draining = false;
   private stopped = true;
   private breaker = false;
@@ -65,15 +75,48 @@ export class CdcEngine {
     if (this.timer) return;
     this.stopped = false;
     this.breaker = false;
-    await this.sink.init();
-    await this.setControl(true, { stale: false, note: 'engine started' });
+    this.clearRetry();
+    try {
+      await this.sink.init();
+      await this.setControl(true, { stale: false, note: 'engine started' });
+    } catch (err) {
+      // Destination not up yet (or a transient auth/network fault). Capture is left exactly as it
+      // was, so change_log keeps coalescing and the retry drains it — nothing is lost by waiting.
+      this.scheduleStartRetry(err as Error);
+      return;
+    }
+    // stop() may have landed while init() was in flight — do not resurrect a stopped engine.
+    if (this.stopped) return;
+    this.retryDelayMs = 0;
     log.info(`✅ CDC sink "${this.sink.name}" started — capture ON, draining every ${this.opts.intervalMs}ms`);
     this.timer = setInterval(() => void this.drainOnce(), this.opts.intervalMs);
     void this.drainOnce();
   }
 
+  /** Re-attempt a failed start on an exponential backoff until it succeeds or stop() is called. */
+  private scheduleStartRetry(err: Error): void {
+    if (this.stopped) return;
+    this.retryDelayMs =
+      this.retryDelayMs === 0 ? START_RETRY_MIN_MS : Math.min(this.retryDelayMs * 2, START_RETRY_MAX_MS);
+    log.warn(`[cdc:${this.sink.name}] start failed — retrying in ${Math.round(this.retryDelayMs / 1000)}s`, {
+      error: err.message,
+    });
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      if (!this.stopped) void this.start();
+    }, this.retryDelayMs);
+  }
+
+  private clearRetry(): void {
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+  }
+
   async stop(): Promise<void> {
     this.stopped = true;
+    this.clearRetry();
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;

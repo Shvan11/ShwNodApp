@@ -11,7 +11,8 @@
     "noRate": "لا يوجد سعر صرف لـ {{date}}",
     "setRate": "تعيين السعر",
     "save": "حفظ",
-    "display": "1 USD = {{rate}} IQD"
+    "display": "1 USD = {{rate}} IQD",
+    "carriedForward": "(منقول من {{date}})"
   },
   "form": {
     "currency": "عملة الدفع",
@@ -70,12 +71,17 @@
     "cantCalculate": "تعذّر حساب المبلغ المراد تسجيله. يرجى التحقق من المبالغ النقدية.",
     "enterAtLeastOne": "يرجى إدخال مبلغ بعملة واحدة على الأقل",
     "exceedsBalance": "المبلغ يتجاوز الرصيد المتبقي ({{balance}})",
-    "invalidChange": "باقٍ غير صحيح: {{change}} دينار لا يمكن أن يتجاوز الدينار المستلم ({{received}} دينار)"
+    "rateRequired": "هذه الدفعة تتضمن تحويل عملة — يرجى تعيين سعر الصرف لـ {{date}} أولاً",
+    "invalidChange": "باقٍ غير صحيح: {{change}} دينار لا يمكن أن يتجاوز الدينار المستلم ({{received}} دينار)",
+    "rateAlreadySet": "التاريخ {{date}} له سعر صرف مسجّل خاص به — لا يمكن تغييره من هنا. عدّله من الإعدادات ← أسعار الصرف."
   },
   "confirm": {
     "underpaymentMessage": "لم يدفع المريض المبلغ الكافي. المبلغ المستلم أقل من المبلغ المراد تسجيله. هل تريد المتابعة؟",
     "underpaymentTitle": "تحذير دفع ناقص",
-    "underpaymentConfirm": "متابعة"
+    "underpaymentConfirm": "متابعة",
+    "backdatedRateMessage": "سيتم تسجيل 1 USD = {{rate}} IQD كسعر صرف للتاريخ {{date}}، وهو تاريخ سابق. سيُعاد احتساب الإجمالي الكلي لذلك اليوم في الإحصائيات بهذا السعر. هل تريد المتابعة؟",
+    "backdatedRateTitle": "تعيين سعر صرف لتاريخ سابق",
+    "backdatedRateConfirm": "تسجيل السعر"
   },
   "toast": {
     "rateError": "خطأ في تعيين سعر الصرف: {{error}}",

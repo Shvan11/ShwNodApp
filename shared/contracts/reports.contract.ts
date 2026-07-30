@@ -22,12 +22,20 @@ import { timestampString } from '../validation.js';
 // ── Shared money + summary shapes ──────────────────────────────────────────────
 const currencyAmounts = z.object({ IQD: z.number(), USD: z.number() });
 
+// Every CONVERTED figure is nullable, and null means one specific thing: no exchange
+// rate has ever been recorded, so there is no honest way to express IQD and USD as one
+// number. The app does NOT substitute a house rate for this (it used to fall back to a
+// hardcoded 1450, which silently produced plausible-looking totals from a number nobody
+// chose — on a fresh deployment that was the day-one path). Un-converted IQD/USD
+// figures are exact and stay non-null regardless.
+const convertedAmounts = z.object({ IQD: z.number().nullable(), USD: z.number().nullable() });
+
 // Monthly `summary` = MonthlyStatistics (grandTotal + cashBox are money pairs).
 const monthlyStatisticsSummary = z.object({
   totalRevenue: currencyAmounts,
   totalExpenses: currencyAmounts,
   netProfit: currencyAmounts,
-  grandTotal: currencyAmounts,
+  grandTotal: convertedAmounts,
   cashBox: currencyAmounts,
 });
 
@@ -36,7 +44,7 @@ const periodStatisticsSummary = z.object({
   totalRevenue: currencyAmounts,
   totalExpenses: currencyAmounts,
   netProfit: currencyAmounts,
-  grandTotal: z.number(),
+  grandTotal: z.number().nullable(),
 });
 
 // ── Row shapes (mirror the service / route / query interfaces) ─────────────────
@@ -68,7 +76,7 @@ const monthlyTotalRow = z.object({
   SumUSD: z.number(),
   ExpensesUSD: z.number(),
   FinalUSDSum: z.number(),
-  GrandTotal: z.number(),
+  GrandTotal: z.number().nullable(),
 });
 
 // YearTotal (reports.routes) — one aggregated year in the multi-year range.
@@ -80,7 +88,7 @@ const yearTotalRow = z.object({
   ExpensesUSD: z.number(),
   FinalIQDSum: z.number(),
   FinalUSDSum: z.number(),
-  GrandTotal: z.number(),
+  GrandTotal: z.number().nullable(),
 });
 
 // EnrichedInvoice (FinancialReportService) = the getDailyInvoices row + received
@@ -160,16 +168,18 @@ export type CommissionsQuery = z.infer<typeof commissions.query>;
 // split by works.currency, grouped two ways: by work type and by doctor. `id`/`name` are
 // generic so one row schema + one table serves both dimensions. `usd_equivalent` =
 // paid_usd + paid_iqd / exchangeRate (computed + rounded in the route, used as the "most
-// money" ranking key); `exchangeRate` is the most recent real rate from `sms` (NOT a
-// hardcoded 1450). CLOSED `z.object` containers — fully modeled, so NOT a D2 loose-response
-// marker (no baseline bump), same as the commissions schema. Money columns are PG integers.
+// money" ranking key); `exchangeRate` is the most recent real rate from `sms`. Both are
+// NULL when no rate has ever been recorded — there is no house rate to fall back on, so
+// the rows are ranked by IQD collected instead and the UI shows "—" for the equivalent.
+// CLOSED `z.object` containers — fully modeled, so NOT a D2 loose-response marker (no
+// baseline bump), same as the commissions schema. Money columns are PG integers.
 const revenueRow = z.object({
   id: z.number(),
   name: z.string(),
   paid_iqd: z.number(),
   paid_usd: z.number(),
   work_count: z.number(),
-  usd_equivalent: z.number(),
+  usd_equivalent: z.number().nullable(),
 });
 export type RevenueRow = z.infer<typeof revenueRow>;
 
@@ -181,7 +191,7 @@ export const revenueBreakdown = {
   response: z.object({
     byWorkType: z.array(revenueRow),
     byDoctor: z.array(revenueRow),
-    exchangeRate: z.number(),
+    exchangeRate: z.number().nullable(),
     startDate: z.string(),
     endDate: z.string(),
   }),

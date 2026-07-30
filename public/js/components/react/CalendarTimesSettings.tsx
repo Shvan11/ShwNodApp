@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { adminLookupItemsQuery, optionQuery } from '@/query/queries';
@@ -70,6 +70,23 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
     const [isRegenerating, setIsRegenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+    // Show a success banner that clears itself. The handle is kept so a second
+    // action doesn't leave the first action's timer running (it would blank the
+    // newer message early), and so switching tabs mid-countdown doesn't leave a
+    // timer firing setState into an unmounted tree.
+    const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const flashSuccess = useCallback((message: string, ms = 3000): void => {
+        if (successTimer.current) clearTimeout(successTimer.current);
+        setSuccessMessage(message);
+        successTimer.current = setTimeout(() => {
+            successTimer.current = null;
+            setSuccessMessage(null);
+        }, ms);
+    }, []);
+    useEffect(() => () => {
+        if (successTimer.current) clearTimeout(successTimer.current);
+    }, []);
 
     // New time slot input
     const [newTimeHour, setNewTimeHour] = useState('');
@@ -242,8 +259,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             // Clear inputs
             setNewTimeHour('');
             setNewTimeMinute('00');
-            setSuccessMessage(`Added time slot ${timeStr}`);
-            setTimeout(() => setSuccessMessage(null), 3000);
+            flashSuccess(`Added time slot ${timeStr}`);
 
         } catch (err) {
             console.error('Error adding time slot:', err);
@@ -275,8 +291,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             await queryClient.invalidateQueries({ queryKey: qk.adminLookups.table('tbltimes') });
 
             setDeleteConfirm(null);
-            setSuccessMessage(`Deleted time slot ${timeStr}`);
-            setTimeout(() => setSuccessMessage(null), 3000);
+            flashSuccess(`Deleted time slot ${timeStr}`);
 
         } catch (err) {
             console.error('Error deleting time slot:', err);
@@ -311,8 +326,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             queryClient.invalidateQueries({ queryKey: qk.settings.option('CALENDAR_LATE_SLOTS') });
             queryClient.invalidateQueries({ queryKey: qk.settings.option('CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT') });
 
-            setSuccessMessage('Settings saved successfully!');
-            setTimeout(() => setSuccessMessage(null), 3000);
+            flashSuccess('Settings saved successfully!');
 
         } catch (err) {
             console.error('Error saving settings:', err);
@@ -344,8 +358,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                 { schema: calendarContract.regenerate.response }
             );
 
-            setSuccessMessage(data.message || `Added ${data.entriesAdded} calendar entries`);
-            setTimeout(() => setSuccessMessage(null), 5000);
+            flashSuccess(data.message || `Added ${data.entriesAdded} calendar entries`, 5000);
         } catch (err) {
             console.error('Error regenerating calendar:', err);
             setError(httpErrorMessage(err, 'Failed to regenerate calendar'));

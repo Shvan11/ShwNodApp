@@ -2,8 +2,9 @@
  * Waiting-room TV signage management (`/api/tv-display*`).
  *
  * The staff-facing half of the signage feature — Settings → TV Display. Edits
- * the slideshow's schedule/appearance, manages the media folder (upload, delete,
- * reorder), and queues one-shot commands for the LG daemon. Open to every
+ * the slideshow's schedule/appearance, manages the media folder (upload, delete)
+ * and its play sequence (the playlist), and queues one-shot commands for the LG
+ * daemon. Open to every
  * signed-in staff role (see the authorize() note below); uploads here land in a
  * folder the TV then reads without a session, so it is signage content only —
  * never PHI (the public half's posture note has the details).
@@ -14,8 +15,8 @@
  *
  * Follows the shared-contract pattern: validate(...) against
  * `shared/contracts/tv-display.contract.ts`, then sendData(...). Every mutation
- * returns the whole refreshed state, because a media write can rename files
- * (reorder renumbers prefixes) and the UI must not guess the result.
+ * returns the whole refreshed state — an upload appends to the playlist and a
+ * delete prunes it, so the UI must not guess the result.
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import multer from 'multer';
@@ -37,11 +38,12 @@ import {
   classify,
   commitUpload,
   deleteMedia,
+  ensurePlaylist,
   getConnections,
   getSettings,
   listMediaDetailed,
   listUnsupportedFiles,
-  reorderMedia,
+  savePlaylist,
   saveSettings,
 } from '../../services/files/tv-display-store.js';
 import * as tvDisplay from '../../shared/contracts/tv-display.contract.js';
@@ -104,16 +106,20 @@ function uploadMediaFiles(req: Request, res: Response, next: NextFunction): void
 // State
 // ---------------------------------------------------------------------------
 
-/** The whole management view: settings, media (with sizes), paths, liveness. */
+/** The whole management view: settings, media (with sizes), playlist, paths, liveness. */
 async function buildState(): Promise<tvDisplay.TvDisplayState> {
-  const [settings, media, ignoredFiles] = await Promise.all([
+  // ensurePlaylist seeds the sequence once from the folder on an upgraded
+  // deployment (then it's a no-op), so the tab always sees a concrete playlist.
+  const [settings, media, ignoredFiles, playlist] = await Promise.all([
     getSettings(),
     listMediaDetailed(),
     listUnsupportedFiles(),
+    ensurePlaylist(),
   ]);
   return {
     settings,
     media,
+    playlist,
     ignoredFiles,
     mediaDir: MEDIA_DIR,
     settingsFile: SETTINGS_FILE,
@@ -209,22 +215,23 @@ router.delete(
   }
 );
 
-// PUT /api/tv-display/media/order — renumber filename prefixes to match.
+// PUT /api/tv-display/playlist — replace the whole play sequence (reorder, add,
+// remove-one-instance, duplicate — all computed client-side and sent wholesale).
 router.put(
-  '/tv-display/media/order',
-  validate({ body: tvDisplay.reorderMedia.body }),
+  '/tv-display/playlist',
+  validate({ body: tvDisplay.updatePlaylist.body }),
   async (
-    req: Request<unknown, unknown, tvDisplay.ReorderMediaBody>,
+    req: Request<unknown, unknown, tvDisplay.UpdatePlaylistBody>,
     res: Response
   ): Promise<void> => {
     try {
-      await reorderMedia(req.body.names);
+      await savePlaylist(req.body.playlist);
     } catch (error) {
-      log.error('[TV Display] reorder failed', { error: (error as Error).message });
-      ErrorResponses.internalError(res, 'Failed to reorder media', error as Error);
+      log.error('[TV Display] playlist save failed', { error: (error as Error).message });
+      ErrorResponses.internalError(res, 'Failed to save playlist', error as Error);
       return;
     }
-    await respondWithState(res, tvDisplay.reorderMedia.response, 'Failed to read TV display state', true);
+    await respondWithState(res, tvDisplay.updatePlaylist.response, 'Failed to read TV display state', true);
   }
 );
 

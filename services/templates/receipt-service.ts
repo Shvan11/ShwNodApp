@@ -119,8 +119,27 @@ export async function getReceiptData(workId: number): Promise<ReceiptData> {
   // V_Report inlined (sub-views VTotPaid / VLastApp / V_TodayPayment) for a single work:
   //  - TotalPaid:           SUM(tblInvoice.amount_paid) for the work
   //  - app_date:             patient's latest FUTURE appointment (per-person MAX(app_date) > now)
-  //  - date_of_payment/amount_paid: the work's latest payment IFF it landed today (else NULL)
+  //  - date_of_payment/amount_paid: the payment RECORDED today, if there is one
+  //
+  // That last join is keyed on `sys_start_time` (when the row was written) rather than
+  // `date_of_payment` (the business date staff typed). Keying on date_of_payment broke on
+  // a BACKDATED payment: register one dated yesterday, print the receipt it opens, and the
+  // join matched nothing — the receipt said "Amount Paid Today: 0" for money that had just
+  // been handed over. sys_start_time is what "today's payment" actually means here.
+  //
+  // LATERAL … ORDER BY … LIMIT 1 also makes the pick DETERMINISTIC. The old MAX() join
+  // could return several rows for one work (nothing stops two payments sharing a
+  // date_of_payment) and the caller then took an arbitrary results[0].
   const { rows: results } = await sql<ReceiptRow>`
+        WITH "today_start" AS (
+            -- invoices.sys_start_time is UTC wall-clock in a plain timestamp column
+            -- (DEFAULT now() AT TIME ZONE 'UTC'), but "today" means the CLINIC's local
+            -- day. Shift local midnight into that UTC frame by the session's current
+            -- offset (LOCALTIMESTAMP minus the same instant expressed in UTC), so the
+            -- window is a plain range scan and never drifts by the offset.
+            SELECT date_trunc('day', LOCALTIMESTAMP)
+                   - (LOCALTIMESTAMP - (now() AT TIME ZONE 'UTC')) AS "ts"
+        )
         SELECT
             w."person_id",
             p."patient_name",
@@ -144,15 +163,15 @@ export async function getReceiptData(workId: number): Promise<ReceiptData> {
             SELECT "person_id", MAX("app_date") AS "app_date"
             FROM "appointments" WHERE "app_date" > LOCALTIMESTAMP GROUP BY "person_id"
         ) la ON la."person_id" = w."person_id"
-        LEFT JOIN (
-            SELECT i."work_id", i."amount_paid", i."date_of_payment"
-            FROM "invoices" i
-            JOIN (
-                SELECT "work_id", MAX("date_of_payment") AS "LastPayment"
-                FROM "invoices" GROUP BY "work_id"
-            ) m ON m."work_id" = i."work_id" AND m."LastPayment" = i."date_of_payment"
-            WHERE m."LastPayment"::date = CURRENT_DATE
-        ) today ON today."work_id" = w."work_id"
+        LEFT JOIN LATERAL (
+            SELECT i."amount_paid", i."date_of_payment"
+            FROM "invoices" i, "today_start" ts
+            WHERE i."work_id" = w."work_id"
+              AND i."sys_start_time" >= ts."ts"
+              AND i."sys_start_time" <  ts."ts" + INTERVAL '1 day'
+            ORDER BY i."sys_start_time" DESC, i."invoice_id" DESC
+            LIMIT 1
+        ) today ON true
         WHERE w."work_id" = ${workId}
     `.execute(getKysely());
 
@@ -250,6 +269,23 @@ async function getDiscountTemplatePath(): Promise<string> {
 }
 
 /**
+ * Escape a resolved placeholder value for HTML text/attribute context.
+ *
+ * Every `{{…}}` on a receipt is a DB scalar (patient name, phone, id, money, date) that
+ * lands in the document as text — none of them is meant to carry markup. Interpolating
+ * them raw let a patient name containing `<` or `"` reshape the receipt, and the printed
+ * output is written straight into a `document.write`d print window, so it executes.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Render template with data
  * @param templateHTML - HTML template with placeholders
  * @param data - Data to fill into template
@@ -284,7 +320,10 @@ function renderTemplate(templateHTML: string, data: TemplateData): string {
       value = applyFilter(value, filter);
     }
 
-    return value !== null && value !== undefined ? String(value) : '';
+    // Escaped, not raw — the values are text, and the rendered HTML is document.write'n
+    // into a print window. The {{#if}} pass above deliberately stays raw: its body is
+    // template markup, not data.
+    return value !== null && value !== undefined ? escapeHtml(String(value)) : '';
   });
 
   return rendered;

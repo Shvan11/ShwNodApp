@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import cn from 'classnames';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { adminLookupTablesQuery } from '@/query/queries';
@@ -7,7 +8,9 @@ import HolidayEditor from './HolidayEditor';
 import CostPresetsSettings from './CostPresetsSettings';
 import PatientTypesReadOnly from './PatientTypesReadOnly';
 
-// Import component-specific CSS
+// The accordion shell is this tab's own module; the global sheet stays imported
+// for the editor internals it shares with LookupEditor/HolidayEditor/etc.
+import styles from './LookupsSettings.module.css';
 import '../../../css/components/lookup-editor.css';
 
 // Synthetic table entry for cost presets — backed by /api/settings/cost-presets,
@@ -83,6 +86,9 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
         idColumn: 'id',
         columns: [],
     };
+    // `lookupAdmin.tables.response` is `anyArray` on purpose — config rows vary per
+    // registered table, so there is no static schema — hence the assertion off
+    // `unknown[]`.
     const tables = data
         ? [...(data as TableConfig[]), costPresetsEntry, patientTypesEntry]
         : [];
@@ -130,7 +136,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
 
     if (loading) {
         return (
-            <div className="lookups-settings">
+            <div className={styles.lookupsSettings}>
                 <div className="settings-section">
                     <h3>
                         <i className="fas fa-list"></i>
@@ -145,8 +151,54 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
         );
     }
 
+    // One accordion row. Shared by the grouped sections and the "Other" catch-all
+    // below so the two can't drift; the editor a row opens is chosen here, since
+    // three tables are backed by something other than the generic lookup CRUD.
+    const renderAccordionItem = (table: TableConfig) => (
+        <div
+            key={table.key}
+            className={cn(styles.item, expandedTable === table.key && styles.expanded)}
+        >
+            <button
+                className={styles.itemHeader}
+                onClick={() => toggleTable(table.key)}
+                type="button"
+            >
+                <span className={styles.title}>
+                    <i className={table.icon}></i>
+                    <span className={styles.titleText}>{table.displayName}</span>
+                </span>
+                <i className={cn(`fas fa-chevron-${expandedTable === table.key ? 'up' : 'down'}`, styles.chevron)}></i>
+            </button>
+
+            {expandedTable === table.key && (
+                <div className={styles.content}>
+                    {table.key === 'tblHolidays' ? (
+                        <HolidayEditor
+                            tableKey={table.key}
+                            tableName={table.displayName}
+                            columns={table.columns}
+                            idColumn={table.idColumn}
+                        />
+                    ) : table.key === COST_PRESETS_TABLE_KEY ? (
+                        <CostPresetsSettings />
+                    ) : table.key === PATIENT_TYPES_TABLE_KEY ? (
+                        <PatientTypesReadOnly />
+                    ) : (
+                        <LookupEditor
+                            tableKey={table.key}
+                            tableName={table.displayName}
+                            columns={table.columns}
+                            idColumn={table.idColumn}
+                        />
+                    )}
+                </div>
+            )}
+        </div>
+    );
+
     return (
-        <div className="lookups-settings">
+        <div className={styles.lookupsSettings}>
             <div className="settings-section">
                 <h3>
                     <i className="fas fa-list"></i>
@@ -166,55 +218,14 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
                     if (groupTables.length === 0) return null;
 
                     return (
-                        <div key={group.name} className="lookup-group">
-                            <h4 className="lookup-group-header">
+                        <div key={group.name} className={styles.group}>
+                            <h4 className={styles.groupHeader}>
                                 <i className={group.icon}></i>
                                 {group.name}
                             </h4>
 
-                            <div className="lookup-accordion">
-                                {groupTables.map(table => (
-                                    <div
-                                        key={table.key}
-                                        className={`lookup-accordion-item ${expandedTable === table.key ? 'expanded' : ''}`}
-                                    >
-                                        <button
-                                            className="lookup-accordion-header"
-                                            onClick={() => toggleTable(table.key)}
-                                            type="button"
-                                        >
-                                            <span className="accordion-title">
-                                                <i className={table.icon}></i>
-                                                <span className="accordion-title-text">{table.displayName}</span>
-                                            </span>
-                                            <i className={`fas fa-chevron-${expandedTable === table.key ? 'up' : 'down'} accordion-chevron`}></i>
-                                        </button>
-
-                                        {expandedTable === table.key && (
-                                            <div className="lookup-accordion-content">
-                                                {table.key === 'tblHolidays' ? (
-                                                    <HolidayEditor
-                                                        tableKey={table.key}
-                                                        tableName={table.displayName}
-                                                        columns={table.columns}
-                                                        idColumn={table.idColumn}
-                                                    />
-                                                ) : table.key === COST_PRESETS_TABLE_KEY ? (
-                                                    <CostPresetsSettings />
-                                                ) : table.key === PATIENT_TYPES_TABLE_KEY ? (
-                                                    <PatientTypesReadOnly />
-                                                ) : (
-                                                    <LookupEditor
-                                                        tableKey={table.key}
-                                                        tableName={table.displayName}
-                                                        columns={table.columns}
-                                                        idColumn={table.idColumn}
-                                                    />
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                            <div className={styles.accordion}>
+                                {groupTables.map(renderAccordionItem)}
                             </div>
                         </div>
                     );
@@ -228,55 +239,14 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
                     if (uncategorizedTables.length === 0) return null;
 
                     return (
-                        <div className="lookup-group">
-                            <h4 className="lookup-group-header">
+                        <div className={styles.group}>
+                            <h4 className={styles.groupHeader}>
                                 <i className="fas fa-folder"></i>
                                 Other
                             </h4>
 
-                            <div className="lookup-accordion">
-                                {uncategorizedTables.map(table => (
-                                    <div
-                                        key={table.key}
-                                        className={`lookup-accordion-item ${expandedTable === table.key ? 'expanded' : ''}`}
-                                    >
-                                        <button
-                                            className="lookup-accordion-header"
-                                            onClick={() => toggleTable(table.key)}
-                                            type="button"
-                                        >
-                                            <span className="accordion-title">
-                                                <i className={table.icon}></i>
-                                                <span className="accordion-title-text">{table.displayName}</span>
-                                            </span>
-                                            <i className={`fas fa-chevron-${expandedTable === table.key ? 'up' : 'down'} accordion-chevron`}></i>
-                                        </button>
-
-                                        {expandedTable === table.key && (
-                                            <div className="lookup-accordion-content">
-                                                {table.key === 'tblHolidays' ? (
-                                                    <HolidayEditor
-                                                        tableKey={table.key}
-                                                        tableName={table.displayName}
-                                                        columns={table.columns}
-                                                        idColumn={table.idColumn}
-                                                    />
-                                                ) : table.key === COST_PRESETS_TABLE_KEY ? (
-                                                    <CostPresetsSettings />
-                                                ) : table.key === PATIENT_TYPES_TABLE_KEY ? (
-                                                    <PatientTypesReadOnly />
-                                                ) : (
-                                                    <LookupEditor
-                                                        tableKey={table.key}
-                                                        tableName={table.displayName}
-                                                        columns={table.columns}
-                                                        idColumn={table.idColumn}
-                                                    />
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                            <div className={styles.accordion}>
+                                {uncategorizedTables.map(renderAccordionItem)}
                             </div>
                         </div>
                     );

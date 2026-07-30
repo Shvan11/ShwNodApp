@@ -57,28 +57,21 @@
     font-size: 0.95rem;
 }
 
-.button:hover:not(.disabled) {
-    background: rgba(102, 126, 234, 0.08);
+.button:hover {
+    background: color-mix(in oklch, var(--color-purple-light) 8%, transparent);
     color: var(--color-purple-light);
     transform: translateY(-2px);
 }
 
 .button.active {
     color: var(--color-purple-light);
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    background: linear-gradient(
+        135deg,
+        color-mix(in oklch, var(--color-purple-light) 10%, transparent) 0%,
+        color-mix(in oklch, var(--color-purple-dark) 10%, transparent) 100%
+    );
     border-bottom-color: var(--color-purple-light);
     font-weight: 700;
-}
-
-.button.disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    color: var(--text-muted);
-}
-
-.button.disabled:hover {
-    background: transparent;
-    transform: none;
 }
 
 .label {
@@ -92,16 +85,6 @@
     color: var(--warning-300);
     font-size: 0.6rem;
     animation: pulse 2s infinite;
-}
-
-.comingSoonBadge {
-    background: var(--warning-400);
-    color: var(--color-white);
-    font-size: 0.7rem;
-    padding: 0.15rem 0.4rem;
-    border-radius: 10px;
-    margin-left: 0.25rem;
-    font-weight: 600;
 }
 
 /* Animation for pulse effect */
@@ -165,7 +148,7 @@
     }
 
     /* Lift suppresses cleanly on a horizontal strip — keep the bar flat on touch */
-    .button:hover:not(.disabled) {
+    .button:hover {
         transform: none;
     }
 
@@ -191,9 +174,5 @@
 
     .button i {
         font-size: 0.9rem;
-    }
-
-    .comingSoonBadge {
-        display: none;
     }
 }

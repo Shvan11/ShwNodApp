@@ -14,8 +14,8 @@
 
 import { log } from '../../utils/logger.js';
 import {
-  addInvoice,
-  getExchangeRateForDate,
+  addInvoiceWithBalanceGuard,
+  getExchangeRateAsOf,
 } from '../database/queries/payment-queries.js';
 import { getWorkDetails } from '../database/queries/work-queries.js';
 
@@ -139,9 +139,9 @@ function validateCurrencyAmounts(usd: number, iqd: number): void {
 }
 
 /**
- * Determine if payment is same-currency (no change tracking needed)
+ * Determine if payment is same-currency (change stored as NULL when there is none)
  *
- * Only IQD account + IQD payment = same-currency (no change tracking)
+ * Only IQD account + IQD payment = same-currency
  * USD account + USD payment DOES track change (converted to IQD)
  * because clinic uses $50/$100 bills and gives change in IQD
  *
@@ -221,18 +221,25 @@ async function calculateValidatedChange(
 ): Promise<number | null> {
   const { accountCurrency, usd, iqd, change, paymentDate } = params;
 
-  // For same-currency payments: Force change to NULL (cash handling not tracked)
-  if (isSameCurrencyPayment(accountCurrency, usd, iqd)) {
+  const changeAmount = parseInt(String(change)) || 0;
+
+  // Same-currency (IQD→IQD) payments store NULL rather than 0: nothing was handed
+  // back and the column means "not tracked".
+  //
+  // A POSITIVE change is honoured even here. This used to be an unconditional early
+  // return, which re-derived "same currency ⇒ no change" from the cash amounts and so
+  // discarded REAL change on a mixed payment settled in IQD only — a case where the
+  // client shows the field, auto-calculates it and reports it on the receipt. The money
+  // left the drawer either way, so dropping it left ExpectedCashIQD overstated.
+  if (changeAmount === 0 && isSameCurrencyPayment(accountCurrency, usd, iqd)) {
     return null;
   }
 
-  // Cross-currency or mixed payment - validate change
-  const changeAmount = parseInt(String(change)) || 0;
-
   if (changeAmount > 0) {
-    // Get exchange rate for validation
-    const exchangeRate = await getExchangeRateForDate(paymentDate);
-    validateChangeAmount(changeAmount, usd, iqd, exchangeRate);
+    // As-of, not exact-date: a payment dated on a day nobody entered a rate for must
+    // not silently skip validateChangeAmount's cross-currency ceiling check.
+    const rate = await getExchangeRateAsOf(paymentDate);
+    validateChangeAmount(changeAmount, usd, iqd, rate?.exchangeRate ?? null);
   }
 
   return changeAmount;
@@ -244,8 +251,8 @@ async function calculateValidatedChange(
  * Validation Rules:
  * 1. At least one currency amount (USD or IQD) must be > 0
  * 2. currency amounts cannot be negative
- * 3. For same-currency payments: change is set to NULL (not tracked)
- * 4. For cross-currency payments: change is validated and saved
+ * 3. For same-currency payments with no change: change is set to NULL (not tracked)
+ * 4. Any change actually handed back is validated and saved, same- or cross-currency
  * 5. change cannot exceed IQD received (simple case)
  * 6. For USD payments: change validated against total IQD value at exchange rate
  *
@@ -276,6 +283,12 @@ export async function validateAndCreateInvoice(
 
   // Block overpayment: amountPaid must not exceed remaining balance
   // Remaining = total_required - discount - TotalPaid
+  //
+  // This is a FAST FAIL on an unlocked read — it reports the fuller message before the
+  // change-validation round trips run. It is NOT the guarantee: two payments registered
+  // against the same work concurrently would both read this pre-insert balance and both
+  // pass. The authoritative re-check runs under a row lock inside
+  // addInvoiceWithBalanceGuard below, in the same transaction as the insert.
   const totalRequired = Number(workDetails.total_required ?? 0);
   const discount = Number(workDetails.discount ?? 0);
   const totalPaid = Number(workDetails.TotalPaid ?? 0);
@@ -299,8 +312,10 @@ export async function validateAndCreateInvoice(
     paymentDate,
   });
 
-  // Save invoice with validated data
-  const result = await addInvoice({
+  // Save invoice with validated data — the balance is re-read under a row lock on the
+  // work and re-checked inside the insert's own transaction, so a concurrent payment
+  // that slipped past the pre-check above is rejected here rather than overpaying.
+  const result = await addInvoiceWithBalanceGuard({
     workid,
     amountPaid,
     paymentDate,
@@ -309,13 +324,34 @@ export async function validateAndCreateInvoice(
     change: changeToSave, // NULL for same-currency, validated number for cross-currency
   });
 
+  if (result.outcome === 'work_not_found') {
+    // The work was deleted between the read above and the insert.
+    throw new PaymentValidationError('Work record not found', 'WORK_NOT_FOUND');
+  }
+
+  if (result.outcome === 'exceeds_remaining') {
+    const b = result.balance;
+    throw new PaymentValidationError(
+      `Payment (${requestedAmount}) exceeds remaining balance (${b.remaining}). Total ${b.totalRequired}, discount ${b.discount}, already paid ${b.totalPaid}.`,
+      'PAYMENT_EXCEEDS_REMAINING',
+      {
+        workId: workid,
+        amountPaid: requestedAmount,
+        totalRequired: b.totalRequired,
+        discount: b.discount,
+        totalPaid: b.totalPaid,
+        remaining: b.remaining,
+      }
+    );
+  }
+
   log.info(
     `Invoice created successfully: Work ${workid}, amount ${amountPaid}, change: ${changeToSave}`
   );
 
   // Construct the Invoice object from input data plus returned id
   const invoice: CreatedInvoice = {
-    InvoiceID: result[0]?.invoice_id,
+    InvoiceID: result.invoice_id,
     workid,
     amount_paid: amountPaid,
     date_of_payment: new Date(paymentDate),

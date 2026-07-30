@@ -10,7 +10,7 @@
  */
 import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
-import type { DailyData, BaseInvoice } from '../../business/FinancialReportService.js';
+import type { DailyData, EnrichedInvoice } from '../../business/FinancialReportService.js';
 
 /** One aggregated month from ProcYearlyMonthlyTotals. */
 export interface MonthlyTotalRow {
@@ -22,8 +22,20 @@ export interface MonthlyTotalRow {
   SumUSD: number;
   ExpensesUSD: number;
   FinalUSDSum: number;
-  GrandTotal: number;
+  /** null when no exchange rate exists to convert with — see the `ex` parameter. */
+  GrandTotal: number | null;
 }
+
+/**
+ * The per-day conversion-rate fallback these reports take.
+ *
+ * `null` means the `sms` table holds NO rate at all, and it is passed straight through
+ * to SQL so the NULL propagates into every converted column — the report says "we can't
+ * express this as one number" instead of inventing a house rate. (It used to be a
+ * hardcoded 1450, which silently produced confident-looking totals.) Days that DO have
+ * their own `sms.exchange_rate` always use it and never consult this value.
+ */
+export type RateFallback = number | null;
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
@@ -93,7 +105,7 @@ const VW_CTES = sql`
 export async function getMonthlyGrandTotals(
   month: number,
   year: number,
-  ex: number
+  ex: RateFallback
 ): Promise<DailyData[]> {
   const start = `${year}-${pad2(month)}-01`;
   const end = month === 12 ? `${year + 1}-01-01` : `${year}-${pad2(month + 1)}-01`;
@@ -118,12 +130,16 @@ export async function getMonthlyGrandTotals(
       wu.sumusd                                                      AS "SumUSD",
       wu.sumexusd_daily                                              AS "ExpensesUSD",
       wu.finalusdsum_daily                                           AS "FinalUSDSum",
+      -- Both grand totals go NULL when the day has no rate AND no fallback exists.
+      -- NB the USD leg of GrandTotalIQD is deliberately NOT wrapped in its own COALESCE:
+      -- that would mask a missing rate as a 0 USD contribution, i.e. silently report the
+      -- IQD half as if it were the whole.
       CAST(
         (COALESCE(wq.finaliqdsum_daily, 0) / CAST(COALESCE(s."exchange_rate", ${ex}::int) AS float))
         + COALESCE(wu.finalusdsum_daily, 0) AS decimal(9, 2)
       )                                                              AS "GrandTotal",
       (COALESCE(wq.finaliqdsum_daily, 0)
-        + COALESCE(wu.finalusdsum_daily * COALESCE(s."exchange_rate", ${ex}::int), 0)) AS "GrandTotalIQD",
+        + COALESCE(wu.finalusdsum_daily, 0) * COALESCE(s."exchange_rate", ${ex}::int)) AS "GrandTotalIQD",
       (COALESCE(dq.totaliqd, 0) + COALESCE(wq.sumexq_daily, 0) - COALESCE(dq.totalchange, 0)) AS "ExpectedCashIQD",
       (COALESCE(du.totalusd, 0) + COALESCE(wu.sumexusd_daily, 0))          AS "ExpectedCashUSD"
     FROM vwiqd wq
@@ -173,12 +189,19 @@ export async function getMonthlyExpenseTotals(
 
 /**
  * Per-month totals across a 12-month window starting at startMonth/startYear (was:
- * ProcYearlyMonthlyTotals). Uses the supplied @Ex as a flat conversion rate (no per-day rate).
+ * ProcYearlyMonthlyTotals).
+ *
+ * GrandTotal converts each DAY at that day's own `sms.exchange_rate`, exactly like
+ * getMonthlyGrandTotals — `ex` is only the fallback for days with no rate recorded.
+ * It used to apply one flat rate to the whole month's net, which made the Monthly /
+ * Yearly tabs disagree with the Daily table they sit above (the daily rows have always
+ * used per-day rates). The IQD and USD columns are un-converted sums, so they're
+ * unaffected either way.
  */
 export async function getYearlyMonthlyTotals(
   startMonth: number,
   startYear: number,
-  ex: number
+  ex: RateFallback
 ): Promise<MonthlyTotalRow[]> {
   const start = `${startYear}-${pad2(startMonth)}-01`;
   const end = `${startYear + 1}-${pad2(startMonth)}-01`; // DATEADD(MONTH, 12, start)
@@ -195,11 +218,14 @@ export async function getYearlyMonthlyTotals(
       SUM(COALESCE(wu.sumexusd, 0))    AS "ExpensesUSD",
       SUM(COALESCE(wu.finalusdsum, 0)) AS "FinalUSDSum",
       CAST(
-        SUM(COALESCE(wq.finaliqdsum, 0)) / CAST(${ex}::int AS float)
-        + SUM(COALESCE(wu.finalusdsum, 0)) AS decimal(12, 2)
+        SUM(
+          COALESCE(wq.finaliqdsum, 0) / CAST(COALESCE(s."exchange_rate", ${ex}::int) AS float)
+          + COALESCE(wu.finalusdsum, 0)
+        ) AS decimal(12, 2)
       ) AS "GrandTotal"
     FROM vwiqd wq
     FULL OUTER JOIN vwusd wu ON wq.day = wu.day
+    LEFT JOIN "sms" s ON COALESCE(wq.day, wu.day) = s."date"
     WHERE COALESCE(wq.day, wu.day) >= ${start}::date
       AND COALESCE(wq.day, wu.day) <  ${end}::date
     GROUP BY EXTRACT(YEAR FROM COALESCE(wq.day, wu.day)), EXTRACT(MONTH FROM COALESCE(wq.day, wu.day))
@@ -214,9 +240,14 @@ export async function getYearlyMonthlyTotals(
  * - amount_paid is a thousands-grouped string (the proc used FORMAT(..,'#,##0')).
  * - sys_start_time is emitted as a UTC '…Z' ISO string (column stores UTC wall-clock); the
  *   frontend converts to local. SysEndTime was dropped from the PG schema (unused).
+ * - iqd_received / usd_received are selected HERE, off the same row. They used to be
+ *   fetched per invoice by FinancialReportService.enrichInvoicesWithDetails — one extra
+ *   `SELECT iqd_received, usd_received FROM invoices WHERE invoice_id = …` per row, for
+ *   two columns already sitting in this row (a dozen-plus round trips on every open of
+ *   the daily-invoices modal). COALESCE keeps the `?? 0` the enricher applied.
  */
-export async function getDailyInvoices(date: string): Promise<BaseInvoice[]> {
-  const { rows } = await sql<BaseInvoice>`
+export async function getDailyInvoices(date: string): Promise<EnrichedInvoice[]> {
+  const { rows } = await sql<EnrichedInvoice>`
     SELECT
       p."patient_name"                                              AS "patient_name",
       i."invoice_id"                                                AS "invoice_id",
@@ -225,7 +256,9 @@ export async function getDailyInvoices(date: string): Promise<BaseInvoice[]> {
       i."work_id"                                                   AS "work_id",
       to_char(i."sys_start_time", 'YYYY-MM-DD"T"HH24:MI:SS"Z"')      AS "sys_start_time",
       i."change"                                                   AS "change",
-      w."currency"                                                 AS "currency"
+      w."currency"                                                 AS "currency",
+      COALESCE(i."iqd_received", 0)                                AS "iqd_received",
+      COALESCE(i."usd_received", 0)                                AS "usd_received"
     FROM "invoices" i
     INNER JOIN "works" w ON w."work_id" = i."work_id"
     INNER JOIN "patients" p ON w."person_id" = p."person_id"

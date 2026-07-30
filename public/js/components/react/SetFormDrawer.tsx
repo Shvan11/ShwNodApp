@@ -618,18 +618,22 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                         />
                                     </div>
 
+                                    {/* Aligner sets are USD-only (the lab bills external
+                                        doctors in USD) — fixed, not a choice: the payment
+                                        path books every set payment into invoices.usd_received,
+                                        so another currency would price the set one way and
+                                        bank it another. Enforced in aligner.contract.ts too. */}
                                     <div className="form-field">
                                         <label htmlFor="Currency">Currency</label>
-                                        <select
+                                        <input
                                             id="Currency"
                                             name="currency"
+                                            type="text"
                                             value={formData.currency}
-                                            onChange={handleChange}
-                                        >
-                                            <option value="USD">USD</option>
-                                            <option value="IQD">IQD</option>
-                                            <option value="EUR">EUR</option>
-                                        </select>
+                                            readOnly
+                                            disabled
+                                            title="Aligner sets are billed in USD only"
+                                        />
                                     </div>
                                 </div>
                             </div>

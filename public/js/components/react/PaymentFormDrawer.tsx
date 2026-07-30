@@ -115,8 +115,6 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
             await onSave({
                 ...formData,
                 amount_paid: Number(formData.amount_paid),
-                actual_amount: null,
-                actual_cur: set?.currency || 'USD',
                 change: null
             });
             onClose();

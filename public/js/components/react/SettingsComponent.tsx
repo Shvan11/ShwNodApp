@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, ComponentType } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import type { UserResponse } from '@/types/api.types';
 import { authMeQuery } from '@/query/queries';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
 
@@ -35,9 +34,8 @@ interface TabConfig {
     id: string;
     label: string;
     icon: string;
-    component: ComponentType<SettingsTabComponentProps> | null;
+    component: ComponentType<SettingsTabComponentProps>;
     description: string;
-    disabled?: boolean;
     adminOnly?: boolean;
     /** Hide from roles without finance-write capability (clinical). */
     financeOnly?: boolean;
@@ -156,22 +154,6 @@ const tabs: TabConfig[] = [
         adminOnly: true
     },
     {
-        id: 'messaging',
-        label: 'Messaging',
-        icon: 'fas fa-comments',
-        component: null,
-        description: 'WhatsApp and SMS configuration',
-        disabled: true
-    },
-    {
-        id: 'system',
-        label: 'System',
-        icon: 'fas fa-server',
-        component: null,
-        description: 'System preferences and maintenance',
-        disabled: true
-    },
-    {
         id: 'security',
         label: 'Security',
         icon: 'fas fa-shield-alt',
@@ -193,10 +175,11 @@ const SettingsComponent: React.FC = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<string>(tab || 'general');
 
-    // Current user role — drives admin-only tab filtering.
-    const { data: meData } = useQuery(authMeQuery());
-    const me = meData as UserResponse | undefined;
-    const userRole = me?.success && me.user ? me.user.role : null;
+    // Current user role — drives admin-only tab filtering. Straight off the
+    // contract (`auth.me.response`), where `role` is nullable: `null` means
+    // "not loaded / unknown yet" and the redirect effect below waits on it.
+    const { data: me } = useQuery(authMeQuery());
+    const userRole = (me?.success && me.user ? me.user.role : null) ?? null;
 
     // Ref to hold current activeTab - allows stable callback that reads current value.
     // Synced in an effect (not during render); the callbacks that read it run after
@@ -205,25 +188,10 @@ const SettingsComponent: React.FC = () => {
     useEffect(() => {
         activeTabRef.current = activeTab;
     }, [activeTab]);
-    const [tabData, setTabData] = useState<TabDataState>({
-        general: { hasChanges: false },
-        database: { hasChanges: false },
-        protocolHandlers: { hasChanges: false },
-        alignerDoctors: { hasChanges: false },
-        email: { hasChanges: false },
-        employees: { hasChanges: false },
-        exchangeRates: { hasChanges: false },
-        lookups: { hasChanges: false },
-        calendarTimes: { hasChanges: false },
-        supabaseStatus: { hasChanges: false },
-        dolphinStatus: { hasChanges: false },
-        integrations: { hasChanges: false },
-        databaseBackup: { hasChanges: false },
-        messaging: { hasChanges: false },
-        system: { hasChanges: false },
-        security: { hasChanges: false },
-        users: { hasChanges: false }
-    });
+    // Per-tab unsaved-changes flags, keyed by tab id. Starts empty: a tab only ever
+    // appears here once it has reported a state, and `handleTabChangesUpdate` below
+    // creates the entry on demand ("absent" and "false" both mean "no changes").
+    const [tabData, setTabData] = useState<TabDataState>({});
 
     // Filter tabs based on user role dynamically.
     const filteredTabs = useMemo(() => {
@@ -247,25 +215,22 @@ const SettingsComponent: React.FC = () => {
     const [syncedTab, setSyncedTab] = useState<string | undefined>(tab);
     if (tab !== syncedTab) {
         setSyncedTab(tab);
-        if (tab && filteredTabs.some(t => t.id === tab && !t.disabled)) {
+        if (tab && filteredTabs.some(t => t.id === tab)) {
             setActiveTab(tab);
         }
     }
 
-    // Redirect to fallback tab if active tab is unauthorized or disabled
+    // Redirect to the fallback tab if the active one is unknown or unauthorized.
     useEffect(() => {
         if (userRole === null) return; // Wait until user info is loaded
 
-        const isTabAllowed = filteredTabs.some(t => t.id === activeTab && !t.disabled);
-        if (!isTabAllowed) {
-            const fallbackTab = filteredTabs.find(t => !t.disabled)?.id || 'general';
-            navigate(`/settings/${fallbackTab}`, { replace: true });
+        if (!filteredTabs.some(t => t.id === activeTab)) {
+            navigate(`/settings/${filteredTabs[0]?.id ?? 'general'}`, { replace: true });
         }
     }, [userRole, activeTab, filteredTabs, navigate]);
 
     const handleTabChange = (tabId: string): void => {
-        const selectedTab = filteredTabs.find(t => t.id === tabId);
-        if (selectedTab && !selectedTab.disabled) {
+        if (filteredTabs.some(t => t.id === tabId)) {
             navigate(`/settings/${tabId}`);
         }
     };
@@ -288,9 +253,10 @@ const SettingsComponent: React.FC = () => {
         });
     }, []); // Empty deps = stable reference forever
 
-    // Get the active tab component
-    const activeTabConfig = filteredTabs.find(t => t.id === activeTab);
-    const ActiveTabComponent = activeTabConfig?.component;
+    // Every tab has a component, so this is undefined only for an unknown or
+    // unauthorized tab id — for the single render before the effect above
+    // redirects. Render nothing rather than flashing an empty shell.
+    const ActiveTabComponent = filteredTabs.find(t => t.id === activeTab)?.component;
 
     return (
         <div className={styles.container}>
@@ -302,21 +268,10 @@ const SettingsComponent: React.FC = () => {
             />
 
             <div className={styles.content}>
-                {ActiveTabComponent ? (
+                {ActiveTabComponent && (
                     <ActiveTabComponent
                         onChangesUpdate={handleTabChangesUpdate}
                     />
-                ) : (
-                    <div className={styles.placeholder}>
-                        <div className={styles.placeholderIcon}>
-                            <i className={activeTabConfig?.icon || 'fas fa-cog'}></i>
-                        </div>
-                        <h3>{activeTabConfig?.label || 'Settings'}</h3>
-                        <p>This section is coming soon.</p>
-                        <p className={styles.placeholderDescription}>
-                            {activeTabConfig?.description || 'Configure your system settings'}
-                        </p>
-                    </div>
                 )}
             </div>
         </div>

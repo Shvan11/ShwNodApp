@@ -7,7 +7,7 @@
  *   - routes/public/tv-display.routes.ts — session-less reads for the TV browser
  *     and the LG daemon (page, manifest, media stream, settings feed).
  *   - routes/api/tv-display.routes.ts    — authenticated writes from
- *     Settings → TV Display (edit settings, upload/delete/reorder media).
+ *     Settings → TV Display (edit settings, upload/delete media, edit the playlist).
  *
  * NO DATABASE, BY DESIGN. Settings live in one JSON file beside the app's other
  * runtime state (`data/tv-display.settings.json`, override
@@ -107,6 +107,17 @@ export type TvDisplayCommandAction = 'on' | 'off' | 'reload';
 
 interface StoredFile {
   settings: TvDisplaySettings;
+  /**
+   * The play sequence: ordered media filenames, repeats allowed, the single
+   * source of truth for what the TV plays. `null` means "never initialized" —
+   * an older settings file from before playlists existed. The first time the
+   * management side needs it (`ensurePlaylist`), it is seeded ONCE from the
+   * folder's current filename order so an existing deployment keeps playing its
+   * content, then it is authoritative (dropping a new file no longer auto-plays
+   * it — the tab prompts to add it). The public/TV read path treats `null` as
+   * "fall back to folder order" WITHOUT persisting, so it never writes.
+   */
+  playlist: string[] | null;
 }
 
 /** Coerce one unknown JSON value into a valid settings object. */
@@ -148,6 +159,22 @@ function normalize(raw: unknown): TvDisplaySettings {
 }
 
 /**
+ * Coerce the stored playlist. A real array → its string entries reduced to
+ * basenames (defence in depth: the play sequence can never carry a path), with
+ * order and repeats preserved and empties dropped. Anything else (absent key,
+ * wrong type) → `null`, the "never initialized, seed me from the folder" marker.
+ * Membership against actual files is a render-time concern, not enforced here —
+ * a dangling entry is kept so the tab can surface it rather than silently losing it.
+ */
+function normalizePlaylist(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw
+    .filter((n): n is string => typeof n === 'string')
+    .map((n) => path.basename(n))
+    .filter((n) => n && n !== '.' && n !== '..');
+}
+
+/**
  * In-process cache of the settings file, validated against the file's mtime (one
  * cheap `stat`) rather than trusted blindly — a hand-edit of the JSON is then
  * picked up on the next read instead of surviving until a restart. Saves write
@@ -170,8 +197,14 @@ async function load(): Promise<StoredFile> {
     // Strip a UTF-8 BOM: Notepad and PowerShell's Out-File write one by default
     // on Windows, and JSON.parse rejects it — this file is meant to survive a
     // hand-edit, so a BOM must not cost the clinic its settings.
-    const parsed = JSON.parse(raw.replace(/^\uFEFF/, '')) as { settings?: unknown };
-    cached = { settings: normalize(parsed.settings) };
+    const parsed = JSON.parse(raw.replace(/^\uFEFF/, '')) as {
+      settings?: unknown;
+      playlist?: unknown;
+    };
+    cached = {
+      settings: normalize(parsed.settings),
+      playlist: normalizePlaylist(parsed.playlist),
+    };
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code !== 'ENOENT') {
@@ -182,7 +215,9 @@ async function load(): Promise<StoredFile> {
         error: (error as Error).message,
       });
     }
-    cached = { settings: { ...DEFAULT_SETTINGS } };
+    // `playlist: null` = not yet initialized; the folder order stands in until
+    // the management side seeds it (see `ensurePlaylist`).
+    cached = { settings: { ...DEFAULT_SETTINGS }, playlist: null };
   }
   cachedMtimeMs = mtimeMs;
   return cached;
@@ -227,23 +262,94 @@ async function forgetDuration(name: string): Promise<void> {
   await persist({ ...current, settings: { ...current.settings, photoMsByName } });
 }
 
+// ---------------------------------------------------------------------------
+// Playlist — the ordered play sequence (repeats allowed), the single source of
+// truth for what the TV plays. Order lives HERE, not in filename prefixes, so
+// files are never renamed and one file can appear many times with no duplicate
+// on disk. See the StoredFile.playlist doc for the null/seed semantics.
+// ---------------------------------------------------------------------------
+
 /**
- * Re-key per-image dwell overrides after a reorder renames files, so an override
- * follows its picture through the `01-`, `02-` renumbering. `rename` maps each
- * old filename to its new one; keys not in the map keep their name.
+ * The management playlist: the authoritative ordered sequence, seeded ONCE from
+ * the folder's filename order the first time it's needed (the upgrade path — an
+ * existing deployment keeps playing its content), then strict. Called only from
+ * the authenticated management side, so the seed's write never happens on the
+ * public/TV read path.
  */
-async function remapDurations(rename: Map<string, string>): Promise<void> {
-  const current = await load();
-  const src = current.settings.photoMsByName;
-  if (Object.keys(src).length === 0) return;
-  const photoMsByName: Record<string, number> = {};
-  let changed = false;
-  for (const [name, ms] of Object.entries(src)) {
-    const to = rename.get(name) ?? name;
-    if (to !== name) changed = true;
-    photoMsByName[to] = ms;
+export async function ensurePlaylist(): Promise<string[]> {
+  const stored = await load();
+  if (stored.playlist !== null) return [...stored.playlist];
+  const seeded = (await listMedia()).map((m) => m.name);
+  await persist({ ...stored, playlist: seeded });
+  log.info('[TV Display] playlist seeded from folder', { count: seeded.length });
+  return seeded;
+}
+
+/**
+ * The play sequence the TV actually renders: stored order, each entry resolved
+ * to its media type and dangling entries (file gone) dropped. Repeats are kept —
+ * a name listed twice plays twice. Read-only: when the playlist was never
+ * initialized (`null`), it stands in the folder's own order so the screen keeps
+ * playing before the tab is ever opened, WITHOUT persisting anything here.
+ */
+export async function resolvedPlaylist(): Promise<{ name: string; type: MediaKind }[]> {
+  const [stored, library] = await Promise.all([load(), listMedia()]);
+  const typeByName = new Map(library.map((m) => [m.name, m.type]));
+  const order = stored.playlist ?? library.map((m) => m.name);
+  const out: { name: string; type: MediaKind }[] = [];
+  for (const name of order) {
+    const type = typeByName.get(name);
+    if (type) out.push({ name, type }); // skip dangling references
   }
-  if (changed) await persist({ ...current, settings: { ...current.settings, photoMsByName } });
+  return out;
+}
+
+/**
+ * Replace the whole play sequence (reorder / add / remove-one-instance /
+ * duplicate are all computed by the caller and sent wholesale). Basename-
+ * sanitized, order and repeats preserved; dangling entries are NOT filtered out
+ * here — the TV skips them and the tab flags them, so nothing vanishes silently.
+ */
+export async function savePlaylist(names: string[]): Promise<string[]> {
+  const current = await load();
+  const cleaned = names
+    .map((n) => path.basename(String(n)))
+    .filter((n) => n && n !== '.' && n !== '..');
+  await persist({ ...current, playlist: cleaned });
+  log.info('[TV Display] playlist updated', { count: cleaned.length });
+  return cleaned;
+}
+
+/**
+ * Append a just-uploaded file to the play sequence — an upload through the tab is
+ * an explicit "I want this played" act (a file dropped into the folder by hand,
+ * which never calls this, is the case that only prompts). When the playlist was
+ * never initialized, seed it from the folder instead: the new file is already in
+ * that snapshot, so seeding both migrates AND includes it without duplicating.
+ */
+async function addUploadedToPlaylist(name: string): Promise<void> {
+  const current = await load();
+  if (current.playlist === null) {
+    const seeded = (await listMedia()).map((m) => m.name);
+    await persist({ ...current, playlist: seeded });
+    return;
+  }
+  await persist({ ...current, playlist: [...current.playlist, path.basename(name)] });
+}
+
+/**
+ * Drop every instance of a file from the play sequence once its file is deleted,
+ * so a deleted file can't linger as a dangling reference. No-op when the playlist
+ * was never initialized (nothing persisted to prune) or the file isn't listed.
+ */
+async function removeFromPlaylist(name: string): Promise<void> {
+  const current = await load();
+  if (current.playlist === null) return;
+  const base = path.basename(name);
+  const next = current.playlist.filter((n) => n !== base);
+  if (next.length !== current.playlist.length) {
+    await persist({ ...current, playlist: next });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -325,12 +431,16 @@ export function addClient(kind: SignageClientKind, sink: SseSink): () => void {
   };
 }
 
-/** Current playlist + settings — the payload of every `state` frame. */
+/**
+ * The play sequence + settings — the payload of every `state` frame. `items` is
+ * the RESOLVED playlist (ordered, repeats kept, dangling entries dropped), so the
+ * TV page just plays `items` in order and one file listed twice plays twice.
+ */
 export async function currentState(): Promise<{
   settings: TvDisplaySettings;
   items: { name: string; type: MediaKind }[];
 }> {
-  const [settings, items] = await Promise.all([getSettings(), listMedia()]);
+  const [settings, items] = await Promise.all([getSettings(), resolvedPlaylist()]);
   return { settings, items };
 }
 
@@ -536,6 +646,9 @@ export async function commitUpload(stagedPath: string, originalName: string): Pr
   await mkdir(MEDIA_DIR, { recursive: true });
   const finalName = await uniqueName(safe);
   await rename(stagedPath, path.join(MEDIA_DIR, finalName));
+  // An upload through the tab is an explicit "play this" — add it to the
+  // sequence now (a hand-dropped file, which never reaches here, only prompts).
+  await addUploadedToPlaylist(finalName);
   log.info('[TV Display] media added', { name: finalName });
   return finalName;
 }
@@ -546,6 +659,7 @@ export async function deleteMedia(name: string): Promise<boolean> {
   try {
     await unlink(abs);
     await forgetDuration(name);
+    await removeFromPlaylist(name);
     log.info('[TV Display] media deleted', { name: path.basename(name) });
     return true;
   } catch (error) {
@@ -554,43 +668,3 @@ export async function deleteMedia(name: string): Promise<boolean> {
   }
 }
 
-/**
- * Rewrite play order by renumbering filename prefixes to match `names`
- * (`01-clip.mp4`, `02-slide.jpg`, …) — the folder's own sort order IS the
- * playlist, so ordering has to live in the filenames for the manual
- * drop-files-in-a-folder workflow to keep working alongside this UI.
- *
- * Two-phase (everything to a temp name first) so a swap can't collide with a
- * name it is about to free. Files not named in `names` keep their current name
- * and sort after the renumbered ones.
- */
-export async function reorderMedia(names: string[]): Promise<void> {
-  const present = new Set((await listMedia()).map((m) => m.name));
-  const ordered = names.filter((n) => present.has(path.basename(n)));
-  if (ordered.length === 0) return;
-
-  const width = String(ordered.length).length < 2 ? 2 : String(ordered.length).length;
-  const staged: { tmp: string; final: string }[] = [];
-  // old filename → new filename, so per-image dwell overrides can follow the file.
-  const renamed = new Map<string, string>();
-
-  for (const [i, name] of ordered.entries()) {
-    const from = mediaFilePath(name);
-    if (!from) continue;
-    const base = path.basename(name).replace(/^\d+[-_ ]*/, '');
-    const finalName = `${String(i + 1).padStart(width, '0')}-${base}`;
-    if (finalName === path.basename(name)) continue; // already correct
-    renamed.set(path.basename(name), finalName);
-    const tmp = path.join(MEDIA_DIR, `.reorder-${process.pid}-${i}-${base}`);
-    await rename(from, tmp);
-    staged.push({ tmp, final: path.join(MEDIA_DIR, finalName) });
-  }
-
-  for (const { tmp, final } of staged) {
-    await rename(tmp, final);
-  }
-  if (staged.length) {
-    await remapDurations(renamed);
-    log.info('[TV Display] media reordered', { count: staged.length });
-  }
-}

@@ -233,11 +233,7 @@ interface AlignerPaymentData {
   aligner_set_id: number | null;
   amount_paid: number | string;
   date_of_payment: Date | string;
-  actual_amount?: number | null;
-  actual_cur?: string | null;
   change?: number | null;
-  usd_received?: number;
-  iqd_received?: number;
   notes?: string;
 }
 
@@ -1996,47 +1992,39 @@ export async function getNoteReadStatus(noteId: number): Promise<boolean | null>
  * FLAG (date-string): `tblInvoice.date_of_payment` is a PG `date` column; the value is
  * bound as a 'YYYY-MM-DD' string (via toDateOnly) wrapped in `sql<string>` so PG infers the
  * date type and the column isn't shifted by a UTC conversion (see CLAUDE.md date gotcha).
- * `amount_paid`/`actual_amount`/`change`/`usd_received`/`iqd_received` are plain integer columns.
+ * `amount_paid`/`change`/`usd_received`/`iqd_received` are plain integer columns.
  */
 export async function createAlignerPayment(
   paymentData: AlignerPaymentData
 ): Promise<number | null> {
-  const { workid, aligner_set_id, amount_paid, date_of_payment, actual_amount, actual_cur, change } =
-    paymentData;
+  const { workid, aligner_set_id, amount_paid, date_of_payment, change } = paymentData;
 
-  // Determine USD vs IQD based on currency (default to USD for aligner payments)
-  const currency = actual_cur || 'USD';
-  const parsedAmount = typeof amount_paid === 'string' ? parseFloat(amount_paid) : amount_paid;
-  const amount = Math.round(parsedAmount); // Round to integer for usd_received/iqd_received columns
-  const usdReceived = currency === 'USD' ? amount : 0;
-  const iqdReceived = currency === 'IQD' ? amount : 0;
+  // Aligner sets are USD-only (enforced by `usdOnlyCurrency` in aligner.contract.ts +
+  // the fixed field in SetFormDrawer), so the payment lands wholly in usd_received and
+  // the IQD leg of the cash split is always 0. Billing a set in IQD would need a real
+  // currency threaded in from the request AND the set currency re-opened — there is no
+  // half-way state, so nothing here pretends to generalise.
+  //
+  // Rounded to an integer once: amount_paid / usd_received are both integer columns.
+  const amount = Math.round(
+    typeof amount_paid === 'string' ? parseFloat(amount_paid) : amount_paid
+  );
 
-  log.info('Creating aligner payment', {
-    workid,
-    aligner_set_id,
-    amount_paid,
-    currency,
-    usdReceived,
-    iqdReceived,
-  });
+  log.info('Creating aligner payment', { workid, aligner_set_id, amount_paid, usdReceived: amount });
 
   try {
     const dateStr = toDateOnly(new Date(date_of_payment as string));
-    const paidAmount =
-      typeof amount_paid === 'string' ? parseFloat(amount_paid) : amount_paid;
 
     const row = await getKysely()
       .insertInto('invoices')
       .values({
         work_id: workid,
-        amount_paid: Math.round(paidAmount),
+        amount_paid: amount,
         date_of_payment: sql<string>`${dateStr}`,
-        actual_amount: actual_amount ?? null,
-        actual_cur: actual_cur || null,
         change: change ?? null,
         aligner_set_id: aligner_set_id || null,
-        usd_received: usdReceived,
-        iqd_received: iqdReceived,
+        usd_received: amount,
+        iqd_received: 0,
       })
       .returning('invoice_id')
       .executeTakeFirstOrThrow();

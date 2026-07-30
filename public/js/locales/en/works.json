@@ -114,8 +114,6 @@
     "table": {
       "date": "Date",
       "amountPaid": "Amount Paid ({{currency}})",
-      "actualAmount": "Actual Amount",
-      "actualCurrency": "Actual Currency",
       "change": "Change",
       "actions": "Actions"
     },

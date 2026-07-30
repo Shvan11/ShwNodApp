@@ -55,9 +55,14 @@ interface LookupEditorProps {
 // Pure positioner — module-scoped, takes an already-measured rect (keeps the DOM
 // read at the call site).
 const calculatePosition = (rect: DOMRect): Position => {
-    const popoverWidth = 280;
-    const popoverHeight = 160;
     const padding = 8;
+    // Clamp against the width the popover will ACTUALLY render at: the stylesheet
+    // caps it with `max-width: calc(100vw - 16px)`, so on a narrow viewport the
+    // box is narrower than the 280px design width. Positioning against the design
+    // width instead used to push it off-screen, which the stylesheet then had to
+    // drag back with `left: … !important` — this keeps one source of truth.
+    const popoverWidth = Math.min(280, window.innerWidth - padding * 2);
+    const popoverHeight = 160;
 
     let left = rect.left - popoverWidth - padding;
     let top = rect.top + (rect.height / 2) - (popoverHeight / 2);
@@ -160,6 +165,9 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
     const queryClient = useQueryClient();
     const { data: itemsData, isLoading: loading, isError, error: itemsError } =
         useQuery(adminLookupItemsQuery(tableKey));
+    // `lookupAdmin.items.response` is `anyArray` on purpose — rows are generic
+    // per-table key/value pairs whose columns vary by tableName — so the row shape
+    // is asserted once here, off `unknown[]`.
     const items = (itemsData ?? []) as LookupItem[];
     const [modalOpen, setModalOpen] = useState<boolean>(false);
     const [editingItem, setEditingItem] = useState<LookupItem | null>(null);

@@ -244,7 +244,10 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                                                 </td>
                                                 <td data-label="Time">{formatTime(invoice.sys_start_time)}</td>
                                                 <td data-label="Treatment Currency" className={styles.currencyBadge}>
-                                                    <span className={`badge ${invoice.currency}`}>
+                                                    {/* styles.*, not the global string `badge ${currency}` — these
+                                                        classes live in a CSS module, so the global names never
+                                                        matched and the pill rendered completely unstyled. */}
+                                                    <span className={`${styles.badge} ${invoice.currency === 'USD' ? styles.badgeUsd : styles.badgeIqd}`}>
                                                         {invoice.currency}
                                                     </span>
                                                 </td>

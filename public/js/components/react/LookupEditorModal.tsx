@@ -57,9 +57,14 @@ interface LookupEditorModalProps {
 // Pure positioner — module-scoped, takes an already-measured rect (keeps the DOM
 // read at the call site).
 const calculatePosition = (rect: DOMRect): Position => {
-    const modalWidth = 420;
-    const modalHeight = 400;
     const padding = 12;
+    // Clamp against the width the popover will ACTUALLY render at: the stylesheet
+    // caps it with `max-width: calc(100vw - 24px)`, so on a narrow viewport the box
+    // is narrower than the 420px design width. Positioning against the design width
+    // instead used to push it off-screen, which the stylesheet then had to drag back
+    // with `left: … !important` — this keeps one source of truth.
+    const modalWidth = Math.min(420, window.innerWidth - padding * 2);
+    const modalHeight = 400;
 
     let left = rect.left - modalWidth - padding;
     let top = rect.top;
@@ -110,6 +115,8 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
     const referenceOptions = useMemo(() => {
         const out: Record<string, ReferenceOption[]> = {};
         refTables.forEach((table, i) => {
+            // `lookupAdmin.items.response` is `anyArray` on purpose (columns vary by
+            // tableName), so the row shape is asserted here, off `unknown[]`.
             const rows = refQueries[i]?.data as LookupItem[] | undefined;
             if (!rows) return;
             const refCol = refColumns.find(c => c.reference!.table === table)!.reference!;

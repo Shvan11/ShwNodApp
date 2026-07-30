@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { MouseEvent, DragEvent } from 'react';
 import { getItem, setItem } from '../core/storage';
+import { useGlobalState } from '../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 
 // Dashboard styles - CSS Module
 import styles from './Dashboard.module.css';
@@ -50,11 +52,22 @@ const getInitialCards = (): DashboardCardType[] => {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { t } = useTranslation('dashboard');
+  const { user } = useGlobalState();
+
+  // Statistics is admin + front-desk only (server: authorize(FINANCE_ROLES)) — don't
+  // offer clinical staff a card that lands on an access-denied page. Filtered at RENDER,
+  // not in `cards`, so the saved drag order survives a role change.
+  const caps = roleCaps(user?.role as UserRole | undefined);
+  const isVisibleCard = (card: DashboardCardType): boolean =>
+    card.key !== 'statistics' || !user?.role || caps.viewFinance;
 
   const [isCustomizeMode, setIsCustomizeMode] = useState(false);
   const [cards, setCards] = useState<DashboardCardType[]>(getInitialCards);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isDraggingActive, setIsDraggingActive] = useState(false);
+
+  // What actually gets rendered + reordered. `cards` stays the full saved order.
+  const visibleCards = cards.filter(isVisibleCard);
 
   const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
 
@@ -99,16 +112,28 @@ export default function Dashboard() {
     setIsDraggingActive(false);
   };
 
+  /**
+   * Move a card within the VISIBLE list, then write the result back into the full
+   * order — the reordered visible cards drop into the slots visible cards already
+   * occupied, so a card hidden by role keeps its saved position and reappears there.
+   */
+  const reorderVisible = (from: number, to: number) => {
+    const nextVisible = [...visibleCards];
+    const [moved] = nextVisible.splice(from, 1);
+    nextVisible.splice(to, 0, moved);
+
+    let v = 0;
+    const updatedCards = cards.map((c) => (isVisibleCard(c) ? nextVisible[v++] : c));
+
+    setCards(updatedCards);
+    setItem(STORAGE_KEY, updatedCards.map((c) => c.key));
+  };
+
   const handleDragEnter = (e: DragEvent<HTMLAnchorElement>, index: number) => {
     if (!isCustomizeMode || draggedIndex === null || draggedIndex === index) return;
 
-    const updatedCards = [...cards];
-    const [draggedCard] = updatedCards.splice(draggedIndex, 1);
-    updatedCards.splice(index, 0, draggedCard);
-
+    reorderVisible(draggedIndex, index);
     setDraggedIndex(index);
-    setCards(updatedCards);
-    setItem(STORAGE_KEY, updatedCards.map((c) => c.key));
   };
 
   const handleDragOver = (e: DragEvent<HTMLAnchorElement>) => {
@@ -121,14 +146,9 @@ export default function Dashboard() {
     // In RTL, left moves to larger index (forward), right moves to smaller index (backward)
     const isNext = (direction === 'right' && !isRtl) || (direction === 'left' && isRtl);
     const newIndex = isNext ? index + 1 : index - 1;
-    if (newIndex < 0 || newIndex >= cards.length) return;
+    if (newIndex < 0 || newIndex >= visibleCards.length) return;
 
-    const updatedCards = [...cards];
-    const [movedCard] = updatedCards.splice(index, 1);
-    updatedCards.splice(newIndex, 0, movedCard);
-
-    setCards(updatedCards);
-    setItem(STORAGE_KEY, updatedCards.map((c) => c.key));
+    reorderVisible(index, newIndex);
   };
 
   const handleResetLayout = () => {
@@ -169,10 +189,10 @@ export default function Dashboard() {
           </div>
 
           <div className={styles.dashboardGrid}>
-            {cards.map((card, index) => {
+            {visibleCards.map((card, index) => {
               const isDragging = draggedIndex === index && isDraggingActive;
               const isFirst = index === 0;
-              const isLast = index === cards.length - 1;
+              const isLast = index === visibleCards.length - 1;
 
               // Left moves index down in LTR (towards 0), or up in RTL (towards end)
               const cannotMoveLeft = isRtl ? isLast : isFirst;

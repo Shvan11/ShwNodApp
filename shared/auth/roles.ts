@@ -42,6 +42,16 @@ export const FINANCE_ROLES = [ROLES.ADMIN, ROLES.FRONT_DESK] as const;
 export const CLINICAL_ROLES = [ROLES.ADMIN, ROLES.FRONT_DESK, ROLES.CLINICAL] as const;
 
 export interface RoleCapabilities {
+  /**
+   * May see clinic-wide money: the Statistics page (per-day revenue, expenses, net
+   * profit, cash box) and the daily-invoices list. Front desk is included on purpose —
+   * they run the daily cash box and hand the drawer to the admin — but CLINICAL is not.
+   * The server enforces the same line with `authorize(FINANCE_ROLES)` on
+   * `/api/statistics` + `/api/daily-invoices`; this flag only hides the UI.
+   *
+   * Narrower still and admin-only (server: `authorize(ADMIN_ROLES)`): the month/year
+   * rollups, per-doctor commissions and the revenue breakdown.
+   */
   viewFinance: boolean;
   writeFinance: boolean;
   manageUsers: boolean;
@@ -52,7 +62,7 @@ export function roleCaps(role: UserRole | undefined): RoleCapabilities {
   const isAdmin = role === ROLES.ADMIN;
   const isFrontDesk = role === ROLES.FRONT_DESK;
   return {
-    viewFinance: true,
+    viewFinance: isAdmin || isFrontDesk,
     writeFinance: isAdmin || isFrontDesk,
     manageUsers: isAdmin,
   };

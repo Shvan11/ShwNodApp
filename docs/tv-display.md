@@ -1,8 +1,12 @@
 # Waiting-room TV display (digital signage)
 
 An unattended, looping photo/video slideshow on the clinic's waiting-room LG
-webOS TV, driven entirely from **Settings → TV Display** (or by dropping
-files straight into the media folder — both work together, see below).
+webOS TV, driven entirely from **Settings → TV Display**. What plays is an
+explicit **playlist** — an ordered sequence in which a file may appear more than
+once (so one logo/bumper can sit between every clip with **no duplicate file on
+disk**). The media folder is just the pool of available files; dropping a file
+into it puts it on the server but does not auto-play it — the settings tab then
+prompts to add it to the playlist.
 
 This doc is for **both humans and AI agents**: staff/IT who just want to
 change what's on screen, and anyone (human or Claude) about to touch the
@@ -13,10 +17,22 @@ file for a simple content swap.
 
 ## For staff / IT: how to use it
 
-**Add or remove content** — either way works, and both write into the same folder:
-- Settings → TV Display → "Add pictures / videos" (drag/drop or file picker), or
-- Copy files straight into the media folder on the server (ask IT for the path —
-  it's also shown at the bottom of the Settings → TV Display tab).
+**Add content** — two ways to get a file onto the server:
+- Settings → TV Display → "Add pictures / videos" (drag/drop or file picker) —
+  this also drops the file straight into the playlist, ready to play; or
+- Copy files into the media folder on the server (ask IT for the path — it's also
+  shown at the bottom of the Settings → TV Display tab). A file added this way is
+  **not** in the playlist yet: the tab shows it under "in the folder but not in
+  the playlist" with an **Add** button.
+
+**The playlist is what plays.** In the tab, each row is one slot in the loop.
+Reorder with the up/down arrows, **⧉ duplicate** a row to play that clip again
+later (this is how you put a logo between every video — one file, many slots),
+**✕ remove** a slot (the file stays on the server), or **🗑 delete** the file
+entirely. Playlist edits are saved with the **"Save playlist"** button.
+
+**Remove content** — ✕ takes a slot out of the loop; 🗑 deletes the file from the
+server (and removes every slot that used it).
 
 Changes reach the screen in about a second — no restart, no app, nothing to reload.
 
@@ -29,9 +45,10 @@ Videos   : .mp4 (H.264)   .webm   .ogg
 ```
 Export/convert to one of those first (e.g. iPhone photos → JPG).
 
-**Play order** — files play in filename order. Use the Settings tab's
-up/down arrows, or number filenames by hand (`01-welcome.jpg`,
-`02-clinic-tour.mp4`); both write the same numbering, so they never conflict.
+**Play order** — the playlist's own order, top to bottom, set with the up/down
+arrows in the Settings tab (filenames are never renamed — order is stored in the
+playlist, not in `01-`/`02-` prefixes). A clip can appear in multiple slots and
+plays each time it's listed.
 
 **Schedule** — Settings → TV Display → Schedule card sets the daily on/off
 times and the volume the TV comes on at (staff can still adjust volume with
@@ -76,18 +93,33 @@ Two halves, one store, no database:
 | Piece | File | Notes |
 |---|---|---|
 | Public, session-less routes (page, manifest, media stream, event stream, raw settings) | `routes/public/tv-display.routes.ts` | Mounted **before** the auth gate — the TV browser has no login. |
-| Staff-facing admin API (settings, upload/delete/reorder, one-shot commands) | `routes/api/tv-display.routes.ts` | Behind the normal staff-session gate; open to `ALL_ROLES`. |
-| Shared store: settings file + media folder + SSE client registry | `services/files/tv-display-store.ts` | Both routers import this — it's the only thing that touches disk. |
+| Staff-facing admin API (settings, upload/delete media, edit playlist, one-shot commands) | `routes/api/tv-display.routes.ts` | Behind the normal staff-session gate; open to `ALL_ROLES`. |
+| Shared store: settings file (incl. playlist) + media folder + SSE client registry | `services/files/tv-display-store.ts` | Both routers import this — it's the only thing that touches disk. |
 | Shared contract | `shared/contracts/tv-display.contract.ts` | Zod SSoT for the admin API, per the repo's contract convention. |
 | Settings tab UI | `public/js/components/react/TvDisplaySettings.tsx` | |
 | External scheduler daemon (separate project, NOT in this repo) | `C:\Users\Administrator\lgtv-scheduler\tv_daemon.py` | Runs as Windows scheduled task **"LG TV Signage"** (S4U logon, survives RDP/console logoff). Log: `lgtv-watch.log` beside it. |
 
-**No database, by design** — settings live in one JSON file
-(`data/tv-display.settings.json`, override `TV_DISPLAY_SETTINGS_FILE`) and
-media are plain files on disk (`tv-media/`, override
-`TV_DISPLAY_MEDIA_DIR`). Both are per-deployment machine config, not clinic
-data — keeping them off the DB means the waiting-room screen keeps playing
-through a database outage, and neither is included in a DB backup/restore.
+**No database, by design** — settings (including the `playlist` array) live in one
+JSON file (`data/tv-display.settings.json`, override `TV_DISPLAY_SETTINGS_FILE`)
+and media are plain files on disk (`tv-media/`, override `TV_DISPLAY_MEDIA_DIR`).
+Both are per-deployment machine config, not clinic data — keeping them off the DB
+means the waiting-room screen keeps playing through a database outage, and neither
+is included in a DB backup/restore.
+
+**The playlist is the single source of truth for what plays.** It's an ordered
+array of filenames (repeats allowed) stored beside the settings. The public/TV
+read path serves the *resolved* playlist (in order, repeats kept, dangling
+entries — files removed by hand — skipped) as the SSE `items`, so the TV page
+just plays `items` top to bottom. Order lives here, **not** in filename prefixes,
+so files are never renamed. **Upgrade/seed:** a settings file from before
+playlists (`playlist` absent → stored as `null`) is seeded **once** from the
+folder's current filename order the first time the *authenticated* management
+side reads it (`ensurePlaylist`), so an existing deployment keeps playing its
+content and only then becomes strict. The public read path treats `null` as
+"fall back to folder order" **without writing**, preserving the public router's
+zero-writes invariant. An **upload through the tab** auto-appends to the playlist
+(explicit "play this"); a **hand-dropped** file does not (it surfaces as
+"available" for a one-click Add). A **delete** prunes every slot that used the file.
 
 **Push, not poll** — the TV page and the daemon each hold one SSE stream
 open (`GET /tv-display/events?client=page|daemon`). A save from the Settings
@@ -145,10 +177,16 @@ moving it to a wired Ethernet connection (its wired MAC is on file in
 - **Never** let a raw `stat`/`lstat` per file creep into `listMedia()` (the
   TV's hot path) — type comes off `readdir`'s `Dirent`. `listMediaDetailed()`
   (management UI only) is where per-file `stat` is fine.
-- **Filenames ARE the play order.** Reordering renumbers files
-  (`01-`, `02-`, …) — this is why per-image dwell overrides
-  (`photoMsByName`) are re-keyed on every reorder/delete (see
-  `remapDurations`/`forgetDuration` in the store).
+- **The playlist array IS the play order** (`playlist` in the settings file) —
+  files are **never renamed**. Because order lives in the array, per-image dwell
+  overrides (`photoMsByName`) are keyed by the file's own name and only need
+  dropping when the file is deleted (`forgetDuration`); there is no reorder
+  re-keying. A file may appear in the array multiple times — don't dedupe it.
+- **Only the management side may seed/persist the playlist.** `ensurePlaylist`
+  (seed-once from folder order) and every playlist mutation run behind the auth
+  gate. The public/TV path calls the read-only `resolvedPlaylist` (null → folder
+  order, no write) — do not make it persist, or the "public router has zero
+  writes" invariant breaks.
 - **Never** hand-roll a settings interface — `TvDisplaySettings` in the
   shared contract is the SSoT on both sides.
 - The public router has **zero writes** — every mutation lives on the

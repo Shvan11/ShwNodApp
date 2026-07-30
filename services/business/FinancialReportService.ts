@@ -12,10 +12,6 @@
  * encapsulating complex financial calculation and aggregation logic.
  */
 
-import { log } from '../../utils/logger.js';
-import { sql } from 'kysely';
-import { getKysely } from '../database/kysely.js';
-
 /**
  * currency amounts
  */
@@ -31,7 +27,8 @@ export interface MonthlyStatistics {
   totalRevenue: CurrencyAmounts;
   totalExpenses: CurrencyAmounts;
   netProfit: CurrencyAmounts;
-  grandTotal: CurrencyAmounts;
+  /** null on both legs when no exchange rate exists to convert with. */
+  grandTotal: { IQD: number | null; USD: number | null };
   cashBox: CurrencyAmounts;
 }
 
@@ -46,8 +43,9 @@ export interface DailyData {
   ExpensesUSD?: number;
   ExpectedCashIQD?: number;
   ExpectedCashUSD?: number;
-  GrandTotal?: number;
-  GrandTotalIQD?: number;
+  /** null when the day has no exchange rate and none can be carried in. */
+  GrandTotal?: number | null;
+  GrandTotalIQD?: number | null;
   FinalIQDSum?: number;
   FinalUSDSum?: number;
 }
@@ -99,25 +97,44 @@ export interface ValidatedMonthYear {
  * the per-day breakdown). The month rollup still counts monthly expenses, so net profit
  * is unchanged from before this split.
  *
+ * The GRAND TOTALS are accumulated from the per-day GrandTotal / GrandTotalIQD columns,
+ * each of which getMonthlyGrandTotals already converted at THAT DAY's own exchange rate.
+ * They used to be recomputed here by applying one flat rate to the whole month's net,
+ * which made the summary card disagree with the daily table it sits above whenever the
+ * rate moved during the month. `exchangeRate` is now only applied to the monthly-only
+ * expenses (rent/utilities — `is_monthly` rows, absent from the per-day figures), which
+ * are a month-level cost with no day to borrow a rate from.
+ *
  * @param dailyData - Daily data from getMonthlyGrandTotals (per-day, daily-only expenses)
- * @param exchangeRate - Exchange rate for USD to IQD conversion
+ * @param exchangeRate - Reference rate for the month (converts the monthly-only expenses)
  * @param monthlyExpenses - Month's total expenses by currency, ALL expenses (positive)
  * @returns Aggregated monthly statistics
  */
 export function calculateMonthlyStatistics(
   dailyData: DailyData[],
-  exchangeRate: number,
+  exchangeRate: number | null,
   monthlyExpenses: CurrencyAmounts
 ): MonthlyStatistics {
   let totalIQD = 0;
   let totalUSD = 0;
   let finalExpectedCashIQD = 0;
   let finalExpectedCashUSD = 0;
+  // Per-day grand totals (already converted at each day's own rate) + the daily-only
+  // expenses those rows netted out, so the monthly-only remainder can be isolated below.
+  let dailyGrandTotalUSD = 0;
+  let dailyGrandTotalIQD = 0;
+  let dailyExpensesIQD = 0;
+  let dailyExpensesUSD = 0;
 
   // Aggregate daily revenue + carry the running cash-box balance.
   dailyData.forEach((day) => {
     totalIQD += day.SumIQD || 0;
     totalUSD += day.SumUSD || 0;
+    dailyGrandTotalUSD += day.GrandTotal || 0;
+    dailyGrandTotalIQD += day.GrandTotalIQD || 0;
+    // Expense columns arrive negative (the views select -SUM(amount)).
+    dailyExpensesIQD += Math.abs(day.ExpensesIQD || 0);
+    dailyExpensesUSD += Math.abs(day.ExpensesUSD || 0);
     // Use the last day's Expected Cash values as the final balance
     finalExpectedCashIQD = day.ExpectedCashIQD || 0;
     finalExpectedCashUSD = day.ExpectedCashUSD || 0;
@@ -132,9 +149,23 @@ export function calculateMonthlyStatistics(
   const netIQD = totalIQD - totalExpensesIQD;
   const netUSD = totalUSD - totalExpensesUSD;
 
-  // Calculate grand totals with currency conversion
-  const grandTotalUSD = netIQD / exchangeRate + netUSD;
-  const grandTotalIQD = netIQD + netUSD * exchangeRate;
+  // Whatever the per-day rows left out: the is_monthly expenses. Clamped at 0 so a
+  // rounding artefact can never turn into a phantom credit.
+  const monthlyOnlyExpensesIQD = Math.max(0, totalExpensesIQD - dailyExpensesIQD);
+  const monthlyOnlyExpensesUSD = Math.max(0, totalExpensesUSD - dailyExpensesUSD);
+
+  // Grand totals = the per-day (per-day-rate) totals, less the month-level costs.
+  // With no rate on record anywhere there is nothing to convert with, so they report
+  // null rather than a figure derived from an assumed rate. Every un-converted number
+  // above (revenue, expenses, net profit, cash box) is unaffected and still exact.
+  const grandTotalUSD =
+    exchangeRate === null
+      ? null
+      : dailyGrandTotalUSD - (monthlyOnlyExpensesIQD / exchangeRate + monthlyOnlyExpensesUSD);
+  const grandTotalIQD =
+    exchangeRate === null
+      ? null
+      : dailyGrandTotalIQD - (monthlyOnlyExpensesIQD + monthlyOnlyExpensesUSD * exchangeRate);
 
   return {
     totalRevenue: {
@@ -150,8 +181,8 @@ export function calculateMonthlyStatistics(
       USD: netUSD,
     },
     grandTotal: {
-      USD: Math.round(grandTotalUSD * 100) / 100,
-      IQD: Math.round(grandTotalIQD),
+      USD: grandTotalUSD === null ? null : Math.round(grandTotalUSD * 100) / 100,
+      IQD: grandTotalIQD === null ? null : Math.round(grandTotalIQD),
     },
     cashBox: {
       IQD: finalExpectedCashIQD,
@@ -160,61 +191,11 @@ export function calculateMonthlyStatistics(
   };
 }
 
-/**
- * Invoice details from database
- */
-interface InvoiceDetails {
-  iqd_received: number | null;
-  usd_received: number | null;
-  [key: string]: number | null;
-}
-
-/**
- * Enrich an invoice with additional details
- *
- * Fetches iqd_received and usd_received for a specific invoice
- *
- * @param invoice - Base invoice object
- * @returns Enriched invoice with iqd_received and usd_received
- */
-async function enrichInvoice(invoice: BaseInvoice): Promise<EnrichedInvoice> {
-  const db = getKysely();
-  const { rows: invoiceDetails } = await sql<InvoiceDetails>`
-    SELECT "iqd_received", "usd_received" FROM "invoices" WHERE "invoice_id" = ${invoice.invoice_id}
-  `.execute(db);
-
-  return {
-    ...invoice,
-    iqd_received: invoiceDetails[0]?.iqd_received || 0,
-    usd_received: invoiceDetails[0]?.usd_received || 0,
-  };
-}
-
-/**
- * Enrich invoices with additional details in parallel
- *
- * For each invoice from the stored procedure, fetches additional
- * payment details (iqd_received, usd_received) using Promise.all
- *
- * @param invoices - Base invoices from stored procedure
- * @returns Enriched invoices
- */
-export async function enrichInvoicesWithDetails(
-  invoices: BaseInvoice[]
-): Promise<EnrichedInvoice[]> {
-  if (!Array.isArray(invoices) || invoices.length === 0) {
-    return [];
-  }
-
-  // Fetch additional details for all invoices in parallel
-  const enrichedInvoices = await Promise.all(
-    invoices.map((invoice) => enrichInvoice(invoice))
-  );
-
-  log.info(`Enriched ${enrichedInvoices.length} invoices with payment details`);
-
-  return enrichedInvoices;
-}
+// enrichInvoice / enrichInvoicesWithDetails are GONE. They ran one
+// `SELECT iqd_received, usd_received FROM invoices WHERE invoice_id = ?` per invoice —
+// for two columns the daily-invoices row already carried — so every open of the modal
+// cost one round trip per invoice on top of the list query. getDailyInvoices
+// (report-queries.ts) now selects both columns directly and returns EnrichedInvoice[].
 
 /**
  * Validate month and year parameters
@@ -242,22 +223,20 @@ export function validateMonthYear(
 }
 
 /**
- * Validate and parse date parameter
+ * Assert that a date parameter is parseable. Callers use this purely as a guard —
+ * the parsed Date it used to return was discarded at the only call site — so it
+ * returns nothing and simply throws on a bad value.
  * @param date - Date string in YYYY-MM-DD format
- * @returns Parsed date object
  * @throws Error If date format is invalid
  */
-export function validateDate(date: string): Date {
-  const dateObj = new Date(date);
-  if (isNaN(dateObj.getTime())) {
+export function validateDate(date: string): void {
+  if (isNaN(new Date(date).getTime())) {
     throw new Error('Invalid date format');
   }
-  return dateObj;
 }
 
 export default {
   calculateMonthlyStatistics,
-  enrichInvoicesWithDetails,
   validateMonthYear,
   validateDate,
 };

@@ -7,7 +7,6 @@ interface TabConfig {
     label: string;
     icon: string;
     description: string;
-    disabled?: boolean;
 }
 
 interface TabDataItem {
@@ -66,21 +65,13 @@ const SettingsTabNavigation: React.FC<SettingsTabNavigationProps> = ({ tabs, act
                     <button
                         key={tab.id}
                         ref={activeTab === tab.id ? activeButtonRef : undefined}
-                        className={cn(
-                            styles.button,
-                            activeTab === tab.id && styles.active,
-                            tab.disabled && styles.disabled
-                        )}
-                        onClick={() => !tab.disabled && onTabChange(tab.id)}
-                        disabled={tab.disabled}
+                        className={cn(styles.button, activeTab === tab.id && styles.active)}
+                        onClick={() => onTabChange(tab.id)}
                         title={tab.description}
                     >
                         <i className={tab.icon}></i>
                         <span className={styles.label}>{tab.label}</span>
                         {getTabBadge(tab.id)}
-                        {tab.disabled && (
-                            <span className={styles.comingSoonBadge}>Soon</span>
-                        )}
                     </button>
                 ))}
             </div>

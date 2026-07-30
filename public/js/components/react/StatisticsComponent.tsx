@@ -10,6 +10,7 @@ import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/
 import { getChartThemeColors } from '../../utils/chartTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { httpErrorMessage } from '@/core/http';
 import {
     statisticsQuery,
@@ -21,7 +22,8 @@ import styles from './StatisticsComponent.module.css';
 // Types
 interface DailyData {
     Day: string;
-    GrandTotal?: number;
+    /** null when that day has no exchange rate to convert with. */
+    GrandTotal?: number | null;
     SumIQD?: number;
     SumUSD?: number;
     ExpensesIQD?: number;
@@ -41,7 +43,8 @@ interface SummaryData {
     totalRevenue: CurrencyTotals;
     totalExpenses: CurrencyTotals;
     netProfit: CurrencyTotals;
-    grandTotal: CurrencyTotals;
+    /** null on both legs when no exchange rate has ever been recorded. */
+    grandTotal: { IQD: number | null; USD: number | null };
 }
 
 interface StatisticsData {
@@ -49,17 +52,23 @@ interface StatisticsData {
     error?: string;
     dailyData: DailyData[];
     summary: SummaryData;
+    /**
+     * Reference rate the server resolved for this month (days with their own rate use
+     * that). null = no rate on record at all, so nothing here is converted — the app
+     * does not substitute a house rate.
+     */
+    exchangeRate?: number | null;
 }
 
 interface MonthlyDataItem {
     Month: number;
     Year: number;
-    GrandTotal?: number;
+    GrandTotal?: number | null;
 }
 
 interface YearlyDataItem {
     Year: number;
-    GrandTotal?: number;
+    GrandTotal?: number | null;
 }
 
 interface YearlyData {
@@ -76,7 +85,8 @@ interface MultiYearData {
 
 interface ChartDataItem {
     label: string;
-    grandTotal: number;
+    /** null renders as a gap in the line — an unconvertible period, not a zero. */
+    grandTotal: number | null;
 }
 
 // View mode constants
@@ -109,6 +119,13 @@ const StatisticsComponent = () => {
     const { resolvedTheme } = useTheme();
     const { user } = useGlobalState();
     const isAdmin = user?.role === 'admin';
+    // Clinic-wide money is admin + front-desk only (front desk runs the cash box and
+    // hands the drawer over); the server enforces the same line with
+    // authorize(FINANCE_ROLES). Identity can resolve a beat after first paint on a cold
+    // tab, so "not yet known" is treated as neither allowed nor denied — the page shows
+    // its loading state instead of flashing an access error or firing a request that 403s.
+    const roleKnown = !!user?.role;
+    const canViewFinance = roleCaps(user?.role as UserRole | undefined).viewFinance;
     const [searchParams, setSearchParams] = useSearchParams();
     const [month, setMonth] = useState(parseInt(searchParams.get('month') || '') || new Date().getMonth() + 1);
     const [year, setYear] = useState(parseInt(searchParams.get('year') || '') || new Date().getFullYear());
@@ -118,7 +135,6 @@ const StatisticsComponent = () => {
     // For Yearly view: year range
     const [yearRangeStart, setYearRangeStart] = useState(new Date().getFullYear() - 4);
     const [yearRangeEnd, setYearRangeEnd] = useState(new Date().getFullYear());
-    const [exchangeRate] = useState(1450);
     const [viewMode, setViewMode] = useState<ViewMode>((searchParams.get('view') as ViewMode) || VIEW_MODES.DAILY);
 
     // Non-admins can't reach the admin-only tabs — if one is selected via a deep link
@@ -138,11 +154,11 @@ const StatisticsComponent = () => {
         error: statsError,
         refetch: refetchStatistics,
     } = useQuery({
-        ...statisticsQuery(month, year, exchangeRate),
+        ...statisticsQuery(month, year),
         placeholderData: keepPreviousData,
         // The custom tabs (Commissions / Breakdown) own their own queries and never
         // read the monthly stats — don't fetch them while one of those tabs is open.
-        enabled: !isCustomView(effectiveViewMode),
+        enabled: roleKnown && canViewFinance && !isCustomView(effectiveViewMode),
     });
     const statistics = (statisticsData ?? null) as StatisticsData | null;
     const error = isError ? httpErrorMessage(statsError, 'Failed to fetch statistics') : null;
@@ -150,14 +166,14 @@ const StatisticsComponent = () => {
     // 12-month rollup — only fetched in Monthly view (cleared between fetches, so no
     // keepPreviousData here).
     const { data: yearlyDataRaw, isFetching: loadingYearly } = useQuery({
-        ...yearlyStatisticsQuery(periodStartMonth, periodStartYear, exchangeRate),
+        ...yearlyStatisticsQuery(periodStartMonth, periodStartYear),
         enabled: effectiveViewMode === VIEW_MODES.MONTHLY,
     });
     const yearlyData = (yearlyDataRaw ?? null) as YearlyData | null;
 
     // Multi-year rollup — only fetched in Yearly view.
     const { data: multiYearDataRaw, isFetching: loadingMultiYear } = useQuery({
-        ...multiYearStatisticsQuery(yearRangeStart, yearRangeEnd, exchangeRate),
+        ...multiYearStatisticsQuery(yearRangeStart, yearRangeEnd),
         enabled: effectiveViewMode === VIEW_MODES.YEARLY,
     });
     const multiYearData = (multiYearDataRaw ?? null) as MultiYearData | null;
@@ -165,9 +181,36 @@ const StatisticsComponent = () => {
     // Modal open-state lives in the URL (?day=YYYY-MM-DD) so browser back/forward
     // and deep links re-open it; the full row is looked up from the loaded month.
     const selectedDay = searchParams.get('day');
-    const selectedDate = selectedDay
+    const dayMonth = selectedDay ? parseInt(selectedDay.slice(5, 7), 10) : NaN;
+    const dayYear = selectedDay ? parseInt(selectedDay.slice(0, 4), 10) : NaN;
+    const dayIsInLoadedMonth = dayMonth === month && dayYear === year;
+    const selectedDayRow = selectedDay
         ? statistics?.dailyData.find(d => d.Day === selectedDay) ?? null
         : null;
+    // Once the day's own month is loaded, open the modal even if that day has no row in
+    // dailyData (a day with no invoices AND no expenses simply isn't in the result set) —
+    // the modal renders its own "no invoices" state. DailyInvoicesModal accepts the bare
+    // date string for exactly this case; only the per-day expense/cash figures, which
+    // live on the row, are then unavailable.
+    const selectedDate: DailyData | string | null =
+        selectedDayRow ?? (selectedDay && statistics && dayIsInLoadedMonth ? selectedDay : null);
+
+    // A ?day= deep link can name a day OUTSIDE the month currently loaded — a shared link
+    // carrying only ?day= lands on today's month, so the lookup above found nothing and
+    // the modal silently never opened. Adopt the day's own month/year; the URL effect
+    // below then writes them back, and the refetched month resolves the row.
+    //
+    // Keyed adjust-during-render (not an effect, matching the pattern used elsewhere in
+    // the app) and keyed on the ?day VALUE, so it fires once per deep link — navigating
+    // the month picker with the modal open never yanks the month back.
+    const [seededDeepLinkDay, setSeededDeepLinkDay] = useState<string | null>(null);
+    if (selectedDay && selectedDay !== seededDeepLinkDay) {
+        setSeededDeepLinkDay(selectedDay);
+        if (dayMonth && dayYear && (dayMonth !== month || dayYear !== year)) {
+            setMonth(dayMonth);
+            setYear(dayYear);
+        }
+    }
 
     // Keep month/year in the URL (preserving any open ?day modal param).
     useEffect(() => {
@@ -204,14 +247,18 @@ const StatisticsComponent = () => {
 
     // Helper: Aggregate for monthly view (show all months of the year)
     const aggregateByMonth = (dailyData: DailyData[]): ChartDataItem[] => {
-        const months: Record<number, { grandTotal: number; month: number }> = {};
+        // Starts at null and only becomes a number once a convertible day contributes,
+        // so a month with no exchange rate stays a gap rather than plotting as zero.
+        const months: Record<number, { grandTotal: number | null; month: number }> = {};
         dailyData.forEach(day => {
             const date = new Date(day.Day);
             const monthKey = date.getMonth();
             if (!months[monthKey]) {
-                months[monthKey] = { grandTotal: 0, month: monthKey };
+                months[monthKey] = { grandTotal: null, month: monthKey };
             }
-            months[monthKey].grandTotal += day.GrandTotal || 0;
+            if (day.GrandTotal != null) {
+                months[monthKey].grandTotal = (months[monthKey].grandTotal ?? 0) + day.GrandTotal;
+            }
         });
 
         return Object.values(months)
@@ -253,7 +300,7 @@ const StatisticsComponent = () => {
             case VIEW_MODES.DAILY:
                 chartData = statistics.dailyData.map(day => ({
                     label: `${new Date(day.Day).getDate()}/${new Date(day.Day).getMonth() + 1}`,
-                    grandTotal: day.GrandTotal || 0
+                    grandTotal: day.GrandTotal ?? null
                 }));
                 chartTitle = 'Daily Grand Total (USD)';
                 break;
@@ -263,7 +310,7 @@ const StatisticsComponent = () => {
                     const { endMonth, endYear } = getPeriodEnd();
                     chartData = yearlyData.monthlyData.map(m => ({
                         label: `${monthNames[m.Month - 1].substring(0, 3)} ${m.Year}`,
-                        grandTotal: m.GrandTotal || 0
+                        grandTotal: m.GrandTotal ?? null
                     }));
                     chartTitle = `Monthly Revenue: ${monthNames[periodStartMonth - 1]} ${periodStartYear} - ${monthNames[endMonth - 1]} ${endYear}`;
                 } else {
@@ -277,12 +324,16 @@ const StatisticsComponent = () => {
                 if (multiYearData && multiYearData.yearlyData && multiYearData.yearlyData.length > 0) {
                     chartData = multiYearData.yearlyData.map(y => ({
                         label: y.Year.toString(),
-                        grandTotal: y.GrandTotal || 0
+                        grandTotal: y.GrandTotal ?? null
                     }));
                     chartTitle = `Yearly Revenue: ${yearRangeStart} - ${yearRangeEnd}`;
                 } else {
-                    // Fallback to single data point from current month's data
-                    const yearlyTotal = statistics.dailyData.reduce((sum, day) => sum + (day.GrandTotal || 0), 0);
+                    // Fallback to single data point from current month's data. Stays null
+                    // (a gap) unless at least one day was actually convertible.
+                    const yearlyTotal = statistics.dailyData.reduce<number | null>(
+                        (sum, day) => (day.GrandTotal == null ? sum : (sum ?? 0) + day.GrandTotal),
+                        null
+                    );
                     chartData = [{ label: `${monthNames[month-1]} ${year}`, grandTotal: yearlyTotal }];
                     chartTitle = `Yearly Total (USD) - ${year}`;
                 }
@@ -290,7 +341,7 @@ const StatisticsComponent = () => {
             default:
                 chartData = statistics.dailyData.map(day => ({
                     label: `${new Date(day.Day).getDate()}/${new Date(day.Day).getMonth() + 1}`,
-                    grandTotal: day.GrandTotal || 0
+                    grandTotal: day.GrandTotal ?? null
                 }));
         }
 
@@ -375,7 +426,7 @@ const StatisticsComponent = () => {
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [statistics, exchangeRate, effectiveViewMode, month, year, yearlyData, loadingYearly, multiYearData, loadingMultiYear, yearRangeStart, yearRangeEnd, resolvedTheme]);
+    }, [statistics, effectiveViewMode, month, year, yearlyData, loadingYearly, multiYearData, loadingMultiYear, yearRangeStart, yearRangeEnd, resolvedTheme]);
 
     // Navigation handlers
     const handlePrevMonth = () => {
@@ -420,6 +471,13 @@ const StatisticsComponent = () => {
         return formatCurrencyUtil(amount || 0, currency);
     };
 
+    // CONVERTED figures only (grand totals). null means "no exchange rate has ever been
+    // recorded", which has to read as unknown — formatCurrency's `|| 0` would print a
+    // confident "0 USD" for a month that may have taken millions of dinars.
+    const formatConverted = (amount: number | null | undefined, currency: string = 'USD'): string => {
+        return amount == null ? '—' : formatCurrencyUtil(amount, currency);
+    };
+
     // Format date
     const formatDate = (dateString: string): string => {
         const date = new Date(dateString);
@@ -430,6 +488,19 @@ const StatisticsComponent = () => {
     const handlePrint = () => {
         window.print();
     };
+
+    // Clinical staff have no business in the clinic's books. Rendered after every hook
+    // so the hook order stays stable; the queries above are already disabled for them.
+    if (roleKnown && !canViewFinance) {
+        return (
+            <div className={styles.statisticsContainer}>
+                <div className={styles.errorState}>
+                    <i className="fas fa-lock"></i>
+                    <p>Financial statistics are restricted to admin and front-desk staff.</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <>
@@ -701,6 +772,17 @@ const StatisticsComponent = () => {
                             <i className="fas fa-info-circle" aria-hidden="true"></i>
                             Per-day rows show daily expenses only. Monthly expenses (rent, utilities, subscriptions) are counted in the MONTH TOTAL, not on any single day.
                         </p>
+                        {statistics.exchangeRate != null ? (
+                            <p className={styles.tableNote}>
+                                <i className="fas fa-exchange-alt" aria-hidden="true"></i>
+                                Each day converts at its own recorded rate; days with none use 1 USD = {statistics.exchangeRate.toLocaleString('en-US')} IQD.
+                            </p>
+                        ) : (
+                            <p className={styles.tableNote}>
+                                <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                                No exchange rate has been recorded yet, so IQD and USD can&apos;t be combined — the Grand Total columns show &quot;—&quot;. Every IQD and USD figure below is exact. Add a rate in Settings → Exchange Rates.
+                            </p>
+                        )}
                         <div className={styles.tableWrapper}>
                             <table className={styles.dataTable}>
                                 <thead>
@@ -732,7 +814,7 @@ const StatisticsComponent = () => {
                                             <td data-label="USD Revenue" className={styles.amountCell}>{formatCurrency(day.SumUSD, 'USD')}</td>
                                             <td data-label="USD Expenses" className={`${styles.amountCell} ${styles.negative}`}>{formatCurrency(Math.abs(day.ExpensesUSD || 0), 'USD')}</td>
                                             <td data-label="USD Net" className={styles.amountCell}>{formatCurrency(day.FinalUSDSum, 'USD')}</td>
-                                            <td data-label="Grand Total" className={`${styles.amountCell} ${styles.grandTotal}`}>{formatCurrency(day.GrandTotal, 'USD')}</td>
+                                            <td data-label="Grand Total" className={`${styles.amountCell} ${styles.grandTotal}`}>{formatConverted(day.GrandTotal)}</td>
                                             <td data-label="Expected Cash IQD" className={`${styles.amountCell} ${styles.expectedCashColumn} ${styles.expectedCashIqd}`}>{formatCurrency(day.ExpectedCashIQD)}</td>
                                             <td data-label="Expected Cash USD" className={`${styles.amountCell} ${styles.expectedCashColumn} ${styles.expectedCashUsd}`}>{formatCurrency(day.ExpectedCashUSD, 'USD')}</td>
                                         </tr>
@@ -748,7 +830,7 @@ const StatisticsComponent = () => {
                                         <td data-label="USD Revenue" className={styles.amountCell}><strong>{formatCurrency(statistics.summary.totalRevenue.USD, 'USD')}</strong></td>
                                         <td data-label="USD Expenses" className={`${styles.amountCell} ${styles.negative}`}><strong>{formatCurrency(statistics.summary.totalExpenses.USD, 'USD')}</strong></td>
                                         <td data-label="USD Net" className={styles.amountCell}><strong>{formatCurrency(statistics.summary.netProfit.USD, 'USD')}</strong></td>
-                                        <td data-label="Grand Total" className={`${styles.amountCell} ${styles.grandTotal}`}><strong>{formatCurrency(statistics.summary.grandTotal.USD, 'USD')}</strong></td>
+                                        <td data-label="Grand Total" className={`${styles.amountCell} ${styles.grandTotal}`}><strong>{formatConverted(statistics.summary.grandTotal.USD)}</strong></td>
                                         <td data-label="Cash Box Note" className={`${styles.amountCell} ${styles.expectedCashColumn}`} colSpan={2}><em>(Daily Expenses Only)</em></td>
                                     </tr>
                                 </tfoot>

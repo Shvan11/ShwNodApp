@@ -700,8 +700,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                             <tr>
                                                 <th>{t('paymentHistory.table.date')}</th>
                                                 <th>{t('paymentHistory.table.amountPaid', { currency: selectedWorkForPayment.currency })}</th>
-                                                <th>{t('paymentHistory.table.actualAmount')}</th>
-                                                <th>{t('paymentHistory.table.actualCurrency')}</th>
                                                 <th>{t('paymentHistory.table.change')}</th>
                                                 <th>{t('paymentHistory.table.actions')}</th>
                                             </tr>
@@ -709,14 +707,20 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                         <tbody>
                                             {paymentHistory.map((payment, index) => (
                                                 <tr key={payment.InvoiceID || index}>
-                                                    <td>{formatDate(payment.date_of_payment)}</td>
-                                                    <td className={styles.paymentAmount}>
+                                                    {/* data-label feeds the ≤768px card layout's ::before row labels
+                                                        (the table stacks instead of side-scrolling on a phone), so
+                                                        these are visible text and stay translated. */}
+                                                    <td data-label={t('paymentHistory.table.date')}>{formatDate(payment.date_of_payment)}</td>
+                                                    <td data-label={t('paymentHistory.table.amountPaid', { currency: selectedWorkForPayment.currency })} className={styles.paymentAmount}>
                                                         {formatCurrency(payment.amount_paid, selectedWorkForPayment.currency)}
                                                     </td>
-                                                    <td>{payment.actual_amount ? formatCurrency(payment.actual_amount, payment.actual_cur) : '-'}</td>
-                                                    <td>{payment.actual_cur || '-'}</td>
-                                                    <td>{payment.change ? formatCurrency(payment.change, payment.actual_cur) : '-'}</td>
-                                                    <td>
+                                                    {/* Change is always handed back in IQD (the clinic's cash float),
+                                                        whatever the work is denominated in. It used to be formatted
+                                                        with the since-dropped `actual_cur`, which no write path
+                                                        filled — so every change row was labelled 'USD' by the
+                                                        fallback in the local formatCurrency wrapper. */}
+                                                    <td data-label={t('paymentHistory.table.change')}>{payment.change ? formatCurrency(payment.change, 'IQD') : '-'}</td>
+                                                    <td data-label={t('paymentHistory.table.actions')}>
                                                         <div className={styles.paymentActions}>
                                                             <button
                                                                 onClick={() => {

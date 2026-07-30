@@ -450,6 +450,21 @@
     border-top: 1px solid var(--gray-200);
 }
 
+/* Cancel is neutral, NOT the global `.btn-secondary` — that token is GREEN
+   (--secondary-color: #4CAF50). Next to a blue "Save Payment" the green button reads as
+   the confirm, which is exactly backwards on a form that moves money. */
+.btnCancel {
+    color: var(--text-secondary);
+    background-color: var(--gray-200);
+    border-color: var(--gray-300);
+}
+
+.btnCancel:hover {
+    color: var(--text-primary);
+    background-color: var(--gray-300);
+    border-color: var(--gray-400);
+}
+
 /* Success State Compact */
 .paymentSuccessCompact {
     padding: var(--spacing-xl) var(--spacing-lg);
@@ -536,8 +551,30 @@
         width: 100%;
     }
 
+    /* Touch sizing for every money field on a touch screen.
+       - 44px tall: below that the field is under the minimum comfortable tap target,
+         and these are the fields staff hit fastest while counting cash.
+       - 16px font: iOS Safari auto-ZOOMS the page on focus for any input under 16px,
+         which on the payment form means the modal jumps and has to be pinched back
+         between the amount, cash and change fields. */
+    .selectCompact,
+    .inputCompact,
+    .inputLg,
+    .inputMd,
+    .rateInputSmall {
+        height: 2.75rem;
+        font-size: var(--font-size-base);
+    }
+
     .rateInputSmall {
         flex: 1;
+        width: auto;
+        box-sizing: border-box;
+    }
+
+    /* Keep the entry-mode toggle aligned with the taller inputs beside it. */
+    .entryModeField .entryModeToggle {
+        height: 2.75rem;
     }
 }
 
@@ -557,13 +594,18 @@
         flex-direction: column; /* Stack on small mobile */
     }
 
+    /* `column`, not `column-reverse`. Reversed, Cancel landed at the BOTTOM — the
+       thumb-closest position on a phone — directly under the primary action. Stacked in
+       DOM order the primary "Save Payment" sits where the thumb rests and Cancel is the
+       deliberate reach upward. */
     .paymentActionsCompact {
-        flex-direction: column-reverse;
+        flex-direction: column;
     }
 
     .paymentActionsCompact :global(.btn) {
         width: 100%;
         justify-content: center;
+        min-height: 2.75rem;
     }
 
     .paymentSuccessCompact {
@@ -586,18 +628,12 @@
         width: 100%;
     }
 
-    /* Consistent height for ALL input fields on mobile - slightly smaller */
-    .selectCompact,
-    .inputCompact,
-    .inputLg,
-    .inputMd {
-        height: calc(var(--input-height-sm) - var(--spacing-xs));
-        font-size: var(--font-size-sm);
-    }
+    /* Input heights/fonts are NOT shrunk here — the ≤768px block above sets them to the
+       44px / 16px touch sizing, and this block used to undo it (36px at 14px, which is
+       under the tap-target minimum and triggers iOS focus-zoom). */
 
-    /* Entry Mode Toggle - Mobile overrides (matches above input heights) */
+    /* Entry Mode Toggle - matches the input height set above */
     .entryModeField .entryModeToggle {
-        height: calc(var(--input-height-sm) - var(--spacing-xs));
         padding: 0 var(--spacing-xs);
     }
 
@@ -657,91 +693,9 @@
     color: var(--text-secondary);
 }
 
-.summaryGrid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-}
-
-.highlight {
-    grid-column: span 2;
-    padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.negative {
-    color: var(--warning-400);
-}
-
-.positive {
-    color: var(--success-200);
-}
-
 /* Invoice Form */
 .invoiceForm {
     padding: 0 24px 24px 24px;
-}
-
-.sectionTitle {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 16px;
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-    margin: 0 0 20px 0;
-}
-
-.stepNumber {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    background: linear-gradient(135deg, var(--color-purple-light) 0%, var(--color-purple-dark) 100%);
-    color: var(--color-white);
-    border-radius: 50%;
-    font-size: 16px;
-    font-weight: var(--font-weight-bold);
-    flex-shrink: 0;
-}
-
-/* Form Groups */
-.formGroup {
-    margin-bottom: 20px;
-}
-
-.formGroup:last-child {
-    margin-bottom: 0;
-}
-
-.formGroup label {
-    display: block;
-    font-size: 14px;
-    font-weight: var(--font-weight-medium);
-    color: var(--text-secondary);
-    margin-bottom: 8px;
-}
-
-.formGroup input[type="text"],
-.formGroup input[type="number"],
-.formGroup input[type="date"],
-.formGroup select {
-    width: 100%;
-    padding: 10px 14px;
-    border: 1px solid var(--gray-300);
-    border-radius: 6px;
-    font-size: 14px;
-    color: var(--text-primary);
-    transition: all 0.2s ease;
-    background: var(--surface);
-}
-
-.formGroup input:focus,
-.formGroup select:focus {
-    outline: none;
-    border-color: var(--color-purple-light);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 /* ========================================
@@ -848,70 +802,11 @@
     font-size: var(--font-size-sm);
 }
 
-/* Checkbox Group */
-.checkboxGroup {
-    margin-bottom: 16px;
-}
-
-.checkboxLabel {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: var(--font-weight-medium);
-    color: var(--text-secondary);
-    padding: 12px;
-    background: var(--surface);
-    border: 1px solid var(--gray-300);
-    border-radius: 6px;
-    transition: all 0.2s ease;
-}
-
-.checkboxLabel:hover {
-    background: var(--gray-50);
-    border-color: var(--color-purple-light);
-}
-
-.checkboxLabel input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-    accent-color: var(--color-purple-light);
-}
-
-/* Form Actions */
-.formActions {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    margin-top: 24px;
-    padding-top: 24px;
-    border-top: 1px solid var(--gray-200);
-}
-
 /* Button styles use global definitions from /css/components/buttons.css */
-/* Loading State */
-.loadingState {
-    text-align: center;
-    padding: 40px;
-    color: var(--text-secondary);
-    font-size: 16px;
-}
-
-.loadingState i {
-    font-size: 32px;
-    margin-bottom: 12px;
-    color: var(--color-purple-light);
-}
 
 /* Responsive Design */
 
 @media (max-width: 768px) {
-    .modalOverlay {
-        padding: 10px;
-    }
-
     .modalContent {
         max-height: 95vh;
     }
@@ -919,29 +814,6 @@
     .invoiceModal {
         max-width: 100%;
     }
-
-    .summaryGrid {
-        grid-template-columns: 1fr;
-    }
-
-    .highlight {
-        grid-column: span 1;
-    }
-
-    .suggestedPaymentBox {
-        flex-direction: column;
-        text-align: center;
-    }
-
-    .suggestionAmount {
-        font-size: 24px;
-    }
-
-    .formActions {
-        flex-direction: column-reverse;
-    }
-
-    /* Button styles use global definitions from /css/components/buttons.css */
 }
 
 .discountNote {

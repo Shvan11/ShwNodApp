@@ -458,8 +458,6 @@ export interface IntegrationOauthTokens {
 }
 
 export interface Invoices {
-  actual_amount: number | null;
-  actual_cur: string | null;
   aligner_set_id: number | null;
   amount_paid: number;
   change: number | null;

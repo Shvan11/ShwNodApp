@@ -4,14 +4,14 @@
 .container {
     background: var(--surface);
     border-radius: var(--radius-xl);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-md);
     border: 1px solid var(--gray-200);
     transition: all 0.3s ease;
 }
 
 .container:hover {
-    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
-    border-color: rgba(102, 126, 234, 0.3);
+    box-shadow: 0 4px 16px color-mix(in oklch, var(--color-purple-light) 15%, transparent);
+    border-color: color-mix(in oklch, var(--color-purple-light) 30%, transparent);
 }
 
 /* Section header */
@@ -56,7 +56,7 @@
 .btnAdd:hover:not(:disabled) {
     background: var(--blue-300);
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+    box-shadow: 0 4px 8px color-mix(in oklch, var(--blue-300) 30%, transparent);
 }
 
 .btnAdd:disabled {

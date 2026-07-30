@@ -44,10 +44,11 @@ const settings = z.object({
   /**
    * Per-image dwell overrides, keyed by filename: this picture stays up for this
    * many ms instead of the global `photoMs`. A filename absent from the map uses
-   * `photoMs`; videos ignore both (they play to their natural end). The store
-   * keeps these keys in sync when media is reordered (renumbered) or deleted, so
-   * an override follows its file. Defaulted so an older settings file or a body
-   * without the field still validates.
+   * `photoMs`; videos ignore both (they play to their natural end). Keyed by the
+   * file's own name — files are never renamed (order lives in `playlist`, not in
+   * filename prefixes) — so an override is dropped only when its file is deleted;
+   * a picture that appears more than once in the playlist shares one dwell.
+   * Defaulted so an older settings file or a body without the field still validates.
    */
   photoMsByName: z.record(z.string(), z.number().int().min(1000).max(120000)).default({}),
   shuffle: z.boolean(),
@@ -94,6 +95,17 @@ const state = z.object({
   settings,
   media: z.array(mediaItem),
   /**
+   * The play sequence: an ordered list of media filenames, and the SINGLE source
+   * of truth for what the TV plays. A file may appear any number of times (so one
+   * logo/bumper can sit between every clip with no duplicate on disk), and its
+   * position here — not a filename prefix — is its play order. A name that isn't
+   * in `media` is a dangling reference (its file was removed by hand): the TV
+   * skips it, and the settings tab offers to prune it. A file in `media` that
+   * isn't here is "available, not playing" — the tab prompts to add it. Seeded
+   * once from the folder's filename order on upgrade, then authoritative.
+   */
+  playlist: z.array(z.string()),
+  /**
    * Files sitting in the media folder that the TV browser can't render (wrong
    * type — HEIC, MKV, …), so they are silently skipped. Surfaced in the settings
    * tab as a heads-up when someone drops an unsupported file in by hand; empty in
@@ -135,13 +147,17 @@ export const deleteMedia = {
 } as const;
 export type DeleteMediaParams = z.infer<typeof deleteMedia.params>;
 
-// PUT /api/tv-display/media/order → rewrite play order by renumbering filename
-// prefixes (`01-`, `02-`, …) to match the given sequence.
-export const reorderMedia = {
-  body: z.object({ names: z.array(z.string().min(1).max(255)).max(500) }),
+// PUT /api/tv-display/playlist → replace the whole play sequence. The client
+// computes the desired order (reorder, add, remove-one-instance, duplicate) and
+// sends it wholesale; the server persists it verbatim (basename-sanitized,
+// repeats and order preserved). Not filtered to existing files here — a dangling
+// entry is skipped by the TV and flagged in the tab, never silently dropped.
+// Capped generously above any realistic signage loop.
+export const updatePlaylist = {
+  body: z.object({ playlist: z.array(z.string().min(1).max(255)).max(2000) }),
   response: state,
 } as const;
-export type ReorderMediaBody = z.infer<typeof reorderMedia.body>;
+export type UpdatePlaylistBody = z.infer<typeof updatePlaylist.body>;
 
 // POST /api/tv-display/command → push a one-shot action to the daemon (turn the
 // TV on/off now, or reload the signage page). 409 when no daemon is connected —

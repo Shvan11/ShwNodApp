@@ -226,8 +226,6 @@ export interface PaymentCreateData {
   aligner_set_id: number;
   amount_paid: number | string;
   date_of_payment: string;
-  usd_received?: number;
-  iqd_received?: number;
   change?: number;
   notes?: string;
 }

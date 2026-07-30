@@ -64,6 +64,8 @@ const TITLE_ID = 'lookup-manager-title';
 const LookupManagerModal = ({ isOpen, onClose, tableKey, title, onChanged }: LookupManagerModalProps) => {
   // The config list is long-lived + shared with Settings; only fetch once open.
   const { data } = useQuery({ ...adminLookupTablesQuery(), enabled: isOpen });
+  // `lookupAdmin.tables.response` is `anyArray` on purpose (config rows vary per
+  // registered table), so the shape is asserted once here, off `unknown[]`.
   const tables = (data ?? []) as TableConfig[];
   const config = tables.find((t) => t.key === tableKey) ?? null;
 

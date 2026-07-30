@@ -44,6 +44,8 @@ const MODAL_ICON: Record<ModalState['type'], string> = {
 const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
     const queryClient = useQueryClient();
     const { data, isLoading: isConfigLoading, isError } = useQuery(emailConfigQuery());
+    // `email.config.response` types `config` as `z.unknown()` on purpose (free-form
+    // key/value map), so a single assertion off `unknown` is required here.
     const config = (data?.config ?? {}) as EmailConfig;
     const [pendingChanges, setPendingChanges] = useState<EmailConfig>({});
     const [isSaving, setIsSaving] = useState(false);

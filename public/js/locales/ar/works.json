@@ -114,8 +114,6 @@
     "table": {
       "date": "التاريخ",
       "amountPaid": "المبلغ المدفوع ({{currency}})",
-      "actualAmount": "المبلغ الفعلي",
-      "actualCurrency": "العملة الفعلية",
       "change": "الباقي",
       "actions": "إجراءات"
     },

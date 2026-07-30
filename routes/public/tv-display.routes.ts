@@ -20,11 +20,13 @@
  *   so mixed photo/video looping "just works" (the browser renders both).
  *
  * HOW STAFF UPDATE CONTENT
- *   Either from Settings → TV Display (upload/delete/reorder, no file access
- *   needed), or by dropping files straight into the media folder — both are
- *   first-class: the folder IS the playlist and its filename order IS the play
- *   order. The page re-scans every 60s, so changes appear within a minute
- *   without a restart or a page reload.
+ *   From Settings → TV Display: upload/delete files and arrange the playlist —
+ *   an ordered sequence that is the single source of truth for what plays, in
+ *   which a file may appear more than once (one logo between every clip, no
+ *   duplicate on disk). Dropping a file straight into the media folder still
+ *   works to get it ONTO the server, but it does not auto-play: the settings tab
+ *   then prompts to add it to the playlist. Changes reach the screen in about a
+ *   second via the pushed `state` frame — no restart, no reload.
  *
  * SECURITY POSTURE (intentionally public, LAN signage)
  *   - Mounted BEFORE the auth gate in index.ts, exactly like the public video
@@ -61,8 +63,8 @@ import {
   MIME,
   addClient,
   getSettings,
-  listMedia,
   mediaFilePath,
+  resolvedPlaylist,
   sendState,
   type SignageClientKind,
 } from '../../services/files/tv-display-store.js';
@@ -110,17 +112,17 @@ router.get('/events', async (req: Request, res: Response): Promise<void> => {
 
 /**
  * GET /tv-display/manifest
- * Current playlist (live directory scan, ordered by filename) plus the stored
- * settings. The page fetches this ONCE at boot so it can render before the event
- * stream says anything, and again only if the stream is down (its degraded
- * mode); every normal update arrives as a pushed `state` frame. Also handy for
- * diagnostics — open it in a browser to see exactly what the TV would play.
- * A missing folder is not an error: an empty list makes the page show its
- * placeholder until content appears.
+ * The resolved play sequence (the stored playlist, in order, with repeats, minus
+ * any dangling entries) plus the stored settings. The page fetches this ONCE at
+ * boot so it can render before the event stream says anything, and again only if
+ * the stream is down (its degraded mode); every normal update arrives as a pushed
+ * `state` frame. Also handy for diagnostics — open it in a browser to see exactly
+ * what the TV would play, in order. An empty list (empty playlist or missing
+ * folder) makes the page show its placeholder until content appears.
  */
 router.get('/manifest', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const [items, settings] = await Promise.all([listMedia(), getSettings()]);
+    const [items, settings] = await Promise.all([resolvedPlaylist(), getSettings()]);
     // Signage content changes rarely and the page polls on its own timer; a
     // short no-cache keeps every poll honest (picks up folder edits at once).
     res.setHeader('Cache-Control', 'no-store');

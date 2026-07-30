@@ -61,21 +61,6 @@ export interface ApiErrorResponse {
 }
 
 // =============================================================================
-// EXCHANGE RATE
-// =============================================================================
-
-/** GET /api/getCurrentExchangeRate, GET /api/getExchangeRateForDate. */
-export type ExchangeRateResult = ApiResponse<{ exchangeRate?: number; date?: DateOnly }>;
-
-export interface HistoryEntry {
-    date: DateOnly;
-    exchangeRate: number;
-}
-
-/** GET /api/exchange-rates?from=&to=. */
-export type HistoryResult = ApiResponse<{ rates?: HistoryEntry[] }>;
-
-// =============================================================================
 // PAYMENT
 // =============================================================================
 
@@ -87,23 +72,7 @@ export type HistoryResult = ApiResponse<{ rates?: HistoryEntry[] }>;
 export interface PaymentSaveData {
     amount_paid: number;
     date_of_payment: string;
-    actual_amount: null;
-    actual_cur: string;
     change: null;
-}
-
-// =============================================================================
-// AUTH / USER
-// =============================================================================
-
-/** GET /api/auth/me. */
-export interface UserResponse {
-    success: boolean;
-    user?: {
-        username?: string;
-        fullName?: string;
-        role: string;
-    };
 }
 
 // =============================================================================

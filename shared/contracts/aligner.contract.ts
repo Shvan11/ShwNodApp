@@ -81,6 +81,25 @@ const clearableStr = z
   .preprocess((v) => (v === '' ? null : v), z.string().nullable())
   .optional();
 
+// Aligner-set currency is USD-ONLY, enforced here rather than left to the UI.
+// The lab bills external doctors in USD; more importantly the payment path has no
+// representation for anything else — `createAlignerPayment` books the amount into
+// `invoices.usd_received`/`iqd_received` (two columns, no third), and the cash-box
+// reports read exactly those. A set priced in another currency would validate its
+// balance in that currency while its payments were still booked as USD cash.
+// Two shapes, matching how the two bodies are built:
+//  - create: a fresh form that always sends 'USD' → 'USD' or omitted (optInt-style,
+//    ''/null collapse to undefined, so it stays assignable to SetCreateData).
+//  - update: clearableStr-style (null survives), because the quick-edit paths in
+//    PatientSets round-trip a whole GET row and legacy rows carry `currency: null`
+//    (which every reader already renders as USD via `|| 'USD'`).
+const usdOnlyCurrencyCreate = z
+  .preprocess((v) => (v === '' || v === null ? undefined : v), z.literal('USD').optional())
+  .optional();
+const usdOnlyCurrencyUpdate = z
+  .preprocess((v) => (v === '' ? null : v), z.literal('USD').nullable())
+  .optional();
+
 // One print label (GenerateLabelsBody.labels[]). The handler does its own per-label
 // `!text`/`!patientName` 400s, so these stay plain `z.string()` (empty reaches the
 // handler's specific message) — modeled, not opaque, so the handler can read them.
@@ -357,14 +376,16 @@ export const doctorsList = {
 // POST /api/aligner/payments — fully enumerated (mirrors PaymentCreateData; the
 // client's `currency`/`actual_*` extras are stripped — the service never reads
 // them). `amount_paid` coerced (form sends a string); `change` may arrive null.
+//
+// No `usd_received`/`iqd_received`: no client sends them and createAlignerPayment
+// derives the cash split itself from `amount_paid` + the set currency, so accepting
+// them only advertised a field the write path overwrote.
 export const addPayment = {
   body: z.object({
     workid: intId,
     aligner_set_id: intId,
     amount_paid: z.coerce.number(),
     date_of_payment: z.string().min(1),
-    usd_received: optNum,
-    iqd_received: optNum,
     change: optNum,
     notes: z.string().optional(),
   }),
@@ -393,7 +414,7 @@ export const createSet = {
     days: optInt,
     set_url: z.string().optional(),
     set_video: z.string().optional(),
-    currency: z.string().optional(),
+    currency: usdOnlyCurrencyCreate,
   }),
   response: z.object({ setId: z.number() }),
 } as const;
@@ -425,7 +446,7 @@ export const updateSet = {
     set_url: clearableStr,
     set_video: clearableStr,
     set_pdf_url: clearableStr,
-    currency: clearableStr,
+    currency: usdOnlyCurrencyUpdate,
   }),
 } as const;
 export type UpdateSetBody = z.infer<typeof updateSet.body>;

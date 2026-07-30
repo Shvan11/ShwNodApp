@@ -1,5 +1,4 @@
 import { useState, useEffect, ChangeEvent } from 'react';
-import type { HistoryEntry } from '@/types/api.types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { updateExchangeRate as updateExchangeRateContract } from '@shared/contracts/payment.contract';
@@ -50,7 +49,7 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
         isError: historyIsError,
         error: historyError,
     } = useQuery(exchangeRatesHistoryQuery(fromDate, toDate));
-    const history = (historyData?.rates ?? []) as HistoryEntry[];
+    const history = historyData?.rates ?? [];
 
     // A genuine (non-404) failure to load today's rate is worth a toast; a 404 isn't.
     useEffect(() => {

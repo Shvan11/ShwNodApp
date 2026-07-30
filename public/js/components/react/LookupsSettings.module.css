@@ -1,0 +1,148 @@
+/*
+ * Settings → Lookups: the group headings and the table accordion.
+ *
+ * Moved out of public/css/components/lookup-editor.css, which stays global on
+ * purpose — its EDITOR internals (toolbar, search, table, popovers, .lookup-loading)
+ * are shared by LookupEditor, LookupEditorModal, HolidayEditor, PatientTypesReadOnly
+ * and the right-click LookupManagerModal. Only the shell below was exclusive to this
+ * tab, so only the shell became a module.
+ *
+ * `.settings-section`, `.section-description` and `.lookup-loading` are still used
+ * as global classes here: EmailSettings/PatientTypesReadOnly share them.
+ */
+
+/* Main container */
+.lookupsSettings {
+    padding: var(--spacing-md);
+}
+
+.lookupsSettings :global(.settings-section) {
+    background: var(--background-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+}
+
+.lookupsSettings :global(.section-description) {
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-lg);
+    font-size: var(--font-size-sm);
+}
+
+/* Group headers */
+.group {
+    margin-bottom: var(--spacing-xl);
+}
+
+.group:last-child {
+    margin-bottom: 0;
+}
+
+.groupHeader {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.groupHeader i {
+    color: var(--primary-color);
+}
+
+/* Accordion */
+.accordion {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.item {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+}
+
+.item:hover {
+    box-shadow: var(--shadow-sm);
+}
+
+.item.expanded {
+    box-shadow: var(--shadow-md);
+}
+
+.itemHeader {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--background-secondary);
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.itemHeader:hover {
+    background: var(--background-tertiary);
+}
+
+.item.expanded .itemHeader {
+    background: var(--primary-color);
+    color: var(--color-white);
+}
+
+.title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.title i {
+    width: 20px;
+    text-align: center;
+}
+
+.titleText {
+    font-size: var(--font-size-base);
+}
+
+.chevron {
+    transition: transform 0.2s ease;
+}
+
+.item.expanded .chevron {
+    transform: rotate(180deg);
+}
+
+.content {
+    padding: var(--spacing-lg);
+    background: var(--background-primary);
+    border-top: 1px solid var(--border-color);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .itemHeader {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .titleText {
+        font-size: var(--font-size-sm);
+    }
+}
+
+@media (max-width: 480px) {
+    .lookupsSettings :global(.settings-section) {
+        padding: var(--spacing-md);
+    }
+
+    .content {
+        padding: var(--spacing-md);
+    }
+}

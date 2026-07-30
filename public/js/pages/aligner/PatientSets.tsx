@@ -522,9 +522,6 @@ const PatientSets: React.FC = () => {
                 aligner_set_id: currentSetForPayment.aligner_set_id,
                 amount_paid: paymentData.amount_paid,
                 date_of_payment: paymentData.date_of_payment,
-                payment_method: 'Cash', // Default method
-                actual_amount: paymentData.actual_amount,
-                actual_cur: paymentData.actual_cur,
                 change: paymentData.change
             });
         } catch (err) {

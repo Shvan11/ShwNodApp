@@ -2,7 +2,7 @@
  * Payment-related database queries
  *
  * Migration Phase 4: translated to typed Kysely (PostgreSQL). Money columns on
- * tblInvoice (amount_paid, usd_received, iqd_received, actual_amount, change) are PG
+ * tblInvoice (amount_paid, usd_received, iqd_received, change) are PG
  * `integer`, so they map straight to JS numbers (no numeric cast needed). The date-only
  * columns (date_of_payment, start_date) are PG `date`, which the centralized pg parser
  * (kysely.ts) returns as a 'YYYY-MM-DD' string; the generated `Database` type already
@@ -13,7 +13,7 @@
  * are wrapped as `sql<string>` to satisfy the static type without changing emitted SQL.
  */
 import { sql } from 'kysely';
-import { getKysely } from '../kysely.js';
+import { getKysely, withPgTransaction } from '../kysely.js';
 import { toDateOnly } from '../../../utils/date.js';
 
 // type definitions
@@ -28,21 +28,6 @@ export interface Payment {
   Date: string;
 }
 
-// `type` (not `interface`) so it carries an implicit string index signature and
-// is therefore assignable to the `z.looseObject(...)` response contract that
-// `sendData` validates against (see shared-contract-progress.md, Phase 1 finding).
-type WorkForInvoice = {
-  work_id: number;
-  person_id: number;
-  total_required: number | null;
-  currency: string | null;
-  type_of_work: number | null;
-  start_date: string | null;
-  patient_name: string;
-  phone: string | null;
-  TotalPaid: number;
-};
-
 interface InvoiceData {
   workid: number;
   amountPaid: number;
@@ -52,15 +37,14 @@ interface InvoiceData {
   change: number | null;
 }
 
-// `type` (not `interface`): see WorkForInvoice — implicit index signature so it
-// satisfies the `z.looseObject` paymentHistory response contract via `sendData`.
+// `type` (not `interface`) so it carries an implicit string index signature and is
+// therefore assignable to the `z.looseObject` paymentHistory response contract that
+// `sendData` validates against (see shared-contract-progress.md, Phase 1 finding).
 type PaymentRecord = {
   InvoiceID: number;
   work_id: number;
   amount_paid: number;
   date_of_payment: string;
-  actual_amount: number | null;
-  actual_cur: string | null;
   change: number | null;
 };
 
@@ -81,41 +65,6 @@ export function getPayments(PID: number): Promise<Payment[]> {
       'i.date_of_payment as Date',
     ])
     .execute() as Promise<Payment[]>;
-}
-
-/**
- * Retrieves active work details for invoice generation
- */
-export function getActiveWorkForInvoice(PID: number): Promise<WorkForInvoice[]> {
-  const db = getKysely();
-  return db
-    .selectFrom('patients as p')
-    .innerJoin('works as w', 'p.person_id', 'w.person_id')
-    .leftJoin('invoices as i', 'w.work_id', 'i.work_id')
-    .where('w.status', '=', 1)
-    .where('p.person_id', '=', PID)
-    .groupBy([
-      'w.work_id',
-      'w.person_id',
-      'w.total_required',
-      'w.currency',
-      'w.type_of_work',
-      'w.start_date',
-      'p.patient_name',
-      'p.phone',
-    ])
-    .select((eb) => [
-      'w.work_id',
-      'w.person_id',
-      'w.total_required',
-      'w.currency',
-      'w.type_of_work',
-      'w.start_date as start_date',
-      'p.patient_name',
-      'p.phone',
-      eb.fn.coalesce(eb.fn.sum('i.amount_paid'), sql<number>`0`).$castTo<number>().as('TotalPaid'),
-    ])
-    .execute() as Promise<WorkForInvoice[]>;
 }
 
 /**
@@ -153,50 +102,139 @@ export async function getLatestExchangeRate(): Promise<number | null> {
   return row ? row.exchange_rate : null;
 }
 
-/**
- * Adds a new invoice record with dual-currency support
- */
-export async function addInvoice(invoiceData: InvoiceData): Promise<{ invoice_id: number }[]> {
-  const { workid, amountPaid, paymentDate, usdReceived, iqdReceived, change } = invoiceData;
-
-  // The old function-based overpayment CHECK (CK_MoreThanTotal: SUM(amount_paid) <=
-  // total_required) is re-enforced upstream in PaymentService.validateAndCreateInvoice —
-  // the sole caller — which rejects a payment exceeding the remaining balance
-  // (total_required - discount - TotalPaid) before this runs. Aligner-set payments are
-  // likewise guarded in AlignerService.validateAndCreateAlignerPayment.
-  //
-  // No patient-type side effect: an invoice doesn't change the patient's works, and the
-  // patient type is now DERIVED from works by classifyPatient() — the legacy first-payment
-  // Active/Not-Ortho transition is gone.
-  const row = await getKysely()
-    .insertInto('invoices')
-    .values({
-      work_id: workid,
-      amount_paid: amountPaid,
-      date_of_payment: sql<string>`${paymentDate}`,
-      usd_received: usdReceived,
-      iqd_received: iqdReceived,
-      change: change,
-    })
-    .returning('invoice_id')
-    .executeTakeFirstOrThrow();
-
-  return [{ invoice_id: row.invoice_id }];
+/** An exchange rate together with the date it was actually recorded on. */
+export interface ExchangeRateAsOf {
+  exchangeRate: number;
+  rateDate: string;
 }
 
 /**
- * Gets the exchange rate for a specific date
+ * The rate in force ON a given date: the most recent `sms.exchange_rate` dated on or
+ * before it. Unlike getExchangeRateForDate() this never comes back empty just because
+ * nobody entered a rate that particular day — it carries the last known rate forward,
+ * which is what actually happened in the real world (the rate didn't reset overnight).
+ * If the date predates every recorded rate (backdated history) the EARLIEST rate on
+ * record is returned instead — still far closer than a hardcoded constant. null only
+ * if `sms` holds no rate at all.
+ *
+ * Used by the payment modal (so a missing daily rate can't block a payment) and by the
+ * statistics routes (as the per-period fallback for days with no rate of their own).
  */
-export async function getExchangeRateForDate(date: string): Promise<number | null> {
+export async function getExchangeRateAsOf(date: string): Promise<ExchangeRateAsOf | null> {
   const db = getKysely();
-  const row = await db
-    .selectFrom('sms')
-    .where('date', '=', sql<string>`${date}`)
-    .where('exchange_rate', 'is not', null)
-    .select('exchange_rate')
-    .executeTakeFirst();
 
-  return row ? row.exchange_rate : null;
+  const { rows } = await sql<ExchangeRateAsOf>`
+    SELECT "exchange_rate" AS "exchangeRate", "date"::text AS "rateDate"
+    FROM "sms"
+    WHERE "exchange_rate" IS NOT NULL AND "date" <= ${date}::date
+    ORDER BY "date" DESC
+    LIMIT 1
+  `.execute(db);
+  if (rows[0]) return rows[0];
+
+  // Only reached for a date older than every rate on record — one extra round trip
+  // in a case that effectively never happens on the hot path.
+  const { rows: earliest } = await sql<ExchangeRateAsOf>`
+    SELECT "exchange_rate" AS "exchangeRate", "date"::text AS "rateDate"
+    FROM "sms"
+    WHERE "exchange_rate" IS NOT NULL
+    ORDER BY "date" ASC
+    LIMIT 1
+  `.execute(db);
+
+  return earliest[0] ?? null;
+}
+
+/** The work's balance as re-read INSIDE the guarded insert's transaction. */
+export interface WorkBalanceSnapshot {
+  totalRequired: number;
+  discount: number;
+  totalPaid: number;
+  remaining: number;
+}
+
+/** Outcome of {@link addInvoiceWithBalanceGuard} — the caller maps these to its own errors. */
+export type GuardedInvoiceResult =
+  | { outcome: 'created'; invoice_id: number }
+  | { outcome: 'work_not_found' }
+  | { outcome: 'exceeds_remaining'; balance: WorkBalanceSnapshot };
+
+/**
+ * Adds a new invoice record with dual-currency support, re-checking the remaining
+ * balance under a row lock so the overpayment rule can't be raced.
+ *
+ * The old function-based overpayment CHECK (CK_MoreThanTotal: SUM(amount_paid) <=
+ * total_required) was dropped, and PaymentService.validateAndCreateInvoice re-enforces it
+ * in TypeScript. That check alone is a read-then-write: two payments registered against
+ * the same work at the same moment both read the pre-insert balance, both pass, and the
+ * work ends up overpaid. So the authoritative check lives HERE, inside one transaction:
+ *
+ *   1. `SELECT … FOR UPDATE` on the works row — concurrent payments against the SAME work
+ *      serialize on that lock (different works never contend).
+ *   2. Re-sum invoices.amount_paid. Under READ COMMITTED this statement runs after the
+ *      lock is granted, so it sees the other transaction's committed insert.
+ *   3. Insert only if the payment still fits.
+ *
+ * PaymentService keeps its pre-check: it fails fast with a fuller message before the
+ * change-validation work, and it needs the work's currency anyway. This is the backstop
+ * that actually holds under concurrency.
+ *
+ * No patient-type side effect: an invoice doesn't change the patient's works, and the
+ * patient type is now DERIVED from works by classifyPatient() — the legacy first-payment
+ * Active/Not-Ortho transition is gone.
+ */
+export function addInvoiceWithBalanceGuard(
+  invoiceData: InvoiceData
+): Promise<GuardedInvoiceResult> {
+  const { workid, amountPaid, paymentDate, usdReceived, iqdReceived, change } = invoiceData;
+
+  return withPgTransaction(async (trx): Promise<GuardedInvoiceResult> => {
+    const work = await trx
+      .selectFrom('works')
+      .where('work_id', '=', workid)
+      .select(['total_required', 'discount'])
+      .forUpdate()
+      .executeTakeFirst();
+
+    if (!work) {
+      return { outcome: 'work_not_found' };
+    }
+
+    const paidRow = await trx
+      .selectFrom('invoices')
+      .where('work_id', '=', workid)
+      .select((eb) =>
+        eb.fn.coalesce(eb.fn.sum('amount_paid'), sql<number>`0`).$castTo<number>().as('paid')
+      )
+      .executeTakeFirstOrThrow();
+
+    const totalRequired = Number(work.total_required ?? 0);
+    const discount = Number(work.discount ?? 0);
+    const totalPaid = Number(paidRow.paid ?? 0);
+    const remaining = totalRequired - discount - totalPaid;
+
+    if ((Number(amountPaid) || 0) > remaining) {
+      return {
+        outcome: 'exceeds_remaining',
+        balance: { totalRequired, discount, totalPaid, remaining },
+      };
+    }
+
+    const row = await trx
+      .insertInto('invoices')
+      .values({
+        work_id: workid,
+        amount_paid: amountPaid,
+        date_of_payment: sql<string>`${paymentDate}`,
+        usd_received: usdReceived,
+        iqd_received: iqdReceived,
+        change: change,
+      })
+      .returning('invoice_id')
+      .executeTakeFirstOrThrow();
+
+    return { outcome: 'created', invoice_id: row.invoice_id };
+  });
 }
 
 /**
@@ -255,8 +293,6 @@ export function getPaymentHistoryByWorkId(workId: number): Promise<PaymentRecord
       'work_id',
       'amount_paid',
       'date_of_payment',
-      'actual_amount',
-      'actual_cur',
       'change',
     ])
     .execute() as Promise<PaymentRecord[]>;

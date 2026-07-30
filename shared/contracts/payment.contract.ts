@@ -23,16 +23,21 @@ import { withPendingOutcome } from './approvals.contract.js';
 // services/database/queries/payment-queries.ts#getPaymentHistoryByWorkId
 //
 // WorkComponent's payment-history table reads InvoiceID, amount_paid,
-// date_of_payment, actual_amount, actual_cur, change → model those (the row's
-// always-present columns; actual_*/change are nullable). Long tail stays loose.
+// date_of_payment, change → model those (the row's always-present columns; `change`
+// is nullable). Long tail stays loose.
+//
+// The retired `actual_amount`/`actual_cur` pair is gone from the table entirely as of
+// migration 1783000000000: no write path had populated it since the dual-currency
+// rewrite (the cash split lives in usd_received/iqd_received), so the two columns it
+// fed here showed "-" for every payment staff could create, and the stale `actual_cur`
+// was mislabelling the Change column's currency. The 2,134 legacy rows were dumped to
+// C:\DBBackup\invoices-actual-columns-2026-07-30.restore.sql first.
 // ---------------------------------------------------------------------------
 
 const paymentHistoryRow = z.looseObject({
   InvoiceID: z.number(),
   amount_paid: z.number(),
   date_of_payment: z.string(),
-  actual_amount: z.number().nullable(),
-  actual_cur: z.string().nullable(),
   change: z.number().nullable(),
 });
 
@@ -53,17 +58,6 @@ export const workForReceipt = {
 export type WorkForReceiptResponse = z.infer<typeof workForReceipt.response>;
 
 // ---------------------------------------------------------------------------
-// GET /api/getActiveWorkForInvoice?PID= — array of active works.
-// services/database/queries/payment-queries.ts#getActiveWorkForInvoice
-// (No frontend consumer today; the contract pins the backend payload.)
-// ---------------------------------------------------------------------------
-
-export const activeWorkForInvoice = {
-  response: z.array(z.looseObject({ work_id: z.number() })),
-} as const;
-export type ActiveWorkForInvoiceResponse = z.infer<typeof activeWorkForInvoice.response>;
-
-// ---------------------------------------------------------------------------
 // GET /api/getCurrentExchangeRate — { exchangeRate } (closed container).
 // ---------------------------------------------------------------------------
 
@@ -73,13 +67,24 @@ export const currentExchangeRate = {
 export type CurrentExchangeRateResponse = z.infer<typeof currentExchangeRate.response>;
 
 // ---------------------------------------------------------------------------
-// GET /api/getExchangeRateForDate?date= — { exchangeRate, date } (closed).
+// GET /api/getExchangeRateForDate?date= — the rate IN FORCE on `date` (closed).
 // `date` is the request date echoed back (already used to find the rate) → a
 // plain string, not the stricter `dateString` (avoid a dev-parse false-positive).
+//
+// The rate is CARRIED FORWARD: if nobody entered one for `date`, the most recent
+// earlier rate is returned with `rateDate` naming the day it was recorded and
+// `isCarriedForward: true` (the real-world rate doesn't reset overnight, and a
+// 404 here used to block every payment until someone typed a rate in). A 404 now
+// means `sms` holds no rate at all.
 // ---------------------------------------------------------------------------
 
 export const exchangeRateForDate = {
-  response: z.object({ exchangeRate: z.number(), date: z.string() }),
+  response: z.object({
+    exchangeRate: z.number(),
+    date: z.string(),
+    rateDate: z.string(),
+    isCarriedForward: z.boolean(),
+  }),
 } as const;
 export type ExchangeRateForDateResponse = z.infer<typeof exchangeRateForDate.response>;
 
@@ -161,10 +166,10 @@ export const deleteInvoice = {
 export type DeleteInvoiceResponse = z.infer<typeof deleteInvoice.response>;
 
 // Shared GET query for the payment read endpoints. Type-only (handlers parse manually).
+// Only the params a handler actually destructures: `workId` (getpaymenthistory) and
+// `date` (getExchangeRateForDate).
 export const paymentQuery = z.object({
-  code: z.string().optional(),
   workId: z.string().optional(),
   date: z.string().optional(),
-  PID: z.string().optional(),
 });
 export type PaymentQueryParams = z.infer<typeof paymentQuery>;

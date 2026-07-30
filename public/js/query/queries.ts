@@ -751,35 +751,40 @@ export const exchangeRatesHistoryQuery = (from: string, to: string) =>
 // Reports / statistics
 // ---------------------------------------------------------------------------
 
-/** GET /api/statistics?month=&year=&exchangeRate= — daily breakdown + monthly summary. */
-export const statisticsQuery = (month: number, year: number, exchangeRate: number) =>
+// `exchangeRate` is deliberately NOT sent on these three reads. It used to carry a
+// frozen client-side 1450, which the server then echoed into every conversion; the
+// server now resolves the period's real rate from `sms` (per DAY for the rows, as-of
+// the period end for the month-level figures) and returns it as `exchangeRate`.
+
+/** GET /api/statistics?month=&year= — daily breakdown + monthly summary. */
+export const statisticsQuery = (month: number, year: number) =>
   queryOptions({
-    queryKey: qk.reports.statistics(month, year, exchangeRate),
+    queryKey: qk.reports.statistics(month, year),
     queryFn: ({ signal }) =>
       fetchJSON<z.infer<typeof reportsContract.statistics.response>>(
-        `/api/statistics?month=${month}&year=${year}&exchangeRate=${exchangeRate}`,
+        `/api/statistics?month=${month}&year=${year}`,
         { signal, schema: reportsContract.statistics.response }
       ),
   });
 
-/** GET /api/statistics/yearly?startMonth=&startYear=&exchangeRate= — 12-month rollup. */
-export const yearlyStatisticsQuery = (startMonth: number, startYear: number, exchangeRate: number) =>
+/** GET /api/statistics/yearly?startMonth=&startYear= — 12-month rollup. */
+export const yearlyStatisticsQuery = (startMonth: number, startYear: number) =>
   queryOptions({
-    queryKey: qk.reports.yearly(startMonth, startYear, exchangeRate),
+    queryKey: qk.reports.yearly(startMonth, startYear),
     queryFn: ({ signal }) =>
       fetchJSON<z.infer<typeof reportsContract.yearlyStatistics.response>>(
-        `/api/statistics/yearly?startMonth=${startMonth}&startYear=${startYear}&exchangeRate=${exchangeRate}`,
+        `/api/statistics/yearly?startMonth=${startMonth}&startYear=${startYear}`,
         { signal, schema: reportsContract.yearlyStatistics.response }
       ),
   });
 
-/** GET /api/statistics/multi-year?startYear=&endYear=&exchangeRate= — multi-year rollup. */
-export const multiYearStatisticsQuery = (startYear: number, endYear: number, exchangeRate: number) =>
+/** GET /api/statistics/multi-year?startYear=&endYear= — multi-year rollup. */
+export const multiYearStatisticsQuery = (startYear: number, endYear: number) =>
   queryOptions({
-    queryKey: qk.reports.multiYear(startYear, endYear, exchangeRate),
+    queryKey: qk.reports.multiYear(startYear, endYear),
     queryFn: ({ signal }) =>
       fetchJSON<z.infer<typeof reportsContract.multiYearStatistics.response>>(
-        `/api/statistics/multi-year?startYear=${startYear}&endYear=${endYear}&exchangeRate=${exchangeRate}`,
+        `/api/statistics/multi-year?startYear=${startYear}&endYear=${endYear}`,
         { signal, schema: reportsContract.multiYearStatistics.response }
       ),
   });
@@ -1342,9 +1347,10 @@ export const brandingQuery = () =>
 
 /**
  * GET /api/tv-display — waiting-room signage state: settings, the media folder's
- * contents, and liveness (when the TV last fetched the slideshow / the LG daemon
- * last fetched settings). The liveness half is only meaningful while the tab is
- * open, so this refetches on an interval rather than caching — see the tab.
+ * contents, the play sequence (playlist), and liveness (when the TV last fetched
+ * the slideshow / the LG daemon last fetched settings). The liveness half is only
+ * meaningful while the tab is open, so this refetches on an interval rather than
+ * caching — see the tab.
  */
 export const tvDisplayQuery = () =>
   queryOptions({
@@ -1498,10 +1504,33 @@ export const whatsappGroupSettingsQuery = () =>
  * read raw (no contract schema), mirroring the prior component fetches. Poll
  * cadence + freshness are owned by the consuming component's `refetchInterval`.
  */
+/**
+ * One sink's health row, as built by routes/sync-webhook.ts. Both status tabs
+ * (Supabase + Dolphin) render the identical card off this shape, so it is typed
+ * here once rather than re-declared (and re-asserted) per component. `sink` is a
+ * plain string — the endpoints answer 'failover'/'reverse'/'dolphin' and a
+ * consumer keying off it must tolerate an unknown value.
+ */
+export interface SyncSinkStatus {
+  sink: string;
+  configured: boolean;
+  // The endpoints also send `envEnabled` (the boot-time env flag). Deliberately
+  // not modelled: the UI shows `enabled`, the authoritative runtime capture flag
+  // the engine maintains, and showing both invited misreading one for the other.
+  enabled: boolean;
+  stale: boolean;
+  note: string | null;
+  updatedAt: string | null;
+  backlog: number;
+  reachable: boolean | null;
+  latencyMs: number | null;
+  error: string | null;
+}
+
 export interface SyncSinkStatusResponse {
   success: boolean;
   checkedAt?: string;
-  sinks?: unknown[];
+  sinks?: SyncSinkStatus[];
   error?: string;
 }
 

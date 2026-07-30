@@ -125,6 +125,51 @@
     overflow-wrap: anywhere;
 }
 
+/* ---- available-to-add notice (info, not a warning) ---- */
+
+.notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    width: 100%;
+    padding: 1rem 1.25rem;
+    background: var(--info-50, var(--gray-100));
+    border: 1px solid var(--info-color, var(--primary-color));
+    border-inline-start: 4px solid var(--info-color, var(--primary-color));
+    border-radius: var(--radius-lg);
+}
+
+.noticeIcon {
+    color: var(--info-color, var(--primary-color));
+    font-size: 1.15rem;
+    margin-top: 0.15rem;
+    flex-shrink: 0;
+}
+
+.noticeBody {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    align-items: flex-start;
+}
+
+.noticeTitle {
+    margin: 0;
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.noticeText {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+}
+
 /* ---- status ---- */
 
 .statusGrid {
@@ -352,11 +397,19 @@
 .mediaItem {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.85rem;
     padding: 0.6rem 0.75rem;
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
     background: var(--background-primary);
+}
+
+/* A playlist slot whose file is gone (dangling reference) — muted + flagged. */
+.mediaItemMissing {
+    border-color: var(--warning-color);
+    border-inline-start: 4px solid var(--warning-color);
+    background: var(--warning-50);
 }
 
 .mediaIndex {
@@ -439,8 +492,10 @@
 
 .mediaActions {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.35rem;
     flex-shrink: 0;
+    margin-inline-start: auto;
 }
 
 /* ---- preview ---- */

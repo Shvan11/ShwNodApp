@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { useApiMutation } from '@/query/useApiMutation';
 import { tvDisplayQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
@@ -93,23 +94,9 @@ function serialize(s: Settings): string {
     });
 }
 
-/**
- * Mirror of the store's reorder renumbering (`01-`, `02-`, …), used to re-key
- * unsaved per-image durations so they follow their file when the play order is
- * saved. MUST match services/files/tv-display-store.ts#reorderMedia.
- */
-function renumber(names: string[]): Map<string, string> {
-    const width = String(names.length).length < 2 ? 2 : String(names.length).length;
-    const map = new Map<string, string>();
-    names.forEach((name, i) => {
-        const base = name.replace(/^\d+[-_ ]*/, '');
-        map.set(name, `${String(i + 1).padStart(width, '0')}-${base}`);
-    });
-    return map;
-}
-
 const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
     const toast = useToast();
+    const confirm = useConfirm();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const { data, isLoading, error } = useQuery({
@@ -122,17 +109,28 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
     // Server copy the draft was seeded from, so a background refetch doesn't
     // clobber edits in progress but a real remote change still re-seeds.
     const [seededFrom, setSeededFrom] = useState<string>('');
-    // Local play order while reordering; null = "same as server".
-    const [orderDraft, setOrderDraft] = useState<string[] | null>(null);
+    // Local edits to the play sequence (reorder / add / remove-instance /
+    // duplicate) while arranging; null = "same as the server's playlist".
+    const [playlistDraft, setPlaylistDraft] = useState<string[] | null>(null);
     const [uploading, setUploading] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
 
     const serverSettings = data?.settings ?? null;
     const serverKey = serverSettings ? serialize(serverSettings) : '';
 
+    // Does this user have edits the server hasn't seen? Measured against the
+    // snapshot the draft was SEEDED from, not the live server copy — that is what
+    // separates "I typed something" from "somebody else saved", and it is the only
+    // thing that may block a re-seed.
+    const hasLocalEdits = draft !== null && serialize(draft) !== seededFrom;
+
     // Seed/re-seed the draft during render (adjust-state-during-render), keyed on
     // the server payload rather than in an effect, so the React Compiler keeps it.
-    if (serverSettings && serverKey !== seededFrom && draft === null) {
+    // A remote change is adopted whenever nothing local is pending (including the
+    // first load, where `draft` is null); edits in progress are never clobbered.
+    // Terminates: the branch sets `seededFrom` to `serverKey`, so the re-render
+    // fails the `serverKey !== seededFrom` test.
+    if (serverSettings && serverKey !== seededFrom && !hasLocalEdits) {
         setSeededFrom(serverKey);
         setDraft(serverSettings);
     }
@@ -146,16 +144,30 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
         onChangesUpdate?.(dirty);
     }, [dirty, onChangesUpdate]);
 
+    // The media library (every file on disk, with size/type) and the play
+    // sequence (ordered, repeats allowed) are now separate: the library is the
+    // pool, the playlist is the single source of truth for what plays.
     const media = useMemo(() => data?.media ?? [], [data]);
-    const orderedNames = orderDraft ?? media.map((m) => m.name);
-    const orderDirty =
-        orderDraft !== null && JSON.stringify(orderDraft) !== JSON.stringify(media.map((m) => m.name));
+    const serverPlaylist = useMemo(() => data?.playlist ?? [], [data]);
+    // The sequence being edited: the local draft, or the server's if untouched.
+    const playlist = playlistDraft ?? serverPlaylist;
+    const playlistDirty =
+        playlistDraft !== null && JSON.stringify(playlistDraft) !== JSON.stringify(serverPlaylist);
     const byName = useMemo(() => new Map(media.map((m) => [m.name, m])), [media]);
+
+    // Files sitting in the folder that AREN'T in the playlist — the "you dropped
+    // a file, add it?" prompt. Membership ignores repeats: a file is available
+    // iff it appears zero times in the sequence.
+    const inPlaylist = useMemo(() => new Set(playlist), [playlist]);
+    const available = useMemo(
+        () => media.filter((m) => !inPlaylist.has(m.name)),
+        [media, inPlaylist]
+    );
 
     // Issues to flag when the tab opens — the state fetch above just re-scanned
     // the folder, so this reflects the folder as it is right now:
-    //   • orphanDurations — saved custom times whose picture was renamed/deleted
-    //     in the folder by hand (the override can't attach to anything).
+    //   • orphanDurations — saved custom times whose picture was deleted from the
+    //     folder by hand (the override can't attach to anything).
     //   • ignoredFiles — files the TV can't play (unsupported type), reported by
     //     the server so "I dropped a file and it won't show" has an explanation.
     const orphanDurations = useMemo(
@@ -181,8 +193,9 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
         invalidate: () => [qk.tvDisplay()],
     });
 
-    const saveOrder = useApiMutation<State, string[]>({
-        mutationFn: (names) => putJSON<State, { names: string[] }>('/api/tv-display/media/order', { names }),
+    const savePlaylistMut = useApiMutation<State, string[]>({
+        mutationFn: (playlistNames) =>
+            putJSON<State, { playlist: string[] }>('/api/tv-display/playlist', { playlist: playlistNames }),
         invalidate: () => [qk.tvDisplay()],
     });
 
@@ -235,8 +248,13 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
         }
     };
 
+    // Reset means "discard my edits", so the seed snapshot has to move with the
+    // draft — otherwise the stale snapshot would keep reading as a local edit and
+    // go on blocking re-seeds after the user had explicitly given them up.
     const handleReset = (): void => {
-        if (serverSettings) setDraft(serverSettings);
+        if (!serverSettings) return;
+        setDraft(serverSettings);
+        setSeededFrom(serverKey);
     };
 
     const handleFiles = async (files: FileList | null): Promise<void> => {
@@ -246,8 +264,9 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
         setUploading(true);
         try {
             await uploadMedia.mutateAsync(form);
-            setOrderDraft(null);
-            toast.success(files.length === 1 ? 'File added' : `${files.length} files added`);
+            // The server appended the upload(s) to the playlist; take its copy.
+            setPlaylistDraft(null);
+            toast.success(files.length === 1 ? 'File added to the playlist' : `${files.length} files added to the playlist`);
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Upload failed'));
         } finally {
@@ -256,53 +275,81 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
         }
     };
 
+    // Delete the actual FILE from disk (distinct from removing it from the
+    // playlist below). The server prunes every playlist instance and forgets the
+    // file's custom time; we mirror both locally so an unsaved draft can't carry
+    // a stale entry back on the next Save.
+    //
+    // That mirror leaves the draft one edit ahead of `seededFrom`, so it reads as
+    // a local edit until the next Save/Reset and suppresses auto-adopt of a remote
+    // change in the meantime. Deliberate: it is the conservative direction (never
+    // clobbers), it has no visible effect (`dirty` still compares against the live
+    // server copy, which made the same removal), and syncing `seededFrom` here
+    // would mean either an impure state updater or dropping a concurrent edit.
     const handleDelete = async (name: string): Promise<void> => {
-        if (!window.confirm(`Remove "${name}" from the waiting-room screen?`)) return;
+        const uses = playlist.filter((n) => n === name).length;
+        const warning =
+            uses > 1
+                ? `Delete "${name}" from the server? It's in the playlist ${uses} times — all of them will be removed.`
+                : `Delete "${name}" from the server?`;
+        if (!await confirm(warning, { title: 'Delete file', danger: true, confirmText: 'Delete' })) return;
         try {
             await removeMedia.mutateAsync(name);
-            setOrderDraft(null);
-            // Mirror the store: the deleted file's override is gone too, so an
-            // unsaved draft can't carry a stale key back on the next Save.
+            setPlaylistDraft(null);
             setDraft((prev) => {
                 if (!prev || !(name in prev.photoMsByName)) return prev;
                 const photoMsByName = { ...prev.photoMsByName };
                 delete photoMsByName[name];
                 return { ...prev, photoMsByName };
             });
-            toast.success('File removed');
+            toast.success('File deleted');
         } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to remove file'));
+            toast.error(httpErrorMessage(err, 'Failed to delete file'));
         }
     };
 
+    // --- playlist editing (draft; persisted with "Save playlist") ----------
+    // All four operations seed the draft from the server's playlist on first edit
+    // (via `playlist`), then mutate a fresh copy.
+
     const move = (index: number, delta: number): void => {
-        const next = [...orderedNames];
+        const next = [...playlist];
         const target = index + delta;
         if (target < 0 || target >= next.length) return;
         [next[index], next[target]] = [next[target], next[index]];
-        setOrderDraft(next);
+        setPlaylistDraft(next);
     };
 
-    const handleSaveOrder = async (): Promise<void> => {
+    // Remove ONE instance (this position), leaving the file on disk and any other
+    // instances in place.
+    const removeAt = (index: number): void => {
+        setPlaylistDraft(playlist.filter((_, i) => i !== index));
+    };
+
+    // Add another instance right after this one — how a single logo/bumper is
+    // repeated between clips with no duplicate file on disk.
+    const duplicateAt = (index: number): void => {
+        const next = [...playlist];
+        next.splice(index + 1, 0, playlist[index]);
+        setPlaylistDraft(next);
+    };
+
+    // Add an available (on-disk but unscheduled) file to the end of the sequence.
+    const addToPlaylist = (name: string): void => {
+        setPlaylistDraft([...playlist, name]);
+    };
+
+    const handleSavePlaylist = async (): Promise<void> => {
         try {
-            // Re-key durations the same way the store renumbers the files, so an
-            // override (saved or not) follows its picture through the reorder.
-            const rename = renumber(orderedNames);
-            await saveOrder.mutateAsync(orderedNames);
-            setOrderDraft(null);
-            setDraft((prev) => {
-                if (!prev) return prev;
-                const photoMsByName: Record<string, number> = {};
-                for (const [name, ms] of Object.entries(prev.photoMsByName)) {
-                    photoMsByName[rename.get(name) ?? name] = ms;
-                }
-                return { ...prev, photoMsByName };
-            });
-            toast.success('Play order saved (files were renumbered)');
+            await savePlaylistMut.mutateAsync(playlist);
+            setPlaylistDraft(null);
+            toast.success('Playlist saved — sent to the screen');
         } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to save order'));
+            toast.error(httpErrorMessage(err, 'Failed to save playlist'));
         }
     };
+
+    const handleDiscardPlaylist = (): void => setPlaylistDraft(null);
 
     const handleCommand = async (action: 'on' | 'off' | 'reload'): Promise<void> => {
         try {
@@ -363,7 +410,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                     {orphanDurations.length} custom picture time
                                     {orphanDurations.length > 1 ? 's' : ''}
                                 </strong>{' '}
-                                point to files that aren&apos;t in the folder any more (renamed or deleted by
+                                point to files that aren&apos;t in the folder any more (deleted by
                                 hand): {orphanDurations.join(', ')}. They&apos;re ignored on screen — remove
                                 them to tidy up, then Save.
                             </p>
@@ -618,7 +665,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
             {/* ---------------- Media ---------------- */}
             <section className={styles.card}>
                 <h4 className={styles.cardTitle}>
-                    <i className="fas fa-photo-video"></i> What&apos;s on screen ({media.length})
+                    <i className="fas fa-photo-video"></i> Playlist — what plays, in order ({playlist.length})
                 </h4>
 
                 <div className={styles.uploadRow}>
@@ -639,16 +686,27 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                         <i className={`fas ${uploading ? 'fa-spinner fa-spin' : 'fa-upload'}`}></i>
                         {uploading ? 'Uploading…' : 'Add pictures / videos'}
                     </button>
-                    {orderDirty && (
-                        <button
-                            type="button"
-                            className={styles.primaryBtn}
-                            onClick={handleSaveOrder}
-                            disabled={saveOrder.isPending}
-                        >
-                            <i className="fas fa-list-ol"></i>
-                            {saveOrder.isPending ? 'Saving order…' : 'Save play order'}
-                        </button>
+                    {playlistDirty && (
+                        <>
+                            <button
+                                type="button"
+                                className={styles.primaryBtn}
+                                onClick={handleSavePlaylist}
+                                disabled={savePlaylistMut.isPending}
+                            >
+                                <i className={`fas ${savePlaylistMut.isPending ? 'fa-spinner fa-spin' : 'fa-list-ol'}`}></i>
+                                {savePlaylistMut.isPending ? 'Saving…' : 'Save playlist'}
+                            </button>
+                            <button
+                                type="button"
+                                className={styles.secondaryBtn}
+                                onClick={handleDiscardPlaylist}
+                                disabled={savePlaylistMut.isPending}
+                            >
+                                Discard changes
+                            </button>
+                            <span className={styles.hint}>Unsaved playlist changes</span>
+                        </>
                     )}
                     <span className={styles.hint}>
                         Allowed: {data.allowedExtensions.join(' ')}. Other formats (HEIC, MKV) are
@@ -656,21 +714,98 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                     </span>
                 </div>
 
+                {/* Files on disk that aren't in the playlist — the "add me?" prompt. */}
+                {available.length > 0 && (
+                    <div className={styles.notice} role="status">
+                        <i className={`fas fa-inbox ${styles.noticeIcon}`}></i>
+                        <div className={styles.noticeBody}>
+                            <h5 className={styles.noticeTitle}>
+                                {available.length} file{available.length > 1 ? 's are' : ' is'} in the folder but not in
+                                the playlist
+                            </h5>
+                            <p className={styles.noticeText}>
+                                Dropped into the media folder, or taken out of the playlist earlier.{' '}
+                                {available.length > 1 ? 'They' : 'It'} won&apos;t play until added.
+                            </p>
+                            <ul className={styles.mediaList}>
+                                {available.map((item) => (
+                                    <li key={item.name} className={styles.mediaItem}>
+                                        <div className={styles.thumb}>
+                                            {item.type === 'image' ? (
+                                                <img
+                                                    src={`/tv-display/media/${encodeURIComponent(item.name)}`}
+                                                    alt=""
+                                                    loading="lazy"
+                                                />
+                                            ) : (
+                                                <i className="fas fa-film"></i>
+                                            )}
+                                        </div>
+                                        <div className={styles.mediaMeta}>
+                                            <span className={styles.mediaName}>{item.name}</span>
+                                            <span className={styles.hint}>
+                                                {item.type === 'image' ? 'Picture' : 'Video'} ·{' '}
+                                                {formatBytes(item.sizeBytes)}
+                                            </span>
+                                        </div>
+                                        <div className={styles.mediaActions}>
+                                            <button
+                                                type="button"
+                                                className={styles.secondaryBtn}
+                                                onClick={() => addToPlaylist(item.name)}
+                                            >
+                                                <i className="fas fa-plus"></i> Add
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={styles.dangerBtn}
+                                                title="Delete file from server"
+                                                onClick={() => void handleDelete(item.name)}
+                                                disabled={removeMedia.isPending}
+                                            >
+                                                <i className="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                            {available.length > 1 && (
+                                <button
+                                    type="button"
+                                    className={styles.secondaryBtn}
+                                    onClick={() => setPlaylistDraft([...playlist, ...available.map((a) => a.name)])}
+                                >
+                                    <i className="fas fa-plus"></i> Add all {available.length} to the playlist
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {media.length === 0 ? (
                     <p className={styles.empty}>
-                        Nothing to play yet — the screen shows the clinic name. Add a picture or video
+                        Nothing here yet — the screen shows the clinic name. Add a picture or video
                         above.
+                    </p>
+                ) : playlist.length === 0 ? (
+                    <p className={styles.empty}>
+                        The playlist is empty — nothing plays. Add files from the list above.
                     </p>
                 ) : (
                     <ul className={styles.mediaList}>
-                        {orderedNames.map((name, index) => {
+                        {playlist.map((name, index) => {
                             const item = byName.get(name);
-                            if (!item) return null;
+                            const isImage = item?.type === 'image';
                             return (
-                                <li key={name} className={styles.mediaItem}>
+                                <li
+                                    key={`${name}-${index}`}
+                                    className={item ? styles.mediaItem : `${styles.mediaItem} ${styles.mediaItemMissing}`}
+                                >
                                     <span className={styles.mediaIndex}>{index + 1}</span>
                                     <div className={styles.thumb}>
-                                        {item.type === 'image' ? (
+                                        {!item ? (
+                                            <i className="fas fa-exclamation-triangle"></i>
+                                        ) : isImage ? (
                                             <img
                                                 src={`/tv-display/media/${encodeURIComponent(name)}`}
                                                 alt=""
@@ -683,12 +818,13 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                     <div className={styles.mediaMeta}>
                                         <span className={styles.mediaName}>{name}</span>
                                         <span className={styles.hint}>
-                                            {item.type === 'image' ? 'Picture' : 'Video'} ·{' '}
-                                            {formatBytes(item.sizeBytes)}
+                                            {item
+                                                ? `${isImage ? 'Picture' : 'Video'} · ${formatBytes(item.sizeBytes)}`
+                                                : 'Missing — this file is no longer in the folder'}
                                         </span>
                                     </div>
                                     <div className={styles.mediaDuration}>
-                                        {item.type === 'image' ? (
+                                        {isImage ? (
                                             <label
                                                 className={styles.durationField}
                                                 title="Seconds this picture stays on screen — leave blank to use the default"
@@ -710,9 +846,9 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                                 />
                                                 <span className={styles.durationUnit}>s</span>
                                             </label>
-                                        ) : (
+                                        ) : item ? (
                                             <span className={styles.durationNote}>plays to end</span>
-                                        )}
+                                        ) : null}
                                     </div>
                                     <div className={styles.mediaActions}>
                                         <button
@@ -729,19 +865,38 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                             className={styles.iconBtn}
                                             title="Move later"
                                             onClick={() => move(index, 1)}
-                                            disabled={index === orderedNames.length - 1}
+                                            disabled={index === playlist.length - 1}
                                         >
                                             <i className="fas fa-arrow-down"></i>
                                         </button>
                                         <button
                                             type="button"
-                                            className={styles.dangerBtn}
-                                            title="Remove"
-                                            onClick={() => void handleDelete(name)}
-                                            disabled={removeMedia.isPending}
+                                            className={styles.iconBtn}
+                                            title="Play this again — add another slot for it"
+                                            onClick={() => duplicateAt(index)}
+                                            disabled={!item}
                                         >
-                                            <i className="fas fa-trash"></i>
+                                            <i className="fas fa-clone"></i>
                                         </button>
+                                        <button
+                                            type="button"
+                                            className={styles.iconBtn}
+                                            title="Remove this slot from the playlist (keeps the file)"
+                                            onClick={() => removeAt(index)}
+                                        >
+                                            <i className="fas fa-times"></i>
+                                        </button>
+                                        {item && (
+                                            <button
+                                                type="button"
+                                                className={styles.dangerBtn}
+                                                title="Delete the file from the server"
+                                                onClick={() => void handleDelete(name)}
+                                                disabled={removeMedia.isPending}
+                                            >
+                                                <i className="fas fa-trash"></i>
+                                            </button>
+                                        )}
                                     </div>
                                 </li>
                             );
@@ -750,14 +905,15 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                 )}
 
                 <p className={styles.hint}>
-                    The <strong>s</strong> box on each picture sets how long it stays on screen; leave
-                    it blank to use the default above. Those times are saved with the
-                    &ldquo;Save settings&rdquo; button — the play order is saved separately.
+                    Order is the list order. <i className="fas fa-clone"></i> repeats a clip — the way to
+                    put one logo between every video with no duplicate file. <i className="fas fa-times"></i>{' '}
+                    removes just that slot (the file stays); <i className="fas fa-trash"></i> deletes the
+                    file from the server. Playlist changes are saved with “Save playlist”.
                 </p>
                 <p className={styles.hint}>
-                    Saving the play order renames the files with number prefixes (01-, 02-, …) —
-                    that numbering IS the order, so dropping files into the folder by hand keeps
-                    working exactly as before.
+                    The <strong>s</strong> box on each picture sets how long it stays on screen; leave
+                    it blank to use the default above. Those times are saved with the
+                    &ldquo;Save settings&rdquo; button, and a picture used more than once shares one time.
                 </p>
             </section>
 
@@ -805,7 +961,10 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                 </h4>
                 <dl className={styles.pathList}>
                     <dt>Media folder (on this server)</dt>
-                    <dd><code>{data.mediaDir}</code> — dropping files here works too</dd>
+                    <dd>
+                        <code>{data.mediaDir}</code> — dropping files here adds them to the server; this
+                        tab then prompts to put them in the playlist
+                    </dd>
 
                     <dt>Settings file</dt>
                     <dd><code>{data.settingsFile}</code> — written by this page; not in the database</dd>

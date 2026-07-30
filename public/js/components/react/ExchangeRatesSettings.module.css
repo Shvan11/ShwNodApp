@@ -174,7 +174,7 @@
 }
 
 .todayRow {
-    background: rgba(0, 123, 255, 0.05);
+    background: color-mix(in oklch, var(--primary-color) 8%, transparent);
 }
 
 .todayBadge {

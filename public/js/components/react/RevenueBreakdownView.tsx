@@ -30,15 +30,22 @@ const BreakdownSection = ({ title, icon, nameLabel, rows, resolvedTheme }: Break
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const chartRef = useRef<Chart | null>(null);
 
-    const totals = rows.reduce(
+    // usdEq stays null when no exchange rate has ever been recorded — there is no house
+    // rate to fall back on, and a `?? 0` here would total real money into a fake figure.
+    const totals = rows.reduce<{ iqd: number; usd: number; usdEq: number | null; works: number }>(
         (acc, r) => ({
             iqd: acc.iqd + r.paid_iqd,
             usd: acc.usd + r.paid_usd,
-            usdEq: acc.usdEq + r.usd_equivalent,
+            usdEq: r.usd_equivalent == null ? acc.usdEq : (acc.usdEq ?? 0) + r.usd_equivalent,
             works: acc.works + r.work_count,
         }),
-        { iqd: 0, usd: 0, usdEq: 0, works: 0 }
+        { iqd: 0, usd: 0, usdEq: null, works: 0 }
     );
+
+    // With no exchange rate there is no USD-equivalent to plot, so the ranking chart is
+    // omitted entirely rather than drawn as an empty axis. The table still shows the
+    // exact IQD/USD columns.
+    const canRank = rows.some((r) => r.usd_equivalent != null);
 
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -46,7 +53,7 @@ const BreakdownSection = ({ title, icon, nameLabel, rows, resolvedTheme }: Break
         if (!ctx) return;
 
         if (chartRef.current) chartRef.current.destroy();
-        if (rows.length === 0) return;
+        if (rows.length === 0 || !canRank) return;
 
         const top = rows.slice(0, TOP_N);
         const chartColors = getChartThemeColors();
@@ -97,7 +104,7 @@ const BreakdownSection = ({ title, icon, nameLabel, rows, resolvedTheme }: Break
         return () => {
             if (chartRef.current) chartRef.current.destroy();
         };
-    }, [rows, resolvedTheme]);
+    }, [rows, canRank, resolvedTheme]);
 
     const barCount = Math.min(rows.length, TOP_N);
     const chartHeight = Math.max(180, barCount * 38 + 50);
@@ -109,7 +116,7 @@ const BreakdownSection = ({ title, icon, nameLabel, rows, resolvedTheme }: Break
                     <i className={`fas ${icon}`} aria-hidden="true"></i> {title}
                 </h3>
                 <span className={styles.sectionTotal}>
-                    ${formatNumber(totals.usdEq)} <small>USD-equiv</small>
+                    {totals.usdEq == null ? '—' : `$${formatNumber(totals.usdEq)}`} <small>USD-equiv</small>
                 </span>
             </div>
 
@@ -117,9 +124,11 @@ const BreakdownSection = ({ title, icon, nameLabel, rows, resolvedTheme }: Break
                 <p className={styles.message}>No revenue collected in this period.</p>
             ) : (
                 <>
-                    <div className={styles.chartWrapper} style={{ height: `${chartHeight}px` }}>
-                        <canvas ref={canvasRef}></canvas>
-                    </div>
+                    {canRank && (
+                        <div className={styles.chartWrapper} style={{ height: `${chartHeight}px` }}>
+                            <canvas ref={canvasRef}></canvas>
+                        </div>
+                    )}
                     <div className={styles.tableWrapper}>
                         <table className={styles.table}>
                             <thead>
@@ -137,7 +146,7 @@ const BreakdownSection = ({ title, icon, nameLabel, rows, resolvedTheme }: Break
                                         <td data-label={nameLabel} className={styles.name}>{r.name}</td>
                                         <td data-label="Collected IQD" className={styles.num}>{formatNumber(r.paid_iqd)}</td>
                                         <td data-label="Collected USD" className={styles.num}>{formatNumber(r.paid_usd)}</td>
-                                        <td data-label="USD-equiv" className={`${styles.num} ${styles.usdEq}`}>{formatNumber(r.usd_equivalent)}</td>
+                                        <td data-label="USD-equiv" className={`${styles.num} ${styles.usdEq}`}>{r.usd_equivalent == null ? '—' : formatNumber(r.usd_equivalent)}</td>
                                         <td data-label="Works" className={styles.num}>{r.work_count}</td>
                                     </tr>
                                 ))}
@@ -147,7 +156,7 @@ const BreakdownSection = ({ title, icon, nameLabel, rows, resolvedTheme }: Break
                                     <td data-label="Total"><strong>TOTAL</strong></td>
                                     <td className={styles.num}><strong>{formatNumber(totals.iqd)}</strong></td>
                                     <td className={styles.num}><strong>{formatNumber(totals.usd)}</strong></td>
-                                    <td className={`${styles.num} ${styles.usdEq}`}><strong>{formatNumber(totals.usdEq)}</strong></td>
+                                    <td className={`${styles.num} ${styles.usdEq}`}><strong>{totals.usdEq == null ? '—' : formatNumber(totals.usdEq)}</strong></td>
                                     <td className={styles.num}><strong>{formatNumber(totals.works)}</strong></td>
                                 </tr>
                             </tfoot>
@@ -181,7 +190,10 @@ const RevenueBreakdownView = () => {
 
     const byWorkType = data?.byWorkType ?? [];
     const byDoctor = data?.byDoctor ?? [];
-    const exchangeRate = data?.exchangeRate ?? 0;
+    // null = no exchange rate has ever been recorded, so there is no USD-equivalent to
+    // rank by; the server falls back to ordering by IQD collected and says so below.
+    const exchangeRate = data?.exchangeRate ?? null;
+    const hasRate = exchangeRate != null && exchangeRate > 0;
 
     return (
         <div className={styles.container}>
@@ -193,10 +205,15 @@ const RevenueBreakdownView = () => {
                 idPrefix="breakdown"
             />
 
-            {exchangeRate > 0 && (
+            {hasRate ? (
                 <p className={styles.rateNote}>
                     <i className="fas fa-circle-info" aria-hidden="true"></i>{' '}
-                    Ranked by USD-equivalent · 1 USD = {formatNumber(exchangeRate)} IQD (most recent rate)
+                    Ranked by USD-equivalent · 1 USD = {formatNumber(exchangeRate as number)} IQD (most recent rate)
+                </p>
+            ) : (
+                <p className={styles.rateNote}>
+                    <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>{' '}
+                    No exchange rate recorded — ranked by IQD collected, and USD-equivalent shows &quot;—&quot;. Add a rate in Settings → Exchange Rates.
                 </p>
             )}
 

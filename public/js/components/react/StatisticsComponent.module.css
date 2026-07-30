@@ -265,10 +265,6 @@
     color: var(--info-color);
 }
 
-.summaryCard.cashbox .cardHeader i {
-    color: var(--warning-color);
-}
-
 .cardContent {
     display: flex;
     flex-direction: column;
@@ -732,6 +728,10 @@ th.expectedCashColumn {
     font-weight: var(--font-weight-medium);
 }
 
+/* Currency pill. These are CSS-MODULE classes and the JSX must reference them through
+   `styles.*` — DailyInvoicesModal used to write the global string `badge ${currency}`,
+   which never matched the hashed names, so the pill rendered as bare text (no background,
+   no radius, no padding) in both the desktop and mobile rule blocks. */
 .statisticsInvoicesTable .currencyBadge .badge {
     display: inline-block;
     padding: 0.25rem 0.75rem;
@@ -740,12 +740,12 @@ th.expectedCashColumn {
     font-weight: var(--font-weight-semibold);
 }
 
-.statisticsInvoicesTable .currencyBadge .badge.IQD {
+.statisticsInvoicesTable .currencyBadge .badge.badgeIqd {
     background: var(--success-green);
     color: var(--color-white);
 }
 
-.statisticsInvoicesTable .currencyBadge .badge.USD {
+.statisticsInvoicesTable .currencyBadge .badge.badgeUsd {
     background: var(--info-color);
     color: var(--color-white);
 }
@@ -1072,9 +1072,35 @@ th.expectedCashColumn {
         padding: 1rem;
     }
 
+    /* Two columns, not one. Stacked, the 7 summary rows filled the whole phone viewport
+       and pushed the invoice list — the point of the modal — below the fold. */
     .statisticsInvoiceSummary {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.625rem 1rem;
         padding: 1rem;
+    }
+
+    .statisticsInvoiceSummary .summaryItem {
+        gap: 0.125rem;
+    }
+
+    .statisticsInvoiceSummary .summaryItem .label,
+    .statisticsInvoiceSummary .summaryItem .labelLink {
+        font-size: 0.8125rem;
+    }
+
+    .statisticsInvoiceSummary .summaryItem .value {
+        font-size: 1.0625rem;
+    }
+
+    /* The two "Expected Cash" rows are the reconciliation figures — keep them full-width
+       and visually separated at the end of the block. */
+    .statisticsInvoiceSummary .summaryItem.highlight {
+        grid-column: 1 / -1;
+        flex-direction: row;
+        align-items: baseline;
+        justify-content: space-between;
+        padding: 0.5rem 0.75rem;
     }
 
     .statisticsInvoicesTable {
@@ -1168,12 +1194,12 @@ th.expectedCashColumn {
         font-weight: var(--font-weight-bold);
     }
 
-    .statisticsInvoicesTable .badge.IQD {
+    .statisticsInvoicesTable .badge.badgeIqd {
         background: var(--success-green);
         color: var(--color-white);
     }
 
-    .statisticsInvoicesTable .badge.USD {
+    .statisticsInvoicesTable .badge.badgeUsd {
         background: var(--info-color);
         color: var(--color-white);
     }

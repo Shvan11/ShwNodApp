@@ -147,19 +147,18 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         isOver: false
     });
 
-    // Receipt-enriched work row + the exchange rate for the payment date, both on
-    // useQuery. The contract response is a loose boundary guard (work_id); the richer
-    // local WorkData stays the consumer type. The rate's expected 404 ("no rate set")
-    // surfaces as `isError`, which drives the inline "Set Rate" prompt — no throw.
+    // Receipt-enriched work row + the exchange rate in force on the payment date, both
+    // on useQuery. The contract response is a loose boundary guard (work_id); the richer
+    // local WorkData stays the consumer type. The endpoint carries the last known rate
+    // forward, so its 404 — which drives the inline "Set Rate" prompt, no throw — now
+    // means no rate has EVER been recorded, not just none for this day.
     const { data: completeWorkDataRaw } = useQuery(workForReceiptQuery(workData?.work_id ?? null));
     const completeWorkData = (completeWorkDataRaw ?? null) as WorkData | null;
 
-    const {
-        data: rateData,
-        isError: rateIsError,
-    } = useQuery(exchangeRateForDateQuery(formData.paymentDate));
+    const { data: rateData } = useQuery(exchangeRateForDateQuery(formData.paymentDate));
     const exchangeRate = rateData?.exchangeRate ?? null;
-    const exchangeRateError = rateIsError || (!!rateData && !rateData.exchangeRate);
+    // True when the day has no rate of its own and an earlier one stood in for it.
+    const rateIsCarriedForward = !!rateData?.isCarriedForward;
 
     // The form/balance seed + the two recalculations below were setState-in-effect
     // cascades; they are now keyed adjust-during-render blocks (matching the display
@@ -232,21 +231,27 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const [seededTotalKey, setSeededTotalKey] = useState<string | null>(null);
     if (totalKey !== seededTotalKey) {
         setSeededTotalKey(totalKey);
-        if (exchangeRate) {
-            const actualUSD = parseFloat(String(formData.actualUSD)) || 0;
-            const actualIQD = parseFloat(String(formData.actualIQD)) || 0;
+        const actualUSD = parseFloat(String(formData.actualUSD)) || 0;
+        const actualIQD = parseFloat(String(formData.actualIQD)) || 0;
+        const accountCurrency = calculations.accountCurrency;
+        // Cash in the OTHER currency is the only leg that needs a rate. Without one this
+        // block used to bail entirely, leaving totalReceived/isShort stale even for an
+        // IQD work settled in IQD, where nothing is converted at all.
+        const foreignCash = accountCurrency === 'USD' ? actualIQD : actualUSD;
+
+        if (exchangeRate || foreignCash === 0) {
             const amountToRegister = parseFloat(String(formData.amountToRegister)) || 0;
-            const accountCurrency = calculations.accountCurrency;
+            const rate = exchangeRate ?? 0; // only ever applied to a zero foreign leg when 0
 
             // Convert total received to account currency - Round DOWN what patient gave (you benefit)
             let totalInAccountCurrency: number;
             if (accountCurrency === 'USD') {
                 // Patient gave IQD, convert to USD - Round DOWN
-                const iqdValueInUSD = Math.floor(actualIQD / exchangeRate);
+                const iqdValueInUSD = rate ? Math.floor(actualIQD / rate) : 0;
                 totalInAccountCurrency = actualUSD + iqdValueInUSD;
             } else {
                 // Patient gave USD, convert to IQD - Round DOWN to nearest 1000
-                const usdValueInIQD = Math.floor(actualUSD * exchangeRate / 1000) * 1000;
+                const usdValueInIQD = rate ? Math.floor(actualUSD * rate / 1000) * 1000 : 0;
                 totalInAccountCurrency = usdValueInIQD + actualIQD;
             }
 
@@ -254,10 +259,12 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             const overpayment = totalInAccountCurrency - amountToRegister;
 
             // Convert overpayment to IQD (change always in IQD) - Round DOWN to nearest 1000 (you give less)
+            // A USD-denominated overpayment can't be expressed in IQD without a rate, so it
+            // stays 0 until one exists (rateRequired keeps that case off the Save button).
             let changeInIQD = 0;
             if (overpayment > 0) {
                 if (accountCurrency === 'USD') {
-                    changeInIQD = Math.floor(overpayment * exchangeRate / 1000) * 1000;
+                    changeInIQD = rate ? Math.floor(overpayment * rate / 1000) * 1000 : 0;
                 } else {
                     changeInIQD = Math.floor(overpayment / 1000) * 1000;
                 }
@@ -305,11 +312,44 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         }));
     }
 
+    // The rate editor writes to whatever date the form currently holds, so it must never
+    // outlive the date it was opened for. Changing the payment date closes it: otherwise
+    // staff could open it on a day with no rate, switch to an earlier date that HAS one,
+    // and the save would silently rewrite that day's recorded rate.
+    const [seededRateDate, setSeededRateDate] = useState(formData.paymentDate);
+    if (seededRateDate !== formData.paymentDate) {
+        setSeededRateDate(formData.paymentDate);
+        if (showRateInput) setShowRateInput(false);
+        if (newRateValue) setNewRateValue('');
+    }
+
     const handleSetExchangeRate = async () => {
         const rate = parseFormattedNumber(newRateValue);
         if (!rate || rate <= 0) {
             toast.warning(t('validation.enterValidRate'));
             return;
+        }
+
+        // Never overwrite a rate the day already owns. `sms` keeps ONE rate per date and
+        // the statistics rows convert each day at its own rate, so rewriting a stored
+        // rate silently restates that day's Grand Total. The editor is only offered when
+        // the day has no rate of its own (none at all, or one carried forward), and this
+        // re-checks it against the rate actually loaded at save time.
+        if (exchangeRate && !rateIsCarriedForward) {
+            toast.warning(t('validation.rateAlreadySet', { date: formData.paymentDate }));
+            setShowRateInput(false);
+            setNewRateValue('');
+            return;
+        }
+
+        // Recording a rate for a PAST day is legitimate (it's the rate that really stood
+        // that day) but it does restate that day's totals — so it's confirmed, not silent.
+        if (formData.paymentDate < formatISODate()) {
+            const proceed = await confirm(
+                t('confirm.backdatedRateMessage', { date: formData.paymentDate, rate: formatNumber(rate) }),
+                { title: t('confirm.backdatedRateTitle'), confirmText: t('confirm.backdatedRateConfirm') }
+            );
+            if (!proceed) return;
         }
 
         try {
@@ -342,20 +382,26 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const [seededReverseKey, setSeededReverseKey] = useState<string | null>(null);
     if (reverseKey !== seededReverseKey) {
         setSeededReverseKey(reverseKey);
-        if (entryMode === 'cash' && exchangeRate) {
-            const actualUSD = parseFloat(String(formData.actualUSD)) || 0;
-            const actualIQD = parseFloat(String(formData.actualIQD)) || 0;
-            const accountCurrency = calculations.accountCurrency;
+        const actualUSD = parseFloat(String(formData.actualUSD)) || 0;
+        const actualIQD = parseFloat(String(formData.actualIQD)) || 0;
+        const accountCurrency = calculations.accountCurrency;
+        // Same rule as the total/change block: only the foreign leg needs a rate, so
+        // MIXED-in-cash-mode settled entirely in the account's own currency still derives
+        // its amount (it used to sit empty and fail with "could not calculate").
+        const foreignCash = accountCurrency === 'USD' ? actualIQD : actualUSD;
+
+        if (entryMode === 'cash' && (exchangeRate || foreignCash === 0)) {
+            const rate = exchangeRate ?? 0;
 
             if (actualUSD === 0 && actualIQD === 0) {
                 setFormData(prev => ({ ...prev, amountToRegister: '' }));
             } else {
                 let amountToRegister: number;
                 if (accountCurrency === 'USD') {
-                    const iqdValueInUSD = Math.floor(actualIQD / exchangeRate);
+                    const iqdValueInUSD = rate ? Math.floor(actualIQD / rate) : 0;
                     amountToRegister = actualUSD + iqdValueInUSD;
                 } else {
-                    const usdValueInIQD = Math.floor(actualUSD * exchangeRate / 1000) * 1000;
+                    const usdValueInIQD = rate ? Math.floor(actualUSD * rate / 1000) * 1000 : 0;
                     amountToRegister = usdValueInIQD + actualIQD;
                 }
 
@@ -620,6 +666,43 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         }
     };
 
+    // Detect same-currency payment for change tracking (only IQD-to-IQD)
+    // USD-to-USD tracks change as IQD because clinic uses $50/$100 bills
+    const isSameCurrencyPayment =
+        calculations.accountCurrency === 'IQD' && formData.paymentCurrency === 'IQD';
+
+    // THE single source of truth for whether change is tracked on this payment —
+    // read by the Change field, the summary strip AND handleSubmit. Change is not
+    // tracked for:
+    // 1. Cash mode (registering exactly what was given, no target amount)
+    // 2. IQD-to-IQD same currency (exact payments expected)
+    // 3. USD account + IQD payment in amount mode (auto-calculated, no change needed)
+    //
+    // Submit used to re-derive this from the cash amounts instead (`actualIQD > 0 &&
+    // actualUSD === 0`), which disagreed with the UI on a MIXED payment settled in IQD
+    // only: the field showed and auto-calculated change, then submit sent null. The cash
+    // handed back went unrecorded and ExpectedCashIQD overstated the drawer by it.
+    const isChangeDisabled =
+        entryMode === 'cash' ||
+        isSameCurrencyPayment ||
+        (calculations.accountCurrency === 'USD' && formData.paymentCurrency === 'IQD');
+
+    // Whether this payment genuinely needs an exchange rate. Only two things convert:
+    // cash taken in a currency other than the work's, and change (always handed back in
+    // IQD) owed on a USD-denominated overpayment. Saving was previously gated on the
+    // rate unconditionally, so an IQD work being paid in IQD — nothing to convert —
+    // could not be registered at all until someone entered the day's rate.
+    const usdCash = parseFloat(String(formData.actualUSD)) || 0;
+    const iqdCash = parseFloat(String(formData.actualIQD)) || 0;
+    const foreignCashEntered =
+        calculations.accountCurrency === 'USD' ? iqdCash > 0 : usdCash > 0;
+    const rateRequired =
+        (formData.paymentCurrency === 'MIXED'
+            // MIXED only converts once foreign cash is actually entered.
+            ? foreignCashEntered
+            : formData.paymentCurrency !== calculations.accountCurrency) ||
+        (calculations.accountCurrency === 'USD' && !isChangeDisabled && calculations.isOver);
+
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
@@ -652,6 +735,11 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             return;
         }
 
+        if (rateRequired && !exchangeRate) {
+            toast.warning(t('validation.rateRequired', { date: formData.paymentDate }));
+            return;
+        }
+
         if (calculations.remainingBalance > 0 && amountPaid > calculations.remainingBalance) {
             toast.error(t('validation.exceedsBalance', { balance: formatCurrency(calculations.remainingBalance, calculations.accountCurrency) }));
             return;
@@ -661,22 +749,12 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             if (!await confirm(t('confirm.underpaymentMessage'), { title: t('confirm.underpaymentTitle'), confirmText: t('confirm.underpaymentConfirm') })) return;
         }
 
-        // Scenarios where change is not tracked (NULL):
-        // 1. Cash mode: registering exactly what was given, no target amount
-        // 2. IQD-to-IQD: same-currency, exact payments expected
-        // 3. USD account + IQD payment: auto-calculated, no change needed
-        // USD-to-USD in amount mode DOES track change (converted to IQD) because clinic uses $50/$100 bills
-        const shouldDisableChange =
-            entryMode === 'cash' ||
-            (calculations.accountCurrency === 'IQD' && actualIQD > 0 && actualUSD === 0) ||
-            (calculations.accountCurrency === 'USD' && actualIQD > 0 && actualUSD === 0);
-
-        // For disabled scenarios: Force change to NULL
-        // For all other scenarios: Use the change value (can be 0 or positive)
-        const changeToSubmit = shouldDisableChange ? null : (parseInt(String(formData.change)) || 0);
+        // Change is saved exactly when the form tracked it (see isChangeDisabled above):
+        // NULL for the untracked scenarios, the entered/auto-calculated value otherwise.
+        const changeToSubmit = isChangeDisabled ? null : (parseInt(String(formData.change)) || 0);
 
         // Validate cross-currency change doesn't exceed received amounts
-        if (!shouldDisableChange && changeToSubmit !== null && changeToSubmit > 0) {
+        if (changeToSubmit !== null && changeToSubmit > 0) {
             // Simple case: IQD only payment
             if (actualUSD === 0 && changeToSubmit > actualIQD) {
                 toast.error(t('validation.invalidChange', { change: changeToSubmit, received: actualIQD }));
@@ -714,7 +792,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                 paymentDateTime: new Date().toISOString(),
                 usdReceived: actualUSD,
                 iqdReceived: actualIQD,
-                change: parseInt(String(formData.change)) || 0,
+                // The receipt must show what was RECORDED, not what the field happened to
+                // hold — those diverged whenever change was submitted as NULL.
+                change: changeToSubmit ?? 0,
                 newBalance: ((workData!.total_required || 0) - Number(workData!.discount ?? 0) - (workData!.TotalPaid || 0) - amountPaid)
             });
 
@@ -806,19 +886,32 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         (calculations.accountCurrency === 'USD' && formData.paymentCurrency === 'USD') ||
         (calculations.accountCurrency === 'IQD' && formData.paymentCurrency === 'IQD');
 
-    // Detect same-currency payment for change tracking (only IQD-to-IQD)
-    // USD-to-USD tracks change as IQD because clinic uses $50/$100 bills
-    const isSameCurrencyPayment =
-        calculations.accountCurrency === 'IQD' && formData.paymentCurrency === 'IQD';
-
-    // Disable change field for:
-    // 1. Cash mode (registering exactly what was given, no target amount)
-    // 2. IQD-to-IQD same currency (exact payments expected)
-    // 3. USD account + IQD payment in amount mode (auto-calculated, no change needed)
-    const isChangeDisabled =
-        entryMode === 'cash' ||
-        isSameCurrencyPayment ||
-        (calculations.accountCurrency === 'USD' && formData.paymentCurrency === 'IQD');
+    // "Set Rate" link → inline rate input. Shared by the no-rate banner and the
+    // carried-forward one (both let staff record this day's actual rate).
+    const rateEditor = !showRateInput ? (
+        <button type="button" onClick={() => setShowRateInput(true)} className={styles.btnLink}>
+            {t('exchangeRate.setRate')}
+        </button>
+    ) : (
+        <div className={styles.rateInputInline}>
+            <input
+                type="text"
+                value={displayValues.newRateValue}
+                onChange={(e) => {
+                    setNewRateValue(e.target.value);
+                    setDisplayValues(prev => ({ ...prev, newRateValue: e.target.value }));
+                }}
+                placeholder="1,406"
+                className={styles.rateInputSmall}
+            />
+            <button type="button" onClick={handleSetExchangeRate} disabled={loading} className={styles.btnSmPrimary}>
+                {loading ? '...' : t('exchangeRate.save')}
+            </button>
+            <button type="button" onClick={() => { setShowRateInput(false); setNewRateValue(''); }} className={styles.btnSmGhost}>
+                {t('actions.closeX')}
+            </button>
+        </div>
+    );
 
     return (
         <Modal
@@ -848,43 +941,31 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                             }
                         />
 
-                        {/* Exchange Rate - Compact Inline */}
-                        {exchangeRateError && !exchangeRate ? (
+                        {/* Exchange Rate - Compact Inline. Shown in three states: no rate on
+                            record at all, a rate carried forward from an earlier day (offer to
+                            set the real one), or this day's own rate. */}
+                        {!exchangeRate ? (
                             <div className={styles.exchangeRateErrorCompact}>
                                 <i className="fas fa-exclamation-triangle"></i>
                                 <span>{t('exchangeRate.noRate', { date: formData.paymentDate })}</span>
-                                {!showRateInput ? (
-                                    <button type="button" onClick={() => setShowRateInput(true)} className={styles.btnLink}>
-                                        {t('exchangeRate.setRate')}
-                                    </button>
-                                ) : (
-                                    <div className={styles.rateInputInline}>
-                                        <input
-                                            type="text"
-                                            value={displayValues.newRateValue}
-                                            onChange={(e) => {
-                                                setNewRateValue(e.target.value);
-                                                setDisplayValues(prev => ({ ...prev, newRateValue: e.target.value }));
-                                            }}
-                                            placeholder="1,406"
-                                            className={styles.rateInputSmall}
-                                        />
-                                        <button type="button" onClick={handleSetExchangeRate} disabled={loading} className={styles.btnSmPrimary}>
-                                            {loading ? '...' : t('exchangeRate.save')}
-                                        </button>
-                                        <button type="button" onClick={() => { setShowRateInput(false); setNewRateValue(''); }} className={styles.btnSmGhost}>
-                                            {t('actions.closeX')}
-                                        </button>
-                                    </div>
-                                )}
+                                {rateEditor}
                             </div>
-                        ) : exchangeRate ? (
+                        ) : (
                             <div className={styles.exchangeRateCompact}>
                                 <i className="fas fa-exchange-alt"></i>
                                 <span>{t('exchangeRate.display', { rate: formatNumber(exchangeRate) })}</span>
-                                <span className={styles.rateDate}>({formData.paymentDate})</span>
+                                {rateIsCarriedForward ? (
+                                    <>
+                                        <span className={styles.rateDate}>
+                                            {t('exchangeRate.carriedForward', { date: rateData?.rateDate ?? '' })}
+                                        </span>
+                                        {rateEditor}
+                                    </>
+                                ) : (
+                                    <span className={styles.rateDate}>({formData.paymentDate})</span>
+                                )}
                             </div>
-                        ) : null}
+                        )}
 
                         <form onSubmit={handleSubmit} className={`${styles.invoiceForm} ${styles.paymentFormCompact}`}>
                             {/* Row 1: Currency + Entry Mode + Date */}
@@ -1147,10 +1228,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
                             {/* Actions - Compact */}
                             <div className={styles.paymentActionsCompact}>
-                                <button type="button" className="btn btn-secondary" onClick={onClose}>
+                                <button type="button" className={`btn ${styles.btnCancel}`} onClick={onClose}>
                                     {t('actions.cancel')}
                                 </button>
-                                <button type="submit" className="btn btn-primary" disabled={loading || !exchangeRate}>
+                                <button type="submit" className="btn btn-primary" disabled={loading || (rateRequired && !exchangeRate)}>
                                     {loading ? (
                                         <><i className="fas fa-spinner fa-spin"></i> {t('actions.saving')}</>
                                     ) : (

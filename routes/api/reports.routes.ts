@@ -7,11 +7,10 @@ import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import { authorize } from '../../middleware/auth.js';
-import { ADMIN_ROLES } from '../../shared/auth/roles.js';
+import { ADMIN_ROLES, FINANCE_ROLES } from '../../shared/auth/roles.js';
 import * as reports from '../../shared/contracts/reports.contract.js';
 import {
   calculateMonthlyStatistics,
-  enrichInvoicesWithDetails,
   validateMonthYear,
   validateDate,
 } from '../../services/business/FinancialReportService.js';
@@ -25,7 +24,10 @@ import {
   getRevenueByDoctor,
   type RevenueBreakdownRow,
 } from '../../services/database/queries/report-queries.js';
-import { getLatestExchangeRate } from '../../services/database/queries/payment-queries.js';
+import {
+  getLatestExchangeRate,
+  getExchangeRateAsOf,
+} from '../../services/database/queries/payment-queries.js';
 
 const router = Router();
 
@@ -40,21 +42,67 @@ type DailyInvoicesQuery = reports.DailyInvoicesQuery;
 type CommissionsQuery = reports.CommissionsQuery;
 type RevenueBreakdownQuery = reports.RevenueBreakdownQuery;
 
-/** Default IQD-per-USD rate used only if the `sms` table has no rate at all. */
-const FALLBACK_EXCHANGE_RATE = 1450;
+/** ISO date of the last day of a 1-based month. UTC math, so no timezone shift. */
+function monthEnd(year: number, month: number): string {
+  return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+}
+
+/**
+ * The IQD-per-USD rate a report period converts at, or null if there isn't one.
+ *
+ * The per-day rows (getMonthlyGrandTotals / getYearlyMonthlyTotals) each use that day's
+ * own `sms.exchange_rate`; this is the fallback for days that have none, and the rate the
+ * month-level figures (monthly-only expenses) are converted at. It is resolved AS OF the
+ * period's last day — a 2024 report must not be converted at today's rate.
+ *
+ * There is deliberately NO house rate behind this. These endpoints used to fall back to a
+ * hardcoded 1450 — a magic number no operator could see or change, which by mid-2026 ran
+ * 3–7% below the real rate (1497–1549), disagreed with the per-day rows in the same
+ * response, and on a brand-new deployment (empty `sms`) silently converted a clinic's
+ * entire books at another country's April-2023 rate. Returning null instead makes every
+ * converted figure null, so the UI reports "no rate recorded" rather than a confident
+ * wrong number. Un-converted IQD/USD figures are exact and unaffected.
+ *
+ * An explicit `?exchangeRate=` still wins — it's a documented what-if override — but no
+ * caller supplies one by default any more.
+ */
+async function resolveReferenceRate(
+  override: string | undefined,
+  asOf: string
+): Promise<number | null> {
+  const explicit = override ? parseInt(override) : NaN;
+  if (Number.isFinite(explicit) && explicit > 0) {
+    return explicit;
+  }
+
+  const recorded = await getExchangeRateAsOf(asOf);
+  return recorded?.exchangeRate ?? null;
+}
 
 /**
  * Attach usd_equivalent (paid_usd + paid_iqd / rate, rounded to 2dp) to each breakdown
  * row and sort descending — the "which earns most money" ranking. IQD/USD stay separate
  * in the payload; the USD-equivalent is only a ranking + headline figure.
  */
-function rankByUsdEquivalent(rows: RevenueBreakdownRow[], rate: number): reports.RevenueRow[] {
+function rankByUsdEquivalent(
+  rows: RevenueBreakdownRow[],
+  rate: number | null
+): reports.RevenueRow[] {
+  // No rate on record → no honest cross-currency ranking exists. Report the equivalent
+  // as null and fall back to a deterministic single-currency order (IQD collected, then
+  // USD) rather than ranking by a made-up conversion.
+  if (rate === null) {
+    return rows
+      .map((r) => ({ ...r, usd_equivalent: null }))
+      .sort((a, b) => b.paid_iqd - a.paid_iqd || b.paid_usd - a.paid_usd);
+  }
+
   return rows
     .map((r) => ({
       ...r,
       usd_equivalent: Math.round((r.paid_usd + r.paid_iqd / rate) * 100) / 100,
     }))
-    .sort((a, b) => b.usd_equivalent - a.usd_equivalent);
+    .sort((a, b) => (b.usd_equivalent ?? 0) - (a.usd_equivalent ?? 0));
 }
 
 /**
@@ -72,7 +120,8 @@ interface StatisticsSummary {
   totalRevenue: CurrencyTotals;
   totalExpenses: CurrencyTotals;
   netProfit: CurrencyTotals;
-  grandTotal: number;
+  /** null when no exchange rate exists to convert the period with. */
+  grandTotal: number | null;
 }
 
 /**
@@ -86,15 +135,21 @@ interface YearTotal {
   ExpensesUSD: number;
   FinalIQDSum: number;
   FinalUSDSum: number;
-  GrandTotal: number;
+  /** null when no exchange rate exists to convert the year with. */
+  GrandTotal: number | null;
 }
 
 /**
  * GET /statistics
  * Get monthly financial statistics
  * Query params: month, year, exchangeRate (optional)
+ *
+ * FINANCE_ROLES, not open: the payload is the clinic's books — per-day revenue, expenses,
+ * net profit and the cash-box balance. Front desk is included deliberately (they run the
+ * daily cash box and hand the drawer over), clinical staff are not. The month-level
+ * summary is additionally hidden client-side from non-admins.
  */
-router.get('/statistics', async (req: Request<object, object, object, StatisticsQuery>, res: Response): Promise<void> => {
+router.get('/statistics', authorize(FINANCE_ROLES), async (req: Request<object, object, object, StatisticsQuery>, res: Response): Promise<void> => {
   try {
     const { month, year, exchangeRate } = req.query;
 
@@ -106,7 +161,7 @@ router.get('/statistics', async (req: Request<object, object, object, Statistics
 
     // Delegate validation to service layer
     const { month: monthNum, year: yearNum } = validateMonthYear(month, year);
-    const exRate = exchangeRate ? parseInt(exchangeRate) : 1450; // Default exchange rate
+    const exRate = await resolveReferenceRate(exchangeRate, monthEnd(yearNum, monthNum));
 
     // Daily cash-box totals for the month (Day arrives as a 'YYYY-MM-DD' string from PG).
     // Per-day rows are daily-only — monthly expenses excluded so they don't distort the
@@ -146,8 +201,11 @@ router.get('/statistics', async (req: Request<object, object, object, Statistics
  * GET /statistics/yearly
  * Get monthly totals for a 12-month period starting from specified month/year
  * Query params: startMonth, startYear, exchangeRate (optional)
+ *
+ * ADMIN_ROLES — a multi-period revenue rollup, same tier as Commissions/Breakdown
+ * (the client already hides the Monthly tab from non-admins).
  */
-router.get('/statistics/yearly', async (req: Request<object, object, object, YearlyStatisticsQuery>, res: Response): Promise<void> => {
+router.get('/statistics/yearly', authorize(ADMIN_ROLES), async (req: Request<object, object, object, YearlyStatisticsQuery>, res: Response): Promise<void> => {
   try {
     const { startMonth, startYear, exchangeRate } = req.query;
 
@@ -158,7 +216,9 @@ router.get('/statistics/yearly', async (req: Request<object, object, object, Yea
     }
 
     const { month: monthNum, year: yearNum } = validateMonthYear(startMonth, startYear);
-    const exRate = exchangeRate ? parseInt(exchangeRate) : 1450;
+    // The window is [start, start + 12 months) → its last day is the end of the month
+    // BEFORE startMonth, one year on.
+    const exRate = await resolveReferenceRate(exchangeRate, monthEnd(yearNum + 1, monthNum - 1));
 
     // Per-month totals across the 12-month period.
     const monthlyData = await getYearlyMonthlyTotals(monthNum, yearNum, exRate);
@@ -177,12 +237,14 @@ router.get('/statistics/yearly', async (req: Request<object, object, object, Yea
         IQD: acc.netProfit.IQD + (month.FinalIQDSum || 0),
         USD: acc.netProfit.USD + (month.FinalUSDSum || 0)
       },
-      grandTotal: acc.grandTotal + (month.GrandTotal || 0)
+      // Stays null with no rate to convert by — `|| 0` here would quietly turn
+      // "unknown" into a total that looks real.
+      grandTotal: acc.grandTotal === null ? null : acc.grandTotal + (month.GrandTotal || 0)
     }), {
       totalRevenue: { IQD: 0, USD: 0 },
       totalExpenses: { IQD: 0, USD: 0 },
       netProfit: { IQD: 0, USD: 0 },
-      grandTotal: 0
+      grandTotal: exRate === null ? null : 0
     });
 
     sendData(res, reports.yearlyStatistics.response, {
@@ -211,8 +273,10 @@ router.get('/statistics/yearly', async (req: Request<object, object, object, Yea
  * Get yearly totals for a range of years
  * Query params: startYear, endYear, exchangeRate (optional)
  * Returns aggregated totals for each full year in the range
+ *
+ * ADMIN_ROLES — see /statistics/yearly (the client hides the Yearly tab from non-admins).
  */
-router.get('/statistics/multi-year', async (req: Request<object, object, object, MultiYearStatisticsQuery>, res: Response): Promise<void> => {
+router.get('/statistics/multi-year', authorize(ADMIN_ROLES), async (req: Request<object, object, object, MultiYearStatisticsQuery>, res: Response): Promise<void> => {
   try {
     const { startYear, endYear, exchangeRate } = req.query;
 
@@ -224,7 +288,6 @@ router.get('/statistics/multi-year', async (req: Request<object, object, object,
 
     const startYearNum = parseInt(startYear);
     const endYearNum = parseInt(endYear);
-    const exRate = exchangeRate ? parseInt(exchangeRate) : 1450;
 
     // Validate year range
     if (isNaN(startYearNum) || startYearNum < 2000 || startYearNum > 2100) {
@@ -243,6 +306,9 @@ router.get('/statistics/multi-year', async (req: Request<object, object, object,
       ErrorResponses.badRequest(res, 'Year range cannot exceed 10 years');
       return;
     }
+
+    // Resolved after validation so a bad year can't reach the rate lookup.
+    const exRate = await resolveReferenceRate(exchangeRate, monthEnd(endYearNum, 12));
 
     // Fetch each year independently, in parallel — ProcYearlyMonthlyTotals for
     // one year doesn't depend on any other, so collapse the serial round-trips
@@ -267,7 +333,7 @@ router.get('/statistics/multi-year', async (req: Request<object, object, object,
           ExpensesUSD: acc.ExpensesUSD + (month.ExpensesUSD || 0),
           FinalIQDSum: acc.FinalIQDSum + (month.FinalIQDSum || 0),
           FinalUSDSum: acc.FinalUSDSum + (month.FinalUSDSum || 0),
-          GrandTotal: acc.GrandTotal + (month.GrandTotal || 0)
+          GrandTotal: acc.GrandTotal === null ? null : acc.GrandTotal + (month.GrandTotal || 0)
         }), {
           Year: year,
           SumIQD: 0,
@@ -276,7 +342,7 @@ router.get('/statistics/multi-year', async (req: Request<object, object, object,
           ExpensesUSD: 0,
           FinalIQDSum: 0,
           FinalUSDSum: 0,
-          GrandTotal: 0
+          GrandTotal: exRate === null ? null : 0
         });
       })
     );
@@ -295,12 +361,15 @@ router.get('/statistics/multi-year', async (req: Request<object, object, object,
         IQD: acc.netProfit.IQD + year.FinalIQDSum,
         USD: acc.netProfit.USD + year.FinalUSDSum
       },
-      grandTotal: acc.grandTotal + year.GrandTotal
+      grandTotal:
+        acc.grandTotal === null || year.GrandTotal === null
+          ? null
+          : acc.grandTotal + year.GrandTotal
     }), {
       totalRevenue: { IQD: 0, USD: 0 },
       totalExpenses: { IQD: 0, USD: 0 },
       netProfit: { IQD: 0, USD: 0 },
-      grandTotal: 0
+      grandTotal: exRate === null ? null : 0
     });
 
     sendData(res, reports.multiYearStatistics.response, {
@@ -389,7 +458,8 @@ router.get(
         getRevenueByDoctor(startDate, endDate),
       ]);
 
-      const exchangeRate = latestRate ?? FALLBACK_EXCHANGE_RATE;
+      // null when `sms` has never held a rate — no house rate stands in for it.
+      const exchangeRate = latestRate;
 
       sendData(res, reports.revenueBreakdown.response, {
         byWorkType: rankByUsdEquivalent(byWorkTypeRaw, exchangeRate),
@@ -409,8 +479,11 @@ router.get(
  * GET /daily-invoices
  * Get daily invoices for a specific date
  * Query params: date (YYYY-MM-DD format)
+ *
+ * FINANCE_ROLES — every payment taken that day, by patient, with the cash split. Same
+ * tier as /statistics: front desk reconciles the drawer from this, clinical staff don't.
  */
-router.get('/daily-invoices', async (req: Request<object, object, object, DailyInvoicesQuery>, res: Response): Promise<void> => {
+router.get('/daily-invoices', authorize(FINANCE_ROLES), async (req: Request<object, object, object, DailyInvoicesQuery>, res: Response): Promise<void> => {
   try {
     const { date } = req.query;
 
@@ -423,16 +496,15 @@ router.get('/daily-invoices', async (req: Request<object, object, object, DailyI
     // Delegate validation to service layer
     validateDate(date);
 
-    // Invoices paid on this date (sys_start_time already a UTC '…Z' ISO string from the query).
-    const baseInvoices = await getDailyInvoices(date);
-
-    // Delegate enrichment to service layer
-    const enrichedInvoices = await enrichInvoicesWithDetails(baseInvoices);
+    // Invoices paid on this date, cash-received splits included (sys_start_time already a
+    // UTC '…Z' ISO string from the query). ONE query — the per-invoice enrichment pass
+    // this used to make was fetching two columns that were already on the row.
+    const invoices = await getDailyInvoices(date);
 
     sendData(res, reports.dailyInvoices.response, {
       date: date,
-      count: enrichedInvoices.length,
-      invoices: enrichedInvoices
+      count: invoices.length,
+      invoices: invoices
     });
 
   } catch (error) {
