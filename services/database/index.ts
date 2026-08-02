@@ -1,15 +1,13 @@
 /**
  * Database service — PostgreSQL (node-postgres + Kysely).
  *
- * As of migration Phase 9 the app is PostgreSQL-only: the dual-driver dispatcher,
- * the legacy mssql facade, and the `executeQuery`/`executeStoredProcedure`/`TYPES`/`sql`
- * bridge shim are gone. Query modules talk to PG directly via `getKysely()` /
- * `withPgTransaction()` (see `./kysely.js`); this module only exposes connection
+ * The app is PostgreSQL-only: query modules talk to PG directly via `getKysely()` /
+ * `withPgTransaction()` (see `./kysely.js`). This module only exposes connection
  * diagnostics + lifecycle used by boot (`index.ts`) and the health monitor
  * (`services/monitoring/HealthCheck.ts`).
  *
- * (The `mssql` package + `./pool.ts` survive solely for the one-way migration scripts
- * under `scripts/` — ETL + parity harnesses needed for the Phase 10 prod cutover.)
+ * (The `mssql` package + `./pool.ts` survive solely for the temporary one-way Dolphin
+ * sink — `services/sync/cdc/dolphin-sink.ts` — and go when it is deleted.)
  */
 import config from '../../config/config.js';
 import { getPgPool } from './kysely.js';
@@ -42,13 +40,6 @@ export interface TestResult {
   data?: ConnectionTestResult;
   error?: string;
   poolStats?: PoolStats;
-}
-
-export interface HealthCheckResult {
-  healthy: boolean;
-  message: string;
-  error?: string;
-  details: DatabaseStats & { connectionTest?: TestResult };
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -133,36 +124,6 @@ export function getDatabaseStats(): DatabaseStats {
     timestamp: Date.now(),
     healthy: !poolStats.isShuttingDown,
   };
-}
-
-export async function healthCheck(): Promise<HealthCheckResult> {
-  try {
-    const stats = getDatabaseStats();
-
-    if (!stats.healthy) {
-      return {
-        healthy: false,
-        message: 'Database connection pool is not healthy',
-        details: stats,
-      };
-    }
-
-    const connectionTest = await testConnection();
-    return {
-      healthy: connectionTest.success,
-      message: connectionTest.success
-        ? 'Database is healthy and responsive'
-        : 'Database connectivity issues detected',
-      details: { ...stats, connectionTest },
-    };
-  } catch (error) {
-    return {
-      healthy: false,
-      message: 'Database health check failed',
-      error: (error as Error).message,
-      details: getDatabaseStats(),
-    };
-  }
 }
 
 export async function shutdown(): Promise<void> {

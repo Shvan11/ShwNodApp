@@ -1,10 +1,9 @@
 /**
- * Photo-session preparation queries (ShwanNew only).
+ * Photo-session preparation queries.
  *
- * Helpers behind the native photo editor's prepare/render + date-picker flow:
- * patient lookup, tblwork Initial/Final photo-date conflict read/override, and the
- * appointment/visit lists used to suggest session dates. None of these touch
- * DolphinPlatform.
+ * Helpers behind the native photo editor's prepare/render + date-picker flow: patient
+ * lookup, the `works` Initial/Final photo-date conflict read/override, and the
+ * appointment/visit lists used to suggest session dates.
  */
 import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
@@ -107,13 +106,12 @@ export async function getPhotoSessionAppointments(
 }
 
 /**
- * Get visits with photo flags for date selection. (was: VisitsPhotoforOne)
+ * Get visits with photo flags for date selection.
  *
- * Deviation (flagged for Phase 7): the old positional mapper read the proc's columns in the wrong
- * order (proc emitted `type, visit_date`; the mapper assigned col0→visitDate, col1→hasInitialPhoto…),
- * so the mssql result was effectively garbage (a string in `visitDate`). This returns the
- * interface-correct result the field names intend: the photo-bearing visits of the active work
- * with each visit's real date and photo flags.
+ * Returns the photo-bearing visits of the patient's ACTIVE work, each with its real
+ * visit date and photo flags — i.e. exactly what the field names claim. (An earlier
+ * positional mapper mismatched the column order here and returned garbage; the named
+ * projection below is what prevents that class of bug recurring.)
  */
 export async function getPhotoSessionVisits(personId: string): Promise<PhotoSessionVisit[]> {
   const WID = await getActiveWID(parseInt(personId, 10));

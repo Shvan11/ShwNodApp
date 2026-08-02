@@ -115,7 +115,7 @@ Validate **untrusted input crossing into the app**, nowhere else: request body/p
 
 **PostgreSQL** (local native service) via **node-postgres (`pg`) + Kysely** — `pg.Pool` (max 10, ~30s timeouts). No stored procedures/triggers/functions for app logic (all in TypeScript); the only DB triggers are CDC capture (see Sync).
 
-**Where to talk to the DB:** `services/database/kysely.ts` exposes `getKysely()` (the `Kysely<Database>`) and `withPgTransaction(cb)` — use these directly. `services/database/index.ts` is only connection diagnostics + lifecycle (`testConnection`/`testConnectionWithRetry`/`getDatabaseStats`/`healthCheck`/`shutdown`); there's no `executeQuery`/`executeStoredProcedure`. One-off raw SQL: Kysely's `sql` tag.
+**Where to talk to the DB:** `services/database/kysely.ts` exposes `getKysely()` (the `Kysely<Database>`) and `withPgTransaction(cb)` — use these directly. `services/database/index.ts` is only connection diagnostics + lifecycle (`testConnection`/`testConnectionWithRetry`/`getDatabaseStats`/`shutdown`); there's no `executeQuery`/`executeStoredProcedure`. One-off raw SQL: Kysely's `sql` tag.
 
 **Gotchas — do not regress:**
 - **Names:** schema is all lowercase `snake_case` (`patients`, `time_points`, `aligner_sets`; `person_id`, `city_id`). The SQL-Server-era `tbl*`/PascalCase/`"PersonID"`/`dbo.` are gone — a raw `sql` string using them fails. `types/db.d.ts` (from `npm run db:codegen`) is the SSoT for table/column names.

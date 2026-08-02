@@ -1,14 +1,13 @@
 /**
  * Patient portal authentication queries
  *
- * Manages the tblPatientPortalAuth table: PIN hash, enabled flag,
+ * Manages the `patient_portal_auth` table: PIN hash, enabled flag,
  * failed-attempt lockout, and last-login tracking.
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). The MERGE upsert
- * became `ON CONFLICT (person_id) DO UPDATE` against the PK. timestamp columns
- * (`locked_until`, `last_login_at`, `created_at`, `updated_at`) are PG `timestamp` →
- * parsed to local Date by kysely.ts. `SYSUTCDATETIME()` → `now() AT TIME ZONE 'UTC'`
- * to preserve the UTC wall-clock the columns were written with.
+ * The upsert is `ON CONFLICT (person_id) DO UPDATE` against the PK. The timestamp
+ * columns (`locked_until`, `last_login_at`, `created_at`, `updated_at`) are PG
+ * `timestamp` → parsed to a local Date by kysely.ts, and are written with
+ * `now() AT TIME ZONE 'UTC'` so they stay on a UTC wall-clock.
  */
 import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';

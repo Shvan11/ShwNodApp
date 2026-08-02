@@ -1,11 +1,9 @@
 /**
- * Database queries for tbloptions table operations
- * Manages system settings and preferences
+ * Database queries for the `options` table — system settings and preferences.
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). This was a facade
- * bypasser (`withTransaction` + `new sql.Request(tx)`); the bulk path now runs on a
- * Kysely transaction via `withPgTransaction`. `option_name` is `citext`, so the LIKE
- * pattern match stays case-insensitive (matches the old Arabic_CI_AS column).
+ * The bulk-update path runs on a Kysely transaction via `withPgTransaction` so a
+ * failed row rolls the whole batch back. `option_name` is `citext`, so the LIKE
+ * pattern match is case-insensitive.
  */
 import { getKysely, withPgTransaction } from '../kysely.js';
 import { log } from '../../../utils/logger.js';

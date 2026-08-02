@@ -1,7 +1,7 @@
 /**
  * Calendar queries (PostgreSQL / Kysely `sql` tag).
  *
- * Phase 5 reimplementation of the calendar stored procs: ProcWeeklyCalendarOptimized,
+ * Calendar slot reads. Reimplemented in TS from the original procs:
  * ProcCalendarStatsOptimized, ProcDay, ProcEnsureCalendarRange and FillCalender (whose VFillCal /
  * CalStep1 / CalStep2 view chain is inlined). Consumed by routes/calendar.ts.
  *

@@ -4,11 +4,11 @@
  * Provides CRUD operations for managing estimated cost preset values
  * that are displayed in dropdowns for faster data entry.
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). `amount` is a PG
- * `numeric`; the centralized pg parser (kysely.ts) returns it as a JS number, so
- * `$castTo<number>()` aligns the static type (kysely-codegen types numeric as string)
- * with the runtime value without emitting a SQL cast.
+ * `amount` is a PG `numeric`; the centralized pg parser (kysely.ts) returns it as a JS
+ * number, so `$castTo<number>()` aligns the static type (kysely-codegen types numeric
+ * as string) with the runtime value without emitting a SQL cast.
  */
+import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
 
 // type definitions
@@ -29,13 +29,26 @@ export async function getCostPresets(currency: string | null = null): Promise<Co
   const db = getKysely();
   let q = db
     .selectFrom('estimated_cost_presets')
-    .select((eb) => ['preset_id', eb.ref('amount').$castTo<number>().as('amount'), 'currency', 'display_order']);
+    // `currency` is free-text citext in the DB but a closed 3-value vocabulary in the
+    // app (the write path validates `z.enum(['IQD','USD','EUR'])`, and the read contract
+    // declares the same enum). Restricting the SELECT to those three makes the narrowed
+    // static type a GUARANTEE rather than an assertion, and keeps a stray legacy row
+    // from fail-loud-ing the client's contract parse.
+    .where('currency', 'in', ['IQD', 'USD', 'EUR'])
+    .select((eb) => [
+      'preset_id',
+      eb.ref('amount').$castTo<number>().as('amount'),
+      eb.ref('currency').$castTo<'IQD' | 'USD' | 'EUR'>().as('currency'),
+      // display_order is nullable in the schema; the contract and the consumer's sort
+      // both require a number, so default it in SQL (matches the handler's 0 default).
+      eb.fn.coalesce('display_order', sql<number>`0`).as('display_order'),
+    ]);
 
   q = currency
     ? q.where('currency', '=', currency).orderBy('display_order').orderBy('amount')
     : q.orderBy('currency').orderBy('display_order').orderBy('amount');
 
-  return q.execute() as Promise<CostPreset[]>;
+  return q.execute();
 }
 
 /**

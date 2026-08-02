@@ -1,16 +1,14 @@
 /**
  * Visit and wire-related database queries (PostgreSQL / Kysely).
  *
- * Phase 5: the six stored-proc-backed functions (ProVisitSum / ProlatestVisitSum / proAddVisit /
- * proGetVisitSum / proGetLatestWire) are reimplemented as typed Kysely queries — the HTML visit
- * "Summary" the procs concatenated is now built in TS (`buildVisitSummary`). The three SQL Server
- * triggers on `tblvisits` (PhotoInsert / MyTrigger / PhotoDelete) maintained the parent
- * `tblwork`'s i_photo_date / f_photo_date / debond_date / status from a visit's photo flags; PG has no
- * triggers, so that logic is folded into every visit write path here (`applyPhoto*`), each wrapped
- * in one transaction so the visit row and the work roll-up commit atomically — matching the
- * original AFTER-trigger semantics.
+ * The HTML visit "Summary" is built in TS (`buildVisitSummary`), not concatenated in SQL.
+ *
+ * A visit's photo flags drive the parent work's i_photo_date / f_photo_date / debond_date /
+ * status roll-up. There are no DB triggers for app logic, so that lives in every visit write
+ * path here (`applyPhoto*`), each wrapped in one transaction so the visit row and the work
+ * roll-up commit atomically.
  */
-import type { Transaction } from 'kysely';
+import { type Transaction } from 'kysely';
 import { getKysely, withPgTransaction, type Database } from '../kysely.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { getActiveWID } from './patient-queries.js';
@@ -251,11 +249,11 @@ export async function getVisitsSummary(PID: number): Promise<VisitSummary[]> {
     work_id: r.work_id,
     id: r.id,
     visit_date: r.visit_date, // PG `date` → 'YYYY-MM-DD' string
-    opg: r.opg ?? false,
-    i_photo: r.i_photo ?? false,
-    f_photo: r.f_photo ?? false,
-    p_photo: r.p_photo ?? false,
-    appliance_removed: r.appliance_removed ?? false,
+    opg: r.opg,
+    i_photo: r.i_photo,
+    f_photo: r.f_photo,
+    p_photo: r.p_photo,
+    appliance_removed: r.appliance_removed,
     Summary: buildVisitSummary(r),
   }));
 }
@@ -350,9 +348,9 @@ export async function deleteVisit(VID: number): Promise<{ success: boolean }> {
     await trx.deleteFrom('visits').where('id', '=', VID).execute();
     if (existing) {
       await applyPhotoDelete(trx, existing.work_id, {
-        i_photo: existing.i_photo ?? false,
-        f_photo: existing.f_photo ?? false,
-        appliance_removed: existing.appliance_removed ?? false,
+        i_photo: existing.i_photo,
+        f_photo: existing.f_photo,
+        appliance_removed: existing.appliance_removed,
       });
     }
   });
@@ -367,7 +365,7 @@ export function getWires(): Promise<wire[]> {
     .selectFrom('wires')
     .select(['wire_id as id', 'wire as name'])
     .orderBy('wire')
-    .execute() as Promise<wire[]>;
+    .execute();
 }
 
 /**
@@ -406,12 +404,19 @@ export async function getVisitsByWorkId(workId: number): Promise<Visit[]> {
     .where('v.work_id', '=', workId)
     .orderBy('v.visit_date')
     .select([
-      'v.id', 'v.work_id', 'v.visit_date', 'v.bracket_change', 'v.wire_bending', 'v.opg',
-      'v.others', 'v.next_visit', 'v.elastics', 'v.upper_wire_id', 'v.lower_wire_id', 'v.p_photo',
-      'v.i_photo', 'v.f_photo', 'v.appliance_removed', 'v.operator_id',
+      'v.id', 'v.work_id', 'v.visit_date', 'v.bracket_change', 'v.wire_bending',
+      'v.others', 'v.next_visit', 'v.elastics', 'v.upper_wire_id', 'v.lower_wire_id',
+      'v.operator_id',
+      // The five photo/appliance flags are `NOT NULL DEFAULT false` as of
+      // migrations/pg/1785700253568 — the DB is the guarantee that visit.contract.ts
+      // #visitRow's plain booleans hold, so these are selected raw. (They previously
+      // carried a `coalesce(…, false)` because the columns were nullable; a NULL now
+      // cannot exist, and if one somehow did it SHOULD throw at the contract rather
+      // than render as an unchecked box.)
+      'v.opg', 'v.p_photo', 'v.i_photo', 'v.f_photo', 'v.appliance_removed',
       'uw.wire as UpperWireName', 'lw.wire as LowerWireName', 'e.employee_name as OperatorName',
     ])
-    .execute() as Promise<Visit[]>;
+    .execute();
 }
 
 /**
@@ -425,13 +430,15 @@ export async function getVisitById(visitId: number): Promise<Visit | null> {
     .leftJoin('employees as e', 'e.id', 'v.operator_id')
     .where('v.id', '=', visitId)
     .select([
-      'v.id', 'v.work_id', 'v.visit_date', 'v.bracket_change', 'v.wire_bending', 'v.opg',
-      'v.others', 'v.next_visit', 'v.elastics', 'v.upper_wire_id', 'v.lower_wire_id', 'v.p_photo',
-      'v.i_photo', 'v.f_photo', 'v.appliance_removed', 'v.operator_id',
+      'v.id', 'v.work_id', 'v.visit_date', 'v.bracket_change', 'v.wire_bending',
+      'v.others', 'v.next_visit', 'v.elastics', 'v.upper_wire_id', 'v.lower_wire_id',
+      'v.operator_id',
+      // NOT NULL DEFAULT false in the schema — see the note in getVisitsByWorkId above.
+      'v.opg', 'v.p_photo', 'v.i_photo', 'v.f_photo', 'v.appliance_removed',
       'uw.wire as UpperWireName', 'lw.wire as LowerWireName', 'e.employee_name as OperatorName',
     ])
     .executeTakeFirst();
-  return (row as Visit | undefined) ?? null;
+  return row ?? null;
 }
 
 /**
@@ -439,6 +446,10 @@ export async function getVisitById(visitId: number): Promise<Visit | null> {
  */
 export async function addVisitByWorkId(visitData: VisitData): Promise<{ id: number } | null> {
   const visitDate = toDateOnly(visitData.visit_date);
+  // The `?? false` below defaults REQUEST-BODY input, not a nullable column — the five
+  // flags are `.optional()` in visit.contract.ts#visitFields and NewVisitComponent omits
+  // an untouched checkbox. Keep them even though the columns are now NOT NULL: this is
+  // the untrusted boundary, and dropping them would insert `undefined`.
   const flags: PhotoFlags = {
     i_photo: visitData.i_photo ?? false,
     f_photo: visitData.f_photo ?? false,
@@ -513,9 +524,9 @@ export async function updateVisitByWorkId(
       .execute();
     if (existing) {
       await applyPhotoUpdate(trx, existing.work_id, visitDate, {
-        i_photo: existing.i_photo ?? false,
-        f_photo: existing.f_photo ?? false,
-        appliance_removed: existing.appliance_removed ?? false,
+        i_photo: existing.i_photo,
+        f_photo: existing.f_photo,
+        appliance_removed: existing.appliance_removed,
       }, newF);
     }
   });

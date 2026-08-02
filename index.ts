@@ -98,14 +98,6 @@ interface WhatsAppStatus {
 }
 
 /**
- * Database test result
- */
-interface DbTestResult {
-  success: boolean;
-  error?: string;
-}
-
-/**
  * Application initialization result
  */
 interface AppInitResult {
@@ -146,7 +138,7 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     // ===== ADDED: Test database connectivity with retry logic =====
     log.info('📊 Testing database connectivity...');
-    const dbTest = await testConnectionWithRetry() as DbTestResult;
+    const dbTest = await testConnectionWithRetry();
     if (!dbTest.success) {
       log.error('❌ Database connection failed after retries:', { error: dbTest.error });
       log.info('💡 Please check your database configuration and ensure the server is running');
@@ -927,7 +919,7 @@ async function initializeWhatsAppOnStartup(): Promise<void> {
 function startBackgroundDatabaseRetry(): void {
   const retryInterval = setInterval(async () => {
     try {
-      const dbTest = await testConnection() as DbTestResult;
+      const dbTest = await testConnection();
       if (dbTest.success) {
         log.info('✅ Database connection restored!');
         clearInterval(retryInterval);

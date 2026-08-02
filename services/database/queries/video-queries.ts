@@ -3,12 +3,9 @@
  *
  * Database queries for educational video management.
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). The dbo.V_Videos
- * view does not exist in the PG schema (views are recreated in Phase 5), so its
- * logic is inlined here: the `VideosPath` option (tbloptions) is concatenated with
- * `file_name`/`video_extension` to build the `Video` and `Image` URLs, mirroring the
- * original `CTE.Path + file_name + '.' + video_extension` / `+ '.jpg'` view. CRUD
- * still targets the tblvideos table.
+ * There is no videos view in the PG schema, so the URL assembly is inlined here: the
+ * `VideosPath` row from `options` is concatenated with `file_name`/`video_extension` to
+ * build the `Video` and `Image` URLs. CRUD targets the `videos` table.
  */
 import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
@@ -23,15 +20,6 @@ export type Video = {
   category: number | null;
   details: string | null;
 };
-
-export interface VideoRecord {
-  id: number;
-  description: string;
-  category: number | null;
-  details: string | null;
-  file_name: string | null;
-  video_extension: string | null;
-}
 
 interface CreateVideoData {
   description: string;
@@ -118,26 +106,7 @@ export async function getVideoById(id: number): Promise<Video | null> {
 }
 
 /**
- * Get video record for editing (uses tblvideos table)
- */
-export async function getVideoRecord(id: number): Promise<VideoRecord | null> {
-  try {
-    const db = getKysely();
-    const row = await db
-      .selectFrom('videos')
-      .where('id', '=', id)
-      .select(['id', 'description', 'category', 'details', 'file_name', 'video_extension'])
-      .executeTakeFirst();
-
-    return row ?? null;
-  } catch (error) {
-    log.error('Error fetching video record', { id, error: (error as Error).message });
-    throw error;
-  }
-}
-
-/**
- * Get videos folder path from tbloptions
+ * Get videos folder path from the `options` table
  */
 export async function getVideosPath(): Promise<string> {
   try {
@@ -168,14 +137,16 @@ export type VideoCategory = {
 };
 
 /**
- * Get all video categories from tblVidCat
+ * Get all video categories
  */
 export async function getVideoCategories(): Promise<VideoCategory[]> {
   try {
     const db = getKysely();
     return await db
       .selectFrom('video_categories')
-      .select((eb) => ['vid_cat_id as id', eb.ref('category').$castTo<string>().as('name')])
+      // `category` is NULLable but the contract (video.contract.ts#videoCategoryRow)
+      // requires a string — guarantee it in SQL rather than asserting with $castTo.
+      .select((eb) => ['vid_cat_id as id', eb.fn.coalesce('category', sql<string>`''`).as('name')])
       .orderBy('vid_cat_id')
       .execute();
   } catch (error) {

@@ -1,15 +1,10 @@
 /**
  * Messaging queries (WhatsApp + SMS) — PostgreSQL / Kysely.
  *
- * Phase 5: every stored proc this module used (GetWhatsAppMessagesToSend, ProcSMS, ProcFetch,
- * Procgetsids, GetMessageStatusByDate, UpdateWhatsAppStatus, UpdateWhatsAppDeliveryStatus,
- * UpdateSingleMessageStatus, ProcUpdatesms1/2) is reimplemented here. The Arabic/English message
- * building, relative-day logic, and phone normalisation the procs did in T-SQL now live in TS;
- * the TVP-driven bulk updates (WhatsTableType / SMSStatusType) become PG `unnest($1::int[], …)`
- * set-based updates. `getNewAppointmentMessage` (was GetNewAppointmentMessage) and
- * `resetMessagingForDate` (was ResetMessagingForDate) are added for the route callers.
- *
- * The DatabaseCircuitBreaker wrapper and public function signatures are unchanged.
+ * The Arabic/English message building, relative-day logic and phone normalisation all live
+ * in TS here rather than in the database. Bulk status updates are set-based via PG
+ * `unnest($1::int[], …)` rather than row-at-a-time. Reads/writes go through the
+ * DatabaseCircuitBreaker wrapper.
  */
 import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
@@ -209,7 +204,7 @@ class DatabaseCircuitBreaker {
 
 const dbCircuitBreaker = new DatabaseCircuitBreaker();
 
-// ── Message-building helpers (replace the T-SQL string assembly inside the procs) ──
+// ── Message-building helpers (all message assembly lives in TS, not the DB) ──
 
 const ENGLISH_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -224,7 +219,7 @@ function englishDay(value: Date | string): string {
   return ENGLISH_DAYS[parseLocalDate(value).getDay()] ?? '';
 }
 
-/** SQL `DATEDIFF(day, GETDATE(), @date)` — whole days from today (local) to the target date. */
+/** Whole days from today (local wall-clock) to the target date. */
 function daysFromToday(target: Date | string): number {
   const t = parseLocalDate(target);
   const now = new Date();

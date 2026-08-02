@@ -1,13 +1,12 @@
 /**
  * Private-photos queries
  *
- * Rows in tblPrivatePhotos mark photos that are HIDDEN from the patient
+ * Rows in `private_photos` mark photos that are HIDDEN from the patient
  * portal. Absence of a row = visible (public by default).
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). `timepoint_code` /
- * `image_name` are `citext`, so the lookups/conflict key stay case-insensitive
- * (matches the old Arabic_CI_AS columns). The T-SQL MERGE upsert became an
- * `ON CONFLICT … DO NOTHING` against the (person_id, timepoint_code, image_name) PK.
+ * `timepoint_code` / `image_name` are `citext`, so the lookups and the conflict key are
+ * case-insensitive. The upsert is `ON CONFLICT … DO NOTHING` against the
+ * (person_id, timepoint_code, image_name) PK.
  */
 import { getKysely } from '../kysely.js';
 

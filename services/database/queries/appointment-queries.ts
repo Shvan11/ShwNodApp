@@ -1,10 +1,9 @@
 /**
  * Appointment-related database queries (PostgreSQL / Kysely).
  *
- * Phase 5: the four stored procs (PTodayAppsWeb, UpdatePresent, UndoAppointmentState,
- * GetDailyAppointmentsOptimized) are reimplemented as typed Kysely queries; the T-SQL time
- * formatting + state-machine validation now live in TS. UpdatePresent keeps its row-lock
- * (SELECT … FOR UPDATE) + state-transition guards inside one transaction.
+ * Time formatting and the check-in state-machine validation live in TS, not the DB.
+ * `updatePresent` takes a row lock (SELECT … FOR UPDATE) and applies its state-transition
+ * guards inside one transaction, so two terminals can't race the same appointment.
  */
 import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
@@ -261,8 +260,8 @@ export interface AppointmentNotificationRow {
 /**
  * Insert an appointment. Returns the new appointmentID.
  *
- * Replaces the raw T-SQL inserts in AppointmentService (which used `CAST(.. AS datetime2)`,
- * `SCOPE_IDENTITY()` and `GETDATE()` — none valid in PG). The legacy AppoPatientType
+ * Owns the appointment inserts (formerly raw SQL in AppointmentService, which used `CAST(.. AS datetime2)`,
+ * `SCOPE_IDENTITY()` and `GETDATE()`). The legacy AppoPatientType
  * transition (timed appointment promotes a Consult patient to New) is GONE: patient type
  * is now derived from a patient's works by classifyPatient(), not their appointments.
  *

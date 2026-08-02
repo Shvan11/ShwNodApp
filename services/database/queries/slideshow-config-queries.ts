@@ -34,7 +34,7 @@ export async function listConfigs(personId?: number): Promise<ConfigRow[]> {
   return res.rows;
 }
 
-export async function getConfigById(id: number): Promise<ConfigRow | null> {
+async function getConfigById(id: number): Promise<ConfigRow | null> {
   const db = getKysely();
   const res = await sql<ConfigRow>`SELECT ${COLS} FROM slideshow_configs WHERE id = ${id}`.execute(db);
   return res.rows[0] ?? null;

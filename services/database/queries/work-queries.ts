@@ -1,18 +1,14 @@
 /**
  * Work-related database queries
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). Runs against the pg
- * pool regardless of DB_DRIVER — the positional `ColumnValue[]` mappers are gone and
- * the bodies return plain objects.
- *
  * notes for this module:
- *  - Money/amount aggregates (`SUM(tblInvoice.amount_paid)`) come back from PG as a
+ *  - Money/amount aggregates (`SUM(invoices.amount_paid)`) come back from PG as a
  *    `numeric`; the centralized pg parser (kysely.ts) returns a JS number, so the
  *    aggregate is coalesced and typed `number`.
- *  - The work-table date columns `start_date`/`debond_date`/`f_photo_date`/`i_photo_date`/
- *    `notes_date`/`discount_date` (and `tblWorkItems.start_date`/`completed_date`) are PG
- *    `date` columns, so the parser yields `'YYYY-MM-DD'` strings at runtime (mssql
- *    returned `Date`). `addition_date` is a `timestamp`, typed honestly as `Date | null`
+ *  - The `works` date columns `start_date`/`debond_date`/`f_photo_date`/`i_photo_date`/
+ *    `notes_date`/`discount_date` (and `work_items.start_date`/`completed_date`) are PG
+ *    `date` columns, so the parser yields `'YYYY-MM-DD'` strings at runtime.
+ *    `addition_date` is a `timestamp`, typed honestly as `Date | null`
  *    on the `Work` interface; consumers that cross the HTTP boundary truncate it to a
  *    local `YYYY-MM-DD` string via `toDateOnly` at the DTO (see `toExistingWorkInfo` in
  *    WorkService) so the wire never carries a UTC-shifted ISO timestamp.
@@ -197,9 +193,11 @@ type work_type = {
   work_type: string;
 };
 
+// `keywords.key_word` is nullable in the schema and work.contract.ts#getWorkKeywords
+// models it nullable (the dropdown renders it directly).
 type Keyword = {
   id: number;
-  key_word: string;
+  key_word: string | null;
 };
 
 type tooth_number = {
@@ -333,7 +331,7 @@ export async function getWorksByPatient(personId: number): Promise<Work[]> {
     ])
     // NULLS LAST so undated (legacy) works sort to the bottom, matching SQL Server.
     .orderBy('w.addition_date', sql`desc nulls last`)
-    .execute() as Promise<Work[]>;
+    .execute();
 }
 
 export async function getWorkDetails(workId: number): Promise<WorkDetails | null> {
@@ -806,7 +804,7 @@ async function insertFullPaymentInvoice(
  * that once, after all of its works writes. status is hard-coded to 2 (Finished),
  * matching the original VALUES list.
  */
-export async function insertWorkWithInvoice(
+async function insertWorkWithInvoice(
   trx: Kysely<Database>,
   workData: WorkData
 ): Promise<{ workId: number; invoiceId: number }> {
@@ -1023,7 +1021,7 @@ export async function getWorkTypes(): Promise<work_type[]> {
     .selectFrom('work_types')
     .select(['id', 'work_type'])
     .orderBy('work_type')
-    .execute() as Promise<work_type[]>;
+    .execute();
 }
 
 export async function getWorkKeywords(): Promise<Keyword[]> {
@@ -1032,7 +1030,7 @@ export async function getWorkKeywords(): Promise<Keyword[]> {
     .selectFrom('keywords')
     .select(['id', 'key_word'])
     .orderBy('key_word')
-    .execute() as Promise<Keyword[]>;
+    .execute();
 }
 
 // ===== TOOTH NUMBER FUNCTIONS =====
@@ -1045,9 +1043,22 @@ export async function getToothNumbers(
   // quadrant / tooth_number are text columns ('UR'…'LL', '11'…); select them as
   // their real (string) types — the historical `$castTo<number>()` was a type-level
   // fiction (the runtime values are strings) that forced an `as unknown` at the read.
+  //
+  // `quadrant` is free-text in the schema but a closed 4-value vocabulary in the app
+  // (work.contract.ts#teeth declares the enum, and the table holds exactly UR/UL/LR/LL).
+  // Restricting the SELECT makes the narrowed type a guarantee rather than an assertion.
   let q = db
     .selectFrom('tooth_numbers')
-    .select(['id', 'tooth_code', 'tooth_name', 'quadrant', 'tooth_number', 'is_permanent', 'sort_order']);
+    .where('quadrant', 'in', ['UR', 'UL', 'LR', 'LL'])
+    .select((eb) => [
+      'id',
+      'tooth_code',
+      'tooth_name',
+      eb.ref('quadrant').$castTo<'UR' | 'UL' | 'LR' | 'LL'>().as('quadrant'),
+      'tooth_number',
+      'is_permanent',
+      'sort_order',
+    ]);
 
   if (includePermanent && !includeDeciduous) {
     q = q.where('is_permanent', '=', true);
@@ -1055,7 +1066,7 @@ export async function getToothNumbers(
     q = q.where('is_permanent', '=', false);
   }
 
-  return q.orderBy('sort_order').execute() as Promise<tooth_number[]>;
+  return q.orderBy('sort_order').execute();
 }
 
 /**
@@ -1067,7 +1078,7 @@ export async function getToothNumbers(
  * caller's transaction is supplied (`executor`) we reuse it so the item write and the
  * teeth write commit together; otherwise we open our own transaction for the pair.
  */
-export async function setWorkItemTeeth(
+async function setWorkItemTeeth(
   workItemId: number,
   teethIds: number[],
   executor?: Kysely<Database>
@@ -1104,7 +1115,7 @@ export async function getImplantManufacturers(): Promise<ImplantManufacturer[]> 
     .selectFrom('implant_manufacturers')
     .select(['id as id', 'manufacturer_name as name'])
     .orderBy('manufacturer_name')
-    .execute() as Promise<ImplantManufacturer[]>;
+    .execute();
 }
 
 /**
@@ -1120,7 +1131,7 @@ export async function getLabs(): Promise<Lab[]> {
     .select(['id', 'lab_name as name'])
     .where('is_active', '=', true)
     .orderBy('lab_name')
-    .execute() as Promise<Lab[]>;
+    .execute();
 }
 
 // ===== WORK TRANSFER FUNCTIONS =====

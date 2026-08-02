@@ -4,11 +4,9 @@
  * Database queries for holiday management and validation.
  * Used by appointment validation and calendar display.
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). `holiday_date` is a PG
- * `date`, so the centralized pg parser (kysely.ts) returns it as a 'YYYY-MM-DD' string
- * — consumers already handle the string form (calendar.ts, AppointmentService via
- * toDateOnly). The mssql-only `created_at` column does not exist in the PG schema
- * (dropped in Phase 2), so `getAllHolidays` no longer returns it.
+ * `holiday_date` is a PG `date`, and `db:codegen` runs with `--date-parser string`, so
+ * both the generated type and the runtime value (see the pg parser in kysely.ts) are a
+ * 'YYYY-MM-DD' string — bind plain strings and select the column directly, no `$castTo`.
  */
 import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
@@ -37,16 +35,8 @@ export async function isDateHoliday(date: string): Promise<Holiday | null> {
   const db = getKysely();
   const row = await db
     .selectFrom('holidays')
-    // holiday_date is a PG `date`; pass the 'YYYY-MM-DD' string as a param (PG infers the
-    // date type from the comparison). kysely-codegen types `date` as timestamp(Date), so
-    // the value is wrapped to satisfy the static type without changing the emitted SQL.
-    .where('holiday_date', '=', sql<string>`${date}`)
-    .select((eb) => [
-      'id',
-      eb.ref('holiday_date').$castTo<string>().as('holiday_date'),
-      'holiday_name',
-      'description',
-    ])
+    .where('holiday_date', '=', date)
+    .select(['id', 'holiday_date', 'holiday_name', 'description'])
     .executeTakeFirst();
 
   return row ?? null;
@@ -59,45 +49,28 @@ export async function getHolidaysInRange(startDate: string, endDate: string): Pr
   const db = getKysely();
   return db
     .selectFrom('holidays')
-    .where('holiday_date', '>=', sql<string>`${startDate}`)
-    .where('holiday_date', '<=', sql<string>`${endDate}`)
+    .where('holiday_date', '>=', startDate)
+    .where('holiday_date', '<=', endDate)
     .orderBy('holiday_date')
-    .select((eb) => [
-      'id',
-      eb.ref('holiday_date').$castTo<string>().as('holiday_date'),
-      'holiday_name',
-      'description',
-    ])
+    .select(['id', 'holiday_date', 'holiday_name', 'description'])
     .execute();
 }
 
 /**
  * Get appointments on a specific date (for warning when adding holiday)
+ *
+ * Filters on the `app_day` generated column (`(app_date)::date`, indexed by `ix_appday`)
+ * rather than `cast(app_date as date)` — an expression predicate on `app_date` is
+ * non-sargable and seq-scans a table designed to reach ~2M rows. Same pattern as
+ * appointment-queries / messaging-queries.
  */
 export async function getAppointmentsOnDate(date: string): Promise<AppointmentOnDate[]> {
   const db = getKysely();
   return db
     .selectFrom('appointments as a')
     .innerJoin('patients as p', 'p.person_id', 'a.person_id')
-    .where(sql<boolean>`cast(${sql.ref('a.app_date')} as date) = ${date}`)
+    .where('a.app_day', '=', sql<string>`${date}::date`)
     .orderBy('a.app_date')
     .select(['a.appointment_id', 'a.person_id', 'a.app_date', 'a.app_detail', 'p.patient_name', 'p.phone'])
-    .execute();
-}
-
-/**
- * Get all holidays (for admin/listing purposes)
- */
-export async function getAllHolidays(): Promise<Holiday[]> {
-  const db = getKysely();
-  return db
-    .selectFrom('holidays')
-    .orderBy('holiday_date', 'desc')
-    .select((eb) => [
-      'id',
-      eb.ref('holiday_date').$castTo<string>().as('holiday_date'),
-      'holiday_name',
-      'description',
-    ])
     .execute();
 }

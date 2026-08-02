@@ -1,19 +1,17 @@
 /**
  * Patient-related database queries
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). This was a facade
- * bypasser (`withTransaction` + `new sql.Request(tx)`); the delete-cascade now runs on
- * a Kysely transaction via `withPgTransaction`. The `V_rptNoWork` → `VLastApp` view
- * chain (not yet recreated in PG — views are Phase 5) is inlined here as a correlated
- * "latest future appointment" subquery. `patient_name`/`currency`/`country_code` are
- * `citext`, so the duplicate-name check stays case-insensitive (matches Arabic_CI_AS).
+ * The delete-cascade runs on a Kysely transaction via `withPgTransaction`. The
+ * no-work receipt read inlines its "latest future appointment" lookup as a correlated
+ * subquery (there is no DB view behind it). `patient_name`/`currency`/`country_code`
+ * are `citext`, so the duplicate-name check is case-insensitive.
+ *
+ * On-disk patient assets (X-rays, `assets/`) are NOT read here — see
+ * services/files/patient-assets.service.ts, which `getInfos` composes with its row read.
  */
 import { sql, type Kysely } from 'kysely';
-import fs from 'fs/promises';
-import { createReadStream } from 'fs';
-import * as readline from 'node:readline';
 import { getKysely, withPgTransaction, type Database } from '../kysely.js';
-import { patientPath } from '../../files/clinic-paths.js';
+import { getPatientAssets, type PatientAssets } from '../../files/patient-assets.service.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 import { isUniqueViolation } from '../../../utils/pg-errors.js';
@@ -62,18 +60,6 @@ interface ActiveAlert {
   alertSeverity: number;
 }
 
-interface PatientAssets {
-  xrays: XrayInfo[];
-  assets: string[];
-}
-
-interface XrayInfo {
-  name: string;
-  detailsDirName?: string;
-  previewImagePartialPath?: string;
-  date?: string | null;
-}
-
 type PatientPhone = {
   id: number;
   name: string;
@@ -107,7 +93,17 @@ interface CreatePatientResult {
 // `type` (not `interface`) so a LookupItem[] is assignable to the lookup
 // contract's `z.array(z.looseObject({ id }))` sendData arg — see the index-
 // signature rule in docs/shared-contract-progress.md.
+//
+// `name` is the NULLABLE display column of a reference table (referrals.referral,
+// patient_types.patient_type, addresses.zone) — mirrors lookup.contract.ts#idNameRow,
+// which models it nullable for exactly these three feeds.
 type LookupItem = {
+  id: number;
+  name: string | null;
+};
+
+/** Lookup row whose display name always exists (mirrors lookup.contract.ts#idNameRowNN). */
+type LookupItemNN = {
   id: number;
   name: string;
 };
@@ -170,18 +166,6 @@ interface DuplicatePatientError extends Error {
 }
 
 /**
- * Helper function to check if a path exists
- */
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await fs.access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Retrieves patient information for a given patient id.
  * Returns full patient details with all related lookup values.
  */
@@ -226,8 +210,10 @@ export async function getInfos(PID: number): Promise<(PatientInfo & PatientAsset
       'p.phone',
       'p.phone2',
       'p.email',
-      // date_of_birth is a PG `date` → the parser already returns 'YYYY-MM-DD' (was CONVERT(...,23)).
-      eb.ref('p.date_of_birth').$castTo<string>().as('DateOfBirth'),
+      // date_of_birth is a PG `date` → codegen types it `string | null` and the parser
+      // returns 'YYYY-MM-DD'. Selected as-is: it is NULL for most patients, so the old
+      // `$castTo<string>()` was narrowing away a null that genuinely occurs.
+      'p.date_of_birth as DateOfBirth',
       'p.gender',
       'a.zone as address_name',
       'r.referral as referral_source',
@@ -258,7 +244,7 @@ export async function getInfos(PID: number): Promise<(PatientInfo & PatientAsset
     ])
     .executeTakeFirst();
 
-  const [row, assets] = await Promise.all([rowPromise, getAssets(PID)]);
+  const [row, assets] = await Promise.all([rowPromise, getPatientAssets(PID)]);
 
   // No patient row = not found. Returning a stub here would defeat the caller's
   // not-found guard (assets always has keys), ending in a contract-parse 500.
@@ -306,120 +292,13 @@ export async function getInfos(PID: number): Promise<(PatientInfo & PatientAsset
 }
 
 /**
- * Retrieves asset information (X-rays and other assets) for a given patient id.
- */
-async function getAssets(pid: number): Promise<PatientAssets> {
-  const xrayDir = patientPath(pid, 'OPG');
-  const assetsDir = patientPath(pid, 'assets');
-
-  const xrays = (await pathExists(xrayDir)) ? await getXrays(xrayDir, pid) : [];
-
-  const assets = (await pathExists(assetsDir)) ? await fs.readdir(assetsDir) : [];
-
-  return { xrays, assets };
-}
-
-/**
- * Retrieves X-ray information for a given directory.
- */
-async function getXrays(
-  xrayDir: string,
-  pid: number
-): Promise<XrayInfo[]> {
-  const allFiles = await fs.readdir(xrayDir);
-  const xrayNames = allFiles.filter(
-    (xrayName) =>
-      xrayName.endsWith('.dcm') ||
-      xrayName.endsWith('.pano') ||
-      xrayName.endsWith('.ceph') ||
-      xrayName.endsWith('.rvg') ||
-      xrayName.startsWith('TASK_')
-  );
-
-  // The details dir is the same for every xray of this patient, so read it ONCE
-  // up front rather than re-running pathExists + readdir inside the per-file map.
-  const parentDetailsDirPath = patientPath(pid, 'OPG/.csi_data/.version_4.4');
-  const detailsSubDirs = (await pathExists(parentDetailsDirPath))
-    ? await fs.readdir(parentDetailsDirPath)
-    : [];
-
-  const xrays = await Promise.all(
-    xrayNames.map(async (xrayName) => {
-      const xray: XrayInfo = { name: xrayName };
-
-      for (const subDir of detailsSubDirs) {
-        if (subDir.endsWith(xrayName)) {
-          xray.detailsDirName = subDir;
-          const previewPath = patientPath(
-            pid,
-            `OPG/.csi_data/.version_4.4/${subDir}/t.png`
-          );
-
-          if (await pathExists(previewPath)) {
-            xray.previewImagePartialPath = `/OPG/.csi_data/.version_4.4/${subDir}/t.png`;
-          }
-
-          const metaFile = patientPath(
-            pid,
-            `OPG/.csi_data/.version_4.4/${subDir}/meta`
-          );
-          xray.date = await extractDate(metaFile);
-        }
-      }
-      return xray;
-    })
-  );
-  return xrays;
-}
-
-/**
- * Extracts the date from a metadata file.
- */
-async function extractDate(metaFile: string): Promise<string | null> {
-  return new Promise((resolve, reject) => {
-    const fileStream = createReadStream(metaFile);
-    const rl = readline.createInterface({
-      input: fileStream,
-      crlfDelay: Infinity,
-    });
-
-    let dateString = '';
-    let targetLine: number | null = null;
-    let lineCount = 0;
-
-    rl.on('line', (line: string) => {
-      lineCount++;
-      if (targetLine === null && line.endsWith("'seriesDate'")) {
-        targetLine = lineCount + 2;
-      } else if (lineCount === targetLine) {
-        dateString = line.split("'")[1];
-        rl.close();
-        fileStream.close();
-        resolve(dateString);
-      }
-    });
-
-    rl.on('error', (err: Error) => {
-      log.error('Error reading file', { error: err.message });
-      reject(err);
-    });
-
-    rl.on('close', () => {
-      if (!dateString) {
-        resolve(null);
-      }
-    });
-  });
-}
-
-/**
  * Retrieves patient names and phone numbers.
  */
 export function getPatientsPhones(): Promise<PatientPhone[]> {
   return getKysely()
     .selectFrom('patients')
     .select(['person_id as id', 'patient_name as name', 'phone as phone'])
-    .execute() as Promise<PatientPhone[]>;
+    .execute();
 }
 
 /**
@@ -517,7 +396,7 @@ export function getReferralSources(): Promise<LookupItem[]> {
     .selectFrom('referrals')
     .select(['id as id', 'referral as name'])
     .orderBy('referral')
-    .execute() as Promise<LookupItem[]>;
+    .execute();
 }
 
 /**
@@ -528,7 +407,7 @@ export function getPatientTypes(): Promise<LookupItem[]> {
     .selectFrom('patient_types')
     .select(['id as id', 'patient_type as name'])
     .orderBy('patient_type')
-    .execute() as Promise<LookupItem[]>;
+    .execute();
 }
 
 /**
@@ -539,13 +418,13 @@ export function getAddresses(): Promise<LookupItem[]> {
     .selectFrom('addresses')
     .select(['id as id', 'zone as name'])
     .orderBy('zone')
-    .execute() as Promise<LookupItem[]>;
+    .execute();
 }
 
 /**
  * Retrieves all genders for dropdown lists.
  */
-export function getGenders(): Promise<LookupItem[]> {
+export function getGenders(): Promise<LookupItemNN[]> {
   // genders lookup dissolved — return the fixed Male/Female domain (was a DB table read).
   return Promise.resolve(
     Object.entries(GENDER_LABELS).map(([id, name]) => ({ id: Number(id), name }))

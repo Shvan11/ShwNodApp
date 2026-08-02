@@ -1,16 +1,13 @@
 /**
  * Payment-related database queries
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). Money columns on
- * tblInvoice (amount_paid, usd_received, iqd_received, change) are PG
+ * Money columns on `invoices` (amount_paid, usd_received, iqd_received, change) are PG
  * `integer`, so they map straight to JS numbers (no numeric cast needed). The date-only
  * columns (date_of_payment, start_date) are PG `date`, which the centralized pg parser
  * (kysely.ts) returns as a 'YYYY-MM-DD' string; the generated `Database` type already
  * types them `string`, so they're projected as-is and the declared return types are
- * `string` (no `$castTo` needed).
- * The IF EXISTS…UPDATE…ELSE INSERT exchange-rate upserts became ON CONFLICT against
- * the new uq_sms_date unique index. tblsms.date is PG `date`, so date params
- * are wrapped as `sql<string>` to satisfy the static type without changing emitted SQL.
+ * `string` (no `$castTo` needed). The exchange-rate upserts use ON CONFLICT against the
+ * `uq_sms_date` unique index.
  */
 import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
@@ -64,7 +61,7 @@ export function getPayments(PID: number): Promise<Payment[]> {
       'i.amount_paid as Payment',
       'i.date_of_payment as Date',
     ])
-    .execute() as Promise<Payment[]>;
+    .execute();
 }
 
 /**
@@ -276,7 +273,7 @@ export function listExchangeRates(
       eb.ref('date').$castTo<string>().as('date'),
       eb.ref('exchange_rate').$castTo<number>().as('exchangeRate'),
     ])
-    .execute() as Promise<{ date: string; exchangeRate: number }[]>;
+    .execute();
 }
 
 /**
@@ -295,7 +292,7 @@ export function getPaymentHistoryByWorkId(workId: number): Promise<PaymentRecord
       'date_of_payment',
       'change',
     ])
-    .execute() as Promise<PaymentRecord[]>;
+    .execute();
 }
 
 /** Delete a single invoice by primary key. Returns the number of rows deleted (0 or 1). */

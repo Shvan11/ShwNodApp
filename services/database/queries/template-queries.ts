@@ -2,18 +2,19 @@
  * Document Template System - Database Queries
  * Handles all database operations for document templates, elements, and data fields
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). The positional
- * `ColumnValue` mappers are gone — selects return plain objects. `is_active`/
- * `is_default`/`is_system`/`show_grid` are PG `boolean` columns now, so filters/
- * inserts use JS booleans (was mssql bit 1/0). `created_date`/`updated_at` are PG
- * `timestamp`, parsed to local-wall-clock `Date` by the centralized kysely.ts parser.
- * `updateTemplate`'s dynamic partial SET clause is built with `eb`/`set()` from the
- * provided fields; `updated_at` is maintained by the trg_set_updated_at DB trigger.
+ * `is_active`/`is_default`/`is_system`/`show_grid` are PG `boolean` columns, so filters
+ * and inserts use JS booleans. `created_date`/`updated_at` are PG `timestamp`, parsed to
+ * a local-wall-clock `Date` by the centralized kysely.ts parser. `updateTemplate`'s
+ * dynamic partial SET clause is built from only the provided fields; `updated_at` is
+ * maintained by the `trg_set_updated_at` DB trigger.
  */
 import type { UpdateObject } from 'kysely';
 import { getKysely, type Database } from '../kysely.js';
 
 // type definitions
+// Nullability mirrors template.contract.ts#documentTypeRow, which is itself derived
+// from the live column definitions — these were previously non-null here and papered
+// over with an `as Promise<DocumentType[]>` cast at the query.
 interface DocumentType {
   type_id: number;
   type_code: string;
@@ -23,8 +24,8 @@ interface DocumentType {
   default_paper_width: number | null;
   default_paper_height: number | null;
   default_orientation: string | null;
-  is_active: boolean;
-  sort_order: number;
+  is_active: boolean | null;
+  sort_order: number | null;
 }
 
 interface DocumentTemplate {
@@ -37,21 +38,21 @@ interface DocumentTemplate {
   document_type_icon?: string | null;
   paper_width: number;
   paper_height: number;
-  paper_orientation: string;
-  paper_margin_top: number;
-  paper_margin_right: number;
-  paper_margin_bottom: number;
-  paper_margin_left: number;
-  background_color: string;
-  show_grid: boolean;
-  grid_size: number;
-  is_default: boolean;
-  is_active: boolean;
-  is_system: boolean;
-  template_version?: number;
+  paper_orientation: string | null;
+  paper_margin_top: number | null;
+  paper_margin_right: number | null;
+  paper_margin_bottom: number | null;
+  paper_margin_left: number | null;
+  background_color: string | null;
+  show_grid: boolean | null;
+  grid_size: number | null;
+  is_default: boolean | null;
+  is_active: boolean | null;
+  is_system: boolean | null;
+  template_version?: number | null;
   parent_template_id?: number | null;
-  created_by: string;
-  created_date: Date;
+  created_by: string | null;
+  created_date: Date | null;
   modified_by?: string | null;
   updated_at?: Date | null;
   last_used_date?: Date | null;
@@ -130,7 +131,7 @@ export async function getDocumentTypes(): Promise<DocumentType[]> {
     .where('is_active', '=', true)
     .orderBy('sort_order')
     .orderBy('type_name')
-    .execute() as Promise<DocumentType[]>;
+    .execute();
 }
 
 // ============================================================================
@@ -190,7 +191,7 @@ export async function getDocumentTemplates(
 
   q = q.orderBy('t.is_default', 'desc').orderBy('t.template_name');
 
-  return q.execute() as Promise<DocumentTemplate[]>;
+  return q.execute();
 }
 
 /**
@@ -233,17 +234,7 @@ export async function getTemplateById(templateId: number): Promise<DocumentTempl
     .where('t.template_id', '=', templateId)
     .executeTakeFirst();
 
-  return (row as DocumentTemplate | undefined) ?? null;
-}
-
-/**
- * Get template with all elements (deprecated - now file-based)
- */
-export async function getTemplateWithElements(
-  templateId: number
-): Promise<DocumentTemplate | null> {
-  // File-based templates don't have elements in database
-  return getTemplateById(templateId);
+  return row ?? null;
 }
 
 /**
@@ -356,47 +347,5 @@ export async function deleteTemplate(templateId: number): Promise<boolean> {
     .execute();
 
   return true;
-}
-
-/**
- * Clone a template
- */
-export async function cloneTemplate(
-  templateId: number,
-  newName: string,
-  createdBy: string
-): Promise<number> {
-  // Get original template with elements
-  const originalTemplate = await getTemplateWithElements(templateId);
-
-  if (!originalTemplate) {
-    throw new Error('Template not found');
-  }
-
-  // Create new template
-  const newTemplateData: TemplateData = {
-    template_name: newName || `${originalTemplate.template_name} (Copy)`,
-    description: originalTemplate.description,
-    document_type_id: originalTemplate.document_type_id,
-    paper_width: originalTemplate.paper_width,
-    paper_height: originalTemplate.paper_height,
-    paper_orientation: originalTemplate.paper_orientation,
-    paper_margin_top: originalTemplate.paper_margin_top,
-    paper_margin_right: originalTemplate.paper_margin_right,
-    paper_margin_bottom: originalTemplate.paper_margin_bottom,
-    paper_margin_left: originalTemplate.paper_margin_left,
-    background_color: originalTemplate.background_color,
-    show_grid: originalTemplate.show_grid,
-    grid_size: originalTemplate.grid_size,
-    is_default: false, // Never default
-    is_active: true,
-    is_system: false, // Never system
-    parent_template_id: templateId,
-    created_by: createdBy || 'system',
-  };
-
-  const newTemplateId = await createTemplate(newTemplateData);
-
-  return newTemplateId;
 }
 

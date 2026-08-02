@@ -2,10 +2,9 @@
  * PostgreSQL data-access foundation (Kysely + node-postgres) — the app's LIVE data layer.
  *
  * Owns the singleton pg connection pool and the Kysely<Database> query-builder instance.
- * Exposes getKysely() and withPgTransaction(), imported by all query modules under
- * services/database/queries/* plus the converted routes/services. The mssql facade was
- * retired in the Phase-9 cutover — services/database/index.ts is now only connection
- * diagnostics + lifecycle. DB_DRIVER defaults to 'pg' and no longer changes runtime behavior.
+ * Exposes getKysely() and withPgTransaction(), imported by every query module under
+ * services/database/queries/* plus the routes/services that talk to the DB directly.
+ * services/database/index.ts is only connection diagnostics + lifecycle.
  */
 import pg from 'pg';
 import type { Pool } from 'pg';
@@ -17,14 +16,15 @@ import { log } from '../../utils/logger.js';
 
 const { Pool: PgPool, types: pgTypes } = pg;
 
-// ── Type parsers: preserve the app's wall-clock / date-only semantics (mssql ran useUTC:false). ──
-// Centralized here so ETL (Phase 6) and runtime agree; parity-validated in Phase 7.
+// ── Type parsers: preserve the app's wall-clock / date-only semantics. ──
+// `date`/`timestamp` columns are WITHOUT time zone (single-clinic wall-clock), so these
+// parsers must never route through UTC — see the date gotchas in CLAUDE.md.
 // pg invokes a parser only for non-NULL values, so the input is always a string.
 // DATE (oid 1082) → raw 'YYYY-MM-DD' string (matches utils/date.ts#toDateOnly; avoids Date/UTC drift).
 pgTypes.setTypeParser(1082, (v: string) => v);
 // TIMESTAMP WITHOUT TIME ZONE (oid 1114) → local wall-clock Date, NOT UTC.
 pgTypes.setTypeParser(1114, (v: string) => new Date(v.replace(' ', 'T')));
-// NUMERIC / DECIMAL (oid 1700) → JS number (mssql returned numbers for decimal/money).
+// NUMERIC / DECIMAL (oid 1700) → JS number.
 pgTypes.setTypeParser(1700, (v: string) => Number.parseFloat(v));
 // BIGINT (oid 20) → JS number (ids here are well within Number.MAX_SAFE_INTEGER).
 pgTypes.setTypeParser(20, (v: string) => Number.parseInt(v, 10));
@@ -69,7 +69,7 @@ export function getKysely(): Kysely<Database> {
   return db;
 }
 
-/** Run `cb` inside one Kysely transaction (PG counterpart of the legacy facade's withTransaction). */
+/** Run `cb` inside one Kysely transaction. */
 export function withPgTransaction<T>(cb: (trx: Transaction<Database>) => Promise<T>): Promise<T> {
   return getKysely().transaction().execute(cb);
 }

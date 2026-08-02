@@ -1,11 +1,8 @@
 /**
  * Stand / Mini-Pharmacy database queries
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). This was a facade
- * BYPASSER (raw T-SQL via `executeQuery` + `new sql.Request(tx)` inside
- * `withTransaction`); all reads now run on `getKysely()` and the multi-statement
- * sale/void/restock/adjust transactions run on `withPgTransaction`. Positional
- * `ColumnValue` mappers are gone — queries return plain objects.
+ * Reads run on `getKysely()`; the multi-statement sale/void/restock/adjust flows run
+ * on `withPgTransaction` so the stock ledger can never diverge from the item rows.
  *
  * type notes:
  * - All price/cost/total/stock columns are PG `integer` → JS number (no cast).
@@ -16,8 +13,27 @@
  * - citext columns (`item_name`/`sku`/`barcode`/`movement_type`/…) make `=`/`LIKE`
  *   case-insensitive with no app churn (matches the old Arabic_CI_AS columns).
  */
-import { sql } from 'kysely';
-import { getKysely, withPgTransaction } from '../kysely.js';
+import { sql, type Kysely, type Transaction } from 'kysely';
+import { getKysely, withPgTransaction, type Database } from '../kysely.js';
+
+// ============================================================================
+// DATE-RANGE HELPERS
+// ============================================================================
+
+/**
+ * Sargable inclusive-day-range bounds for the `timestamp` columns `sale_date` /
+ * `movement_date`.
+ *
+ * `cast(col as date) BETWEEN a AND b` reads naturally but is NON-sargable: wrapping the
+ * column in an expression stops the planner using `ix_standsales_saledate` /
+ * `ix_standstockmovements_movementdate`, forcing a seq scan. The half-open equivalent
+ * `col >= a AND col < b + 1 day` is index-driven and still covers all of the end day
+ * (these are `timestamp`s, so a plain `<= b` would clip everything after midnight).
+ *
+ * Both take a 'YYYY-MM-DD' string and are used as `>=` / `<` bounds respectively.
+ */
+const dayStart = (date: string) => sql<Date>`${date}::timestamp`;
+const dayAfter = (date: string) => sql<Date>`(${date}::date + 1)::timestamp`;
 
 // ============================================================================
 // TYPES
@@ -302,7 +318,7 @@ export async function getStandItems(filters: StandItemFilters = {}): Promise<Sta
     q = q.where((eb) => eb('i.current_stock', '>', eb.ref('i.reorder_level')));
   }
 
-  return q.orderBy('i.item_name').execute() as Promise<StandItemRow[]>;
+  return q.orderBy('i.item_name').execute();
 }
 
 export async function getStandItemById(id: number): Promise<StandItemRow | null> {
@@ -328,44 +344,57 @@ export async function getStandItemByBarcode(barcode: string): Promise<StandItemR
   return (row as StandItemRow | undefined) ?? null;
 }
 
+/**
+ * Create an item and, when it starts with stock on hand, its opening ledger row.
+ *
+ * Both writes run in ONE transaction: the item row carries `current_stock`, and the
+ * `initial` movement is the ledger entry explaining it. Committing the item without the
+ * movement (the previous behaviour — the movement ran on its own pool connection) leaves
+ * stock that no ledger row accounts for, which every stock report then mis-reconciles.
+ */
 export async function addStandItem(data: StandItemCreateData): Promise<{ item_id: number }> {
   const initialStock = data.currentStock ?? 0;
 
-  const row = await getKysely()
-    .insertInto('stand_items')
-    .values({
-      item_name: data.itemName,
-      sku: data.sku || null,
-      barcode: data.barcode || null,
-      category_id: data.categoryId || null,
-      cost_price: data.costPrice,
-      sell_price: data.sellPrice,
-      current_stock: initialStock,
-      reorder_level: data.reorderLevel ?? 1,
-      expiry_date: data.expiryDate || null,
-      unit: data.unit || null,
-      notes: data.notes || null,
-      created_by: data.createdBy || null,
-    })
-    .returning('item_id')
-    .executeTakeFirstOrThrow();
+  return withPgTransaction(async (trx) => {
+    const row = await trx
+      .insertInto('stand_items')
+      .values({
+        item_name: data.itemName,
+        sku: data.sku || null,
+        barcode: data.barcode || null,
+        category_id: data.categoryId || null,
+        cost_price: data.costPrice,
+        sell_price: data.sellPrice,
+        current_stock: initialStock,
+        reorder_level: data.reorderLevel ?? 1,
+        expiry_date: data.expiryDate || null,
+        unit: data.unit || null,
+        notes: data.notes || null,
+        created_by: data.createdBy || null,
+      })
+      .returning('item_id')
+      .executeTakeFirstOrThrow();
 
-  const itemId = row.item_id;
+    const itemId = row.item_id;
 
-  // Insert initial stock movement if stock > 0
-  if (initialStock > 0) {
-    await addStockMovement({
-      itemId,
-      movementType: 'initial',
-      quantity: initialStock,
-      unitCost: data.costPrice,
-      totalCost: initialStock * data.costPrice,
-      reason: 'Initial stock',
-      performedBy: data.createdBy || null,
-    });
-  }
+    // Opening ledger row — same transaction as the item it describes.
+    if (initialStock > 0) {
+      await addStockMovement(
+        {
+          itemId,
+          movementType: 'initial',
+          quantity: initialStock,
+          unitCost: data.costPrice,
+          totalCost: initialStock * data.costPrice,
+          reason: 'Initial stock',
+          performedBy: data.createdBy || null,
+        },
+        trx
+      );
+    }
 
-  return { item_id: itemId };
+    return { item_id: itemId };
+  });
 }
 
 export async function updateStandItem(id: number, data: StandItemUpdateData): Promise<void> {
@@ -409,7 +438,7 @@ export async function getLowStockItems(): Promise<StandItemRow[]> {
     .where('i.is_active', '=', true)
     .where((eb) => eb('i.current_stock', '<=', eb.ref('i.reorder_level')))
     .orderBy('i.current_stock', 'asc')
-    .execute() as Promise<StandItemRow[]>;
+    .execute();
 }
 
 export async function getExpiringItems(daysAhead: number = 30): Promise<StandItemRow[]> {
@@ -422,7 +451,7 @@ export async function getExpiringItems(daysAhead: number = 30): Promise<StandIte
     .where('i.expiry_date', '>=', sql<string>`current_date`)
     .where('i.expiry_date', '<=', sql<string>`current_date + (${daysAhead} * interval '1 day')`)
     .orderBy('i.expiry_date', 'asc')
-    .execute() as Promise<StandItemRow[]>;
+    .execute();
 }
 
 // ============================================================================
@@ -536,10 +565,10 @@ export async function getStandSales(
     ]);
 
   if (filters.startDate) {
-    q = q.where(sql`cast(${sql.ref('s.sale_date')} as date)`, '>=', sql<string>`${filters.startDate}`);
+    q = q.where('s.sale_date', '>=', dayStart(filters.startDate));
   }
   if (filters.endDate) {
-    q = q.where(sql`cast(${sql.ref('s.sale_date')} as date)`, '<=', sql<string>`${filters.endDate}`);
+    q = q.where('s.sale_date', '<', dayAfter(filters.endDate));
   }
   if (filters.cashierId) {
     q = q.where('s.cashier_id', '=', filters.cashierId);
@@ -558,7 +587,7 @@ export async function getStandSales(
     q = q.limit(limit).offset(offset);
   }
 
-  return q.execute() as Promise<(StandSaleRow & { items_summary: string })[]>;
+  return q.execute();
 }
 
 export async function getStandSaleById(id: number): Promise<(StandSaleRow & { Items: StandSaleItemRow[] }) | null> {
@@ -666,17 +695,28 @@ export async function voidStandSale(
 // STOCK OPERATIONS
 // ============================================================================
 
-export async function addStockMovement(data: {
-  itemId: number;
-  movementType: string;
-  quantity: number;
-  unitCost?: number | null;
-  totalCost?: number | null;
-  relatedSaleId?: number | null;
-  reason?: string | null;
-  performedBy?: number | null;
-}): Promise<void> {
-  await getKysely()
+/**
+ * Append one row to the stock ledger.
+ *
+ * Takes an optional executor so a caller already inside a transaction can enrol this
+ * write in it — a ledger row must commit with the item/stock change it describes, or
+ * the ledger silently diverges from `stand_items.current_stock`. Defaults to the pool
+ * for the standalone (manual-adjustment) path.
+ */
+async function addStockMovement(
+  data: {
+    itemId: number;
+    movementType: string;
+    quantity: number;
+    unitCost?: number | null;
+    totalCost?: number | null;
+    relatedSaleId?: number | null;
+    reason?: string | null;
+    performedBy?: number | null;
+  },
+  executor: Kysely<Database> | Transaction<Database> = getKysely()
+): Promise<void> {
+  await executor
     .insertInto('stand_stock_movements')
     .values({
       item_id: data.itemId,
@@ -780,10 +820,10 @@ export async function getStockMovements(
     .where('m.item_id', '=', itemId);
 
   if (filters.startDate) {
-    q = q.where(sql`cast(${sql.ref('m.movement_date')} as date)`, '>=', sql<string>`${filters.startDate}`);
+    q = q.where('m.movement_date', '>=', dayStart(filters.startDate));
   }
   if (filters.endDate) {
-    q = q.where(sql`cast(${sql.ref('m.movement_date')} as date)`, '<=', sql<string>`${filters.endDate}`);
+    q = q.where('m.movement_date', '<', dayAfter(filters.endDate));
   }
   if (filters.movementType) {
     q = q.where('m.movement_type', '=', filters.movementType);
@@ -791,7 +831,7 @@ export async function getStockMovements(
 
   q = q.orderBy('m.movement_date', 'desc').orderBy('m.movement_id', 'desc');
 
-  return q.execute() as Promise<StandMovementRow[]>;
+  return q.execute();
 }
 
 // ============================================================================
@@ -801,7 +841,8 @@ export async function getStockMovements(
 export async function getStandDashboardKPIs(): Promise<DashboardKPIs> {
   const db = getKysely();
 
-  const todayPredicate = sql<boolean>`cast("sale_date" as date) = current_date`;
+  // Half-open today range rather than `cast(sale_date as date) = current_date` — see dayStart/dayAfter.
+  const todayPredicate = sql<boolean>`"sale_date" >= current_date AND "sale_date" < current_date + 1`;
 
   const todayStats = await db
     .selectFrom('stand_sales')
@@ -863,8 +904,8 @@ export async function getStandSalesSummary(
       eb.fn.sum('total_cost').as('Cost'),
       eb.fn.sum('total_profit').as('Profit'),
     ])
-    .where(sql`cast("sale_date" as date)`, '>=', sql<string>`${startDate}`)
-    .where(sql`cast("sale_date" as date)`, '<=', sql<string>`${endDate}`)
+    .where('sale_date', '>=', dayStart(startDate))
+    .where('sale_date', '<', dayAfter(endDate))
     .where('voided_date', 'is', null)
     .groupBy(sql`to_char("sale_date", 'YYYY-MM-DD')`)
     .orderBy('sale_date')
@@ -895,8 +936,8 @@ export async function getTopSellingItems(
       eb.fn.sum('si.line_total').as('TotalRevenue'),
       eb.fn.sum(sql<number>`si."line_total" - (si."quantity" * si."unit_cost")`).as('total_profit'),
     ])
-    .where(sql`cast(${sql.ref('s.sale_date')} as date)`, '>=', sql<string>`${startDate}`)
-    .where(sql`cast(${sql.ref('s.sale_date')} as date)`, '<=', sql<string>`${endDate}`)
+    .where('s.sale_date', '>=', dayStart(startDate))
+    .where('s.sale_date', '<', dayAfter(endDate))
     .where('s.voided_date', 'is', null)
     .groupBy(['si.item_id', 'i.item_name'])
     .orderBy('TotalQuantity', 'desc')
@@ -923,8 +964,8 @@ export async function getStandPurchasesSummary(
       eb.fn.countAll().as('RestockCount'),
     ])
     .where('movement_type', '=', 'restock')
-    .where(sql`cast("movement_date" as date)`, '>=', sql<string>`${startDate}`)
-    .where(sql`cast("movement_date" as date)`, '<=', sql<string>`${endDate}`)
+    .where('movement_date', '>=', dayStart(startDate))
+    .where('movement_date', '<', dayAfter(endDate))
     .executeTakeFirstOrThrow();
 
   return {

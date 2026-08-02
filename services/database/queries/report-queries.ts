@@ -1,7 +1,7 @@
 /**
  * Financial report aggregations (PostgreSQL / Kysely `sql` tag).
  *
- * Phase 5 reimplementation of the reporting stored procs ProcGrandTotal /
+ * Reporting aggregates. Reimplemented in TS from the original procs ProcGrandTotal /
  * ProcYearlyMonthlyTotals / ProDailyInvoices. Each proc read a chain of SQL Server views
  * (VIQD / VUSD / V_EIQ / V_EI$ / VWIQD / VWUSD) that no longer exist in PG; those views are
  * inlined here as CTEs. The dual-currency cash-box ("Expected Cash") math is preserved verbatim.

@@ -9,10 +9,12 @@
  */
 import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
+import { LAB_CASE_STATUSES } from '../../../shared/contracts/lab-case.contract.js';
 import type {
   LabCaseRow,
-  LabCaseBoardRow,
+  LabCaseBoardRowInput,
   LabCaseEventRow,
+  LabCaseStatus,
   ListLabCasesQuery,
   UpdateLabCaseBody,
 } from '../../../shared/contracts/lab-case.contract.js';
@@ -20,7 +22,7 @@ import type {
 export const COLS = sql`id, work_item_id, person_id, lab_id, material, status, is_on_hold, is_rush,
   due_date, sent_at, delivered_at, remake_count, status_changed_at, note, created_at, created_by, delivered_by`;
 
-export async function getLabCaseById(id: number): Promise<LabCaseRow | null> {
+async function getLabCaseById(id: number): Promise<LabCaseRow | null> {
   const db = getKysely();
   const res = await sql<LabCaseRow>`SELECT ${COLS} FROM lab_cases WHERE id = ${id}`.execute(db);
   return res.rows[0] ?? null;
@@ -57,6 +59,7 @@ function boardQuery() {
     .leftJoin('labs as l', 'l.id', 'lc.lab_id')
     .leftJoin('work_item_teeth as wit', 'wit.work_item_id', 'wi.id')
     .leftJoin('tooth_numbers as tn', 'tn.id', 'wit.tooth_id')
+    .where('lc.status', 'in', LAB_CASE_STATUSES)
     .select((eb) => [
       'lc.id',
       'w.work_id',
@@ -70,7 +73,10 @@ function boardQuery() {
       'lc.material',
       'wi.shade_system',
       'wi.shade',
-      'lc.status',
+      // `lab_cases.status` is free text in the schema but a closed vocabulary in the app
+      // (LAB_CASE_STATUSES — validated on every write, declared as a z.enum on the read
+      // contract). The matching WHERE below makes this narrowing a guarantee, not a cast.
+      eb.ref('lc.status').$castTo<LabCaseStatus>().as('status'),
       'lc.is_on_hold',
       'lc.is_rush',
       'lc.due_date',
@@ -110,12 +116,12 @@ function boardQuery() {
     ]);
 }
 
-export async function getLabCaseBoardRow(id: number): Promise<LabCaseBoardRow | null> {
+export async function getLabCaseBoardRow(id: number): Promise<LabCaseBoardRowInput | null> {
   const row = await boardQuery().where('lc.id', '=', id).executeTakeFirst();
-  return (row as LabCaseBoardRow | undefined) ?? null;
+  return row ?? null;
 }
 
-export async function listLabCases(filters: ListLabCasesQuery): Promise<LabCaseBoardRow[]> {
+export async function listLabCases(filters: ListLabCasesQuery): Promise<LabCaseBoardRowInput[]> {
   let q = boardQuery();
 
   if (filters.status) q = q.where('lc.status', '=', filters.status);
@@ -135,7 +141,7 @@ export async function listLabCases(filters: ListLabCasesQuery): Promise<LabCaseB
   }
 
   const rows = await q.orderBy('lc.due_date', sql`asc nulls last`).orderBy('lc.status_changed_at', 'asc').execute();
-  return rows as unknown as LabCaseBoardRow[];
+  return rows;
 }
 
 export async function listLabCaseEvents(labCaseId: number): Promise<LabCaseEventRow[]> {

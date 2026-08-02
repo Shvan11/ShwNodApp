@@ -9,24 +9,16 @@
  * - Aligner patients
  * - Aligner payments
  *
- * Migration Phase 4 + 5: all functions are typed Kysely (PostgreSQL) via `getKysely()` /
- * `withPgTransaction()`. The four batch stored procedures (usp_CreateAlignerBatch /
- * usp_UpdateAlignerBatch / usp_UpdateBatchStatus / usp_DeleteAlignerBatch) are reimplemented as
- * transactional TS write paths here (`createBatch` / `updateBatch` / `updateBatchStatus` /
- * `deleteBatch`); `resequenceBatches()` ports the procs' resequencing CTEs (ordering deliberately
- * changed to the existing batch_sequence — see its doc comment).
- * `createNote` folds in trg_AlignerNotes_DoctorActivity (Doctor-note → activity flag).
+ * All write paths are transactional TS (`createBatch` / `updateBatch` / `updateBatchStatus` /
+ * `deleteBatch`); `resequenceBatches()` renumbers by the existing batch_sequence — see its doc
+ * comment. `createNote` also sets the doctor-activity flag for a Doctor-authored note.
  *
- * The batch procs only adjust `tblAlignerSets.Remaining{Upper,Lower}Aligners`, which touches none
- * of the tblAlignerSets UPDATE triggers (they fire only on days/set_cost/currency/creation_date),
- * so no extra set-trigger cascade is needed here.
+ * Batch writes adjust only `aligner_sets.remaining_{upper,lower}_aligners`. NB
+ * `remaining_*` means NOT-YET-BATCHED (consumed at batch creation) — never derive
+ * "delivered" from total − remaining; use the per-batch delivered sums.
  *
- * Two SQL Server views are inlined (no PG equivalent): `v_allsets` → `getAllAlignerSets`;
- * `vw_AlignerSetPayments` → `getAlignerSetsByWorkId` + `getAlignerSetBalance`.
- *
- * FLAG (Phase 7 parity): `createAlignerSet`/`updateAlignerSet` preserve the inline set_sequence /
- * work-total / remaining-aligner logic carried over from Phase 4 (the tblAlignerSets INSERT-trigger
- * effects); verify against the SQL Server baseline.
+ * `getAllAlignerSets`, and `getAlignerSetsByWorkId` + `getAlignerSetBalance`, assemble their
+ * joins inline — there are no DB views behind them.
  */
 import { sql, type Transaction } from 'kysely';
 import { getKysely, withPgTransaction, type Database } from '../kysely.js';
@@ -464,7 +456,7 @@ export async function deleteDoctor(drID: number): Promise<void> {
  * Get all aligner sets.
  *
  * FLAG (inlined view): the SQL Server `dbo.v_allsets` view does not exist in the PG
- * schema (views land in Phase 5). Its logic is inlined here:
+ * schema. Its logic is inlined here:
  *   - "latest batch" per set: ROW_NUMBER() OVER (PARTITION BY aligner_set_id
  *     ORDER BY active-first, batch_sequence DESC) = 1
  *   - NextDueDate: batch_expiry_date of the latest DELIVERED batch
@@ -514,7 +506,9 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
         's.aligner_dr_id as aligner_dr_id',
         's.aligner_set_id as aligner_set_id',
         's.set_sequence as set_sequence',
-        's.is_active as SetIsActive',
+        // `aligner_sets.is_active` is NULLable but aligner.contract.ts declares
+        // `SetIsActive: z.boolean()` — default in SQL so the type is guaranteed.
+        eb.fn.coalesce('s.is_active', sql<boolean>`false`).as('SetIsActive'),
         'lb.batch_sequence as batch_sequence',
         'lb.delivered_to_patient_date as delivered_to_patient_date',
         // NextDueDate: batch_expiry_date of the latest DELIVERED batch
@@ -561,7 +555,7 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
       .orderBy('p.patient_name')
       .execute();
 
-    return rows as unknown as AlignerSetFromView[];
+    return rows;
   } catch (err) {
     log.error('Failed to get all aligner sets', {
       error: err instanceof Error ? err.message : String(err),
@@ -573,7 +567,7 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
 /**
  * Get aligner sets for a specific work id.
  *
- * FLAG (inlined view): joins the `vw_AlignerSetPayments` view (absent from PG — Phase 5).
+ * Payment roll-up is joined inline — there is no DB view behind it.
  * Its TotalPaid/Balance/PaymentStatus logic is inlined as a per-set aggregate subquery.
  */
 export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSetWithDetails[]> {
@@ -785,7 +779,7 @@ export async function getAlignerSetById(setId: number): Promise<AlignerSet | nul
  * Create a new aligner set with business logic.
  * Deactivates other sets if creating an active set.
  *
- * FLAG (Phase 5 / trigger-dependent): under SQL Server, INSERT triggers on
+ * NOTE (roll-up owned here, not by the DB): under the old engine, INSERT triggers on
  * `tblAlignerSets` maintain derived state (set_sequence allocation, work-total roll-up,
  * remaining-aligner seeding). Those triggers don't exist in PG. This translation seeds
  * RemainingUpper/LowerAligners = Upper/lower_aligners_count explicitly (as the original
@@ -865,7 +859,7 @@ export async function createAlignerSet(setData: AlignerSetData): Promise<number 
 /**
  * Update an aligner set.
  *
- * FLAG (Phase 5 / trigger-dependent): writes `tblAlignerSets` directly; SQL Server
+ * NOTE (roll-up owned here, not by the DB): writes `aligner_sets` directly; the old engine
  * UPDATE triggers maintaining derived state are absent in PG. The remaining-aligner
  * delta arithmetic below is preserved verbatim from the original statement.
  */
@@ -1277,11 +1271,9 @@ export async function getBatchesBySetId(setId: number): Promise<AlignerBatch[]> 
 }
 
 /**
- * Create a new aligner batch using optimized stored procedure
- * note: manufacture_date and delivered_to_patient_date are not set during creation
- * They should be set via usp_UpdateBatchStatus (MANUFACTURE/DELIVER actions)
- *
- * Phase 5: reimplemented as a TS write path; still routes to the proc stub for now.
+ * Create a new aligner batch.
+ * note: manufacture_date and delivered_to_patient_date are NOT set at creation —
+ * they are set later via updateBatchStatus() (MANUFACTURE / DELIVER actions).
  */
 export async function createBatch(batchData: BatchData): Promise<number | null> {
   const {
@@ -1428,10 +1420,8 @@ async function resequenceBatches(trx: PgTransaction, setId: number): Promise<voi
 }
 
 /**
- * Update an aligner batch using optimized stored procedure
- * NOTE: manufacture_date and delivered_to_patient_date are managed via updateBatchStatus()
- *
- * Phase 5: reimplemented as a TS write path; still routes to the proc stub for now.
+ * Update an aligner batch.
+ * NOTE: manufacture_date and delivered_to_patient_date are managed via updateBatchStatus().
  */
 export async function updateBatch(
   batchId: number,
@@ -1574,7 +1564,7 @@ export async function updateBatch(
 
   });
 
-  // usp_UpdateAlignerBatch returned no result set → no deactivated-batch info.
+  // No result set → no deactivated-batch info.
   return null;
 }
 
@@ -1582,9 +1572,9 @@ export async function updateBatch(
  * Update batch status using consolidated stored procedure
  *
  * Actions:
- * - MANUFACTURE: Sets manufacture_date = @targetDate or GETDATE()
+ * - MANUFACTURE: Sets manufacture_date = targetDate, else the current date
  *                If @targetDate provided and already manufactured, updates date
- * - DELIVER: Sets delivered_to_patient_date = @targetDate or GETDATE()
+ * - DELIVER: Sets delivered_to_patient_date = targetDate, else the current date
  *            batch_expiry_date is auto-computed from delivered_to_patient_date + (days * AlignerCount)
  *            If batch is latest (highest batch_sequence) AND not already active:
  *            - Deactivates other batches in the set
@@ -1594,10 +1584,8 @@ export async function updateBatch(
  *
  * @param batchId - The batch id to update
  * @param action - The action to perform
- * @param targetDate - Optional date for backdating/correction. If null, uses GETDATE()
+ * @param targetDate - Optional date for backdating/correction. If null, uses the current date
  * @returns Result with operation info and activation status
- *
- * Phase 5: reimplemented as a TS write path; still routes to the proc stub for now.
  */
 export async function updateBatchStatus(
   batchId: number,
@@ -1707,9 +1695,7 @@ export async function updateBatchStatus(
 }
 
 /**
- * Delete a batch using optimized stored procedure
- *
- * Phase 5: reimplemented as a TS write path; still routes to the proc stub for now.
+ * Delete a batch (and resequence the survivors).
  */
 export async function deleteBatch(batchId: number): Promise<void> {
   await withPgTransaction(async (trx) => {
@@ -1828,7 +1814,7 @@ export async function alignerSetExists(setId: number): Promise<boolean> {
 /**
  * Create a note
  *
- * FLAG (Phase 5 / trigger-dependent): SQL Server `trg_AlignerNotes_DoctorActivity` fires
+ * NOTE (roll-up owned here, not by the DB): a doctor-activity trigger used to fire
  * on INSERT here to maintain doctor-activity flags. That trigger is absent in PG; this
  * statement is translated as the raw INSERT only.
  */
@@ -2041,7 +2027,7 @@ export async function createAlignerPayment(
 /**
  * Get aligner set balance information for validation.
  *
- * FLAG (inlined view): `vw_AlignerSetPayments` is absent from the PG schema (Phase 5);
+ * Payment roll-up is assembled inline (no DB view);
  * its set_cost / TotalPaid / Balance logic is inlined as a single aggregate query.
  */
 export async function getAlignerSetBalance(alignerSetId: number): Promise<AlignerSetBalance | null> {
@@ -2068,70 +2054,6 @@ export async function getAlignerSetBalance(alignerSetId: number): Promise<Aligne
     };
   } catch (err) {
     log.error('Failed to get aligner set balance', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    throw err;
-  }
-}
-
-// ==============================
-// LABEL GENERATION QUERIES
-// ==============================
-
-/**
- * Get a single batch by id
- */
-export async function getBatchById(batchId: number): Promise<AlignerBatch[]> {
-  try {
-    const rows = await getKysely()
-      .selectFrom('aligner_batches')
-      .where('aligner_batch_id', '=', batchId)
-      .select((eb) => [
-        'aligner_batch_id',
-        'aligner_set_id',
-        'batch_sequence',
-        'upper_aligner_count',
-        'lower_aligner_count',
-        'upper_aligner_start_sequence',
-        'upper_aligner_end_sequence',
-        'lower_aligner_start_sequence',
-        'lower_aligner_end_sequence',
-        eb.ref('creation_date').$castTo<Date>().as('creation_date'),
-        'manufacture_date',
-        'delivered_to_patient_date',
-        'days',
-        'notes',
-        'is_active',
-        'is_last',
-        'has_upper_template',
-        'has_lower_template',
-      ])
-      .execute();
-
-    return rows.map((r) => ({
-      aligner_batch_id: r.aligner_batch_id,
-      aligner_set_id: r.aligner_set_id,
-      batch_sequence: r.batch_sequence,
-      upper_aligner_count: r.upper_aligner_count,
-      lower_aligner_count: r.lower_aligner_count,
-      upper_aligner_start_sequence: r.upper_aligner_start_sequence,
-      upper_aligner_end_sequence: r.upper_aligner_end_sequence,
-      lower_aligner_start_sequence: r.lower_aligner_start_sequence,
-      lower_aligner_end_sequence: r.lower_aligner_end_sequence,
-      creation_date: r.creation_date,
-      manufacture_date: r.manufacture_date,
-      delivered_to_patient_date: r.delivered_to_patient_date,
-      days: r.days,
-      validity_period: null,
-      batch_expiry_date: null,
-      notes: r.notes,
-      is_active: !!r.is_active,
-      is_last: r.is_last,
-      has_upper_template: r.has_upper_template,
-      has_lower_template: r.has_lower_template,
-    }));
-  } catch (err) {
-    log.error('Failed to get batch by id', {
       error: err instanceof Error ? err.message : String(err),
     });
     throw err;
@@ -2178,7 +2100,7 @@ export async function getSetsWithArchformIds(): Promise<AlignerSetForMatch[]> {
       .orderBy('p.patient_name')
       .execute();
 
-    return rows as unknown as AlignerSetForMatch[];
+    return rows;
   } catch (err) {
     log.error('Failed to get sets with archform ids', {
       error: err instanceof Error ? err.message : String(err),

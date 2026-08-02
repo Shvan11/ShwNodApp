@@ -270,7 +270,7 @@ router.get(
         ErrorResponses.notFound(res, 'Time point');
         return;
       }
-      const folder = timepointFolderName(existing.tp_description ?? '', existing.tp_date_time);
+      const folder = timepointFolderName(existing.tp_description, existing.tp_date_time);
       const exists = folder ? await entryExists(personId, folder) : false;
       sendData(res, patientContract.timepointFolder.response, { folder, exists });
     } catch (error) {
@@ -328,8 +328,11 @@ router.put(
         return;
       }
 
-      // Resolve the final (name, date) as a partial patch over the current row.
-      const finalName = (tpDescription ?? existing.tp_description ?? '').trim();
+      // Resolve the final (name, date) as a partial patch over the current row. Both
+      // columns are NOT NULL (migrations/pg/1785700253568), so omitting either field
+      // always falls back to a real value — no dateless/nameless row to guard against.
+      // The empty-NAME check below is still live: the body allows `tpDescription: ''`.
+      const finalName = (tpDescription ?? existing.tp_description).trim();
       const finalDate = tpDateTime ?? existing.tp_date_time;
       if (!finalName) {
         ErrorResponses.badRequest(res, 'Time point name cannot be empty');
@@ -350,7 +353,7 @@ router.put(
       }
 
       // Rename the originals folder if the (name, date)-derived folder changed.
-      const oldFolder = timepointFolderName(existing.tp_description ?? '', existing.tp_date_time);
+      const oldFolder = timepointFolderName(existing.tp_description, existing.tp_date_time);
       const newFolder = timepointFolderName(finalName, finalDate);
       if (oldFolder && newFolder && oldFolder !== newFolder) {
         try {
@@ -438,7 +441,7 @@ router.delete(
 
       // Remove the originals folder only for a full delete (best-effort).
       if (scope === 'all') {
-        const folder = timepointFolderName(existing.tp_description ?? '', existing.tp_date_time);
+        const folder = timepointFolderName(existing.tp_description, existing.tp_date_time);
         if (folder) {
           try {
             await hardDelete(personId, folder);

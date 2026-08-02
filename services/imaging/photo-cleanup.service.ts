@@ -20,10 +20,16 @@ const VIEW_CODES = ['10', '12', '13', '20', '21', '22', '23', '24'];
  * Originals-folder convention on the share: `{tpName}_{DD-MM-YYYY}`. Mirrors
  * `public/js/components/react/photo-editor/PhotoEditor.tsx#folderName` so the
  * server can locate the folder a timepoint's source photos were uploaded into.
- * Returns null when the date isn't a valid 'YYYY-MM-DD' (no deterministic
- * folder name → caller skips the filesystem step).
+ * Returns null when the date is missing or isn't a valid 'YYYY-MM-DD' (no
+ * deterministic folder name → caller skips the filesystem step). The nullable params
+ * are for CLIENT input, not DB nullability: `time_points.tp_description`/`tp_date_time`
+ * are NOT NULL (migrations/pg/1785700253568), but photo-editor.routes.ts feeds this
+ * helper the request body's optional `tpName`/`tpDate` (photo-editor.contract.ts).
  */
-export function timepointFolderName(tpName: string, tpDate: string): string | null {
+export function timepointFolderName(
+  tpName: string | null,
+  tpDate: string | null
+): string | null {
   const name = (tpName || '').trim();
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(tpDate || '');
   if (!name || !m) return null;

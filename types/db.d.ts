@@ -749,8 +749,8 @@ export interface TimePoints {
   person_id: number;
   time_point_id: Generated<number>;
   tp_code: number;
-  tp_date_time: string | null;
-  tp_description: string | null;
+  tp_date_time: string;
+  tp_description: string;
   updated_at: Timestamp | null;
 }
 
@@ -797,19 +797,19 @@ export interface Videos {
 }
 
 export interface Visits {
-  appliance_removed: Generated<boolean | null>;
+  appliance_removed: Generated<boolean>;
   bracket_change: string | null;
   created_at: Timestamp | null;
   elastics: string | null;
-  f_photo: Generated<boolean | null>;
-  i_photo: Generated<boolean | null>;
+  f_photo: Generated<boolean>;
+  i_photo: Generated<boolean>;
   id: Generated<number>;
   lower_wire_id: number | null;
   next_visit: string | null;
   operator_id: number | null;
-  opg: Generated<boolean | null>;
+  opg: Generated<boolean>;
   others: string | null;
-  p_photo: Generated<boolean | null>;
+  p_photo: Generated<boolean>;
   updated_at: Timestamp | null;
   upper_wire_id: number | null;
   visit_date: string;

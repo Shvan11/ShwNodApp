@@ -1,18 +1,15 @@
 /**
- * Native timepoint queries — WRITE to the LOCAL clone tables
- * (`tblTimePoints` / `tblTimePointImages`).
+ * Native timepoint queries — WRITE side of `time_points` / `time_point_images`.
  *
  * These are the app's authoritative timepoint tables: both reads (timepoint tabs,
  * portal, chair display — via `timepoint-queries.ts`) and writes (the photo editor)
  * go here, so a timepoint created by the editor shows as a grid tab immediately and
  * its images light up by tpCode via the shared `working/` directory.
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). The old facade-bypasser
- * `new sql.Request(tx)` + T-SQL `WITH (UPDLOCK, HOLDLOCK)` / `IF @@ROWCOUNT=0` became
- * a `withPgTransaction` with `SELECT … FOR UPDATE` on the existing-row lookup, and the
- * Phase-2 unique constraints as the race backstops:
- *   - `UX_tblTimePoints_Person_tpCode` (person_id, tpCode)  — find-or-create allocator
- *   - `UQ_tblTimePointImages_TP_Type`  (time_point_id, image_type) — image upsert key
+ * Concurrency: `withPgTransaction` + `SELECT … FOR UPDATE` on the existing-row lookup,
+ * with two unique constraints as the race backstops:
+ *   - `(person_id, tp_code)`          — find-or-create allocator
+ *   - `(time_point_id, image_type)`   — image upsert key
  */
 import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
@@ -111,8 +108,13 @@ export async function upsertNativeTimePointImage(
 
 export interface NativeTimePointRow {
   timePointId: number;
-  tp_description: string | null;
-  /** PG `date` → 'YYYY-MM-DD' string at runtime (see kysely.ts pg parser). */
+  tp_description: string;
+  /**
+   * PG `date` → 'YYYY-MM-DD' string at runtime (see kysely.ts pg parser).
+   * `NOT NULL` as of migrations/pg/1785700253568 — a dateless timepoint is not a state
+   * the app can represent (the originals-folder name and the photo-editor render both
+   * require a real date), so the DB now rejects one at the write.
+   */
   tp_date_time: string;
 }
 
@@ -130,13 +132,9 @@ export async function getNativeTimePoint(
     .selectFrom('time_points')
     .where('person_id', '=', personId)
     .where('tp_code', '=', tp_code)
-    .select((eb) => [
-      'time_point_id as timePointId',
-      'tp_description',
-      eb.ref('tp_date_time').$castTo<string>().as('tp_date_time'),
-    ])
+    .select(['time_point_id as timePointId', 'tp_description', 'tp_date_time'])
     .executeTakeFirst();
-  return (row as NativeTimePointRow | undefined) ?? null;
+  return row ?? null;
 }
 
 /**

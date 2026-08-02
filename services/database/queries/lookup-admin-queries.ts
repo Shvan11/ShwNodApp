@@ -4,19 +4,20 @@
  * Generic CRUD operations for lookup tables with whitelist validation.
  * Only whitelisted tables can be accessed to prevent SQL injection.
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). These functions build
- * dynamic SQL over a *whitelisted* set of tables/columns (the static Kysely builder
- * can't express fully-dynamic table+column names), so the bodies use the `sql`
- * template tag with `sql.id()`-quoted identifiers (drawn only from the validated
- * LOOKUP_TABLE_CONFIG) and bound parameters for all values — identical injection
- * posture to the old `@p`-param T-SQL. The positional `ColumnValue` mappers are gone;
- * rows come back as plain objects from `result.rows`.
+ * These functions build dynamic SQL over a *whitelisted* set of tables/columns (the
+ * static Kysely builder can't express fully-dynamic table+column names), so the bodies
+ * use the `sql` template tag with `sql.id()`-quoted identifiers — drawn ONLY from
+ * LOOKUP_TABLE_CONFIG, resolved via `resolveConfig` (own properties only) — and bound
+ * parameters for every value. No caller-supplied string ever reaches the SQL text.
  *
- * type mapping vs. the old mssql path:
- *  - `bit` columns are now PG `boolean`, so values are coerced to JS `true`/`false`
- *    (was `1`/`0`).
+ * NB the config KEYS (`tblHolidays`, `tblWorkType`, …) are the public admin-endpoint
+ * table keys the client calls (`GET /api/admin/lookups/:tableKey`), NOT PG table names;
+ * `pgTableName()` maps a key to its real table. Renaming a key is an API break.
+ *
+ * type notes:
+ *  - `bit` columns are PG `boolean`, so values are coerced to JS `true`/`false`.
  *  - referential-integrity violations surface as PG SQLSTATE `23503`
- *    (foreign_key_violation) instead of mssql error 547.
+ *    (foreign_key_violation) → `ReferentialError`.
  */
 import { sql, type RawBuilder } from 'kysely';
 import { getKysely } from '../kysely.js';
@@ -313,7 +314,7 @@ function pgTableName(configTableName: string): string {
  * Coerce an incoming form value to the JS type expected by the PG column.
  *  - bit  → boolean (PG boolean column)
  *  - int / reference → integer (or null on blank/NaN)
- * Other types pass through (string/date). Mirrors the old mssql conversion rules.
+ * Other types pass through (string/date).
  */
 function coerceValue(col: ColumnConfig, raw: unknown): unknown {
   if (col.type === 'bit') {
@@ -332,10 +333,23 @@ function coerceValue(col: ColumnConfig, raw: unknown): unknown {
 }
 
 /**
+ * Resolve a table key against the whitelist, OWN PROPERTIES ONLY.
+ *
+ * `LOOKUP_TABLE_CONFIG` is an object literal, so a plain `config[key]` / `key in config`
+ * also reaches `Object.prototype` — `?tableName=constructor` (or `toString`, `valueOf`…)
+ * yields a truthy non-config and sails past a `!config` guard, then dies on
+ * `config.columns.map` as a 500 instead of a clean 400. `Object.hasOwn` closes that.
+ * Every lookup in this module goes through here.
+ */
+function resolveConfig(tableKey: string): LookupTableConfig | null {
+  return Object.hasOwn(LOOKUP_TABLE_CONFIG, tableKey) ? LOOKUP_TABLE_CONFIG[tableKey] : null;
+}
+
+/**
  * Get configuration for a specific table
  */
 export function getTableConfig(tableKey: string): LookupTableConfig | null {
-  return LOOKUP_TABLE_CONFIG[tableKey] || null;
+  return resolveConfig(tableKey);
 }
 
 /**
@@ -355,7 +369,7 @@ export function getLookupTableConfigs(): LookupTableInfo[] {
  * Get all items from a lookup table
  */
 export async function getLookupItems(tableKey: string): Promise<LookupItem[]> {
-  const config = LOOKUP_TABLE_CONFIG[tableKey];
+  const config = resolveConfig(tableKey);
   if (!config) {
     throw new Error(`Invalid lookup table: ${tableKey}`);
   }
@@ -375,7 +389,7 @@ export async function getLookupItems(tableKey: string): Promise<LookupItem[]> {
       const joinAlias = sql.id(`r${idx}`);
       // `reference.table` is the referenced table's whitelist KEY — resolve it to the
       // actual PG table name via the config (falls back to treating it as a raw name).
-      const refConfig = LOOKUP_TABLE_CONFIG[col.reference.table];
+      const refConfig = resolveConfig(col.reference.table);
       const refPgTable = pgTableName(refConfig ? refConfig.tableName : col.reference.table);
       joinParts.push(
         sql`LEFT JOIN ${sql.id(refPgTable)} AS ${joinAlias} ON ${joinAlias}.${sql.id(col.reference!.idColumn)} = ${baseAlias}.${sql.id(col.name)}`
@@ -406,7 +420,7 @@ export async function createLookupItem(
   tableKey: string,
   data: Record<string, unknown>
 ): Promise<string | number | null> {
-  const config = LOOKUP_TABLE_CONFIG[tableKey];
+  const config = resolveConfig(tableKey);
   if (!config) {
     throw new Error(`Invalid lookup table: ${tableKey}`);
   }
@@ -417,7 +431,7 @@ export async function createLookupItem(
 
   let query;
   if (config.idType === 'uniqueidentifier') {
-    // PG generates the uuid via gen_random_uuid() (was T-SQL NEWID()).
+    // PG generates the uuid via gen_random_uuid().
     query = sql<Record<string, string | number>>`
       INSERT INTO ${sql.id(pgTableName(config.tableName))} (${sql.id(config.idColumn)}, ${sql.join(colIds, sql`, `)})
       VALUES (gen_random_uuid(), ${sql.join(values, sql`, `)})
@@ -436,23 +450,32 @@ export async function createLookupItem(
 }
 
 /**
- * Update an existing lookup item
+ * Update an existing lookup item — a PARTIAL update over the supplied columns.
+ *
+ * Only columns actually present in `data` are written. Previously every whitelisted
+ * column was SET unconditionally, and `coerceValue` maps a missing key to `null` (or
+ * `false` for a `bit`), so a caller that posted a subset of the row silently BLANKED
+ * every column it left out. The request body is `z.looseObject({})` (columns vary per
+ * table), so nothing upstream forces a complete row — the guarantee has to live here.
  */
 export async function updateLookupItem(
   tableKey: string,
   id: string | number,
   data: Record<string, unknown>
 ): Promise<void> {
-  const config = LOOKUP_TABLE_CONFIG[tableKey];
+  const config = resolveConfig(tableKey);
   if (!config) {
     throw new Error(`Invalid lookup table: ${tableKey}`);
   }
 
-  const db = getKysely();
-  const setParts = config.columns.map(
-    (c) => sql`${sql.id(c.name)} = ${coerceValue(c, data[c.name])}`
-  );
+  const setParts = config.columns
+    .filter((c) => Object.hasOwn(data, c.name))
+    .map((c) => sql`${sql.id(c.name)} = ${coerceValue(c, data[c.name])}`);
 
+  // Nothing to change — an empty SET list is a SQL syntax error, so bail out.
+  if (setParts.length === 0) return;
+
+  const db = getKysely();
   const query = sql`
     UPDATE ${sql.id(pgTableName(config.tableName))}
     SET ${sql.join(setParts, sql`, `)}
@@ -466,7 +489,7 @@ export async function updateLookupItem(
  * Delete a lookup item
  */
 export async function deleteLookupItem(tableKey: string, id: string | number): Promise<void> {
-  const config = LOOKUP_TABLE_CONFIG[tableKey];
+  const config = resolveConfig(tableKey);
   if (!config) {
     throw new Error(`Invalid lookup table: ${tableKey}`);
   }
@@ -480,7 +503,7 @@ export async function deleteLookupItem(tableKey: string, id: string | number): P
   try {
     await query.execute(db);
   } catch (err) {
-    // PG foreign_key_violation (was mssql error 547).
+    // PG foreign_key_violation (SQLSTATE 23503).
     if (isForeignKeyViolation(err)) {
       throw new ReferentialError(
         'Cannot delete: this item is still referenced elsewhere.'
@@ -494,5 +517,6 @@ export async function deleteLookupItem(tableKey: string, id: string | number): P
  * Check if a table key is valid
  */
 export function isValidTableKey(tableKey: string): boolean {
-  return tableKey in LOOKUP_TABLE_CONFIG;
+  // `in` walks the prototype chain ('constructor' in {} === true) — own properties only.
+  return Object.hasOwn(LOOKUP_TABLE_CONFIG, tableKey);
 }

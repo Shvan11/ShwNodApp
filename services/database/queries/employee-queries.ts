@@ -1,9 +1,6 @@
 /**
  * Employee CRUD (PostgreSQL / Kysely).
  *
- * Phase 5: replaces the raw T-SQL in routes/api/employee.routes.ts (which used
- * `OUTPUT INSERTED … INTO @table` — not valid in PG).
- *
  * Employee expenses now reference `employees` directly via `expenses.employee_id` (a
  * real FK), so the old name-matched `expense_subcategories` shadow under category 5
  * (and its insert/rename/delete sync) is gone — see the labs-normalization migration.

@@ -120,6 +120,13 @@ export const labCaseBoardRow = z.object({
   delivered_by: z.string().nullable(),
 });
 export type LabCaseBoardRow = z.infer<typeof labCaseBoardRow>;
+/**
+ * The board row as the SERVER holds it, before `sendData` parses it: the
+ * `timestampString` columns are still `Date` (PG `timestamp` → Date via the kysely.ts
+ * parser) and only become ISO strings on the way out. Query modules return this;
+ * consumers of the parsed response use `LabCaseBoardRow`.
+ */
+export type LabCaseBoardRowInput = z.input<typeof labCaseBoardRow>;
 
 // Raw `lab_case_events` row — fully modeled (small, fixed column set), closed.
 export const labCaseEventRow = z.object({

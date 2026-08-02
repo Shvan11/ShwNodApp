@@ -1,13 +1,12 @@
 /**
  * Expense-related database queries
  *
- * Migration Phase 4: translated to typed Kysely (PostgreSQL). `tblExpenses.amount` is
- * PG `integer` (maps straight to a JS number; no numeric cast). `expense_date` is a PG
- * `date`, which the centralized pg parser (kysely.ts) returns as a 'YYYY-MM-DD' string,
- * and the generated `Database` type already types it `string` — so it's projected as-is
- * and the declared return type is `string` (no `$castTo` needed). `currency` is `citext`, so equality is
- * already case-insensitive (matches the old Arabic_CI_AS column); we keep the trim
- * (`LTRIM(RTRIM(...))`) via PG `btrim()` so the grouping/filtering behavior is identical.
+ * `expenses.amount` is PG `integer` (maps straight to a JS number; no numeric cast).
+ * `expense_date` is a PG `date`, which the centralized pg parser (kysely.ts) returns as a
+ * 'YYYY-MM-DD' string, and the generated `Database` type already types it `string` — so
+ * it's projected as-is and the declared return type is `string` (no `$castTo` needed).
+ * `currency` is `citext`, so equality is case-insensitive; the `btrim()` on it guards
+ * against historical rows stored with surrounding whitespace.
  */
 import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
@@ -160,7 +159,7 @@ export async function getAllExpenses(filters: ExpenseFilters = {}): Promise<Expe
     q = q.limit(limit).offset(offset);
   }
 
-  return q.execute() as Promise<Expense[]>;
+  return q.execute();
 }
 
 /**
@@ -228,7 +227,7 @@ export async function getExpenseSubcategories(
 
   q = q.orderBy('s.subcategory_name');
 
-  return q.execute() as Promise<ExpenseSubcategory[]>;
+  return q.execute();
 }
 
 /**
@@ -317,7 +316,7 @@ export async function getExpenseSummary(
       eb.fn.countAll<number>().as('ExpenseCount'),
       eb.fn.sum('e.amount').$castTo<number>().as('total_amount'),
     ])
-    .execute() as Promise<ExpenseSummary[]>;
+    .execute();
 }
 
 /**
@@ -339,5 +338,5 @@ export async function getExpenseTotalsByCurrency(
       eb.fn.countAll<number>().as('ExpenseCount'),
       eb.fn.sum('amount').$castTo<number>().as('total_amount'),
     ])
-    .execute() as Promise<ExpenseTotal[]>;
+    .execute();
 }
