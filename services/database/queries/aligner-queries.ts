@@ -181,18 +181,18 @@ interface BatchData {
   has_upper_template?: boolean;
   has_lower_template?: boolean;
   is_last?: boolean;
-  batch_sequence?: number;
-  AlignersInBatch?: number;
-  upper_aligner_start_sequence?: number;
-  upper_aligner_end_sequence?: number;
-  lower_aligner_start_sequence?: number;
-  lower_aligner_end_sequence?: number;
-  // note: batch_expiry_date and validity_period are computed columns - cannot be set directly
+  // NOTE the write surface stops here. batch_sequence and the four upper/lower
+  // start/end sequences are DERIVED (createBatch computes them from MAX() over the
+  // set; resequenceSet recomputes them on change), batch_expiry_date and
+  // validity_period are generated columns, and AlignersInBatch is a retired
+  // SQL-Server-era name. They were declared here (and enumerated in the contract)
+  // but never read, so the API accepted them and silently dropped them.
 }
 
-interface BatchUpdateData extends Omit<BatchData, 'aligner_set_id'> {
-  aligner_set_id?: number;
-}
+// Full replace (every editable column is written unconditionally). `aligner_set_id`
+// stays REQUIRED: it identifies the owning set and is rejected if it differs from
+// the stored value — a batch cannot be moved between sets.
+type BatchUpdateData = BatchData;
 
 /**
  * Coerce a possibly-empty / string numeric input to an integer.
@@ -1449,6 +1449,9 @@ export async function updateBatch(
       .where('aligner_batch_id', '=', batchId)
       .executeTakeFirst();
     if (!old) throw new Error('Aligner batch not found');
+    // aligner_set_id identifies the owning set, it is not editable — a batch cannot
+    // be moved between sets. Required in the contract, so `undefined` (which never
+    // equals the stored id) can no longer reach here from a partial body.
     if (aligner_set_id !== old.aligner_set_id) throw new Error('Cannot change aligner_set_id');
 
     const oldHasU = old.has_upper_template ?? false;

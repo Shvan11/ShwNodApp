@@ -46,12 +46,18 @@ const LAST_APPOINTMENT_OPTIONS: SelectOption[] = [
     { value: 'custom', label: 'Custom date range...' },
 ];
 
-type FinalPhotosFilter = '' | 'has' | 'none';
+type PhotoPresenceFilter = '' | 'has' | 'none';
 
-const FINAL_PHOTOS_OPTIONS: { value: FinalPhotosFilter; label: string }[] = [
+const FINAL_PHOTOS_OPTIONS: { value: PhotoPresenceFilter; label: string }[] = [
     { value: '', label: 'Any' },
     { value: 'has', label: 'Has final photos' },
     { value: 'none', label: 'No final photos' },
+];
+
+const PROGRESS_PHOTOS_OPTIONS: { value: PhotoPresenceFilter; label: string }[] = [
+    { value: '', label: 'Any' },
+    { value: 'has', label: 'Has progress photos' },
+    { value: 'none', label: 'No progress photos' },
 ];
 
 interface SavedState {
@@ -72,7 +78,8 @@ interface SavedState {
     lastAppointmentFilter: string;
     lastAppointmentFrom: string;
     lastAppointmentTo: string;
-    finalPhotos: FinalPhotosFilter;
+    finalPhotos: PhotoPresenceFilter;
+    progressPhotos: PhotoPresenceFilter;
     hasDebt: boolean;
     showFilters: boolean;
     sortConfig: SortConfig;
@@ -158,7 +165,8 @@ const PatientManagement = () => {
     // Legacy migration: the old single custom date meant "before X" ⇒ range with only a To bound.
     const [lastAppointmentTo, setLastAppointmentTo] = useState(savedState?.lastAppointmentTo ?? savedState?.lastAppointmentCustomDate ?? '');
     // Legacy migration: the old boolean checkbox maps to the 'has' tri-state.
-    const [finalPhotos, setFinalPhotos] = useState<FinalPhotosFilter>(savedState?.finalPhotos ?? (savedState?.hasFinalPhotos ? 'has' : ''));
+    const [finalPhotos, setFinalPhotos] = useState<PhotoPresenceFilter>(savedState?.finalPhotos ?? (savedState?.hasFinalPhotos ? 'has' : ''));
+    const [progressPhotos, setProgressPhotos] = useState<PhotoPresenceFilter>(savedState?.progressPhotos ?? '');
     const [hasDebt, setHasDebt] = useState(savedState?.hasDebt || false);
     const [showFilters, setShowFilters] = useState(savedState?.showFilters || false);
     const [sortConfig, setSortConfig] = useState<SortConfig>(savedState?.sortConfig || { key: 'name', direction: 'asc' });
@@ -220,6 +228,7 @@ const PatientManagement = () => {
                 lastAppointmentFrom,
                 lastAppointmentTo,
                 finalPhotos,
+                progressPhotos,
                 hasDebt,
                 showFilters,
                 sortConfig
@@ -232,7 +241,7 @@ const PatientManagement = () => {
     }, [
         patients, hasSearched, totalCount, hasMore, currentOffset, searchPatientName, searchFirstName, searchLastName, searchTerm,
         nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes,
-        lastAppointmentFilter, lastAppointmentFrom, lastAppointmentTo, finalPhotos, hasDebt, showFilters, sortConfig
+        lastAppointmentFilter, lastAppointmentFrom, lastAppointmentTo, finalPhotos, progressPhotos, hasDebt, showFilters, sortConfig
     ]);
 
     // --- Search Logic ---
@@ -269,6 +278,7 @@ const PatientManagement = () => {
                 params.append('lastAppointment', lastAppointmentFilter);
             }
             if (finalPhotos) params.append('finalPhotos', finalPhotos);
+            if (progressPhotos) params.append('progressPhotos', progressPhotos);
             if (hasDebt) params.append('hasDebt', 'true');
 
             params.append('sortBy', currentSort.key);
@@ -306,7 +316,7 @@ const PatientManagement = () => {
                 setLoadingMore(false);
             }
         }
-    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentFrom, lastAppointmentTo, finalPhotos, hasDebt, sortConfig, currentOffset, toast]);
+    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentFrom, lastAppointmentTo, finalPhotos, progressPhotos, hasDebt, sortConfig, currentOffset, toast]);
 
     // --- Load More Handler ---
     const handleLoadMore = useCallback(() => {
@@ -326,7 +336,7 @@ const PatientManagement = () => {
     useEffect(() => {
         const hasInputs = searchPatientName || searchFirstName || searchLastName || searchTerm ||
                           selectedWorkTypes.length > 0 || selectedKeywords.length > 0 || selectedTags.length > 0 ||
-                          selectedPatientTypes.length > 0 || lastAppointmentFilter || finalPhotos || hasDebt;
+                          selectedPatientTypes.length > 0 || lastAppointmentFilter || finalPhotos || progressPhotos || hasDebt;
 
         // SKIP search if we just restored data from storage
         // This ensures the "cached view" remains stable and we don't flash a loading spinner unnecessarily
@@ -354,7 +364,7 @@ const PatientManagement = () => {
         return () => {
             if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
         };
-    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentFrom, lastAppointmentTo, finalPhotos, hasDebt]);
+    }, [searchPatientName, searchFirstName, searchLastName, searchTerm, nameStartsWith, selectedWorkTypes, selectedKeywords, selectedTags, selectedPatientTypes, lastAppointmentFilter, lastAppointmentFrom, lastAppointmentTo, finalPhotos, progressPhotos, hasDebt]);
 
     // --- Handlers ---
 
@@ -385,7 +395,7 @@ const PatientManagement = () => {
         setNameStartsWith(false);
         setSelectedWorkTypes([]); setSelectedKeywords([]); setSelectedTags([]);
         setSelectedPatientTypes([]); setLastAppointmentFilter(''); setLastAppointmentFrom(''); setLastAppointmentTo('');
-        setFinalPhotos(''); setHasDebt(false);
+        setFinalPhotos(''); setProgressPhotos(''); setHasDebt(false);
         setPatients([]); setHasSearched(false); setShowFilters(false);
         setSortConfig({ key: 'name', direction: 'asc' });
         // Reset means "back to the empty page" — the criteria clearing above must
@@ -413,7 +423,7 @@ const PatientManagement = () => {
         // actually changes, or it would linger and swallow the next real search.
         const hadCriteria = !!(searchPatientName || searchFirstName || searchLastName || searchTerm ||
             selectedWorkTypes.length || selectedKeywords.length || selectedTags.length ||
-            selectedPatientTypes.length || lastAppointmentFilter || finalPhotos || hasDebt || nameStartsWith);
+            selectedPatientTypes.length || lastAppointmentFilter || finalPhotos || progressPhotos || hasDebt || nameStartsWith);
         if (hadCriteria) skipAutoSearchRef.current = true;
 
         // Clear inputs and filters, reset pagination AND sort — the fetch below is
@@ -423,7 +433,7 @@ const PatientManagement = () => {
         setNameStartsWith(false);
         setSelectedWorkTypes([]); setSelectedKeywords([]); setSelectedTags([]); setSelectedPatientTypes([]);
         setLastAppointmentFilter(''); setLastAppointmentFrom(''); setLastAppointmentTo('');
-        setFinalPhotos(''); setHasDebt(false);
+        setFinalPhotos(''); setProgressPhotos(''); setHasDebt(false);
         setCurrentOffset(0);
         setSortConfig({ key: 'name', direction: 'asc' });
         // Kill any pending debounce / in-flight filtered search — a late response
@@ -491,7 +501,8 @@ const PatientManagement = () => {
     const handleJumpToPatient = (personId: number) => navigate(`/patient/${personId}/works`);
 
     const activeFilterCount = selectedWorkTypes.length + selectedKeywords.length + selectedTags.length +
-        selectedPatientTypes.length + (lastAppointmentFilter ? 1 : 0) + (finalPhotos ? 1 : 0) + (hasDebt ? 1 : 0);
+        selectedPatientTypes.length + (lastAppointmentFilter ? 1 : 0) + (finalPhotos ? 1 : 0) +
+        (progressPhotos ? 1 : 0) + (hasDebt ? 1 : 0);
 
     const lastAppointmentChipLabel = lastAppointmentFilter === 'custom'
         ? (lastAppointmentFrom && lastAppointmentTo ? `Last visit ${lastAppointmentFrom} – ${lastAppointmentTo}`
@@ -636,6 +647,14 @@ const PatientManagement = () => {
                                 </button>
                             </span>
                         )}
+                        {progressPhotos && (
+                            <span className={styles.filterChip}>
+                                {progressPhotos === 'has' ? 'Has Progress Photos' : 'No Progress Photos'}
+                                <button type="button" className={styles.filterChipRemove} aria-label="Remove progress photos filter" onClick={() => setProgressPhotos('')}>
+                                    <i className="fas fa-times" aria-hidden="true"></i>
+                                </button>
+                            </span>
+                        )}
                         {hasDebt && (
                             <span className={styles.filterChip}>
                                 Has Unpaid Balance
@@ -730,6 +749,17 @@ const PatientManagement = () => {
                                     options={FINAL_PHOTOS_OPTIONS}
                                     value={FINAL_PHOTOS_OPTIONS.find(o => o.value === finalPhotos) || FINAL_PHOTOS_OPTIONS[0]}
                                     onChange={(option) => setFinalPhotos(option?.value ?? '')}
+                                    classNamePrefix="react-select"
+                                    isClearable
+                                />
+                            </div>
+                            <div className={styles.filterGroup}>
+                                <label htmlFor="pm-filter-progress-photos">Progress Photos</label>
+                                <Select
+                                    inputId="pm-filter-progress-photos"
+                                    options={PROGRESS_PHOTOS_OPTIONS}
+                                    value={PROGRESS_PHOTOS_OPTIONS.find(o => o.value === progressPhotos) || PROGRESS_PHOTOS_OPTIONS[0]}
+                                    onChange={(option) => setProgressPhotos(option?.value ?? '')}
                                     classNamePrefix="react-select"
                                     isClearable
                                 />

@@ -23,7 +23,6 @@ import {
   getTimePoints,
   getTimePointImgs,
 } from '../database/queries/timepoint-queries.js';
-import { getPayments, type Payment } from '../database/queries/payment-queries.js';
 import { getTimePointCodesForPatient } from '../database/queries/native-timepoint-queries.js';
 import {
   deleteWorkingFilesForPatient,
@@ -32,43 +31,13 @@ import { deletePatientFolder } from '../files/file-explorer.service.js';
 import { purgeDolphinPatient } from '../sync/cdc/dolphin-sink.js';
 
 /**
- * Patient information returned from service
+ * Patient information returned from service — exactly what `getInfos` yields.
+ *
+ * Derived, NOT re-declared: this used to be a hand-written copy of
+ * `PatientInfo & PatientAssets` that had to be kept in sync by hand and silently
+ * narrowed the query's row for every caller.
  */
-type PatientInfoResult = {
-  person_id: number;
-  patient_name: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  phone: string | null;
-  phone2: string | null;
-  email: string | null;
-  DateOfBirth: string | null;
-  gender: number | null;
-  gender_display: string | null;
-  address_name: string | null;
-  referral_source: string | null;
-  patient_type_name: string | null;
-  tag_name: string | null;
-  notes: string | null;
-  language: number | null;
-  country_code: string | null;
-  estimated_cost: number | null;
-  currency: string | null;
-  DolphinId: number | null;
-  date_added: string | null;
-  AlertCount: number;
-  name: string | null;
-  start_date: string | null;
-  estimatedCost: number | null;
-  activeAlert: {
-    alertId: number;
-    alertType: string;
-    alertDetails: string;
-    alertSeverity: number;
-  } | null;
-  xrays: Array<{ name: string; detailsDirName?: string; previewImagePartialPath?: string; date?: string | null }>;
-  assets: string[];
-};
+type PatientInfoResult = NonNullable<Awaited<ReturnType<typeof getInfos>>>;
 
 type TimePointResult = {
   tp_code: string;
@@ -252,29 +221,6 @@ export async function getPatientTimePointImages(
     }
     log.error(`Error fetching time point images for patient ${pid}, tp ${timePoint}:`, { error: error instanceof Error ? error.message : String(error) });
     throw new Error('Failed to fetch time point images', { cause: error });
-  }
-}
-
-/**
- * Get patient payments with validation
- * @param patientId - Patient id
- * @returns Array of payments
- * @throws PatientValidationError If validation fails
- */
-export async function getPatientPayments(
-  patientId: string | number | undefined | null
-): Promise<Payment[]> {
-  const pid = validatePatientId(patientId);
-
-  try {
-    const payments = await getPayments(parseInt(pid, 10));
-    return payments || [];
-  } catch (error) {
-    if (error instanceof PatientValidationError) {
-      throw error;
-    }
-    log.error(`Error fetching payments for patient ${pid}:`, { error: error instanceof Error ? error.message : String(error) });
-    throw new Error('Failed to fetch patient payments', { cause: error });
   }
 }
 

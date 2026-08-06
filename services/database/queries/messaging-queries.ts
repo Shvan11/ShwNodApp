@@ -610,13 +610,29 @@ export async function getWhatsAppDeliveryStatus(
         .where('a.sent_wa', '=', true)
         .select([
           'a.appointment_id as id',
-          sql<string>`COALESCE(p."country_code", '964') || p."phone" || '@c.us'`.as('number'),
+          'p.phone as phone',
+          'p.country_code as countryCode',
           'a.wa_message_id as wamid',
         ])
         .execute();
 
-      log.info('WhatsApp messages retrieved for status checking', { messageCount: rows.length, date });
-      return rows.map((r) => ({ id: r.id, number: r.number, wamid: (r.wamid as string) ?? '' }));
+      // Build the chat id with the SAME ladder the send path used (formatPhone),
+      // not raw concatenation: `'964' || '07xxxxxxxxx'` yields a chat id that was
+      // never messaged, so every status check for such a patient silently missed.
+      const messages = rows
+        .filter((r) => isValidPhone(r.phone))
+        .map((r) => ({
+          id: r.id,
+          number: `${formatPhone(r.phone!, r.countryCode || '964')}@c.us`,
+          wamid: (r.wamid as string) ?? '',
+        }));
+
+      log.info('WhatsApp messages retrieved for status checking', {
+        messageCount: messages.length,
+        skippedInvalidPhone: rows.length - messages.length,
+        date,
+      });
+      return messages;
     }, operationName)
     .catch((error: Error) => {
       log.error('Failed to retrieve WhatsApp delivery status', { operationName, error: error.message });

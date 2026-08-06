@@ -128,12 +128,16 @@ export interface WorkDependencies {
 }
 
 /**
- * Deletion result
+ * Deletion result — mirrors `work-queries.deleteWork`'s return shape EXACTLY.
+ * `success`/`rowCount` are set only on the canDelete path, `dependencies` only on
+ * the blocked path. (This used to declare `deleted`/`rowsAffected`, neither of which
+ * the query ever returns; an `as DeleteResult` cast hid the mismatch and made the
+ * route report `rowsAffected: 0` on every successful delete.)
  */
 export interface DeleteResult {
   canDelete: boolean;
-  deleted?: boolean;
-  rowsAffected?: number;
+  success?: boolean;
+  rowCount?: number;
   dependencies?: WorkDependencies;
 }
 
@@ -592,6 +596,16 @@ export async function validateAndUpdateWork(
     }
   }
 
+  // `getWorkDetails` is a ten-join read carrying the invoice TotalPaid aggregate, and
+  // both the total-required guard and the discount block below need it. Fetch it at
+  // most ONCE per update (a save touching total_required AND discount used to run it
+  // twice), and only when one of those blocks is actually going to run.
+  let workDetails: Awaited<ReturnType<typeof getWorkDetails>> | undefined;
+  const loadWorkDetails = async (): Promise<Awaited<ReturnType<typeof getWorkDetails>>> => {
+    if (workDetails === undefined) workDetails = await getWorkDetails(workId);
+    return workDetails;
+  };
+
   // ===== STATUS CHANGE VALIDATION =====
   if (status !== undefined && currentWork && currentWork.status !== status) {
     const validation = await validateStatusChange(
@@ -646,7 +660,7 @@ export async function validateAndUpdateWork(
     workData.total_required !== undefined
   ) {
     const newTotal = Number(workData.total_required);
-    const workForTotal = await getWorkDetails(workId);
+    const workForTotal = await loadWorkDetails();
     const alreadyPaid = Number((workForTotal as { TotalPaid?: number } | null)?.TotalPaid ?? 0);
     if (Number.isFinite(newTotal) && newTotal < alreadyPaid) {
       throw new WorkUpdateError(
@@ -668,7 +682,7 @@ export async function validateAndUpdateWork(
   );
 
   if (hasDiscountFieldInPayload) {
-    const workWithPaid = await getWorkDetails(workId);
+    const workWithPaid = await loadWorkDetails();
     if (!workWithPaid) {
       throw new WorkUpdateError('notFound', 'Work'); // resource noun; see above
     }
@@ -719,14 +733,24 @@ export async function validateAndUpdateWork(
 }
 
 /**
- * Check work dependencies before deletion
+ * Validate and delete a work record.
+ *
+ * NOTE `work-queries.deleteWork` is BOTH the dependency check and the delete: it
+ * counts the dependent records and, only when every count is zero, performs the
+ * delete in the same call. There is no read-only pre-check to call first — an
+ * earlier `checkWorkDependencies` wrapper around it implied one and was removed,
+ * because invoking it deleted the work.
+ *
  * @param workId - Work id
- * @returns Dependency information
+ * @returns Deletion result with rowCount
+ * @throws WorkValidationError If the work has dependencies, or does not exist
  */
-export async function checkWorkDependencies(
+export async function validateAndDeleteWork(
   workId: number
 ): Promise<DeleteResult> {
-  const result = (await dbDeleteWork(workId)) as DeleteResult;
+  log.info(`Attempting to delete work ${workId}`);
+
+  const result = await dbDeleteWork(workId);
 
   if (!result.canDelete) {
     const deps = result.dependencies!;
@@ -757,21 +781,12 @@ export async function checkWorkDependencies(
     );
   }
 
-  return result;
-}
-
-/**
- * Validate and delete a work record
- * @param workId - Work id
- * @returns Deletion result with rowsAffected
- * @throws WorkValidationError If work has dependencies
- */
-export async function validateAndDeleteWork(
-  workId: number
-): Promise<DeleteResult> {
-  log.info(`Attempting to delete work ${workId}`);
-
-  const result = await checkWorkDependencies(workId);
+  // A work id that never existed also has zero dependencies, so deleteWork reports
+  // canDelete with rowCount 0. Surface that as a miss instead of a silent success —
+  // the delete route would otherwise 200 on a bogus id.
+  if (!result.rowCount) {
+    throw new WorkValidationError('Work not found', 'WORK_NOT_FOUND', { workId });
+  }
 
   log.info(`Work ${workId} deleted successfully`);
   return result;
@@ -873,13 +888,3 @@ export async function getTransferPreview(workId: number): Promise<WorkRelatedCou
 
   return getWorkRelatedCounts(workId);
 }
-
-export default {
-  validateAndCreateWork,
-  validateAndCreateWorkWithInvoice,
-  checkWorkDependencies,
-  validateAndDeleteWork,
-  validateAndTransferWork,
-  getTransferPreview,
-  WorkValidationError,
-};

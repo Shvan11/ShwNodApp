@@ -82,13 +82,15 @@ export class AlignerValidationError extends Error {
 
 /**
  * Set creation data
+ *
+ * NB the retired SQL-Server-era `TotalAligners`/`RemainingAligners` are NOT here:
+ * `createAlignerSet` seeds `remaining_upper_aligners`/`remaining_lower_aligners`
+ * from the upper/lower counts and never read them.
  */
 export interface SetCreateData {
   work_id: number;
   aligner_dr_id: number;
   is_active?: boolean;
-  TotalAligners?: number;
-  RemainingAligners?: number;
   set_cost?: number;
   notes?: string;
   set_sequence?: number;
@@ -107,8 +109,6 @@ export interface SetCreateData {
 export interface SetUpdateData {
   aligner_dr_id?: number;
   is_active?: boolean;
-  TotalAligners?: number;
-  RemainingAligners?: number;
   // Clearable on update: null = clear the column, undefined = leave unchanged.
   set_cost?: number | null;
   notes?: string | null;
@@ -126,47 +126,46 @@ export interface SetUpdateData {
 
 /**
  * Batch creation data
+ *
+ * Server-derived, so deliberately NOT accepted from the caller: `batch_sequence`
+ * and the four upper/lower start/end sequences (createBatch computes them from
+ * MAX() over the set's existing batches), `batch_expiry_date`/`validity_period`
+ * (generated columns), and the retired `AlignersInBatch`.
  */
 export interface BatchCreateData {
   aligner_set_id: number;
   is_active?: boolean;
-  batch_sequence?: number;
-  AlignersInBatch?: number;
+  is_last?: boolean;
   notes?: string;
   upper_aligner_count?: number;
   lower_aligner_count?: number;
-  upper_aligner_start_sequence?: number;
-  upper_aligner_end_sequence?: number;
-  lower_aligner_start_sequence?: number;
-  lower_aligner_end_sequence?: number;
   days?: number;
-  validity_period?: number;
   has_upper_template?: boolean;
   has_lower_template?: boolean;
 }
 
 /**
  * Batch update data
- * NOTE: manufacture_date and delivered_to_patient_date are managed via markBatchManufactured/markBatchDelivered
+ *
+ * Same server-derived exclusions as BatchCreateData. manufacture_date and
+ * delivered_to_patient_date are managed via markBatchManufactured/markBatchDelivered.
+ *
+ * A FULL REPLACE, not a partial patch: `updateBatch` writes every editable column
+ * unconditionally, so an omitted count persists as 0 and an omitted days/notes as
+ * NULL. `aligner_set_id` is REQUIRED and identifies the owning set — the query layer
+ * rejects a value that differs from the stored one (a batch cannot move between
+ * sets), so omitting it used to 400 with a misleading "Cannot change aligner_set_id".
  */
 export interface BatchUpdateData {
-  aligner_set_id?: number;
+  aligner_set_id: number;
   is_active?: boolean;
-  batch_sequence?: number;
-  AlignersInBatch?: number;
-  // manufacture_date and delivered_to_patient_date are managed via status endpoints
   notes?: string;
   upper_aligner_count?: number;
   lower_aligner_count?: number;
-  upper_aligner_start_sequence?: number;
-  upper_aligner_end_sequence?: number;
-  lower_aligner_start_sequence?: number;
-  lower_aligner_end_sequence?: number;
   days?: number;
   is_last?: boolean;
   has_upper_template?: boolean;
   has_lower_template?: boolean;
-  // note: batch_expiry_date and validity_period are computed columns - cannot be set directly
 }
 
 /**
@@ -281,7 +280,6 @@ export interface AlignerPatientSearchResult {
 export async function validateAndCreateSet(
   setData: SetCreateData
 ): Promise<number> {
-  const startTime = Date.now();
   const { work_id, aligner_dr_id } = setData;
 
   // Validation
@@ -300,30 +298,14 @@ export async function validateAndCreateSet(
       : undefined,
   };
 
-  const afterValidation = Date.now();
-  log.info(
-    `⏱️  [SERVICE TIMING] Validation took: ${afterValidation - startTime}ms`
-  );
-  log.info('Creating new aligner set with business logic:', sanitizedData);
-
   try {
-    const dbStartTime = Date.now();
     const newSetId = (await alignerQueries.createAlignerSet(sanitizedData)) as number;
-    const dbEndTime = Date.now();
-
-    log.info(
-      `⏱️  [SERVICE TIMING] Database query took: ${dbEndTime - dbStartTime}ms`
-    );
-    log.info(
-      `⏱️  [SERVICE TIMING] Total service time: ${dbEndTime - startTime}ms`
-    );
     log.info(
       `Aligner set created successfully: Set ${newSetId} for Work ${work_id}`
     );
     return newSetId;
   } catch (error) {
-    const errorTime = Date.now() - startTime;
-    log.error(`⏱️  [SERVICE TIMING] Error after ${errorTime}ms:`, { error: error instanceof Error ? error.message : String(error) });
+    log.error('Error creating aligner set:', { error: error instanceof Error ? error.message : String(error) });
     throw error;
   }
 }
@@ -514,7 +496,7 @@ export async function validateAndCreateBatch(
     batchData.lower_aligner_count,
     'Lower aligner count'
   );
-  parseOptionalDays(batchData.days); // format check; value applied in createBatch
+  const days = parseOptionalDays(batchData.days);
 
   // A batch with no aligners on either arch is meaningless.
   if (upperCount <= 0 && lowerCount <= 0) {
@@ -552,7 +534,15 @@ export async function validateAndCreateBatch(
 
   log.info('Creating new aligner batch:', batchData);
 
-  const newBatchId = (await alignerQueries.createBatch(batchData)) as number;
+  // Persist the values we just validated, not the raw request ones — otherwise the
+  // checks above and the stored row are derived by two different code paths (the
+  // query layer's `toIntOr` safety net would re-coerce the originals).
+  const newBatchId = (await alignerQueries.createBatch({
+    ...batchData,
+    upper_aligner_count: upperCount,
+    lower_aligner_count: lowerCount,
+    days,
+  })) as number;
   log.info(`Aligner batch created successfully: Batch ${newBatchId}`);
 
   return {
@@ -629,21 +619,24 @@ export async function validateAndUpdateBatch(
     );
   }
 
-  // Validate the numeric fields that were supplied (a PUT may be partial — e.g.
-  // toggling is_active only — so unsupplied fields keep their stored values). A
-  // blank/garbage value returns a friendly 400 instead of a raw PG 22P02.
-  const hasUpper = batchData.upper_aligner_count !== undefined;
-  const hasLower = batchData.lower_aligner_count !== undefined;
-  const upperCount = hasUpper
-    ? parseOptionalCount(batchData.upper_aligner_count, 'Upper aligner count')
-    : null;
-  const lowerCount = hasLower
-    ? parseOptionalCount(batchData.lower_aligner_count, 'Lower aligner count')
-    : null;
-  if (batchData.days !== undefined) parseOptionalDays(batchData.days);
+  // This PUT is a FULL REPLACE, not a partial patch: `updateBatch` writes every
+  // editable column unconditionally, so an omitted count is persisted as 0 and an
+  // omitted days/notes as NULL. Validate on that basis — an absent count IS a
+  // request to set that arch to 0, so the checks run unconditionally rather than
+  // only when the field happens to be present (which let an omit-both PUT through
+  // to write a meaningless 0/0 batch).
+  const upperCount = parseOptionalCount(
+    batchData.upper_aligner_count,
+    'Upper aligner count'
+  );
+  const lowerCount = parseOptionalCount(
+    batchData.lower_aligner_count,
+    'Lower aligner count'
+  );
+  const days = parseOptionalDays(batchData.days);
 
-  // When both counts are being set, a 0/0 batch is meaningless (mirror create).
-  if (hasUpper && hasLower && (upperCount ?? 0) <= 0 && (lowerCount ?? 0) <= 0) {
+  // A 0/0 batch is meaningless (mirrors create).
+  if (upperCount <= 0 && lowerCount <= 0) {
     throw new AlignerValidationError(
       'Enter an upper or lower aligner count',
       'VALIDATION_ERROR'
@@ -653,10 +646,13 @@ export async function validateAndUpdateBatch(
   log.info(`Updating aligner batch ${batchId}:`, batchData);
 
   try {
-    const result = (await alignerQueries.updateBatch(
-      parseInt(String(batchId)),
-      batchData
-    )) as BatchUpdateResult | void;
+    // Persist the validated values (see validateAndCreateBatch).
+    const result = (await alignerQueries.updateBatch(parseInt(String(batchId)), {
+      ...batchData,
+      upper_aligner_count: upperCount,
+      lower_aligner_count: lowerCount,
+      days,
+    })) as BatchUpdateResult | void;
     log.info(`Aligner batch ${batchId} updated successfully`);
 
     if (result && result.deactivatedBatch) {
@@ -1289,38 +1285,3 @@ export async function searchPatients(
   }
 }
 
-// Export all functions
-export default {
-  // Sets
-  validateAndCreateSet,
-  validateAndUpdateSet,
-  validateAndDeleteSet,
-
-  // Batches
-  validateAndCreateBatch,
-  validateAndUpdateBatch,
-  validateAndDeleteBatch,
-  markBatchDelivered,
-  markBatchManufactured,
-  undoManufactureBatch,
-  undoDeliverBatch,
-
-  // Doctors
-  validateAndCreateDoctor,
-  validateAndUpdateDoctor,
-  validateAndDeleteDoctor,
-
-  // notes
-  validateAndCreateNote,
-  validateAndUpdateNote,
-  validateAndDeleteNote,
-
-  // Payments
-  validateAndCreatePayment,
-
-  // Search
-  searchPatients,
-
-  // Error class
-  AlignerValidationError,
-};

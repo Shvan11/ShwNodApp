@@ -15,6 +15,8 @@ import { log } from '../../utils/logger.js';
 interface WhatsappClient {
   res: Response;
   viewerId: string;
+  /** Idempotent per-stream teardown (unregisters the QR viewer exactly once). */
+  disconnect: () => void;
 }
 
 const whatsappClients = new Map<string, WhatsappClient>();
@@ -96,7 +98,6 @@ export function createWhatsappSseRouter(emitter: EventEmitter): Router {
     openStream(req, res);
 
     const viewerId = generateViewerId(req);
-    whatsappClients.set(viewerId, { res, viewerId });
 
     // Pair each registerQRViewer with exactly one unregisterQRViewer regardless
     // of timing. The 'close' listener is attached BEFORE the await so a
@@ -104,7 +105,14 @@ export function createWhatsappSseRouter(emitter: EventEmitter): Router {
     // resolves, cleanup is deferred so we never unregister before we register.
     let registered = false;
     let closedEarly = false;
+    // ...and exactly one unregister per viewer, however many times we're asked:
+    // teardown ends the response, which itself fires `close`, so without this
+    // latch the same viewer would be unregistered twice and activeQRViewers
+    // would drift below the real number of open streams.
+    let cleanedUp = false;
     const cleanup = (): void => {
+      if (cleanedUp) return;
+      cleanedUp = true;
       whatsappClients.delete(viewerId);
       void messageState.unregisterQRViewer(viewerId).catch(() => {
         /* state already torn down */
@@ -115,10 +123,13 @@ export function createWhatsappSseRouter(emitter: EventEmitter): Router {
       });
     };
 
-    req.on('close', () => {
+    const disconnect = (): void => {
       if (registered) cleanup();
       else closedEarly = true;
-    });
+    };
+
+    whatsappClients.set(viewerId, { res, viewerId, disconnect });
+    req.on('close', disconnect);
 
     // Every SSE subscriber is a QR viewer. Triggers QR data-URL generation
     // and gates the on-demand init in /api/wa/initial-state.
@@ -160,9 +171,11 @@ export function teardownWhatsappSseBroadcaster(): void {
     attachedEmitter = null;
   }
   listenerRefs = [];
-  for (const { res, viewerId } of whatsappClients.values()) {
+  // Go through each stream's own teardown so the QR-viewer count is decremented
+  // exactly once per viewer — the `close` that res.end() triggers finds it done.
+  for (const { res, disconnect } of Array.from(whatsappClients.values())) {
     try { res.end(); } catch { /* ignore */ }
-    void messageState.unregisterQRViewer(viewerId).catch(() => { /* state already torn down */ });
+    disconnect();
   }
   whatsappClients.clear();
   initialized = false;

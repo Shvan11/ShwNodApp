@@ -235,8 +235,3 @@ export function validateDate(date: string): void {
   }
 }
 
-export default {
-  calculateMonthlyStatistics,
-  validateMonthYear,
-  validateDate,
-};

@@ -27,10 +27,13 @@ export interface XrayInfo {
   date?: string | null;
 }
 
-export interface PatientAssets {
+// `type`, not `interface`: this flows into a `sendData` payload validated against a
+// `z.looseObject` contract, and only a type alias gets the implicit string index
+// signature that assignment needs (see CLAUDE.md — TS2345).
+export type PatientAssets = {
   xrays: XrayInfo[];
   assets: string[];
-}
+};
 
 /** X-ray file extensions CS-Imaging writes, plus its in-progress `TASK_` markers. */
 const XRAY_SUFFIXES = ['.dcm', '.pano', '.ceph', '.rvg'];

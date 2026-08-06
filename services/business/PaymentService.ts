@@ -363,7 +363,3 @@ export async function validateAndCreateInvoice(
   return invoice;
 }
 
-export default {
-  validateAndCreateInvoice,
-  PaymentValidationError,
-};

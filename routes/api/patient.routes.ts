@@ -557,7 +557,7 @@ router.get(
 
 /**
  * Search patients by name, phone, id, work type, keywords, tags, patient type,
- * last-appointment age/date-range, final-photo presence, and unpaid balance.
+ * last-appointment age/date-range, final/progress-photo presence, and unpaid balance.
  * GET /patients/search — query params are the contract's `patientSearch.query`.
  */
 router.get(
@@ -580,6 +580,7 @@ router.get(
       const lastAppointmentFrom = req.query.lastAppointmentFrom || '';
       const lastAppointmentTo = req.query.lastAppointmentTo || '';
       const finalPhotos = req.query.finalPhotos || '';
+      const progressPhotos = req.query.progressPhotos || '';
       const hasDebt = req.query.hasDebt === 'true';
       const nameStartsWith = req.query.nameStartsWith === 'true';
 
@@ -750,6 +751,28 @@ router.get(
             ))`;
         whereConditions.push(
           finalPhotos === 'has' ? hasFinalPhotosCondition : sql`NOT ${hasFinalPhotosCondition}`
+        );
+      }
+
+      // Filter by progress-photo presence (tri-state: absent | 'has' | 'none').
+      // Same two-marker shape as final photos, but works has no p_photo_date
+      // column (a case can have many progress sessions), so the second marker is
+      // the visit's own p_photo flag — the field the Visits form ticks.
+      if (progressPhotos) {
+        const hasProgressPhotosCondition = sql`(EXISTS (
+                SELECT 1 FROM "time_points" tp
+                WHERE tp."person_id" = p."person_id"
+                AND tp."tp_description" LIKE '%Progress%'
+            ) OR EXISTS (
+                SELECT 1 FROM "visits" v
+                JOIN "works" wp ON wp."work_id" = v."work_id"
+                WHERE wp."person_id" = p."person_id"
+                AND v."p_photo"
+            ))`;
+        whereConditions.push(
+          progressPhotos === 'has'
+            ? hasProgressPhotosCondition
+            : sql`NOT ${hasProgressPhotosCondition}`
         );
       }
 

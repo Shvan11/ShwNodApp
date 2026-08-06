@@ -73,13 +73,6 @@ export interface SessionStats {
   activeMessages?: number;
 }
 
-/**
- * WhatsApp service interface (minimal for dependency)
- */
-export interface WhatsAppServiceInterface {
-  // Placeholder for WhatsApp service methods - empty interface allows any object
-}
-
 // ===========================================
 // MESSAGE SESSION CLASS
 // ===========================================
@@ -98,20 +91,14 @@ export class MessageSession {
   public readonly autoExpireEnabled: boolean;
   public readonly maxMessages: number;
 
-  private whatsappService: WhatsAppServiceInterface;
   private messageIdToAppointmentMap: Map<string, MessageMapping>;
   private appointmentIdToMessageMap: Map<number, string>;
   private processedAppointments: Set<number>;
   private stats: SessionStats;
 
-  constructor(
-    date: string,
-    whatsappService: WhatsAppServiceInterface,
-    options: MessageSessionOptions = {}
-  ) {
+  constructor(date: string, options: MessageSessionOptions = {}) {
     this.sessionId = `msg_session_${date}_${Date.now()}`;
     this.date = date;
-    this.whatsappService = whatsappService;
     this.startTime = new Date();
     this.endTime = null;
     this.status = 'CREATED';
@@ -399,10 +386,14 @@ export class MessageSession {
   }
 
   /**
-   * Record message failed
+   * Record message failed. `messageId` is null when the send never produced one
+   * (the usual case) — the failure counter still moves, there is just no mapping
+   * to annotate.
    */
-  recordMessageFailed(messageId: string, error: string): void {
+  recordMessageFailed(messageId: string | null, error: string): void {
     this.stats.failedMessages++;
+    if (!messageId) return;
+
     const mapping = this.messageIdToAppointmentMap.get(messageId);
     if (mapping) {
       mapping.failedAt = new Date();

@@ -75,8 +75,6 @@ export interface PgDatabaseConfig {
  * Telegram configuration
  */
 export interface TelegramConfig {
-  token?: string;
-  chatId?: string;
   apiId?: number;
   apiHash?: string;
 }
@@ -263,8 +261,6 @@ export interface OptionalEnvVars {
   PORT?: string;
   NODE_ENV?: Environment;
   MACHINE_PATH?: string;
-  TELEGRAM_TOKEN?: string;
-  TELEGRAM_CHAT_ID?: string;
   TELEGRAM_API_ID?: string;
   TELEGRAM_API_HASH?: string;
   TWILIO_ACCOUNT_SID?: string;

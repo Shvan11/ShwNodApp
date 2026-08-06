@@ -242,6 +242,7 @@ export const patientSearch = {
     lastAppointmentFrom: optionalDateString,
     lastAppointmentTo: optionalDateString,
     finalPhotos: z.enum(['has', 'none']).optional(),
+    progressPhotos: z.enum(['has', 'none']).optional(),
     hasDebt: z.enum(['true', 'false']).optional(),
     sortBy: z.enum(['name', 'date', 'lastVisit', 'id']).optional(),
     order: z.enum(['asc', 'desc']).optional(),

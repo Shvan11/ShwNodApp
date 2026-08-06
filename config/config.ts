@@ -110,8 +110,7 @@ const config: AppConfig = {
   // NOTE: pg_dump's version must be >= the server's PostgreSQL major version.
   pgDumpPath: process.env.PG_DUMP_PATH || 'pg_dump',
   telegram: {
-    token: process.env.TELEGRAM_TOKEN,
-    chatId: process.env.TELEGRAM_CHAT_ID,
+    // MTProto (GramJS) only — the bot API is not used, see services/messaging/telegram.ts.
     apiId: process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : undefined,
     apiHash: process.env.TELEGRAM_API_HASH
   },

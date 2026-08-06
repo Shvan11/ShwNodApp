@@ -1,5 +1,9 @@
 // services/messaging/telegram.ts
-import TelegramBot from 'node-telegram-bot-api';
+//
+// Telegram sending goes through the MTProto *user* account (GramJS), never a bot:
+// a bot can't message a patient who hasn't started a chat with it, and bots are
+// capped at 50 MB uploads. The old bot-API `sendDocument()` helper had no callers
+// and was removed along with node-telegram-bot-api / TELEGRAM_TOKEN / CHAT_ID.
 import { TelegramClient, Api } from 'telegram';
 import { CustomFile } from 'telegram/client/uploads.js';
 import { StringSession } from 'telegram/sessions/index.js';
@@ -102,32 +106,6 @@ type ExtendedTelegramClient = TelegramClient & {
 // ===========================================
 // FUNCTIONS
 // ===========================================
-
-/**
- * Send a document via Telegram bot
- * @param filePath - Path to the file to send
- * @returns Promise resolving to the sent message
- */
-export async function sendDocument(filePath: string): Promise<TelegramBot.Message> {
-  try {
-    const token = config.telegram.token;
-    const chatId = config.telegram.chatId;
-
-    if (!token) {
-      throw new Error('Telegram token not configured');
-    }
-
-    if (!chatId) {
-      throw new Error('Telegram chatId not configured');
-    }
-
-    const bot = new TelegramBot(token);
-    return await bot.sendDocument(chatId, filePath);
-  } catch (error) {
-    log.error('Error sending document via Telegram bot:', { error: error instanceof Error ? error.message : String(error) });
-    throw error;
-  }
-}
 
 /**
  * Fully tear a one-shot client down. `destroy()` sets `_destroyed`, which is what

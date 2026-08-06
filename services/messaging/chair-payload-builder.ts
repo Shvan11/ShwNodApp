@@ -39,7 +39,14 @@ export async function buildChairPatientPayload(
   }
 
   try {
-    const allImages = await getPatientImagesLocal(pid);
+    // Independent reads — the kiosk waits on the slowest, not on their sum. Only
+    // the visit summary has to follow (it's gated on the work being orthodontic).
+    const [allImages, activeWork, patientRecord] = await Promise.all([
+      getPatientImagesLocal(pid),
+      getActiveWork(personId),
+      getPatientById(personId),
+    ]);
+
     const filteredImages = allImages.filter(img =>
       CHAIR_DISPLAY_INTRAORAL_EXTS.some(ext => img.name.toLowerCase().endsWith(ext))
     );
@@ -50,12 +57,8 @@ export async function buildChairPatientPayload(
         - CHAIR_DISPLAY_INTRAORAL_EXTS.indexOf(bExt as typeof CHAIR_DISPLAY_INTRAORAL_EXTS[number]);
     });
 
-    const activeWork = await getActiveWork(personId);
     const isOrtho = !!(activeWork && ORTHO_WORK_TYPE_SET.has(activeWork.type_of_work as number));
-    const [latestVisit, patientRecord] = await Promise.all([
-      isOrtho ? getLatestVisitsSum(personId) : Promise.resolve(null),
-      getPatientById(personId),
-    ]);
+    const latestVisit = isOrtho ? await getLatestVisitsSum(personId) : null;
 
     const name = patientRecord?.patient_name?.trim() ||
       [patientRecord?.first_name, patientRecord?.last_name].filter(Boolean).join(' ').trim() ||

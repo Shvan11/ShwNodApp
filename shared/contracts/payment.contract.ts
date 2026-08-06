@@ -139,14 +139,19 @@ export type UpdateExchangeRateResponse = z.infer<typeof updateExchangeRate.respo
 // stable id and keep the rest loose.
 // ---------------------------------------------------------------------------
 
+// All four money fields are `.int()`: the invoices columns are PG `integer`
+// (amount_paid/usd_received/iqd_received/change), and PaymentService parses the
+// three cash fields with parseInt. Accepting a plain number meant a fractional
+// input was silently TRUNCATED on the cash legs but ROUNDED by PG on amountPaid —
+// two different answers for the same request. Reject it at the boundary instead.
 export const addInvoice = {
   body: z.looseObject({
     workid: intId,
-    amountPaid: z.coerce.number(),
+    amountPaid: z.coerce.number().int(),
     paymentDate: dateString,
-    usdReceived: z.coerce.number().optional(),
-    iqdReceived: z.coerce.number().optional(),
-    change: z.coerce.number().optional(),
+    usdReceived: z.coerce.number().int().optional(),
+    iqdReceived: z.coerce.number().int().optional(),
+    change: z.coerce.number().int().optional(),
   }),
   response: z.looseObject({ InvoiceID: z.number().optional() }),
 } as const;

@@ -25,7 +25,9 @@ const transformedMessage = z.object({
   messageId: z.string(),
   appointmentId: z.number().optional(),
   errorMessage: z.string().optional(),
-  message: z.string(),
+  // No `message` field: this feed is delivery status only. It used to be modeled
+  // (required), but the service hardcoded it to '' — the reminder TEXT is fetched
+  // per-appointment via GET /api/messaging/message-text.
   status: z.number(),
   name: z.string(),
   timeSent: z.string(),

@@ -7,6 +7,14 @@ import { log } from '../../utils/logger.js';
 
 const { MessageMedia } = whatsapp;
 
+/**
+ * Files WhatsApp should receive as a photo. Covers ordinary image extensions plus
+ * the clinic's Dolphin naming convention (`.i10`, `.i22`, …), which are JPEGs
+ * behind a non-standard extension — hence the rename + explicit mimetype below.
+ * Anything else keeps its real name and detected type so it arrives intact.
+ */
+const PHOTO_EXT_RE = /\.(i\d{2}|jpe?g|png|webp|gif|bmp)$/i;
+
 // ===========================================
 // TYPES
 // ===========================================
@@ -100,18 +108,19 @@ export async function sendXray_(number: string, file: string): Promise<SendXrayR
       // Create media with custom filename for phone compatibility
       const media = MessageMedia.fromFilePath(file);
 
-      // Convert filename to .jpg for phone compatibility
       const originalFilename = file.split(/[/\\]/).pop() || ''; // Get filename from path
-      const convertedFilename = getPhoneCompatibleFilename(originalFilename);
 
-      // Set the filename that recipients will see
-      media.filename = convertedFilename;
-
-      // Ensure correct MIME type for images (critical for WhatsApp to display as photo)
-      media.mimetype = 'image/jpeg';
+      // Only photos get renamed to .jpg and stamped image/jpeg (critical for
+      // WhatsApp to display them inline). Anything else keeps the name and type
+      // MessageMedia detected — forcing jpeg on, say, a PDF delivered a file the
+      // recipient couldn't open.
+      if (PHOTO_EXT_RE.test(originalFilename)) {
+        media.filename = getPhoneCompatibleFilename(originalFilename);
+        media.mimetype = 'image/jpeg';
+      }
 
       log.info(
-        `Sending file: ${originalFilename} as ${convertedFilename} with MIME type: ${media.mimetype}`
+        `Sending file: ${originalFilename} as ${media.filename} with MIME type: ${media.mimetype}`
       );
 
       // Remove + prefix if present for WhatsApp number validation

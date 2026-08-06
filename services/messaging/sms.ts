@@ -56,7 +56,6 @@ interface SmsSid {
  */
 class SmsService {
   private client: TwilioClient | null;
-  private sentSmsList: SentSms[];
   // Pending 5-min status-check timers, keyed by date — so repeated sends don't
   // stack timers and graceful shutdown can clear them.
   private statusCheckTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
@@ -71,8 +70,6 @@ class SmsService {
     } else {
       this.client = twilio(accountSid, authToken);
     }
-
-    this.sentSmsList = [];
 
     ResourceManager.register('sms-service', this, () => this.cleanup());
   }

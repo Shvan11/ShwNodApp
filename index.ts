@@ -538,22 +538,12 @@ async function initializeApplication(): Promise<AppInitResult> {
         }
     });
 
-    whatsappService.on('qr', async (qr: string) => {
-        log.info("QR event fired");
-        try {
-            await messageState.setQR(qr);
-
-            // Only broadcast if there are active viewers
-            if (messageState.activeQRViewers > 0 && wsEmitter) {
-                wsEmitter.emit(InternalEmitterEvents.WHATSAPP_QR_UPDATED, {
-                    qr,
-                    clientReady: false
-                });
-            }
-        } catch (error) {
-            log.error("Error handling QR event:", { error });
-        }
-    });
+    // NOTE: there is deliberately no whatsappService.on('qr') handler here.
+    // handleQR() in the service already stores the QR in messageState AND emits
+    // WHATSAPP_QR_UPDATED carrying a rendered data URL. A handler here would emit
+    // a SECOND frame for the same QR holding the RAW code string — and the auth
+    // page renders that payload straight into <img src=…>, so whichever frame
+    // landed last decided whether the user saw a QR or a broken image.
 
     // ===== Enhanced error handling =====
     // An uncaught *exception* can leave the process in an unknown/corrupted

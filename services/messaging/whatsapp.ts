@@ -37,13 +37,12 @@ export type ClientState = 'DISCONNECTED' | 'INITIALIZING' | 'CONNECTED' | 'ERROR
 export type CircuitBreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
 /**
- * Lock waiter entry
+ * A queued lock acquirer. Both callbacks close over their own acquisition
+ * timeout and clear it, so the handle isn't stored on the entry.
  */
 interface LockWaiter {
   resolve: () => void;
   reject: () => void;
-  timeout: NodeJS.Timeout;
-  timestamp: number;
 }
 
 /**
@@ -83,7 +82,9 @@ interface WebSocketEmitter {
 interface PuppeteerBrowser {
   pages(): Promise<PuppeteerPage[]>;
   close(): Promise<void>;
-  process(): { kill(signal: string): void } | null;
+  // The real value is a Node ChildProcess; `pid` is declared because
+  // ensureProfileUnlocked() needs it to confirm the browser is actually gone.
+  process(): { kill(signal: string): void; pid?: number } | null;
 }
 
 /**
@@ -201,8 +202,15 @@ class ClientStateManager {
   public state: ClientState = 'DISCONNECTED';
   public client: WhatsAppClient | null = null;
   public browser: PuppeteerBrowser | null = null;
-  public page: PuppeteerPage | null = null;
   public initializationPromise: Promise<boolean> | null = null;
+  /**
+   * Set for the WHOLE of a restart() — the teardown as well as the init that
+   * follows — so callers join the restart instead of racing its teardown.
+   * Deliberately NOT cleared by cleanup(): restart() calls cleanup() partway
+   * through itself and its single-flight guard has to survive that. Owned by
+   * restart(), which clears it by identity.
+   */
+  public restartPromise: Promise<boolean> | null = null;
   public initializationAbortController: AbortController | null = null;
   public reconnectTimer: NodeJS.Timeout | null = null;
   public reconnectAttempts = 0;
@@ -214,6 +222,15 @@ class ClientStateManager {
 
   private initializationLock: number | false = false;
   private lockWaiters: LockWaiter[] = [];
+  /**
+   * Identifies the CURRENT lock holder. A holder releases by presenting its token,
+   * so an ABANDONED attempt — one whose lock was force-released by cleanup() while
+   * it was still running — presents a stale token and its release becomes a no-op.
+   * Without this its late release would free the lock out from under whatever
+   * attempt replaced it, letting the next caller launch a second Chrome against the
+   * same LocalAuth profile.
+   */
+  private lockToken = 0;
 
   // Constants
   public readonly MAX_RECONNECT_ATTEMPTS = 10;
@@ -226,18 +243,34 @@ class ClientStateManager {
   public readonly INITIALIZATION_TIMEOUT = 60000;
   public readonly MAX_LOCK_WAIT_TIME = 30000;
 
-  async acquireInitializationLock(timeoutMs: number = this.MAX_LOCK_WAIT_TIME): Promise<boolean> {
+  /**
+   * Take the initialization lock. Resolves with the caller's OWNER TOKEN, which
+   * must be handed back to releaseInitializationLock().
+   */
+  async acquireInitializationLock(timeoutMs: number = this.MAX_LOCK_WAIT_TIME): Promise<number> {
     if (!this.initializationLock) {
       this.initializationLock = Date.now();
-      return true;
+      return ++this.lockToken;
     }
 
+    // A lock older than the timeout is only ORPHANED if no attempt is actually
+    // running behind it — age alone is not evidence. An attempt is NOT bounded by
+    // INITIALIZATION_TIMEOUT: the `qr` handler in createAndInitializeClient cancels
+    // the outer wait and opens a fresh FRESH_AUTH_TIMEOUT scan window, so a
+    // legitimate session→QR fallback runs SESSION_RESTORATION_TIMEOUT +
+    // FRESH_AUTH_TIMEOUT before its cleanup even starts. Stealing on age would
+    // therefore take the lock from a healthy slow attempt and start a second Chrome
+    // on the same LocalAuth profile — which authenticates but never reaches `ready`,
+    // so the watchdog mis-parks a good session as "needs re-link". The in-flight
+    // promise is the liveness signal: present means a real attempt owns this lock
+    // (wait for it), absent means the holder is gone and the lock is free to take.
     const lockAge = Date.now() - this.initializationLock;
-    if (lockAge > this.INITIALIZATION_TIMEOUT) {
-      log.warn(`Force releasing stale lock`, { lockAge });
+    const attemptInFlight = this.initializationPromise ?? this.restartPromise;
+    if (lockAge > this.INITIALIZATION_TIMEOUT && !attemptInFlight) {
+      log.warn(`Force releasing orphaned lock (no attempt in flight)`, { lockAge });
       this.forceReleaseLock();
       this.initializationLock = Date.now();
-      return true;
+      return ++this.lockToken;
     }
 
     return new Promise((resolve, reject) => {
@@ -253,22 +286,24 @@ class ClientStateManager {
         resolve: () => {
           clearTimeout(timeout);
           this.initializationLock = Date.now();
-          resolve(true);
+          resolve(++this.lockToken);
         },
         reject: () => {
           clearTimeout(timeout);
           reject(new Error('Lock acquisition cancelled'));
         },
-        timeout,
-        timestamp: Date.now(),
       };
 
       this.lockWaiters.push(waitEntry);
     });
   }
 
-  releaseInitializationLock(): void {
-    if (!this.initializationLock) {
+  releaseInitializationLock(token: number): void {
+    // Only the CURRENT holder may release. An attempt that was abandoned mid-flight
+    // (cleanup() force-released its lock, a replacement then took it) carries a
+    // stale token — its release has to be a no-op, or it frees the replacement's
+    // lock and a third caller starts a second browser alongside a live attempt.
+    if (!this.initializationLock || token !== this.lockToken) {
       return;
     }
 
@@ -290,6 +325,9 @@ class ClientStateManager {
 
   forceReleaseLock(): void {
     this.initializationLock = false;
+    // Invalidate the outgoing holder's token. Its attempt may still be running, and
+    // its eventual release must not free a lock a newer attempt has since taken.
+    this.lockToken++;
 
     while (this.lockWaiters.length > 0) {
       const waiter = this.lockWaiters.shift();
@@ -338,7 +376,7 @@ class ClientStateManager {
       initializing: this.isState('INITIALIZING'),
       reconnectAttempts: this.reconnectAttempts,
       lastError: this.lastError?.message,
-      hasActivePromise: !!this.initializationPromise,
+      hasActivePromise: !!(this.initializationPromise ?? this.restartPromise),
     };
   }
 
@@ -371,9 +409,13 @@ class ClientStateManager {
       this.initializationAbortController = null;
     }
 
-    if (this.initializationPromise) {
-      this.initializationPromise = null;
-    }
+    // Explicitly ABANDON any in-flight attempt's registration: cleanup() runs when
+    // the caller (restart/unlink) is about to replace that attempt, so joiners must
+    // not be handed the dying one. Safe because an owner now clears by identity —
+    // the abandoned attempt can no longer null its replacement's registration on the
+    // way out. restartPromise is deliberately NOT cleared: restart() calls cleanup()
+    // partway through itself and its single-flight guard has to survive it.
+    this.initializationPromise = null;
 
     this.forceReleaseLock();
 
@@ -522,6 +564,13 @@ class WhatsAppService extends EventEmitter {
   private readyWatchdog: ReturnType<typeof setTimeout> | null = null;
   private readyWatchdogRestarts = 0;
 
+  // The post-`authenticated` 60s "let the session settle" wait. Held here so a
+  // teardown can cut it short instead of leaving handleAuthenticated parked on an
+  // uncancellable timer that then marks a dead client's session as stabilized.
+  private stabilizationTimer: ReturnType<typeof setTimeout> | null = null;
+  private stabilizationResolve: (() => void) | null = null;
+  private stabilizationAborted = false;
+
   // Monotonic id for each initialization attempt. Overlapping triggers — the ready
   // watchdog, scheduleReconnect, and EVERY open auth page's on-demand init — can
   // start a fresh attempt while an older one is still pending. The older attempt's
@@ -573,9 +622,10 @@ class WhatsAppService extends EventEmitter {
 
   // Ad-hoc sends (per-patient resend, receipts) aren't registered in a batch
   // MessageSession, so their acks used to be dropped by handleMessageAck. Track
-  // recent ad-hoc messageId → appointment here so delivery ticks still land in
-  // the DB + SSE. In-memory, pruned by size; scale is a handful/day.
-  private adhocMessages = new Map<string, { appointmentId: number; trackedAt: number }>();
+  // recent ad-hoc messageId → appointmentId here so delivery ticks still land in
+  // the DB + SSE. In-memory, pruned by insertion order once ADHOC_MESSAGES_MAX is
+  // reached (no TTL — scale is a handful a day).
+  private adhocMessages = new Map<string, number>();
   private readonly ADHOC_MESSAGES_MAX = 500;
 
   private eventHandlers: {
@@ -604,28 +654,18 @@ class WhatsAppService extends EventEmitter {
       onLoadingScreen: this.handleLoadingScreen.bind(this),
     };
 
-    this.setupCleanupHandlers();
     this.setupEventListeners();
   }
 
-  private setupCleanupHandlers(): void {
-    // Signal handling is owned by index.ts:gracefulShutdown, which calls
-    // whatsappService.gracefulShutdown() at the right point in the chain.
-    // No process.on('SIGINT'/'SIGTERM') here.
-
-    stateEvents.on('qr_cleanup_required', () => {
-      this.scheduleClientCleanup();
-    });
-
-    stateEvents.on('qr_viewer_connected', () => {
-      this.handleViewerConnected();
-    });
-  }
-
+  // Signal handling is owned by index.ts:gracefulShutdown, which calls
+  // whatsappService.gracefulShutdown() at the right point in the chain — no
+  // process.on('SIGINT'/'SIGTERM') here. `qr_cleanup_required` /
+  // `qr_viewer_connected` are handled by messageState alone; this service used to
+  // subscribe to both with log-only no-op handlers, which is why they're gone.
   private setupEventListeners(): void {
     stateEvents.on('whatsapp_initialization_requested', () => {
       // Fire-and-forget: when an init is already in flight, initializeOnDemand()
-      // returns the *shared* initializationPromise, which can reject (e.g. init
+      // returns the *shared* in-flight attempt, which can reject (e.g. init
       // timeout). Without this .catch() that rejection escapes as an unhandled
       // rejection. The primary awaiter in initialize() already handles recovery
       // (reconnect/circuit breaker), so here we only need to swallow it.
@@ -664,33 +704,94 @@ class WhatsAppService extends EventEmitter {
     };
   }
 
-  private async handleViewerConnected(): Promise<void> {
-    log.debug('QR viewer connected - checking session state');
-
-    if (this.clientState.isState('DISCONNECTED') && !this.clientState.client) {
-      log.debug(
-        'Client disconnected with no instance - will wait for explicit initialization request'
-      );
-    } else {
-      log.debug('Skipping auto-initialization', {
-        state: this.clientState.state,
-        hasClient: !!this.clientState.client,
-        qrViewers: this.messageState.activeQRViewers,
-      });
-    }
+  /**
+   * The attempt every caller should join. A whole restart outranks a bare init:
+   * during a restart the init half hasn't registered yet (or is about to be torn
+   * down), and joiners want the outcome of the restart, not of the attempt it is
+   * replacing.
+   */
+  private inFlightAttempt(): Promise<boolean> | null {
+    return this.clientState.restartPromise ?? this.clientState.initializationPromise;
   }
 
-  async initialize(forceRestart = false): Promise<boolean> {
-    if (!forceRestart && this.clientState.isState('CONNECTED')) {
+  /**
+   * Bring the client up, JOINING whatever attempt is already under way.
+   *
+   * Concurrent attempts must never overlap. whatsapp-web.js + LocalAuth is a
+   * singleton bound to ONE Chrome profile, and a second client.initialize()
+   * against the same --user-data-dir usually does NOT throw "browser is already
+   * running": the new page authenticates but never reaches `ready`, and the ready
+   * watchdog then parks a perfectly healthy session as "needs re-link" (the same
+   * contention documented in performInitialization's boot sweep). So overlap
+   * doesn't just waste work — it manufactures a false "session expired, re-scan
+   * the QR" for the front desk. Dedupe is lossless here because init takes no
+   * parameters: a second attempt cannot learn or do anything the first isn't
+   * already doing. And the triggers genuinely fan in within milliseconds — every
+   * SSE subscriber's on-demand init, the reconnect timer, the ready watchdog, the
+   * /restart + /refresh-qr endpoints.
+   *
+   * The join tests the PROMISE, not the state: performInitialization reaches
+   * setState('INITIALIZING') only after the boot orphan sweep and
+   * validateSessionQuality, so for the first seconds of an attempt a state-keyed
+   * test misses it and the caller falls through to the lock — a 30s wait, then a
+   * throw at an SSE subscriber.
+   */
+  async initialize(): Promise<boolean> {
+    const inFlight = this.inFlightAttempt();
+    if (inFlight) {
+      log.info('WhatsApp initialization already in flight — joining it');
+      return inFlight;
+    }
+
+    if (this.clientState.isState('CONNECTED')) {
       log.info('WhatsApp client already connected');
       return true;
     }
 
-    if (!forceRestart && this.clientState.isState('INITIALIZING')) {
-      log.info('WhatsApp client already initializing, waiting for completion');
-      return this.clientState.initializationPromise as Promise<boolean>;
+    if (this.clientState.isState('INITIALIZING')) {
+      // INITIALIZING with nothing in flight means the previous attempt ended in
+      // QR mode and is parked waiting for a human to scan. There is no promise
+      // to await, so report "not connected" — the old cast returned `null` here,
+      // which `await`ed to null and made restart()/initializeOnDemand() resolve a
+      // value that was neither the client's state nor a real attempt.
+      log.debug('Client is waiting for a QR scan — no initialization in flight');
+      return false;
     }
 
+    return this.initializeInternal();
+  }
+
+  /**
+   * The attempt itself, minus initialize()'s join. restart() drives this directly:
+   * it has already published its own promise, so going through the join would
+   * deadlock it on itself.
+   */
+  private initializeInternal(): Promise<boolean> {
+    // Register the attempt SYNCHRONOUSLY, before its first await. Acquiring the lock
+    // is async, so a promise published after it leaves a hole in which a second
+    // caller sees nothing in flight, misses the join, and queues on the lock instead
+    // — where it waits MAX_LOCK_WAIT_TIME and then either throws at its caller or
+    // (once the first attempt releases) proceeds into a SECOND attempt, which is the
+    // overlap this whole path exists to prevent. Registering first makes the join
+    // airtight regardless of when the caller arrives.
+    const attempt = this.runInitialization();
+    this.clientState.initializationPromise = attempt;
+
+    return attempt.finally(() => {
+      // Clear only our OWN registration, by identity. A restart (or unlink) can
+      // abandon this attempt mid-flight and start a replacement; when the abandoned
+      // attempt finally settles — up to SESSION_RESTORATION_TIMEOUT later, since
+      // nothing interrupts it — a bare "did I start one?" test would null the
+      // REPLACEMENT's registration, leaving a live attempt invisible to joiners
+      // (initializeOnDemand then mis-reports it as parked on a QR scan) and the
+      // profile open for a second Chrome.
+      if (this.clientState.initializationPromise === attempt) {
+        this.clientState.initializationPromise = null;
+      }
+    });
+  }
+
+  private async runInitialization(): Promise<boolean> {
     // Do NOT short-circuit here when the breaker is OPEN. The OPEN→HALF_OPEN
     // transition (and the actual re-probe) happens only inside
     // circuitBreaker.execute() in performInitialization(). Gating the breaker here
@@ -702,37 +803,42 @@ class WhatsAppService extends EventEmitter {
     // genuinely OPEN (its catch reschedules) and half-opens once the cooldown
     // elapses, so an unattended server recovers from a transient outage on its own.
 
+    let lockToken: number | null = null;
     try {
       log.debug('Acquiring initialization lock');
-      await this.clientState.acquireInitializationLock();
+      lockToken = await this.clientState.acquireInitializationLock();
 
-      if (
-        !forceRestart &&
-        (this.clientState.isState('CONNECTED') || this.clientState.isState('INITIALIZING'))
-      ) {
-        this.clientState.releaseInitializationLock();
-        return this.clientState.initializationPromise || true;
+      // The lock is held for the WHOLE of an attempt, so getting it means no
+      // other attempt is in flight and the state alone is the answer: CONNECTED
+      // is a real success, INITIALIZING here can only be QR mode (parked for a
+      // scan), which is not a connection. (restart() reaches this having just set
+      // DISCONNECTED, so it always falls through to a real attempt.)
+      if (this.clientState.isState('CONNECTED') || this.clientState.isState('INITIALIZING')) {
+        return this.clientState.isState('CONNECTED');
       }
 
-      this.clientState.initializationPromise = this.performInitialization(forceRestart);
-
-      const result = await this.clientState.initializationPromise;
-      return result;
+      return await this.performInitialization();
     } catch (error) {
       log.error('Initialization failed', error);
       throw error;
     } finally {
-      this.clientState.initializationPromise = null;
-      this.clientState.releaseInitializationLock();
+      // Release the lock by OWNER TOKEN. An attempt abandoned mid-flight (cleanup()
+      // force-released its lock, a replacement then took it) holds a stale token and
+      // its release is a no-op — otherwise it would free the replacement's lock and
+      // let a third caller start a second browser alongside a live attempt. The token
+      // covers the other direction too: on an acquisition timeout we never held it.
+      if (lockToken !== null) {
+        this.clientState.releaseInitializationLock(lockToken);
+      }
     }
   }
 
-  private async performInitialization(forceRestart = false): Promise<boolean> {
+  private async performInitialization(): Promise<boolean> {
     // Tag this attempt. Overlapping triggers can abandon it mid-flight; its late
     // failure must then become a no-op instead of tearing down whatever client a
     // newer attempt has since made live (see the superseded-attempt guard below).
     const myEpoch = ++this.initEpoch;
-    log.info('Starting initialization', { forceRestart, attempt: myEpoch });
+    log.info('Starting initialization', { attempt: myEpoch });
 
     try {
       // BOOT-ONLY orphan sweep: a prior PROCESS generation (e.g. a service restart
@@ -753,11 +859,11 @@ class WhatsAppService extends EventEmitter {
         await this.ensureProfileUnlocked();
       }
 
-      if (forceRestart && this.clientState.client) {
-        await this.destroyClient('restart');
-      }
-
-      if (!forceRestart && !this.clientState.client) {
+      // No client yet — this is a fresh attempt, so vet what's on disk before
+      // launching. (restart() gets here the same way: it destroys the old client
+      // itself, so the session it is about to reload is validated too. The old
+      // `forceRestart` flag skipped this check and nothing ever set it.)
+      if (!this.clientState.client) {
         const sessionQuality = await this.validateSessionQuality();
 
         if (sessionQuality === 'valid') {
@@ -1268,11 +1374,47 @@ class WhatsAppService extends EventEmitter {
     log.info('Waiting 60s for session to stabilize...');
 
     const SESSION_STABILIZATION_DELAY = 60000;
+    const clientAtAuth = this.clientState.client;
+    this.stabilizationAborted = false;
 
-    await new Promise((resolve) => setTimeout(resolve, SESSION_STABILIZATION_DELAY));
+    await new Promise<void>((resolve) => {
+      this.stabilizationResolve = resolve;
+      const timer = setTimeout(() => {
+        this.stabilizationTimer = null;
+        this.stabilizationResolve = null;
+        resolve();
+      }, SESSION_STABILIZATION_DELAY);
+      // Never let a purely advisory wait hold the process open at shutdown.
+      if (typeof timer.unref === 'function') timer.unref();
+      this.stabilizationTimer = timer;
+    });
+
+    // The client we authenticated with may have been torn down or replaced while
+    // we waited (restart, re-link park, shutdown). Marking THAT session stabilized
+    // would be a claim about a client that is already on its way out.
+    if (this.stabilizationAborted || this.clientState.client !== clientAtAuth) {
+      log.debug('Stabilization wait ended on a superseded client - not marking stabilized');
+      return;
+    }
 
     this.clientState.sessionStabilized = true;
     log.info('Session stabilized - safe to restart');
+  }
+
+  /**
+   * End the post-`authenticated` stabilization wait early. Resolves the pending
+   * promise (rather than just clearing the timer) so handleAuthenticated resumes,
+   * sees the client has changed, and returns instead of hanging forever.
+   */
+  private clearStabilizationWait(): void {
+    this.stabilizationAborted = true;
+    if (this.stabilizationTimer) {
+      clearTimeout(this.stabilizationTimer);
+      this.stabilizationTimer = null;
+    }
+    const resolve = this.stabilizationResolve;
+    this.stabilizationResolve = null;
+    if (resolve) resolve();
   }
 
   private async handleReady(): Promise<void> {
@@ -1287,9 +1429,8 @@ class WhatsAppService extends EventEmitter {
     if (this.clientState.client) {
       try {
         this.clientState.browser = this.clientState.client.pupBrowser || null;
-        this.clientState.page = this.clientState.client.pupPage || null;
       } catch (error) {
-        log.warn('Could not store browser references', error);
+        log.warn('Could not store browser reference', error);
       }
     }
 
@@ -1443,6 +1584,7 @@ class WhatsAppService extends EventEmitter {
     log.warn('Manual WhatsApp re-link requested — clearing session for a fresh QR');
     this.clearReadyWatchdog();
     this.stopHeartbeat();
+    this.clearStabilizationWait();
     this.clientState.clearReconnectTimer();
     this.clientState.destroyInProgress = true;
     this.messageState.manualDisconnect = true;
@@ -1639,21 +1781,21 @@ class WhatsAppService extends EventEmitter {
     if (!messageInfo) {
       // Ad-hoc sends (per-patient resend, receipts) aren't in a batch session —
       // persist their acks via the bounded ad-hoc map instead of dropping them.
-      const adhoc = this.adhocMessages.get(messageId);
-      if (adhoc) {
+      const adhocAppointmentId = this.adhocMessages.get(messageId);
+      if (adhocAppointmentId !== undefined) {
         try {
           await messagingQueries.updateSingleMessageStatus(messageId, ack);
           if (this.wsEmitter) {
             this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_MESSAGE_STATUS, {
               messageId,
-              appointmentId: adhoc.appointmentId,
+              appointmentId: adhocAppointmentId,
               status: ack,
             });
           }
         } catch (error) {
           log.error('Error updating ad-hoc message status', {
             messageId,
-            appointmentId: adhoc.appointmentId,
+            appointmentId: adhocAppointmentId,
             error: (error as Error).message,
           });
         }
@@ -1810,11 +1952,47 @@ class WhatsAppService extends EventEmitter {
     }, delay);
   }
 
+  /**
+   * Tear the client down and bring it back up on the SAME session (no QR).
+   *
+   * SINGLE-FLIGHT, and the guard has to cover the teardown, not just the init that
+   * follows it: the teardown ends in ensureProfileUnlocked(), whose untargeted
+   * sweep would kill a concurrently-restarting attempt's freshly launched Chrome
+   * (see the boot-sweep note in performInitialization). The triggers fire
+   * independently and are easy to overlap — POST /restart, the fire-and-forget
+   * POST /refresh-qr behind a button staff can double-click, the liveness
+   * heartbeat, and the ready watchdog — so collapse them onto one restart.
+   *
+   * The promise is published BEFORE any teardown so initialize() callers join the
+   * WHOLE restart rather than racing it, and it outranks initializationPromise in
+   * inFlightAttempt() so nobody is handed the attempt this restart is replacing.
+   */
   async restart(): Promise<boolean> {
+    const existing = this.clientState.restartPromise;
+    if (existing) {
+      log.info('Restart already in progress — joining it');
+      return existing;
+    }
+
+    const attempt = this.performRestart();
+    this.clientState.restartPromise = attempt;
+    try {
+      return await attempt;
+    } finally {
+      // By identity, for the same reason initializeInternal() clears by identity:
+      // never strip a newer restart's registration off the state manager.
+      if (this.clientState.restartPromise === attempt) {
+        this.clientState.restartPromise = null;
+      }
+    }
+  }
+
+  private async performRestart(): Promise<boolean> {
     log.info('Restarting WhatsApp client - preserving authentication');
 
     this.clearReadyWatchdog();
     this.stopHeartbeat();
+    this.clearStabilizationWait();
     // Explicit user retry — lift any re-link park so this attempt runs. (If the
     // session is still poisoned it will re-stall and the watchdog re-parks; the
     // session-clearing fix is unlink(), not restart, which preserves auth.)
@@ -1885,7 +2063,9 @@ class WhatsAppService extends EventEmitter {
         }
       }
 
-      const result = await this.initialize();
+      // Straight to the attempt: restart() has already published restartPromise, so
+      // going through initialize()'s join would have this await itself forever.
+      const result = await this.initializeInternal();
 
       this.messageState.manualDisconnect = false;
       await this.messageState.reset();
@@ -1936,7 +2116,6 @@ class WhatsAppService extends EventEmitter {
       }
     } finally {
       this.clientState.browser = null;
-      this.clientState.page = null;
     }
   }
 
@@ -1944,6 +2123,7 @@ class WhatsAppService extends EventEmitter {
     log.info(`Destroying WhatsApp client (reason: ${reason})`);
     this.clearReadyWatchdog();
     this.stopHeartbeat();
+    this.clearStabilizationWait();
 
     if (
       this.clientState.client &&
@@ -1996,7 +2176,6 @@ class WhatsAppService extends EventEmitter {
       await this.forceCloseBrowser();
     } finally {
       this.clientState.browser = null;
-      this.clientState.page = null;
       this.clientState.destroyInProgress = false;
     }
   }
@@ -2105,12 +2284,6 @@ class WhatsAppService extends EventEmitter {
     }
   }
 
-  private scheduleClientCleanup(): void {
-    log.debug(
-      'Automatic cleanup disabled - client will persist until manually destroyed'
-    );
-  }
-
   /**
    * Generate the daily appointments PDF (the same report the email path builds)
    * and post it to the staff WhatsApp group named {@link APPOINTMENTS_GROUP_NAME}.
@@ -2212,7 +2385,7 @@ class WhatsAppService extends EventEmitter {
     return this.circuitBreaker.execute(async () => {
       log.info(`Starting message sending session for date: ${date}`);
 
-      const session = messageSessionManager.startSession(date, this);
+      const session = messageSessionManager.startSession(date);
 
       // Post the full appointment list (as PDF) to the staff group — once per
       // session, so a re-clicked/reset resend doesn't spam the group (observed
@@ -2487,37 +2660,16 @@ class WhatsAppService extends EventEmitter {
       }
 
       log.debug(`Message sent to ${number} (normalized: ${cleanNumber})`);
+      const messageId = sentMessage.id.id;
 
-      if (session) {
-        const registered = session.registerMessage(
-          sentMessage.id.id,
-          appointmentId,
-          appointmentDate
-        );
-
-        if (!registered) {
-          log.warn('Failed to register message in session', {
-            messageId: sentMessage.id.id,
-            appointmentId,
-            appointmentDate,
-            sessionId: session.sessionId,
-          });
-        }
-
-        session.recordMessageSent(sentMessage.id.id);
-      }
-
-      const person: Person = {
-        messageId: sentMessage.id.id,
-        appointmentId: appointmentId,
-        name,
-        number,
-        success: '&#10004;',
-      };
-
+      // Mark the appointment sent BEFORE any session bookkeeping. The message has
+      // already left the machine here, so a throw from the bookkeeping below
+      // (registerMessage rejects a session that is no longer ACTIVE) must never
+      // leave this row eligible — the next batch would pick it up and the patient
+      // would get the same reminder twice.
       if (appointmentId) {
         try {
-          await messagingQueries.updateWhatsAppStatus([appointmentId], [sentMessage.id.id]);
+          await messagingQueries.updateWhatsAppStatus([appointmentId], [messageId]);
           log.debug(`Marked appointment ${appointmentId} as sent in database`);
         } catch (dbError) {
           log.error(
@@ -2527,17 +2679,50 @@ class WhatsAppService extends EventEmitter {
         }
       }
 
+      // Ack tracking is best-effort: losing it costs live delivery ticks, never a
+      // re-send, so it must not turn a delivered message into a reported failure.
+      try {
+        const registered = session.registerMessage(messageId, appointmentId, appointmentDate);
+
+        if (!registered) {
+          log.warn('Failed to register message in session', {
+            messageId,
+            appointmentId,
+            appointmentDate,
+            sessionId: session.sessionId,
+          });
+        }
+
+        session.recordMessageSent(messageId);
+      } catch (registerError) {
+        log.warn('Session registration threw — delivery ticks lost for this message', {
+          messageId,
+          appointmentId,
+          sessionId: session.sessionId,
+          error: (registerError as Error).message,
+        });
+      }
+
+      const person: Person = {
+        messageId,
+        appointmentId: appointmentId,
+        name,
+        number,
+        success: '&#10004;',
+      };
+
       this.emit('MessageSent', person);
 
-      return { success: true, messageId: sentMessage.id.id };
+      return { success: true, messageId };
     } catch (error) {
       // Everything user-facing gets the humanized reason; the raw library
       // message stays in the error log (the send() loop logs it).
       const friendlyError = humanizeWhatsAppError((error as Error).message);
 
-      if (session) {
-        session.recordMessageFailed('', friendlyError);
-      }
+      // No message id exists on a send failure (and none is usable on a malformed
+      // result), so this only moves the session's failure counter — `null` says
+      // that explicitly instead of passing an empty string that silently misses.
+      session.recordMessageFailed(null, friendlyError);
 
       const person: StatePersonType = {
         messageId: `error_${Date.now()}_${number}`,
@@ -2663,7 +2848,7 @@ class WhatsAppService extends EventEmitter {
       const oldest = this.adhocMessages.keys().next().value;
       if (oldest) this.adhocMessages.delete(oldest);
     }
-    this.adhocMessages.set(messageId, { appointmentId, trackedAt: Date.now() });
+    this.adhocMessages.set(messageId, appointmentId);
   }
 
   async report(date: string): Promise<{ success: boolean; messagesChecked: number }> {
@@ -2760,12 +2945,25 @@ class WhatsAppService extends EventEmitter {
       return false;
     }
 
-    if (
-      this.clientState.isState('CONNECTED') ||
-      this.clientState.isState('INITIALIZING')
-    ) {
-      log.debug('Client already connected or initializing');
-      return this.clientState.initializationPromise || true;
+    // Join a real in-flight attempt before any of the gates below: a caller that
+    // arrives mid-attempt wants that attempt's outcome regardless of viewer counts
+    // or breaker state. Tested on the promise, not the state — see initialize().
+    const inFlight = this.inFlightAttempt();
+    if (inFlight) {
+      log.debug('Client already initializing — joining the in-flight attempt');
+      return inFlight;
+    }
+
+    if (this.clientState.isState('CONNECTED')) {
+      log.debug('Client already connected');
+      return true;
+    }
+
+    if (this.clientState.isState('INITIALIZING')) {
+      // INITIALIZING with nothing in flight means we're parked on a QR scan, which
+      // is NOT a ready client (the old `|| true` reported success here).
+      log.debug('Client is waiting for a QR scan — no initialization in flight');
+      return false;
     }
 
     if (this.messageState.activeQRViewers === 0) {

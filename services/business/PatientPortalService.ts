@@ -38,7 +38,12 @@ export interface PatientPortalProfile {
   first_name: string | null;
   last_name: string | null;
   phone: string | null;
-  date_of_birth: Date | null;
+  /**
+   * `patients.date_of_birth` is a PG `date`, and the pg parser returns those as
+   * 'YYYY-MM-DD' STRINGS (see CLAUDE.md / db.d.ts) — this was declared `Date | null`,
+   * which the raw `sql<PatientPortalProfile>` generic asserts rather than checks.
+   */
+  date_of_birth: string | null;
   language: number | null;
 }
 
@@ -82,7 +87,10 @@ export function deriveDefaultPin(profile: PatientPortalProfile): string | null {
     if (digits.length >= 4) return digits.slice(-4);
   }
   if (profile.date_of_birth) {
-    const d = profile.date_of_birth instanceof Date ? profile.date_of_birth : new Date(profile.date_of_birth);
+    // A date-only 'YYYY-MM-DD' string parses as UTC midnight, so the UTC getters are
+    // the ones that read back the stored calendar day (local getters would shift it
+    // west of Greenwich).
+    const d = new Date(profile.date_of_birth);
     if (!isNaN(d.getTime())) {
       const dd = String(d.getUTCDate()).padStart(2, '0');
       const mm = String(d.getUTCMonth() + 1).padStart(2, '0');

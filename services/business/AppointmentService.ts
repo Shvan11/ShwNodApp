@@ -130,17 +130,20 @@ export interface QuickCheckInResult {
     app_date: string;
     app_detail?: string;
     dr_id?: number | null;
-    present?: string | Date;
+    /** Always a wall-clock 'HH:MM:SS' string — see quickCheckIn. */
+    present?: string;
   };
 }
 
 /**
- * Formatted date time object
+ * Formatted date time object — all three fields derive from ONE `Date` reading, so
+ * they can never straddle a second/day boundary relative to each other.
  */
 interface FormattedDateTime {
   dateTime: string;
   dateOnly: string;
-  timeObject: Date;
+  /** Wall-clock 'HH:MM:SS' for the `present` column (never a Date — see quickCheckIn). */
+  timeOnly: string;
 }
 
 /**
@@ -274,7 +277,7 @@ function formatCurrentDateTime(): FormattedDateTime {
   return {
     dateTime: `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`,
     dateOnly: `${year}-${month}-${day}`,
-    timeObject: now,
+    timeOnly: `${hours}:${minutes}:${seconds}`,
   };
 }
 
@@ -352,12 +355,12 @@ export async function quickCheckIn(
   const detail = app_detail || 'Walk-in';
   const doctorId = dr_id ? parseInt(String(dr_id)) : null;
 
-  // Get formatted current date/time
-  const { dateTime, dateOnly, timeObject } = formatCurrentDateTime();
-
-  // Generate present time string (avoids UTC conversion issue with Date objects)
-  const now = new Date();
-  const presentTimeString = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+  // Get formatted current date/time. `timeOnly` is the check-in stamp: a wall-clock
+  // string, never a Date — a Date would serialize through res.json() as a UTC ISO
+  // timestamp, so the same `present` field came back in two different formats
+  // depending on which branch below returned. It also used to be built from a SECOND
+  // `new Date()`, which could disagree with `dateTime` across a second boundary.
+  const { dateTime, dateOnly, timeOnly: presentTimeString } = formatCurrentDateTime();
 
   // Check if patient already has an appointment today
   interface ExistingAppointment {
@@ -467,7 +470,7 @@ export async function quickCheckIn(
       app_date: dateTime,
       app_detail: detail,
       dr_id: doctorId,
-      present: timeObject,
+      present: presentTimeString,
     },
   };
 }
@@ -509,12 +512,3 @@ export async function getDailyAppointments(
   };
 }
 
-export default {
-  validateAndCreateAppointment,
-  verifyDoctor,
-  checkAppointmentConflict,
-  checkHolidayConflict,
-  quickCheckIn,
-  getDailyAppointments,
-  AppointmentValidationError,
-};

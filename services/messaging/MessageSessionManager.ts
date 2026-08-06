@@ -5,11 +5,8 @@
  * monitoring, and session isolation to prevent cross-date contamination.
  */
 
-import {
-  MessageSession,
-  SessionStats,
-  WhatsAppServiceInterface,
-} from './MessageSession.js';
+import { MessageSession } from './MessageSession.js';
+import ResourceManager from '../core/ResourceManager.js';
 import { log } from '../../utils/logger.js';
 import { toDateOnly } from '../../utils/date.js';
 
@@ -21,10 +18,6 @@ import { toDateOnly } from '../../utils/date.js';
  * Manager configuration options
  */
 export interface MessageSessionManagerOptions {
-  /** Maximum sessions in history (default: 30) */
-  maxHistorySize?: number;
-  /** Keep session history (default: true) */
-  keepHistory?: boolean;
   /** Maximum active sessions (default: 25) */
   maxActiveSessions?: number;
   /** Maximum messages per session (default: 1000) */
@@ -48,27 +41,14 @@ export interface MessageLookupResult {
   sessionId: string;
 }
 
-/**
- * Manager statistics summary
- */
-export interface ManagerStatsSummary {
-  activeSessions: number;
-  historicalSessions: number;
-  totalSessions: number;
-}
-
-
 // ===========================================
 // MESSAGE SESSION MANAGER CLASS
 // ===========================================
 
 export class MessageSessionManager {
   private activeSessions: Map<string, MessageSession>;
-  private sessionHistory: Map<string, SessionStats>;
   private cleanupTimer: NodeJS.Timeout | null;
 
-  public readonly maxHistorySize: number;
-  public readonly keepHistory: boolean;
   public readonly maxActiveSessions: number;
   public readonly maxMessagesPerSession: number;
   public readonly ackTrackingWindow: number;
@@ -78,11 +58,7 @@ export class MessageSessionManager {
 
   constructor(options: MessageSessionManagerOptions = {}) {
     this.activeSessions = new Map();
-    this.sessionHistory = new Map();
     this.cleanupTimer = null;
-
-    this.maxHistorySize = options.maxHistorySize || 30;
-    this.keepHistory = options.keepHistory !== false;
 
     // Memory leak protection - session limits
     this.maxActiveSessions = options.maxActiveSessions || 25;
@@ -99,6 +75,10 @@ export class MessageSessionManager {
     // Start periodic cleanup
     this.startPeriodicCleanup();
 
+    // So graceful shutdown actually stops the interval instead of relying on
+    // process.exit() to take it down with the process.
+    ResourceManager.register('message-session-manager', this, () => this.stop());
+
     log.info('MessageSessionManager initialized', {
       ackTrackingWindow: `${this.ackTrackingWindow / 1000}s`,
       cleanupInterval: `${this.cleanupInterval / 1000}s`,
@@ -110,10 +90,7 @@ export class MessageSessionManager {
   /**
    * Create or get active session for a date
    */
-  getOrCreateSession(
-    date: Date | string,
-    whatsappService: WhatsAppServiceInterface
-  ): MessageSession {
+  getOrCreateSession(date: Date | string): MessageSession {
     // Normalize date to YYYY-MM-DD format
     const normalizedDate = date instanceof Date ? toDateOnly(date) : date;
 
@@ -167,7 +144,7 @@ export class MessageSessionManager {
       maxMessages: this.maxMessagesPerSession,
     };
 
-    const session = new MessageSession(normalizedDate, whatsappService, sessionOptions);
+    const session = new MessageSession(normalizedDate, sessionOptions);
     this.activeSessions.set(normalizedDate, session);
 
     log.info('New MessageSession created', {
@@ -182,8 +159,8 @@ export class MessageSessionManager {
   /**
    * Start a session for message sending
    */
-  startSession(date: Date | string, whatsappService: WhatsAppServiceInterface): MessageSession {
-    const session = this.getOrCreateSession(date, whatsappService);
+  startSession(date: Date | string): MessageSession {
+    const session = this.getOrCreateSession(date);
 
     if (session.status === 'CREATED') {
       session.start();
@@ -209,7 +186,7 @@ export class MessageSessionManager {
     // Search through active sessions
     for (const [date, session] of this.activeSessions) {
       const appointmentId = session.getAppointmentId(messageId);
-      if (appointmentId) {
+      if (appointmentId !== null) {
         log.debug('Message found in session', {
           messageId,
           appointmentId,
@@ -277,10 +254,8 @@ export class MessageSessionManager {
     // Complete the session
     session.complete();
 
-    // Move to history (only if history is enabled)
-    if (this.keepHistory) {
-      this.sessionHistory.set(session.sessionId, session.getStats());
-    }
+    // Final stats must be read BEFORE cleanup() clears the mappings.
+    const finalStats = session.getStats();
 
     // Remove from active sessions
     this.activeSessions.delete(normalizedDate);
@@ -288,14 +263,11 @@ export class MessageSessionManager {
     // Cleanup session resources
     session.cleanup();
 
-    log.info('Session completed and moved to history', {
+    log.info('Session completed', {
       date: normalizedDate,
       sessionId: session.sessionId,
-      stats: session.getStats(),
+      stats: finalStats,
     });
-
-    // Maintain history size limit
-    this.trimHistory();
   }
 
   /**
@@ -318,14 +290,29 @@ export class MessageSessionManager {
    * Start periodic cleanup of old sessions
    */
   private startPeriodicCleanup(): void {
-    this.cleanupTimer = setInterval(() => {
+    const timer = setInterval(() => {
       this.performPeriodicCleanup();
     }, this.cleanupInterval);
+    // Housekeeping only — it must never be the reason the process stays alive.
+    if (typeof timer.unref === 'function') timer.unref();
+    this.cleanupTimer = timer;
 
     log.debug('Periodic cleanup started', {
       interval: `${this.cleanupInterval / 1000}s`,
       maxAge: `${this.maxSessionAge / 1000}s`,
     });
+  }
+
+  /**
+   * Stop the housekeeping timer and release every active session (graceful
+   * shutdown; wired through ResourceManager in the constructor). Idempotent.
+   */
+  stop(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+    this.completeAllSessions();
   }
 
   /**
@@ -366,64 +353,18 @@ export class MessageSessionManager {
       cleanedCount++;
     }
 
-    // Third pass: aggressively trim history on every cleanup (if history is enabled)
-    const historyBefore = this.sessionHistory.size;
-    if (this.keepHistory) {
-      this.trimHistory();
-    } else {
-      // Clear all history if disabled
-      this.sessionHistory.clear();
-    }
-    const historyTrimmed = historyBefore - this.sessionHistory.size;
-
-    if (expiredCount > 0 || cleanedCount > 0 || historyTrimmed > 0) {
+    if (expiredCount > 0 || cleanedCount > 0) {
       log.info('Periodic cleanup completed', {
         expiredSessions: expiredCount,
         cleanedSessions: cleanedCount,
-        historyTrimmed: historyTrimmed,
         remainingActive: this.activeSessions.size,
-        remainingHistory: this.sessionHistory.size,
       });
     }
   }
-
-  /**
-   * Trim history to maintain size limit
-   */
-  private trimHistory(): void {
-    if (this.sessionHistory.size <= this.maxHistorySize) {
-      return;
-    }
-
-    // Convert to array, sort by date, keep most recent
-    const entries = Array.from(this.sessionHistory.entries());
-    entries.sort((a, b) => {
-      const dateA = a[1].startTime ? new Date(a[1].startTime).getTime() : 0;
-      const dateB = b[1].startTime ? new Date(b[1].startTime).getTime() : 0;
-      return dateB - dateA;
-    });
-
-    // Keep only the most recent entries
-    const toKeep = entries.slice(0, this.maxHistorySize);
-    const toRemove = entries.slice(this.maxHistorySize);
-
-    this.sessionHistory.clear();
-    toKeep.forEach(([sessionId, stats]) => {
-      this.sessionHistory.set(sessionId, stats);
-    });
-
-    log.debug('Session history trimmed', {
-      removed: toRemove.length,
-      remaining: this.sessionHistory.size,
-    });
-  }
-
 }
 
 // Export singleton instance with memory-optimized defaults for production
 export const messageSessionManager = new MessageSessionManager({
-  maxHistorySize: 10, // Keep only 10 days of history
-  keepHistory: true, // Keep minimal history for debugging
   ackTrackingWindow: 24 * 60 * 60 * 1000, // 24 hours (sufficient for most status updates)
   cleanupInterval: 6 * 60 * 60 * 1000, // 6 hours (original cleanup frequency)
   maxSessionAge: 48 * 60 * 60 * 1000, // 48 hours (original session lifetime)

@@ -397,14 +397,16 @@ export type AddPaymentBody = z.infer<typeof addPayment.body>;
 // sends a subset; numeric fields are strings/'' → coerced via optInt/optNum.
 // days/set_url/set_video/currency are form fields the query persists — they must
 // be enumerated here or the strict body strips them and they save as NULL.
-// set_pdf_url is deliberately absent: AlignerPdfService owns that column.
+// set_pdf_url is deliberately absent: AlignerPdfService owns that column, and so
+// are TotalAligners/RemainingAligners — retired SQL-Server-era names that
+// createAlignerSet/updateAlignerSet never read (remaining_* is seeded from
+// upper_aligners_count/lower_aligners_count). Enumerating them here meant the API
+// accepted them and silently discarded them.
 export const createSet = {
   body: z.object({
     work_id: intId,
     aligner_dr_id: intId,
     is_active: z.boolean().optional(),
-    TotalAligners: optInt,
-    RemainingAligners: optInt,
     set_cost: optNum,
     notes: z.string().optional(),
     set_sequence: optInt,
@@ -434,8 +436,6 @@ export const updateSet = {
   body: z.object({
     aligner_dr_id: optInt,
     is_active: z.boolean().optional(),
-    TotalAligners: optInt,
-    RemainingAligners: optInt,
     set_cost: clearableNum,
     notes: clearableStr,
     set_sequence: optInt,
@@ -479,24 +479,26 @@ export type UpdateNoteBody = z.infer<typeof updateNote.body>;
 // BATCHES
 // ===========================================================================
 
-// POST /api/aligner/batches — fully enumerated (mirrors BatchCreateData). The
-// form's `is_last` extra is stripped (BatchCreateData has none on create); end
-// sequences arrive null → undefined via optInt.
+// POST /api/aligner/batches — fully enumerated (mirrors BatchCreateData).
+//
+// Deliberately ABSENT because `aligner-queries.createBatch` derives them and never
+// reads a client value: `batch_sequence` + the four upper/lower start/end sequences
+// (computed from MAX() over the set's existing batches) and `validity_period` (a
+// generated column). `AlignersInBatch` is a retired SQL-Server-era column. All six
+// used to be enumerated here, so the API accepted them and silently dropped them.
+//
+// `is_last` IS honoured by createBatch — it was missing from this body, so the
+// drawer's "Mark as Last Batch" confirm was stripped on create (it only stuck on
+// a subsequent edit).
 export const createBatch = {
   body: z.object({
     aligner_set_id: intId,
     is_active: z.boolean().optional(),
-    batch_sequence: optInt,
-    AlignersInBatch: optInt,
+    is_last: z.boolean().optional(),
     notes: z.string().optional(),
     upper_aligner_count: optInt,
     lower_aligner_count: optInt,
-    upper_aligner_start_sequence: optInt,
-    upper_aligner_end_sequence: optInt,
-    lower_aligner_start_sequence: optInt,
-    lower_aligner_end_sequence: optInt,
     days: optInt,
-    validity_period: optInt,
     has_upper_template: z.boolean().optional(),
     has_lower_template: z.boolean().optional(),
   }),
@@ -510,19 +512,23 @@ export type CreateBatchBody = z.infer<typeof createBatch.body>;
 // PUT /api/aligner/batches/:batchId — fully enumerated (mirrors BatchUpdateData).
 // Response is the handler's `Record<string, unknown>` (optional `deactivatedBatch`)
 // → open `looseObject({})` so the Record arg assigns and nothing is stripped.
+// Same server-derived fields as createBatch are absent here (see above) —
+// `updateBatch` recomputes sequences via resequenceSet and never reads them.
+//
+// This is a FULL REPLACE, not a partial patch: updateBatch writes every editable
+// column unconditionally, so an omitted count persists as 0 and an omitted
+// days/notes as NULL. `aligner_set_id` is therefore REQUIRED — it was `optInt`,
+// but the query layer rejects any value that differs from the stored one, and an
+// omitted field reads as `undefined`, so a genuinely partial PUT always 400'd with
+// a confusing "Cannot change aligner_set_id". It identifies the owning set (the
+// batch cannot be moved between sets); it is not an editable field.
 export const updateBatch = {
   body: z.object({
-    aligner_set_id: optInt,
+    aligner_set_id: intId,
     is_active: z.boolean().optional(),
-    batch_sequence: optInt,
-    AlignersInBatch: optInt,
     notes: z.string().optional(),
     upper_aligner_count: optInt,
     lower_aligner_count: optInt,
-    upper_aligner_start_sequence: optInt,
-    upper_aligner_end_sequence: optInt,
-    lower_aligner_start_sequence: optInt,
-    lower_aligner_end_sequence: optInt,
     days: optInt,
     is_last: z.boolean().optional(),
     has_upper_template: z.boolean().optional(),

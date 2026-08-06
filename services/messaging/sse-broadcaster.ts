@@ -36,6 +36,9 @@ const KEEP_ALIVE_MS = 25_000;
 let initialized = false;
 let keepAliveHandle: ReturnType<typeof setInterval> | null = null;
 let listenerRefs: Array<{ event: string; fn: (...args: unknown[]) => void }> = [];
+// Declared before ensureInitialized(), which assigns it — a `let` below the
+// function body is a TDZ waiting to happen if this is ever called at module load.
+let attachedEmitter: EventEmitter | null = null;
 
 function safeWrite(res: Response, data: string): void {
   if (res.writableEnded || res.destroyed) return;
@@ -115,8 +118,6 @@ function ensureInitialized(emitter: EventEmitter): void {
   // Cache emitter so teardown can detach listeners.
   attachedEmitter = emitter;
 }
-
-let attachedEmitter: EventEmitter | null = null;
 
 function openStream(req: Request, res: Response): void {
   // Bypass the global 30 s requestTimeout (middleware/timeout.ts) — without

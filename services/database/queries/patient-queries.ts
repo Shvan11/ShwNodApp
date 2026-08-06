@@ -23,7 +23,10 @@ import { PATIENT_TYPE_IDS } from '../../../shared/treatment-taxonomy.js';
 const GENDER_LABELS: Record<number, string> = { 1: 'Male', 2: 'Female' };
 
 // type definitions
-interface PatientInfo {
+// `type`, not `interface`: getInfos' row flows into a `sendData` payload validated
+// against a `z.looseObject` contract, which needs the implicit string index
+// signature only a type alias carries (see CLAUDE.md — TS2345).
+export type PatientInfo = {
   person_id: number;
   patient_name: string | null;
   first_name: string | null;
@@ -51,14 +54,14 @@ interface PatientInfo {
   start_date: string | null;
   estimatedCost: number | null;
   activeAlert: ActiveAlert | null;
-}
+};
 
-interface ActiveAlert {
+export type ActiveAlert = {
   alertId: number;
   alertType: string;
   alertDetails: string;
   alertSeverity: number;
-}
+};
 
 type PatientPhone = {
   id: number;

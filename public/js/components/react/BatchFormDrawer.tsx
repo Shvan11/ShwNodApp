@@ -254,12 +254,14 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         setSaving(true);
 
         try {
+            // batch_sequence and the start/end sequences are DERIVED server-side
+            // (createBatch/resequenceSet own them) — computedFields drives the
+            // read-only preview inputs below, it is not part of the write payload.
+            const { batch_sequence: _batchSequence, ...editableFields } = formData;
             const dataToSend = {
-                ...formData,
+                ...editableFields,
                 ...(markAsLast && { is_last: true }),
                 aligner_set_id: set?.aligner_set_id,
-                upper_aligner_start_sequence: computedFields.upper_aligner_start_sequence,
-                lower_aligner_start_sequence: computedFields.lower_aligner_start_sequence,
                 has_upper_template: canChangeTemplateOption ? hasUpperTemplate : undefined,
                 has_lower_template: canChangeTemplateOption ? hasLowerTemplate : undefined
             };

@@ -38,6 +38,11 @@ export type DeliveryStatus =
 
 /**
  * Database message format
+ *
+ * The reminder TEXT is deliberately absent: this feed carries delivery status only,
+ * and the text is fetched per-appointment via GET /api/messaging/message-text.
+ * (`message`/`errorMessage` used to be declared here but `convertToDatabaseMessage`
+ * in messaging.routes.ts never populated either.)
  */
 export interface DatabaseMessage {
   sentStatus: boolean | null;
@@ -47,18 +52,19 @@ export interface DatabaseMessage {
   sentTimestamp: string;
   messageId: string;
   appointmentId?: number;
-  message?: string;
-  errorMessage?: string;
 }
 
 /**
  * Transformed message for frontend
+ *
+ * `errorMessage` is overlaid by the /status route from the live in-memory send
+ * state (the DB has no error column) — hence optional here.
  */
 export interface TransformedMessage extends DatabaseMessage {
   status: MessageStatusCode;
   name: string;
   timeSent: string;
-  message: string;
+  errorMessage?: string;
   originalSentStatus: boolean | null;
   originalDeliveryStatus: DeliveryStatus;
 }
@@ -133,12 +139,9 @@ export function transformMessageStatus(
   return {
     ...msg,
     status: status,
-    // Map field names to what frontend expects
+    // Aliases the frontend reads (phone/messageId come through the spread as-is)
     name: msg.patientName,
-    phone: msg.phone,
     timeSent: msg.sentTimestamp,
-    message: '', // Will be populated if needed
-    messageId: msg.messageId,
     // Include original values for debugging
     originalSentStatus: msg.sentStatus,
     originalDeliveryStatus: msg.deliveryStatus,
@@ -196,8 +199,3 @@ export function calculateMessageCount(
   return messageCount;
 }
 
-export default {
-  transformMessageStatus,
-  transformMessageStatuses,
-  calculateMessageCount,
-};

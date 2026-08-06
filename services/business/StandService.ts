@@ -26,9 +26,7 @@ export type StandErrorCode =
   | 'ITEM_INACTIVE'
   | 'ITEM_NOT_FOUND'
   | 'INVALID_QUANTITY'
-  | 'NEGATIVE_CHANGE'
   | 'UNDERPAID'
-  | 'SELL_BELOW_COST'
   | 'SALE_NOT_FOUND'
   | 'ALREADY_VOIDED';
 

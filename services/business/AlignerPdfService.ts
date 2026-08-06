@@ -325,8 +325,3 @@ export async function deletePdfFromSet(setId: number): Promise<void> {
   }
 }
 
-export default {
-  uploadPdfForSet,
-  deletePdfFromSet,
-  AlignerPdfError,
-};

@@ -9,7 +9,7 @@
  * Phase 0: response-only (migrated from the deleted public/js/core/api.schemas.ts).
  */
 import { z } from 'zod';
-import { idParams, intId, timestampString } from '../validation.js';
+import { idParams, intId } from '../validation.js';
 
 // ---------------------------------------------------------------------------
 // GET /api/getDailyAppointments?AppsDate=YYYY-MM-DD
@@ -155,7 +155,8 @@ export const appointmentById = {
 // POST /api/appointments/quick-checkin — strict body; QuickCheckInResult.
 // Modeled from AppointmentService's QuickCheckInResult (closed → the interface stays
 // assignable to sendData). `appointment_id` is `number | undefined` → optional;
-// `present` is string|Date → timestampString (Date in / string out).
+// `present` is a wall-clock 'HH:MM:SS' string on every branch (it was string|Date →
+// timestampString, so the Date branch serialized as a UTC ISO timestamp instead).
 export const quickCheckin = {
   body: z.object({
     person_id: intId,
@@ -175,7 +176,7 @@ export const quickCheckin = {
       app_date: z.string(),
       app_detail: z.string().optional(),
       dr_id: z.number().nullable().optional(),
-      present: timestampString.optional(),
+      present: z.string().optional(),
     }),
   }),
 } as const;

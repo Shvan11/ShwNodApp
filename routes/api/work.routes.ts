@@ -430,11 +430,11 @@ router.delete(
       // workId validated + coerced to a positive int by workContract.deleteWork.body.
       const result = await validateAndDeleteWork(workIdNum);
 
-      // DeleteResult.rowsAffected is optional; on the success path it's the deleted
-      // row count — coerce a (type-only) undefined to 0 to satisfy the strict contract.
+      // validateAndDeleteWork only returns on the applied path (a blocked or missing
+      // work throws), so rowCount is the real deleted-row count — 1.
       // Notify tier: same-day admin-visible FYI; recordNotice no-ops for admin callers.
       await recordNotice('work.delete', { workId: workIdNum, person_id: personId }, req);
-      sendData(res, workContract.deleteWork.response, { outcome: 'applied', rowsAffected: result.rowsAffected ?? 0 }, 'Work deleted successfully');
+      sendData(res, workContract.deleteWork.response, { outcome: 'applied', rowsAffected: result.rowCount ?? 0 }, 'Work deleted successfully');
     } catch (error) {
       // Handle validation errors from service layer (expected business-rule
       // rejections — log at warn, not error, and without a stack trace).
@@ -443,6 +443,12 @@ router.delete(
           code: error.code,
           workId: req.body?.workId
         });
+        // A bogus/already-deleted work id is a 404, not a business-rule conflict.
+        // notFound takes the resource NOUN — it appends " not found".
+        if (error.code === 'WORK_NOT_FOUND') {
+          ErrorResponses.notFound(res, 'Work', error.details);
+          return;
+        }
         ErrorResponses.conflict(res, error.message, error.details);
         return;
       }
