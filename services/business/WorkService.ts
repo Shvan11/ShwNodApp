@@ -340,6 +340,45 @@ async function formatDuplicateActiveWorkError(
 }
 
 /**
+ * Coerce the loose request-shaped work data into the numeric types the query layer
+ * binds. Shared by both create paths, which built this object identically.
+ */
+function toDbWorkData(dataWithDates: WorkCreateData) {
+  return {
+    ...dataWithDates,
+    person_id: parseInt(String(dataWithDates.person_id), 10),
+    dr_id: parseInt(String(dataWithDates.dr_id), 10),
+    type_of_work: parseInt(String(dataWithDates.type_of_work), 10),
+    total_required:
+      dataWithDates.total_required != null
+        ? parseFloat(String(dataWithDates.total_required))
+        : null,
+  };
+}
+
+/**
+ * Rethrow a duplicate-active-work unique violation as a typed WorkValidationError
+ * carrying the existing work's details; pass anything else through untouched.
+ *
+ * pg reports this as SQLSTATE 23505 + the partial index name `unq_tblwork_active` —
+ * NOT the old mssql 2601. Shared by both create paths, which handled it identically.
+ */
+async function rethrowAsWorkError(
+  error: unknown,
+  personId: number | string
+): Promise<never> {
+  if (isUniqueViolation(error, 'unq_tblwork_active')) {
+    const errorDetails = await formatDuplicateActiveWorkError(personId);
+    throw new WorkValidationError(
+      'Patient already has an active work',
+      errorDetails.code as WorkErrorCode,
+      errorDetails
+    );
+  }
+  throw error;
+}
+
+/**
  * Validate and create a new work record
  * @param workData - Work data object
  * @returns Created work record with workId
@@ -373,16 +412,8 @@ export async function validateAndCreateWork(
   const dataWithDates = normalizeDateFields(normalizedData);
 
   try {
-    // Convert to proper types for database
-    const dbData = {
-      ...dataWithDates,
-      person_id: parseInt(String(dataWithDates.person_id), 10),
-      dr_id: parseInt(String(dataWithDates.dr_id), 10),
-      type_of_work: parseInt(String(dataWithDates.type_of_work), 10),
-      total_required: dataWithDates.total_required != null ? parseFloat(String(dataWithDates.total_required)) : null,
-    };
     // Create work in database
-    const result = await addWork(dbData);
+    const result = await addWork(toDbWorkData(dataWithDates));
     if (!result) {
       throw new Error('Work creation did not return an id');
     }
@@ -391,19 +422,7 @@ export async function validateAndCreateWork(
     );
     return result;
   } catch (error) {
-    // Duplicate active-work unique violation (partial index unq_tblwork_active).
-    // pg reports this as SQLSTATE 23505 + constraint name — NOT the old mssql 2601.
-    if (isUniqueViolation(error, 'unq_tblwork_active')) {
-      const errorDetails = await formatDuplicateActiveWorkError(
-        workData.person_id
-      );
-      throw new WorkValidationError(
-        'Patient already has an active work',
-        errorDetails.code as WorkErrorCode,
-        errorDetails
-      );
-    }
-    throw error;
+    return rethrowAsWorkError(error, workData.person_id);
   }
 }
 
@@ -430,36 +449,14 @@ export async function validateAndCreateWorkWithInvoice(
   const dataWithDates = normalizeDateFields(workData);
 
   try {
-    // Convert to proper types for database
-    const dbData = {
-      ...dataWithDates,
-      person_id: parseInt(String(dataWithDates.person_id), 10),
-      dr_id: parseInt(String(dataWithDates.dr_id), 10),
-      type_of_work: parseInt(String(dataWithDates.type_of_work), 10),
-      total_required: dataWithDates.total_required != null ? parseFloat(String(dataWithDates.total_required)) : null,
-    };
     // Create work and invoice in database (transaction handled by query layer)
-    const result = (await dbAddWorkWithInvoice(
-      dbData
-    )) as WorkWithInvoiceResult;
+    const result = await dbAddWorkWithInvoice(toDbWorkData(dataWithDates));
     log.info(
       `Work with invoice created successfully: Work ${result.workId}, Invoice ${result.invoiceId} for Patient ${workData.person_id}`
     );
     return result;
   } catch (error) {
-    // Duplicate active-work unique violation (partial index unq_tblwork_active).
-    // pg reports this as SQLSTATE 23505 + constraint name — NOT the old mssql 2601.
-    if (isUniqueViolation(error, 'unq_tblwork_active')) {
-      const errorDetails = await formatDuplicateActiveWorkError(
-        workData.person_id
-      );
-      throw new WorkValidationError(
-        'Patient already has an active work',
-        errorDetails.code as WorkErrorCode,
-        errorDetails
-      );
-    }
-    throw error;
+    return rethrowAsWorkError(error, workData.person_id);
   }
 }
 
@@ -475,7 +472,7 @@ export async function validateAndCreateWorkWithInvoice(
  * @param totalPaid - Current sum of invoices paid for this work
  * @throws WorkValidationError when rules are violated
  */
-export function validateDiscount(
+function validateDiscount(
   discount: number | null | undefined,
   totalRequired: number | null | undefined,
   totalPaid: number
@@ -661,7 +658,7 @@ export async function validateAndUpdateWork(
   ) {
     const newTotal = Number(workData.total_required);
     const workForTotal = await loadWorkDetails();
-    const alreadyPaid = Number((workForTotal as { TotalPaid?: number } | null)?.TotalPaid ?? 0);
+    const alreadyPaid = Number(workForTotal?.TotalPaid ?? 0);
     if (Number.isFinite(newTotal) && newTotal < alreadyPaid) {
       throw new WorkUpdateError(
         'badRequest',
@@ -704,11 +701,7 @@ export async function validateAndUpdateWork(
     // fail when the admin hits Approve.
     if (discountChanged) {
       try {
-        validateDiscount(
-          discount ?? null,
-          workWithPaid.total_required,
-          (workWithPaid as { TotalPaid?: number }).TotalPaid ?? 0
-        );
+        validateDiscount(discount ?? null, workWithPaid.total_required, workWithPaid.TotalPaid);
       } catch (err) {
         // Surface validateDiscount's WorkValidationError as a 400 carrying its code.
         if (err instanceof WorkValidationError) {

@@ -470,6 +470,7 @@ router.delete(
  */
 router.get(
   '/patients/:personId/gallery/:tp',
+  validate({ params: patientContract.gallery.params }),
   async (
     req: Request<{ personId: string; tp: string }>,
     res: Response

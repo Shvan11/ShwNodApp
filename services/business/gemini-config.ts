@@ -18,17 +18,25 @@ import { getOption, upsertOption } from '../database/queries/options-queries.js'
 
 const OPT_API_KEY = 'gemini_api_key';
 const OPT_MODEL = 'gemini_model';
-export const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview';
+const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview';
 
 // Cache the client keyed by the resolved API key, so a key change (via settings)
 // transparently rebuilds it on next use — no restart, no stale singleton.
 let cached: { key: string; client: GoogleGenAI } | null = null;
 
-/** Effective API key: DB option (if non-empty) → env → null. */
-async function resolveApiKey(): Promise<string | null> {
+/**
+ * Effective API key AND where it came from: DB option (if non-empty) → env → none.
+ *
+ * Returns the source too so `getGeminiStatus` can label the Settings card without
+ * re-implementing this precedence — it used to inline its own copy, so the DB→env rule
+ * lived in two places and could drift.
+ */
+async function resolveApiKey(): Promise<{ key: string | null; source: 'db' | 'env' | null }> {
   const dbVal = (await getOption(OPT_API_KEY))?.trim();
-  if (dbVal) return dbVal;
-  return process.env.GEMINI_API_KEY?.trim() || null;
+  if (dbVal) return { key: dbVal, source: 'db' };
+  const envVal = process.env.GEMINI_API_KEY?.trim();
+  if (envVal) return { key: envVal, source: 'env' };
+  return { key: null, source: null };
 }
 
 /** Effective model: DB option (if non-empty) → env → built-in default. */
@@ -40,7 +48,7 @@ export async function getGeminiModel(): Promise<string> {
 
 /** Effective Gemini client, or null when no key is configured (DB or env). */
 export async function getGeminiClient(): Promise<GoogleGenAI | null> {
-  const key = await resolveApiKey();
+  const { key } = await resolveApiKey();
   if (!key) {
     cached = null;
     return null;
@@ -66,12 +74,10 @@ function maskKey(key: string): string {
 
 /** Status for the Settings → Integrations card. */
 export async function getGeminiStatus(): Promise<GeminiStatus> {
-  const dbVal = (await getOption(OPT_API_KEY))?.trim();
-  const envVal = process.env.GEMINI_API_KEY?.trim();
-  const key = dbVal || envVal || null;
+  const { key, source } = await resolveApiKey();
   return {
     configured: !!key,
-    source: dbVal ? 'db' : envVal ? 'env' : null,
+    source,
     model: await getGeminiModel(),
     maskedKey: key ? maskKey(key) : null,
   };

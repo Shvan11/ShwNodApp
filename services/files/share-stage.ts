@@ -25,7 +25,7 @@ const TTL_MS = 60 * 60 * 1000; // 1 hour — long enough to pick a recipient, sh
 const TOKEN_RE = /^\d+-[a-f0-9]{16}\.(?:png|jpg)$/;
 
 /** Absolute path of the share-staging dir (`clinic1/.uploads/share-stage`). */
-export function shareStageDir(): string {
+function shareStageDir(): string {
   return clinicPath(STAGE_REL);
 }
 

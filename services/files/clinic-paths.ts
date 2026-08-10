@@ -51,6 +51,55 @@ export function workingDir(): string {
 }
 
 /**
+ * The canonical working-file name for one (patient, timepoint, view) — the ONE
+ * place the `{personId}0{tpCode}.{view}` convention is spelled out. `view` is a
+ * full code from `shared/photo-views.ts#VIEW_CODES` (e.g. `i12`).
+ *
+ * Always build names with this and match them EXACTLY; never pattern-match a
+ * `{personId}0…` prefix. Decimal ids prefix each other, so a prefix match is
+ * ambiguous and crosses patients: patient 5's `^50\d+` also matches patient 50's
+ * `5001.i12` and patient 5012's `501201.i12`. Only the patient's real set of
+ * `time_points.tp_code` values disambiguates, which is why both the read path
+ * (working-files.service.ts) and the delete path (photo-cleanup.service.ts) take
+ * tpCodes and enumerate exact names.
+ */
+export function workingFileName(
+  personId: string | number,
+  tpCode: string | number,
+  view: string
+): string {
+  return `${personId}0${tpCode}.${view}`;
+}
+
+/**
+ * Every on-disk spelling one (patient, timepoint, view) can have, canonical FIRST.
+ *
+ * Our renderer always writes the lowercase `.iNN` form, but Dolphin-era files on the
+ * share carry an uppercase extension (`.INN`). On the Windows/NTFS production box
+ * that distinction is invisible — the two names resolve to the same file — so the
+ * lowercase-only paths worked by accident. On a case-SENSITIVE volume (the WSL dev
+ * box today, the planned Linux server tomorrow) they are two different files, and a
+ * legacy `.INN` becomes both unreadable by the gallery and undeletable.
+ *
+ * So read paths probe these in order and use whichever exists (returning the REAL
+ * name, which the `/DolImgs` URL and the working-file endpoints need), and delete
+ * paths remove all of them. Deleting every variant is safe on NTFS too: the second
+ * `rm` just no-ops on the already-removed file.
+ *
+ * NOT for the write path — a renderer that "cleaned up" the other variant after
+ * writing would delete its own output on NTFS, where both names are the same file.
+ */
+export function workingFileNameVariants(
+  personId: string | number,
+  tpCode: string | number,
+  view: string
+): string[] {
+  const canonical = workingFileName(personId, tpCode, view);
+  const legacyUpper = `${personId}0${tpCode}.${view.toUpperCase()}`;
+  return canonical === legacyUpper ? [canonical] : [canonical, legacyUpper];
+}
+
+/**
  * Absolute path of a single file inside the working dir, addressed by its bare
  * Dolphin name (`{personId}0{tpCode}.{view}`, or the shared `logo.png`). Callers
  * MUST validate `name` first — it must never contain a path separator (each one

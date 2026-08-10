@@ -54,15 +54,19 @@ async function pathExists(path: string): Promise<boolean> {
  * Extract the `seriesDate` value from a CS-Imaging `meta` file.
  *
  * The format puts the value two lines after the line ending in `'seriesDate'`.
- * Resolves null when the file has no such key (the `close` handler), so a metadata-less
- * X-ray degrades to "no date" rather than hanging the request.
+ * Resolves null when the file has no such key (the `close` handler) — and ALSO on
+ * a read error, so one unreadable file degrades to "no date" instead of failing
+ * the caller. CS-Imaging writes into this directory while the app reads it (hence
+ * the `TASK_` in-progress markers), so a locked or half-written `meta` is normal;
+ * rejecting here used to propagate through getXrays → getPatientAssets → getInfos
+ * and 500 the entire patient-info request over one unreadable sidecar file.
  */
 async function extractDate(metaFile: string): Promise<string | null> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const fileStream = createReadStream(metaFile);
     const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
 
-    let dateString = '';
+    let dateString: string | null = null;
     let targetLine: number | null = null;
     let lineCount = 0;
 
@@ -71,7 +75,9 @@ async function extractDate(metaFile: string): Promise<string | null> {
       if (targetLine === null && line.endsWith("'seriesDate'")) {
         targetLine = lineCount + 2;
       } else if (lineCount === targetLine) {
-        dateString = line.split("'")[1];
+        // A malformed line (no quoted value) yields undefined → normalize to null
+        // so the resolved type is honest.
+        dateString = line.split("'")[1] ?? null;
         rl.close();
         fileStream.close();
         resolve(dateString);
@@ -79,8 +85,13 @@ async function extractDate(metaFile: string): Promise<string | null> {
     });
 
     rl.on('error', (err: Error) => {
-      log.error('Error reading file', { error: err.message });
-      reject(err);
+      log.warn('[Files] unreadable CS-Imaging meta file; treating as undated', {
+        file: metaFile,
+        error: err.message,
+      });
+      rl.close();
+      fileStream.close();
+      resolve(null);
     });
 
     rl.on('close', () => {

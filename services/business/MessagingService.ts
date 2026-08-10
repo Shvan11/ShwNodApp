@@ -102,7 +102,7 @@ export type WhatsAppMessagesArray = [string[], string[], string[], string[]];
  * @param msg - Message object from database
  * @returns Transformed message with numeric status
  */
-export function transformMessageStatus(
+function transformMessageStatus(
   msg: DatabaseMessage
 ): TransformedMessage {
   let status: MessageStatusCode = 0;

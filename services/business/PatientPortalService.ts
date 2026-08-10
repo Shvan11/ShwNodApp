@@ -81,7 +81,7 @@ export async function getPatientProfile(personId: number): Promise<PatientPortal
  *   2. DDMM of date_of_birth, or
  *   3. null (staff must set it manually).
  */
-export function deriveDefaultPin(profile: PatientPortalProfile): string | null {
+function deriveDefaultPin(profile: PatientPortalProfile): string | null {
   if (profile.phone) {
     const digits = profile.phone.replace(/\D/g, '');
     if (digits.length >= 4) return digits.slice(-4);
@@ -211,9 +211,10 @@ export async function unlock(personId: number): Promise<void> {
 /**
  * Build the portal url for this patient's QR code.
  */
-export function portalUrlFor(personId: number): string {
-  const publicUrl = config.urls.publicUrl || 'https://remote.shwan-orthodontics.com';
-  return `${publicUrl}/portal?pid=${personId}`;
+function portalUrlFor(personId: number): string {
+  // config.urls.publicUrl carries its own default — never re-default it here, or the
+  // deployment's URL lives in two places (this is a per-clinic install, not one domain).
+  return `${config.urls.publicUrl}/portal?pid=${personId}`;
 }
 
 /**

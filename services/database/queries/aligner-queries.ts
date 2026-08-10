@@ -380,7 +380,7 @@ export async function getDoctorSetCount(drID: number): Promise<number> {
 /**
  * Create a new aligner doctor
  */
-export async function createDoctor(doctorData: DoctorData): Promise<number | null> {
+export async function createDoctor(doctorData: DoctorData): Promise<number> {
   const { doctor_name, doctor_email, logo_path } = doctorData;
 
   try {
@@ -786,7 +786,7 @@ export async function getAlignerSetById(setId: number): Promise<AlignerSet | nul
  * INSERT did) and writes the provided set_sequence verbatim; any other trigger-maintained
  * column must be reconciled in the Phase-5 AlignerService write path.
  */
-export async function createAlignerSet(setData: AlignerSetData): Promise<number | null> {
+export async function createAlignerSet(setData: AlignerSetData): Promise<number> {
   const startTime = Date.now();
   const {
     work_id,
@@ -1825,7 +1825,7 @@ export async function createNote(
   setId: number,
   noteText: string,
   noteType: 'Lab' | 'Doctor' = 'Lab'
-): Promise<number | null> {
+): Promise<number> {
   try {
     return await withPgTransaction(async (trx) => {
       const row = await trx
@@ -1985,7 +1985,7 @@ export async function getNoteReadStatus(noteId: number): Promise<boolean | null>
  */
 export async function createAlignerPayment(
   paymentData: AlignerPaymentData
-): Promise<number | null> {
+): Promise<number> {
   const { workid, aligner_set_id, amount_paid, date_of_payment, change } = paymentData;
 
   // Aligner sets are USD-only (enforced by `usdOnlyCurrency` in aligner.contract.ts +

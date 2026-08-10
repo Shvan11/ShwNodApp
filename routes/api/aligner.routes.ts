@@ -969,7 +969,7 @@ router.get(
       }
 
       const photos = await listPhotosForSet(setId);
-      res.json({ success: true, photos });
+      sendData(res, contract.getSetPhotos.response, { photos });
     } catch (error) {
       log.error('Error listing R2 photos:', error);
       ErrorResponses.internalError(res, 'Failed to retrieve set photos', error as Error);

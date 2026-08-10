@@ -4,29 +4,17 @@ import QRCode from 'qrcode';
 import config from '../../config/config.js';
 import { log } from '../../utils/logger.js';
 
-// ===========================================
-// TYPES
-// ===========================================
-
-/**
- * QR code result
- */
-export interface QRCodeResult {
-  qr: string;
-}
-
-// ===========================================
-// QR CODE FUNCTIONS
-// ===========================================
-
 /**
  * Generate a QR code for sharing a video
  * @param videoId - Video ID
- * @returns Object containing the QR code data URL and the share URL
+ * @returns The QR code data URL and the share URL it encodes
  */
-export async function generateVideoQRCode(videoId: number): Promise<QRCodeResult & { url: string }> {
-  const publicUrl = config.urls.publicUrl || 'https://remote.shwan-orthodontics.com';
-  const shareUrl = `${publicUrl}/v/${videoId}`;
+export async function generateVideoQRCode(
+  videoId: number
+): Promise<{ qr: string; url: string }> {
+  // config.urls.publicUrl carries its own default — never re-default it here, or the
+  // deployment's URL lives in two places (this is a per-clinic install, not one domain).
+  const shareUrl = `${config.urls.publicUrl}/v/${videoId}`;
 
   try {
     const qr = await QRCode.toDataURL(shareUrl, {

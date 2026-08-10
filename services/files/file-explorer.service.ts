@@ -59,8 +59,14 @@ export class FileExplorerError extends Error {
 
 const MAX_DEPTH = 12;
 const MAX_ENTRIES = 5000;
-/** App-managed infra dirs that must never surface in a patient listing. */
-const INFRA_DIRS = new Set(['.trash', '.thumbs', '.uploads']);
+/**
+ * App-managed infra dirs that must never surface in a patient listing. These live
+ * as siblings of the patient folders (`clinic1/.trash`, `clinic1/.uploads`), so
+ * this filter is defence in depth — and `sanitizeName` refuses to CREATE one of
+ * these inside a patient folder, since a filtered-out name would be invisible in
+ * every listing and therefore impossible to rename or delete from the UI.
+ */
+const INFRA_DIRS = new Set(['.trash', '.uploads']);
 
 /** Trash root: sibling of the numeric patient folders, same volume. */
 const TRASH_ROOT = clinicPath('.trash');
@@ -97,12 +103,12 @@ export function resolveSafe(personId: string | number, relPath = ''): SafePath {
   }
   const root = patientRoot(personId);
 
-  let rel: string;
-  try {
-    rel = decodeURIComponent(relPath || '');
-  } catch {
-    throw new FileExplorerError('Malformed path', 400);
-  }
+  // NO decodeURIComponent here: every caller already hands us a decoded value
+  // (Express/qs decodes `?path=`, and the mutation routes read a plain JSON
+  // body), so decoding again corrupts legitimate names. `Report%20final.pdf`
+  // would resolve to `Report final.pdf`, and a bare `%` — `Discount 50%.pdf` —
+  // throws URIError, making the file unlistable, unpreviewable and undeletable.
+  let rel = relPath || '';
   if (rel.includes('\0')) {
     throw new FileExplorerError('Invalid path', 400);
   }
@@ -213,6 +219,11 @@ export function sanitizeName(name: string): string {
     throw new FileExplorerError('Name cannot end with a space or dot', 400);
   }
   if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i.test(n)) {
+    throw new FileExplorerError('Reserved name', 400);
+  }
+  // An infra name would be filtered out of every listing — creating one would
+  // make a folder the user can see neither, nor rename, nor delete.
+  if (INFRA_DIRS.has(n.toLowerCase())) {
     throw new FileExplorerError('Reserved name', 400);
   }
   return n;
@@ -389,14 +400,21 @@ export async function renameEntry(
   if (src.abs === src.root) {
     throw new FileExplorerError('Cannot rename the patient root', 400);
   }
-  await realpathGuard(src.abs, src.root);
+  const srcReal = await realpathGuard(src.abs, src.root);
 
   const destRel = joinRel(parentOf(relPath) ?? '', safeName);
   const dest = resolveSafe(personId, destRel);
   await realpathGuardParent(dest.abs, dest.root);
 
-  if (await exists(dest.abs)) {
-    throw new FileExplorerError('A file or folder with that name already exists', 409);
+  // A case-only rename (`Photo.jpg` → `photo.jpg`) is legitimate, but on a
+  // case-INSENSITIVE filesystem — NTFS, i.e. the Windows prod target — the
+  // destination "already exists": it IS the source. Compare canonical paths so
+  // only a genuinely different entry blocks the rename.
+  if (src.abs !== dest.abs && (await exists(dest.abs))) {
+    const destReal = await fs.realpath(dest.abs).catch(() => null);
+    if (destReal !== srcReal) {
+      throw new FileExplorerError('A file or folder with that name already exists', 409);
+    }
   }
   await fs.rename(src.abs, dest.abs);
 

@@ -22,12 +22,14 @@ import { toDateOnly } from '../../utils/date.js';
 import {
   getTimePoints,
   getTimePointImgs,
+  type TimePoint,
 } from '../database/queries/timepoint-queries.js';
 import { getTimePointCodesForPatient } from '../database/queries/native-timepoint-queries.js';
 import {
   deleteWorkingFilesForPatient,
 } from '../imaging/photo-cleanup.service.js';
 import { deletePatientFolder } from '../files/file-explorer.service.js';
+import { purgePatientThumbnails } from '../files/thumbnail.service.js';
 import { purgeDolphinPatient } from '../sync/cdc/dolphin-sink.js';
 
 /**
@@ -39,11 +41,12 @@ import { purgeDolphinPatient } from '../sync/cdc/dolphin-sink.js';
  */
 type PatientInfoResult = NonNullable<Awaited<ReturnType<typeof getInfos>>>;
 
-type TimePointResult = {
-  tp_code: string;
-  tp_date_time: string;
-  tp_description: string;
-};
+/**
+ * Re-exported from the query layer rather than re-declared. The local copy was a
+ * structural duplicate that would have silently narrowed the row (or gone stale) the
+ * moment `getTimePoints` gained or renamed a column.
+ */
+type TimePointResult = TimePoint;
 
 /**
  * Error codes for patient validation
@@ -81,19 +84,6 @@ export class PatientValidationError extends Error {
     this.code = code;
     this.details = details;
   }
-}
-
-/**
- * Time point image data
- */
-export interface TimePointImage {
-  name: string;
-  path?: string;
-  date?: string;
-  width?: number;
-  height?: number;
-  description?: string;
-  type?: string;
 }
 
 /**
@@ -336,6 +326,11 @@ export async function deletePatientCascade(personId: number): Promise<{ folderRe
       error: (workingErr as Error).message,
     });
   }
+
+  // Drop the server-local thumbnail cache too: those WebP renders outlive both
+  // folders above (they sit off-share under .cache/thumbs) and are downscaled
+  // copies of the same clinical photos. Never throws.
+  await purgePatientThumbnails(personId);
 
   // Finish the Dolphin wipe: the CDC sink removes the Dolphin timepoints/images
   // (via the cascade deletes), but never the Dolphin patient row — purge it here so

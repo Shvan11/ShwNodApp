@@ -40,6 +40,7 @@ import {
   listPatientWorkingFiles,
   resolveWorkingFile,
 } from '../../services/files/working-files.service.js';
+import { getTimePointCodes } from '../../services/database/queries/timepoint-queries.js';
 
 const router = Router();
 
@@ -219,7 +220,11 @@ router.get(
   async (req: Request<PersonIdParams>, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
-      const entries = await listPatientWorkingFiles(personId);
+      // The patient's own tp codes scope the shared flat `working/` dir to files
+      // this patient can actually own (a `{personId}0…` prefix match would pull in
+      // any patient whose id starts with `{personId}0`).
+      const tpCodes = await getTimePointCodes(personId);
+      const entries = await listPatientWorkingFiles(personId, tpCodes);
       log.info('[Files] working-list', {
         userId: req.session?.userId,
         personId,
@@ -242,8 +247,10 @@ router.get(
       const download = isTruthy(req.query.download);
       const thumbRaw = queryString(req.query.thumb);
 
-      // Strictly validated to `{personId}0….iNN` — no separators, no traversal.
-      const { abs, mtimeMs } = await resolveWorkingFile(personId, name);
+      // Strictly validated against the exact names THIS patient's timepoints can
+      // produce — no separators, no traversal, no other patient's files.
+      const tpCodes = await getTimePointCodes(personId);
+      const { abs, mtimeMs } = await resolveWorkingFile(personId, name, tpCodes);
 
       // ── Thumbnail branch ──
       if (thumbRaw && thumbRaw !== '0') {

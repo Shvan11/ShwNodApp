@@ -169,12 +169,14 @@ export interface BatchUpdateData {
 }
 
 /**
- * Batch update result
+ * Batch update result — mirrors `aligner-queries.updateBatch`'s return EXACTLY:
+ * `{ deactivatedBatch }` when activating this batch turned another one off, else
+ * `null`. (This used to declare `deactivatedBatch` as an optional `{ batchSequence }`
+ * and was reached via an `as` cast, which both dropped `batchId` from the type and
+ * mis-modelled the no-deactivation case as `void` when the query returns `null`.)
  */
 export interface BatchUpdateResult {
-  deactivatedBatch?: {
-    batchSequence: number;
-  };
+  deactivatedBatch: DeactivatedBatchInfo;
 }
 
 /**
@@ -229,37 +231,6 @@ export interface PaymentCreateData {
   notes?: string;
 }
 
-/**
- * Set balance info
- */
-interface SetBalanceInfo {
-  set_cost: number | null;
-  TotalPaid: number;
-  Balance: number;
-}
-
-/**
- * Batch info for deactivation check
- */
-interface BatchInfo {
-  aligner_batch_id: number;
-  batch_sequence: number;
-  is_active: boolean;
-}
-
-/**
- * Aligner patient search result
- */
-export interface AlignerPatientSearchResult {
-  person_id: number;
-  patient_name: string;
-  phone?: string | null;
-  work_id?: number;
-  doctor_name?: string | null;
-  SetCount?: number;
-  ActiveSetID?: number | null;
-}
-
 // ==============================
 // ALIGNER SETS BUSINESS LOGIC
 // ==============================
@@ -299,7 +270,7 @@ export async function validateAndCreateSet(
   };
 
   try {
-    const newSetId = (await alignerQueries.createAlignerSet(sanitizedData)) as number;
+    const newSetId = await alignerQueries.createAlignerSet(sanitizedData);
     log.info(
       `Aligner set created successfully: Set ${newSetId} for Work ${work_id}`
     );
@@ -329,13 +300,13 @@ export async function validateAndUpdateSet(
     throw new AlignerValidationError('Valid setId is required', 'INVALID_SET_ID');
   }
 
+  const parsedSetId = parseInt(String(setId));
+
   // Check if set exists
-  const setExists = await alignerQueries.getAlignerSetById(
-    parseInt(String(setId))
-  );
+  const setExists = await alignerQueries.getAlignerSetById(parsedSetId);
   if (!setExists) {
     throw new AlignerValidationError('Aligner set not found', 'SET_NOT_FOUND', {
-      setId: parseInt(String(setId)),
+      setId: parsedSetId,
     });
   }
 
@@ -355,14 +326,14 @@ export async function validateAndUpdateSet(
   // drop below what's already been paid for it, otherwise the set becomes overpaid.
   // A clear (null) is exempt, as it always was: NULL means "no cost set", not zero.
   if (sanitizedData.set_cost !== undefined && sanitizedData.set_cost !== null) {
-    const balance = await alignerQueries.getAlignerSetBalance(parseInt(String(setId)));
+    const balance = await alignerQueries.getAlignerSetBalance(parsedSetId);
     const alreadyPaid = Number(balance?.TotalPaid ?? 0);
     if (Number(sanitizedData.set_cost) < alreadyPaid) {
       throw new AlignerValidationError(
         `Set cost (${sanitizedData.set_cost}) cannot be less than the amount already paid for this set (${alreadyPaid}).`,
         'SET_COST_BELOW_PAID',
         {
-          setId: parseInt(String(setId)),
+          setId: parsedSetId,
           setCost: Number(sanitizedData.set_cost),
           alreadyPaid,
         }
@@ -373,7 +344,7 @@ export async function validateAndUpdateSet(
   log.info(`Updating aligner set ${setId}:`, sanitizedData);
 
   try {
-    await alignerQueries.updateAlignerSet(parseInt(String(setId)), sanitizedData);
+    await alignerQueries.updateAlignerSet(parsedSetId, sanitizedData);
     log.info(`Aligner set ${setId} updated successfully`);
   } catch (error) {
     log.error('Error updating aligner set:', { error: error instanceof Error ? error.message : String(error) });
@@ -517,9 +488,7 @@ export async function validateAndCreateBatch(
   // Check for currently active batch (before creating new one)
   let deactivatedBatch: DeactivatedBatchInfo | null = null;
   if (is_active) {
-    const batches = (await alignerQueries.getBatchesBySetId(
-      aligner_set_id
-    )) as BatchInfo[];
+    const batches = await alignerQueries.getBatchesBySetId(aligner_set_id);
     const activeBatch = batches.find((b) => b.is_active);
     if (activeBatch) {
       deactivatedBatch = {
@@ -611,13 +580,15 @@ function mapBatchStatusError(message: string): AlignerErrorCode | null {
 export async function validateAndUpdateBatch(
   batchId: number | string,
   batchData: BatchUpdateData
-): Promise<BatchUpdateResult | void> {
+): Promise<BatchUpdateResult | null> {
   if (!batchId || isNaN(parseInt(String(batchId)))) {
     throw new AlignerValidationError(
       'Valid batchId is required',
       'INVALID_BATCH_ID'
     );
   }
+
+  const parsedBatchId = parseInt(String(batchId));
 
   // This PUT is a FULL REPLACE, not a partial patch: `updateBatch` writes every
   // editable column unconditionally, so an omitted count is persisted as 0 and an
@@ -647,12 +618,12 @@ export async function validateAndUpdateBatch(
 
   try {
     // Persist the validated values (see validateAndCreateBatch).
-    const result = (await alignerQueries.updateBatch(parseInt(String(batchId)), {
+    const result = await alignerQueries.updateBatch(parsedBatchId, {
       ...batchData,
       upper_aligner_count: upperCount,
       lower_aligner_count: lowerCount,
       days,
-    })) as BatchUpdateResult | void;
+    });
     log.info(`Aligner batch ${batchId} updated successfully`);
 
     if (result && result.deactivatedBatch) {
@@ -672,7 +643,7 @@ export async function validateAndUpdateBatch(
     const errorCode = mapBatchUpdateError(message);
     if (errorCode) {
       throw new AlignerValidationError(message, errorCode, {
-        batchId: parseInt(String(batchId)),
+        batchId: parsedBatchId,
       });
     }
     // Re-throw unexpected (infrastructure) errors as-is
@@ -699,10 +670,12 @@ export async function validateAndDeleteBatch(
     );
   }
 
+  const parsedBatchId = parseInt(String(batchId));
+
   log.info(`Deleting aligner batch ${batchId}`);
 
   try {
-    await alignerQueries.deleteBatch(parseInt(String(batchId)));
+    await alignerQueries.deleteBatch(parsedBatchId);
     log.info(`Aligner batch ${batchId} deleted successfully`);
   } catch (error) {
     log.error('Error deleting aligner batch:', { error: error instanceof Error ? error.message : String(error) });
@@ -711,12 +684,12 @@ export async function validateAndDeleteBatch(
     const message = error instanceof Error ? error.message : String(error);
     if (message === 'Aligner batch not found') {
       throw new AlignerValidationError(message, 'BATCH_NOT_FOUND', {
-        batchId: parseInt(String(batchId)),
+        batchId: parsedBatchId,
       });
     }
     if (message.includes('would be renumbered')) {
       throw new AlignerValidationError(message, 'SEQUENCE_LOCKED', {
-        batchId: parseInt(String(batchId)),
+        batchId: parsedBatchId,
       });
     }
     throw error;
@@ -931,7 +904,7 @@ export async function validateAndCreateDoctor(
   }
 
   try {
-    const newDrID = (await alignerQueries.createDoctor(doctorData)) as number;
+    const newDrID = await alignerQueries.createDoctor(doctorData);
     log.info(
       `Aligner doctor created successfully: Dr ${newDrID} - ${doctor_name}`
     );
@@ -967,9 +940,11 @@ export async function validateAndUpdateDoctor(
     );
   }
 
+  const parsedDrId = parseInt(String(drID));
+
   // Business Rule: email must be unique (excluding this doctor, only check if email is provided)
   const emailExists = doctor_email
-    ? await alignerQueries.isDoctorEmailTaken(doctor_email, parseInt(String(drID)))
+    ? await alignerQueries.isDoctorEmailTaken(doctor_email, parsedDrId)
     : false;
   if (emailExists) {
     throw new AlignerValidationError(
@@ -980,7 +955,7 @@ export async function validateAndUpdateDoctor(
   }
 
   try {
-    await alignerQueries.updateDoctor(parseInt(String(drID)), doctorData);
+    await alignerQueries.updateDoctor(parsedDrId, doctorData);
     log.info(
       `Aligner doctor updated successfully: Dr ${drID} - ${doctor_name}`
     );
@@ -1004,10 +979,10 @@ export async function validateAndUpdateDoctor(
 export async function validateAndDeleteDoctor(
   drID: number | string
 ): Promise<void> {
+  const parsedDrId = parseInt(String(drID));
+
   // Business Rule: Check for dependencies
-  const setCount = (await alignerQueries.getDoctorSetCount(
-    parseInt(String(drID))
-  )) as number;
+  const setCount = await alignerQueries.getDoctorSetCount(parsedDrId);
 
   if (setCount > 0) {
     throw new AlignerValidationError(
@@ -1018,7 +993,7 @@ export async function validateAndDeleteDoctor(
   }
 
   try {
-    await alignerQueries.deleteDoctor(parseInt(String(drID)));
+    await alignerQueries.deleteDoctor(parsedDrId);
     log.info(`Aligner doctor deleted successfully: Dr ${drID}`);
     scheduleDoctorEmailListSync(`doctor ${drID} deleted`);
   } catch (error) {
@@ -1058,22 +1033,18 @@ export async function validateAndCreateNote(
     );
   }
 
+  const parsedSetId = parseInt(String(setId));
+
   // Verify that the set exists
-  const setExists = await alignerQueries.alignerSetExists(
-    parseInt(String(setId))
-  );
+  const setExists = await alignerQueries.alignerSetExists(parsedSetId);
   if (!setExists) {
     throw new AlignerValidationError('Aligner set not found', 'SET_NOT_FOUND', {
-      setId: parseInt(String(setId)),
+      setId: parsedSetId,
     });
   }
 
   try {
-    const noteId = (await alignerQueries.createNote(
-      parseInt(String(setId)),
-      noteText,
-      'Lab'
-    )) as number;
+    const noteId = await alignerQueries.createNote(parsedSetId, noteText, 'Lab');
     log.info(`Lab added note to aligner set ${setId}`);
     return noteId;
   } catch (error) {
@@ -1111,18 +1082,18 @@ export async function validateAndUpdateNote(
     );
   }
 
+  const parsedNoteId = parseInt(String(noteId));
+
   // Verify note exists
-  const existingNote = await alignerQueries.getNoteById(
-    parseInt(String(noteId))
-  );
+  const existingNote = await alignerQueries.getNoteById(parsedNoteId);
   if (!existingNote) {
     throw new AlignerValidationError('note not found', 'NOTE_NOT_FOUND', {
-      noteId: parseInt(String(noteId)),
+      noteId: parsedNoteId,
     });
   }
 
   try {
-    await alignerQueries.updateNote(parseInt(String(noteId)), noteText);
+    await alignerQueries.updateNote(parsedNoteId, noteText);
     log.info(`note ${noteId} updated`);
   } catch (error) {
     log.error('Error updating note:', { error: error instanceof Error ? error.message : String(error) });
@@ -1149,18 +1120,18 @@ export async function validateAndDeleteNote(
     );
   }
 
+  const parsedNoteId = parseInt(String(noteId));
+
   // Verify note exists
-  const existingNote = await alignerQueries.getNoteById(
-    parseInt(String(noteId))
-  );
+  const existingNote = await alignerQueries.getNoteById(parsedNoteId);
   if (!existingNote) {
     throw new AlignerValidationError('note not found', 'NOTE_NOT_FOUND', {
-      noteId: parseInt(String(noteId)),
+      noteId: parsedNoteId,
     });
   }
 
   try {
-    await alignerQueries.deleteNote(parseInt(String(noteId)));
+    await alignerQueries.deleteNote(parsedNoteId);
     log.info(`note ${noteId} deleted`);
   } catch (error) {
     log.error('Error deleting note:', { error: error instanceof Error ? error.message : String(error) });
@@ -1204,9 +1175,7 @@ export async function validateAndCreatePayment(
 
   // Validate payment doesn't exceed set balance
   if (aligner_set_id) {
-    const setBalance = (await alignerQueries.getAlignerSetBalance(
-      aligner_set_id
-    )) as SetBalanceInfo | null;
+    const setBalance = await alignerQueries.getAlignerSetBalance(aligner_set_id);
 
     if (!setBalance) {
       throw new AlignerValidationError(
@@ -1222,9 +1191,15 @@ export async function validateAndCreatePayment(
       );
     }
 
-    if (paymentAmount > setBalance.Balance) {
+    // `Balance` is `set_cost - coalesce(sum(paid), 0)`, so it is NULL only when
+    // set_cost is — already rejected above. The `?? 0` is the type-level narrowing
+    // for that, not a real fallback (it would reject any payment, which is the safe
+    // direction anyway). This used to be an `as SetBalanceInfo` cast that asserted
+    // the column non-null instead of proving it.
+    const balance = setBalance.Balance ?? 0;
+    if (paymentAmount > balance) {
       throw new AlignerValidationError(
-        `Payment amount (${paymentAmount}) exceeds remaining balance (${setBalance.Balance})`,
+        `Payment amount (${paymentAmount}) exceeds remaining balance (${balance})`,
         'PAYMENT_EXCEEDS_BALANCE'
       );
     }
@@ -1235,9 +1210,7 @@ export async function validateAndCreatePayment(
   );
 
   try {
-    const invoiceID = (await alignerQueries.createAlignerPayment(
-      paymentData
-    )) as number;
+    const invoiceID = await alignerQueries.createAlignerPayment(paymentData);
     log.info(`Payment added successfully: Invoice ${invoiceID}`);
     return invoiceID;
   } catch (error) {

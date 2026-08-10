@@ -121,3 +121,27 @@ export async function getWorkingThumbnail(
 ): Promise<string> {
   return renderThumb(abs, mtimeMs, ['working', String(personId)], name, width);
 }
+
+/**
+ * Drop a patient's entire thumbnail cache — BOTH namespaces (`{id}/…` for patient
+ * files, `working/{id}/…` for rendered views).
+ *
+ * Called when the patient record is deleted: these are downscaled renders of
+ * clinical photos, so leaving them behind after the source files are gone is a
+ * retention problem, not just wasted disk. Best-effort — a failure here must
+ * never block the delete (the authoritative rows and files are already gone).
+ */
+export async function purgePatientThumbnails(personId: string | number): Promise<void> {
+  if (!/^\d+$/.test(String(personId))) return;
+  const id = String(personId);
+  for (const dir of [path.join(THUMB_CACHE_DIR, id), path.join(THUMB_CACHE_DIR, 'working', id)]) {
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+    } catch (err) {
+      log.warn('[Files] failed to purge thumbnail cache', {
+        dir,
+        error: (err as Error).message,
+      });
+    }
+  }
+}

@@ -52,8 +52,8 @@ export const UPLOAD_STAGE_DIR = path.join(MEDIA_DIR, '.uploads');
 // What the webOS browser can render
 // ---------------------------------------------------------------------------
 
-export const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
-export const VIDEO_EXT = new Set(['.mp4', '.webm', '.ogg']);
+const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+const VIDEO_EXT = new Set(['.mp4', '.webm', '.ogg']);
 
 export const MIME: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -88,7 +88,7 @@ export function classify(ext: string): MediaKind | null {
  * sound on at volume 15). No per-image overrides out of the box — every picture
  * uses `photoMs` until staff set one.
  */
-export const DEFAULT_SETTINGS: TvDisplaySettings = {
+const DEFAULT_SETTINGS: TvDisplaySettings = {
   enabled: true,
   onHour: 15,
   onMinute: 0,
@@ -236,16 +236,44 @@ async function persist(next: StoredFile): Promise<void> {
   }
 }
 
+/**
+ * Serializes every read-modify-write of the settings file onto one promise chain.
+ *
+ * Each mutation below is `load()` → compute → `persist()`, and the whole file is
+ * rewritten wholesale, so two overlapping mutations would both read the same
+ * snapshot and the second would silently discard the first's change (delete a
+ * media file while a settings save is in flight and the playlist prune vanishes).
+ * The chain is per-process, which is the right scope: one Windows service owns
+ * this file, and `load()` still revalidates against the file's mtime so an
+ * outside hand-edit is picked up rather than overwritten blindly.
+ */
+let writeQueue: Promise<unknown> = Promise.resolve();
+
+function serialize<T>(fn: () => Promise<T>): Promise<T> {
+  // Swallow the predecessor's rejection so one failed write can't poison the
+  // queue for every later one; the original caller still sees its own error.
+  const run = writeQueue.then(fn, fn);
+  writeQueue = run.catch(() => undefined);
+  return run;
+}
+
+/** Deep-ish copy: `photoMsByName` must not hand out the cached object itself. */
+function copySettings(s: TvDisplaySettings): TvDisplaySettings {
+  return { ...s, photoMsByName: { ...s.photoMsByName } };
+}
+
 export async function getSettings(): Promise<TvDisplaySettings> {
-  return { ...(await load()).settings };
+  return copySettings((await load()).settings);
 }
 
 export async function saveSettings(settings: TvDisplaySettings): Promise<TvDisplaySettings> {
-  const current = await load();
-  const next = normalize(settings);
-  await persist({ ...current, settings: next });
-  log.info('[TV Display] settings updated', { settings: next });
-  return { ...next };
+  return serialize(async () => {
+    const current = await load();
+    const next = normalize(settings);
+    await persist({ ...current, settings: next });
+    log.info('[TV Display] settings updated', { settings: next });
+    return copySettings(next);
+  });
 }
 
 /**
@@ -254,12 +282,14 @@ export async function saveSettings(settings: TvDisplaySettings): Promise<TvDispl
  * happens to reuse the name). No-op when the file had no override.
  */
 async function forgetDuration(name: string): Promise<void> {
-  const key = path.basename(name);
-  const current = await load();
-  if (!(key in current.settings.photoMsByName)) return;
-  const photoMsByName = { ...current.settings.photoMsByName };
-  delete photoMsByName[key];
-  await persist({ ...current, settings: { ...current.settings, photoMsByName } });
+  return serialize(async () => {
+    const key = path.basename(name);
+    const current = await load();
+    if (!(key in current.settings.photoMsByName)) return;
+    const photoMsByName = { ...current.settings.photoMsByName };
+    delete photoMsByName[key];
+    await persist({ ...current, settings: { ...current.settings, photoMsByName } });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -277,12 +307,14 @@ async function forgetDuration(name: string): Promise<void> {
  * public/TV read path.
  */
 export async function ensurePlaylist(): Promise<string[]> {
-  const stored = await load();
-  if (stored.playlist !== null) return [...stored.playlist];
-  const seeded = (await listMedia()).map((m) => m.name);
-  await persist({ ...stored, playlist: seeded });
-  log.info('[TV Display] playlist seeded from folder', { count: seeded.length });
-  return seeded;
+  return serialize(async () => {
+    const stored = await load();
+    if (stored.playlist !== null) return [...stored.playlist];
+    const seeded = (await listMedia()).map((m) => m.name);
+    await persist({ ...stored, playlist: seeded });
+    log.info('[TV Display] playlist seeded from folder', { count: seeded.length });
+    return seeded;
+  });
 }
 
 /**
@@ -311,13 +343,15 @@ export async function resolvedPlaylist(): Promise<{ name: string; type: MediaKin
  * here — the TV skips them and the tab flags them, so nothing vanishes silently.
  */
 export async function savePlaylist(names: string[]): Promise<string[]> {
-  const current = await load();
-  const cleaned = names
-    .map((n) => path.basename(String(n)))
-    .filter((n) => n && n !== '.' && n !== '..');
-  await persist({ ...current, playlist: cleaned });
-  log.info('[TV Display] playlist updated', { count: cleaned.length });
-  return cleaned;
+  return serialize(async () => {
+    const current = await load();
+    const cleaned = names
+      .map((n) => path.basename(String(n)))
+      .filter((n) => n && n !== '.' && n !== '..');
+    await persist({ ...current, playlist: cleaned });
+    log.info('[TV Display] playlist updated', { count: cleaned.length });
+    return cleaned;
+  });
 }
 
 /**
@@ -328,13 +362,15 @@ export async function savePlaylist(names: string[]): Promise<string[]> {
  * that snapshot, so seeding both migrates AND includes it without duplicating.
  */
 async function addUploadedToPlaylist(name: string): Promise<void> {
-  const current = await load();
-  if (current.playlist === null) {
-    const seeded = (await listMedia()).map((m) => m.name);
-    await persist({ ...current, playlist: seeded });
-    return;
-  }
-  await persist({ ...current, playlist: [...current.playlist, path.basename(name)] });
+  return serialize(async () => {
+    const current = await load();
+    if (current.playlist === null) {
+      const seeded = (await listMedia()).map((m) => m.name);
+      await persist({ ...current, playlist: seeded });
+      return;
+    }
+    await persist({ ...current, playlist: [...current.playlist, path.basename(name)] });
+  });
 }
 
 /**
@@ -343,13 +379,15 @@ async function addUploadedToPlaylist(name: string): Promise<void> {
  * was never initialized (nothing persisted to prune) or the file isn't listed.
  */
 async function removeFromPlaylist(name: string): Promise<void> {
-  const current = await load();
-  if (current.playlist === null) return;
-  const base = path.basename(name);
-  const next = current.playlist.filter((n) => n !== base);
-  if (next.length !== current.playlist.length) {
-    await persist({ ...current, playlist: next });
-  }
+  return serialize(async () => {
+    const current = await load();
+    if (current.playlist === null) return;
+    const base = path.basename(name);
+    const next = current.playlist.filter((n) => n !== base);
+    if (next.length !== current.playlist.length) {
+      await persist({ ...current, playlist: next });
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -365,10 +403,16 @@ async function removeFromPlaylist(name: string): Promise<void> {
 /** Which side of the feature a stream belongs to. */
 export type SignageClientKind = 'page' | 'daemon';
 
-/** The subset of `res` this module needs — keeps the store free of Express types. */
+/**
+ * The subset of `res` this module needs — keeps the store free of Express types.
+ *
+ * `destroyed` is load-bearing, not decoration: it is the ONLY reliable liveness
+ * signal here (see `safeWrite`). Optional so a plain test double stays valid.
+ */
 interface SseSink {
   write(chunk: string): boolean;
   end(): void;
+  readonly destroyed?: boolean;
 }
 
 interface SignageClient {
@@ -390,7 +434,9 @@ const HEARTBEAT_MS = 25_000;
 function startHeartbeat(): void {
   if (heartbeat) return;
   heartbeat = setInterval(() => {
-    for (const client of clients) safeWrite(client, ':\n\n');
+    // Snapshot: safeWrite can drop a client mid-loop. Doubles as the sweep that
+    // reaps streams whose 'close' never fired.
+    for (const client of [...clients]) safeWrite(client, ':\n\n');
   }, HEARTBEAT_MS);
   // Never hold the process open for a keepalive.
   heartbeat.unref?.();
@@ -403,13 +449,42 @@ function stopHeartbeatIfIdle(): void {
   }
 }
 
-/** Write to one stream, dropping it if the socket is already gone. */
-function safeWrite(client: SignageClient, frame: string): void {
+/** Forget a stream whose socket is gone. Idempotent with `addClient`'s dispose. */
+function dropClient(client: SignageClient, reason: string): void {
+  if (clients.delete(client)) {
+    log.info('[TV Display] stream dropped', { kind: client.kind, reason, streams: clients.size });
+  }
+  stopHeartbeatIfIdle();
+}
+
+/**
+ * Write one frame to a stream. Returns whether it reached a LIVE stream, and
+ * drops the client when it did not — so a caller that reports delivery to the
+ * user (`broadcastCommand`) can tell the truth.
+ *
+ * The branches below follow measured `http.ServerResponse` behaviour, not
+ * intuition:
+ *   - `write()` NEVER throws on a dead stream — not when the client vanished, not
+ *     after the response was ended. It returns `false`.
+ *   - It ALSO returns `false` under ordinary backpressure on a perfectly healthy
+ *     stream (a slow TV over the tunnel), where the frame IS buffered and does
+ *     get sent.
+ * So the return value cannot distinguish "gone" from "slow", and treating
+ * `false` as failure would drop healthy screens mid-slideshow. `destroyed` is
+ * true in exactly the dead cases and false under backpressure, so it is the
+ * discriminator. The try/catch remains as a guard for a non-Node sink.
+ */
+function safeWrite(client: SignageClient, frame: string): boolean {
+  if (client.sink.destroyed) {
+    dropClient(client, 'socket destroyed');
+    return false;
+  }
   try {
-    client.sink.write(frame);
-  } catch {
-    clients.delete(client);
-    stopHeartbeatIfIdle();
+    client.sink.write(frame); // `false` here = backpressure; still delivered
+    return true;
+  } catch (err) {
+    dropClient(client, (err as Error).message);
+    return false;
   }
 }
 
@@ -444,10 +519,19 @@ export async function currentState(): Promise<{
   return { settings, items };
 }
 
-/** Send the current state to one stream (used right after it connects). */
+/**
+ * Send the current state to one stream (used right after it connects). Guarded
+ * like every other write here: building the state is async, so the socket can be
+ * gone by the time we write, and that must not throw into the route handler.
+ */
 export async function sendState(sink: SseSink): Promise<void> {
   const state = await currentState();
-  sink.write(frame('state', state));
+  if (sink.destroyed) return; // vanished while we were reading the folder
+  try {
+    sink.write(frame('state', state));
+  } catch {
+    /* client vanished mid-connect — its dispose callback does the cleanup */
+  }
 }
 
 /**
@@ -458,33 +542,44 @@ export async function broadcastState(): Promise<void> {
   if (clients.size === 0) return;
   const state = await currentState();
   const payload = frame('state', state);
-  for (const client of clients) safeWrite(client, payload);
+  for (const client of [...clients]) safeWrite(client, payload); // snapshot: safeWrite can drop
 }
 
 /**
- * Push a one-shot command to the daemon(s). Returns false when no daemon stream
- * is connected — nothing is queued, and the caller tells the user plainly rather
- * than letting a button silently do nothing.
+ * Push a one-shot command to the daemon(s). Returns whether the frame actually
+ * reached a live daemon stream — false when none is connected OR when the only
+ * ones registered turn out to have dead sockets. Nothing is queued, and the route
+ * turns a false into a plain "the scheduler isn't connected" 409, so this must
+ * never report success for a write that went nowhere: the staff member would be
+ * told the TV was switched off while it stayed on.
  */
 export function broadcastCommand(action: TvDisplayCommandAction): boolean {
   const payload = frame('command', { action });
   let delivered = false;
-  for (const client of clients) {
+  for (const client of [...clients]) {
+    // Snapshot: a failed write drops the client from the live set mid-loop.
     if (client.kind !== 'daemon') continue;
-    safeWrite(client, payload);
-    delivered = true;
+    if (safeWrite(client, payload)) delivered = true;
   }
   log.info('[TV Display] command pushed', { action, delivered });
   return delivered;
 }
 
-/** Live connection state, for the settings tab's status card. */
+/**
+ * Live connection state, for the settings tab's status card. Reaps dead streams
+ * first: a socket that died without its 'close' firing would otherwise keep the
+ * card showing a green "TV connected" indefinitely.
+ */
 export function getConnections(): {
   pageConnected: boolean;
   pageSince: string | null;
   daemonConnected: boolean;
   daemonSince: string | null;
 } {
+  for (const client of [...clients]) {
+    if (client.sink.destroyed) dropClient(client, 'socket destroyed');
+  }
+
   let page: number | null = null;
   let daemon: number | null = null;
   for (const client of clients) {
@@ -602,7 +697,7 @@ export function mediaFilePath(name: string): string {
  * set replaced, length capped, extension normalized to lower case. Returns ''
  * when the extension is not renderable.
  */
-export function sanitizeUploadName(original: string): string {
+function sanitizeUploadName(original: string): string {
   const base = path.basename(original || '');
   const ext = path.extname(base).toLowerCase();
   if (!classify(ext)) return '';
@@ -613,6 +708,36 @@ export function sanitizeUploadName(original: string): string {
     .trim()
     .slice(0, 80);
   return `${stem || 'media'}${ext}`;
+}
+
+/**
+ * Delete staged uploads left behind by a crash or a dropped connection. Multer
+ * names them `stage-{epochMs}-{hex}{ext}`, so age comes from the filename — no
+ * stat, and mirrors share-stage.ts. A committed upload is renamed OUT of here, so
+ * anything still present past the TTL is garbage; without this a single 1 GB
+ * interrupted video would sit on the clinic volume forever.
+ *
+ * The TTL is deliberately long: a genuinely in-flight upload is still being
+ * written under its (already old) name, and deleting one mid-transfer would be
+ * far worse than keeping an orphan a few extra hours.
+ */
+const STAGE_TTL_MS = 6 * 60 * 60 * 1000;
+
+async function sweepStagedUploads(): Promise<void> {
+  try {
+    const now = Date.now();
+    const names = await readdir(UPLOAD_STAGE_DIR);
+    await Promise.all(
+      names.map(async (name) => {
+        const m = /^stage-(\d+)-/.exec(name);
+        if (m && now - Number(m[1]) > STAGE_TTL_MS) {
+          await unlink(path.join(UPLOAD_STAGE_DIR, name)).catch(() => {});
+        }
+      })
+    );
+  } catch {
+    /* best effort — a missing dir or racey unlink is harmless */
+  }
 }
 
 /** `name.jpg` → `name-2.jpg` → `name-3.jpg` … until nothing is in the way. */
@@ -643,6 +768,7 @@ export async function commitUpload(stagedPath: string, originalName: string): Pr
     await unlink(stagedPath).catch(() => {});
     throw new Error(`Unsupported file type: ${path.extname(originalName) || originalName}`);
   }
+  void sweepStagedUploads(); // best-effort GC of crashed uploads; never blocks this one.
   await mkdir(MEDIA_DIR, { recursive: true });
   const finalName = await uniqueName(safe);
   await rename(stagedPath, path.join(MEDIA_DIR, finalName));

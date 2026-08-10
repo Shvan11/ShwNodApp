@@ -8,12 +8,16 @@ import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
 
 // type definitions
-interface TimePoint {
+//
+// `type`, not `interface`: this row flows through `sendData` into a `z.looseObject`
+// contract, whose inferred string index signature an interface is not assignable to
+// (TS2345 — see the contract-authoring rules in CLAUDE.md).
+export type TimePoint = {
   tp_code: string;
   /** PG `date` → 'YYYY-MM-DD' string at runtime (see the kysely.ts pg parser). */
   tp_date_time: string;
   tp_description: string;
-}
+};
 
 /**
  * Retrieves time points for a given patient id, ordered chronologically by date.
@@ -50,6 +54,24 @@ export function getTimePoints(PID: string): Promise<TimePoint[]> {
     .orderBy('tp_date_time')
     .orderBy('tp_code')
     .execute();
+}
+
+/**
+ * The patient's own `tp_code` set — the disambiguator for the shared flat
+ * `working/` dir. A rendered view is named `{personId}0{tpCode}.{view}`, and
+ * decimal ids prefix each other, so a `{personId}0…` prefix match spans patients
+ * (patient 5 also matches patient 50's `5001.i12`). Callers pair these codes with
+ * `VIEW_CODES` to enumerate the EXACT names this patient can own — see
+ * services/files/working-files.service.ts.
+ */
+export function getTimePointCodes(PID: string): Promise<number[]> {
+  const db = getKysely();
+  return db
+    .selectFrom('time_points')
+    .where('person_id', '=', Number.parseInt(PID, 10))
+    .select('tp_code')
+    .execute()
+    .then((rows) => rows.map((r) => r.tp_code));
 }
 
 /**

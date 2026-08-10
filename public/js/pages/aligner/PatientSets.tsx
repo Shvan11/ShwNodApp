@@ -42,6 +42,19 @@ import { qk } from '@/query/keys';
 import * as alignerContract from '@shared/contracts/aligner.contract';
 import styles from './PatientSets.module.css';
 
+/** Fullscreen photo viewer: the photo list it was opened from + the current position. */
+type PhotoViewerState = { photos: AlignerPhoto[]; index: number };
+
+/**
+ * Clamped prev/next stepper for the photo viewer. Module-scoped so it's referentially
+ * stable in the keydown effect's deps without manual memoization.
+ */
+const stepViewer = (delta: number) => (v: PhotoViewerState | null): PhotoViewerState | null => {
+    if (!v) return v;
+    const next = v.index + delta;
+    return next >= 0 && next < v.photos.length ? { ...v, index: next } : v;
+};
+
 const getFileIconClass = (photo: AlignerPhoto): string => {
     const ext = photo.file_name.split('.').pop()?.toLowerCase();
     switch (ext) {
@@ -141,24 +154,31 @@ const PatientSets: React.FC = () => {
     const [batchesData, setBatchesData] = useState<Record<number, AlignerBatch[]>>({});
     const [notesData, setNotesData] = useState<Record<number, AlignerNote[]>>({});
     const [photosData, setPhotosData] = useState<Record<number, AlignerPhoto[]>>({});
-    const [viewerPhoto, setViewerPhoto] = useState<AlignerPhoto | null>(null);
+    // The viewer holds the whole photo list it was opened from plus the current
+    // position, so it can step back/forth like the patient-files preview modal.
+    const [viewer, setViewer] = useState<PhotoViewerState | null>(null);
     const [expandedCommunication, setExpandedCommunication] = useState<Record<number, boolean>>({});
     const [loading, setLoading] = useState<boolean>(false);
 
-    // Close fullscreen photo viewer with Escape key
+    const viewerPhoto = viewer ? viewer.photos[viewer.index] ?? null : null;
+
+    // Fullscreen photo viewer keys: Escape closes, arrows step through the set's photos.
     useEffect(() => {
+        if (!viewer) return;
         const handleKeyDown = (e: globalThis.KeyboardEvent) => {
             if (e.key === 'Escape') {
-                setViewerPhoto(null);
+                setViewer(null);
+            } else if (e.key === 'ArrowLeft') {
+                setViewer(stepViewer(-1));
+            } else if (e.key === 'ArrowRight') {
+                setViewer(stepViewer(1));
             }
         };
-        if (viewerPhoto) {
-            window.addEventListener('keydown', handleKeyDown);
-        }
+        window.addEventListener('keydown', handleKeyDown);
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [viewerPhoto]);
+    }, [viewer]);
 
     // Self-managed data loaders. Declared above the drawer hooks + mount effects
     // that reference them so every reference is a backward one (a forward reference
@@ -1935,15 +1955,15 @@ const PatientSets: React.FC = () => {
                                                                 <p className="empty-state">No photos uploaded by the doctor yet</p>
                                                             ) : (
                                                                 <div className="aligner-photos-grid">
-                                                                    {imagePhotos.map((photo) => (
-                                                                        <div 
-                                                                            key={photo.path} 
+                                                                    {imagePhotos.map((photo, photoIndex) => (
+                                                                        <div
+                                                                            key={photo.path}
                                                                             className="aligner-photo-card"
-                                                                            onClick={() => setViewerPhoto(photo)}
+                                                                            onClick={() => setViewer({ photos: imagePhotos, index: photoIndex })}
                                                                             onKeyDown={(e) => {
                                                                                 if (e.key === 'Enter' || e.key === ' ') {
                                                                                     e.preventDefault();
-                                                                                    setViewerPhoto(photo);
+                                                                                    setViewer({ photos: imagePhotos, index: photoIndex });
                                                                                 }
                                                                             }}
                                                                             role="button"
@@ -2248,28 +2268,39 @@ const PatientSets: React.FC = () => {
                 doctorName={labelModalData.set?.AlignerDoctorName ?? undefined}
             />
 
-            {viewerPhoto && (
-                <div 
-                    className="aligner-photo-viewer-overlay" 
-                    onClick={() => setViewerPhoto(null)}
-                    role="dialog" 
+            {viewer && viewerPhoto && (
+                <div
+                    className="aligner-photo-viewer-overlay"
+                    onClick={() => setViewer(null)}
+                    role="dialog"
                     aria-modal="true"
                 >
-                    <button 
-                        className="aligner-photo-viewer-close" 
-                        onClick={() => setViewerPhoto(null)}
+                    <button
+                        className="aligner-photo-viewer-close"
+                        onClick={() => setViewer(null)}
                         aria-label="Close viewer"
                     >
                         <i className="fas fa-times"></i>
                     </button>
-                    <div 
-                        className="aligner-photo-viewer-content" 
+                    {viewer.photos.length > 1 && (
+                        <button
+                            className="aligner-photo-viewer-nav aligner-photo-viewer-prev"
+                            onClick={(e) => { e.stopPropagation(); setViewer(stepViewer(-1)); }}
+                            disabled={viewer.index === 0}
+                            title="Previous photo"
+                            aria-label="Previous photo"
+                        >
+                            <i className="fas fa-chevron-left"></i>
+                        </button>
+                    )}
+                    <div
+                        className="aligner-photo-viewer-content"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <img 
-                            src={viewerPhoto.view_url} 
-                            alt={viewerPhoto.file_name} 
-                            className="aligner-photo-viewer-image" 
+                        <img
+                            src={viewerPhoto.view_url}
+                            alt={viewerPhoto.file_name}
+                            className="aligner-photo-viewer-image"
                         />
                         <div className="aligner-photo-viewer-details">
                             <div className="aligner-photo-viewer-filename">{viewerPhoto.file_name}</div>
@@ -2278,8 +2309,24 @@ const PatientSets: React.FC = () => {
                                     Uploaded: {formatDate(viewerPhoto.uploaded_at)}
                                 </div>
                             )}
+                            {viewer.photos.length > 1 && (
+                                <div className="aligner-photo-viewer-counter">
+                                    {viewer.index + 1} / {viewer.photos.length}
+                                </div>
+                            )}
                         </div>
                     </div>
+                    {viewer.photos.length > 1 && (
+                        <button
+                            className="aligner-photo-viewer-nav aligner-photo-viewer-next"
+                            onClick={(e) => { e.stopPropagation(); setViewer(stepViewer(1)); }}
+                            disabled={viewer.index === viewer.photos.length - 1}
+                            title="Next photo"
+                            aria-label="Next photo"
+                        >
+                            <i className="fas fa-chevron-right"></i>
+                        </button>
+                    )}
                 </div>
             )}
         </div>

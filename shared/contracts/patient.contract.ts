@@ -207,6 +207,13 @@ export const timepointFolder = {
 // keys mirror shared/photo-views.ts VIEW_CODES; the centre logo is a client-only
 // layout concern and is intentionally not part of the payload.
 export const gallery = {
+  // Both params build a filename under the shared `working/` dir, so they are
+  // constrained here (digits / the portal's `tp` charset) rather than trusted —
+  // see services/imaging/index.ts#getImageSizes and clinic-paths#workingFilePath.
+  params: z.object({
+    personId: z.string().regex(/^\d+$/, 'Invalid patient id'),
+    tp: z.string().regex(/^[A-Za-z0-9_-]{1,10}$/, 'Invalid time point code'),
+  }),
   response: z.object({
     i10: galleryView, i12: galleryView, i13: galleryView, i23: galleryView,
     i24: galleryView, i20: galleryView, i22: galleryView, i21: galleryView,

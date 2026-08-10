@@ -16,9 +16,6 @@ import { parseViewTag, isViewCode, VIEW_TAG_RE } from '../../shared/photo-views.
 import { resolveSafe, FileExplorerError } from '../files/file-explorer.service.js';
 import { log } from '../../utils/logger.js';
 
-export { parseViewTag } from '../../shared/photo-views.js';
-export type { ViewTag } from '../../shared/photo-views.js';
-
 /** Strip a leading `{view}-` tag (if any) → the clean original basename. */
 function stripTag(name: string): string {
   const m = VIEW_TAG_RE.exec(name);

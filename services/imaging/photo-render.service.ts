@@ -25,14 +25,11 @@
 import path from 'path';
 import fs from 'fs/promises';
 import sharp from 'sharp';
-import { VIEW_CODES } from '../../shared/photo-views.js';
+import { isViewCode } from '../../shared/photo-views.js';
 import { getFileCategory } from '../../utils/file-mime.js';
-import { workingFilePath } from '../files/clinic-paths.js';
+import { workingFileName, workingFileNameVariants, workingFilePath } from '../files/clinic-paths.js';
 import { resolveFileForServe, FileExplorerError } from '../files/file-explorer.service.js';
 import { log } from '../../utils/logger.js';
-
-/** The 8 fixed Dolphin view-code slots. Defense-in-depth: only these reach a filename. */
-const ALLOWED_VIEWS = new Set<string>(VIEW_CODES);
 
 /** Cap absurd inputs/outputs (phone photos ~40 MP are well under this). */
 const MAX_INPUT_PIXELS = 300_000_000;
@@ -96,6 +93,11 @@ function clampInt(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, Math.round(v)));
 }
 
+// Monotonic suffix for the staging file. pid+ms alone can repeat when two renders of
+// the SAME slot land in one millisecond (two users saving the same timepoint), and the
+// loser's `rename` then fails ENOENT because the winner already moved the shared temp.
+let tmpSeq = 0;
+
 /**
  * Render one slot to `working/{personId}0{tpCode}.{view}` (lowercase, matching
  * getImageSizes). Atomic temp-file + rename on the working/ volume (no EXDEV).
@@ -107,8 +109,11 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
   // ── Validation (these values build a filename + drive a decode) ───────────────
   if (!/^\d+$/.test(String(personId))) throw new FileExplorerError('Invalid patient id', 400);
   if (!/^\d+$/.test(String(tpCode))) throw new FileExplorerError('Invalid timepoint code', 400);
-  if (!ALLOWED_VIEWS.has(view)) throw new FileExplorerError(`Invalid view code: ${view}`, 400);
+  if (!isViewCode(view)) throw new FileExplorerError(`Invalid view code: ${view}`, 400);
   if (!Number.isFinite(rotation)) throw new FileExplorerError('Invalid rotation', 400);
+  if (!Number.isFinite(output.width) || !Number.isFinite(output.height) || output.height <= 0) {
+    throw new FileExplorerError('Invalid output size', 400);
+  }
   // VIEW_OUTPUT (from the client) supplies the per-view ASPECT only. The saved view
   // keeps the crop's NATIVE pixel resolution — no upscaling, no downscaling — so it
   // carries the original's full detail; see the outW/outH derivation below, once the
@@ -121,9 +126,9 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
     throw new FileExplorerError('Source is not an image', 415);
   }
 
-  const filename = `${personId}0${tpCode}.${view}`;
+  const filename = workingFileName(personId, tpCode, view);
   const destAbs = workingFilePath(filename);
-  const tmpPath = `${destAbs}.tmp-${process.pid}-${Date.now()}`;
+  const tmpPath = `${destAbs}.tmp-${process.pid}-${Date.now()}-${tmpSeq++}`;
 
   await acquire();
   try {
@@ -296,13 +301,16 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
  * Delete a single rendered view file `working/{personId}0{tpCode}.{view}` (the
  * cropped output) — backs the photo editor's per-view "Remove". Idempotent: a
  * missing file is a no-op. Guards mirror renderSlotToWorking so only a valid
- * (personId, tpCode, view) can ever form the path.
+ * (personId, tpCode, view) can ever form the path. Clears the legacy uppercase
+ * `.INN` spelling too, so "Remove" empties the slot on a case-sensitive volume
+ * as well (see workingFileNameVariants).
  */
 export async function deleteWorkingView(personId: number, tpCode: number, view: string): Promise<void> {
   if (!/^\d+$/.test(String(personId))) throw new FileExplorerError('Invalid patient id', 400);
   if (!/^\d+$/.test(String(tpCode))) throw new FileExplorerError('Invalid timepoint code', 400);
-  if (!ALLOWED_VIEWS.has(view)) throw new FileExplorerError(`Invalid view code: ${view}`, 400);
-  const destAbs = workingFilePath(`${personId}0${tpCode}.${view}`);
-  await fs.rm(destAbs, { force: true });
+  if (!isViewCode(view)) throw new FileExplorerError(`Invalid view code: ${view}`, 400);
+  for (const name of workingFileNameVariants(personId, tpCode, view)) {
+    await fs.rm(workingFilePath(name), { force: true });
+  }
   log.info('[PhotoEditor] deleted view', { personId, tpCode, view });
 }

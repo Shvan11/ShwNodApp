@@ -2618,3 +2618,64 @@
     color: var(--gray-400, #cbd5e0);
 }
 
+.aligner-photo-viewer-counter {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+    color: var(--gray-400, #cbd5e0);
+}
+
+/* Prev/next stepping across the photos of one set (mirrors the patient-files preview) */
+.aligner-photo-viewer-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    color: white;
+    font-size: 1.35rem;
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity 0.2s, background 0.2s;
+}
+
+.aligner-photo-viewer-nav:hover:not(:disabled) {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.24);
+}
+
+.aligner-photo-viewer-nav:disabled {
+    opacity: 0.2;
+    cursor: default;
+}
+
+.aligner-photo-viewer-prev {
+    left: 24px;
+}
+
+.aligner-photo-viewer-next {
+    right: 24px;
+}
+
+@media (max-width: 768px) {
+    .aligner-photo-viewer-nav {
+        width: 40px;
+        height: 40px;
+        font-size: 1.1rem;
+    }
+
+    .aligner-photo-viewer-prev {
+        left: 8px;
+    }
+
+    .aligner-photo-viewer-next {
+        right: 8px;
+    }
+}
+

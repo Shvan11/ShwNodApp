@@ -43,7 +43,7 @@ function brandingDir(): string {
 }
 
 /** True when `name` is a well-formed branding filename (and has no separators). */
-export function isLogoFilename(name: string): boolean {
+function isLogoFilename(name: string): boolean {
   return FILENAME_RE.test(name);
 }
 

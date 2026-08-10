@@ -4,7 +4,7 @@ import fs from 'fs';
 import { execFile, ChildProcess } from 'child_process';
 import config from '../../config/config.js';
 import { imageSizeFromFile } from 'image-size/fromFile';
-import { workingFilePath, patientPath } from '../files/clinic-paths.js';
+import { workingFileNameVariants, workingFilePath, patientPath } from '../files/clinic-paths.js';
 import { VIEW_CODES, type PhotoViewCode } from '../../shared/photo-views.js';
 import { log } from '../../utils/logger.js';
 
@@ -38,6 +38,11 @@ export type ImageDimension = {
  * shared VIEW_CODES SSoT) so no consumer depends on array position. Each value is
  * the view's pixel size + mtime, or `null` when that view hasn't been rendered.
  * The centre logo is a client-only layout concern and is not included.
+ *
+ * `pid`/`tp` build a filename under `working/`, so both callers validate them at
+ * their request boundary (`patientContract.gallery.params` for the staff route,
+ * `photosParamsSchema` for the portal); the digit guard below is defense in depth
+ * for `workingFilePath`'s "no separator" contract.
  * @param pid - Patient ID
  * @param tp - Time point code
  */
@@ -45,25 +50,35 @@ async function getImageSizes(
   pid: string,
   tp: string
 ): Promise<Record<PhotoViewCode, ImageDimension | null>> {
+  if (!/^\d+$/.test(pid) || !/^[A-Za-z0-9_-]{1,10}$/.test(tp)) {
+    throw new Error('Invalid patient id or time point code');
+  }
   const probe = async (view: PhotoViewCode): Promise<ImageDimension | null> => {
-    const name = `${pid}0${tp}.${view}`;
-    try {
-      const filePath = workingFilePath(name);
-      // imageSizeFromFile is truly async and non-blocking; stat runs alongside it
-      // to capture the mtime cache-bust token (see ImageDimension.mtime).
-      const [dimensions, stat] = await Promise.all([
-        imageSizeFromFile(filePath),
-        fs.promises.stat(filePath),
-      ]);
-      return {
-        name,
-        width: dimensions.width || 0,
-        height: dimensions.height || 0,
-        mtime: Math.round(stat.mtimeMs),
-      };
-    } catch {
-      return null; // missing or unreadable slot
+    // Canonical lowercase `.iNN` first, then the Dolphin-era `.INN` — see
+    // workingFileNameVariants. On NTFS the first candidate always wins (the names
+    // are one file); on a case-sensitive volume the fallback is what keeps a legacy
+    // uppercase render visible. We return the name that actually resolved, since it
+    // becomes the `/DolImgs/<name>` URL.
+    for (const name of workingFileNameVariants(pid, tp, view)) {
+      try {
+        const filePath = workingFilePath(name);
+        // imageSizeFromFile is truly async and non-blocking; stat runs alongside it
+        // to capture the mtime cache-bust token (see ImageDimension.mtime).
+        const [dimensions, stat] = await Promise.all([
+          imageSizeFromFile(filePath),
+          fs.promises.stat(filePath),
+        ]);
+        return {
+          name,
+          width: dimensions.width || 0,
+          height: dimensions.height || 0,
+          mtime: Math.round(stat.mtimeMs),
+        };
+      } catch {
+        continue; // missing or unreadable under this spelling — try the next
+      }
     }
+    return null; // slot not rendered
   };
 
   // All views probed concurrently (non-blocking).
@@ -125,51 +140,71 @@ async function processXrayImage(pid: string, file: string, detailsDir: string): 
   return new Promise((resolve, reject) => {
     const child: ChildProcess = execFile(csExport, args);
 
-    const timer = setTimeout(() => {
-      child.kill();
-      log.error('X-ray processing timed out', { file });
-      if (fs.existsSync(source)) {
-        resolve(source);
-      } else {
-        reject(new Error(`X-ray processing timed out and source file not found: ${source}`));
-      }
-    }, PROCESS_TIMEOUT_MS);
+    // A timeout kills the child, which then fires `exit` (code null) — without this
+    // guard that second event re-ran the whole fallback and logged a bogus
+    // "processing failed" on top of the timeout error.
+    let settled = false;
+    // Declared before the handlers that clear it — they only ever run after the
+    // assignment below, but a closure-captured const would be a TDZ trap tsc can't see.
+    let timer: ReturnType<typeof setTimeout>;
 
-    child.stdout?.on('data', (data: string) => log.debug('X-ray processing stdout', { data }));
-    child.stderr?.on('data', (data: string) => log.debug('X-ray processing stderr', { data }));
-
-    child.on('exit', (code: number | null) => {
+    /**
+     * Every failure path lands here. A killed or crashed cs_export can leave a
+     * TRUNCATED destination behind, and the `existsSync(destination)` fast path at
+     * the top of this function would then serve that partial PNG forever — so drop
+     * it before falling back to the source.
+     */
+    const failWith = (reason: string): void => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
-      if (code === 0) {
-        log.info('X-ray processed successfully', { destination });
-        resolve(destination);
-      } else {
-        log.error('X-ray processing failed', { exitCode: code, file, args });
-
-        // Graceful fallback - return original file if it exists
-        if (fs.existsSync(source)) {
-          log.info('Falling back to original file', { source });
-          resolve(source);
-        } else {
-          reject(
-            new Error(
-              `X-ray processing failed (exit code ${code}) and source file not found: ${source}`
-            )
-          );
-        }
+      try {
+        fs.rmSync(destination, { force: true });
+      } catch (err) {
+        log.warn('Failed to clean up partial X-ray output', {
+          destination,
+          error: (err as Error).message,
+        });
       }
-    });
-
-    child.on('error', (error: Error) => {
-      clearTimeout(timer);
-      log.error('X-ray processing command error', { error: error.message });
       // Graceful fallback - return original file if it exists
       if (fs.existsSync(source)) {
         log.info('Falling back to original file', { source });
         resolve(source);
       } else {
-        reject(new Error(`X-ray processing command failed: ${error.message}`));
+        reject(new Error(`${reason} and source file not found: ${source}`));
       }
+    };
+
+    timer = setTimeout(() => {
+      child.kill();
+      log.error('X-ray processing timed out', { file });
+      failWith('X-ray processing timed out');
+    }, PROCESS_TIMEOUT_MS);
+
+    child.stdout?.on('data', (data: Buffer) =>
+      log.debug('X-ray processing stdout', { data: data.toString() })
+    );
+    child.stderr?.on('data', (data: Buffer) =>
+      log.debug('X-ray processing stderr', { data: data.toString() })
+    );
+
+    child.on('exit', (code: number | null) => {
+      if (settled) return;
+      if (code === 0) {
+        settled = true;
+        clearTimeout(timer);
+        log.info('X-ray processed successfully', { destination });
+        resolve(destination);
+        return;
+      }
+      log.error('X-ray processing failed', { exitCode: code, file, args });
+      failWith(`X-ray processing failed (exit code ${code})`);
+    });
+
+    child.on('error', (error: Error) => {
+      if (settled) return;
+      log.error('X-ray processing command error', { error: error.message });
+      failWith(`X-ray processing command failed: ${error.message}`);
     });
   });
 }

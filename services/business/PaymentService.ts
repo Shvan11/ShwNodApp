@@ -47,13 +47,14 @@ export type PaymentErrorCode =
   | 'NEGATIVE_CHANGE'
   | 'CHANGE_EXCEEDS_IQD_RECEIVED'
   | 'CHANGE_EXCEEDS_TOTAL_VALUE'
+  | 'EXCHANGE_RATE_REQUIRED'
   | 'WORK_NOT_FOUND'
   | 'PAYMENT_EXCEEDS_REMAINING';
 
 /**
- * currency type
+ * currency type — internal: it only types the private change-calculation helpers.
  */
-export type CurrencyType = 'USD' | 'IQD';
+type CurrencyType = 'USD' | 'IQD';
 
 /**
  * Error details for payment validation
@@ -191,8 +192,29 @@ function validateChangeAmount(
     );
   }
 
-  // Validation 4: For USD payments, validate against total IQD value
-  if (usd > 0 && exchangeRate) {
+  // Validation 4: For USD payments the ceiling is the transaction's total IQD value,
+  // which cannot be computed without a rate.
+  //
+  // A missing rate FAILS CLOSED rather than skipping the check. `getExchangeRateAsOf`
+  // already falls back to the earliest rate on record, so null/0 here means the
+  // deployment has NEVER had an exchange rate entered (day one of a new clinic — this
+  // ships per-clinic) or holds a nonsense 0 row. The guard used to be `usd > 0 &&
+  // exchangeRate`, so that case fell through BOTH checks (validation 3 only covers
+  // usd === 0) and persisted change with no ceiling at all. Only reachable when change
+  // is actually being handed back — a USD payment with no change never gets here.
+  if (usd > 0) {
+    if (!exchangeRate || exchangeRate <= 0) {
+      throw new PaymentValidationError(
+        'Cannot validate change on a USD payment: no exchange rate has been recorded yet. Enter an exchange rate first.',
+        'EXCHANGE_RATE_REQUIRED',
+        {
+          usdReceived: usd,
+          iqdReceived: iqd,
+          changeRequested: changeAmount,
+        }
+      );
+    }
+
     const totalIQDValue = iqd + Math.floor(usd * exchangeRate);
 
     if (changeAmount > totalIQDValue) {

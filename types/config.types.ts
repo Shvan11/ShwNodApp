@@ -161,7 +161,8 @@ export interface ServerConfig {
  */
 export interface UrlConfig {
   qrHost?: string;
-  publicUrl?: string;
+  /** Always set — config.ts supplies the default, so consumers must not re-default it. */
+  publicUrl: string;
 }
 
 /**
@@ -195,7 +196,8 @@ export interface R2Config {
   accountId?: string;
   accessKeyId?: string;
   secretAccessKey?: string;
-  bucketName?: string;
+  /** Always set — config.ts supplies the default, so consumers must not re-default it. */
+  bucketName: string;
 }
 
 // ===========================================

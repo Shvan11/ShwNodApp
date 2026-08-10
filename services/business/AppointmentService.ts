@@ -97,9 +97,9 @@ export interface CreatedAppointment {
 }
 
 /**
- * Doctor info from verification
+ * Doctor info from verification — internal: only `verifyDoctor` produces it.
  */
-export interface DoctorInfo {
+interface DoctorInfo {
   id: number;
   employee_name: string;
   position_name: string;
@@ -187,7 +187,7 @@ function validateAppointmentRequiredFields(
  * @returns Doctor information
  * @throws AppointmentValidationError If employee is not a doctor
  */
-export async function verifyDoctor(drID: number | string): Promise<DoctorInfo> {
+async function verifyDoctor(drID: number | string): Promise<DoctorInfo> {
   const db = getKysely();
   const { rows: doctorCheck } = await sql<DoctorInfo>`
         SELECT e."id", e."employee_name", p."position_name"
@@ -207,13 +207,21 @@ export async function verifyDoctor(drID: number | string): Promise<DoctorInfo> {
 }
 
 /**
- * Check for appointment conflicts (same patient, same day)
+ * Check for appointment conflicts (same patient, same day).
+ *
+ * The rule is ONE appointment row per patient per calendar day, deliberately with no
+ * state filter: `appointments` has no cancelled/void column at all (only the
+ * `present`/`seated`/`dismissed` wall-clock stamps), so there is no "inactive" row to
+ * skip. A patient already seen and dismissed therefore cannot be booked a second time
+ * that day through this path — the existing row has to be edited instead. (Walk-ins are
+ * unaffected: `quickCheckIn` reuses the same-day row rather than creating a second one.)
+ *
  * @param personID - Patient id
  * @param appDate - Appointment date
  * @returns null if no conflict
  * @throws AppointmentValidationError If conflict exists
  */
-export async function checkAppointmentConflict(
+async function checkAppointmentConflict(
   personID: number | string,
   appDate: string
 ): Promise<null> {
@@ -244,7 +252,7 @@ export async function checkAppointmentConflict(
  * @param appDate - Appointment date
  * @throws AppointmentValidationError If date is a holiday
  */
-export async function checkHolidayConflict(appDate: string): Promise<void> {
+async function checkHolidayConflict(appDate: string): Promise<void> {
   // Extract date portion (YYYY-MM-DD)
   const dateOnly = appDate.split('T')[0];
 
@@ -263,21 +271,35 @@ export async function checkHolidayConflict(appDate: string): Promise<void> {
 }
 
 /**
+ * Serialize a `Date` as a local wall-clock 'YYYY-MM-DDTHH:MM:SS' string.
+ *
+ * Local getters, never `.toISOString()`: `app_date` is a `timestamp` WITHOUT time zone
+ * (single-clinic wall-clock — see CLAUDE.md), so emitting UTC would shift a near-midnight
+ * appointment back a day on the wire.
+ */
+function toLocalDateTimeString(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
+/**
  * Format current date/time for appointment operations
  */
 function formatCurrentDateTime(): FormattedDateTime {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const dateTime = toLocalDateTimeString(now);
 
   return {
-    dateTime: `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`,
-    dateOnly: `${year}-${month}-${day}`,
-    timeOnly: `${hours}:${minutes}:${seconds}`,
+    dateTime,
+    // Both slices come from the SAME formatted reading, so they can never straddle a
+    // second/day boundary relative to each other or to `dateTime`.
+    dateOnly: dateTime.slice(0, 10),
+    timeOnly: dateTime.slice(11),
   };
 }
 
@@ -365,6 +387,8 @@ export async function quickCheckIn(
   // Check if patient already has an appointment today
   interface ExistingAppointment {
     appointment_id: number;
+    /** `timestamp` column → a real `Date` at runtime (see kysely.ts parsers). */
+    app_date: Date;
     present: string | null;
     seated: string | null;
     dismissed: string | null;
@@ -372,7 +396,7 @@ export async function quickCheckIn(
 
   const db = getKysely();
   const { rows: existingAppointment } = await sql<ExistingAppointment>`
-        SELECT "appointment_id", "present", "seated", "dismissed"
+        SELECT "appointment_id", "app_date", "present", "seated", "dismissed"
         FROM "appointments"
         WHERE "person_id" = ${parseInt(String(person_id))}
           AND "app_date"::date = ${dateOnly}::date
@@ -381,6 +405,11 @@ export async function quickCheckIn(
   // Scenario 1: Appointment exists and patient already checked in
   if (existingAppointment && existingAppointment.length > 0) {
     const apt = existingAppointment[0];
+    // Report the appointment's STORED time, not `dateTime` (= now). Both branches below
+    // used to echo the check-in moment as `app_date`, which fabricated a booking time
+    // that never matched the row — the date part happened to be right only because the
+    // query already filtered on today.
+    const existingAppDate = toLocalDateTimeString(apt.app_date);
 
     if (apt.present) {
       log.info(
@@ -394,7 +423,7 @@ export async function quickCheckIn(
         appointment: {
           appointment_id: apt.appointment_id,
           person_id: parseInt(String(person_id)),
-          app_date: dateTime,
+          app_date: existingAppDate,
           present: apt.present,
         },
       };
@@ -429,7 +458,7 @@ export async function quickCheckIn(
       appointment: {
         appointment_id: apt.appointment_id,
         person_id: parseInt(String(person_id)),
-        app_date: dateTime,
+        app_date: existingAppDate,
         present: presentTimeString,
       },
     };
@@ -505,10 +534,8 @@ export async function getDailyAppointments(
     `Retrieved daily appointments for ${AppsDate}: ${result.stats.total} total, ${result.stats.checkedIn} checked in`
   );
 
-  return {
-    allAppointments: result.allAppointments,
-    checkedInAppointments: result.checkedInAppointments,
-    stats: result.stats,
-  };
+  // Returned as-is: this used to rebuild the object field by field, which was a no-op
+  // that silently dropped any field the query layer later added to the result type.
+  return result;
 }
 
