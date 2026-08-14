@@ -1,9 +1,9 @@
-// services/core/ResourceManager.ts
+// utils/resource-manager.ts
 /**
  * Resource manager for proper cleanup and disposal
  */
 
-import { log } from '../../utils/logger.js';
+import { log } from './logger.js';
 
 type CleanupFn<T> = (resource: T) => Promise<void> | void;
 

@@ -11,7 +11,7 @@ import type { Pool } from 'pg';
 import { Kysely, PostgresDialect, type Transaction } from 'kysely';
 import type { DB } from '../../types/db.js';
 import config from '../../config/config.js';
-import ResourceManager from '../core/ResourceManager.js';
+import ResourceManager from '../../utils/resource-manager.js';
 import { log } from '../../utils/logger.js';
 
 const { Pool: PgPool, types: pgTypes } = pg;

@@ -1,6 +1,6 @@
 import sql from 'mssql';
 import config from '../../config/config.js';
-import ResourceManager from '../core/ResourceManager.js';
+import ResourceManager from '../../utils/resource-manager.js';
 import { log } from '../../utils/logger.js';
 
 let pool: sql.ConnectionPool | null = null;

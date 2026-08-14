@@ -9,7 +9,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { EventEmitter } from 'events';
 import { InternalEmitterEvents } from './websocket-events.js';
-import messageState from '../state/messageState.js';
+import messageState from './messageState.js';
 import { log } from '../../utils/logger.js';
 
 interface WhatsappClient {

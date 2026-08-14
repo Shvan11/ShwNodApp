@@ -1,6 +1,6 @@
 // ArchformMatcher.tsx - Match Archform patients to aligner sets
 import { useState, useMemo, type ChangeEvent, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Select, { type SingleValue, type StylesConfig } from 'react-select';
 import { useToast } from '../../contexts/ToastContext';
@@ -54,6 +54,7 @@ type SortDirection = 'asc' | 'desc';
 const ArchformMatcher: React.FC = () => {
     const toast = useToast();
     const navigate = useNavigate();
+    const location = useLocation();
     const queryClient = useQueryClient();
 
     // /archform/matches reads Postgres, so only /archform/patients can return
@@ -740,7 +741,9 @@ const ArchformMatcher: React.FC = () => {
                                                 {matchedSet && (
                                                     <button
                                                         className={styles.btnEditPatient}
-                                                        onClick={() => navigate(`/patient/${matchedSet.person_id}/edit-patient`)}
+                                                        onClick={() => navigate(`/patient/${matchedSet.person_id}/edit-patient`, {
+                                                            state: { from: `${location.pathname}${location.search}` },
+                                                        })}
                                                         title="Edit patient info"
                                                     >
                                                         <i className="fas fa-user-edit"></i>

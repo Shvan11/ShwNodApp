@@ -5,7 +5,7 @@
 
 import { Router, type Request, type Response } from 'express';
 import { log } from '../utils/logger.js';
-import emailService from '../services/email/email-service.js';
+import emailService from '../services/messaging/email.js';
 import pdfGenerator from '../services/pdf/appointment-pdf-generator.js';
 import { validate } from '../middleware/validate.js';
 import { sendData, ErrorResponses } from '../utils/error-response.js';

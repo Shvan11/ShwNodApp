@@ -4,7 +4,7 @@
  * Memoized to prevent unnecessary re-renders
  */
 import React, { useState, useEffect, useRef, ChangeEvent, MouseEvent } from 'react';
-import { useParams, useNavigate, useLoaderData } from 'react-router-dom';
+import { useParams, useNavigate, useLoaderData, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AlignerPatientWorkLoaderResult } from '../../router/loaders';
 import ConfirmDialog from '../../components/react/ConfirmDialog';
@@ -126,6 +126,7 @@ const PatientSets: React.FC = () => {
     const { doctorId, workId } = useParams<{ doctorId?: string; workId?: string }>();
     const loaderData = useLoaderData() as AlignerPatientWorkLoaderResult;
     const navigate = useNavigate();
+    const location = useLocation();
     const toast = useToast();
     const queryClient = useQueryClient();
     const { addToQueue, isInQueue, removeByBatchId } = usePrintQueue();
@@ -1344,7 +1345,9 @@ const PatientSets: React.FC = () => {
 
                         <button
                             className="btn btn-success"
-                            onClick={() => navigate(`/patient/${patient.person_id}/edit-patient`)}
+                            onClick={() => navigate(`/patient/${patient.person_id}/edit-patient`, {
+                                state: { from: `${location.pathname}${location.search}` },
+                            })}
                         >
                             <i className="fas fa-edit"></i>
                             Edit Patient

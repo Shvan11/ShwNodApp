@@ -3,7 +3,7 @@ import twilio from 'twilio';
 import config from '../../config/config.js';
 import * as database from '../database/queries/messaging-queries.js';
 import { log } from '../../utils/logger.js';
-import ResourceManager from '../core/ResourceManager.js';
+import ResourceManager from '../../utils/resource-manager.js';
 
 // ===========================================
 // TYPES

@@ -1452,6 +1452,17 @@ export const integrationsGoogleDriveStatusQuery = () =>
       ),
   });
 
+/** GET /api/integrations/google-contacts/status — recipient phone book, per Google account. */
+export const integrationsGoogleContactsStatusQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.integrationsGoogleContactsStatus(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof integrationsContract.googleContactsStatus.response>>(
+        '/api/integrations/google-contacts/status',
+        { signal, schema: integrationsContract.googleContactsStatus.response }
+      ),
+  });
+
 /** GET /api/integrations/cloudflare-list/status — aligner-portal Access email-list sync status. */
 export const integrationsCloudflareListStatusQuery = () =>
   queryOptions({

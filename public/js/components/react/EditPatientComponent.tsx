@@ -1,6 +1,6 @@
 import { useState, ChangeEvent, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import PhoneInput from './PhoneInput';
@@ -75,6 +75,7 @@ interface FormData {
 const EditPatientComponent = ({ personId }: Props) => {
     const { t } = useTranslation('patients');
     const navigate = useNavigate();
+    const location = useLocation();
     const toast = useToast();
     const queryClient = useQueryClient();
     const [saving, setSaving] = useState(false);
@@ -117,6 +118,13 @@ const EditPatientComponent = ({ personId }: Props) => {
 
     // Use validated PersonID from loader, fallback to patientData.person_id
     const validPersonId = personId ?? patientData?.person_id ?? null;
+
+    // Where Save/Cancel return to. Callers that navigate here pass the page they
+    // came from in `location.state.from` (patient-info, patient management, …) so
+    // the form hands the user back where they were instead of dumping them on the
+    // works page. Falls back to works for a direct URL / refresh (no history state).
+    const returnTo = (location.state as { from?: string } | null)?.from ?? null;
+    const backTo = (pid: string | number) => returnTo ?? `/patient/${pid}/works`;
 
     // Form data
     const [formData, setFormData] = useState<FormData>({
@@ -220,9 +228,9 @@ const EditPatientComponent = ({ personId }: Props) => {
             queryClient.invalidateQueries({ queryKey: qk.patient.all(pid) });
 
             toast.success(t('edit.toast.success'));
-            // Close the form on success — return to the patient's works page
+            // Close the form on success — return to the page the user came from
             // (same destination as Cancel). The toast persists across navigation.
-            navigate(`/patient/${pid}/works`);
+            navigate(backTo(pid));
         } catch (err) {
             // Duplicate patient name → 409 with code/context in `details` (root kept as a fallback).
             const errorData = (err as HttpError).data as {
@@ -275,11 +283,11 @@ const EditPatientComponent = ({ personId }: Props) => {
     };
 
     const handleCancel = () => {
-        // Navigate back to works page using React Router
+        // Back to wherever the user opened the form from (works page by default)
         if (validPersonId) {
-            navigate(`/patient/${validPersonId}/works`);
+            navigate(backTo(validPersonId));
         } else {
-            navigate('/patient-management');
+            navigate(returnTo ?? '/patient-management');
         }
     };
 
@@ -373,7 +381,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                 <button
                     type="submit"
                     form="edit-patient-form"
-                    className="btn bg-success"
+                    className="btn btn-primary"
                     disabled={saving}
                 >
                     {saving ? (
@@ -654,7 +662,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                     </button>
                     <button
                         type="submit"
-                        className="btn bg-success"
+                        className="btn btn-primary"
                         disabled={saving}
                     >
                         {saving ? (

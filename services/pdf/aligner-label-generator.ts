@@ -439,5 +439,6 @@ class AlignerLabelGenerator {
 // EXPORTS
 // =============================================================================
 
-export { AlignerLabelGenerator, getSlotPosition, LABELS_PER_SHEET };
+// Only the singleton is consumed (routes/api/aligner.routes.ts). The class and the
+// sheet-geometry helpers stay module-private.
 export default new AlignerLabelGenerator();

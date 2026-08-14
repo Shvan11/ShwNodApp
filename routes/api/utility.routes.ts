@@ -10,7 +10,9 @@
 
 import { Router, type Request, type Response } from 'express';
 import sms from '../../services/messaging/sms.js';
-import { getContacts } from '../../services/authentication/google.js';
+import { getContacts } from '../../services/google-contacts/contacts.js';
+import { GoogleContactsAuthError } from '../../services/google-contacts/oauth.js';
+import { isGoogleContactAccountId } from '../../shared/google-contacts-accounts.js';
 import config from '../../config/config.js';
 import { workingFilePath } from '../../services/files/clinic-paths.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
@@ -69,10 +71,10 @@ router.get('/checktwilio', async (req: Request<object, unknown, unknown, DateQue
 
 /**
  * GET /google
- * Fetch Google contacts for a user via OAuth
+ * Fetch Google contacts for one connected Google account.
  *
  * Query Parameters:
- * - source: The OAuth source/identifier for fetching contacts
+ * - source: Account id from shared/google-contacts-accounts.ts (`shw`/`cli`)
  *
  * Returns:
  * - contacts: Array of contacts from Google
@@ -84,10 +86,22 @@ router.get('/google', async (req: Request<object, unknown, unknown, GoogleQuery>
       ErrorResponses.missingParameter(res, 'source');
       return;
     }
+    if (!isGoogleContactAccountId(source)) {
+      ErrorResponses.badRequest(res, `Unknown Google Contacts account “${source}”.`);
+      return;
+    }
 
     const contacts = await getContacts(source);
     sendData(res, utility.google.response, contacts);
   } catch (error) {
+    // A not-configured / not-connected account is an operator-actionable state, not
+    // a server fault — surface the friendly message so the recipient dropdown can
+    // tell the user to connect it in Settings instead of showing "Unknown error".
+    if (error instanceof GoogleContactsAuthError) {
+      log.warn('Google contacts unavailable', { source: req.query.source, code: error.code });
+      ErrorResponses.badRequest(res, error.message);
+      return;
+    }
     log.error('Error fetching Google contacts:', error);
     ErrorResponses.internalError(res, 'Failed to fetch Google contacts', error as Error);
   }

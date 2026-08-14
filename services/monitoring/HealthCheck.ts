@@ -1,8 +1,8 @@
 // services/monitoring/HealthCheck.ts
 import EventEmitter from 'events';
-import ResourceManager from '../core/ResourceManager.js';
+import ResourceManager from '../../utils/resource-manager.js';
 import { getDatabaseStats } from '../database/index.js';
-import messageState from '../state/messageState.js';
+import messageState from '../messaging/messageState.js';
 import whatsapp from '../messaging/whatsapp.js';
 import { log } from '../../utils/logger.js';
 
@@ -61,20 +61,15 @@ export interface DetailedHealthReport extends HealthStatus {
 }
 
 /**
- * Health check service stats interface
- */
-export interface HealthCheckStats {
-  isRunning: boolean;
-  totalChecks: number;
-  activeIntervals: number;
-  lastResults: number;
-}
-
-/**
  * Health check system for monitoring system components
  */
 class HealthCheckService extends EventEmitter {
   private checks: Map<string, HealthCheckFn> = new Map();
+  // The interval each check was registered with. Kept beside the check so start()
+  // honours it — it used to re-derive intervals from a duplicate hard-coded map,
+  // so the period passed to registerCheck() was silently ignored (and any check
+  // not in that map quietly fell back to 30s).
+  private checkIntervals: Map<string, number> = new Map();
   private intervals: Map<string, ReturnType<typeof setInterval>> = new Map();
   private lastResults: Map<string, HealthCheckResult> = new Map();
   private isRunning = false;
@@ -239,6 +234,7 @@ class HealthCheckService extends EventEmitter {
    */
   registerCheck(name: string, checkFn: HealthCheckFn, interval = 30000): void {
     this.checks.set(name, checkFn);
+    this.checkIntervals.set(name, interval);
 
     if (this.isRunning) {
       this.startCheck(name, interval);
@@ -322,17 +318,9 @@ class HealthCheckService extends EventEmitter {
     log.info('Starting health check service');
     this.isRunning = true;
 
-    // Start all registered checks with their default intervals
-    const defaultIntervals: Record<string, number> = {
-      database: 30000,
-      whatsapp: 15000,
-      memory: 60000,
-      system: 300000,
-    };
-
+    // Start all registered checks at the interval they were registered with.
     for (const [name] of this.checks) {
-      const interval = defaultIntervals[name] || 30000;
-      this.startCheck(name, interval);
+      this.startCheck(name, this.checkIntervals.get(name) ?? 30000);
     }
 
     this.emit('started');
@@ -394,48 +382,6 @@ class HealthCheckService extends EventEmitter {
       resourceStats: ResourceManager.getStats(),
       databaseStats: getDatabaseStats().connectionPool as unknown as Record<string, unknown>,
     };
-  }
-
-  /**
-   * Get health check statistics
-   */
-  getStats(): HealthCheckStats {
-    return {
-      isRunning: this.isRunning,
-      totalChecks: this.checks.size,
-      activeIntervals: this.intervals.size,
-      lastResults: this.lastResults.size,
-    };
-  }
-
-  /**
-   * Remove a health check
-   */
-  removeCheck(name: string): void {
-    if (this.intervals.has(name)) {
-      clearInterval(this.intervals.get(name)!);
-      this.intervals.delete(name);
-    }
-
-    this.checks.delete(name);
-    this.lastResults.delete(name);
-
-    log.info(`Health check removed: ${name}`);
-  }
-
-  /**
-   * Update check interval
-   */
-  updateCheckInterval(name: string, newInterval: number): void {
-    if (!this.checks.has(name)) {
-      log.warn(`Health check ${name} not found`);
-      return;
-    }
-
-    if (this.isRunning) {
-      this.startCheck(name, newInterval);
-      log.info(`Health check interval updated: ${name} -> ${newInterval}ms`);
-    }
   }
 }
 

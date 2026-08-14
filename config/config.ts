@@ -130,6 +130,16 @@ const config: AppConfig = {
     refreshToken: process.env.GOOGLE_DRIVE_REFRESH_TOKEN,
     folderId: process.env.GOOGLE_DRIVE_FOLDER_ID
   },
+  googleContacts: {
+    // `explicit` records whether an operator deliberately set contacts-specific
+    // credentials. services/google-contacts/oauth.ts only lets those override a
+    // pre-existing credentials.json — grants already on disk are bound to that
+    // file's client and would fail invalid_client against a different one.
+    explicit: Boolean(process.env.GOOGLE_CONTACTS_CLIENT_ID && process.env.GOOGLE_CONTACTS_CLIENT_SECRET),
+    clientId: process.env.GOOGLE_CONTACTS_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CONTACTS_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET,
+    redirectUri: process.env.GOOGLE_CONTACTS_REDIRECT_URI || `http://localhost:${process.env.PORT || 3000}/api/admin/google-contacts/callback`
+  },
   fileSystem: {
     machinePath: process.env.MACHINE_PATH
   },

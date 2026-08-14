@@ -165,10 +165,10 @@ class EmailService {
   }
 
   /**
-   * Get employee email recipients from database
-   * Uses the unified /api/employees endpoint with receiveEmail filter
+   * Get employee email recipients from database. Internal — the only caller is
+   * sendEmail(), when no explicit `to` was supplied.
    */
-  async getEmployeeRecipients(): Promise<EmployeeRecipient[]> {
+  private async getEmployeeRecipients(): Promise<EmployeeRecipient[]> {
     try {
       // Query employees with receiveEmail = true and valid email addresses
       const db = getKysely();
@@ -205,17 +205,16 @@ class EmailService {
       // If no recipients specified, fetch from database
       if (!recipients) {
         const employees = await this.getEmployeeRecipients();
-        if (employees.length > 0) {
-          recipients = employees.map((emp) => emp.email).join(', ');
-          log.info('Sending email to employees', {
-            count: employees.length,
-            names: employees.map((e) => e.employee_name).join(', '),
-          });
-        } else if (!recipients) {
+        if (employees.length === 0) {
           throw new Error(
             'No recipients configured. Please enable "Receive Email" for at least one employee in Settings > Employees.'
           );
         }
+        recipients = employees.map((emp) => emp.email).join(', ');
+        log.info('Sending email to employees', {
+          count: employees.length,
+          names: employees.map((e) => e.employee_name).join(', '),
+        });
       }
 
       const mailOptions: SendMailOptions = {
@@ -334,9 +333,13 @@ class EmailService {
       // Reload configuration
       await this.loadConfig();
 
-      // Reinitialize transporter with new config
+      // Drop the stale transporter so the next send rebuilds it from the new
+      // config. Re-initializing HERE used to throw the whole call away when the
+      // saved config isn't yet sendable (e.g. an admin sets only from_name on a
+      // fresh install — initialize() rejects with "credentials not configured"),
+      // reporting a 500 for a write that had already committed. Rebuilding lazily
+      // keeps the save's success independent of whether SMTP is complete yet.
       this.transporter = null;
-      await this.initialize();
 
       log.info('Email configuration updated', { updates });
       return {

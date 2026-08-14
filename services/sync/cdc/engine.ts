@@ -201,8 +201,10 @@ export class CdcEngine {
 
       // Only fast-chain when we made progress; if the whole window failed (destination down, or
       // parents sit beyond this window) waiting for the next interval tick avoids a hot retry loop.
+      // unref() so this fire-and-forget chain never holds the event loop open during
+      // graceful shutdown (matches every other timer in the codebase).
       if (applied > 0 && rows.length === this.opts.batchSize && !this.stopped)
-        setTimeout(() => void this.drainOnce(), 50);
+        setTimeout(() => void this.drainOnce(), 50).unref();
     } catch (err) {
       log.warn(`[cdc:${this.sink.name}] drain cycle failed (will retry)`, { error: (err as Error).message });
     } finally {

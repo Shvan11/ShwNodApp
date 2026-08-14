@@ -108,6 +108,21 @@ export interface GoogleDriveConfig {
 }
 
 /**
+ * Google Contacts configuration (message-recipient phone book).
+ *
+ * `redirectUri` is always resolved (env or the PORT-derived default), so it is
+ * non-optional. `explicit` records whether contacts-specific credentials were
+ * deliberately set — only those may override a pre-existing credentials.json,
+ * whose client issued any grants already on disk.
+ */
+export interface GoogleContactsConfig {
+  explicit: boolean;
+  clientId?: string;
+  clientSecret?: string;
+  redirectUri: string;
+}
+
+/**
  * WebCeph integration configuration
  */
 export interface WebCephConfig {
@@ -215,6 +230,7 @@ export interface AppConfig {
   twilio: TwilioConfig;
   google: GoogleConfig;
   googleDrive: GoogleDriveConfig;
+  googleContacts: GoogleContactsConfig;
   fileSystem: FileSystemConfig;
   server: ServerConfig;
   urls: UrlConfig;

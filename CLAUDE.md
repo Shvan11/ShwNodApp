@@ -27,7 +27,7 @@ npm run gate             # CI gate: typecheck:all + lint + test + contracts:chec
 
 **Backend** — Express 5, ESM, strict TS. Entry: `index.ts`.
 - `routes/` — root routes (admin/auth/portal/calendar/sync-webhook/template-api/user-management/web/email-api) + `routes/api/*.routes.ts` per feature
-- `services/` — ~18 domain subdirs (`business/`, `database/`, `messaging/`, `sync/`, `pdf/`, `templates/`, `webceph/`, `google-drive/`, `files/`, `imaging/`, `state/`, `monitoring/`, …)
+- `services/` — 19 domain subdirs (`business/`, `database/`, `messaging/`, `sync/`, `pdf/`, `templates/`, `webceph/`, `google-drive/`, `files/`, `imaging/`, `settings/`, `monitoring/`, …). `messaging/` owns every channel (WhatsApp incl. its runtime state — `messageState`/`stateEvents`/`StateManager` — plus SMS, Telegram, email); `settings/` backs the Settings screen (do not confuse with the root `config/` boot config behind `@config/*`); process-lifecycle infra is `utils/resource-manager.ts`, not a service.
 - `services/database/queries/` — one query module per domain (~24)
 - `middleware/`, `utils/`, `config/`, `types/`; `shared/` — cross-boundary Zod contracts
 
@@ -193,7 +193,9 @@ Use `import type { … }` for type-only imports.
 
 ## Environment
 
-Boot **requires** (validated in `config/config.ts`, throws if missing): `MACHINE_PATH`, `SESSION_SECRET`, and the PostgreSQL block (`PG_HOST`/`PG_PORT`/`PG_DATABASE`/`PG_USER`/`PG_PASSWORD`, or `DATABASE_URL`). `PORT` defaults to 3000. Optional service blocks (Telegram, Twilio, Google Drive, WebCeph, Gemini, Supabase sync, LocalSend, Cloudflare Zero Trust list sync) disable when blank. Legacy `DB_*` (SQL Server) vars feed only the Dolphin sink, not boot. `.env.example` documents every block by category; per-machine WSL overrides go in `.env.development`.
+Boot **requires** (validated in `config/config.ts`, throws if missing): `MACHINE_PATH`, `SESSION_SECRET`, and the PostgreSQL block (`PG_HOST`/`PG_PORT`/`PG_DATABASE`/`PG_USER`/`PG_PASSWORD`, or `DATABASE_URL`). `PORT` defaults to 3000. Optional service blocks (Telegram, Twilio, Google Drive, Google Contacts, WebCeph, Gemini, Supabase sync, LocalSend, Cloudflare Zero Trust list sync) disable when blank.
+
+**Google OAuth integrations** (Drive = aligner-PDF storage; Contacts = message-recipient phone book) follow one pattern: browser redirect flow under `/api/admin/<provider>/{auth-url,callback}`, tokens in the LOCAL-ONLY `integration_oauth_tokens` table (never CDC-synced), status + disconnect under `/api/integrations/<provider>/*`, driven from Settings → Integrations. **Never** reintroduce `@google-cloud/local-auth` — it opens a browser + loopback consent server *on the server*, which cannot complete on the headless Windows service (that was the pre-2026-08-14 Contacts bug). Contacts differs from Drive in two ways: it is **multi-account** (registry `shared/google-contacts-accounts.ts`; token rows keyed `google_contacts:<accountId>`; the account rides in the session beside the CSRF state so the callback knows which grant the code is for), and its client credentials are **resolved, not assumed** — explicit `GOOGLE_CONTACTS_*` env wins, else a pre-existing `credentials.json`, else the shared `GOOGLE_*` pair. That order is load-bearing: a refresh token is bound to the client that issued it, so an install carrying legacy `tokens/*.json` grants (auto-imported on first use) must keep using its credentials.json client or every refresh fails `invalid_client`. A desktop ("installed") client can refresh existing grants but cannot complete a browser sign-in; the Settings card detects this and says so. Legacy `DB_*` (SQL Server) vars feed only the Dolphin sink, not boot. `.env.example` documents every block by category; per-machine WSL overrides go in `.env.development`.
 
 ---
 

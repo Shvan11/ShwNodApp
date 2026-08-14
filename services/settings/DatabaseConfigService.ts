@@ -1,10 +1,10 @@
-// services/config/DatabaseConfigService.ts
+// services/settings/DatabaseConfigService.ts
 /**
  * Database Configuration Service
  * Manages database configuration through environment files and provides connection testing
  */
 
-import EnvironmentManager, { DatabaseConfig, EnvironmentValidation, FileStatus } from './EnvironmentManager.js';
+import EnvironmentManager, { DatabaseConfig } from './EnvironmentManager.js';
 import pg from 'pg';
 import { log } from '../../utils/logger.js';
 
@@ -53,18 +53,6 @@ export interface ConfigValidation {
 }
 
 /**
- * Configuration status interface
- */
-export interface ConfigStatus {
-  success: boolean;
-  files?: FileStatus;
-  validation?: EnvironmentValidation;
-  timestamp?: string;
-  message?: string;
-  error?: string;
-}
-
-/**
  * Configuration export result interface
  */
 export interface ConfigExportResult {
@@ -74,16 +62,6 @@ export interface ConfigExportResult {
   exportDate?: string;
   version?: string;
   error?: string;
-}
-
-/**
- * Connection preset interface
- */
-export interface ConnectionPreset {
-  id: string;
-  name: string;
-  description: string;
-  config: Partial<DatabaseConfig>;
 }
 
 class DatabaseConfigService {

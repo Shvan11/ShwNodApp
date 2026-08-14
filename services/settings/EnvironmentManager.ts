@@ -1,4 +1,4 @@
-// services/config/EnvironmentManager.ts
+// services/settings/EnvironmentManager.ts
 /**
  * Environment Manager Service
  * Handles reading, writing, and managing .env configuration files
@@ -23,42 +23,13 @@ export interface DatabaseConfig {
   PG_PASSWORD: string;
 }
 
-/**
- * Environment validation result interface
- */
-export interface EnvironmentValidation {
-  valid: boolean;
-  message: string;
-  missing?: string[];
-  suggestions?: string[];
-  config?: DatabaseConfig;
-  error?: string;
-}
-
-/**
- * File status interface
- */
-export interface FileStatus {
-  envExists: boolean;
-  backupExists: boolean;
-  templateExists: boolean;
-  envModified?: Date;
-  envSize?: number;
-  envError?: string;
-  backupModified?: Date;
-  backupSize?: number;
-  backupError?: string;
-}
-
 class EnvironmentManager {
   private envPath: string;
   private backupPath: string;
-  private templatePath: string;
 
   constructor() {
     this.envPath = path.join(process.cwd(), '.env');
     this.backupPath = path.join(process.cwd(), '.env.backup');
-    this.templatePath = path.join(process.cwd(), '.env.template');
   }
 
   /**
@@ -131,7 +102,8 @@ class EnvironmentManager {
    */
   applyEnvUpdates(raw: string, updates: Record<string, string>): string {
     const newline = raw.includes('\r\n') ? '\r\n' : '\n';
-    const remaining = new Set(Object.keys(updates));
+    const wanted = new Set(Object.keys(updates));
+    const seen = new Set<string>();
     const lines = raw.length ? raw.split(/\r?\n/) : [];
 
     // Drop a single trailing empty line (from the file's final newline) so appended
@@ -144,13 +116,17 @@ class EnvironmentManager {
       const eq = trimmed.indexOf('=');
       if (eq <= 0) return line;
       const key = trimmed.substring(0, eq).trim();
-      if (!remaining.has(key)) return line;
-      remaining.delete(key);
+      if (!wanted.has(key)) return line;
+      // Rewrite EVERY occurrence, not just the first. A hand-edited .env can carry
+      // the same key twice, and dotenv honours the LAST one — stopping at the first
+      // match wrote the new value into a line the loader then ignores, so the save
+      // silently did nothing.
+      seen.add(key);
       return `${key}=${this.formatEnvValue(updates[key])}`;
     });
 
-    for (const key of remaining) {
-      out.push(`${key}=${this.formatEnvValue(updates[key])}`);
+    for (const key of wanted) {
+      if (!seen.has(key)) out.push(`${key}=${this.formatEnvValue(updates[key])}`);
     }
 
     return out.join(newline) + newline;
@@ -191,32 +167,32 @@ class EnvironmentManager {
   }
 
   /**
-   * Restore .env file from backup
-   */
-  async restoreFromBackup(): Promise<boolean> {
-    try {
-      if (fs_sync.existsSync(this.backupPath)) {
-        await fs.copyFile(this.backupPath, this.envPath);
-        log.info('Environment restored from backup successfully');
-        return true;
-      }
-      throw new Error('No backup file found');
-    } catch (error) {
-      log.error('Failed to restore from backup', { error: (error as Error).message });
-      throw new Error(`Restore failed: ${(error as Error).message}`, { cause: error });
-    }
-  }
-
-  /**
    * Write text to a path atomically: stage to a temp file on the SAME directory,
    * then rename into place. A crash mid-write can't truncate the live .env, and
    * staging on the same volume avoids EXDEV on a network-mounted filesystem.
+   *
+   * The temp file is created 0600 and the destination's existing mode is re-applied
+   * after the rename: .env holds the DB password, and a default-umask temp file
+   * would silently widen its permissions on every save.
    */
   private async atomicWrite(targetPath: string, content: string): Promise<void> {
     const dir = path.dirname(targetPath);
     const tmp = path.join(dir, `.env.tmp-${process.pid}-${Date.now()}`);
-    await fs.writeFile(tmp, content, 'utf8');
+
+    let priorMode: number | null = null;
+    try {
+      priorMode = (await fs.stat(targetPath)).mode & 0o777;
+    } catch {
+      // First write — no prior file to inherit a mode from.
+    }
+
+    await fs.writeFile(tmp, content, { encoding: 'utf8', mode: 0o600 });
     await fs.rename(tmp, targetPath);
+
+    if (priorMode !== null && priorMode !== 0o600) {
+      // chmod is a no-op on Windows for anything but the read-only bit; harmless.
+      await fs.chmod(targetPath, priorMode).catch(() => {});
+    }
   }
 
   /**
@@ -314,87 +290,6 @@ class EnvironmentManager {
       log.error('Failed to update database configuration', { error: (error as Error).message });
       throw new Error(`Database config update failed: ${(error as Error).message}`, { cause: error });
     }
-  }
-
-  /**
-   * Validate environment file exists and is readable
-   */
-  async validateEnvironment(): Promise<EnvironmentValidation> {
-    try {
-      const exists = fs_sync.existsSync(this.envPath);
-      if (!exists) {
-        return {
-          valid: false,
-          message: '.env file does not exist',
-          suggestions: ['Create .env file from template', 'Initialize with default values'],
-        };
-      }
-
-      const dbConfig = await this.getDatabaseConfig();
-
-      // Check for required database fields
-      const required: Array<keyof DatabaseConfig> = [
-        'PG_HOST',
-        'PG_PORT',
-        'PG_DATABASE',
-        'PG_USER',
-      ];
-      const missing = required.filter((field) => !dbConfig[field]);
-
-      if (missing.length > 0) {
-        return {
-          valid: false,
-          message: `Missing required database configuration: ${missing.join(', ')}`,
-          missing,
-          suggestions: ['Add missing database configuration fields'],
-        };
-      }
-
-      return {
-        valid: true,
-        message: 'Environment configuration is valid',
-        config: dbConfig,
-      };
-    } catch (error) {
-      return {
-        valid: false,
-        message: `Environment validation failed: ${(error as Error).message}`,
-        error: (error as Error).message,
-      };
-    }
-  }
-
-  /**
-   * Get configuration file status
-   */
-  async getFileStatus(): Promise<FileStatus> {
-    const status: FileStatus = {
-      envExists: fs_sync.existsSync(this.envPath),
-      backupExists: fs_sync.existsSync(this.backupPath),
-      templateExists: fs_sync.existsSync(this.templatePath),
-    };
-
-    if (status.envExists) {
-      try {
-        const stats = await fs.stat(this.envPath);
-        status.envModified = stats.mtime;
-        status.envSize = stats.size;
-      } catch (error) {
-        status.envError = (error as Error).message;
-      }
-    }
-
-    if (status.backupExists) {
-      try {
-        const stats = await fs.stat(this.backupPath);
-        status.backupModified = stats.mtime;
-        status.backupSize = stats.size;
-      } catch (error) {
-        status.backupError = (error as Error).message;
-      }
-    }
-
-    return status;
   }
 }
 

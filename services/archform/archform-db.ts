@@ -11,7 +11,7 @@
 import Database from 'better-sqlite3';
 import fsSync from 'fs';
 import { getOption } from '../database/queries/options-queries.js';
-import ResourceManager from '../core/ResourceManager.js';
+import ResourceManager from '../../utils/resource-manager.js';
 import { log } from '../../utils/logger.js';
 import {
   getPlatformInfo,
@@ -237,7 +237,11 @@ function parseIdBlob(blob: Buffer | null): number[] {
   const count = blob.readInt32LE(0);
   if (count <= 0) return [];
   const ids: number[] = [];
-  for (let i = 0; i < count && (i + 1) * 4 < blob.length; i++) {
+  // Need 4 whole bytes at the offset, not just a byte AT it — the old
+  // `(i + 1) * 4 < blob.length` admitted a read starting in the last 3 bytes, so a
+  // blob truncated mid-id (plausible reading Archform's file over SMB) threw a
+  // RangeError out of the delete transaction instead of stopping at what's there.
+  for (let i = 0; i < count && (i + 1) * 4 + 4 <= blob.length; i++) {
     ids.push(blob.readInt32LE((i + 1) * 4));
   }
   return ids;
@@ -402,9 +406,10 @@ export async function deleteArchformPatient(id: number): Promise<{ deletedFromTa
 }
 
 /**
- * Close the Archform SQLite database connection
+ * Close the Archform SQLite database connection.
+ * Internal — the only caller is the ResourceManager registration below.
  */
-export function closeArchformDb(): void {
+function closeArchformDb(): void {
   if (db) {
     try {
       db.close();

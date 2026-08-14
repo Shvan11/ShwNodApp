@@ -17,7 +17,7 @@ import { log } from '../../utils/logger.js';
 import * as messagingQueries from '../../services/database/queries/messaging-queries.js';
 import { getWhatsAppMessages } from '../../services/database/queries/messaging-queries.js';
 import { getAppointmentForNotification } from '../../services/database/queries/appointment-queries.js';
-import messageState from '../../services/state/messageState.js';
+import messageState from '../../services/messaging/messageState.js';
 import { sendSuccess, sendData, ErrorResponses } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import {

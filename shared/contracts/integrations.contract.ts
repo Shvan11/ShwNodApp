@@ -178,6 +178,39 @@ export const googleDriveDisconnect = {
   response: z.object({ ok: z.boolean() }),
 } as const;
 
+// ── Google Contacts (message-recipient phone book, OAuth) ──
+// Like Drive, the interactive connect flow is browser redirects under
+// /api/admin/google-contacts (auth-url/callback); these surface status +
+// disconnect. Multi-account: one entry per shared/google-contacts-accounts.ts
+// entry. Closed z.object — built field-for-field from the OAuth token store.
+
+// GET /api/integrations/google-contacts/status — per-account connection status.
+export const googleContactsStatus = {
+  response: z.object({
+    configured: z.boolean(),
+    credentialsSource: z.enum(['env', 'credentials.json']).nullable(),
+    connectSupported: z.boolean(),
+    redirectUri: z.string(),
+    accounts: z.array(
+      z.object({
+        id: z.string(),
+        label: z.string(),
+        connected: z.boolean(),
+        expiresAt: z.string().nullable(),
+        scope: z.string().nullable(),
+      })
+    ),
+  }),
+} as const;
+export type GoogleContactsStatusResponse = z.infer<typeof googleContactsStatus.response>;
+
+// POST /api/integrations/google-contacts/disconnect — clear one account's tokens.
+export const googleContactsDisconnect = {
+  body: z.object({ accountId: z.string().min(1) }),
+  response: z.object({ ok: z.boolean() }),
+} as const;
+export type GoogleContactsDisconnectBody = z.infer<typeof googleContactsDisconnect.body>;
+
 // ── Cloudflare Zero Trust (aligner-portal Access email list) ──
 // The server mirrors aligner_doctors.doctor_email into the Zero Trust list the
 // external portal's Access policy references ("Emails in list"). Sync runs

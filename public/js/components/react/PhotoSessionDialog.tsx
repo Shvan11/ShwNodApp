@@ -1,5 +1,5 @@
 import { useState, useEffect, ChangeEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useImportFolder } from '@/hooks/useImportFolder';
@@ -54,6 +54,7 @@ interface ConflictInfo {
 const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Props) => {
     const toast = useToast();
     const navigate = useNavigate();
+    const location = useLocation();
     // The memory-card import folder reused by the editor's "Move from card" flow; surfaced
     // here so the user sees/grants access before opening the editor.
     const importFolder = useImportFolder('readwrite');
@@ -93,7 +94,10 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
 
     const handleOpenEditPatient = () => {
         onClose();
-        navigate(`/patient/${personId}/edit-patient`);
+        // Return the user to the page this dialog was opened over, not the works page
+        navigate(`/patient/${personId}/edit-patient`, {
+            state: { from: `${location.pathname}${location.search}` },
+        });
     };
 
     const handleSubmit = async (overrideDate = false) => {

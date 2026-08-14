@@ -336,8 +336,11 @@ class GoogleDriveClient {
     }
 
     try {
-      // Search for existing folder
-      const query = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and '${parentFolderId}' in parents and trashed=false`;
+      // Search for existing folder. Drive query literals are single-quoted, so a
+      // name carrying ' or \ must be escaped or it breaks (or reshapes) the query —
+      // callers that don't pre-sanitize would otherwise get a hard HTTP 400.
+      const q = (s: string): string => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      const query = `name='${q(folderName)}' and mimeType='application/vnd.google-apps.folder' and '${q(parentFolderId)}' in parents and trashed=false`;
 
       const response = await this.drive.files.list({
         q: query,

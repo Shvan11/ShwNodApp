@@ -8,6 +8,8 @@ import { authorize } from '../middleware/auth.js';
 import { ADMIN_ROLES } from '../shared/auth/roles.js';
 import driveUploadService from '../services/google-drive/drive-upload.js';
 import * as googleDriveOAuth from '../services/google-drive/oauth.js';
+import * as googleContactsOAuth from '../services/google-contacts/oauth.js';
+import { isGoogleContactAccountId } from '../shared/google-contacts-accounts.js';
 
 const router = Router();
 
@@ -38,7 +40,7 @@ type OAuthCallbackQuery = {
 // Kept at this existing path (not /api/auth/google-drive/*, the convention used by
 // 3Shape) — it's the redirect URI already registered against this Google Cloud
 // OAuth client; moving it would require a matching change in Google Cloud Console.
-const GOOGLE_DRIVE_SETTINGS_URL = '/settings/integrations';
+const SETTINGS_INTEGRATIONS_URL = '/settings/integrations';
 const GOOGLE_DRIVE_STATE_TTL_MS = 10 * 60 * 1000; // login → callback round-trip window
 
 /**
@@ -87,7 +89,7 @@ router.get(
     req: Request<unknown, unknown, unknown, OAuthCallbackQuery>,
     res: Response
   ): Promise<void> => {
-    const back = (params: string): void => res.redirect(`${GOOGLE_DRIVE_SETTINGS_URL}?${params}`);
+    const back = (params: string): void => res.redirect(`${SETTINGS_INTEGRATIONS_URL}?${params}`);
     const fail = (reason: string): void => back(`googleDrive=error&reason=${encodeURIComponent(reason)}`);
 
     const { code, state, error: oauthError } = req.query;
@@ -119,6 +121,108 @@ router.get(
       back('googleDrive=connected');
     } catch (error) {
       log.error('Error in OAuth callback', { error: (error as Error).message });
+      fail('exchange_failed');
+    }
+  }
+);
+
+// ============================================================================
+// GOOGLE CONTACTS OAUTH (message-recipient phone book)
+// ============================================================================
+// Same redirect shape as Google Drive above, but multi-account: the account being
+// connected rides along in the session next to the anti-CSRF state, because the
+// callback is a fresh request with no other way to tell which grant the code is for.
+
+const GOOGLE_CONTACTS_STATE_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * GET /api/admin/google-contacts/auth-url?account=<id> — stash state + account in
+ * the session and 302 to Google's consent screen. (Full-page redirect, not JSON —
+ * the Settings → Integrations "Connect" button navigates here directly.)
+ */
+router.get(
+  '/api/admin/google-contacts/auth-url',
+  async (
+    req: Request<unknown, unknown, unknown, { account?: string }>,
+    res: Response
+  ): Promise<void> => {
+    const accountId = req.query.account;
+    if (!accountId || !isGoogleContactAccountId(accountId)) {
+      res.status(400).json({ success: false, error: 'Unknown Google Contacts account.' });
+      return;
+    }
+    if (!(await googleContactsOAuth.isConfigured())) {
+      res
+        .status(503)
+        .json({ success: false, error: 'Google Contacts is not configured on this server.' });
+      return;
+    }
+    try {
+      const state = googleContactsOAuth.generateState();
+      const url = await googleContactsOAuth.buildAuthorizeUrl(accountId, state);
+      req.session.googleContacts = { state, accountId, createdAt: Date.now() };
+      // Persist BEFORE redirecting — the callback reads it back from the store.
+      req.session.save((err) => {
+        if (err) {
+          log.error('[GoogleContacts] failed to persist OAuth session', { error: err.message });
+          res
+            .status(500)
+            .json({ success: false, error: 'Could not start Google Contacts sign-in.' });
+          return;
+        }
+        res.redirect(url);
+      });
+    } catch (error) {
+      log.error('[GoogleContacts] error generating auth URL', { error: (error as Error).message });
+      res.status(500).json({ success: false, error: (error as Error).message });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/google-contacts/callback — exchange the code for tokens against
+ * the account stashed at auth-url time, then redirect back to the Settings card.
+ */
+router.get(
+  '/api/admin/google-contacts/callback',
+  async (
+    req: Request<unknown, unknown, unknown, OAuthCallbackQuery>,
+    res: Response
+  ): Promise<void> => {
+    const back = (params: string): void =>
+      res.redirect(`${SETTINGS_INTEGRATIONS_URL}?${params}`);
+    const fail = (reason: string): void =>
+      back(`googleContacts=error&reason=${encodeURIComponent(reason)}`);
+
+    const { code, state, error: oauthError } = req.query;
+
+    // One-shot: consume the stashed state regardless of outcome.
+    const pending = req.session.googleContacts;
+    delete req.session.googleContacts;
+
+    if (oauthError) {
+      log.warn('[GoogleContacts] authorize returned an error', { error: oauthError });
+      fail(oauthError);
+      return;
+    }
+    if (!pending || !state || state !== pending.state) {
+      fail('invalid_state');
+      return;
+    }
+    if (Date.now() - pending.createdAt > GOOGLE_CONTACTS_STATE_TTL_MS) {
+      fail('expired');
+      return;
+    }
+    if (!code) {
+      fail('missing_code');
+      return;
+    }
+
+    try {
+      await googleContactsOAuth.exchangeCode(pending.accountId, code);
+      back(`googleContacts=connected&account=${encodeURIComponent(pending.accountId)}`);
+    } catch (error) {
+      log.error('[GoogleContacts] error in OAuth callback', { error: (error as Error).message });
       fail('exchange_failed');
     }
   }

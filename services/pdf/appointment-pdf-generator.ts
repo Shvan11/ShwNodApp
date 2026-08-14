@@ -500,9 +500,12 @@ class AppointmentPDFGenerator {
       count: range.count,
     });
 
-    // Iterate through all pages and add footer
+    // Iterate through all pages and add footer. switchToPage() takes the ABSOLUTE
+    // page index, so it must be offset by range.start — that is 0 today (nothing
+    // calls flushPages() early), but indexing by the loop counter would silently
+    // footer the wrong pages the moment it isn't.
     for (let i = 0; i < totalPages; i++) {
-      doc.switchToPage(i);
+      doc.switchToPage(range.start + i);
       this._addFooter(doc, i + 1, totalPages, generatedTime);
     }
   }
@@ -746,9 +749,6 @@ class AppointmentPDFGenerator {
 // EXPORTS
 // =============================================================================
 
-// Export class for custom instantiation
-export { AppointmentPDFGenerator };
-
-// Export default singleton for convenience
+// Only the singleton is consumed (routes/email-api.ts); the class stays private.
 const defaultGenerator = new AppointmentPDFGenerator();
 export default defaultGenerator;

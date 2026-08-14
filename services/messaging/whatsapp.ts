@@ -1,7 +1,7 @@
 // services/messaging/whatsapp.ts - WhatsApp Service with MessageSession Architecture
 import EventEmitter from 'events';
-import messageState, { type Person as StatePersonType } from '../state/messageState.js';
-import stateEvents from '../state/stateEvents.js';
+import messageState, { type Person as StatePersonType } from './messageState.js';
+import stateEvents from './stateEvents.js';
 import { getWhatsAppMessages, markWhatsAppBatchSent } from '../database/queries/messaging-queries.js';
 import * as messagingQueries from '../database/queries/messaging-queries.js';
 import { InternalEmitterEvents } from './websocket-events.js';

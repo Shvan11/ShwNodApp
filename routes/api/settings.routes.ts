@@ -16,7 +16,7 @@ import {
   updateOption,
   bulkUpdateOptions
 } from '../../services/database/queries/options-queries.js';
-import DatabaseConfigService from '../../services/config/DatabaseConfigService.js';
+import DatabaseConfigService from '../../services/settings/DatabaseConfigService.js';
 import { sendSuccess, sendData, ErrorResponses } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import { log } from '../../utils/logger.js';

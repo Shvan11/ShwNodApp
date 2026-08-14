@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, ChangeEvent } from 'react';
-import { useNavigate, useLoaderData, Link } from 'react-router-dom';
+import { useNavigate, useLoaderData, useLocation, Link } from 'react-router-dom';
 import Select, { MultiValue } from 'react-select';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
@@ -106,6 +106,7 @@ interface LoaderData {
  */
 const PatientManagement = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const toast = useToast();
     const queryClient = useQueryClient();
     const loaderData = useLoaderData() as LoaderData | undefined;
@@ -854,7 +855,7 @@ const PatientManagement = () => {
                                         <div className={styles.actionButtons}>
                                             <button onClick={(e) => handleQuickCheckin(e, p)} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionSuccess)} title="Quick Check-in" aria-label={`Quick check-in ${p.patient_name}`}><i className="fas fa-user-check" aria-hidden="true"></i></button>
                                             <button onClick={() => navigate(`/patient/${p.person_id}/works`)} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionPrimary)} title="View Patient" aria-label={`View ${p.patient_name}`}><i className="fas fa-eye" aria-hidden="true"></i></button>
-                                            <button onClick={() => navigate(`/patient/${p.person_id}/edit-patient`)} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionWarning)} title="Edit Patient" aria-label={`Edit ${p.patient_name}`}><i className="fas fa-edit" aria-hidden="true"></i></button>
+                                            <button onClick={() => navigate(`/patient/${p.person_id}/edit-patient`, { state: { from: `${location.pathname}${location.search}` } })} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionWarning)} title="Edit Patient" aria-label={`Edit ${p.patient_name}`}><i className="fas fa-edit" aria-hidden="true"></i></button>
                                             <button onClick={() => handleDeleteClick(p)} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionDanger)} title="Delete Patient" aria-label={`Delete ${p.patient_name}`}><i className="fas fa-trash" aria-hidden="true"></i></button>
                                         </div>
                                     </td>

@@ -27,6 +27,8 @@ import * as threeShapeOAuth from '../../services/threeshape/oauth.js';
 import * as threeShapeClient from '../../services/threeshape/client.js';
 import { sendThreeShapeError } from '../../services/threeshape/route-helpers.js';
 import * as googleDriveOAuth from '../../services/google-drive/oauth.js';
+import * as googleContactsOAuth from '../../services/google-contacts/oauth.js';
+import { isGoogleContactAccountId } from '../../shared/google-contacts-accounts.js';
 import {
   getDoctorEmailListSyncStatus,
   isDoctorEmailListSyncEnabled,
@@ -263,6 +265,46 @@ router.post('/google-drive/disconnect', async (_req: Request, res: Response): Pr
     ErrorResponses.internalError(res, 'Failed to disconnect Google Drive');
   }
 });
+
+// ── Google Contacts (message-recipient phone book) ──
+
+// GET /api/integrations/google-contacts/status — per-account connection status
+// (the connect flow itself is the browser redirect at
+// /api/admin/google-contacts/auth-url?account=<id>).
+router.get('/google-contacts/status', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const status = await googleContactsOAuth.getStatus();
+    sendData(res, integrations.googleContactsStatus.response, status);
+  } catch (err) {
+    log.error('[Integrations] google-contacts status failed', { error: (err as Error).message });
+    ErrorResponses.internalError(res, 'Failed to read Google Contacts status');
+  }
+});
+
+// POST /api/integrations/google-contacts/disconnect — clear one account's tokens.
+router.post(
+  '/google-contacts/disconnect',
+  validate({ body: integrations.googleContactsDisconnect.body }),
+  async (
+    req: Request<object, unknown, integrations.GoogleContactsDisconnectBody>,
+    res: Response
+  ): Promise<void> => {
+    const { accountId } = req.body;
+    if (!isGoogleContactAccountId(accountId)) {
+      ErrorResponses.badRequest(res, 'Unknown Google Contacts account.');
+      return;
+    }
+    try {
+      await googleContactsOAuth.disconnect(accountId);
+      sendData(res, integrations.googleContactsDisconnect.response, { ok: true });
+    } catch (err) {
+      log.error('[Integrations] google-contacts disconnect failed', {
+        error: (err as Error).message,
+      });
+      ErrorResponses.internalError(res, 'Failed to disconnect Google Contacts');
+    }
+  }
+);
 
 // ── Cloudflare Zero Trust (aligner-portal Access email list) ──
 

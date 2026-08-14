@@ -1,4 +1,4 @@
-// services/state/StateManager.ts
+// services/messaging/StateManager.ts
 import { log } from '../../utils/logger.js';
 
 /**
@@ -10,10 +10,11 @@ interface LockInfo {
 }
 
 /**
- * A queued lock acquirer, resolved by releaseLock via direct hand-off.
+ * A queued lock acquirer, resolved by releaseLock via direct hand-off. Resolves
+ * with the fencing token minted for the hand-off (see acquireLock).
  */
 interface LockWaiter {
-  resolve: () => void;
+  resolve: (token: number) => void;
   reject: (err: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 }
@@ -34,21 +35,9 @@ interface StateValidation {
 }
 
 /**
- * State manager stats interface
- */
-interface StateStats {
-  stateSize: number;
-  activeLocks: number;
-  totalOperations: number;
-  memoryUsage: number;
-  isHealthy: boolean;
-  issues: string[];
-}
-
-/**
  * Thread-safe state manager with atomic operations
  */
-export class StateManager {
+class StateManager {
   private state: Map<string, unknown> = new Map();
   private locks: Map<string, LockInfo> = new Map();
   // FIFO queue of acquirers blocked on a held key. Drained by releaseLock.
@@ -68,30 +57,6 @@ export class StateManager {
   }
 
   /**
-   * Set a value in state
-   */
-  set<T>(key: string, value: T): void {
-    this.state.set(key, value);
-  }
-
-  /**
-   * Check if a key exists in state
-   */
-  has(key: string): boolean {
-    return this.state.has(key);
-  }
-
-  /**
-   * Delete a key from state
-   */
-  delete(key: string): boolean {
-    // Also clean up any locks for this key
-    this.locks.delete(key);
-    this.rejectWaiters(key, `State key '${key}' deleted`);
-    return this.state.delete(key);
-  }
-
-  /**
    * Reject and clear any queued lock acquirers for a key (used when the key/state
    * goes away under them, so they fail fast instead of hanging until timeout).
    */
@@ -106,7 +71,9 @@ export class StateManager {
   }
 
   /**
-   * Clear all state
+   * Clear all state. Locks are dropped wholesale and queued acquirers rejected;
+   * any still-running holder's eventual release is a no-op (its fencing token no
+   * longer matches anything), so it cannot evict a lock taken after the clear.
    */
   clear(): void {
     this.state.clear();
@@ -117,39 +84,32 @@ export class StateManager {
   }
 
   /**
-   * Get all keys
+   * Acquire a lock for a key. Returns a **fencing token** identifying this
+   * particular grant; it must be passed back to releaseLock, which ignores any
+   * release that doesn't match the current holder. Without that check a holder
+   * whose lock was taken away (by the reaper, or by clear()) would, on finishing,
+   * release whoever holds it *now* — desynchronizing ownership for that key from
+   * then on. Always release via try/finally.
    */
-  keys(): string[] {
-    return Array.from(this.state.keys());
-  }
-
-  /**
-   * Get state size
-   */
-  size(): number {
-    return this.state.size;
-  }
-
-  /**
-   * Acquire a lock for a key
-   */
-  async acquireLock(key: string): Promise<void> {
+  async acquireLock(key: string): Promise<number> {
     // Fast path: the lock is free. has→set has no await between it, so it's an
     // atomic critical section on the single-threaded event loop — no double-grant.
     if (!this.locks.has(key)) {
-      this.locks.set(key, { acquired: Date.now(), operationId: ++this.operations });
-      return;
+      const token = ++this.operations;
+      this.locks.set(key, { acquired: Date.now(), operationId: token });
+      return token;
     }
 
     // Contended: join the FIFO queue and wait for releaseLock to hand off to us.
     // The lock entry is transferred to us *by releaseLock* (it stays held the
     // whole time), so we must NOT set it ourselves on resume — that's what keeps
     // a newcomer from stealing the lock in the gap before this promise resolves.
+    // releaseLock mints our token as part of the hand-off and resolves us with it.
     const waiters = this.lockWaiters.get(key) ?? [];
     this.lockWaiters.set(key, waiters);
     log.debug(`Lock contended for key '${key}' — queued (depth ${waiters.length + 1})`);
 
-    await new Promise<void>((resolve, reject) => {
+    return await new Promise<number>((resolve, reject) => {
       const waiter: LockWaiter = {
         resolve,
         reject,
@@ -168,18 +128,36 @@ export class StateManager {
   }
 
   /**
-   * Release a lock for a key. If acquirers are queued, hand the lock directly to
-   * the next one (the entry stays held, re-stamped) rather than freeing it — this
+   * Release a lock for a key, identified by the token acquireLock returned. A
+   * token that doesn't match the current holder is a stale release (the lock was
+   * revoked under this caller) and is ignored — never blindly freed, or the
+   * caller would evict the rightful holder.
+   *
+   * If acquirers are queued, hand the lock directly to the next one (the entry
+   * stays held, re-stamped with a fresh token) rather than freeing it — this
    * prevents a newcomer from jumping the queue between release and resume.
    */
-  releaseLock(key: string): void {
+  releaseLock(key: string, token: number): void {
+    const held = this.locks.get(key);
+    if (!held) {
+      // Lock already gone (clear() wiped it). Any waiters were rejected there.
+      return;
+    }
+    if (held.operationId !== token) {
+      log.warn(
+        `Ignoring stale lock release for key '${key}' (token ${token}, current holder ${held.operationId}) — the lock was revoked under its holder`
+      );
+      return;
+    }
+
     const waiters = this.lockWaiters.get(key);
     if (waiters && waiters.length > 0) {
       const next = waiters.shift()!;
       if (waiters.length === 0) this.lockWaiters.delete(key);
       clearTimeout(next.timer);
-      this.locks.set(key, { acquired: Date.now(), operationId: ++this.operations });
-      next.resolve();
+      const nextToken = ++this.operations;
+      this.locks.set(key, { acquired: Date.now(), operationId: nextToken });
+      next.resolve(nextToken);
     } else {
       this.locks.delete(key);
     }
@@ -192,7 +170,7 @@ export class StateManager {
     key: string,
     operation: (currentValue: T | undefined) => T | Promise<T>
   ): Promise<T> {
-    await this.acquireLock(key);
+    const token = await this.acquireLock(key);
 
     try {
       const currentValue = this.state.get(key) as T | undefined;
@@ -200,31 +178,41 @@ export class StateManager {
       this.state.set(key, newValue);
       return newValue;
     } finally {
-      this.releaseLock(key);
+      this.releaseLock(key, token);
     }
   }
 
   /**
-   * Clean up expired locks (safety mechanism)
+   * Report locks held longer than maxAge. Diagnostic only — it deliberately does
+   * NOT force-release them.
+   *
+   * A lock can only be held across a timer tick if some `operation` passed to
+   * atomicOperation awaits something slow; force-releasing it would admit a second
+   * body into the critical section the lock exists to protect, which is strictly
+   * worse than the stall. The stall itself is already surfaced to callers: each
+   * queued acquirer rejects after lockWaitTimeout with the offending key. This
+   * adds the holder-side half of that signal (which key, how long, how many are
+   * queued behind it) so the underlying hung operation can be found and fixed.
    */
-  cleanupExpiredLocks(maxAge = 30000): number {
+  reportStuckLocks(maxAge = 30000): number {
     const now = Date.now();
-    const expiredKeys: string[] = [];
+    const stuck: string[] = [];
 
     for (const [key, lockInfo] of this.locks.entries()) {
-      if (now - lockInfo.acquired > maxAge) {
-        expiredKeys.push(key);
+      const heldMs = now - lockInfo.acquired;
+      if (heldMs > maxAge) {
+        stuck.push(`${key} (held ${heldMs}ms, ${this.lockWaiters.get(key)?.length ?? 0} queued)`);
       }
     }
 
-    if (expiredKeys.length > 0) {
-      log.warn(`Cleaning up ${expiredKeys.length} expired locks:`, expiredKeys);
-      // Force-release rather than raw-delete so any queued acquirers receive the
-      // lock (hand-off) and the queue keeps draining past a stuck holder.
-      expiredKeys.forEach((key) => this.releaseLock(key));
+    if (stuck.length > 0) {
+      log.warn(
+        `${stuck.length} state lock(s) held longer than ${maxAge}ms — a slow/hung atomicOperation callback is blocking them:`,
+        stuck
+      );
     }
 
-    return expiredKeys.length;
+    return stuck.length;
   }
 
   /**
@@ -285,33 +273,18 @@ export class StateManager {
 
     log.info('StateManager cleanup completed');
   }
-
-  /**
-   * Get performance statistics
-   */
-  getStats(): StateStats {
-    const validation = this.validateState();
-
-    return {
-      stateSize: this.state.size,
-      activeLocks: this.locks.size,
-      totalOperations: this.operations,
-      memoryUsage: validation.stats.memoryUsage,
-      isHealthy: validation.valid,
-      issues: validation.issues,
-    };
-  }
 }
 
 // Create and export singleton instance
 const stateManagerInstance = new StateManager();
 
-// Set up periodic cleanup of expired locks. unref() so this module-scoped
-// timer doesn't hold the event loop open and block a clean process exit.
-const lockCleanupTimer = setInterval(() => {
-  stateManagerInstance.cleanupExpiredLocks();
+// Periodically report (never force-release) locks stuck under a slow holder.
+// unref() so this module-scoped timer doesn't hold the event loop open and block
+// a clean process exit.
+const stuckLockTimer = setInterval(() => {
+  stateManagerInstance.reportStuckLocks();
 }, 60000); // Every minute
-lockCleanupTimer.unref();
+stuckLockTimer.unref();
 
 // Export singleton as default
 export default stateManagerInstance;

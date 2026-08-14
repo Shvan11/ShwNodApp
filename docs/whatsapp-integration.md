@@ -88,7 +88,7 @@ whatsapp-web.js) and do **not** pin `webVersion`/`webVersionCache` (see the nuan
 | Low-level media senders (`sendImg_`, `sendXray_`) via the circuit breaker | `services/messaging/whatsapp-api.ts` |
 | Per-date message → appointment mapping for delivery ACKs | `services/messaging/MessageSession.ts`, `MessageSessionManager.ts` |
 | Daily-appointments group-PDF settings (options table) | `services/messaging/group-settings.ts` |
-| Shared mutable state (clientReady, QR, viewer count, send stats, persons) | `services/state/messageState.ts` |
+| Shared mutable state (clientReady, QR, viewer count, send stats, persons) | `services/messaging/messageState.ts` |
 | In-process event names (NOT on the wire) | `services/messaging/websocket-events.ts` (`InternalEmitterEvents`) |
 | Server→client SSE broadcaster (QR / ready / status / send progress) | `services/messaging/sse-whatsapp.ts` |
 | HTTP routes (`/api/wa/*`) | `routes/api/whatsapp.routes.ts` |

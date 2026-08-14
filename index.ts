@@ -55,7 +55,7 @@ import {
   isDoctorEmailListSyncEnabled,
   scheduleDoctorEmailListSync,
 } from './services/cloudflare/doctor-email-list.js';
-import messageState from './services/state/messageState.js';
+import messageState from './services/messaging/messageState.js';
 import { MessageStatus } from './services/messaging/message-status.js';
 import { InternalEmitterEvents } from './services/messaging/websocket-events.js';
 import { EventEmitter } from 'events';
@@ -68,7 +68,7 @@ import { clinicRoot, workingDir } from './services/files/clinic-paths.js';
 import { startCdc, stopCdc } from './services/sync/cdc/index.js';
 import { teardownSupabasePools } from './services/sync/cdc/supabase-pool.js';
 import { localsendService } from './services/localsend/index.js';
-import ResourceManager from './services/core/ResourceManager.js';
+import ResourceManager from './utils/resource-manager.js';
 import { log } from './utils/logger.js';
 import { requestTimeout, TIMEOUTS } from './middleware/timeout.js';
 

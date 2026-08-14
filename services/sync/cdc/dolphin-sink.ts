@@ -305,8 +305,13 @@ export class DolphinSink implements SyncSink {
       .input('desc', sql.VarChar, tp_description ?? null)
       .input('dt', sql.DateTime, date)
       .query<{ tpID: string }>(
+        // NULL-safe description match: `tpDescription = @desc` is never true when
+        // either side is NULL, so a timepoint with no description never adopted its
+        // existing Dolphin row and INSERTed a duplicate on every drain instead.
         `SELECT TOP 1 tpID FROM DolphinPlatform.dbo.TimePoints
-          WHERE patID = @pat AND tpDescription = @desc AND CAST(tpDateTime AS date) = CAST(@dt AS date)
+          WHERE patID = @pat
+            AND (tpDescription = @desc OR (tpDescription IS NULL AND @desc IS NULL))
+            AND CAST(tpDateTime AS date) = CAST(@dt AS date)
           ORDER BY tpCreatedDate`
       );
     if (found.recordset.length > 0) {
@@ -450,8 +455,11 @@ export class DolphinSink implements SyncSink {
       .input('tp', sql.UniqueIdentifier, tpId)
       .input('typ', sql.Char, imageType ?? null)
       .query<{ tpiID: string }>(
+        // NULL-safe view match (see resolveTpId) — an image with no type would
+        // otherwise never adopt its existing Dolphin slot.
         `SELECT TOP 1 tpiID FROM DolphinPlatform.dbo.TimePointImages
-          WHERE tpID = @tp AND tpiImageType = @typ
+          WHERE tpID = @tp
+            AND (tpiImageType = @typ OR (tpiImageType IS NULL AND @typ IS NULL))
           ORDER BY tpiImageDate`
       );
     if (found.recordset.length > 0) {

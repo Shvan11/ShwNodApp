@@ -1,6 +1,6 @@
 import { useState, ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import PhotoSessionDialog from './PhotoSessionDialog';
 import AlertModal from './AlertModal';
@@ -76,6 +76,7 @@ interface AlertType {
 const ViewPatientInfo = ({ personId }: Props) => {
     const { t } = useTranslation('patients');
     const navigate = useNavigate();
+    const location = useLocation();
     const toast = useToast();
     const queryClient = useQueryClient();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -329,7 +330,10 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 </div>
                 <div className={styles.patientHeaderActions}>
                     <button
-                        onClick={() => navigate(`/patient/${validPersonId}/edit-patient`)}
+                        onClick={() => navigate(`/patient/${validPersonId}/edit-patient`, {
+                            // Save/Cancel on the edit form return here instead of the works page
+                            state: { from: `${location.pathname}${location.search}` },
+                        })}
                         className="btn btn-primary"
                         disabled={!validPersonId}
                     >

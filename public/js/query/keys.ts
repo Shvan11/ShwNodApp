@@ -325,6 +325,9 @@ export const qk = {
     integrationsGeminiStatus: () => ['settings', 'integrations-gemini-status'] as const,
     /** GET /api/integrations/google-drive/status — Google Drive (aligner PDF storage) integration status. */
     integrationsGoogleDriveStatus: () => ['settings', 'integrations-google-drive-status'] as const,
+    /** GET /api/integrations/google-contacts/status — Google Contacts (recipient phone book) status. */
+    integrationsGoogleContactsStatus: () =>
+      ['settings', 'integrations-google-contacts-status'] as const,
     /** GET /api/integrations/cloudflare-list/status — aligner-portal Access email-list sync status. */
     integrationsCloudflareListStatus: () => ['settings', 'integrations-cloudflare-list-status'] as const,
     /** GET /api/wa/group-settings — WhatsApp daily-list group posting config. */

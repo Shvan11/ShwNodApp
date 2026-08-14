@@ -17,6 +17,7 @@ import {
   integrationsThreeShapeStatusQuery,
   integrationsGeminiStatusQuery,
   integrationsGoogleDriveStatusQuery,
+  integrationsGoogleContactsStatusQuery,
   integrationsCloudflareListStatusQuery,
 } from '@/query/queries';
 import { qk } from '@/query/keys';
@@ -269,6 +270,64 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
     }
   }, [toast, queryClient]);
 
+  // ── Google Contacts (message-recipient phone book, OAuth, multi-account) ──
+  const { data: gcData, isLoading: gcLoading } = useQuery(integrationsGoogleContactsStatusQuery());
+  const gcStatus = (gcData as integrations.GoogleContactsStatusResponse | undefined) ?? null;
+  const [gcBusy, setGcBusy] = useState<string | null>(null);
+
+  // One-shot ?googleContacts=connected|error flag from the OAuth callback.
+  const gcOauthFlagHandled = useRef(false);
+  useEffect(() => {
+    if (gcOauthFlagHandled.current) return;
+    const flag = searchParams.get('googleContacts');
+    if (!flag) return;
+    gcOauthFlagHandled.current = true;
+    if (flag === 'connected') {
+      toast.success('Google Contacts account connected');
+    } else {
+      const reason = searchParams.get('reason');
+      toast.error(
+        reason ? `Google Contacts connection failed: ${reason}` : 'Google Contacts connection failed'
+      );
+    }
+    void queryClient.invalidateQueries({
+      queryKey: qk.settings.integrationsGoogleContactsStatus(),
+    });
+    const next = new URLSearchParams(searchParams);
+    next.delete('googleContacts');
+    next.delete('account');
+    next.delete('reason');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, toast, queryClient]);
+
+  // Start OAuth for one account: full-page navigation to the server route, which
+  // 302s to Google. External-provider redirect — sanctioned SPA-only-nav exception.
+  const connectGoogleContacts = useCallback((accountId: string): void => {
+    window.location.href = `/api/admin/google-contacts/auth-url?account=${encodeURIComponent(accountId)}`;
+  }, []);
+
+  const disconnectGoogleContacts = useCallback(
+    async (accountId: string): Promise<void> => {
+      setGcBusy(accountId);
+      try {
+        await postJSON(
+          '/api/integrations/google-contacts/disconnect',
+          { accountId },
+          { schema: integrations.googleContactsDisconnect.response }
+        );
+        toast.success('Google Contacts account disconnected');
+        await queryClient.invalidateQueries({
+          queryKey: qk.settings.integrationsGoogleContactsStatus(),
+        });
+      } catch (err) {
+        toast.error(httpErrorMessage(err, 'Failed to disconnect the Google Contacts account'));
+      } finally {
+        setGcBusy(null);
+      }
+    },
+    [toast, queryClient]
+  );
+
   // ── Gemini (Google GenAI) ──
   const { data: gmData, isLoading: gmLoading } = useQuery(integrationsGeminiStatusQuery());
   const gmStatus = (gmData as integrations.GeminiStatusResponse | undefined) ?? null;
@@ -411,6 +470,19 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
     : gdStatus.connected
       ? 'Connected'
       : 'Not connected';
+
+  // Multi-account: green only once every registered account is connected, amber
+  // while any is still missing — a half-connected phone book fails at send time.
+  const gcConnectedCount = gcStatus?.accounts.filter((a) => a.connected).length ?? 0;
+  const gcTotalCount = gcStatus?.accounts.length ?? 0;
+  const gcHealth: 'ok' | 'warn' | 'off' = !gcStatus?.configured
+    ? 'off'
+    : gcConnectedCount === gcTotalCount && gcTotalCount > 0
+      ? 'ok'
+      : 'warn';
+  const gcHealthLabel = !gcStatus?.configured
+    ? 'Not configured'
+    : `${gcConnectedCount}/${gcTotalCount} connected`;
 
   const health: 'ok' | 'warn' | 'off' = !status?.configured
     ? 'off'
@@ -740,6 +812,92 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
               </button>
             )}
           </div>
+        )}
+      </div>
+
+      {/* ── Google Contacts card ── */}
+      <div className={`${styles.card} ${styles[gcHealth]}`}>
+        <div className={styles.cardHeader}>
+          <span className={styles.serviceName}>
+            <i className="fas fa-address-book" aria-hidden="true" /> Google Contacts
+          </span>
+          <span className={`${styles.badge} ${styles[gcHealth]}`}>
+            <span className={styles.dot} />
+            {gcLoading && !gcStatus ? 'Checking…' : gcHealthLabel}
+          </span>
+        </div>
+        <p className={styles.serviceDescription}>
+          Supplies the phone-book options when sending a message or sharing files. Each Google
+          account is connected separately — reconnect one whenever its contact list stops loading.
+        </p>
+
+        {gcStatus && !gcStatus.configured && (
+          <div className={styles.notice}>
+            Google Contacts is not configured. Set <code>GOOGLE_CONTACTS_CLIENT_ID</code> and{' '}
+            <code>GOOGLE_CONTACTS_CLIENT_SECRET</code> (or the shared <code>GOOGLE_CLIENT_ID</code> /{' '}
+            <code>GOOGLE_CLIENT_SECRET</code>) in the server environment, then refresh.
+          </div>
+        )}
+
+        {gcStatus?.configured && !gcStatus.connectSupported && (
+          <div className={styles.notice}>
+            The credentials in <code>credentials.json</code> belong to a Google <em>desktop</em>{' '}
+            client, which cannot complete a browser sign-in. Existing connections keep working, but
+            to connect or reconnect an account, set <code>GOOGLE_CONTACTS_CLIENT_ID</code> /{' '}
+            <code>GOOGLE_CONTACTS_CLIENT_SECRET</code> to a <em>Web application</em> client and add{' '}
+            <code>{gcStatus.redirectUri}</code> to its authorized redirect URIs.
+          </div>
+        )}
+
+        {gcStatus?.configured && gcStatus.connectSupported && (
+          <div className={styles.notice}>
+            Authorized redirect URI for this server: <code>{gcStatus.redirectUri}</code> — it must
+            be listed on the Google OAuth client, or sign-in fails with{' '}
+            <code>redirect_uri_mismatch</code>.
+          </div>
+        )}
+
+        {gcStatus?.configured && (
+          <dl className={styles.rows}>
+            {gcStatus.accounts.map((account) => (
+              <div className={styles.row} key={account.id}>
+                <dt>{account.label}</dt>
+                <dd>
+                  {account.connected ? (
+                    <span className={styles.okText}>Connected</span>
+                  ) : (
+                    'Not connected'
+                  )}
+                  {gcStatus.connectSupported && (
+                    <>
+                      {' '}
+                      <button
+                        type="button"
+                        className={styles.toolBtn}
+                        onClick={() => connectGoogleContacts(account.id)}
+                        disabled={gcBusy !== null}
+                      >
+                        {account.connected ? 'Reconnect' : 'Connect'}
+                      </button>
+                    </>
+                  )}
+                  {account.connected && (
+                    <>
+                      {' '}
+                      <button
+                        type="button"
+                        className={styles.dangerBtn}
+                        onClick={() => void disconnectGoogleContacts(account.id)}
+                        disabled={gcBusy !== null}
+                      >
+                        Disconnect
+                      </button>
+                    </>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
         )}
       </div>
 

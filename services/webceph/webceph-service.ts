@@ -238,7 +238,10 @@ class WebCephService {
       }
     }
 
-    throw lastError;
+    // Every loop exit path assigns lastError, but the type says it may be undefined
+    // and `throw undefined` would defeat every `(error as Error).message` handler
+    // upstream — normalize so callers always catch a real Error.
+    throw lastError ?? new Error('WebCeph API request failed with no response');
   }
 
   /**

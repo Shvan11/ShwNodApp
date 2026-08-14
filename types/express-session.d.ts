@@ -21,5 +21,10 @@ declare module 'express-session' {
     // Short-lived Google Drive OAuth state, set by /api/admin/google-drive/auth-url
     // and consumed (one-shot) by /api/admin/google-drive/callback.
     googleDrive?: { state: string; createdAt: number };
+    // Short-lived Google Contacts OAuth state, set by
+    // /api/admin/google-contacts/auth-url and consumed (one-shot) by
+    // /api/admin/google-contacts/callback. Carries the account being connected —
+    // the callback has no other way to know which grant the code belongs to.
+    googleContacts?: { state: string; accountId: string; createdAt: number };
   }
 }

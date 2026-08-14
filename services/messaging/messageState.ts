@@ -1,7 +1,7 @@
-// services/state/messageState.ts
+// services/messaging/messageState.ts
 import stateEvents from './stateEvents.js';
 import StateManager from './StateManager.js';
-import { MessageStatus } from '../messaging/message-status.js';
+import { MessageStatus } from './message-status.js';
 import { log } from '../../utils/logger.js';
 
 /**
@@ -61,7 +61,6 @@ interface QRStatus {
   activeViewers: number;
   generationActive: boolean;
   lastRequested: number | null;
-  lastVerified?: number;
 }
 
 /**
@@ -250,9 +249,10 @@ class MessageStateManager {
   }
 
   /**
-   * Update person status in persons array
+   * Update person status in persons array. Internal — the only caller is
+   * updateMessageStatus(), which owns the monotonic ack ordering.
    */
-  async updatePersonStatus(messageId: string, status: number): Promise<void> {
+  private async updatePersonStatus(messageId: string, status: number): Promise<void> {
     await StateManager.atomicOperation<Map<string, Person>>(this.stateKeys.PERSONS, (persons) => {
       const current = persons || new Map<string, Person>();
       const existing = current.get(messageId);
@@ -283,11 +283,15 @@ class MessageStateManager {
       } else {
         // New message — insert. Map preserves insertion order, so the array views
         // (persons getter / dump) keep the same ordering the array append produced.
+        // PENDING is only the DEFAULT: a caller that already knows the outcome
+        // (index.ts's MessageFailed handler) passes its own status, and clobbering
+        // it here left every failed send permanently recorded as PENDING — nothing
+        // downstream ever transitions a person that was born failed.
         wasNewMessage = true;
         current.set(person.messageId, {
           ...person,
           addedAt: Date.now(),
-          status: MessageStatus.PENDING,
+          status: person.status ?? (person.success === '&times;' ? MessageStatus.ERROR : MessageStatus.PENDING),
         });
       }
       return current;
@@ -419,43 +423,6 @@ class MessageStateManager {
   }
 
   /**
-   * Verify QR viewer count matches actual connections
-   */
-  async verifyQRViewerCount(activeViewerIds: string[] = []): Promise<QRStatus> {
-    const result = await StateManager.atomicOperation<QRStatus>(
-      this.stateKeys.QR_STATUS,
-      (qrStatus) => {
-        const current = qrStatus || {
-          qr: null,
-          activeViewers: 0,
-          generationActive: false,
-          lastRequested: null,
-        };
-        const expectedCount = activeViewerIds.length;
-        const actualCount = current.activeViewers || 0;
-
-        if (expectedCount !== actualCount) {
-          log.warn(`QR viewer count mismatch - Expected: ${expectedCount}, Actual: ${actualCount}`);
-          // Correct the count
-          return {
-            ...current,
-            activeViewers: expectedCount,
-            lastVerified: Date.now(),
-          };
-        }
-
-        return current;
-      }
-    );
-
-    if (result.activeViewers !== activeViewerIds.length) {
-      log.info(`Corrected QR viewer count to ${activeViewerIds.length}`);
-    }
-
-    return result;
-  }
-
-  /**
    * Set finish report status
    */
   async setFinishReport(finished: boolean): Promise<MessageStats> {
@@ -463,11 +430,6 @@ class MessageStateManager {
       ...(stats || { sent: 0, failed: 0, finished: false, finishReport: false }),
       finishReport: finished,
     }));
-  }
-
-  get finishReport(): boolean {
-    const stats = StateManager.get<MessageStats>(this.stateKeys.MESSAGE_STATS);
-    return stats?.finishReport || false;
   }
 
   /**
