@@ -56,6 +56,17 @@ function buildSupabasePool(max: number): Pool {
   });
 }
 
+/**
+ * A throwaway single-connection pool to the same Supabase database, for a caller that needs ONE
+ * statement and must not create (or keep alive) either shared singleton — e.g. the boot-time capture
+ * disable for a reverse sink switched off by env. The caller owns it and must `end()` it.
+ */
+export function buildOneShotSupabasePool(): Pool {
+  const p = buildSupabasePool(1);
+  p.on('error', () => {}); // short-lived and caller-owned: the statement's own result is the signal
+  return p;
+}
+
 let forwardWritePool: Pool | null = null;
 let reverseReadPool: Pool | null = null;
 

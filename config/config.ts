@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { z } from 'zod';
 import type { AppConfig } from '../types/config.types.js';
 import { log } from '../utils/logger.js';
+import { resolvePgConnection } from './pg-connection.js';
 
 // Load base .env file first (shared configuration) - silent mode for production
 dotenv.config({ path: '.env', debug: false });
@@ -69,6 +70,10 @@ function getDefaultPort(): number {
   return 3000;
 }
 
+// PostgreSQL connection settings — DATABASE_URL *or* the discrete PG_* block, per-field, resolved
+// in config/pg-connection.ts (extracted so it is unit-testable; config.ts throws at import time).
+const pgConnection = resolvePgConnection(process.env, (m) => log.warn(m));
+
 const config: AppConfig = {
   database: {
     server: process.env.DB_SERVER || '',
@@ -95,11 +100,7 @@ const config: AppConfig = {
   // setting DB_DRIVER=mssql no longer changes runtime behavior.
   dbDriver: (process.env.DB_DRIVER as 'mssql' | 'pg') || 'pg',
   databasePg: {
-    host: process.env.PG_HOST || 'localhost',
-    port: parseInt(process.env.PG_PORT || '5432', 10),
-    database: process.env.PG_DATABASE || 'shwan_test',
-    user: process.env.PG_USER || 'shwan_app',
-    password: process.env.PG_PASSWORD || '',
+    ...pgConnection,
     max: 10,
     connectionTimeoutMillis: 30000,
     idleTimeoutMillis: 30000,

@@ -61,6 +61,34 @@ export interface DetailedHealthReport extends HealthStatus {
 }
 
 /**
+ * RSS ceiling before the memory check reports unhealthy.
+ *
+ * Configurable because the right number is deployment-specific: this process can
+ * host a Puppeteer Chrome and the WhatsApp client, which together sail past the
+ * old hardcoded 1000 MB on a perfectly healthy box — so the check sat permanently
+ * unhealthy and warned on every run, training everyone to ignore it.
+ */
+const MEMORY_LIMIT_MB = Number(process.env.HEALTH_MEMORY_LIMIT_MB) > 0
+  ? Number(process.env.HEALTH_MEMORY_LIMIT_MB)
+  : 3000;
+
+/** Process/runtime facts, read once per caller. Was duplicated between the
+ *  `system` check's details and `getDetailedReport().systemInfo`. */
+function systemInfo(): { uptime: number; nodeVersion: string; platform: NodeJS.Platform; pid: number } {
+  return {
+    uptime: process.uptime(),
+    nodeVersion: process.version,
+    platform: process.platform,
+    pid: process.pid,
+  };
+}
+
+/** Pool stats widened for the details bag (the cast was written out twice). */
+function poolStats(): Record<string, unknown> {
+  return getDatabaseStats().connectionPool as unknown as Record<string, unknown>;
+}
+
+/**
  * Health check system for monitoring system components
  */
 class HealthCheckService extends EventEmitter {
@@ -93,7 +121,7 @@ class HealthCheckService extends EventEmitter {
 
         return {
           healthy,
-          details: stats as unknown as Record<string, unknown>,
+          details: poolStats(),
           message: healthy ? 'Database pool is healthy' : 'Database pool is unhealthy',
         };
       },
@@ -188,41 +216,49 @@ class HealthCheckService extends EventEmitter {
         const usage = process.memoryUsage();
         const totalMB = Math.round(usage.rss / 1024 / 1024);
         const heapMB = Math.round(usage.heapUsed / 1024 / 1024);
-        const healthy = totalMB < 1000; // Alert if using more than 1GB
+        const healthy = totalMB < MEMORY_LIMIT_MB;
 
         return {
           healthy,
           details: {
             totalMB,
             heapMB,
+            limitMB: MEMORY_LIMIT_MB,
             external: Math.round(usage.external / 1024 / 1024),
           },
           message: healthy
-            ? `Memory usage is normal (${totalMB}MB)`
-            : `High memory usage (${totalMB}MB)`,
+            ? `Memory usage is normal (${totalMB}MB / ${MEMORY_LIMIT_MB}MB)`
+            : `High memory usage (${totalMB}MB, limit ${MEMORY_LIMIT_MB}MB)`,
         };
       },
       60000
     ); // Check every minute
 
-    // System uptime check
+    // Event-loop responsiveness.
+    //
+    // Replaces an uptime check whose predicate was `uptime > 0` — true by
+    // construction inside a running process, so it could never fail and cost a
+    // timer every 5 minutes to say so. Loop lag is the thing an operator actually
+    // wants to know: it is what a stuck sync pass or a runaway render looks like
+    // from the outside, and it is cheap to sample.
+    const EVENT_LOOP_LAG_LIMIT_MS = 2000;
+
     this.registerCheck(
       'system',
       async () => {
-        const uptime = process.uptime();
-        const uptimeHours = Math.floor(uptime / 3600);
-        const healthy = uptime > 0; // Always healthy if process is running
+        const started = Date.now();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const lagMs = Math.max(0, Date.now() - started - 100);
+        const healthy = lagMs < EVENT_LOOP_LAG_LIMIT_MS;
+        const info = systemInfo();
+        const uptimeHours = Math.floor(info.uptime / 3600);
 
         return {
           healthy,
-          details: {
-            uptimeSeconds: uptime,
-            uptimeHours,
-            nodeVersion: process.version,
-            platform: process.platform,
-            pid: process.pid,
-          },
-          message: `System running for ${uptimeHours} hours`,
+          details: { ...info, uptimeHours, lagMs, lagLimitMs: EVENT_LOOP_LAG_LIMIT_MS },
+          message: healthy
+            ? `System responsive (up ${uptimeHours}h, loop lag ${lagMs}ms)`
+            : `Event loop blocked — ${lagMs}ms lag (limit ${EVENT_LOOP_LAG_LIMIT_MS}ms)`,
         };
       },
       300000
@@ -343,6 +379,11 @@ class HealthCheckService extends EventEmitter {
     }
     this.intervals.clear();
 
+    // Drop the last results too. They are snapshots from checks that are no longer
+    // running, and /health served them as if they were current — a stopped service
+    // reported the health it had at shutdown.
+    this.lastResults.clear();
+
     this.emit('stopped');
   }
 
@@ -373,14 +414,9 @@ class HealthCheckService extends EventEmitter {
 
     return {
       ...status,
-      systemInfo: {
-        uptime: process.uptime(),
-        nodeVersion: process.version,
-        platform: process.platform,
-        pid: process.pid,
-      },
+      systemInfo: systemInfo(),
       resourceStats: ResourceManager.getStats(),
-      databaseStats: getDatabaseStats().connectionPool as unknown as Record<string, unknown>,
+      databaseStats: poolStats(),
     };
   }
 }

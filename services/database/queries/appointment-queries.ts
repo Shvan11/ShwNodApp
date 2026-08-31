@@ -7,6 +7,7 @@
  */
 import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
+import { formatClock12, formatTime12 } from '../../../utils/date.js';
 
 // type definitions
 interface UpdatePresentResult {
@@ -51,19 +52,10 @@ export type DailyAppointmentsOptimizedResult = {
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
 /** FORMAT(dt, 'hh:mm' [+ ' tt']) — 12-hour clock, leading-zero hour. */
-function fmtClock(date: Date, withMeridiem: boolean): string {
-  const h = date.getHours();
-  const base = `${pad2(h % 12 || 12)}:${pad2(date.getMinutes())}`;
-  return withMeridiem ? `${base} ${h < 12 ? 'AM' : 'PM'}` : base;
-}
+const fmtClock = formatClock12;
 
 /** Format a PG `time` value ('HH:MM:SS' string) as 'hh:mm' (12-hour leading-zero). */
-function fmtTimeStr(t: string | null): string | null {
-  if (!t) return null;
-  const [hh, mm] = t.split(':');
-  const h = parseInt(hh, 10);
-  return `${pad2(h % 12 || 12)}:${mm}`;
-}
+const fmtTimeStr = (t: string | null): string | null => formatTime12(t);
 
 function isMidnight(date: Date): boolean {
   return date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0;
@@ -298,12 +290,15 @@ export interface AppointmentWithPhone {
   patient_type: string;
   patient_name: string;
   phone: string;
+  /** 24-hour `HH:MM`. Render via utils/date#formatTime12 — never re-derive. */
   apptime: string;
   employee_name: string;
+  /** Has the patient already checked in? Shown as a marker, not a filter. */
+  checked_in: boolean;
 }
 
 /**
- * Not-yet-present appointments for a date with patient/type/phone/doctor. (was: ProAppsPhones)
+ * Every appointment booked for a date with patient/type/phone/doctor. (was: ProAppsPhones)
  * Used by the appointment-list PDF generator.
  */
 export async function getAppointmentsWithPhones(date: string): Promise<AppointmentWithPhone[]> {
@@ -314,13 +309,19 @@ export async function getAppointmentsWithPhones(date: string): Promise<Appointme
     .leftJoin('patient_types as pt', 'pt.id', 'p.patient_type_id')
     .leftJoin('employees as e', 'e.id', 'a.dr_id')
     .where('a.app_day', '=', sql<string>`${dateStr}::date`)
-    .where('a.present', 'is', null)
+    // Every appointment booked for the day, checked-in or not. This used to filter
+    // `present IS NULL` (inherited from the legacy ProAppsPhones proc), which made
+    // the report self-erasing: regenerate it at noon and everyone who had already
+    // arrived silently vanished from the list AND from "Total Appointments".
     .orderBy('a.app_date')
     .select([
       'a.appointment_id', 'a.person_id', 'a.app_detail',
       sql<string>`to_char(a."app_day", 'YYYY-MM-DD')`.as('app_day'),
-      'pt.patient_type', 'p.patient_name', 'p.phone',
-      sql<string>`to_char(a."app_date", 'HH12:MI')`.as('apptime'),
+      'pt.patient_type', 'p.patient_name', 'p.phone', 'a.present',
+      // HH24 — the ONLY convention on the wire. Consumers convert to 12-hour via
+      // utils/date#formatTime12. This was HH12 with no meridiem, which the PDF
+      // generator then read as 24-hour: every PM appointment printed as AM.
+      sql<string>`to_char(a."app_date", 'HH24:MI')`.as('apptime'),
       'e.employee_name',
     ])
     .execute();
@@ -334,6 +335,7 @@ export async function getAppointmentsWithPhones(date: string): Promise<Appointme
     phone: r.phone ?? '',
     apptime: r.apptime ?? '',
     employee_name: r.employee_name ?? '',
+    checked_in: r.present != null,
   }));
 }
 

@@ -13,6 +13,8 @@
     "node_modules",
     "dist",
     "dist-server",
-    "public"
+    "public",
+    "**/*.test.ts",
+    "**/*.test.tsx"
   ]
 }

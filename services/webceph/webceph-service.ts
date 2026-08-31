@@ -102,25 +102,33 @@ interface WebCephApiResponse {
   thumbnail?: string;
 }
 
+/** Cap on one WebCeph round trip — generous for an X-ray upload, tight for the JSON calls. */
+const DEFAULT_TIMEOUT_MS = 20_000;
+const UPLOAD_TIMEOUT_MS = 60_000;
+
 // ===========================================
 // WEBCEPH SERVICE CLASS
 // ===========================================
 
 class WebCephService {
-  private partnerApiKey: string;
-  private userEmail: string;
-  private userApiPassword: string;
-  private baseUrl: string;
-  private maxRetries: number;
-  private retryDelay: number;
+  private readonly maxRetries = 3;
+  private readonly retryDelay = 1000; // 1 second, multiplied by the attempt number
 
-  constructor() {
-    this.partnerApiKey = config.webceph.partnerApiKey || '';
-    this.userEmail = config.webceph.userEmail || '';
-    this.userApiPassword = config.webceph.userApiPassword || '';
-    this.baseUrl = config.webceph.baseUrl;
-    this.maxRetries = 3;
-    this.retryDelay = 1000; // 1 second
+  // Credentials are read from config at CALL time rather than snapshotted into fields by the
+  // constructor. The singleton is built at import, so a snapshot could only ever be changed by a
+  // restart — and the sibling Contacts integration already needed an explicit cache-reset hatch
+  // (resetResolvedClient) after making exactly that assumption.
+  private get partnerApiKey(): string {
+    return config.webceph.partnerApiKey || '';
+  }
+  private get userEmail(): string {
+    return config.webceph.userEmail || '';
+  }
+  private get userApiPassword(): string {
+    return config.webceph.userApiPassword || '';
+  }
+  private get baseUrl(): string {
+    return config.webceph.baseUrl;
   }
 
   /**
@@ -145,27 +153,38 @@ class WebCephService {
   }
 
   /**
-   * Make authenticated request to WebCeph API
+   * Make an authenticated request to the WebCeph API, retrying transient failures.
+   *
+   * `body` is a FACTORY, not a value. A request body may be a STREAM — `uploadImage` sends
+   * multipart via form-data — and a stream can only be read once. Passing one value and re-sending
+   * it across attempts meant attempt 2 shipped an already-drained stream: with a Content-Length
+   * promising bytes that never came, the upload either hung until the server gave up or landed
+   * truncated, and the caller was told it succeeded. Rebuilding per attempt is cheap here (the
+   * image is already a Buffer in memory) and makes the retry actually recoverable.
+   *
    * @param endpoint - API endpoint (e.g., '/api/v1/addnewpatient/')
-   * @param options - Fetch options
+   * @param options - method, headers, and a per-attempt body factory
    * @returns API response
    */
   async makeRequest(
     endpoint: string,
-    options: Omit<RequestInit, 'headers' | 'body'> & { headers?: Record<string, string>; body?: BodyInit } = {}
+    options: {
+      method?: string;
+      headers?: Record<string, string> | (() => Record<string, string>);
+      body?: () => BodyInit;
+      timeoutMs?: number;
+    } = {}
   ): Promise<WebCephApiResponse> {
     const url = `${this.baseUrl}${endpoint}`;
 
-    // WebCeph requires these specific headers for authentication
-    const additionalHeaders = options.headers && typeof options.headers === 'object' && !Array.isArray(options.headers)
-      ? options.headers
-      : {};
-    const headers: Record<string, string> = {
+    // WebCeph requires these specific headers for authentication. Like the body, headers can be
+    // per-attempt (form-data's boundary belongs to the FormData instance that attempt built).
+    const buildHeaders = (): Record<string, string> => ({
       'X-Partner-ApiKey': this.partnerApiKey,
       'X-User-ApiUsername': this.userEmail,
       'X-User-ApiPass': this.encryptApiPass(),
-      ...additionalHeaders,
-    };
+      ...(typeof options.headers === 'function' ? options.headers() : (options.headers ?? {})),
+    });
 
     log.debug('[WebCeph] Making request', { url });
     log.debug('[WebCeph] Headers status', {
@@ -178,17 +197,28 @@ class WebCephService {
     // bodies (gateway HTML error pages). A parsed non-5xx API rejection is
     // deterministic — e.g. "Record dates already exist", "no matching photo
     // class" — so retrying it just burns the 30 req/min rate limit and adds
-    // seconds of latency; those throw immediately. (Caveat: a retried multipart
-    // upload may re-send an already-consumed form-data stream — pre-existing,
-    // but now only reachable on a genuine transient failure.)
+    // seconds of latency; those throw immediately. Multipart is safe to retry now that the body is
+    // rebuilt per attempt (see the method doc).
     let lastError: Error | undefined;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       let status: number | undefined;
       let textResponse: string | undefined;
       try {
+        // Body BEFORE headers, and both fresh per attempt (see the method doc). The order is
+        // load-bearing for multipart: form-data generates a random boundary per instance, and the
+        // Content-Type header naming that boundary can only be read off the instance the body
+        // factory just built. Building them the other way round ships one form's bytes under
+        // another form's boundary, which the server reads as an empty upload.
+        const attemptBody = options.body?.();
+        const attemptHeaders = buildHeaders();
         const response: Response = await fetch(url, {
-          ...options,
-          headers,
+          method: options.method ?? 'GET',
+          headers: attemptHeaders,
+          body: attemptBody,
+          // node-fetch v3 dropped `timeout`; without a signal three attempts can each hang for the
+          // OS TCP timeout against a stalled api.webceph.com, pinning the Express request with
+          // nothing logged. An AbortError is treated as transient, so the retry is what recovers it.
+          signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
         });
         status = response.status;
         textResponse = await response.text();
@@ -213,7 +243,14 @@ class WebCephService {
           if (data.error) {
             throw new Error(data.message || data.error);
           }
-          if (status >= 400 && data.result !== 'success') {
+          // An explicit non-success `result` is a failure whatever the status. This test used to sit
+          // under `status >= 400`, so a 200 carrying `{ result: 'fail' }` and nothing else was
+          // returned as success — callers then read `undefined` off it and the real problem surfaced
+          // much later as a missing WebCeph link.
+          if (data.result !== undefined && data.result !== 'success') {
+            throw new Error(data.message || JSON.stringify(data));
+          }
+          if (status >= 400) {
             throw new Error(JSON.stringify(data));
           }
           return data;
@@ -265,12 +302,11 @@ class WebCephService {
 
       log.debug('[WebCeph] Request body prepared');
 
+      const encoded = formData.toString();
       const response = await this.makeRequest('/api/v1/addnewpatient/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: () => encoded, // a string is re-sendable as-is; the factory is for the stream case
       });
 
       log.info('[WebCeph] Patient created successfully', { patientId: response.patientid });
@@ -301,12 +337,11 @@ class WebCephService {
       formData.append('patientid', patientID);
       formData.append('recorddate', recordDate);
 
+      const encoded = formData.toString();
       const response = await this.makeRequest('/api/v1/addnewpatientrecord/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: () => encoded,
       });
 
       log.info('[WebCeph] Record created successfully');
@@ -332,23 +367,36 @@ class WebCephService {
     try {
       log.info('[WebCeph] Uploading image for patient', { patientId: uploadData.patientID });
 
-      const formData = new FormData();
-      formData.append('patientid', uploadData.patientID);
-      formData.append('recordhash', uploadData.recordHash);
-      formData.append('targetclass', uploadData.targetClass);
-      formData.append('overwrite', uploadData.overwrite ? 'true' : 'false');
-
-      // Append the image file — WebCeph's upload field name is "file"
-      // (NOT "photo", which it rejects with "invalid upload").
-      formData.append('file', uploadData.image, {
-        filename: uploadData.filename || 'image.jpg',
-        contentType: uploadData.contentType || 'image/jpeg',
-      });
+      // Built fresh per attempt: form-data is a STREAM, so a retry that re-sent one already
+      // drained by attempt 1 would hang against its own Content-Length or upload a truncated
+      // X-ray. The buffer is in memory, so rebuilding costs nothing. The boundary lives on the
+      // instance, hence the matching per-attempt headers.
+      let current: FormData | null = null;
+      const buildForm = (): FormData => {
+        const form = new FormData();
+        form.append('patientid', uploadData.patientID);
+        form.append('recordhash', uploadData.recordHash);
+        form.append('targetclass', uploadData.targetClass);
+        form.append('overwrite', uploadData.overwrite ? 'true' : 'false');
+        // WebCeph's upload field name is "file" (NOT "photo", which it rejects with
+        // "invalid upload").
+        form.append('file', uploadData.image, {
+          filename: uploadData.filename || 'image.jpg',
+          contentType: uploadData.contentType || 'image/jpeg',
+        });
+        return form;
+      };
 
       const response = await this.makeRequest('/api/v1/uploadrecordphoto/', {
         method: 'POST',
-        body: formData,
-        headers: formData.getHeaders(),
+        body: () => {
+          current = buildForm();
+          return current as unknown as BodyInit;
+        },
+        // makeRequest calls `body` first, so `current` is this attempt's form and its headers
+        // carry the matching boundary.
+        headers: () => (current ?? buildForm()).getHeaders(),
+        timeoutMs: UPLOAD_TIMEOUT_MS,
       });
 
       log.info('[WebCeph] Image uploaded successfully');

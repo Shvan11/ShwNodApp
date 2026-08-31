@@ -105,3 +105,137 @@ export function lwwUpdateClause(
     `AND (${qt}.${ua} IS NULL OR EXCLUDED.${ua} ${op} ${qt}.${ua})`
   );
 }
+
+/**
+ * Per-sink cache of the three schema facts a raw row-copy needs, all resolved from the LOCAL
+ * catalog (local and the Supabase mirror are DDL-parity-equal, so one lookup serves both sinks).
+ *
+ * Each fact has the same subtlety: a table ABSENT from the loaded map means "no generated columns"
+ * / "no updated_at" / "not captured", so cache membership alone can't distinguish "known absent"
+ * from "loaded before this table existed". Every lookup therefore keeps a `seen` set and refreshes
+ * exactly ONCE per table, which is what lets a newly-captured table (or one that just gained
+ * `updated_at`) be picked up without a restart — and what stops an absent table from re-running the
+ * catalog query on every single change row.
+ *
+ * Lifted out of FailoverSink/ReverseSink, which held byte-identical copies of all of this.
+ */
+export class SchemaMetaCache {
+  private pkCache: Map<string, string> | null = null;
+  private pkSeen: Set<string> | null = null;
+  private genColsCache: Map<string, Set<string>> | null = null;
+  private genColsSeen: Set<string> | null = null;
+  private updatedAtCache: Set<string> | null = null;
+  private updatedAtSeen: Set<string> | null = null;
+
+  constructor(private readonly local: () => Pool) {}
+
+  /** Drop everything — called from a sink's init()/close(). */
+  reset(): void {
+    this.pkCache = null;
+    this.pkSeen = null;
+    this.genColsCache = null;
+    this.genColsSeen = null;
+    this.updatedAtCache = null;
+    this.updatedAtSeen = null;
+  }
+
+  /** The table's single PK column, or undefined when it isn't a single-PK captured table. */
+  async pkFor(table: string): Promise<string | undefined> {
+    if (!this.pkCache || !this.pkSeen) {
+      this.pkCache = await loadPks(this.local());
+      this.pkSeen = new Set();
+    }
+    if (!this.pkSeen.has(table)) {
+      this.pkCache = await loadPks(this.local()); // refresh once for a newly-captured table
+      this.pkSeen.add(table);
+    }
+    return this.pkCache.get(table);
+  }
+
+  /** Stored generated columns to drop from a raw upsert (PG rejects an explicit value for them). */
+  async generatedColsFor(table: string): Promise<Set<string>> {
+    if (!this.genColsCache || !this.genColsSeen) {
+      this.genColsCache = await loadGeneratedCols(this.local());
+      this.genColsSeen = new Set();
+    }
+    if (!this.genColsSeen.has(table)) {
+      this.genColsCache = await loadGeneratedCols(this.local());
+      this.genColsSeen.add(table);
+    }
+    return this.genColsCache.get(table) ?? new Set();
+  }
+
+  /** Whether `table` carries `updated_at` → the upsert rides the whole-row LWW conflict clause. */
+  async isUpdatedAtTable(table: string): Promise<boolean> {
+    if (!this.updatedAtCache || !this.updatedAtSeen) {
+      this.updatedAtCache = await loadUpdatedAtTables(this.local());
+      this.updatedAtSeen = new Set();
+    }
+    if (!this.updatedAtSeen.has(table)) {
+      this.updatedAtCache = await loadUpdatedAtTables(this.local());
+      this.updatedAtSeen.add(table);
+    }
+    return this.updatedAtCache.has(table);
+  }
+}
+
+/** A ready-to-run upsert (`sql` + positional `params`) for one replicated row. */
+export interface UpsertStatement {
+  sql: string;
+  params: unknown[];
+}
+
+/**
+ * Build the raw INSERT … ON CONFLICT that replicates one row verbatim, shared by BOTH sinks (they
+ * differ only in the LWW operator: forward `>=` so local wins ties, reverse `>` so Supabase must be
+ * strictly newer). Stored generated columns are dropped — PG rejects an explicit value and the
+ * receiving side recomputes them from the same expression. Tables with no `updated_at` (the lookup
+ * tables, forward-only) fall back to a blind upsert.
+ */
+export async function buildRowUpsert(
+  meta: SchemaMetaCache,
+  table: string,
+  pkCol: string,
+  row: Record<string, unknown>,
+  lwwOp: '>' | '>='
+): Promise<UpsertStatement> {
+  const generated = await meta.generatedColsFor(table);
+  const cols = Object.keys(row).filter((c) => !generated.has(c));
+  const colList = cols.map(qIdent).join(', ');
+  const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
+
+  let conflict: string;
+  if (await meta.isUpdatedAtTable(table)) {
+    conflict = lwwUpdateClause(table, pkCol, cols, lwwOp);
+  } else {
+    const setList = cols
+      .filter((c) => c !== pkCol)
+      .map((c) => `${qIdent(c)} = EXCLUDED.${qIdent(c)}`)
+      .join(', ');
+    conflict = setList
+      ? `ON CONFLICT (${qIdent(pkCol)}) DO UPDATE SET ${setList}`
+      : `ON CONFLICT (${qIdent(pkCol)}) DO NOTHING`;
+  }
+
+  return {
+    sql: `INSERT INTO ${qIdent(table)} (${colList}) VALUES (${placeholders}) ${conflict}`,
+    params: cols.map((c) => row[c]),
+  };
+}
+
+/**
+ * Read one row as jsonb — `to_jsonb` so wall-clock `date`/`timestamp` values transfer as text with
+ * no UTC drift. Returns null when the row is gone (the caller propagates that as a delete).
+ */
+export async function readRowAsJson(
+  pool: Pool,
+  table: string,
+  pkCol: string,
+  pk: string
+): Promise<Record<string, unknown> | null> {
+  const { rows } = await pool.query<{ r: Record<string, unknown> }>(
+    `SELECT to_jsonb(t.*) AS r FROM ${qIdent(table)} t WHERE ${qIdent(pkCol)} = $1`,
+    [pk]
+  );
+  return rows.length === 0 ? null : rows[0].r;
+}

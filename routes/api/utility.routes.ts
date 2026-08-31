@@ -91,7 +91,7 @@ router.get('/google', async (req: Request<object, unknown, unknown, GoogleQuery>
       return;
     }
 
-    const contacts = await getContacts(source);
+    const contacts = await getContacts(source, req.query.refresh === true);
     sendData(res, utility.google.response, contacts);
   } catch (error) {
     // A not-configured / not-connected account is an operator-actionable state, not

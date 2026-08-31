@@ -13,12 +13,11 @@
  *
  * Wired into index.ts boot + gracefulShutdown.
  */
-import type { Pool } from 'pg';
 import { CdcEngine } from './engine.js';
 import { FailoverSink } from './failover-sink.js';
 import { DolphinSink } from './dolphin-sink.js';
 import { ReverseSink } from './reverse-sink.js';
-import { getReverseReadPool } from './supabase-pool.js';
+import { getReverseReadPool, buildOneShotSupabasePool } from './supabase-pool.js';
 import { getPgPool } from '../../database/kysely.js';
 import { log } from '../../../utils/logger.js';
 import type { SyncSink, EngineOpts } from './types.js';
@@ -32,15 +31,26 @@ function num(v: string | undefined, d: number): number {
  * Turn a sink's capture OFF in its cdc_sink_control row. Called at boot for a sink whose env flag is
  * off: with no drainer running, leaving capture on would let change_log grow with nothing consuming
  * it. (Capture is otherwise never disabled on a normal stop — see engine.ts.) Leaves `stale`
- * untouched. `source` selects which DB holds the row — local for failover/dolphin, the Supabase
- * reverse-read pool for the reverse sink (its control row lives on Supabase).
+ * untouched.
+ *
+ * `remote` says the control row lives on Supabase (the reverse sink) rather than locally
+ * (failover/dolphin). A remote disable deliberately builds a ONE-SHOT pool and ends it rather than
+ * reaching for getReverseReadPool(): that shared singleton would otherwise be created — and held
+ * open for the whole process lifetime — purely to run this single UPDATE for a sink that is switched
+ * off, leaving idle Supabase connections on every install where reverse sync is disabled.
  */
-async function disableSinkCapture(sink: string, source?: () => Pool): Promise<void> {
-  const pool = source?.() ?? getPgPool();
-  await pool.query(
-    `UPDATE cdc_sink_control SET enabled = false, note = 'sink disabled by env', updated_at = now() WHERE sink = $1`,
-    [sink]
-  );
+async function disableSinkCapture(sink: string, remote = false): Promise<void> {
+  const sql = `UPDATE cdc_sink_control SET enabled = false, note = 'sink disabled by env', updated_at = now() WHERE sink = $1`;
+  if (!remote) {
+    await getPgPool().query(sql, [sink]);
+    return;
+  }
+  const pool = buildOneShotSupabasePool();
+  try {
+    await pool.query(sql, [sink]);
+  } finally {
+    await pool.end().catch(() => {});
+  }
 }
 
 const engines: CdcEngine[] = [];
@@ -84,8 +94,8 @@ export function startCdc(): void {
   for (const d of defs) {
     if (!d.on) {
       log.info(`⏭️  CDC sink "${d.sink.name}" disabled — turning capture OFF (no drainer will run)`);
-      // The reverse sink's control row lives on Supabase → disable it there (d.opts.source).
-      void disableSinkCapture(d.sink.name, d.opts.source).catch((e) =>
+      // The reverse sink's control row lives on Supabase → disable it there, over a one-shot pool.
+      void disableSinkCapture(d.sink.name, d.sink.name === 'reverse').catch((e) =>
         log.warn(`[cdc:${d.sink.name}] could not disable capture for off sink`, { error: (e as Error).message })
       );
       continue;
@@ -96,7 +106,12 @@ export function startCdc(): void {
   }
 }
 
-/** Stop all running engines (turns each sink's capture off). */
+/**
+ * Stop all running engines. Capture is deliberately left ON in cdc_sink_control — a change recorded
+ * while we are down must survive the restart so the next boot drains it. See the CdcEngine header:
+ * capture is turned off only on purpose (startCdc for an env-disabled sink, the circuit breaker, or
+ * the manual kill switch), never by a normal stop.
+ */
 export async function stopCdc(): Promise<void> {
   await Promise.all(engines.map((e) => e.stop().catch(() => {})));
   engines.length = 0;

@@ -13,6 +13,10 @@
  * is an intentional, documented reintroduction of a runtime mssql dependency for a temporary
  * feature (CLAUDE.md otherwise calls pool.ts script-only).
  *
+ * WHERE THE MAPPING LIVES: `dolphin_sync_map`, NOT the `time_points.dolphin_tp_id` /
+ * `time_points.dolphin_pat_id` / `time_point_images.dolphin_tpi_id` columns — those are unused
+ * reservations from an earlier design and nothing reads or writes them (they go when this sink does).
+ *
  * The delete problem & the mapping table — change_log carries only (sink, tbl, pk); on a delete the
  * source PG row is already gone (no payload to read), and PG integer PKs don't match Dolphin's
  * uniqueidentifier PKs anyway. So the sink owns an UN-triggered table, dolphin_sync_map(local_table,
@@ -113,8 +117,11 @@ export class DolphinSink implements SyncSink {
   private pool: ConnectionPool | null = null;
   /** person_id → Dolphin patID GUID. Reset on init. Bounded by distinct patients with photo edits. */
   private patIdByPerson = new Map<number, string>();
-  /** image_type_code → Dolphin itypID GUID. Reset on init. Bounded by the 34 image types. */
-  private itypByCode = new Map<string, string>();
+  /**
+   * image_type_code → Dolphin itypID GUID, or null for a code with no Dolphin mapping (cached too,
+   * so an unmapped type doesn't re-query per image). Reset on init. Bounded by the 34 image types.
+   */
+  private itypByCode = new Map<string, string | null>();
 
   async init(): Promise<void> {
     this.pool = await getPool(); // ShwanNew; Dolphin reached via DolphinPlatform.dbo.* three-part names
@@ -236,18 +243,22 @@ export class DolphinSink implements SyncSink {
     return id;
   }
 
-  /** Resolve the Dolphin itypID for a 2-digit image_type code via the local tblImageTypes.dolphin_ityp_id. */
+  /**
+   * Resolve the Dolphin itypID for a 2-digit image_type code via the local
+   * tblImageTypes.dolphin_ityp_id. Misses are cached as null too — an image type with no Dolphin
+   * mapping is a permanent fact of the schema, and not caching it re-queried image_types for every
+   * single image of that type on every drain.
+   */
   private async resolveItyp(imageType: string | null): Promise<string | null> {
     if (!imageType) return null;
-    const cached = this.itypByCode.get(imageType);
-    if (cached) return cached;
+    if (this.itypByCode.has(imageType)) return this.itypByCode.get(imageType)!;
     const row = await getKysely()
       .selectFrom('image_types')
       .select('dolphin_ityp_id')
       .where('image_type_code', '=', imageType)
       .executeTakeFirst();
     const id = row?.dolphin_ityp_id ?? null;
-    if (id) this.itypByCode.set(imageType, id);
+    this.itypByCode.set(imageType, id);
     return id;
   }
 

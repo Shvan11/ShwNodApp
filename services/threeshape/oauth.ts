@@ -14,6 +14,7 @@ import crypto from 'node:crypto';
 import fetch from 'node-fetch';
 import config from '../../config/config.js';
 import { log } from '../../utils/logger.js';
+import { describeFetchError } from '../../utils/fetch-timeout.js';
 import { ThreeShapeError } from './errors.js';
 import { tokenError, tokenResponse, type TokenResponse } from './dtos.js';
 import {
@@ -24,6 +25,16 @@ import {
 
 // Refresh this many ms before the access token actually expires (clock skew + RTT).
 const EXPIRY_SKEW_MS = 60_000;
+
+/**
+ * Hard cap on an identity.3shape.com round trip.
+ *
+ * node-fetch v3 dropped its `timeout` option, so without an explicit signal there is NO bound: a
+ * refused connection fails fast, but a firewall that DROPS rather than rejects hangs for the OS TCP
+ * timeout (~75s+) — past Express's own 30s requestTimeout, so the caller gets a generic timeout
+ * instead of the friendly 'unreachable' message this module works to produce.
+ */
+const TOKEN_TIMEOUT_MS = 15_000;
 
 function base64url(buf: Buffer): string {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -39,10 +50,9 @@ export function challengeFromVerifier(verifier: string): string {
   return base64url(crypto.createHash('sha256').update(verifier).digest());
 }
 
-/** Random anti-CSRF `state`. */
-export function generateState(): string {
-  return base64url(crypto.randomBytes(16));
-}
+// Anti-CSRF `state` is shared with the Google integrations (utils/oauth.ts) — the same 16 random
+// bytes, base64url. `base64url()` above stays local because PKCE also needs it for the challenge.
+export { generateState } from '../../utils/oauth.js';
 
 type RequiredOAuthConfig = {
   clientId: string;
@@ -92,12 +102,13 @@ async function postToken(body: URLSearchParams): Promise<TokenResponse> {
         Accept: 'application/json',
       },
       body: body.toString(),
+      signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
     });
   } catch (err) {
-    throw new ThreeShapeError(
-      'unreachable',
-      `Could not reach the 3Shape identity service: ${(err as Error).message}`
-    );
+    // An AbortError here is the timeout above, which is the same operational condition as a refused
+    // connection from the caller's point of view — both mean "couldn't talk to 3Shape".
+    const detail = describeFetchError(err, TOKEN_TIMEOUT_MS);
+    throw new ThreeShapeError('unreachable', `Could not reach the 3Shape identity service: ${detail}`);
   }
   const json: unknown = await res.json().catch(() => null);
   if (!res.ok) {
@@ -190,7 +201,7 @@ export async function getValidAccessToken(): Promise<string> {
 export interface ThreeShapeStatus {
   /** clientId + Web Service URL both set. */
   configured: boolean;
-  /** Tokens are stored (does NOT ping the workstation). */
+  /** A refreshable grant is stored (does NOT ping the workstation). */
   connected: boolean;
   /** Access-token expiry as ISO string, or null. */
   expiresAt: string | null;
@@ -204,7 +215,10 @@ export async function getStatus(): Promise<ThreeShapeStatus> {
   const tokens = await getThreeShapeTokens();
   return {
     configured: Boolean(c.clientId && c.webServiceBase),
-    connected: Boolean(tokens),
+    // A row with no refresh token is NOT connected: once its access token expires,
+    // getValidAccessToken() throws reconnect_required on every call. Reporting "Connected" there
+    // left staff with no reason to click the one button that fixes it. Matches Drive/Contacts.
+    connected: Boolean(tokens?.refreshToken),
     expiresAt: tokens ? tokens.expiresAt.toISOString() : null,
     scopes: tokens?.scope ?? null,
   };

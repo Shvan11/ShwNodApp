@@ -3,14 +3,20 @@ import { defineConfig } from 'vitest/config';
 
 /**
  * Unit-test runner for the frontend infrastructure modules (core/http funnel,
- * router/loader-cache). Tests live next to their module as `*.test.ts` under
- * public/js. Playwright owns e2e/ — keep the two runners out of each other's
- * globs.
+ * router/loader-cache) plus the pure cross-boundary helpers in `shared/` and
+ * `utils/`. Tests live next to their module as `*.test.ts`. Playwright owns
+ * e2e/ — keep the two runners out of each other's globs.
  */
 export default defineConfig({
   test: {
     environment: 'jsdom',
-    include: ['public/js/**/*.test.{ts,tsx}'],
+    include: [
+      'public/js/**/*.test.{ts,tsx}',
+      'shared/**/*.test.ts',
+      'utils/**/*.test.ts',
+      'services/**/*.test.ts',
+      'config/**/*.test.ts',
+    ],
     exclude: ['node_modules/**', 'e2e/**', 'dist/**', 'dist-server/**'],
   },
   resolve: {

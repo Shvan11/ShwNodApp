@@ -49,6 +49,7 @@
  */
 import { z } from 'zod';
 import { idParams, intId, optionalDateString, timestampString } from '../validation.js';
+import { PDF_ARABIC_FONT_IDS } from '../pdf-fonts.js';
 
 // The aligner set/batch forms send numeric fields as STRINGS ('' when blank) and
 // batch end-sequences as `null`. Both must collapse to `undefined` (NOT 0) so the
@@ -626,7 +627,7 @@ export const generateLabels = {
   body: z.object({
     labels: z.array(labelData).min(1, 'No labels to generate'),
     startingPosition: z.coerce.number().int(),
-    arabicFont: z.enum(['cairo', 'noto']).optional(),
+    arabicFont: z.enum(PDF_ARABIC_FONT_IDS).optional(),
   }),
 } as const;
 export type GenerateLabelsBody = z.infer<typeof generateLabels.body>;

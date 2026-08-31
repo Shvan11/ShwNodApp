@@ -4,9 +4,14 @@
  * Manages database configuration through environment files and provides connection testing
  */
 
-import EnvironmentManager, { DatabaseConfig } from './EnvironmentManager.js';
+import EnvironmentManager, {
+  DatabaseConfig,
+  DATABASE_FIELD_LABELS,
+  REQUIRED_DATABASE_FIELDS,
+} from './EnvironmentManager.js';
 import pg from 'pg';
 import { log } from '../../utils/logger.js';
+import { MASKED_SECRET, isMaskedSecret } from '../../shared/masked-secret.js';
 
 /**
  * Configuration result interface
@@ -72,7 +77,9 @@ class DatabaseConfigService {
   }
 
   /**
-   * Get current database configuration (with masked password)
+   * Read the stored configuration, masking the password unless the caller
+   * explicitly asks for it. `exportConfiguration` was a second copy of this that
+   * differed only in its envelope keys.
    */
   async getCurrentConfig(includeSensitive = false): Promise<ConfigResult> {
     try {
@@ -80,7 +87,7 @@ class DatabaseConfigService {
 
       const displayConfig = { ...config };
       if (!includeSensitive && displayConfig.PG_PASSWORD) {
-        displayConfig.PG_PASSWORD = '••••••••';
+        displayConfig.PG_PASSWORD = MASKED_SECRET;
       }
 
       return {
@@ -103,14 +110,7 @@ class DatabaseConfigService {
   async testConnection(testConfig: Partial<DatabaseConfig>): Promise<ConnectionTestResult> {
     const startTime = Date.now();
 
-    // PG_PASSWORD may be empty (trust/peer auth), so it is not required here.
-    const required: Array<keyof DatabaseConfig> = [
-      'PG_HOST',
-      'PG_PORT',
-      'PG_DATABASE',
-      'PG_USER',
-    ];
-    const missing = required.filter(
+    const missing = REQUIRED_DATABASE_FIELDS.filter(
       (field) => !testConfig[field] || testConfig[field]!.trim() === ''
     );
 
@@ -119,6 +119,18 @@ class DatabaseConfigService {
         success: false,
         message: 'Missing required configuration',
         details: `Required fields: ${missing.join(', ')}`,
+        duration: Date.now() - startTime,
+      };
+    }
+
+    // The mask is a display artefact, never a credential — refuse it here too, so
+    // the check does not depend on the client remembering to make it.
+    if (isMaskedSecret(testConfig.PG_PASSWORD)) {
+      return {
+        success: false,
+        message: 'Cannot test with masked password',
+        details:
+          'The stored password is hidden. Type the password to test the connection, or clear the field for trust/peer auth.',
         duration: Date.now() - startTime,
       };
     }
@@ -214,17 +226,9 @@ class DatabaseConfigService {
   validateConfiguration(config: Partial<DatabaseConfig>): ConfigValidation {
     const errors: string[] = [];
 
-    // Required fields (PG_PASSWORD may be empty for trust/peer auth)
-    const required: Array<{ field: keyof DatabaseConfig; name: string }> = [
-      { field: 'PG_HOST', name: 'Host' },
-      { field: 'PG_PORT', name: 'Port' },
-      { field: 'PG_DATABASE', name: 'Database Name' },
-      { field: 'PG_USER', name: 'Username' },
-    ];
-
-    for (const { field, name } of required) {
+    for (const field of REQUIRED_DATABASE_FIELDS) {
       if (!config[field] || config[field]!.trim() === '') {
-        errors.push(`${name} is required`);
+        errors.push(`${DATABASE_FIELD_LABELS[field]} is required`);
       }
     }
 
@@ -251,30 +255,26 @@ class DatabaseConfigService {
   }
 
   /**
-   * Export current configuration (sanitized)
+   * Export the current configuration, always sanitized.
    */
   async exportConfiguration(): Promise<ConfigExportResult> {
-    try {
-      const config = await this.envManager.getDatabaseConfig();
-
-      // Sanitize sensitive data
-      const sanitizedConfig: DatabaseConfig = { ...config };
-      sanitizedConfig.PG_PASSWORD = '••••••••';
-
-      return {
-        success: true,
-        message: 'Configuration exported successfully',
-        config: sanitizedConfig,
-        exportDate: new Date().toISOString(),
-        version: '1.0',
-      };
-    } catch (error) {
+    const result = await this.getCurrentConfig(false);
+    if (!result.success || !result.config) {
       return {
         success: false,
         message: 'Failed to export configuration',
-        error: (error as Error).message,
+        error: result.error,
       };
     }
+    return {
+      success: true,
+      message: 'Configuration exported successfully',
+      // getCurrentConfig only masks a NON-EMPTY password; force the mask here so an
+      // exported file never reveals that the deployment uses trust/peer auth.
+      config: { ...result.config, PG_PASSWORD: MASKED_SECRET },
+      exportDate: new Date().toISOString(),
+      version: '1.0',
+    };
   }
 
 }

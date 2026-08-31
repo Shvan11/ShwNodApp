@@ -12,6 +12,8 @@
 import https from 'node:https';
 import fetch, { type Response } from 'node-fetch';
 import config from '../../config/config.js';
+import { log } from '../../utils/logger.js';
+import { describeFetchError } from '../../utils/fetch-timeout.js';
 import { ThreeShapeError } from './errors.js';
 import { getValidAccessToken } from './oauth.js';
 import { v3Case, v3Media, v3Webhook } from './dtos.js';
@@ -19,10 +21,27 @@ import { v3Case, v3Media, v3Webhook } from './dtos.js';
 // Self-signed LAN cert for the Web Service Host Device — scoped to this client only.
 const agent = new https.Agent({ rejectUnauthorized: false });
 
+/**
+ * Hard cap on a Web Service round trip.
+ *
+ * node-fetch v3 dropped its `timeout` option, so without an explicit signal there is NO bound. A
+ * workstation that is OFF refuses the connection and fails fast, which is the case the friendly
+ * 'unreachable' message was written for — but the common real-world case is a workstation asleep or
+ * on a segmented VLAN, where the SYN is DROPPED and the request hangs for the OS TCP timeout
+ * (~75s+). That is past Express's own 30s requestTimeout, so staff saw a generic timeout instead of
+ * "check Unite is running", and the request held a connection the whole time.
+ *
+ * Binary transfers get a longer budget than metadata calls — a volume scan is genuinely large.
+ */
+const WS_TIMEOUT_MS = 15_000;
+const WS_DOWNLOAD_TIMEOUT_MS = 120_000;
+
 interface WsRequest {
   method?: string;
   headers?: Record<string, string>;
   body?: string | Buffer;
+  /** Override the default round-trip cap (binary transfers need a longer budget). */
+  timeoutMs?: number;
 }
 
 function baseUrl(): string {
@@ -33,21 +52,26 @@ function baseUrl(): string {
   return base.replace(/\/+$/, '');
 }
 
-/** Authenticated fetch to the Web Service; network failures → 'unreachable'. */
+/** Authenticated fetch to the Web Service; network failures and timeouts → 'unreachable'. */
 async function wsFetch(path: string, init: WsRequest = {}): Promise<Response> {
   const token = await getValidAccessToken();
   const headers: Record<string, string> = { ...(init.headers ?? {}), Authorization: `Bearer ${token}` };
+  const timeoutMs = init.timeoutMs ?? WS_TIMEOUT_MS;
   try {
     return await fetch(`${baseUrl()}${path}`, {
       method: init.method ?? 'GET',
       headers,
       body: init.body,
       agent,
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
+    // A dropped SYN reaches us as the timeout above rather than a connection error; both mean the
+    // same thing to the person at the desk, so both get the same actionable message.
+    const detail = describeFetchError(err, timeoutMs);
     throw new ThreeShapeError(
       'unreachable',
-      `Could not reach the 3Shape Web Service on the workstation — check Unite is running and signed in, and that port 5492 is open from this server. (${(err as Error).message})`
+      `Could not reach the 3Shape Web Service on the workstation — check Unite is running and signed in, and that port 5492 is open from this server. (${detail})`
     );
   }
 }
@@ -123,17 +147,70 @@ async function getJson(path: string, ctx: string): Promise<unknown> {
   return res.json();
 }
 
-/** 3Shape paged endpoints wrap items in an envelope whose exact key we don't know
- *  for sure — accept a bare array or a common items/results/data field. */
-function extractArray(json: unknown): unknown[] {
+/**
+ * Unwrap a 3Shape paged response to its array of items.
+ *
+ * Field NAMES within an item are confirmed against the official /v3 docs (see dtos.ts); the
+ * ENVELOPE key is the part read leniently, because 3Shape's forward-compatibility rule asks for
+ * tolerant readers and different endpoints have used different wrappers. A bare array is accepted
+ * too.
+ *
+ * Throws rather than returning `[]` when nothing matches: an unrecognised shape and a genuinely
+ * empty result are completely different facts, and rendering "no scans" for a payload we simply
+ * failed to read is the kind of silence that hides an upstream change for months.
+ */
+const ENVELOPE_KEYS = [
+  'items', 'Items', 'results', 'Results', 'data', 'Data',
+  'cases', 'Cases', 'media', 'Media', 'value',
+] as const;
+
+function extractArray(json: unknown, ctx: string): unknown[] {
   if (Array.isArray(json)) return json;
   if (json && typeof json === 'object') {
     const o = json as Record<string, unknown>;
-    for (const k of ['items', 'Items', 'results', 'Results', 'data', 'Data', 'cases', 'Cases', 'media', 'Media', 'value']) {
+    for (const k of ENVELOPE_KEYS) {
       if (Array.isArray(o[k])) return o[k] as unknown[];
     }
+    // An object with no recognised array key AND no keys at all is an empty page, not a shape change.
+    if (Object.keys(o).length === 0) return [];
   }
-  return [];
+  throw new ThreeShapeError(
+    'api_error',
+    `3Shape ${ctx} returned an unrecognised response shape — the Web Service API may have changed.`
+  );
+}
+
+/**
+ * Walk a /v3 offset-paged endpoint to the end, mapping each page's items.
+ *
+ * The two list endpoints used to request one page (`offset=0`, `pageSize=100`/`200`) and stop —
+ * so a long-running ortho patient past that count silently lost their older scans, with nothing in
+ * the UI to say so. `HARD_ITEM_CAP` keeps a runaway or mis-paging endpoint from looping forever;
+ * hitting it is logged, because at that point the list IS truncated and we should know.
+ */
+const PAGE_SIZE = 100;
+const HARD_ITEM_CAP = 2000;
+
+async function fetchAllPages<T>(
+  path: string,
+  extraParams: Record<string, string>,
+  ctx: string,
+  map: (raw: unknown) => T[]
+): Promise<T[]> {
+  const out: T[] = [];
+  let offset = 0;
+  for (;;) {
+    const qs = new URLSearchParams({ ...extraParams, offset: String(offset), pageSize: String(PAGE_SIZE) });
+    const page = extractArray(await getJson(`${path}?${qs.toString()}`, ctx), ctx);
+    for (const raw of page) out.push(...map(raw));
+    // A short page is the last page. (An exactly-full final page costs one extra empty request.)
+    if (page.length < PAGE_SIZE) return out;
+    offset += page.length;
+    if (offset >= HARD_ITEM_CAP) {
+      log.warn(`[3Shape] ${ctx} truncated at the ${HARD_ITEM_CAP}-item cap`, { path, offset });
+      return out;
+    }
+  }
 }
 
 /** A case indication, normalized for the UI. */
@@ -164,35 +241,34 @@ function normalizeDate(d: string | null | undefined): string | null {
   return Number.isFinite(year) && year < 1900 ? null : d;
 }
 
-/** GET /v3/patients/{integrationId}/cases — a patient's cases (paged; first 100). */
+/** GET /v3/patients/{integrationId}/cases — every one of a patient's cases (all pages). */
 export async function getCases(integrationId: string, workflowStatus?: string): Promise<ScanCase[]> {
-  const qs = new URLSearchParams({ offset: '0', pageSize: '100' });
-  if (workflowStatus) qs.set('workflowStatus', workflowStatus);
-  const json = await getJson(
-    `/v3/patients/${encodeURIComponent(integrationId)}/cases?${qs.toString()}`,
-    'list cases'
+  return fetchAllPages<ScanCase>(
+    `/v3/patients/${encodeURIComponent(integrationId)}/cases`,
+    workflowStatus ? { workflowStatus } : {},
+    'list cases',
+    (raw) => {
+      const parsed = v3Case.safeParse(raw);
+      if (!parsed.success || parsed.data.caseId == null) return [];
+      const c = parsed.data;
+      return [
+        {
+          id: String(c.caseId),
+          workflowStatus: c.workflowStatus ?? null,
+          creationDate: c.creationDate ?? null,
+          deliveryDate: normalizeDate(c.deliveryDate),
+          lastModifiedDate: c.lastModifiedDate ?? null,
+          uniteCloudLink: c.uniteCloudLink ?? null,
+          indications: (c.indications ?? []).map((i) => ({
+            from: i.from ?? null,
+            to: i.to ?? null,
+            type: i.type ?? null,
+            material: i.material ?? null,
+          })),
+        },
+      ];
+    }
   );
-  return extractArray(json).flatMap((raw) => {
-    const parsed = v3Case.safeParse(raw);
-    if (!parsed.success || parsed.data.caseId == null) return [];
-    const c = parsed.data;
-    return [
-      {
-        id: String(c.caseId),
-        workflowStatus: c.workflowStatus ?? null,
-        creationDate: c.creationDate ?? null,
-        deliveryDate: normalizeDate(c.deliveryDate),
-        lastModifiedDate: c.lastModifiedDate ?? null,
-        uniteCloudLink: c.uniteCloudLink ?? null,
-        indications: (c.indications ?? []).map((i) => ({
-          from: i.from ?? null,
-          to: i.to ?? null,
-          type: i.type ?? null,
-          material: i.material ?? null,
-        })),
-      },
-    ];
-  });
 }
 
 /** A downloadable file inside a media item, normalized for the UI. */
@@ -217,34 +293,33 @@ export interface ScanMedia {
   files: ScanMediaFile[];
 }
 
-/** GET /v3/patients/{integrationId}/media — a patient's media files (paged; first 200). */
+/** GET /v3/patients/{integrationId}/media — every one of a patient's media items (all pages). */
 export async function getMedia(integrationId: string, type?: string): Promise<ScanMedia[]> {
-  const qs = new URLSearchParams({ offset: '0', pageSize: '200' });
-  if (type) qs.set('type', type);
-  const json = await getJson(
-    `/v3/patients/${encodeURIComponent(integrationId)}/media?${qs.toString()}`,
-    'list media'
+  return fetchAllPages<ScanMedia>(
+    `/v3/patients/${encodeURIComponent(integrationId)}/media`,
+    type ? { type } : {},
+    'list media',
+    (raw) => {
+      const parsed = v3Media.safeParse(raw);
+      if (!parsed.success || parsed.data.id == null) return [];
+      const m = parsed.data;
+      return [
+        {
+          id: String(m.id),
+          mediaType: m.mediaType ?? null,
+          captureDate: m.captureDate ?? null,
+          uniteCloudLink: m.uniteCloudLink ?? null,
+          files: (m.mediaFiles ?? []).map((f) => ({
+            id: f.id != null ? String(f.id) : null,
+            name: f.name ?? null,
+            size: f.size != null ? Number(f.size) : null,
+            fileType: f.fileType ?? null,
+            scanType: f.metadata?.scanType ?? null,
+          })),
+        },
+      ];
+    }
   );
-  return extractArray(json).flatMap((raw) => {
-    const parsed = v3Media.safeParse(raw);
-    if (!parsed.success || parsed.data.id == null) return [];
-    const m = parsed.data;
-    return [
-      {
-        id: String(m.id),
-        mediaType: m.mediaType ?? null,
-        captureDate: m.captureDate ?? null,
-        uniteCloudLink: m.uniteCloudLink ?? null,
-        files: (m.mediaFiles ?? []).map((f) => ({
-          id: f.id != null ? String(f.id) : null,
-          name: f.name ?? null,
-          size: f.size != null ? Number(f.size) : null,
-          fileType: f.fileType ?? null,
-          scanType: f.metadata?.scanType ?? null,
-        })),
-      },
-    ];
-  });
 }
 
 // ── Binary proxies — return the upstream Response; the route buffers + forwards bytes. ──
@@ -255,7 +330,12 @@ export async function fetchMediaDownload(id: string, fileId?: string, format?: s
   if (fileId) qs.set('fileId', fileId);
   if (format) qs.set('format', format);
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
-  return ensureOk(await wsFetch(`/v3/media/${encodeURIComponent(id)}/download${suffix}`), 'media download');
+  return ensureOk(
+    await wsFetch(`/v3/media/${encodeURIComponent(id)}/download${suffix}`, {
+      timeoutMs: WS_DOWNLOAD_TIMEOUT_MS,
+    }),
+    'media download'
+  );
 }
 
 /** GET /v3/media/{id}/thumbnail — a media thumbnail image. */
@@ -303,7 +383,7 @@ export async function registerWebhook(opts: {
 /** GET /v3/webhooks — list current subscriptions. */
 export async function listWebhooks(): Promise<WebhookSubscription[]> {
   const json = await getJson('/v3/webhooks', 'list webhooks');
-  return extractArray(json).flatMap((raw) => {
+  return extractArray(json, 'list webhooks').flatMap((raw) => {
     const parsed = v3Webhook.safeParse(raw);
     if (!parsed.success || parsed.data.subscriptionId == null) return [];
     return [

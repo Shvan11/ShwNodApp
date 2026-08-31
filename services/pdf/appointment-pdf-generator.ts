@@ -14,10 +14,11 @@
  */
 
 import PDFDocument from 'pdfkit';
-import path from 'path';
-import fs from 'fs';
 import { getAppointmentsWithPhones } from '../database/queries/appointment-queries.js';
 import { log } from '../../utils/logger.js';
+import { formatDatePattern, formatTime12 } from '../../utils/date.js';
+import { hasArabic, isReadableFile, resolveArabicFontPath } from './pdf-assets.js';
+import type { PdfArabicFont } from '../../shared/pdf-fonts.js';
 
 // =============================================================================
 // TYPES
@@ -36,6 +37,7 @@ interface AppointmentData {
   phone: string;
   apptime: string;
   employee_name: string;
+  checked_in: boolean;
 }
 
 /**
@@ -56,6 +58,8 @@ export interface PDFResult {
 export interface PDFGeneratorOptions {
   clinicName?: string;
   reportTitle?: string;
+  /** Registry id of the embeddable Arabic face (shared/pdf-fonts.ts). */
+  arabicFont?: PdfArabicFont;
 }
 
 /**
@@ -65,7 +69,9 @@ interface ColumnConfig {
   key: string;
   label: string;
   width: number;
-  align?: string;
+  align?: 'left' | 'center' | 'right';
+  /** Cell text for a row. Declared with the column so the two can't drift. */
+  value: (appointment: AppointmentData) => string;
 }
 
 /**
@@ -75,34 +81,9 @@ interface ColumnPositions {
   [key: string]: number;
 }
 
-/**
- * Font paths configuration
- */
-interface FontPaths {
-  arabic: string;
-  regular: string;
-  bold: string;
-}
-
-/**
- * Date format options
- */
-interface DateFormatOptions {
-  weekday?: 'long' | 'short' | 'narrow';
-  year?: 'numeric' | '2-digit';
-  month?: 'long' | 'short' | 'narrow' | 'numeric' | '2-digit';
-  day?: 'numeric' | '2-digit';
-}
-
 // =============================================================================
 // CONSTANTS
 // =============================================================================
-
-// Resolve from the launch directory (repo root), not the compiled file location.
-// Assets like fonts/ live in the repo root and are NOT copied into dist-server by
-// the tsc build, so anchoring to __dirname would miss them in production. Matches
-// aligner-label-generator.ts, which already resolves fonts via process.cwd().
-const PROJECT_ROOT = process.cwd();
 
 /** PDF Document Configuration */
 const PDF_CONFIG = {
@@ -134,20 +115,41 @@ const TYPOGRAPHY = {
   },
 };
 
+/** PDFKit alias every draw call selects; bound to the Arabic TTF, else Helvetica. */
+const DOC_FONT = 'DocFont';
+
 /** Table Configuration */
 const TABLE_CONFIG = {
   ROW_HEIGHT: 25,
   HEADER_UNDERLINE_OFFSET: 15,
   HEADER_HEIGHT: 20,
   START_X: PDF_CONFIG.MARGIN,
+  // Widths sum to PDF_CONFIG.CONTENT_WIDTH (495) — asserted below.
   COLUMNS: [
-    { key: 'time', label: 'Time', width: 70 },
-    { key: 'patient', label: 'Patient Name', width: 160, align: 'center' },
-    { key: 'phone', label: 'phone', width: 110 },
-    { key: 'type', label: 'type', width: 90 },
-    { key: 'detail', label: 'detail', width: 65 },
+    { key: 'time', label: 'Time', width: 62, align: 'left',
+      value: (a) => formatTime12(a.apptime, true) ?? 'N/A' },
+    { key: 'patient', label: 'Patient Name', width: 150, align: 'center',
+      value: (a) => safeString(a.patient_name) },
+    { key: 'phone', label: 'Phone', width: 100, align: 'left',
+      value: (a) => safeString(a.phone) },
+    { key: 'type', label: 'Type', width: 85, align: 'left',
+      value: (a) => safeString(a.patient_type) },
+    { key: 'detail', label: 'Detail', width: 58, align: 'left',
+      value: (a) => safeString(a.app_detail) },
+    // Arrivals are marked, never filtered out — see getAppointmentsWithPhones.
+    { key: 'status', label: 'Status', width: 40, align: 'left',
+      value: (a) => (a.checked_in ? 'In' : '') },
   ] as ColumnConfig[],
 };
+
+// Fail loudly at import if a column edit pushes the table past the printable width
+// instead of silently clipping the last column on every generated report.
+const TOTAL_COLUMN_WIDTH = TABLE_CONFIG.COLUMNS.reduce((sum, c) => sum + c.width, 0);
+if (TOTAL_COLUMN_WIDTH > PDF_CONFIG.CONTENT_WIDTH) {
+  throw new Error(
+    `Appointment PDF columns total ${TOTAL_COLUMN_WIDTH}pt, exceeding the ${PDF_CONFIG.CONTENT_WIDTH}pt content width`
+  );
+}
 
 // Calculate column X positions dynamically
 const calculateColumnPositions = (): ColumnPositions => {
@@ -169,17 +171,6 @@ const COLUMN_POSITIONS = calculateColumnPositions();
 // =============================================================================
 
 /**
- * Check if text contains Arabic characters
- * @param text - Text to check
- * @returns True if text contains Arabic characters
- */
-const containsArabic = (text: string | null | undefined): boolean => {
-  if (!text || typeof text !== 'string') return false;
-  const arabicPattern = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
-  return arabicPattern.test(text);
-};
-
-/**
  * Validate date string format
  * @param dateString - Date string to validate (YYYY-MM-DD)
  * @returns True if valid date format
@@ -191,48 +182,6 @@ const isValidDate = (dateString: string | null | undefined): boolean => {
 
   const date = new Date(dateString);
   return date instanceof Date && !isNaN(date.getTime());
-};
-
-/**
- * Format date for display
- * @param dateString - Date string (YYYY-MM-DD)
- * @returns Formatted date string
- */
-const formatDate = (dateString: string): string => {
-  try {
-    const date = new Date(dateString);
-    const options: DateFormatOptions = {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    };
-    return date.toLocaleDateString('en-US', options);
-  } catch {
-    return dateString;
-  }
-};
-
-/**
- * Format time from HH:MM format to 12-hour format
- * @param timeString - Time string in HH:MM format
- * @returns Formatted time string (e.g., "2:30 PM")
- */
-const formatTime = (timeString: string | null | undefined): string => {
-  if (!timeString || typeof timeString !== 'string') return 'N/A';
-
-  const parts = timeString.split(':');
-  if (parts.length < 2) return timeString;
-
-  const hours = parseInt(parts[0], 10);
-  const minutes = parts[1].padStart(2, '0');
-
-  if (isNaN(hours)) return timeString;
-
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const displayHours = hours % 12 || 12;
-
-  return `${displayHours}:${minutes} ${period}`;
 };
 
 /**
@@ -251,43 +200,12 @@ const safeString = (value: unknown, fallback: string = 'N/A'): string => {
 // =============================================================================
 // FONT CONFIGURATION
 // =============================================================================
-
-/**
- * Get font paths based on platform with fallback support
- * @returns Font paths object
- */
-const getFontPaths = (): FontPaths => {
-  const fontsDir = path.join(PROJECT_ROOT, 'fonts');
-  const platform = process.platform;
-
-  const fonts: FontPaths = {
-    arabic: path.join(fontsDir, 'NotoSansArabic.ttf'),
-    regular:
-      platform === 'win32'
-        ? 'C:\\Windows\\Fonts\\arial.ttf'
-        : '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-    bold:
-      platform === 'win32'
-        ? 'C:\\Windows\\Fonts\\arialbd.ttf'
-        : '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-  };
-
-  return fonts;
-};
-
-/**
- * Verify font file exists
- * @param fontPath - Path to font file
- * @returns True if font exists
- */
-const fontExists = (fontPath: string): boolean => {
-  try {
-    fs.accessSync(fontPath, fs.constants.R_OK);
-    return true;
-  } catch {
-    return false;
-  }
-};
+//
+// The embeddable Arabic face comes from the shared registry (shared/pdf-fonts.ts)
+// so this report and the aligner labels can no longer drift onto different
+// typefaces for the same patient name. `null` means no bundled TTF was readable —
+// the document then falls back to PDFKit's built-in Helvetica, which renders
+// Latin correctly and Arabic as tofu, and that is logged once at boot.
 
 // =============================================================================
 // PDF GENERATOR CLASS
@@ -299,8 +217,7 @@ const fontExists = (fontPath: string): boolean => {
 class AppointmentPDFGenerator {
   private clinicName: string;
   private reportTitle: string;
-  private fonts: FontPaths;
-  private fontRegistered: boolean;
+  private arabicFontPath: string | null;
 
   /**
    * Create a new AppointmentPDFGenerator instance
@@ -309,51 +226,29 @@ class AppointmentPDFGenerator {
   constructor(options: PDFGeneratorOptions = {}) {
     this.clinicName = options.clinicName || 'Shwan Orthodontics';
     this.reportTitle = options.reportTitle || 'Daily Appointments Report';
-    this.fonts = getFontPaths();
-    this.fontRegistered = false;
+    this.arabicFontPath = resolveArabicFontPath(options.arabicFont);
 
-    this._validateFonts();
-  }
-
-  /**
-   * Validate that required fonts exist
-   * @private
-   */
-  private _validateFonts(): void {
-    if (!fontExists(this.fonts.arabic)) {
-      log.warn('Arabic font not found, falling back to system font', {
-        expected: this.fonts.arabic,
-      });
-      // Fallback to regular font if Arabic font is missing
-      this.fonts.arabic = this.fonts.regular;
+    if (!this.arabicFontPath) {
+      log.warn('No bundled Arabic TTF is readable — Arabic names will render as tofu');
     }
-
-    log.info('PDF Generator initialized', {
-      fonts: this.fonts,
-      arabicFontAvailable: fontExists(this.fonts.arabic),
-    });
   }
 
   /**
-   * Register fonts with the PDF document
+   * Register the document font under the single alias every draw call uses.
    * @private
    * @param doc - PDFKit document instance
    */
   private _registerFonts(doc: PDFKit.PDFDocument): void {
     try {
-      if (fontExists(this.fonts.arabic)) {
-        doc.registerFont('NotoArabic', this.fonts.arabic);
-        this.fontRegistered = true;
-      } else {
-        // Use Helvetica as ultimate fallback (built into PDFKit)
-        doc.registerFont('NotoArabic', 'Helvetica');
-        log.warn('Using Helvetica as font fallback');
+      if (this.arabicFontPath && isReadableFile(this.arabicFontPath)) {
+        doc.registerFont(DOC_FONT, this.arabicFontPath);
+        return;
       }
     } catch (error) {
-      log.error('Failed to register fonts', { error: (error as Error).message });
-      // Fallback to built-in font
-      doc.registerFont('NotoArabic', 'Helvetica');
+      log.error('Failed to register Arabic font', { error: (error as Error).message });
     }
+    // Built into PDFKit — always available.
+    doc.registerFont(DOC_FONT, 'Helvetica');
   }
 
   /**
@@ -451,7 +346,7 @@ class AppointmentPDFGenerator {
     doc.fillColor(TYPOGRAPHY.COLORS.TEXT);
 
     // Clinic Name
-    doc.fontSize(TYPOGRAPHY.FONTS.HEADER_SIZE).font('NotoArabic').text(this.clinicName, {
+    doc.fontSize(TYPOGRAPHY.FONTS.HEADER_SIZE).font(DOC_FONT).text(this.clinicName, {
       align: 'center',
     });
 
@@ -465,7 +360,7 @@ class AppointmentPDFGenerator {
     // Date and count
     doc
       .fontSize(TYPOGRAPHY.FONTS.SUBTITLE_SIZE)
-      .text(`Date: ${formatDate(date)}`, { align: 'center' })
+      .text(`Date: ${formatDatePattern(date, 'dddd, MMMM DD, YYYY')}`, { align: 'center' })
       .text(`Total Appointments: ${count}`, { align: 'center' });
 
     doc.moveDown(1);
@@ -534,7 +429,7 @@ class AppointmentPDFGenerator {
     // See: https://github.com/foliojs/pdfkit/issues/198
     doc
       .fontSize(TYPOGRAPHY.FONTS.FOOTER_SIZE)
-      .font('NotoArabic')
+      .font(DOC_FONT)
       .fillColor(TYPOGRAPHY.COLORS.MUTED)
       .text(footerText, PDF_CONFIG.MARGIN, footerY, {
         width: PDF_CONFIG.CONTENT_WIDTH,
@@ -554,7 +449,7 @@ class AppointmentPDFGenerator {
   private _addTableHeader(doc: PDFKit.PDFDocument, startY: number): number {
     doc
       .fontSize(TYPOGRAPHY.FONTS.TABLE_HEADER_SIZE)
-      .font('NotoArabic')
+      .font(DOC_FONT)
       .fillColor(TYPOGRAPHY.COLORS.TEXT);
 
     let x = TABLE_CONFIG.START_X;
@@ -592,7 +487,7 @@ class AppointmentPDFGenerator {
     if (!appointments || appointments.length === 0) {
       doc
         .fontSize(TYPOGRAPHY.FONTS.SUBTITLE_SIZE)
-        .font('NotoArabic')
+        .font(DOC_FONT)
         .fillColor(TYPOGRAPHY.COLORS.MUTED)
         .text('No appointments scheduled for this date.', { align: 'center' });
       return;
@@ -602,7 +497,7 @@ class AppointmentPDFGenerator {
     let currentY = this._addTableHeader(doc, doc.y);
 
     // Set font for table rows
-    doc.font('NotoArabic').fontSize(TYPOGRAPHY.FONTS.TABLE_ROW_SIZE);
+    doc.font(DOC_FONT).fontSize(TYPOGRAPHY.FONTS.TABLE_ROW_SIZE);
 
     // Iterate through appointments
     appointments.forEach((apt, index) => {
@@ -617,7 +512,7 @@ class AppointmentPDFGenerator {
         currentY = this._addTableHeader(doc, PDF_CONFIG.MARGIN);
 
         // Reset font for rows
-        doc.font('NotoArabic').fontSize(TYPOGRAPHY.FONTS.TABLE_ROW_SIZE);
+        doc.font(DOC_FONT).fontSize(TYPOGRAPHY.FONTS.TABLE_ROW_SIZE);
       }
 
       // Add alternating row background
@@ -647,54 +542,26 @@ class AppointmentPDFGenerator {
   }
 
   /**
-   * Render a single table row
+   * Render a single table row — one pass over TABLE_CONFIG.COLUMNS, so a column's
+   * width, heading and cell text all come from the same declaration. This used to
+   * be five hand-written `doc.text` blocks indexing `COLUMNS[0..4]` by hand.
    * @private
    * @param doc - PDFKit document instance
    * @param appointment - Appointment data object
    * @param y - Y position for the row
    */
   private _renderTableRow(doc: PDFKit.PDFDocument, appointment: AppointmentData, y: number): void {
-    const textOptions = { ellipsis: true, lineBreak: false };
-
-    // Time column
-    const time = formatTime(appointment.apptime);
-    doc.text(time, COLUMN_POSITIONS.time, y, {
-      width: TABLE_CONFIG.COLUMNS[0].width,
-      align: 'left',
-      ...textOptions,
-    });
-
-    // Patient Name column (with RTL support for Arabic)
-    const patientName = safeString(appointment.patient_name);
-    const isArabicName = containsArabic(patientName);
-
-    doc.text(patientName, COLUMN_POSITIONS.patient, y, {
-      width: TABLE_CONFIG.COLUMNS[1].width,
-      align: 'center',
-      features: isArabicName ? ['rtla'] : [],
-      ...textOptions,
-    });
-
-    // phone column
-    doc.text(safeString(appointment.phone), COLUMN_POSITIONS.phone, y, {
-      width: TABLE_CONFIG.COLUMNS[2].width,
-      align: 'left',
-      ...textOptions,
-    });
-
-    // Patient type column
-    doc.text(safeString(appointment.patient_type), COLUMN_POSITIONS.type, y, {
-      width: TABLE_CONFIG.COLUMNS[3].width,
-      align: 'left',
-      ...textOptions,
-    });
-
-    // detail column
-    doc.text(safeString(appointment.app_detail), COLUMN_POSITIONS.detail, y, {
-      width: TABLE_CONFIG.COLUMNS[4].width,
-      align: 'left',
-      ...textOptions,
-    });
+    for (const column of TABLE_CONFIG.COLUMNS) {
+      const text = column.value(appointment);
+      doc.text(text, COLUMN_POSITIONS[column.key], y, {
+        width: column.width,
+        align: column.align ?? 'left',
+        // Arabic needs the RTL shaping feature; applying it to Latin reorders it.
+        features: hasArabic(text) ? ['rtla'] : [],
+        ellipsis: true,
+        lineBreak: false,
+      });
+    }
   }
 
   /**

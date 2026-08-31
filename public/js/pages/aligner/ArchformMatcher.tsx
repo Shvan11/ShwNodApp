@@ -235,8 +235,8 @@ const ArchformMatcher: React.FC = () => {
             let bVal: string | number | null;
 
             if (sortColumn === 'Name') {
-                aVal = `${a.LastName}`.toLowerCase();
-                bVal = `${b.LastName}`.toLowerCase();
+                aVal = `${a.Name} ${a.LastName}`.toLowerCase();
+                bVal = `${b.Name} ${b.LastName}`.toLowerCase();
             } else if (sortColumn === 'CreatedDate') {
                 aVal = a.CreatedDate ? new Date(a.CreatedDate).getTime() : null;
                 bVal = b.CreatedDate ? new Date(b.CreatedDate).getTime() : null;
@@ -377,7 +377,7 @@ const ArchformMatcher: React.FC = () => {
             // Non-2xx throws; success body is { success:true, message }.
             await deleteJSON(`/api/aligner/archform/patients/${deleteTarget.Id}`);
 
-            toast.success(`Deleted ${deleteTarget.LastName}`);
+            toast.success(`Deleted ${deleteTarget.Name} ${deleteTarget.LastName}`);
 
             // Server refetch clears the deleted patient and any matches that
             // referenced it.
@@ -408,7 +408,7 @@ const ArchformMatcher: React.FC = () => {
             const query = filter.toLowerCase();
             filtered = filtered.filter((p) => {
                 const fullName =
-                    `${p.LastName}`.toLowerCase();
+                    `${p.Name} ${p.LastName}`.toLowerCase();
                 return fullName.includes(query);
             });
         }
@@ -624,7 +624,7 @@ const ArchformMatcher: React.FC = () => {
                                             ) : (
                                                 <span className={styles.nameCell}>
                                                     <span className={styles.archformName}>
-                                                        {patient.LastName}
+                                                        {patient.Name} {patient.LastName}
                                                     </span>
                                                     <button
                                                         className={styles.btnEdit}
@@ -774,7 +774,7 @@ const ArchformMatcher: React.FC = () => {
                     deleteTarget ? (
                         <>
                             Are you sure you want to permanently delete{' '}
-                            <strong>{deleteTarget.LastName}</strong>?
+                            <strong>{deleteTarget.Name} {deleteTarget.LastName}</strong>?
                             This will remove the patient from Archform and clear any aligner set matches.
                             This action cannot be undone.
                         </>

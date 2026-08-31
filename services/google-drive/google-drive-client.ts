@@ -6,6 +6,7 @@ import { drive, drive_v3 } from '@googleapis/drive';
 import { OAuth2Client, type Credentials } from 'google-auth-library';
 import config from '../../config/config.js';
 import { log } from '../../utils/logger.js';
+import { credentialsToTokenRow } from '../../utils/oauth.js';
 import {
   getGoogleDriveTokens,
   saveGoogleDriveTokens,
@@ -105,13 +106,7 @@ class GoogleDriveClient {
       // refresh, so this fires rarely — best-effort, never throws into caller code.
       this.oauth2Client.on('tokens', (tokens: Credentials) => {
         if (!tokens.refresh_token) return;
-        saveGoogleDriveTokens({
-          accessToken: tokens.access_token || '',
-          refreshToken: tokens.refresh_token,
-          tokenType: tokens.token_type || 'Bearer',
-          scope: tokens.scope ?? null,
-          expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : new Date(Date.now() + 3600_000),
-        }).catch((error: unknown) => {
+        saveGoogleDriveTokens(credentialsToTokenRow(tokens)).catch((error: unknown) => {
           log.error('Failed to persist rotated Google Drive refresh token', {
             error: error instanceof Error ? error.message : String(error),
           });
@@ -142,15 +137,29 @@ class GoogleDriveClient {
   }
 
   /**
-   * Load a DB-stored refresh token (Settings → Integrations connect flow), if one
-   * exists, and apply it — taking precedence over the env-configured token so a
-   * reconnect through the UI takes effect immediately, no restart required.
+   * Re-sync the live client's credentials with the token store, in BOTH directions.
+   *
+   * A DB-stored refresh token (Settings → Integrations connect flow) takes precedence over the
+   * env-configured one, so a reconnect through the UI takes effect immediately with no restart.
+   * Equally important: when the store is EMPTY the in-memory credentials are cleared (falling back
+   * to the env refresh token if one is configured) rather than left as they were.
+   *
+   * That second direction is what makes `disconnect()` and `handleInvalidGrant()` real. This method
+   * used to `return false` on the empty path without touching `oauth2Client`, so clearing the DB row
+   * flipped the Settings card to "not connected" while the singleton kept the cleared refresh token
+   * in memory and went on uploading patient PDFs to that Google account until the service restarted.
+   *
    * @returns Whether DB-stored credentials were found and applied
    */
   async loadStoredCredentials(): Promise<boolean> {
     if (!this.oauth2Client) return false;
     const tokens = await getGoogleDriveTokens();
-    if (!tokens?.refreshToken) return false;
+    if (!tokens?.refreshToken) {
+      // No stored grant: fall back to the env token, or to no credentials at all.
+      const envRefresh = config.googleDrive.refreshToken;
+      this.oauth2Client.setCredentials(envRefresh ? { refresh_token: envRefresh } : {});
+      return false;
+    }
     this.oauth2Client.setCredentials({
       refresh_token: tokens.refreshToken,
       access_token: tokens.accessToken || undefined,

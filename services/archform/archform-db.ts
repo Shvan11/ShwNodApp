@@ -153,8 +153,11 @@ async function getDb(): Promise<Database.Database> {
     return db;
   }
 
-  // Check file exists before trying to open
-  if (!fsSync.existsSync(dbPath)) {
+  // Probe READABILITY, not mere existence — matching isArchformAvailable(). A file
+  // that exists but the service account can't read (a common SMB/ACL state) used to
+  // pass this check and then fail inside better-sqlite3 with an opaque native error
+  // instead of the friendly ArchformDbUnavailableError the routes handle.
+  if (!isReadable(dbPath)) {
     throw new ArchformDbUnavailableError(dbPath);
   }
 
@@ -164,6 +167,16 @@ async function getDb(): Promise<Database.Database> {
 // ==============================
 // PUBLIC API
 // ==============================
+
+/** Can this process read the file at `p`? (Not memoized — a mount can come and go.) */
+function isReadable(p: string): boolean {
+  try {
+    fsSync.accessSync(p, fsSync.constants.R_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Check if the Archform database is accessible
@@ -208,6 +221,15 @@ export async function getArchformPatientById(id: number): Promise<ArchformPatien
   return row;
 }
 
+/** better-sqlite3 codes worth one reconnect-and-retry on a network volume. */
+const RETRYABLE_WRITE_CODES = new Set([
+  'SQLITE_BUSY',
+  'SQLITE_READONLY',
+  'SQLITE_IOERR',
+  'SQLITE_CANTOPEN',
+  'SQLITE_PROTOCOL',
+]);
+
 /**
  * Update an Archform patient's name.
  * Retries once with a fresh connection if the write fails (e.g. after SMB remount).
@@ -217,8 +239,10 @@ export async function updateArchformPatient(id: number, name: string, lastName: 
     const database = await getDb();
     database.prepare('UPDATE Patient SET Name = ?, LastName = ? WHERE Id = ?').run(name, lastName, id);
   } catch (error) {
+    // A dropped/remounted share surfaces as an I/O or open failure, not just BUSY
+    // — the doc comment promised remount recovery that these two codes never caught.
     const code = (error as { code?: string }).code;
-    if (code === 'SQLITE_BUSY' || code === 'SQLITE_READONLY') {
+    if (RETRYABLE_WRITE_CODES.has(code ?? '')) {
       log.warn('Archform write failed, retrying with fresh connection', { code });
       const database = await reconnect();
       database.prepare('UPDATE Patient SET Name = ?, LastName = ? WHERE Id = ?').run(name, lastName, id);
@@ -227,6 +251,9 @@ export async function updateArchformPatient(id: number, name: string, lastName: 
     }
   }
 }
+
+/** Conservative bound on SQLite's per-statement parameter limit. */
+const SQLITE_MAX_PARAMS = 900;
 
 /**
  * Parse a packed int32LE blob: [count:int32LE, id1:int32LE, id2:int32LE, ...]
@@ -264,28 +291,29 @@ function deleteToothInfoSet(
 
   if (!tis) return;
 
-  // Delete referenced ToothInfo rows
-  const toothIds = parseIdBlob(tis.ToothIDs);
-  if (toothIds.length > 0) {
-    const placeholders = toothIds.map(() => '?').join(',');
-    const r = database.prepare(`DELETE FROM ToothInfo WHERE Id IN (${placeholders})`).run(...toothIds);
-    if (r.changes > 0) deleted.push(`ToothInfo(${r.changes})`);
-  }
+  // Each child table is (blob column → target table); the delete is otherwise
+  // identical, so it runs once per pair instead of three copy-pasted blocks.
+  const CHILDREN: ReadonlyArray<[Buffer | null, string]> = [
+    [tis.ToothIDs, 'ToothInfo'],
+    [tis.PonticIDs, 'PonticInfo'],
+    [tis.PonticV3IDs, 'PonticV3Info'],
+  ];
 
-  // Delete referenced PonticInfo rows
-  const ponticIds = parseIdBlob(tis.PonticIDs);
-  if (ponticIds.length > 0) {
-    const placeholders = ponticIds.map(() => '?').join(',');
-    const r = database.prepare(`DELETE FROM PonticInfo WHERE Id IN (${placeholders})`).run(...ponticIds);
-    if (r.changes > 0) deleted.push(`PonticInfo(${r.changes})`);
-  }
-
-  // Delete referenced PonticV3Info rows
-  const ponticV3Ids = parseIdBlob(tis.PonticV3IDs);
-  if (ponticV3Ids.length > 0) {
-    const placeholders = ponticV3Ids.map(() => '?').join(',');
-    const r = database.prepare(`DELETE FROM PonticV3Info WHERE Id IN (${placeholders})`).run(...ponticV3Ids);
-    if (r.changes > 0) deleted.push(`PonticV3Info(${r.changes})`);
+  for (const [blob, table] of CHILDREN) {
+    const ids = parseIdBlob(blob);
+    if (ids.length === 0) continue;
+    // SQLite caps bound parameters per statement (999 on older builds), and a
+    // ToothInfoSet's id list is unbounded in principle — chunk so a large set
+    // deletes instead of throwing "too many SQL variables" mid-transaction.
+    let changes = 0;
+    for (let i = 0; i < ids.length; i += SQLITE_MAX_PARAMS) {
+      const chunk = ids.slice(i, i + SQLITE_MAX_PARAMS);
+      const placeholders = chunk.map(() => '?').join(',');
+      changes += database
+        .prepare(`DELETE FROM "${table}" WHERE Id IN (${placeholders})`)
+        .run(...chunk).changes;
+    }
+    if (changes > 0) deleted.push(`${table}(${changes})`);
   }
 
   // Delete the ToothInfoSet itself

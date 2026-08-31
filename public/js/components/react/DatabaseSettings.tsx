@@ -9,6 +9,7 @@ import { fetchJSON, postJSON, putJSON, httpErrorMessage } from '@/core/http';
 import { databaseConfigQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import * as settings from '@shared/contracts/settings.contract';
+import { isMaskedSecret } from '@shared/masked-secret';
 
 interface DatabaseConfig {
     PG_HOST: string;
@@ -122,7 +123,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
             const testConfig = { ...config, ...pendingChanges };
 
             // Check if password is masked (security feature)
-            if (testConfig.PG_PASSWORD === '••••••••') {
+            if (isMaskedSecret(testConfig.PG_PASSWORD)) {
                 setConnectionStatus({
                     success: false,
                     message: 'Cannot test with masked password',
@@ -164,8 +165,15 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
         }
 
         try {
-            // Get complete configuration (current + pending changes)
-            const completeConfig = { ...config, ...pendingChanges };
+            // Get complete configuration (current + pending changes).
+            // The loaded password is a MASK, not the real one. Posting it back
+            // unchanged used to write the bullet characters into .env as the literal
+            // PostgreSQL password — so drop it unless the user actually retyped it.
+            // (The server refuses the mask as well; both halves are deliberate.)
+            const completeConfig: Record<string, string> = { ...config, ...pendingChanges };
+            if (isMaskedSecret(completeConfig.PG_PASSWORD)) {
+                delete completeConfig.PG_PASSWORD;
+            }
 
             const data = await putJSON<{ message?: string; requiresRestart?: boolean }>(
                 '/api/config/database',

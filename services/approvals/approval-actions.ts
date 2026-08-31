@@ -11,8 +11,8 @@
  * `updated_at` (invoices) return null — stale detection is skipped for them.
  */
 
-import { sql } from 'kysely';
-import { getKysely } from '../database/kysely.js';
+import { sql, type Kysely, type Transaction } from 'kysely';
+import { getKysely, type Database } from '../database/kysely.js';
 import { validateAndUpdateWork, validateAndDeleteWork } from '../business/WorkService.js';
 import { deletePatientCascade } from '../business/PatientService.js';
 import { updateExpense, deleteExpense } from '../database/queries/expense-queries.js';
@@ -60,16 +60,33 @@ export interface ApprovalActionDef {
 // Generic helpers
 // ---------------------------------------------------------------------------
 
-async function getUpdatedAt(table: string, pk: string, id: number): Promise<string | null> {
-  const db = getKysely();
+/**
+ * Fetch a target row's `updated_at` as an ISO version stamp for stale-detection.
+ *
+ * Takes the executor so ONE implementation serves both the enqueue-time capture
+ * here and the approve-time re-read inside approval-service's claim transaction.
+ * These were two byte-identical queries in two files. Lives here (not in
+ * approval-service) because approval-service already imports this module — the
+ * reverse direction would close an import cycle.
+ * Returns `null` for a missing row or a table without `updated_at`.
+ */
+export async function readTargetVersion(
+  executor: Kysely<Database> | Transaction<Database>,
+  targetTable: string,
+  pkColumn: string,
+  targetId: number
+): Promise<string | null> {
   const res = await sql<{ updated_at: Date | null }>`
-    SELECT updated_at FROM ${sql.table(table)} WHERE ${sql.ref(pk)} = ${id} LIMIT 1
-  `.execute(db);
+    SELECT updated_at FROM ${sql.table(targetTable)} WHERE ${sql.ref(pkColumn)} = ${targetId} LIMIT 1
+  `.execute(executor);
   const row = res.rows[0];
-  if (!row) return null;
-  if (!row.updated_at) return null;
+  if (!row?.updated_at) return null;
   return row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at);
 }
+
+/** Enqueue-time version capture on the pool. */
+const getUpdatedAt = (table: string, pk: string, id: number): Promise<string | null> =>
+  readTargetVersion(getKysely(), table, pk, id);
 
 /** person_id owning a work row (works.person_id is NOT NULL). */
 async function personIdFromWork(workId: number): Promise<number | null> {
@@ -95,34 +112,35 @@ async function personIdFromInvoice(invoiceId: number): Promise<number | null> {
 // Registry
 // ---------------------------------------------------------------------------
 
+/** Everything an edit-a-work hold needs except its human summary. */
+const workUpdateAction: ApprovalActionDef = {
+  targetTable: 'works',
+  pkColumn: 'work_id',
+  getTargetId: (p) => Number(p.workId),
+  resolvePersonId: (id) => personIdFromWork(id),
+  getVersion: (id) => getUpdatedAt('works', 'work_id', id),
+  summarize: (p) => `Edit work #${p.workId}`,
+  apply: async (p) => {
+    const { workId, ...workData } = p;
+    await validateAndUpdateWork({ workId: Number(workId), userRole: 'admin', workData });
+  },
+};
+
 export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
+  // 'work.update' and 'work.discount' are the SAME write (a validated work update)
+  // differing only in how the bell describes it — so they share one definition and
+  // can't drift apart the way two copy-pasted blocks would.
   'work.update': {
-    targetTable: 'works',
-    pkColumn: 'work_id',
-    getTargetId: (p) => Number(p.workId),
-    resolvePersonId: (id) => personIdFromWork(id),
-    getVersion: (id) => getUpdatedAt('works', 'work_id', id),
+    ...workUpdateAction,
     summarize: (p) => `Edit work #${p.workId}`,
-    apply: async (p) => {
-      const { workId, ...workData } = p;
-      await validateAndUpdateWork({ workId: Number(workId), userRole: 'admin', workData });
-    },
   },
 
   'work.discount': {
-    targetTable: 'works',
-    pkColumn: 'work_id',
-    getTargetId: (p) => Number(p.workId),
-    resolvePersonId: (id) => personIdFromWork(id),
-    getVersion: (id) => getUpdatedAt('works', 'work_id', id),
+    ...workUpdateAction,
     summarize: (p) =>
       p.discount != null && Number(p.discount) > 0
         ? `Apply discount on work #${p.workId}`
         : `Remove discount on work #${p.workId}`,
-    apply: async (p) => {
-      const { workId, ...workData } = p;
-      await validateAndUpdateWork({ workId: Number(workId), userRole: 'admin', workData });
-    },
   },
 
   'work.delete': {
@@ -157,6 +175,10 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     // expenses aren't patient-linked — no person_id (no resolvePersonId).
     getVersion: (id) => getUpdatedAt('expenses', 'id', id),
     summarize: (p) => `Edit expense #${p.id}`,
+    // updateExpense is a FULL-ROW replace (every unset field is written as
+    // null/false), so every field the route accepts must be forwarded here.
+    // `isMonthly` was missing: approving a held edit silently cleared the
+    // monthly flag that the direct (admin) path preserved.
     apply: async (p) => {
       await updateExpense(Number(p.id), {
         expense_date: String(p.expense_date),
@@ -167,6 +189,7 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
         subcategoryId: p.subcategoryId != null ? Number(p.subcategoryId) : undefined,
         labId: p.labId != null ? Number(p.labId) : undefined,
         employeeId: p.employeeId != null ? Number(p.employeeId) : undefined,
+        isMonthly: p.isMonthly === true,
       });
     },
   },

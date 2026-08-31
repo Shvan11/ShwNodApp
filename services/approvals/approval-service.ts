@@ -18,7 +18,7 @@ import { sql, type Transaction } from 'kysely';
 import { getKysely, withPgTransaction, type Database } from '../database/kysely.js';
 import { normalizeRole, ROLES } from '../../shared/auth/roles.js';
 import { log } from '../../utils/logger.js';
-import { APPROVAL_ACTIONS, type ApprovalActionDef } from './approval-actions.js';
+import { APPROVAL_ACTIONS, readTargetVersion, type ApprovalActionDef } from './approval-actions.js';
 import type { ApprovalActionType, ApprovalStatus } from '../../shared/contracts/approvals.contract.js';
 
 // Narrow session-only interface — the service only reads req.session fields, so
@@ -29,15 +29,17 @@ type WithSession = { session?: { username?: string; userRole?: string } | null }
 // Generic DB row type (used for SELECT results from approval_requests)
 // ---------------------------------------------------------------------------
 
-type ApprovalRow = {
+/**
+ * The columns every read returns — and the ONLY shape the API hands out (it is
+ * exactly `approvals.contract.ts#approvalRow`).
+ */
+type ApprovalListRow = {
   request_id: number;
   kind: 'approval' | 'notice';
   action_type: ApprovalActionType;
   target_table: string;
   target_id: number;
   person_id: number | null;
-  payload: Record<string, unknown>;
-  target_version: string | null;
   summary: string;
   requested_by: string;
   requested_at: Date;
@@ -45,9 +47,38 @@ type ApprovalRow = {
   reviewed_by: string | null;
   reviewed_at: Date | null;
   review_note: string | null;
-  // Present only on the list reads (LEFT JOIN patients); absent on RETURNING * rows.
+  // Present only on the list reads (LEFT JOIN patients); absent on RETURNING rows.
   patient_name?: string | null;
 };
+
+/**
+ * The full DB row, including the stored request `payload` and the `target_version`
+ * stamp. INTERNAL ONLY — `approve()` needs the payload to replay the write.
+ *
+ * These were one type, declaring `payload` non-optional while the three list reads
+ * never selected it: `row.payload` came back `undefined` with no type error. The
+ * split makes the projection the type system's problem.
+ */
+type ApprovalRow = ApprovalListRow & {
+  payload: Record<string, unknown>;
+  target_version: string | null;
+};
+
+/**
+ * The API-facing projection. Shared by all three list reads AND by the mutation
+ * responses, so a payload can never reach the client by riding a `RETURNING *`.
+ */
+const LIST_COLUMNS = sql`
+  ar.request_id, ar.kind, ar.action_type, ar.target_table, ar.target_id, ar.person_id,
+  ar.summary, ar.requested_by, ar.requested_at, ar.status,
+  ar.reviewed_by, ar.reviewed_at, ar.review_note
+`;
+
+/** Strip the internal-only columns before a row leaves the service. */
+function toListRow(row: ApprovalRow): ApprovalListRow {
+  const { payload: _payload, target_version: _targetVersion, ...rest } = row;
+  return rest;
+}
 
 // ---------------------------------------------------------------------------
 // Person-id resolution
@@ -96,21 +127,6 @@ async function targetExists(
   return !!res.rows[0]?.exists;
 }
 
-/** Fetch the live version of the target row for stale-detection. */
-async function liveVersion(
-  trx: Transaction<Database>,
-  targetTable: string,
-  pkColumn: string,
-  targetId: number
-): Promise<string | null> {
-  const res = await sql<{ updated_at: Date | null }>`
-    SELECT updated_at FROM ${sql.table(targetTable)} WHERE ${sql.ref(pkColumn)} = ${targetId} LIMIT 1
-  `.execute(trx);
-  const row = res.rows[0];
-  if (!row?.updated_at) return null;
-  return row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at);
-}
-
 // ---------------------------------------------------------------------------
 // Enqueue an approval hold
 // ---------------------------------------------------------------------------
@@ -134,28 +150,30 @@ export async function enqueueApproval(
   const summary = action.summarize(payload);
   const targetVersion = await action.getVersion(targetId).catch(() => null);
 
-  const db = getKysely();
+  // Supersede + insert in ONE transaction. Split across two statements, a failing
+  // INSERT left the previous hold already marked 'stale' with no replacement — the
+  // request silently vanished from the admin queue instead of staying pending.
+  const requestId = await withPgTransaction(async (trx) => {
+    await sql`
+      UPDATE approval_requests
+      SET status = 'stale', review_note = 'Superseded by a newer request'
+      WHERE action_type = ${actionType}
+        AND target_id   = ${targetId}
+        AND status      = 'pending'
+    `.execute(trx);
 
-  // Supersede any existing pending row for the same target+action.
-  await sql`
-    UPDATE approval_requests
-    SET status = 'stale', review_note = 'Superseded by a newer request'
-    WHERE action_type = ${actionType}
-      AND target_id   = ${targetId}
-      AND status      = 'pending'
-  `.execute(db);
+    const res = await sql<{ request_id: number }>`
+      INSERT INTO approval_requests
+        (kind, action_type, target_table, target_id, person_id, payload,
+         target_version, summary, requested_by, status)
+      VALUES
+        ('approval', ${actionType}, ${action.targetTable}, ${targetId}, ${personId},
+         ${JSON.stringify(payload)}::jsonb, ${targetVersion}, ${summary}, ${requestedBy}, 'pending')
+      RETURNING request_id
+    `.execute(trx);
 
-  const res = await sql<{ request_id: number }>`
-    INSERT INTO approval_requests
-      (kind, action_type, target_table, target_id, person_id, payload,
-       target_version, summary, requested_by, status)
-    VALUES
-      ('approval', ${actionType}, ${action.targetTable}, ${targetId}, ${personId},
-       ${JSON.stringify(payload)}::jsonb, ${targetVersion}, ${summary}, ${requestedBy}, 'pending')
-    RETURNING request_id
-  `.execute(db);
-
-  const requestId = res.rows[0]!.request_id;
+    return res.rows[0]!.request_id;
+  });
   log.info('Approval enqueued', { actionType, targetId, requestedBy, requestId });
   return { requestId };
 }
@@ -165,10 +183,14 @@ export async function enqueueApproval(
 // ---------------------------------------------------------------------------
 
 export type ApproveResult =
-  | { status: 'approved'; row: ApprovalRow }
-  | { status: 'conflict' }       // already reviewed (double-click / two admins)
-  | { status: 'missing'; row: ApprovalRow }  // target no longer exists
-  | { status: 'stale'; row: ApprovalRow };   // target changed since enqueue
+  | { status: 'approved'; row: ApprovalListRow }
+  | { status: 'conflict' }                        // already reviewed (double-click / two admins)
+  | { status: 'missing'; row: ApprovalListRow }   // target no longer exists
+  | { status: 'stale'; row: ApprovalListRow }     // target changed since enqueue
+  // The replay itself threw (dependency, constraint, business rule). Distinct from
+  // 'missing' — the row IS there; re-applying the write is what failed, and the
+  // reason is on the row's review_note.
+  | { status: 'failed'; row: ApprovalListRow; error: string };
 
 export async function approve(
   requestId: number,
@@ -182,8 +204,8 @@ export async function approve(
   // leave the row stuck at 'pending' while the write side-effect has already landed.
   type Phase1 =
     | { status: 'conflict' }
-    | { status: 'missing'; row: ApprovalRow }
-    | { status: 'stale'; row: ApprovalRow }
+    | { status: 'missing'; row: ApprovalListRow }
+    | { status: 'stale'; row: ApprovalListRow }
     | { status: 'claimed'; row: ApprovalRow; action: ApprovalActionDef };
 
   const phase1 = await withPgTransaction(async (trx): Promise<Phase1> => {
@@ -206,7 +228,7 @@ export async function approve(
         UPDATE approval_requests SET status='failed', review_note='Unknown action_type'
         WHERE request_id=${requestId}
       `.execute(trx);
-      return { status: 'missing', row };
+      return { status: 'missing', row: toListRow({ ...row, status: 'failed', review_note: 'Unknown action_type' }) };
     }
 
     const targetId = action.getTargetId(row.payload);
@@ -219,19 +241,19 @@ export async function approve(
         SET status='failed', review_note='Target no longer exists'
         WHERE request_id=${requestId}
       `.execute(trx);
-      return { status: 'missing', row: { ...row, status: 'failed', review_note: 'Target no longer exists' } };
+      return { status: 'missing', row: toListRow({ ...row, status: 'failed', review_note: 'Target no longer exists' }) };
     }
 
     // 3. Stale check — compare stored version with current row version.
     if (row.target_version) {
-      const current = await liveVersion(trx, action.targetTable, action.pkColumn, targetId);
+      const current = await readTargetVersion(trx, action.targetTable, action.pkColumn, targetId);
       if (current && current !== row.target_version) {
         await sql`
           UPDATE approval_requests
           SET status='stale', review_note='Target changed since request was submitted'
           WHERE request_id=${requestId}
         `.execute(trx);
-        return { status: 'stale', row: { ...row, status: 'stale', review_note: 'Target changed since request was submitted' } };
+        return { status: 'stale', row: toListRow({ ...row, status: 'stale', review_note: 'Target changed since request was submitted' }) };
       }
     }
 
@@ -245,16 +267,24 @@ export async function approve(
   const { row, action } = phase1;
   try {
     await action.apply(row.payload);
-    return { status: 'approved', row: { ...row, status: 'approved', reviewed_by: reviewedBy } };
+    return {
+      status: 'approved',
+      row: toListRow({ ...row, status: 'approved', reviewed_by: reviewedBy }),
+    };
   } catch (err) {
-    log.error('Approval apply() failed', { requestId, error: (err as Error).message });
+    const message = (err as Error).message;
+    log.error('Approval apply() failed', { requestId, error: message });
+    const note = `Apply error: ${message}`;
     await sql`
       UPDATE approval_requests
-      SET status='failed',
-          review_note=${`Apply error: ${(err as Error).message}`}
+      SET status='failed', review_note=${note}
       WHERE request_id=${requestId}
     `.execute(db);
-    return { status: 'missing', row: { ...row, status: 'failed' } };
+    return {
+      status: 'failed',
+      row: toListRow({ ...row, status: 'failed', review_note: note }),
+      error: message,
+    };
   }
 }
 
@@ -266,7 +296,7 @@ export async function reject(
   requestId: number,
   note: string | undefined,
   req: WithSession
-): Promise<ApprovalRow | null> {
+): Promise<ApprovalListRow | null> {
   const reviewedBy = req.session?.username ?? 'unknown';
   const db = getKysely();
   const res = await sql<ApprovalRow>`
@@ -276,7 +306,8 @@ export async function reject(
     WHERE request_id = ${requestId} AND status = 'pending'
     RETURNING *
   `.execute(db);
-  return res.rows[0] ?? null;
+  const row = res.rows[0];
+  return row ? toListRow(row) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -332,7 +363,7 @@ export async function recordNotice(
 export async function acknowledge(
   requestId: number,
   req: WithSession
-): Promise<ApprovalRow | null> {
+): Promise<ApprovalListRow | null> {
   const reviewedBy = req.session?.username ?? 'unknown';
   const db = getKysely();
   const res = await sql<ApprovalRow>`
@@ -341,7 +372,8 @@ export async function acknowledge(
     WHERE request_id = ${requestId} AND kind = 'notice' AND status = 'pending'
     RETURNING *
   `.execute(db);
-  return res.rows[0] ?? null;
+  const row = res.rows[0];
+  return row ? toListRow(row) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -398,53 +430,36 @@ export async function acknowledgeAll(req: WithSession): Promise<{ cleared: numbe
 // Read helpers
 // ---------------------------------------------------------------------------
 
-/** Admin: list rows filtered by status (defaults to 'pending'). */
-export async function listApprovals(status: ApprovalStatus = 'pending'): Promise<ApprovalRow[]> {
-  const db = getKysely();
-  const res = await sql<ApprovalRow>`
-    SELECT ar.request_id, ar.kind, ar.action_type, ar.target_table, ar.target_id, ar.person_id,
-           ar.summary, ar.requested_by, ar.requested_at, ar.status,
-           ar.reviewed_by, ar.reviewed_at, ar.review_note,
-           p.patient_name
+/**
+ * All three admin/requester reads share one projection + join; only the WHERE and
+ * the row cap differ. They were three copies of the same 13-column SELECT.
+ */
+async function selectApprovals(
+  where: ReturnType<typeof sql>,
+  limit: number
+): Promise<ApprovalListRow[]> {
+  const res = await sql<ApprovalListRow>`
+    SELECT ${LIST_COLUMNS}, p.patient_name
     FROM approval_requests ar
     LEFT JOIN patients p ON p.person_id = ar.person_id
-    WHERE ar.status = ${status}
+    WHERE ${where}
     ORDER BY ar.requested_at DESC
-    LIMIT 200
-  `.execute(db);
+    LIMIT ${sql.lit(limit)}
+  `.execute(getKysely());
   return res.rows;
+}
+
+/** Admin: list rows filtered by status (defaults to 'pending'). */
+export async function listApprovals(status: ApprovalStatus = 'pending'): Promise<ApprovalListRow[]> {
+  return selectApprovals(sql`ar.status = ${status}`, 200);
 }
 
 /** Admin: all non-pending rows newest first (audit trail). */
-export async function listHistory(): Promise<ApprovalRow[]> {
-  const db = getKysely();
-  const res = await sql<ApprovalRow>`
-    SELECT ar.request_id, ar.kind, ar.action_type, ar.target_table, ar.target_id, ar.person_id,
-           ar.summary, ar.requested_by, ar.requested_at, ar.status,
-           ar.reviewed_by, ar.reviewed_at, ar.review_note,
-           p.patient_name
-    FROM approval_requests ar
-    LEFT JOIN patients p ON p.person_id = ar.person_id
-    WHERE ar.status <> 'pending'
-    ORDER BY ar.requested_at DESC
-    LIMIT 500
-  `.execute(db);
-  return res.rows;
+export async function listHistory(): Promise<ApprovalListRow[]> {
+  return selectApprovals(sql`ar.status <> 'pending'`, 500);
 }
 
 /** Requester: their own rows (all statuses). */
-export async function listMine(username: string): Promise<ApprovalRow[]> {
-  const db = getKysely();
-  const res = await sql<ApprovalRow>`
-    SELECT ar.request_id, ar.kind, ar.action_type, ar.target_table, ar.target_id, ar.person_id,
-           ar.summary, ar.requested_by, ar.requested_at, ar.status,
-           ar.reviewed_by, ar.reviewed_at, ar.review_note,
-           p.patient_name
-    FROM approval_requests ar
-    LEFT JOIN patients p ON p.person_id = ar.person_id
-    WHERE ar.requested_by = ${username}
-    ORDER BY ar.requested_at DESC
-    LIMIT 200
-  `.execute(db);
-  return res.rows;
+export async function listMine(username: string): Promise<ApprovalListRow[]> {
+  return selectApprovals(sql`ar.requested_by = ${username}`, 200);
 }

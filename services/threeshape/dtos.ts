@@ -25,12 +25,19 @@ export const tokenError = z.object({
 });
 
 // ── /v3 list items ──
-// Field names/casing are CONFIRMED against the official 3Shape Web Service API v3
-// docs (camelCase — see docs/3shape-integration.md). Still lenient on purpose: the
-// API's forward-compatibility rule requires tolerant readers (silently ignore
-// unknown fields), so we read only what the UI needs and `safeParse` each element,
-// skipping any that don't match — an unexpected shape degrades to a shorter list
-// instead of a hard failure.
+// Field names/casing within an ITEM are CONFIRMED against the official 3Shape Web Service API v3
+// docs (camelCase — see docs/3shape-integration.md); what stays deliberately unconfirmed is the
+// paging ENVELOPE key around them, which client.ts#extractArray probes for (and now throws on when
+// nothing matches, rather than reporting an empty list).
+//
+// Items are still read leniently on purpose: the API's forward-compatibility rule requires tolerant
+// readers (silently ignore unknown fields), so we read only what the UI needs and `safeParse` each
+// element, skipping any that don't match — one unexpected item degrades to a shorter list instead
+// of a hard failure.
+//
+// NOTE: this whole surface is still UNVERIFIED against live hardware (no Unite Host Device has been
+// reachable from a dev box yet). When someone first runs it against the real workstation, confirm
+// the envelope key and settle this comment in the same commit.
 const idLike = z.union([z.string(), z.number()]);
 
 /** A file inside a media item (`media[].mediaFiles[]`). */

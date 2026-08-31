@@ -13,6 +13,10 @@
  * idempotent regardless of which earlier runs succeeded. A GET first preserves
  * the list's dashboard-assigned name/description (PUT requires `name`).
  *
+ * The PUT cannot express an EMPTY set, so removing the last doctor takes the other route:
+ * read the current items and `PATCH { remove: [...] }` them. Without that, revoking the last
+ * doctor's access silently did nothing at all — see syncNow.
+ *
  * Failures never propagate to the doctor CRUD request — they log an error and
  * the next doctor edit (or the boot reconcile in index.ts) converges the list.
  * Disabled unless all three CLOUDFLARE_* env vars are set (config.cloudflare).
@@ -36,6 +40,11 @@ interface ZeroTrustListMeta {
   description?: string;
 }
 
+/** One entry of `GET /gateway/lists/{id}/items`, read only to remove it. */
+interface ZeroTrustListItem {
+  value?: string;
+}
+
 export function isDoctorEmailListSyncEnabled(): boolean {
   const { apiToken, accountId, doctorEmailListId } = config.cloudflare;
   return Boolean(apiToken && accountId && doctorEmailListId);
@@ -50,7 +59,10 @@ export interface DoctorEmailListSyncResult {
   trigger: string;
   /** Emails pushed to the list; null when the run failed before counting. */
   emailCount: number | null;
-  /** True when the run was a no-op because aligner_doctors has no emails. */
+  /**
+   * True when the run made no API call at all. NOT set merely because there are no doctor emails —
+   * that case now actively empties the list (see syncNow).
+   */
   skipped: boolean;
   error: string | null;
 }
@@ -164,24 +176,39 @@ async function syncNow(trigger: string): Promise<DoctorEmailListSyncResult> {
     ),
   ].sort();
 
+  const listPath = `/accounts/${accountId}/gateway/lists/${doctorEmailListId}`;
+
   if (emails.length === 0) {
-    // The API only overwrites items when the array is NON-empty, so an empty
-    // set can't be pushed — if the last emailed doctor was genuinely removed,
-    // clear the list in the Zero Trust dashboard by hand.
-    log.warn('Cloudflare doctor email-list sync skipped: no doctor emails in aligner_doctors', {
+    // REVOCATION PATH. The full-replace PUT only overwrites `items` when the array is non-empty, so
+    // it cannot express "nobody" — this used to log a warning, return ok/skipped, and leave every
+    // previously-listed address holding its Cloudflare Access grant to the portal indefinitely,
+    // while Settings reported the sync as successful. Revoking access is the single thing this
+    // service exists to make safe, so an empty set MUST still empty the list.
+    //
+    // PATCH { remove: [...] } is the API's incremental form and is the only way to reach zero items.
+    // It needs the current membership, so read it first; already-empty is a no-op.
+    const current = await cfFetch<ZeroTrustListItem[]>(`${listPath}/items?per_page=1000`);
+    const existing = (current.result ?? []).map((i) => i.value).filter((v): v is string => !!v);
+    if (existing.length > 0) {
+      await cfFetch(listPath, {
+        method: 'PATCH',
+        body: JSON.stringify({ remove: existing }),
+      });
+    }
+    log.warn('Cloudflare doctor email-list emptied: no doctor emails in aligner_doctors', {
       trigger,
+      removed: existing.length,
     });
     return {
       at: new Date().toISOString(),
       ok: true,
       trigger,
       emailCount: 0,
-      skipped: true,
+      skipped: false,
       error: null,
     };
   }
 
-  const listPath = `/accounts/${accountId}/gateway/lists/${doctorEmailListId}`;
   // PUT requires `name`; read it first so the dashboard-assigned name/description survive.
   const current = await cfFetch<ZeroTrustListMeta>(listPath);
   await cfFetch(listPath, {

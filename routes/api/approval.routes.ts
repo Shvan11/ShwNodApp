@@ -142,12 +142,19 @@ router.post(
         ErrorResponses.conflict(res, 'This approval was already processed');
         return;
       }
-      if (result.status === 'missing') {
+      if (result.status === 'missing' || result.status === 'stale') {
         sendData(res, approvalsContract.approveRequest.response, result.row);
         return;
       }
-      if (result.status === 'stale') {
-        sendData(res, approvalsContract.approveRequest.response, result.row);
+      // The row exists but replaying the write threw — report the real reason
+      // instead of the old "target no longer exists" the 'missing' branch implies.
+      if (result.status === 'failed') {
+        sendData(
+          res,
+          approvalsContract.approveRequest.response,
+          result.row,
+          `Could not apply: ${result.error}`
+        );
         return;
       }
       sendData(res, approvalsContract.approveRequest.response, result.row, 'Approved and applied');

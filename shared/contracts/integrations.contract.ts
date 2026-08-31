@@ -198,6 +198,10 @@ export const googleContactsStatus = {
         connected: z.boolean(),
         expiresAt: z.string().nullable(),
         scope: z.string().nullable(),
+        // The Google address this slot is connected AS. The consent screen can be
+        // steered (login_hint) but never forced, so showing it is what makes a
+        // wrong-account connect visible. Null for a grant predating the column.
+        accountEmail: z.string().nullable(),
       })
     ),
   }),

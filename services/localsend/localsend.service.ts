@@ -24,6 +24,7 @@ import net from 'net';
 import os from 'os';
 import crypto from 'crypto';
 import { createReadStream } from 'fs';
+import { PassThrough } from 'stream';
 import https from 'https';
 import fetch from 'node-fetch';
 import config from '../../config/config.js';
@@ -37,7 +38,8 @@ import type {
 } from '../../shared/contracts/localsend.contract.js';
 
 const LOCALSEND_VERSION = '2.0';
-const MULTICAST_PORT = 53317;
+/** The protocol's default port — the fallback for a peer whose announcement omits its own. */
+const DEFAULT_PEER_PORT = 53317;
 // How long a discovered/probed device stays in the picker without being re-seen.
 const DEVICE_TTL_MS = 5 * 60 * 1000;
 // We solicit announcements this often while running.
@@ -303,7 +305,7 @@ class LocalSendService {
       deviceModel: data.deviceModel,
       deviceType: data.deviceType,
       ip: rinfo.address,
-      port: data.port || MULTICAST_PORT,
+      port: data.port || DEFAULT_PEER_PORT,
       protocol: data.protocol === 'http' ? 'http' : 'https',
     });
 
@@ -350,7 +352,12 @@ class LocalSendService {
     // interpolated into a URL, so a host/port/path here would be an SSRF.
     if (net.isIP(ip) === 0) throw new Error('Not a valid IP address');
     const host = ip.includes(':') ? `[${ip}]` : ip; // bracket IPv6 for the URL
-    const url = `https://${host}:${MULTICAST_PORT}/api/localsend/v2/info`;
+    // `cfg.port`, not the protocol default: everything else here honours LOCALSEND_PORT (the socket
+    // bind, the announce, the advertised selfInfo().port), and a LAN that moved off 53317 moved as a
+    // whole. Hardcoding the constant meant that on such a LAN multicast discovery worked while
+    // probe-by-IP silently hit a dead port — and probe-by-IP is the fallback that exists precisely
+    // for the segmented LANs and WSL2 dev boxes multicast can't reach.
+    const url = `https://${host}:${this.cfg.port}/api/localsend/v2/info`;
     const res = await this.timedFetch(url, { agent: this.httpsAgent }, 8000);
     if (!res.ok) {
       throw new Error(`Device at ${ip} did not respond (HTTP ${res.status})`);
@@ -362,7 +369,7 @@ class LocalSendService {
       deviceModel: info.deviceModel,
       deviceType: info.deviceType,
       ip,
-      port: info.port || MULTICAST_PORT,
+      port: info.port || DEFAULT_PEER_PORT,
       protocol: info.protocol === 'http' ? 'http' : 'https',
     };
     this.upsertDevice(dev);
@@ -556,10 +563,24 @@ class LocalSendService {
         `${base}/upload?sessionId=${encodeURIComponent(prep.sessionId)}` +
         `&fileId=${encodeURIComponent(fileId)}&token=${encodeURIComponent(token)}`;
 
+      // Progress is counted on a PassThrough the file is piped THROUGH, not with a `data` listener
+      // on the read stream. Two reasons:
+      //
+      //  1. A `data` listener switches the stream to flowing mode immediately. It only worked
+      //     because node-fetch reaches `body.pipe(req)` in the same tick; inserting a single
+      //     `await` between the two would start dropping the first chunks of every upload, and the
+      //     symptom (a file that arrives short) points nowhere near the cause.
+      //  2. A read stream races ahead of the socket on a LAN-speed mismatch, so the bar hit 100%
+      //     while the transfer was still going — the one moment a user is most likely to decide it
+      //     has hung and cancel a working send. A PassThrough is bounded by its own backpressure,
+      //     so it tracks what the receiver is actually taking.
       const stream = createReadStream(f.abs);
-      stream.on('data', (chunk: string | Buffer) => {
-        f.sentBytes += chunk.length;
+      const counter = new PassThrough();
+      counter.on('data', (chunk: Buffer) => {
+        f.sentBytes = Math.min(f.sentBytes + chunk.length, f.totalBytes);
       });
+      stream.on('error', (err) => counter.destroy(err));
+      stream.pipe(counter);
 
       try {
         const upRes = await this.timedFetch(
@@ -567,7 +588,7 @@ class LocalSendService {
           {
             method: 'POST',
             agent,
-            body: stream,
+            body: counter,
             // The size is known — advertise it instead of chunked encoding
             // (strict third-party receivers reject chunked uploads).
             headers: { 'Content-Length': String(f.totalBytes) },
@@ -580,6 +601,7 @@ class LocalSendService {
         }
       } catch (err) {
         stream.destroy(); // don't leak the fd on abort/timeout/error
+        counter.destroy();
         if (transfer.canceled) return; // cancel() already settled the record
         f.status = 'failed';
         throw err;

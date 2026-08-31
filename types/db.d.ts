@@ -449,6 +449,10 @@ export interface Implants {
 
 export interface IntegrationOauthTokens {
   access_token: string;
+  /**
+   * External account this grant belongs to (Google address for google_contacts:*). NULL when unknown / not applicable.
+   */
+  account_email: string | null;
   expires_at: Timestamp;
   provider: string;
   refresh_token: string | null;

@@ -44,6 +44,8 @@ export class CdcEngine {
   private retryTimer: NodeJS.Timeout | null = null;
   private retryDelayMs = 0;
   private draining = false;
+  /** A drainNow() that landed mid-cycle; replayed once the running cycle finishes. */
+  private kickPending = false;
   private stopped = true;
   private breaker = false;
 
@@ -133,14 +135,24 @@ export class CdcEngine {
     log.info(`🛑 CDC sink "${this.sink.name}" stopped — capture left ON (drains on next start)`);
   }
 
-  /** Kick an immediate drain (webhook/admin trigger); harmless if one is already running. */
+  /**
+   * Kick an immediate drain (webhook/admin trigger). If a cycle is already running the kick is
+   * REMEMBERED, not dropped — the running cycle may already have read its batch before the change
+   * that prompted the kick landed, so silently discarding it would push that change out to the next
+   * interval tick, which is exactly the latency the webhook exists to avoid.
+   */
   drainNow(): void {
+    if (this.draining) {
+      this.kickPending = true;
+      return;
+    }
     void this.drainOnce();
   }
 
   private async drainOnce(): Promise<void> {
     if (this.draining || this.stopped || this.breaker) return;
     this.draining = true;
+    this.kickPending = false;
     try {
       // The change-feed pool: local for forward/dolphin, the Supabase reverse-read pool for reverse.
       const feed = this.source();
@@ -171,9 +183,13 @@ export class CdcEngine {
       );
       if (rows.length === 0) return;
 
-      let applied = 0;
       let deferred = 0;
       let lastError: string | null = null;
+      // Changelog entries whose apply succeeded, cleared in ONE statement at the end of the cycle.
+      // A per-row DELETE round trip doubled the cycle's trips to the feed DB, which for the reverse
+      // sink is an internet RTT away — that made a full batch latency-bound rather than work-bound.
+      const doneIds: string[] = [];
+      const doneStamps: string[] = [];
       for (const r of rows) {
         if (this.stopped) break;
         // Apply each row independently. A single failure (e.g. an FK-parent that has not
@@ -184,16 +200,26 @@ export class CdcEngine {
         try {
           if (r.op === 'D') await this.sink.remove(r.tbl, r.pk);
           else await this.sink.upsert(r.tbl, r.pk);
-          // Version-guarded delete: skipped (→ reprocessed) if the row was re-touched since we read it.
-          await feed.query('DELETE FROM change_log WHERE id = $1 AND changed_at = $2::timestamp', [
-            r.id,
-            r.changed_at_text,
-          ]);
-          applied++;
+          doneIds.push(r.id);
+          doneStamps.push(r.changed_at_text);
         } catch (rowErr) {
           deferred++;
           lastError = (rowErr as Error).message;
         }
+      }
+
+      // Version-guarded delete, batched: an entry is cleared only if it still carries the
+      // changed_at we read it with, so a row re-touched mid-cycle survives and is reprocessed
+      // (at-least-once — every sink.upsert is idempotent). unnest() zips the two arrays into the
+      // (id, changed_at) pairs to match, keeping the guard identical to the per-row form.
+      const applied = doneIds.length;
+      if (applied > 0) {
+        await feed.query(
+          `DELETE FROM change_log c
+             USING unnest($1::bigint[], $2::timestamp[]) AS d(id, changed_at)
+            WHERE c.id = d.id AND c.changed_at = d.changed_at`,
+          [doneIds, doneStamps]
+        );
       }
       if (applied > 0) log.info(`[cdc:${this.sink.name}] replicated ${applied} change(s)`);
       if (deferred > 0)
@@ -209,6 +235,12 @@ export class CdcEngine {
       log.warn(`[cdc:${this.sink.name}] drain cycle failed (will retry)`, { error: (err as Error).message });
     } finally {
       this.draining = false;
+      // Replay a kick that arrived while this cycle was running (see drainNow). unref() so the
+      // fire-and-forget chain never holds the event loop open during graceful shutdown.
+      if (this.kickPending && !this.stopped && !this.breaker) {
+        this.kickPending = false;
+        setTimeout(() => void this.drainOnce(), 0).unref();
+      }
     }
   }
 }

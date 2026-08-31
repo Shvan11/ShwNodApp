@@ -8,6 +8,7 @@ import fs from 'fs/promises';
 import fs_sync from 'fs';
 import path from 'path';
 import { log } from '../../utils/logger.js';
+import { isMaskedSecret } from '../../shared/masked-secret.js';
 
 /**
  * Database configuration interface (PostgreSQL / node-postgres).
@@ -22,6 +23,82 @@ export interface DatabaseConfig {
   PG_USER: string;
   PG_PASSWORD: string;
 }
+
+/**
+ * Every PG_* key this manager owns. Single source for "which fields exist" —
+ * previously spelled out separately in three places across two files.
+ */
+export const DATABASE_CONFIG_FIELDS: readonly (keyof DatabaseConfig)[] = [
+  'PG_HOST',
+  'PG_PORT',
+  'PG_DATABASE',
+  'PG_USER',
+  'PG_PASSWORD',
+];
+
+/**
+ * Fields that must be non-empty. `PG_PASSWORD` is deliberately absent: trust/peer
+ * auth is a valid configuration with no password at all.
+ */
+export const REQUIRED_DATABASE_FIELDS: readonly (keyof DatabaseConfig)[] = [
+  'PG_HOST',
+  'PG_PORT',
+  'PG_DATABASE',
+  'PG_USER',
+];
+
+/** Human labels for the required fields, for user-facing validation messages. */
+export const DATABASE_FIELD_LABELS: Record<keyof DatabaseConfig, string> = {
+  PG_HOST: 'Host',
+  PG_PORT: 'Port',
+  PG_DATABASE: 'Database Name',
+  PG_USER: 'Username',
+  PG_PASSWORD: 'Password',
+};
+
+/**
+ * Split a raw `.env` value from any trailing ` # comment`.
+ *
+ * A comment is only a comment when it follows whitespace and sits OUTSIDE quotes —
+ * `PG_PASSWORD=a#b` is a password containing a hash, not a commented-out `a`.
+ * Returns the value text and the comment (including its leading whitespace) so a
+ * rewrite can put the comment back.
+ */
+export function splitEnvComment(raw: string): { value: string; comment: string } {
+  let quote: string | null = null;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === '#' && (i === 0 || /\s/.test(raw[i - 1]))) {
+      // Take the WHITESPACE RUN before the '#' with the comment. Without it a
+      // rewrite emits `PG_PORT=5432# default`, and `#` not preceded by whitespace
+      // is no longer a comment — the next read would parse the comment text as
+      // part of the port value.
+      let start = i;
+      while (start > 0 && /\s/.test(raw[start - 1])) start--;
+      return { value: raw.slice(0, start), comment: raw.slice(start) };
+    }
+  }
+  return { value: raw, comment: '' };
+}
+
+/** Strip a trailing comment and surrounding quotes from a raw `.env` value. */
+function parseEnvValue(raw: string): string {
+  let value = splitEnvComment(raw).value.trim();
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1);
+  }
+  return value;
+}
+
+/** How many timestamped `.env` snapshots to keep. */
+const BACKUP_RETENTION = 10;
 
 class EnvironmentManager {
   private envPath: string;
@@ -67,17 +144,7 @@ class EnvironmentManager {
       const equalIndex = trimmed.indexOf('=');
       if (equalIndex > 0) {
         const key = trimmed.substring(0, equalIndex).trim();
-        let value = trimmed.substring(equalIndex + 1).trim();
-
-        // Remove quotes if present
-        if (
-          (value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))
-        ) {
-          value = value.slice(1, -1);
-        }
-
-        env[key] = value;
+        env[key] = parseEnvValue(trimmed.substring(equalIndex + 1));
       }
     }
 
@@ -122,7 +189,10 @@ class EnvironmentManager {
       // match wrote the new value into a line the loader then ignores, so the save
       // silently did nothing.
       seen.add(key);
-      return `${key}=${this.formatEnvValue(updates[key])}`;
+      // Carry any trailing ` # comment` across. Rewriting the whole line deleted
+      // the documentation next to every key the settings form ever touched.
+      const { comment } = splitEnvComment(trimmed.substring(eq + 1));
+      return `${key}=${this.formatEnvValue(updates[key])}${comment}`;
     });
 
     for (const key of wanted) {
@@ -150,19 +220,46 @@ class EnvironmentManager {
   }
 
   /**
-   * Create a backup of the current .env file
+   * Snapshot the current .env before a write.
+   *
+   * Backups are TIMESTAMPED and the newest `BACKUP_RETENTION` kept. A single
+   * fixed `.env.backup` was overwritten on every save, so two consecutive bad
+   * saves destroyed the last good copy — exactly when it is needed. `.env.backup`
+   * is still written as the newest snapshot so existing recovery notes hold.
    */
   async createBackup(): Promise<boolean> {
     try {
-      if (fs_sync.existsSync(this.envPath)) {
-        await fs.copyFile(this.envPath, this.backupPath);
-        log.info('Environment backup created successfully');
-        return true;
-      }
-      return false;
+      if (!fs_sync.existsSync(this.envPath)) return false;
+
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      await fs.copyFile(this.envPath, `${this.backupPath}.${stamp}`);
+      await fs.copyFile(this.envPath, this.backupPath);
+      await this.pruneBackups();
+
+      log.info('Environment backup created successfully');
+      return true;
     } catch (error) {
       log.error('Failed to create environment backup', { error: (error as Error).message });
       throw new Error(`Backup creation failed: ${(error as Error).message}`, { cause: error });
+    }
+  }
+
+  /** Delete all but the newest BACKUP_RETENTION timestamped snapshots. */
+  private async pruneBackups(): Promise<void> {
+    const dir = path.dirname(this.backupPath);
+    const prefix = `${path.basename(this.backupPath)}.`;
+    try {
+      const entries = await fs.readdir(dir);
+      const stale = entries
+        .filter((name) => name.startsWith(prefix))
+        .sort()               // ISO timestamps sort chronologically
+        .slice(0, -BACKUP_RETENTION);
+      await Promise.all(
+        stale.map((name) => fs.unlink(path.join(dir, name)).catch(() => {}))
+      );
+    } catch (error) {
+      // Pruning is housekeeping — never fail a config save over it.
+      log.warn('Could not prune .env backups', { error: (error as Error).message });
     }
   }
 
@@ -252,33 +349,26 @@ class EnvironmentManager {
    */
   async updateDatabaseConfig(dbConfig: Partial<DatabaseConfig>): Promise<DatabaseConfig> {
     try {
-      // Validate required fields (PG_PASSWORD may be empty for trust/peer auth)
-      const required: Array<keyof DatabaseConfig> = [
-        'PG_HOST',
-        'PG_PORT',
-        'PG_DATABASE',
-        'PG_USER',
-      ];
-      for (const field of required) {
+      for (const field of REQUIRED_DATABASE_FIELDS) {
         if (!dbConfig[field] || dbConfig[field]!.trim() === '') {
           throw new Error(`Required field ${field} is missing or empty`);
         }
       }
 
-      // Prepare database-specific updates
       const dbUpdates: Record<string, string> = {};
-      const validFields: Array<keyof DatabaseConfig> = [
-        'PG_HOST',
-        'PG_PORT',
-        'PG_DATABASE',
-        'PG_USER',
-        'PG_PASSWORD',
-      ];
-
-      for (const field of validFields) {
-        if (dbConfig[field] !== undefined) {
-          dbUpdates[field] = dbConfig[field]!.toString().trim();
+      for (const field of DATABASE_CONFIG_FIELDS) {
+        const value = dbConfig[field];
+        if (value === undefined) continue;
+        // The form renders the stored password as a mask and posts the whole
+        // config back, so an untouched password field arrives as the mask itself.
+        // Writing it would set the literal bullet characters as the real
+        // PostgreSQL password and lock the app out at the next restart. Treat it
+        // as "unchanged" and leave the stored value alone.
+        if (isMaskedSecret(value)) {
+          log.info('Ignoring masked secret on config save — keeping stored value', { field });
+          continue;
         }
+        dbUpdates[field] = value.toString().trim();
       }
 
       // Update environment

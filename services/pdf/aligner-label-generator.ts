@@ -11,9 +11,9 @@
  */
 
 import PDFDocument from 'pdfkit';
-import fs from 'fs';
-import path from 'path';
 import { log } from '../../utils/logger.js';
+import { hasArabic, resolveArabicFontPath, resolveLogoPath } from './pdf-assets.js';
+import { DEFAULT_PDF_ARABIC_FONT, type PdfArabicFont } from '../../shared/pdf-fonts.js';
 
 // =============================================================================
 // TYPES
@@ -35,7 +35,7 @@ export interface LabelData {
 export interface LabelGenerateParams {
   labels: LabelData[];
   startingPosition: number;
-  arabicFont?: 'cairo' | 'noto';
+  arabicFont?: PdfArabicFont;
   logoPath?: string;
 }
 
@@ -69,38 +69,21 @@ interface Position {
  */
 interface LabelConfig {
   startingPosition: number;
-  arabicFont: 'cairo' | 'noto';
+  /** Resolved TTF path, or null when no bundled Arabic face is readable. */
+  arabicFontPath: string | null;
   logoPath: string | null;
 }
 
 // =============================================================================
 // CONSTANTS
 // =============================================================================
+//
+// Project root, the readable-file probe, the Arabic-script test and the font/logo
+// paths all live in ./pdf-assets.ts — shared with the appointment report so the two
+// generators can't drift onto different Arabic typefaces for the same name.
 
-// Project root - use process.cwd() for consistent path resolution in dev and production
-const PROJECT_ROOT = process.cwd();
-
-// Default logo path
-const DEFAULT_LOGO_PATH = path.resolve(PROJECT_ROOT, 'public/shawan logon.png');
-
-// Arabic font paths
-const ARABIC_FONTS: Record<string, string> = {
-  cairo: path.resolve(PROJECT_ROOT, 'fonts/Cairo/static/Cairo-Regular.ttf'),
-  noto: path.resolve(PROJECT_ROOT, 'fonts/NotoSansArabic.ttf'),
-};
-
-// Font files are fixed bundled assets, but the existence check used to run once
-// per label inside the synchronous draw loop. Memoize it so the fs syscall fires
-// at most once per font path for the life of the process.
-const fontExistsCache = new Map<string, boolean>();
-function arabicFontExists(fontPath: string): boolean {
-  let exists = fontExistsCache.get(fontPath);
-  if (exists === undefined) {
-    exists = fs.existsSync(fontPath);
-    fontExistsCache.set(fontPath, exists);
-  }
-  return exists;
-}
+/** PDFKit alias bound to the resolved Arabic TTF for this document. */
+const ARABIC_FONT_ALIAS = 'ArabicFont';
 
 // =============================================================================
 // CONSTANTS - OL291 Label Sheet Specifications
@@ -136,28 +119,6 @@ const TYPOGRAPHY = {
 // =============================================================================
 
 /**
- * Check if a logo file exists and is readable
- */
-function logoExists(logoPath: string | null | undefined): boolean {
-  if (!logoPath) return false;
-  try {
-    fs.accessSync(logoPath, fs.constants.R_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Get logo path - returns default if provided path doesn't exist
- */
-function getLogoPath(requestedPath: string | undefined): string | null {
-  if (logoExists(requestedPath)) return requestedPath!;
-  if (logoExists(DEFAULT_LOGO_PATH)) return DEFAULT_LOGO_PATH;
-  return null;
-}
-
-/**
  * Calculate X,Y position for a label slot (1-12)
  */
 function getSlotPosition(slot: number): Position {
@@ -169,13 +130,6 @@ function getSlotPosition(slot: number): Position {
     x: LABEL.MARGIN_LEFT + col * (LABEL.WIDTH + LABEL.GAP_H),
     y: LABEL.MARGIN_TOP + row * (LABEL.HEIGHT + LABEL.GAP_V),
   };
-}
-
-/**
- * Detect if text contains Arabic/RTL characters
- */
-function hasArabic(text: string): boolean {
-  return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
 }
 
 // =============================================================================
@@ -196,7 +150,7 @@ class AlignerLabelGenerator {
    * @returns Promise with buffer and metadata
    */
   async generate(params: LabelGenerateParams): Promise<LabelResult> {
-    const { labels, startingPosition, arabicFont = 'cairo', logoPath } = params;
+    const { labels, startingPosition, arabicFont = DEFAULT_PDF_ARABIC_FONT, logoPath } = params;
 
     // Validate
     if (!labels || !Array.isArray(labels) || labels.length === 0) {
@@ -223,7 +177,7 @@ class AlignerLabelGenerator {
     }
 
     const totalLabels = labels.length;
-    const resolvedLogoPath = getLogoPath(logoPath);
+    const resolvedLogoPath = resolveLogoPath(logoPath);
 
     log.info('Generating aligner labels', {
       totalLabels,
@@ -234,7 +188,7 @@ class AlignerLabelGenerator {
     // Generate PDF
     const buffer = await this._generatePdf(labels, {
       startingPosition,
-      arabicFont,
+      arabicFontPath: resolveArabicFontPath(arabicFont),
       logoPath: resolvedLogoPath,
     });
 
@@ -273,10 +227,9 @@ class AlignerLabelGenerator {
           },
         });
 
-        // Register Arabic font
-        const fontPath = ARABIC_FONTS[config.arabicFont] || ARABIC_FONTS.cairo;
-        if (arabicFontExists(fontPath)) {
-          doc.registerFont('ArabicFont', fontPath);
+        // Register the Arabic face once per document (null = none bundled).
+        if (config.arabicFontPath) {
+          doc.registerFont(ARABIC_FONT_ALIAS, config.arabicFontPath);
         }
 
         const chunks: Buffer[] = [];
@@ -369,42 +322,28 @@ class AlignerLabelGenerator {
       currentY += logoHeight + logoSpacing;
     }
 
-    // Font selection
-    const fontPath = ARABIC_FONTS[config.arabicFont] || ARABIC_FONTS.cairo;
-    const arabicFont = arabicFontExists(fontPath) ? 'ArabicFont' : 'Helvetica';
+    // Latin text keeps Helvetica; Arabic switches to the embedded face (when one
+    // was registered) and gets RTL shaping.
+    const arabicFont = config.arabicFontPath ? ARABIC_FONT_ALIAS : 'Helvetica';
 
     // 2. Draw patient name
-    const patientIsArabic = hasArabic(patientName);
-    doc
-      .fontSize(TYPOGRAPHY.FONTS.PATIENT_NAME)
-      .fillColor(TYPOGRAPHY.COLORS.TEXT)
-      .font(patientIsArabic ? arabicFont : 'Helvetica');
-
-    const patientTextHeight = doc.heightOfString(patientName, { width: contentWidth });
-    doc.text(patientName, contentX, currentY, {
+    currentY += this._drawCenteredText(doc, patientName, {
+      x: contentX,
+      y: currentY,
       width: contentWidth,
-      align: 'center',
-      lineBreak: false,
-      features: patientIsArabic ? ['rtla'] : [],
-    });
-    currentY += patientTextHeight + 8;
+      fontSize: TYPOGRAPHY.FONTS.PATIENT_NAME,
+      arabicFont,
+    }) + 8;
 
     // 3. Draw doctor name
     if (doctorName) {
-      const doctorIsArabic = hasArabic(doctorName);
-      doc
-        .fontSize(TYPOGRAPHY.FONTS.DOCTOR_NAME)
-        .fillColor(TYPOGRAPHY.COLORS.TEXT)
-        .font(doctorIsArabic ? arabicFont : 'Helvetica');
-
-      const doctorTextHeight = doc.heightOfString(doctorName, { width: contentWidth });
-      doc.text(doctorName, contentX, currentY, {
+      currentY += this._drawCenteredText(doc, doctorName, {
+        x: contentX,
+        y: currentY,
         width: contentWidth,
-        align: 'center',
-        lineBreak: false,
-        features: doctorIsArabic ? ['rtla'] : [],
-      });
-      currentY += doctorTextHeight + 10;
+        fontSize: TYPOGRAPHY.FONTS.DOCTOR_NAME,
+        arabicFont,
+      }) + 10;
     } else {
       currentY += 10;
     }
@@ -419,6 +358,33 @@ class AlignerLabelGenerator {
         align: 'center',
         lineBreak: false,
       });
+  }
+
+  /**
+   * Draw one centered, script-aware line and report the height it consumed.
+   * The patient-name and doctor-name blocks were byte-identical apart from the
+   * font size and trailing gap.
+   * @private
+   */
+  private _drawCenteredText(
+    doc: PDFKit.PDFDocument,
+    text: string,
+    opts: { x: number; y: number; width: number; fontSize: number; arabicFont: string }
+  ): number {
+    const isArabic = hasArabic(text);
+    doc
+      .fontSize(opts.fontSize)
+      .fillColor(TYPOGRAPHY.COLORS.TEXT)
+      .font(isArabic ? opts.arabicFont : 'Helvetica');
+
+    const height = doc.heightOfString(text, { width: opts.width });
+    doc.text(text, opts.x, opts.y, {
+      width: opts.width,
+      align: 'center',
+      lineBreak: false,
+      features: isArabic ? ['rtla'] : [],
+    });
+    return height;
   }
 
   /**

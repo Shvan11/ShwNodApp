@@ -37,6 +37,71 @@ type WithSession = { session?: { username?: string } | null };
 const actingUser = (req: WithSession): string => req.session?.username ?? 'unknown';
 
 /**
+ * Append one row to the case's audit trail.
+ *
+ * Every mutation below used to hand-write its own `INSERT INTO lab_case_events`,
+ * and the seven copies had already drifted into four different column lists — the
+ * exact seam where a field quietly stops being recorded. One insert, one column
+ * list, optional fields omitted rather than spelled out per call site.
+ */
+async function insertEvent(
+  trx: Transaction<Database>,
+  event: {
+    labCaseId: number;
+    eventType: 'stage_change' | 'remake' | 'hold' | 'resume' | 'cancel';
+    fromStatus?: string | null;
+    toStatus?: string | null;
+    occurredAt?: string | null;
+    note?: string | null;
+    createdBy: string;
+  }
+): Promise<void> {
+  await sql`
+    INSERT INTO lab_case_events
+      (lab_case_id, event_type, from_status, to_status, occurred_at, note, created_by)
+    VALUES
+      (${event.labCaseId}, ${event.eventType}, ${event.fromStatus ?? null}, ${event.toStatus ?? null},
+       COALESCE(${event.occurredAt ?? null}, LOCALTIMESTAMP), ${event.note ?? null}, ${event.createdBy})
+  `.execute(trx);
+}
+
+/**
+ * Row-lock the case and 404 if it isn't there. Without this an UPDATE that matches
+ * nothing is ambiguous: no such case, or the case is in the wrong state?
+ */
+async function assertCaseExists(trx: Transaction<Database>, id: number): Promise<void> {
+  const row = await trx
+    .selectFrom('lab_cases')
+    .select(['id'])
+    .where('id', '=', id)
+    .forUpdate()
+    .executeTakeFirst();
+  if (!row) throw new Error('[NOT_FOUND] Lab case');
+}
+
+/**
+ * Assert that a remake sends the case BACKWARD.
+ *
+ * That is the whole meaning of the operation, and `advanceLabCase` enforces the
+ * mirror rule for forward moves. This used to check only membership in
+ * LAB_STAGES, so a client-supplied `returnToStatus` could jump a case FORWARD —
+ * as far as 'delivered', setting the terminal status with no `delivered_at` /
+ * `delivered_by` — while incrementing `remake_count`.
+ *
+ * Exported for the unit tests; the service is its only production caller.
+ */
+export function assertRemakeTarget(fromStatus: string, toStatus: string): void {
+  const toIdx = LAB_STAGES.indexOf(toStatus as LabStage);
+  if (toIdx === -1) {
+    throw new Error('[INVALID_STATE_TRANSITION] Invalid returnToStatus');
+  }
+  const fromIdx = LAB_STAGES.indexOf(fromStatus as LabStage);
+  if (fromIdx === -1 || toIdx >= fromIdx) {
+    throw new Error('[INVALID_STATE_TRANSITION] returnToStatus must be an earlier stage than the current one');
+  }
+}
+
+/**
  * Walk backward from `fromStatus` to the nearest earlier `location==='lab'`
  * stage — the case's last at-lab checkpoint before it reached `fromStatus`.
  * Returns `null` when `fromStatus` is (or precedes) the first stage, i.e.
@@ -84,7 +149,12 @@ export async function createLabCase(body: CreateLabCaseBody, req: WithSession): 
         UPDATE lab_cases
         SET status = 'sent_to_lab', is_on_hold = false, lab_id = ${labId}, material = ${material},
             due_date = ${dueDate}, is_rush = ${isRush}, note = ${note},
-            sent_at = COALESCE(${sentOn}, LOCALTIMESTAMP), delivered_at = NULL,
+            sent_at = COALESCE(${sentOn}, LOCALTIMESTAMP),
+            -- Clear the ENTIRE delivery record. Clearing delivered_at alone left the
+            -- previous cycle's delivered_by on a live case: a deliverer with no
+            -- delivery time.
+            delivered_at = NULL, delivered_by = NULL,
+            remake_count = 0, created_by = ${createdBy},
             status_changed_at = LOCALTIMESTAMP
         WHERE id = ${existing.id}
         RETURNING ${COLS}
@@ -102,10 +172,14 @@ export async function createLabCase(body: CreateLabCaseBody, req: WithSession): 
       row = res.rows[0]!;
     }
 
-    await sql`
-      INSERT INTO lab_case_events (lab_case_id, event_type, from_status, to_status, note, created_by)
-      VALUES (${row.id}, 'stage_change', ${existing ? 'cancelled' : null}, 'sent_to_lab', ${note}, ${createdBy})
-    `.execute(trx);
+    await insertEvent(trx, {
+      labCaseId: row.id,
+      eventType: 'stage_change',
+      fromStatus: existing ? 'cancelled' : null,
+      toStatus: 'sent_to_lab',
+      note,
+      createdBy,
+    });
 
     return row;
   });
@@ -155,17 +229,19 @@ export async function advanceLabCase(id: number, body: AdvanceLabCaseBody, req: 
     `.execute(trx);
     const row = res.rows[0]!;
 
-    await sql`
-      INSERT INTO lab_case_events (lab_case_id, event_type, from_status, to_status, occurred_at, note, created_by)
-      VALUES (${id}, 'stage_change', ${body.fromStatus}, ${body.toStatus}, COALESCE(${occurredAt}, LOCALTIMESTAMP), ${body.note ?? null}, ${createdBy})
-    `.execute(trx);
+    await insertEvent(trx, {
+      labCaseId: id,
+      eventType: 'stage_change',
+      fromStatus: body.fromStatus,
+      toStatus: body.toStatus,
+      occurredAt,
+      note: body.note ?? null,
+      createdBy,
+    });
 
     // A case that physically moved is by definition no longer on hold.
     if (wasOnHold) {
-      await sql`
-        INSERT INTO lab_case_events (lab_case_id, event_type, occurred_at, created_by)
-        VALUES (${id}, 'resume', COALESCE(${occurredAt}, LOCALTIMESTAMP), ${createdBy})
-      `.execute(trx);
+      await insertEvent(trx, { labCaseId: id, eventType: 'resume', occurredAt, createdBy });
     }
 
     return row;
@@ -200,9 +276,8 @@ export async function remakeLabCase(id: number, body: RemakeLabCaseBody, req: Wi
       }
       toStatus = fallback;
     }
-    if (!(LAB_STAGES as readonly string[]).includes(toStatus)) {
-      throw new Error('[INVALID_STATE_TRANSITION] Invalid returnToStatus');
-    }
+
+    assertRemakeTarget(fromStatus, toStatus);
 
     const res = await sql<LabCaseRow>`
       UPDATE lab_cases
@@ -215,10 +290,15 @@ export async function remakeLabCase(id: number, body: RemakeLabCaseBody, req: Wi
     `.execute(trx);
     const row = res.rows[0]!;
 
-    await sql`
-      INSERT INTO lab_case_events (lab_case_id, event_type, from_status, to_status, occurred_at, note, created_by)
-      VALUES (${id}, 'remake', ${fromStatus}, ${toStatus}, COALESCE(${occurredAt}, LOCALTIMESTAMP), ${body.reason}, ${createdBy})
-    `.execute(trx);
+    await insertEvent(trx, {
+      labCaseId: id,
+      eventType: 'remake',
+      fromStatus,
+      toStatus,
+      occurredAt,
+      note: body.reason,
+      createdBy,
+    });
 
     return row;
   });
@@ -231,6 +311,11 @@ export async function remakeLabCase(id: number, body: RemakeLabCaseBody, req: Wi
 export async function holdLabCase(id: number, body: HoldLabCaseBody, req: WithSession): Promise<LabCaseRow> {
   const createdBy = actingUser(req);
   return withPgTransaction(async (trx: Transaction<Database>) => {
+    // Lock first so a missing case 404s instead of being reported as a bad state
+    // transition — the client's silent-reload predicate fires on the latter and
+    // would keep reloading a case that does not exist.
+    await assertCaseExists(trx, id);
+
     const res = await sql<LabCaseRow>`
       UPDATE lab_cases SET is_on_hold = true
       WHERE id = ${id} AND status NOT IN ('delivered', 'cancelled')
@@ -240,10 +325,7 @@ export async function holdLabCase(id: number, body: HoldLabCaseBody, req: WithSe
       throw new Error('[INVALID_STATE_TRANSITION] Cannot hold a delivered or cancelled case');
     }
     const row = res.rows[0]!;
-    await sql`
-      INSERT INTO lab_case_events (lab_case_id, event_type, note, created_by)
-      VALUES (${id}, 'hold', ${body.note ?? null}, ${createdBy})
-    `.execute(trx);
+    await insertEvent(trx, { labCaseId: id, eventType: 'hold', note: body.note ?? null, createdBy });
     return row;
   });
 }
@@ -251,6 +333,8 @@ export async function holdLabCase(id: number, body: HoldLabCaseBody, req: WithSe
 export async function resumeLabCase(id: number, body: ResumeLabCaseBody, req: WithSession): Promise<LabCaseRow> {
   const createdBy = actingUser(req);
   return withPgTransaction(async (trx: Transaction<Database>) => {
+    await assertCaseExists(trx, id);
+
     const res = await sql<LabCaseRow>`
       UPDATE lab_cases SET is_on_hold = false
       WHERE id = ${id} AND is_on_hold = true
@@ -260,10 +344,7 @@ export async function resumeLabCase(id: number, body: ResumeLabCaseBody, req: Wi
       throw new Error('[INVALID_STATE_TRANSITION] Case is not currently on hold');
     }
     const row = res.rows[0]!;
-    await sql`
-      INSERT INTO lab_case_events (lab_case_id, event_type, note, created_by)
-      VALUES (${id}, 'resume', ${body.note ?? null}, ${createdBy})
-    `.execute(trx);
+    await insertEvent(trx, { labCaseId: id, eventType: 'resume', note: body.note ?? null, createdBy });
     return row;
   });
 }
@@ -288,10 +369,14 @@ export async function cancelLabCase(id: number, body: CancelLabCaseBody, req: Wi
     `.execute(trx);
     const row = res.rows[0]!;
 
-    await sql`
-      INSERT INTO lab_case_events (lab_case_id, event_type, from_status, to_status, note, created_by)
-      VALUES (${id}, 'cancel', ${pre.status}, 'cancelled', ${body.note ?? null}, ${createdBy})
-    `.execute(trx);
+    await insertEvent(trx, {
+      labCaseId: id,
+      eventType: 'cancel',
+      fromStatus: pre.status,
+      toStatus: 'cancelled',
+      note: body.note ?? null,
+      createdBy,
+    });
 
     return row;
   });

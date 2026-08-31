@@ -31,6 +31,12 @@ export type GoogleContactsTokens = {
   tokenType: string;
   scope: string | null;
   expiresAt: Date;
+  /**
+   * The Google address this grant actually belongs to, read back from the People
+   * API at connect time. NULL for a grant predating the column (or one imported
+   * from the retired on-disk `tokens/*.json`) — it fills in on the next connect.
+   */
+  accountEmail: string | null;
 };
 
 /** Read one account's stored tokens, or null when that account isn't connected. */
@@ -50,6 +56,7 @@ export async function getGoogleContactsTokens(
       tokenType: row.token_type,
       scope: row.scope,
       expiresAt: row.expires_at as Date,
+      accountEmail: row.account_email,
     };
   } catch (error) {
     log.error('Error reading Google Contacts tokens', {
@@ -80,6 +87,7 @@ export async function listGoogleContactsTokens(): Promise<Map<string, GoogleCont
           tokenType: row.token_type,
           scope: row.scope,
           expiresAt: row.expires_at as Date,
+          accountEmail: row.account_email,
         },
       ])
     );
@@ -100,6 +108,7 @@ export async function saveGoogleContactsTokens(
     token_type: tokens.tokenType,
     scope: tokens.scope,
     expires_at: tokens.expiresAt,
+    account_email: tokens.accountEmail,
   };
   try {
     await getKysely()
@@ -114,6 +123,24 @@ export async function saveGoogleContactsTokens(
     });
     throw error;
   }
+}
+
+/**
+ * Which registered account slot (if any) already holds a grant for `email`.
+ *
+ * Guards the connect callback: the consent URL cannot force a particular Google account, so a staff
+ * member signed into the wrong one would otherwise file that grant under whichever slot they
+ * clicked Connect on, silently shadowing the other. Returns the slot's account id, or null when the
+ * address is unclaimed. `account_email` is citext, so the comparison is case-insensitive.
+ */
+export async function findAccountIdByEmail(email: string): Promise<string | null> {
+  const row = await getKysely()
+    .selectFrom('integration_oauth_tokens')
+    .select('provider')
+    .where('provider', 'like', `${PROVIDER_PREFIX}:%`)
+    .where('account_email', '=', email)
+    .executeTakeFirst();
+  return row ? row.provider.slice(PROVIDER_PREFIX.length + 1) : null;
 }
 
 /** Remove one account's tokens (disconnect, or a detected invalid_grant). */

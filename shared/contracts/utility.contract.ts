@@ -14,7 +14,12 @@ import { z } from 'zod';
 // Intentionally loose: Google Contacts API returns dynamic contact objects;
 // the field set varies by source and contact data completeness.
 export const google = {
-  query: z.object({ source: z.string().optional() }),
+  // `refresh=1` bypasses the server-side phone-book cache (the dropdown's Refresh
+  // control) — the crawl is otherwise cached for a few minutes per account.
+  query: z.object({
+    source: z.string().optional(),
+    refresh: z.coerce.boolean().optional(),
+  }),
   response: z.array(z.unknown()),
 } as const;
 export type GoogleQuery = z.infer<typeof google.query>;

@@ -13,9 +13,9 @@
  * never sent to the client) — same table as the 3Shape integration, keyed by a
  * different `provider`. See services/threeshape/oauth.ts for the sibling pattern.
  */
-import crypto from 'node:crypto';
 import config from '../../config/config.js';
 import { log } from '../../utils/logger.js';
+import { credentialsToTokenRow, generateState, isInvalidGrantError } from '../../utils/oauth.js';
 import driveClient from './google-drive-client.js';
 import {
   clearGoogleDriveTokens,
@@ -23,14 +23,14 @@ import {
   saveGoogleDriveTokens,
 } from '../database/queries/google-drive-queries.js';
 
+// The anti-CSRF `state` generator and the invalid-grant classifier are shared with the other OAuth
+// integrations (utils/oauth.ts — they used to be per-provider copies). Re-exported so this module
+// stays the single façade for the Drive integration and call sites keep the `googleDriveOAuth.x` form.
+export { generateState, isInvalidGrantError };
+
 /** Is the OAuth client configured enough to start the connect flow? */
 export function isConfigured(): boolean {
   return Boolean(config.googleDrive.clientId && config.googleDrive.clientSecret);
-}
-
-/** Random anti-CSRF `state`. */
-export function generateState(): string {
-  return crypto.randomBytes(16).toString('base64url');
 }
 
 /** Build the Google consent-screen URL to 302 the browser to. */
@@ -53,13 +53,7 @@ export async function exchangeCode(code: string): Promise<void> {
         'https://myaccount.google.com/permissions and try connecting again.'
     );
   }
-  await saveGoogleDriveTokens({
-    accessToken: tokens.access_token || '',
-    refreshToken: tokens.refresh_token,
-    tokenType: tokens.token_type || 'Bearer',
-    scope: tokens.scope ?? null,
-    expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : new Date(Date.now() + 3600_000),
-  });
+  await saveGoogleDriveTokens(credentialsToTokenRow(tokens));
   await driveClient.loadStoredCredentials();
   log.info('[GoogleDrive] OAuth tokens stored');
 }
@@ -89,27 +83,29 @@ export async function getStatus(): Promise<GoogleDriveStatus> {
   };
 }
 
-/** Disconnect — drop the stored tokens (falls back to the env token, if any). */
+/**
+ * Disconnect — drop the stored tokens AND de-authorize the live client.
+ *
+ * The `loadStoredCredentials()` call is what makes this real rather than cosmetic: it re-reads the
+ * (now empty) store and clears the singleton's in-memory credentials, falling back to the env
+ * refresh token if one is configured. Without that second step the Settings card flipped to "not
+ * connected" while `driveClient` kept the cleared refresh token in memory and went on uploading
+ * until the service was restarted.
+ */
 export async function disconnect(): Promise<void> {
   await clearGoogleDriveTokens();
   await driveClient.loadStoredCredentials();
   log.info('[GoogleDrive] disconnected (tokens cleared)');
 }
 
-/** Detect Google's "refresh token no longer valid" error across the shapes googleapis/gaxios throw it in. */
-export function isInvalidGrantError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const withResponse = err as { response?: { data?: { error?: string } } };
-  if (withResponse.response?.data?.error === 'invalid_grant') return true;
-  return /invalid_grant/i.test(err.message);
-}
-
 /**
  * A Drive call failed with invalid_grant — the stored refresh token was revoked or
  * expired. Drop it so the Settings card immediately reflects "not connected"
- * instead of silently failing on every subsequent upload.
+ * instead of silently failing on every subsequent upload, and drop it from the live
+ * client too so the next call fails loudly instead of retrying a dead token.
  */
 export async function handleInvalidGrant(): Promise<void> {
   await clearGoogleDriveTokens();
+  await driveClient.loadStoredCredentials();
   log.warn('[GoogleDrive] refresh token invalid — cleared stored tokens, reconnect required');
 }

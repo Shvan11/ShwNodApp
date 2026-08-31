@@ -16,14 +16,11 @@ import { prefetchCsrfToken } from '../../core/http';
 import { buildLabelsFromRanges, type AlignerLabel } from '../../utils/aligner-labels';
 import Modal from './Modal';
 import styles from './LabelPreviewModal.module.css';
+import { PDF_ARABIC_FONTS, DEFAULT_PDF_ARABIC_FONT, type PdfArabicFont } from '@shared/pdf-fonts';
 
 const LABELS_PER_SHEET = 12;
 
 // Available Arabic fonts
-const ARABIC_FONTS = [
-    { id: 'cairo', name: 'Cairo', description: 'Modern, clean' },
-    { id: 'noto', name: 'Noto Sans Arabic', description: 'Standard' },
-];
 
 type Label = AlignerLabel;
 
@@ -143,7 +140,7 @@ const LabelPreviewModal = ({
 
     // Shared state
     const [startingPosition, setStartingPosition] = useState(1);
-    const [arabicFont, setArabicFont] = useState('cairo');
+    const [arabicFont, setArabicFont] = useState<PdfArabicFont>(DEFAULT_PDF_ARABIC_FONT);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Single batch mode state
@@ -543,12 +540,12 @@ const LabelPreviewModal = ({
                 <select
                     id="label-arabic-font"
                     value={arabicFont}
-                    onChange={(e: ChangeEvent<HTMLSelectElement>) => setArabicFont(e.target.value)}
+                    onChange={(e: ChangeEvent<HTMLSelectElement>) => setArabicFont(e.target.value as PdfArabicFont)}
                     className={styles.fontSelector}
                 >
-                    {ARABIC_FONTS.map(font => (
+                    {PDF_ARABIC_FONTS.map(font => (
                         <option key={font.id} value={font.id}>
-                            {font.name} - {font.description}
+                            {font.label} - {font.description}
                         </option>
                     ))}
                 </select>

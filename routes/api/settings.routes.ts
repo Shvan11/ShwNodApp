@@ -17,6 +17,7 @@ import {
   bulkUpdateOptions
 } from '../../services/database/queries/options-queries.js';
 import DatabaseConfigService from '../../services/settings/DatabaseConfigService.js';
+import { MASKED_SECRET } from '../../shared/masked-secret.js';
 import { sendSuccess, sendData, ErrorResponses } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import { log } from '../../utils/logger.js';
@@ -258,7 +259,7 @@ router.put(
       if (result.success) {
         // Mask password in response - create a copy to avoid mutating original
         const responseConfig = result.config
-          ? { ...result.config, PG_PASSWORD: '••••••••' }
+          ? { ...result.config, PG_PASSWORD: MASKED_SECRET }
           : result.config;
 
         sendData(res, settings.updateDatabaseConfig.response, {

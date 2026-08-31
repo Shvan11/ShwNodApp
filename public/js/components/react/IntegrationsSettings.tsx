@@ -864,7 +864,14 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
                 <dt>{account.label}</dt>
                 <dd>
                   {account.connected ? (
-                    <span className={styles.okText}>Connected</span>
+                    // Show WHICH Google account this slot holds. The consent screen can be steered
+                    // with a login_hint but never forced, so naming the address is what makes a
+                    // wrong-account connect visible instead of silently serving the wrong phone book.
+                    <span className={styles.okText}>
+                      {account.accountEmail
+                        ? `Connected as ${account.accountEmail}`
+                        : 'Connected'}
+                    </span>
                   ) : (
                     'Not connected'
                   )}
