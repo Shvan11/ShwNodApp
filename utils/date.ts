@@ -5,15 +5,12 @@
 /**
  * Format a date value to a local-time `YYYY-MM-DD` string.
  *
- * The mssql pool runs with `useUTC: false` (see `config/config.ts`), so the
- * driver builds `Date` objects in the server's local timezone. Reading them back
- * with *local* getters returns the exact wall-clock date the DB stored — with no
- * UTC round-trip, which is what shifts a midnight value back a day when a date is
- * serialized via `toISOString()` and then sliced.
- *
- * This is the code-side equivalent of the `CONVERT(varchar, col, 23)` pattern
- * used in the inline SQL queries (e.g. `patient-queries` DateOfBirth/DateAdded),
- * for date columns that arrive as `Date` objects (stored-proc results, etc.).
+ * PostgreSQL `date`/`timestamp` columns are WITHOUT time zone (single-clinic
+ * wall-clock), and the `pg` parsers hand back `date` as a `'YYYY-MM-DD'` string
+ * and `timestamp` as a local `Date`. Reading a `Date` back with *local* getters
+ * returns the exact wall-clock date the DB stored — with no UTC round-trip,
+ * which is what shifts a midnight value back a day when a date is serialized via
+ * `toISOString()` and then sliced.
  *
  * @param value Date object (typical), parseable string, or null/undefined.
  * @returns `YYYY-MM-DD`, or `''` for null/invalid input.
@@ -94,6 +91,15 @@ const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
  * produced — 'May' contains no token, but 'March' contains 'A' and the old
  * two-pass placeholder dance existed only to dodge that.
  *
+ * Literal text is escaped moment-style, in `[square brackets]`: the brackets are
+ * stripped and their contents emitted verbatim. This matters because the single
+ * -character tokens (`h`, `a`, `A`, `D`, `M`, `m`, `s`) match anywhere, including
+ * inside a literal word — `'DD MMMM YYYY at hh:mm A'` renders the `a` of "at" as
+ * the meridiem ("… 2026 pmt 02:05 PM"). Template authors supply these patterns
+ * (`{{ field | date:<format> }}` in the GrapesJS documents), so the escape has to
+ * exist: write `'DD MMMM YYYY [at] hh:mm A'`. An unclosed `[` is emitted as a
+ * literal bracket.
+ *
  * Returns `''` for null/undefined and echoes an unparseable value unchanged.
  */
 export function formatDatePattern(value: Date | string | number | null | undefined, pattern: string): string {
@@ -119,12 +125,16 @@ export function formatDatePattern(value: Date | string | number | null | undefin
     MMMM: MONTHS_FULL[date.getMonth()],
     MMM: MONTHS_SHORT[date.getMonth()],
     MM: String(date.getMonth() + 1).padStart(2, '0'),
+    M: String(date.getMonth() + 1),
     DD: String(date.getDate()).padStart(2, '0'),
+    D: String(date.getDate()),
     HH: String(hours24).padStart(2, '0'),
     hh: String(hours12).padStart(2, '0'),
     h: String(hours12),
     mm: String(date.getMinutes()).padStart(2, '0'),
+    m: String(date.getMinutes()),
     ss: String(date.getSeconds()).padStart(2, '0'),
+    s: String(date.getSeconds()),
     A: meridiem,
     a: meridiem.toLowerCase(),
   };
@@ -134,6 +144,14 @@ export function formatDatePattern(value: Date | string | number | null | undefin
   let out = '';
   let i = 0;
   outer: while (i < pattern.length) {
+    if (pattern[i] === '[') {
+      const close = pattern.indexOf(']', i + 1);
+      if (close !== -1) {
+        out += pattern.slice(i + 1, close);
+        i = close + 1;
+        continue;
+      }
+    }
     for (const token of ordered) {
       if (pattern.startsWith(token, i)) {
         out += tokens[token];

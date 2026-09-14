@@ -9,7 +9,11 @@
  * Phase 0: response-only (migrated from the deleted public/js/core/api.schemas.ts).
  */
 import { z } from 'zod';
-import { idParams, intId } from '../validation.js';
+import {
+  idParams,
+  intId,
+  optionalDateString,
+} from '../validation.js';
 
 // ---------------------------------------------------------------------------
 // GET /api/getDailyAppointments?AppsDate=YYYY-MM-DD
@@ -183,9 +187,13 @@ export const quickCheckin = {
 export type QuickCheckinBody = z.infer<typeof quickCheckin.body>;
 export type QuickCheckinResponse = z.infer<typeof quickCheckin.response>;
 
-// Route-level GET query view (`?AppsDate=`). Type-only — the dailyAppointments
-// read parses the date string itself.
+// GET /api/getDailyAppointments?AppsDate= — now VALIDATED (it was type-only).
+// `optionalDateString` admits absent/'' so the handler's own "AppsDate query
+// parameter is required" 400 still fires, while a repeated key (`?AppsDate=a&
+// AppsDate=b`, an ARRAY in Express) or a non-calendar date is rejected at the
+// boundary instead of being handed to the daily-appointments read as a `string[]`
+// the handler generic swore was a `string`.
 export const appointmentQuery = z.object({
-  AppsDate: z.string().optional(),
+  AppsDate: optionalDateString,
 });
 export type AppointmentQueryParams = z.infer<typeof appointmentQuery>;

@@ -671,7 +671,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 <select
                                     id="work-status"
                                     value={formData.status}
-                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, status: parseInt(e.target.value)})}
+                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, status: parseInt(e.target.value, 10)})}
                                     required
                                 >
                                     <option value={1}>Active</option>

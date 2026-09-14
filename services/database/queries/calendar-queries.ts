@@ -3,7 +3,7 @@
  *
  * Calendar slot reads. Reimplemented in TS from the original procs:
  * ProcCalendarStatsOptimized, ProcDay, ProcEnsureCalendarRange and FillCalender (whose VFillCal /
- * CalStep1 / CalStep2 view chain is inlined). Consumed by routes/calendar.ts.
+ * CalStep1 / CalStep2 view chain is inlined). Consumed by routes/api/calendar.routes.ts.
  *
  * SQL Server DATEPART(WEEKDAY) under DATEFIRST=7 used Friday=6; PG EXTRACT(DOW) uses Friday=5 —
  * the Friday-exclusion filters are translated accordingly. Timestamps are emitted as strings

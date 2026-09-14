@@ -1,59 +1,46 @@
 /**
- * WhatsApp Routes
+ * WhatsApp message-sending routes + the daily-appointments group settings.
  *
- * This module contains all WhatsApp-related API endpoints including:
- * - Message sending (single patient, batch by date)
- * - Media sending (images, X-rays, documents)
- * - QR code authentication
- * - Client status management
- * - Client lifecycle operations (restart, re-link, initialize)
+ * This module contains:
+ * - Message sending (batch by date, receipt, appointment, resend)
+ * - The appointments-PDF group settings the batch send reads
  *
- * All routes support real-time WebSocket updates for status changes.
+ * Two sibling routers were split out of this file (S2/C6) and mount at the same
+ * `/api/wa` prefix immediately after it: `whatsapp-media.routes.ts` (the /sendmedia*
+ * uploads) and `whatsapp-session.routes.ts` (QR/status + client lifecycle).
+ *
+ * All routes support real-time SSE updates for status changes.
  */
 
 import { Router, type Request, type Response } from 'express';
-import multer from 'multer';
-import qrcode from 'qrcode';
-import path from 'path';
 
 // Services
 import whatsapp from '../../services/messaging/whatsapp.js';
-import { sendImg_, sendXray_ } from '../../services/messaging/whatsapp-api.js';
 import { getGroupSettings, saveGroupSettings } from '../../services/messaging/group-settings.js';
-import { sendgramfile } from '../../services/messaging/telegram.js';
-import messageState from '../../services/messaging/messageState.js';
-import stateEvents from '../../services/messaging/stateEvents.js';
 import { getReceiptData } from '../../services/templates/receipt-service.js';
 import { getAppointmentForNotification } from '../../services/database/queries/appointment-queries.js';
 import { getNewAppointmentMessage } from '../../services/database/queries/messaging-queries.js';
 import { toDateOnly } from '../../utils/date.js';
 
 // Utilities
-import config from '../../config/config.js';
-import PhoneFormatter from '../../utils/phoneFormatter.js';
+import PhoneFormatter from '../../utils/phone-formatter.js';
 import { sendData, sendError, ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 import { timeouts } from '../../middleware/timeout.js';
 import { validate } from '../../middleware/validate.js';
+import { authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES, FINANCE_ROLES } from '../../shared/auth/roles.js';
 import * as waContract from '../../shared/contracts/whatsapp.contract.js';
 
 const router = Router();
-const upload = multer();
 
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
-type SendByDateQuery = waContract.SendByDateQuery;
-
 // Request bodies are contracted (request-only) in shared/contracts/whatsapp.contract.ts
 // (`waContract`) — the handlers type from its `z.infer` exports. Responses stay RAW
 // (the client reads top-level fields via the raw apiClient — not the funnel).
-
-interface SendMediaResult {
-  result: string;
-  sentMessages?: number;
-}
 
 // ============================================================================
 // WHATSAPP MESSAGE SENDING ROUTES
@@ -61,52 +48,29 @@ interface SendMediaResult {
 
 /**
  * Send WhatsApp messages in batch for a specific date
- * GET /send (mounted at /api/wa)
- * Query params: date (YYYY-MM-DD format)
+ * POST /send (mounted at /api/wa) — body: { date: 'YYYY-MM-DD' }
+ *
+ * A MUTATION, and deliberately a POST: as a GET it was exempt from csurf (which
+ * ignores safe methods) while the session cookie is `sameSite: 'lax'` and rides
+ * along on a top-level cross-site navigation — so a staff member clicking an
+ * external link to `…/api/wa/send?date=…` fired a real batch send to every
+ * patient booked that day. The date moved into the body with it; the contract's
+ * `dateString` now does the format + calendar-validity checks the handler used
+ * to open with.
  * note: Uses extended timeout (5 minutes) due to batch processing
  */
-router.get(
+router.post(
   '/send',
+  authorize(CLINICAL_ROLES),
   timeouts.whatsappSend,
+  validate({ body: waContract.sendByDate.body }),
   async (
-    req: Request<unknown, unknown, unknown, SendByDateQuery>,
+    req: Request<unknown, unknown, waContract.SendByDateBody>,
     res: Response
   ): Promise<void> => {
-    const dateparam = req.query.date;
+    const dateparam = req.body.date;
 
     try {
-      // Enhanced input validation
-      if (!dateparam) {
-        log.warn('WhatsApp batch send missing date parameter');
-        ErrorResponses.badRequest(res, 'Missing required parameters', {
-          required: ['date']
-        });
-        return;
-      }
-
-      // Validate date format (YYYY-MM-DD)
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(dateparam)) {
-        log.warn('WhatsApp batch send invalid date format', { date: dateparam });
-        ErrorResponses.badRequest(res, 'Invalid input', {
-          details: 'Invalid date format. Expected YYYY-MM-DD'
-        });
-        return;
-      }
-
-      // Validate that it's a valid date
-      const dateObj = new Date(dateparam);
-      if (
-        isNaN(dateObj.getTime()) ||
-        dateObj.toISOString().slice(0, 10) !== dateparam
-      ) {
-        log.warn('WhatsApp batch send invalid date value', { date: dateparam });
-        ErrorResponses.badRequest(res, 'Invalid input', {
-          details: 'Invalid date value'
-        });
-        return;
-      }
-
       log.info(`WhatsApp send request for validated date: ${dateparam}`);
 
       // Check if client is ready
@@ -152,9 +116,7 @@ router.get(
       });
     } catch (error) {
       log.error(`Error starting WhatsApp send: ${(error as Error).message}`);
-      ErrorResponses.internalError(res, 'Failed to start sending process', {
-        error: (error as Error).message
-      });
+      ErrorResponses.internalError(res, 'Failed to start sending process', error as Error);
     }
   }
 );
@@ -167,6 +129,7 @@ router.get(
  */
 router.post(
   '/send-receipt',
+  authorize(CLINICAL_ROLES),
   validate({ body: waContract.sendReceipt.body }),
   async (
     req: Request<unknown, unknown, waContract.SendReceiptBody>,
@@ -185,7 +148,7 @@ router.post(
       }
 
       // Validate workId is numeric
-      if (isNaN(parseInt(String(workId)))) {
+      if (isNaN(parseInt(String(workId), 10))) {
         log.warn('WhatsApp receipt send invalid workId', { workId });
         ErrorResponses.badRequest(res, 'Invalid input', {
           details: 'workId must be a valid number'
@@ -207,7 +170,7 @@ router.post(
       // Get receipt data (includes patient phone, amounts, appointment)
       let receiptData;
       try {
-        receiptData = await getReceiptData(parseInt(String(workId)));
+        receiptData = await getReceiptData(parseInt(String(workId), 10));
       } catch (error) {
         log.error(`Failed to get receipt data for work ${workId}:`, error);
         res.json({
@@ -297,6 +260,7 @@ Thank you for your payment!`;
  */
 router.post(
   '/send-appointment',
+  authorize(CLINICAL_ROLES),
   validate({ body: waContract.sendAppointment.body }),
   async (
     req: Request<unknown, unknown, waContract.SendAppointmentBody>,
@@ -313,7 +277,7 @@ router.post(
         return;
       }
 
-      if (isNaN(parseInt(String(appointmentId)))) {
+      if (isNaN(parseInt(String(appointmentId), 10))) {
         log.warn('WhatsApp appointment send invalid appointmentId', { appointmentId });
         ErrorResponses.badRequest(res, 'Invalid input', {
           details: 'appointmentId must be a valid number'
@@ -331,7 +295,7 @@ router.post(
         return;
       }
 
-      const appointment = await getAppointmentForNotification(parseInt(String(appointmentId)));
+      const appointment = await getAppointmentForNotification(parseInt(String(appointmentId), 10));
       if (!appointment) {
         log.warn(`Appointment not found: ${appointmentId}`);
         res.json({
@@ -427,6 +391,7 @@ Thank you.`;
  */
 router.post(
   '/resend-appointment',
+  authorize(CLINICAL_ROLES),
   validate({ body: waContract.resendAppointment.body }),
   async (
     req: Request<unknown, unknown, waContract.ResendAppointmentBody>,
@@ -488,9 +453,7 @@ router.post(
       log.error(
         `Error resending appointment reminder: ${(error as Error).message}`
       );
-      ErrorResponses.internalError(res, 'Failed to resend message', {
-        error: (error as Error).message
-      });
+      ErrorResponses.internalError(res, 'Failed to resend message', error as Error);
     }
   }
 );
@@ -504,15 +467,13 @@ router.post(
  * target group name). Defaults applied for unset options.
  * GET /group-settings (mounted at /api/wa)
  */
-router.get('/group-settings', async (_req: Request, res: Response): Promise<void> => {
+router.get('/group-settings', authorize(FINANCE_ROLES), async (_req: Request, res: Response): Promise<void> => {
   try {
     const settings = await getGroupSettings();
     sendData(res, waContract.groupSettings.response, settings);
   } catch (error) {
     log.error('Failed to load WhatsApp group settings', { error: (error as Error).message });
-    ErrorResponses.internalError(res, 'Failed to load group settings', {
-      error: (error as Error).message
-    });
+    ErrorResponses.internalError(res, 'Failed to load group settings', error as Error);
   }
 });
 
@@ -523,6 +484,7 @@ router.get('/group-settings', async (_req: Request, res: Response): Promise<void
  */
 router.put(
   '/group-settings',
+  authorize(FINANCE_ROLES),
   validate({ body: waContract.groupSettings.body }),
   async (
     req: Request<unknown, unknown, waContract.GroupSettingsBody>,
@@ -534,472 +496,9 @@ router.put(
       sendData(res, waContract.groupSettings.response, saved);
     } catch (error) {
       log.error('Failed to save WhatsApp group settings', { error: (error as Error).message });
-      ErrorResponses.internalError(res, 'Failed to save group settings', {
-        error: (error as Error).message
-      });
+      ErrorResponses.internalError(res, 'Failed to save group settings', error as Error);
     }
   }
 );
-
-// ============================================================================
-// MEDIA SENDING ROUTES
-// ============================================================================
-
-/**
- * Send media (base64 encoded image) via WhatsApp
- * POST /sendmedia
- * Body: { file: base64Image, phone: phoneNumber }
- * note: Uses extended timeout (2 minutes) for file upload
- */
-router.post(
-  '/sendmedia',
-  timeouts.long,
-  validate({ body: waContract.sendMedia.body }),
-  async (
-    req: Request<unknown, unknown, waContract.SendMediaBody>,
-    res: Response
-  ): Promise<void> => {
-    const { file: imgData, phone } = req.body;
-    const base64Data = imgData.replace(/^data:image\/png;base64,/, '');
-    const formattedPhone = PhoneFormatter.forWhatsApp(phone);
-    try {
-      await sendImg_(formattedPhone, base64Data);
-      res.send('OK');
-    } catch (error) {
-      log.warn('WhatsApp send image failed', { phone, error: (error as Error).message });
-      ErrorResponses.badRequest(res, 'operation failed', {
-        operation: 'send image',
-        details: (error as Error).message
-      });
-    }
-  }
-);
-
-/**
- * Send multiple media files via WhatsApp or Telegram
- * POST /sendmedia2
- * Body: { file: comma-separated paths, phone: phoneNumber, prog: "WhatsApp"|"Telegram" }
- * note: Uses extended timeout (2 minutes) for multiple file uploads
- */
-router.post(
-  '/sendmedia2',
-  timeouts.long,
-  upload.none(),
-  validate({ body: waContract.sendMedia2.body }),
-  async (
-    req: Request<unknown, unknown, waContract.SendMedia2Body>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const paths = req.body.file.split(',');
-      let phone = req.body.phone;
-      const prog = req.body.prog;
-
-      log.info(
-        `Sendmedia2 request - Program: ${prog}, phone: ${phone}, Files: ${paths.length}`
-      );
-
-      if (!phone || !prog || !paths.length) {
-        log.warn('Send media2 missing parameters', { phone, prog, pathCount: paths.length });
-        ErrorResponses.badRequest(res, 'Missing required parameters', {
-          required: ['phone', 'prog', 'file']
-        });
-        return;
-      }
-
-      // Simple Windows path resolution
-      function resolveWindowsPath(inputPath: string): string {
-        const trimmedPath = inputPath.trim();
-
-        // If it's already an absolute path, return as-is
-        if (trimmedPath.startsWith('\\\\') || trimmedPath.match(/^[A-Za-z]:/)) {
-          return trimmedPath;
-        }
-
-        // For relative paths, join with machine path
-        const basePath = config.fileSystem.machinePath || '';
-        return path.win32.join(basePath, trimmedPath);
-      }
-
-      let sentMessages = 0;
-      let state: SendMediaResult = { result: '' };
-
-      if (prog === 'WhatsApp') {
-        phone = PhoneFormatter.forWhatsApp(phone);
-        log.info(`WhatsApp - Formatted phone: ${phone}`);
-
-        for (const filePath of paths) {
-          // Resolve Windows path
-          const resolvedPath = resolveWindowsPath(filePath);
-          log.info(`Sending WhatsApp file: ${filePath} -> ${resolvedPath}`);
-          state = await sendXray_(phone, resolvedPath);
-          log.info(`WhatsApp result:`, state);
-          if (state.result === 'OK') {
-            sentMessages += 1;
-          }
-        }
-      } else if (prog === 'Telegram') {
-        const originalPhone = phone;
-        phone = PhoneFormatter.forTelegram(phone);
-        log.info(
-          `Telegram - Original phone: ${originalPhone}, Formatted phone: ${phone}`
-        );
-
-        for (const filePath of paths) {
-          // Resolve Windows path
-          const resolvedPath = resolveWindowsPath(filePath);
-          log.info(`Sending Telegram file: ${filePath} -> ${resolvedPath}`);
-          state = await sendgramfile(phone, resolvedPath);
-          log.info(`Telegram result:`, state);
-          if (state.result === 'OK') {
-            sentMessages += 1;
-          }
-        }
-      } else {
-        log.warn('Send media2 unsupported program', { prog, phone });
-        ErrorResponses.badRequest(res, 'Invalid input', {
-          details: `Unsupported program: ${prog}. Use 'WhatsApp' or 'Telegram'`
-        });
-        return;
-      }
-
-      state.sentMessages = sentMessages;
-      log.info(
-        `Final result - Sent: ${sentMessages}/${paths.length}, state:`,
-        state
-      );
-      res.json(state);
-    } catch (error) {
-      log.error('Error in sendmedia2:', error);
-      ErrorResponses.internalError(res, 'Error processing media files', {
-        error: (error as Error).message
-      });
-    }
-  }
-);
-
-// ============================================================================
-// WHATSAPP AUTHENTICATION & STATUS ROUTES
-// ============================================================================
-
-/**
- * Get WhatsApp QR code for authentication
- * GET /qr (mounted at /api/wa)
- * Returns QR code as base64 data url or error if not available
- */
-router.get('/qr', async (_req: Request, res: Response): Promise<void> => {
-  try {
-    // Just check if QR code is available
-    if (!messageState || !messageState.qr) {
-      log.warn('WhatsApp QR code not available');
-      ErrorResponses.notFound(res, 'QR code', {
-        details: 'QR code not available yet',
-        status: 'waiting',
-        timestamp: Date.now()
-      });
-      return;
-    }
-
-    // Convert the QR code string to a data url
-    const qrImageUrl = await qrcode.toDataURL(messageState.qr, {
-      margin: 4,
-      scale: 6,
-      errorCorrectionLevel: 'M'
-    });
-
-    // Send back as JSON with metadata
-    res.json({
-      qr: qrImageUrl,
-      status: 'available',
-      timestamp: Date.now(),
-      expiryTime: Date.now() + 60000 // QR codes typically expire after 1 minute
-    });
-  } catch (error) {
-    log.error('Error generating WhatsApp QR code image:', error);
-    ErrorResponses.internalError(res, 'Error generating QR code', {
-      error: (error as Error).message
-    });
-  }
-});
-
-/**
- * Get initial WhatsApp state (replaces the WS REQUEST_WHATSAPP_INITIAL_STATE RPC).
- * GET /initial-state (mounted at /api/wa)
- * Returns the same payload shape the WS handler used to push, so hooks can
- * prime themselves on mount / date-change / visibility / 30s QR-refresh.
- * Triggers on-demand init when QR viewers are connected.
- */
-router.get('/initial-state', async (_req: Request, res: Response): Promise<void> => {
-  try {
-    const stateDump = messageState.dump();
-    const clientStatus = whatsapp.getStatus() as {
-      state?: string;
-      active?: boolean;
-      initializing?: boolean;
-      hasClient?: boolean;
-      needsRelink?: boolean;
-    };
-
-    // Don't kick on-demand init while parked for a re-link (it would no-op in the
-    // service anyway, but skip the emit entirely).
-    if (messageState.activeQRViewers > 0 && !clientStatus.needsRelink) {
-      stateEvents.emit('whatsapp_initialization_requested');
-    }
-
-    const isClientReady = stateDump.clientReady || clientStatus.active;
-    const finished = stateDump.finishedSending;
-
-    // Two distinct "no QR yet" situations, so the auth page never shows a
-    // forever-empty QR box: `needsRelink` = session poisoned, manual re-link
-    // required (parked); `restoring` = a live client mid-restore (a QR may still
-    // be moments away, or it resolves to ready).
-    const needsRelink = !!clientStatus.needsRelink;
-    const restoring =
-      !isClientReady &&
-      !needsRelink &&
-      !messageState.qr &&
-      !!clientStatus.hasClient &&
-      (clientStatus.state === 'INITIALIZING' || !!clientStatus.initializing);
-
-    let html: string;
-    if (isClientReady) {
-      html = finished
-        ? `<p>${stateDump.sentMessages} Messages Sent!</p><p>${stateDump.failedMessages} Messages Failed!</p><p>Finished</p>`
-        : `<p>${stateDump.sentMessages} Messages Sent!</p><p>${stateDump.failedMessages} Messages Failed!</p><p>Sending...</p>`;
-    } else if (needsRelink) {
-      html = '<p>WhatsApp session expired — please re-link the device.</p>';
-    } else if (messageState.qr && messageState.activeQRViewers > 0) {
-      html = '<p>QR code ready - Please scan with WhatsApp</p>';
-    } else if (restoring) {
-      html = '<p>Restoring WhatsApp session...</p>';
-    } else {
-      html = '<p>Initializing the client...</p>';
-    }
-
-    let qrDataUrl: string | null = null;
-    if (!isClientReady && messageState.qr) {
-      try {
-        qrDataUrl = await qrcode.toDataURL(messageState.qr, {
-          margin: 4,
-          scale: 6,
-          errorCorrectionLevel: 'M'
-        });
-      } catch (error) {
-        log.error('Failed to convert QR code to data url', { error: (error as Error).message });
-        qrDataUrl = messageState.qr;
-      }
-    }
-
-    res.json({
-      success: true,
-      htmltext: html,
-      finished,
-      clientReady: isClientReady,
-      initializing: clientStatus.initializing || false,
-      needsRelink,
-      restoring,
-      clientStatus,
-      persons: messageState.persons || [],
-      qr: qrDataUrl,
-      stats: stateDump,
-      sentMessages: stateDump.sentMessages || 0,
-      failedMessages: stateDump.failedMessages || 0,
-      timestamp: Date.now()
-    });
-  } catch (error) {
-    log.error('Error building WhatsApp initial state', { error: (error as Error).message });
-    ErrorResponses.internalError(res, 'Failed to fetch initial state', {
-      error: (error as Error).message
-    });
-  }
-});
-
-// ============================================================================
-// WHATSAPP CLIENT LIFECYCLE ROUTES
-// ============================================================================
-
-/**
- * Restart WhatsApp client
- * POST /restart (mounted at /api/wa)
- * Safely closes the existing client and creates a new one
- */
-router.post(
-  '/restart',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      log.info('Restarting WhatsApp client');
-
-      const success = await whatsapp.restart();
-
-      res.json({
-        success: true,
-        message: 'WhatsApp client restart initiated',
-        result: success ? 'restart_initiated' : 'restart_failed'
-      });
-    } catch (error) {
-      log.error('Error restarting WhatsApp client:', error);
-      ErrorResponses.internalError(res, 'Failed to restart WhatsApp client', {
-        error: (error as Error).message
-      });
-    }
-  }
-);
-
-/**
- * Refresh the WhatsApp QR code.
- * POST /refresh-qr (mounted at /api/wa)
- *
- * The displayed QR is already live-pushed on every whatsapp-web.js rotation via the
- * SSE channel, so re-fetching state can't change it — the only way to mint a *new*
- * code is a fresh client init. This force-restarts the client to do exactly that.
- *
- * It is FIRE-AND-FORGET (returns 200 immediately, restarts in the background): a
- * blocking restart can't be awaited over HTTP because, in QR mode, the init promise
- * doesn't resolve until a scan or FRESH_AUTH_TIMEOUT (90s) — far past the 30s request
- * timeout. The fresh QR arrives over `GET /api/sse/whatsapp` within a few seconds.
- */
-router.post('/refresh-qr', (_req: Request, res: Response): void => {
-  try {
-    log.info('WhatsApp QR refresh requested - restarting client to mint a new QR');
-    res.json({
-      success: true,
-      message: 'Refreshing QR code',
-      action: 'refresh_qr_requested',
-      timestamp: Date.now()
-    });
-
-    setImmediate(async () => {
-      try {
-        await whatsapp.restart();
-        log.info('QR refresh restart completed');
-      } catch (error) {
-        log.error('QR refresh restart failed:', (error as Error).message);
-      }
-    });
-  } catch (error) {
-    log.error('Error handling WhatsApp QR refresh request:', error);
-    ErrorResponses.internalError(res, 'Failed to process QR refresh request', {
-      error: (error as Error).message
-    });
-  }
-});
-
-/**
- * Re-link the WhatsApp client.
- * POST /unlink (mounted at /api/wa)
- *
- * Clears the stored session through whatsapp-web.js's OWN api (a clean
- * client.logout() when the page is healthy, else destroy + LocalAuth.logout() —
- * never our own fs delete of .wwebjs_auth) and starts fresh so a new QR appears.
- * This is the only recovery for a poisoned "authenticated but never ready"
- * session (the parked `needs_relink` state); the Re-link button lands here.
- *
- * FIRE-AND-FORGET (returns 200 immediately): the clear + fresh init can exceed
- * the 30s request timeout, so the outcome is reported over `GET /api/sse/whatsapp`
- * — a fresh QR (`whatsapp_qr_updated`) on success, or a `needs_relink`
- * client-ready frame if the clear couldn't complete.
- */
-router.post('/unlink', (_req: Request, res: Response): void => {
-  try {
-    log.info('WhatsApp re-link requested — clearing session for a fresh QR');
-    res.json({
-      success: true,
-      message: 'Re-linking WhatsApp — a new QR is on the way',
-      action: 'unlink_requested',
-      timestamp: Date.now()
-    });
-
-    setImmediate(async () => {
-      try {
-        const result = await whatsapp.unlink();
-        if (result.success) {
-          log.info('WhatsApp unlink completed — fresh init started');
-        } else {
-          log.warn('WhatsApp unlink reported failure', { error: result.error });
-        }
-      } catch (error) {
-        log.error('WhatsApp unlink failed:', (error as Error).message);
-      }
-    });
-  } catch (error) {
-    log.error('Error handling WhatsApp unlink request:', error);
-    ErrorResponses.internalError(res, 'Failed to process re-link request', {
-      error: (error as Error).message
-    });
-  }
-});
-
-/**
- * Initialize WhatsApp client asynchronously
- * GET /initialize (mounted at /api/wa)
- * Returns 200 OK immediately and starts initialization in background
- * Suitable for external applications that need to trigger initialization
- */
-router.get('/initialize', (_req: Request, res: Response): void => {
-  try {
-    log.info('WhatsApp initialization request received');
-
-    // Immediately respond with 200 OK
-    res.json({
-      success: true,
-      message: 'WhatsApp initialization started',
-      timestamp: Date.now(),
-      action: 'initialize_requested'
-    });
-
-    // Start initialization in background (non-blocking)
-    setImmediate(async () => {
-      try {
-        log.info('Starting WhatsApp client initialization in background');
-        await whatsapp.initialize();
-        log.info('Background WhatsApp initialization completed successfully');
-      } catch (error) {
-        log.error(
-          'Background WhatsApp initialization failed:',
-          (error as Error).message
-        );
-      }
-    });
-  } catch (error) {
-    log.error('Error handling WhatsApp initialization request:', error);
-    ErrorResponses.internalError(res, 'Failed to process initialization request', {
-      error: (error as Error).message
-    });
-  }
-});
-
-/**
- * Manually start the WhatsApp client.
- * POST /initialize (mounted at /api/wa)
- * Mutation twin of the GET above, for the in-app "Start WhatsApp" button — calls
- * whatsapp.initialize() directly, so it works even when WHATSAPP_AUTO_INIT=false
- * disables every automatic init path (boot + on-demand). Returns 200 immediately
- * and initializes in the background; the SSE channel reports ready/QR.
- */
-router.post('/initialize', (_req: Request, res: Response): void => {
-  try {
-    log.info('Manual WhatsApp initialization requested');
-    res.json({
-      success: true,
-      message: 'WhatsApp initialization started',
-      timestamp: Date.now(),
-      action: 'initialize_requested'
-    });
-
-    setImmediate(async () => {
-      try {
-        await whatsapp.initialize();
-        log.info('Manual WhatsApp initialization completed successfully');
-      } catch (error) {
-        log.error('Manual WhatsApp initialization failed:', (error as Error).message);
-      }
-    });
-  } catch (error) {
-    log.error('Error handling manual WhatsApp initialization request:', error);
-    ErrorResponses.internalError(res, 'Failed to process initialization request', {
-      error: (error as Error).message
-    });
-  }
-});
 
 export default router;

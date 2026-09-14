@@ -20,11 +20,23 @@ import DatabaseConfigService from '../../services/settings/DatabaseConfigService
 import { MASKED_SECRET } from '../../shared/masked-secret.js';
 import { sendSuccess, sendData, ErrorResponses } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import { authorize } from '../../middleware/auth.js';
+import { ADMIN_ROLES } from '../../shared/auth/roles.js';
 import { log } from '../../utils/logger.js';
 import { spawnPgDump, backupFilename } from '../../services/database/backup.js';
 import * as settings from '../../shared/contracts/settings.contract.js';
 
 const router = Router();
+
+// Role gate. The two `GET /options` reads stay open to any staff session — the
+// SPA shell reads `PatientsFolder`/`VideosPath` on every page — but every write
+// and the whole database-config surface is ADMIN only. Left ungated these were
+// the most privileged endpoints in the app on an `authenticate`-only footing:
+// `GET /config/database/backup` streams a full `pg_dump` of the clinic (total
+// PHI exfiltration), `POST /config/database/test` probes arbitrary host/port/
+// credential combinations from the server, `PUT /config/database` repoints the
+// database, and `POST /system/restart` is a repeatable DoS.
+const adminOnly = authorize(ADMIN_ROLES);
 
 // Boundary schemas + bodies live in the shared contract
 // (`shared/contracts/settings.contract.ts`) and are the SSoT — the handlers type
@@ -69,6 +81,7 @@ router.get('/options', async (_req: Request, res: Response): Promise<void> => {
  */
 router.put(
   '/options/bulk',
+  adminOnly,
   validate({ body: settings.bulkOptions.body }),
   async (
     req: Request<unknown, unknown, BulkUpdateBody>,
@@ -136,6 +149,7 @@ router.get(
  */
 router.put(
   '/options/:optionName',
+  adminOnly,
   validate({ params: settings.updateOption.params, body: settings.updateOption.body }),
   async (
     req: Request<OptionNameParams, unknown, UpdateOptionBody>,
@@ -181,6 +195,7 @@ const dbConfigService = new DatabaseConfigService();
  */
 router.get(
   '/config/database',
+  adminOnly,
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const result = await dbConfigService.getCurrentConfig(false); // Mask sensitive data
@@ -211,6 +226,7 @@ router.get(
  */
 router.post(
   '/config/database/test',
+  adminOnly,
   validate({ body: settings.testDatabaseConnection.body }),
   async (
     req: Request<unknown, unknown, DatabaseConfigBody>,
@@ -244,6 +260,7 @@ router.post(
  */
 router.put(
   '/config/database',
+  adminOnly,
   validate({ body: settings.updateDatabaseConfig.body }),
   async (
     req: Request<unknown, unknown, DatabaseConfigBody>,
@@ -291,6 +308,7 @@ router.put(
  */
 router.get(
   '/config/database/export',
+  adminOnly,
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const result = await dbConfigService.exportConfiguration();
@@ -325,7 +343,7 @@ router.get(
  * download. A failure *after* bytes have streamed truncates the response (res.destroy)
  * to signal the client that the file is incomplete.
  */
-router.get('/config/database/backup', (req: Request, res: Response): void => {
+router.get('/config/database/backup', adminOnly, (req: Request, res: Response): void => {
   // A dump can exceed the global 30s request timeout on a large DB — opt this stream out.
   req.setTimeout(0);
   res.setTimeout(0);
@@ -399,6 +417,7 @@ router.get('/config/database/backup', (req: Request, res: Response): void => {
  */
 router.post(
   '/system/restart',
+  adminOnly,
   validate({ body: settings.restart.body }),
   async (
     req: Request<unknown, unknown, RestartBody>,

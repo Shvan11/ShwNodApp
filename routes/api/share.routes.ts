@@ -14,6 +14,8 @@ import { z } from 'zod';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import { authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import { stage } from '../../shared/contracts/share.contract.js';
 import { stageShareImage } from '../../services/files/share-stage.js';
 
@@ -41,6 +43,7 @@ function uploadImage(req: Request, res: Response, next: NextFunction): void {
 // POST /api/share/stage — persist an uploaded image and return its staged ref.
 router.post(
   '/stage',
+  authorize(CLINICAL_ROLES),
   uploadImage,
   validate({ body: stage.body }),
   async (req: Request<object, object, z.infer<typeof stage.body>>, res: Response): Promise<void> => {

@@ -15,12 +15,16 @@ interface UpdatePresentResult {
   appointment_id: number;
   state: string;
   time: string;
+  /** The appointment's OWN day (`YYYY-MM-DD`) — the SSE broadcast key. Not part of the HTTP response. */
+  appDay: string | null;
 }
 
 interface UndoStateResult {
   appointment_id: number;
   stateCleared: string;
   success: boolean;
+  /** The appointment's OWN day (`YYYY-MM-DD`) — the SSE broadcast key. Not part of the HTTP response. */
+  appDay: string | null;
 }
 
 /**
@@ -74,15 +78,17 @@ export async function updatePresent(
   state: string,
   Tim: string
 ): Promise<UpdatePresentResult> {
+  let appDay: string | null = null;
   await withPgTransaction(async (trx) => {
     const row = await trx
       .selectFrom('appointments')
-      .select(['present', 'seated', 'dismissed'])
+      .select(['present', 'seated', 'dismissed', 'app_day'])
       .where('appointment_id', '=', Aid)
       .forUpdate()
       .executeTakeFirst();
 
     if (!row) throw new Error('Appointment not found');
+    appDay = row.app_day;
     const present = row.present as string | null;
     const seated = row.seated as string | null;
     const dismissed = row.dismissed as string | null;
@@ -105,7 +111,7 @@ export async function updatePresent(
       throw new Error('Invalid state parameter. Must be present, seated, or dismissed.');
     }
   });
-  return { success: true, appointment_id: Aid, state, time: Tim };
+  return { success: true, appointment_id: Aid, state, time: Tim, appDay };
 }
 
 /**
@@ -120,14 +126,16 @@ export async function undoAppointmentState(
     throw new Error('Invalid state field. Must be present, seated, or dismissed.');
   }
 
+  let appDay: string | null = null;
   await withPgTransaction(async (trx) => {
     const row = await trx
       .selectFrom('appointments')
-      .select(['present', 'seated', 'dismissed'])
+      .select(['present', 'seated', 'dismissed', 'app_day'])
       .where('appointment_id', '=', appointment_id)
       .forUpdate()
       .executeTakeFirst();
 
+    appDay = row?.app_day ?? null;
     const seated = (row?.seated as string | null) ?? null;
     const dismissed = (row?.dismissed as string | null) ?? null;
     if (stateField === 'present' && seated !== null) throw new Error('Cannot undo check-in: Patient is already seated');
@@ -138,7 +146,7 @@ export async function undoAppointmentState(
     await trx.updateTable('appointments').set(set).where('appointment_id', '=', appointment_id).execute();
   });
 
-  return { appointment_id, stateCleared: stateField, success: true };
+  return { appointment_id, stateCleared: stateField, success: true, appDay };
 }
 
 /**
@@ -266,7 +274,13 @@ export async function createAppointment(data: {
   app_detail: string | null;
   dr_id: number | null;
   present?: string | null;
-}): Promise<number> {
+}): Promise<{ appointment_id: number; app_day: string | null }> {
+  // `app_day` comes back from the INSERT because it is the realtime broadcast key
+  // and it is `GENERATED ALWAYS AS ((app_date)::date) STORED` — so the DB, which
+  // owns the timestamp→day cast, is the only thing that can compute it correctly
+  // for every `app_date` format the service accepts. Callers used to re-derive it
+  // in JS (`split('T')[0]`, a hand-rolled toDateOnly, `new Date()`), which agreed
+  // with the row only for the shapes the staff UI happens to send.
   const row = await getKysely()
     .insertInto('appointments')
     .values({
@@ -276,10 +290,10 @@ export async function createAppointment(data: {
       dr_id: data.dr_id,
       present: data.present ?? null,
     })
-    .returning('appointment_id')
+    .returning(['appointment_id', 'app_day'])
     .executeTakeFirstOrThrow();
 
-  return row.appointment_id;
+  return { appointment_id: row.appointment_id, app_day: row.app_day };
 }
 
 export interface AppointmentWithPhone {
@@ -349,4 +363,128 @@ export async function getAppointmentForNotification(
     .select(['a.appointment_id as appointment_id', 'a.app_date', 'p.patient_name', 'p.phone', 'p.person_id'])
     .executeTakeFirst();
   return (row as AppointmentNotificationRow | undefined) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Route-layer reads moved out of `routes/api/appointment.routes.ts` (R9(b)).
+// Rows are `type` (not `interface`) so an array of them feeds the contracts'
+// `sendData` arg — the index-signature rule (CLAUDE.md / TS2345).
+// ---------------------------------------------------------------------------
+
+/** One row of the appointment-type dropdown feed. */
+export type AppointmentDetailRow = {
+  id: number;
+  detail: string;
+};
+
+/**
+ * One appointment as the patient-history list and the single-appointment read
+ * project it. `app_date` is `to_char`-formatted rather than returned as a
+ * `Date`: the column is `timestamp` WITHOUT time zone (clinic wall-clock), and
+ * letting the driver hand back a `Date` would re-introduce a UTC shift on the
+ * way through JSON.
+ */
+export type AppointmentSummaryRow = {
+  appointment_id: number;
+  person_id: number;
+  app_date: string;
+  app_detail: string;
+  dr_id: number;
+  DrName: string | null;
+};
+
+const APPOINTMENT_SUMMARY_SELECT = sql`
+        SELECT
+            a."appointment_id",
+            a."person_id",
+            to_char(a."app_date", 'YYYY-MM-DD"T"HH24:MI:SS') AS "app_date",
+            a."app_detail",
+            a."dr_id",
+            e."employee_name" AS "DrName"
+        FROM "appointments" a
+        LEFT JOIN "employees" e ON a."dr_id" = e."id"
+`;
+
+/** Every appointment type, for the booking dropdowns. */
+export async function listAppointmentDetails(): Promise<AppointmentDetailRow[]> {
+  const { rows } = await sql<AppointmentDetailRow>`
+    SELECT "id", "detail" FROM "details" ORDER BY "detail"
+  `.execute(getKysely());
+  return rows;
+}
+
+/** A patient's full appointment history, newest first. */
+export async function getPatientAppointments(personId: number): Promise<AppointmentSummaryRow[]> {
+  const { rows } = await sql<AppointmentSummaryRow>`
+    ${APPOINTMENT_SUMMARY_SELECT}
+    WHERE a."person_id" = ${personId}
+    ORDER BY a."app_date" DESC
+  `.execute(getKysely());
+  return rows;
+}
+
+/** One appointment by id, or undefined when it doesn't exist. */
+export async function getAppointmentById(
+  appointmentId: number
+): Promise<AppointmentSummaryRow | undefined> {
+  const { rows } = await sql<AppointmentSummaryRow>`
+    ${APPOINTMENT_SUMMARY_SELECT}
+    WHERE a."appointment_id" = ${appointmentId}
+  `.execute(getKysely());
+  return rows[0];
+}
+
+/**
+ * Delete an appointment, returning the day it was on.
+ *
+ * The day is read BEFORE the DELETE — it is the SSE broadcast key, and once the
+ * row is gone there is nothing left to read it from. Returns `null` when the
+ * appointment did not exist (the caller then broadcasts nothing).
+ */
+export async function deleteAppointment(appointmentId: number): Promise<string | null> {
+  const db = getKysely();
+  const { rows: existing } = await sql<{ app_day: string | null }>`
+    SELECT "app_day" FROM "appointments" WHERE "appointment_id" = ${appointmentId}
+  `.execute(db);
+
+  await sql`
+    DELETE FROM "appointments" WHERE "appointment_id" = ${appointmentId}
+  `.execute(db);
+
+  return existing[0]?.app_day ?? null;
+}
+
+/**
+ * The patient portal's "next appointment" row. Narrower than
+ * {@link AppointmentSummaryRow} on purpose — the portal is a patient-facing
+ * surface, so it gets only what it renders.
+ */
+export type NextAppointmentRow = {
+  appointment_id: number;
+  app_date: string;
+  app_detail: string | null;
+  DrName: string | null;
+};
+
+/**
+ * A patient's soonest appointment from today onward, or undefined when they
+ * have none. Compared against `CURRENT_DATE` (not `LOCALTIMESTAMP`) so an
+ * appointment earlier TODAY still counts as "next" for the rest of the day.
+ */
+export async function getNextAppointmentForPatient(
+  personId: number
+): Promise<NextAppointmentRow | undefined> {
+  const { rows } = await sql<NextAppointmentRow>`
+    SELECT
+       a."appointment_id",
+       to_char(a."app_date", 'YYYY-MM-DD"T"HH24:MI:SS') AS "app_date",
+       a."app_detail",
+       e."employee_name" AS "DrName"
+     FROM "appointments" a
+     LEFT JOIN "employees" e ON a."dr_id" = e."id"
+     WHERE a."person_id" = ${personId}
+       AND a."app_date" >= CURRENT_DATE
+     ORDER BY a."app_date" ASC
+     LIMIT 1`.execute(getKysely());
+  return rows[0];
 }

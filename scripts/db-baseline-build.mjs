@@ -28,6 +28,7 @@
 import { spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import pg from 'pg';
+import { resolveLocalPg } from './_pg-connection.mjs';
 
 const out = process.argv[2];
 if (!out) {
@@ -71,13 +72,9 @@ $do$;`
   .trim();
 
 // ---------------------------------------------------------------- live seed rows
-const c = new pg.Client({
-  host: process.env.PG_HOST,
-  port: Number(process.env.PG_PORT ?? 5432),
-  database: process.env.PG_DATABASE,
-  user: process.env.PG_USER,
-  password: process.env.PG_PASSWORD,
-});
+// Resolved the way the APP resolves it (DATABASE_URL or PG_*, discrete wins per
+// field) — see scripts/_pg-connection.mjs.
+const c = new pg.Client(resolveLocalPg());
 await c.connect();
 const q = async (sql) => (await c.query(sql)).rows;
 const lit = (v) => `'${String(v).replace(/'/g, "''")}'`;

@@ -15,7 +15,14 @@
  * identifiers the consumer reads; long-tail fields stay loose.
  */
 import { z } from 'zod';
-import { intId, dateString, idParams } from '../validation.js';
+import {
+  dateString,
+  idParams,
+  intId,
+  moneyInt,
+  numericParam,
+  optionalDateString,
+} from '../validation.js';
 import { withPendingOutcome } from './approvals.contract.js';
 
 // ---------------------------------------------------------------------------
@@ -110,7 +117,9 @@ export type ExchangeRatesResponse = z.infer<typeof exchangeRates.response>;
 export const updateExchangeRate = {
   body: z.looseObject({
     date: dateString,
-    exchangeRate: z.coerce.number().positive(),
+    // `sms.exchange_rate` is an `integer` column (IQD per USD — always a whole
+    // number of dinars in practice).
+    exchangeRate: moneyInt.positive(),
   }),
   response: z.object({
     // Intentionally loose: raw Kysely UpdateResult[] — structure is DB-driver-specific.
@@ -139,19 +148,33 @@ export type UpdateExchangeRateResponse = z.infer<typeof updateExchangeRate.respo
 // stable id and keep the rest loose.
 // ---------------------------------------------------------------------------
 
-// All four money fields are `.int()`: the invoices columns are PG `integer`
-// (amount_paid/usd_received/iqd_received/change), and PaymentService parses the
-// three cash fields with parseInt. Accepting a plain number meant a fractional
-// input was silently TRUNCATED on the cash legs but ROUNDED by PG on amountPaid —
-// two different answers for the same request. Reject it at the boundary instead.
+// All four money fields go through `moneyInt`: the invoices columns are PG
+// `integer` (amount_paid/usd_received/iqd_received/change), and PaymentService
+// parses the three cash fields with parseInt. Accepting a plain number meant a
+// fractional input was silently TRUNCATED on the cash legs but ROUNDED by PG on
+// amountPaid — two different answers for the same request. Reject it at the
+// boundary instead.
+//
+// `moneyInt` also carries the non-negative floor, which this endpoint had nowhere:
+// neither PaymentService's pre-check nor the locked re-check in
+// `addInvoiceWithBalanceGuard` tests a LOWER bound (both ask only
+// `amount > remaining`), so `amountPaid: -100000` was accepted and stored, which
+// RAISES the work's outstanding balance and corrupts every sum over
+// `invoices.amount_paid`. `amountPaid` is `.positive()` on top — 0 is not a
+// payment, and `PaymentModal`'s own `if (!amountPaid)` already refuses it.
+// `change` needs the floor too: `calculateValidatedChange` validates only when
+// `changeAmount > 0`, so a negative slid through unchecked into the column.
+// The cash legs were already service-guarded (`validateCurrencyAmounts` throws
+// NEGATIVE_AMOUNT); stating it here makes the boundary agree and turns it into a
+// field-level 400. The service guard stays — it still covers non-HTTP callers.
 export const addInvoice = {
   body: z.looseObject({
     workid: intId,
-    amountPaid: z.coerce.number().int(),
+    amountPaid: moneyInt.positive('Payment amount must be greater than zero'),
     paymentDate: dateString,
-    usdReceived: z.coerce.number().int().optional(),
-    iqdReceived: z.coerce.number().int().optional(),
-    change: z.coerce.number().int().optional(),
+    usdReceived: moneyInt.optional(),
+    iqdReceived: moneyInt.optional(),
+    change: moneyInt.optional(),
   }),
   response: z.looseObject({ InvoiceID: z.number().optional() }),
 } as const;
@@ -173,8 +196,15 @@ export type DeleteInvoiceResponse = z.infer<typeof deleteInvoice.response>;
 // Shared GET query for the payment read endpoints. Type-only (handlers parse manually).
 // Only the params a handler actually destructures: `workId` (getpaymenthistory) and
 // `date` (getExchangeRateForDate).
+// VALIDATED on `/getpaymenthistory` (it was type-only): the handler `parseInt`s
+// `workId` straight into the query, so a junk id was a PG 22P02 → 500, not a 400.
+// `numericParam` keeps it a STRING so the existing parseInt is unchanged.
 export const paymentQuery = z.object({
-  workId: z.string().optional(),
-  date: z.string().optional(),
+  workId: numericParam.optional(),
+  date: optionalDateString,
 });
+
+/** `:workId` route param for `/getworkforreceipt/:workId`. */
+export const workIdParams = idParams('workId');
+export type WorkIdParams = z.infer<typeof workIdParams>;
 export type PaymentQueryParams = z.infer<typeof paymentQuery>;

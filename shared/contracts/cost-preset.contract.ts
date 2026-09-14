@@ -52,17 +52,23 @@ export const createPreset = {
   response: z.object({ presetId: z.number() }),
 } as const;
 
+/** `:id` route param for the update/delete routes (numeric STRING — see numericParam). */
+export const presetIdParams = idParams('id');
+export type PresetIdParams = z.infer<typeof presetIdParams>;
+
 // PUT /api/settings/cost-presets/:id — void success.
 export const updatePreset = {
-  params: idParams('id'),
+  params: presetIdParams,
   body: costPresetBody,
 } as const;
 
 // DELETE /api/settings/cost-presets/:id — void success.
 export const deletePreset = {
-  params: idParams('id'),
+  params: presetIdParams,
 } as const;
 
 // GET /api/settings/cost-presets?currency= — type-only (handler reads currency directly).
+// GET /api/settings/cost-presets?currency= — now VALIDATED (it was type-only), so a
+// repeated key can't arrive as an array where the handler expects a string.
 export const getPresetsQuery = z.object({ currency: z.string().optional() });
 export type CostPresetQuery = z.infer<typeof getPresetsQuery>;

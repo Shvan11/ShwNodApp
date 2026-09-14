@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AnalogClock from '../components/react/AnalogClock';
-import { VISIBILITY_RESUME_THRESHOLD_MS } from '../constants/sse-liveness';
+import { VISIBILITY_RESUME_THRESHOLD_MS, CLOSED_STREAM_RELOAD_DELAY_MS } from '../constants/sse-liveness';
 import { applyResolvedTheme, getStoredThemePreference, resolveTheme } from '../core/theme';
 import { applyLanguageAttributes, getStoredLanguagePreference } from '../core/language';
 import styles from './ChairDisplay.module.css';
@@ -54,6 +54,7 @@ const ChairDisplay = () => {
     const [patient, setPatient] = useState<PatientPayload | null>(null);
     const esRef = useRef<EventSource | null>(null);
     const hiddenSinceRef = useRef<number | null>(null);
+    const reloadTimerRef = useRef<number | null>(null);
 
     // The kiosk is pinned to LIGHT + LTR regardless of the operator's device
     // theme/language. ChairDisplay lives outside RootLayout (no Theme/Language
@@ -84,7 +85,9 @@ const ChairDisplay = () => {
                 try { esRef.current.close(); } catch { /* ignore */ }
                 esRef.current = null;
             }
-            const es = new EventSource(`/sse/chair-display/${chairId}`);
+            // Authenticated stream (mounted under /api/sse behind the auth gate).
+            // Same-origin EventSource sends the session cookie automatically.
+            const es = new EventSource(`/api/sse/chair-display/${chairId}`);
             esRef.current = es;
 
             es.onopen = () => {
@@ -94,9 +97,23 @@ const ChairDisplay = () => {
 
             es.onerror = () => {
                 if (cancelled) return;
-                // CONNECTING means the browser is auto-reconnecting; CLOSED
-                // means it gave up (e.g. 4xx). UI shows "Reconnecting…" either way.
+                // CONNECTING means the browser is auto-reconnecting; CLOSED means
+                // it gave up. UI shows "Reconnecting…" either way.
                 setConnected(false);
+
+                // CLOSED comes from an HTTP error response, not a dropped socket
+                // (a dead server leaves it CONNECTING and retrying). Since the
+                // stream became session-authenticated, the realistic cause is an
+                // expired staff session — and EventSource never retries after a
+                // 4xx, so the kiosk would sit on "Reconnecting…" forever. Reload:
+                // the web gate then redirects to /login.html, which is a screen a
+                // human can act on. Delayed + latched so a server-side 5xx storm
+                // can't turn this into a reload loop.
+                if (es.readyState === EventSource.CLOSED && reloadTimerRef.current === null) {
+                    reloadTimerRef.current = window.setTimeout(() => {
+                        if (!cancelled) window.location.reload();
+                    }, CLOSED_STREAM_RELOAD_DELAY_MS);
+                }
             };
 
             es.addEventListener('chair_display_patient_loaded', (evt) => {
@@ -140,6 +157,10 @@ const ChairDisplay = () => {
             cancelled = true;
             document.removeEventListener('visibilitychange', handleVisibility);
             window.removeEventListener('pageshow', handlePageShow);
+            if (reloadTimerRef.current !== null) {
+                window.clearTimeout(reloadTimerRef.current);
+                reloadTimerRef.current = null;
+            }
             if (esRef.current) {
                 try { esRef.current.close(); } catch { /* ignore */ }
                 esRef.current = null;

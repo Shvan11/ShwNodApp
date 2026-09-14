@@ -1,11 +1,12 @@
 /**
  * MIME-type + category lookup for the patient file explorer.
  *
- * The video routes keep their own tiny table in `utils/video-mime.ts` (6 media
- * extensions). The file explorer needs a much broader taxonomy — every file
- * type a clinic folder might contain — plus a coarse *category* that drives the
- * frontend preview strategy (inline <img>/<video>/<audio>/<iframe> vs download)
- * and the entry icon. A single table maps each extension to both.
+ * The single MIME table for the whole server. The file explorer needs a broad
+ * taxonomy — every file type a clinic folder might contain — plus a coarse
+ * *category* that drives the frontend preview strategy (inline
+ * <img>/<video>/<audio>/<iframe> vs download) and the entry icon; one table maps
+ * each extension to both. The video routes used to carry a 6-extension copy of
+ * the same data in `utils/video-mime.ts`; they now call `getMediaMimeType`.
  */
 import path from 'path';
 
@@ -133,4 +134,19 @@ export function getFileMimeType(filePath: string): string {
  */
 export function getFileCategory(filePath: string): FileCategory {
   return lookup(filePath)?.category ?? 'other';
+}
+
+/**
+ * MIME type for a file served by the VIDEO routes (public streaming/download +
+ * the authenticated media API).
+ *
+ * Identical to `getFileMimeType` except for `.ogg`, which the shared table calls
+ * `audio/ogg` (its registered use) while the video library stores Ogg *video*
+ * under that extension — serving those as audio hides them from `<video>`. The
+ * override keeps the video routes' long-standing behaviour without pushing a
+ * video type onto the file explorer's audio files.
+ */
+export function getMediaMimeType(filePath: string): string {
+  if (path.extname(filePath).toLowerCase() === '.ogg') return 'video/ogg';
+  return getFileMimeType(filePath);
 }

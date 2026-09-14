@@ -16,17 +16,17 @@
 
 import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
-import { sql } from 'kysely';
-import { getKysely } from '../../services/database/kysely.js';
 import {
   getCurrentExchangeRate,
   getPaymentHistoryByWorkId,
   getExchangeRateAsOf,
   updateExchangeRateForDate,
-  listExchangeRates
+  listExchangeRates,
+  getWorkForReceipt,
+  deleteInvoiceById
 } from '../../services/database/queries/payment-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
-import { FINANCE_ROLES } from '../../shared/auth/roles.js';
+import { CLINICAL_ROLES, FINANCE_ROLES } from '../../shared/auth/roles.js';
 import {
   requireRecordAge,
   getInvoiceCreationDate
@@ -42,9 +42,12 @@ import {
   updateExchangeRate,
   addInvoice,
   deleteInvoice,
+  paymentQuery,
+  workIdParams,
   type UpdateExchangeRateBody,
   type AddInvoiceBody,
   type PaymentQueryParams,
+  type WorkIdParams,
 } from '../../shared/contracts/payment.contract.js';
 import {
   validateAndCreateInvoice,
@@ -63,23 +66,8 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-// PaymentQueryParams is contracted in shared/contracts/payment.contract.ts (type-only).
-
-// `type` (not `interface`) so it carries an implicit string index signature and
-// is assignable to the `z.looseObject` workForReceipt response contract that
-// `sendData` validates against (see shared-contract-progress.md, Phase 1 finding).
-type WorkForReceiptResult = {
-  person_id: number;
-  patient_name: string;
-  phone: string | null;
-  TotalPaid: number;
-  app_date: Date;
-  work_id: number;
-  total_required: number;
-  currency: string;
-  discount: number | null;
-  discount_date: Date | null;
-};
+// PaymentQueryParams is contracted in shared/contracts/payment.contract.ts, and the
+// reads that `parseInt` a `workId` now validate it there rather than trusting the type.
 
 // ============================================================================
 // PAYMENT RETRIEVAL ROUTES
@@ -91,6 +79,12 @@ type WorkForReceiptResult = {
  */
 router.get(
   '/getpaymenthistory',
+  // Deliberately CLINICAL_ROLES, not FINANCE_ROLES like the money WRITES below:
+  // clinical staff see a work's payments/receipt read-only (WorkComponent hides
+  // Add Payment for them but keeps history + printing). Written out so that
+  // "every role may read this" is a decision rather than a missing line.
+  authorize(CLINICAL_ROLES),
+  validate({ query: paymentQuery }),
   async (
     req: Request<unknown, unknown, unknown, PaymentQueryParams>,
     res: Response
@@ -101,7 +95,7 @@ router.get(
         ErrorResponses.missingParameter(res, 'workId');
         return;
       }
-      const payments = await getPaymentHistoryByWorkId(parseInt(workId));
+      const payments = await getPaymentHistoryByWorkId(parseInt(workId, 10));
       sendData(res, paymentHistory.response, payments);
     } catch (error) {
       log.error('Error fetching payment history:', error);
@@ -120,8 +114,10 @@ router.get(
  */
 router.get(
   '/getworkforreceipt/:workId',
+  authorize(CLINICAL_ROLES), // read-only receipt view — see /getpaymenthistory above
+  validate({ params: workIdParams }),
   async (
-    req: Request<{ workId: string }>,
+    req: Request<WorkIdParams>,
     res: Response
   ): Promise<void> => {
     try {
@@ -131,40 +127,14 @@ router.get(
         return;
       }
 
-      // V_Report (and its sub-views VTotPaid / VLastApp) inlined for a single work:
-      //  - TotalPaid: SUM(tblInvoice.amount_paid) for the work (NULL when no payments, as VTotPaid yielded)
-      //  - app_date:   the patient's latest FUTURE appointment (VLastApp: per-person MAX(app_date) > now)
-      const { rows: result } = await sql<WorkForReceiptResult>`
-        SELECT
-          w."person_id",
-          p."patient_name",
-          p."phone",
-          tp."TotalPaid",
-          la."app_date",
-          w."work_id",
-          w."total_required",
-          w."currency",
-          w."discount",
-          w."discount_date"
-        FROM "works" w
-        JOIN "patients" p ON p."person_id" = w."person_id"
-        LEFT JOIN (
-          SELECT "work_id", SUM("amount_paid") AS "TotalPaid"
-          FROM "invoices" GROUP BY "work_id"
-        ) tp ON tp."work_id" = w."work_id"
-        LEFT JOIN (
-          SELECT "person_id", MAX("app_date") AS "app_date"
-          FROM "appointments" WHERE "app_date" > LOCALTIMESTAMP GROUP BY "person_id"
-        ) la ON la."person_id" = w."person_id"
-        WHERE w."work_id" = ${parseInt(workId)}
-      `.execute(getKysely());
+      const work = await getWorkForReceipt(parseInt(workId, 10));
 
-      if (!result || result.length === 0) {
+      if (!work) {
         ErrorResponses.notFound(res, 'Work');
         return;
       }
 
-      sendData(res, workForReceipt.response, result[0]);
+      sendData(res, workForReceipt.response, work);
     } catch (error) {
       log.error('Error fetching work for receipt:', error);
       ErrorResponses.internalError(
@@ -202,11 +172,7 @@ router.get(
       sendData(res, currentExchangeRate.response, { exchangeRate });
     } catch (error) {
       log.error('Error getting exchange rate:', error);
-      ErrorResponses.internalError(
-        res,
-        (error as Error).message,
-        error as Error
-      );
+      ErrorResponses.internalError(res, 'Failed to get the exchange rate', error as Error);
     }
   }
 );
@@ -252,11 +218,7 @@ router.get(
       });
     } catch (error) {
       log.error('Error getting exchange rate for date:', error);
-      ErrorResponses.internalError(
-        res,
-        (error as Error).message,
-        error as Error
-      );
+      ErrorResponses.internalError(res, 'Failed to get the exchange rate', error as Error);
     }
   }
 );
@@ -283,11 +245,7 @@ router.get(
       sendData(res, exchangeRates.response, { rates });
     } catch (error) {
       log.error('Error listing exchange rates:', error);
-      ErrorResponses.internalError(
-        res,
-        (error as Error).message,
-        error as Error
-      );
+      ErrorResponses.internalError(res, 'Failed to list exchange rates', error as Error);
     }
   }
 );
@@ -321,11 +279,7 @@ router.post(
       sendData(res, updateExchangeRate.response, { result, date, exchangeRate });
     } catch (error) {
       log.error('Error updating exchange rate for date:', error);
-      ErrorResponses.internalError(
-        res,
-        (error as Error).message,
-        error as Error
-      );
+      ErrorResponses.internalError(res, 'Failed to update the exchange rate', error as Error);
     }
   }
 );
@@ -410,7 +364,7 @@ router.post(
         return;
       }
 
-      ErrorResponses.internalError(res, err.message, error as Error);
+      ErrorResponses.internalError(res, 'Failed to record the payment', error as Error);
     }
   }
 );
@@ -435,7 +389,7 @@ router.delete(
       const { invoiceId } = req.params as { invoiceId: string };
       const { requestId } = await enqueueApproval(
         'invoice.delete',
-        { invoiceId: parseInt(invoiceId) },
+        { invoiceId: parseInt(invoiceId, 10) },
         req
       );
       sendData(res, deleteInvoice.response, {
@@ -454,15 +408,12 @@ router.delete(
         return;
       }
 
-      const invoiceIdNum = parseInt(invoiceId);
+      const invoiceIdNum = parseInt(invoiceId, 10);
       // Resolve the patient BEFORE deleting — the notice fires post-delete, when
       // the invoice→work→person link is already gone.
       const personId = await resolveApprovalPersonId('invoice.delete', invoiceIdNum);
 
-      const result = await sql`
-        DELETE FROM "invoices" WHERE "invoice_id" = ${invoiceIdNum}
-      `.execute(getKysely());
-      const rowsAffected = Number(result.numAffectedRows ?? 0n);
+      const rowsAffected = await deleteInvoiceById(invoiceIdNum);
 
       if (rowsAffected === 0) {
         ErrorResponses.notFound(res, 'Invoice');
@@ -474,11 +425,7 @@ router.delete(
       sendData(res, deleteInvoice.response, { outcome: 'applied', rowsAffected }, 'Invoice deleted successfully');
     } catch (error) {
       log.error('Error deleting invoice:', error);
-      ErrorResponses.internalError(
-        res,
-        (error as Error).message,
-        error as Error
-      );
+      ErrorResponses.internalError(res, 'Failed to delete the invoice', error as Error);
     }
   }
 );

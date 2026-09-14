@@ -8,13 +8,16 @@
  *
  * Both endpoints respond 202 Accepted immediately. The client is sendBeacon-based
  * and never reads the response, so server response time has no effect on the
- * staff app's perceived performance.
+ * staff app's perceived performance. sendBeacon sends the session cookie (it is a
+ * same-origin credentialed POST), so the gate below does not break it.
  */
 
 import { Router, type Request, type Response } from 'express';
 import type { EventEmitter } from 'events';
 import { log } from '../../utils/logger.js';
 import { InternalEmitterEvents } from '../../services/messaging/websocket-events.js';
+import { authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import * as chairContract from '../../shared/contracts/chair-display.contract.js';
 
@@ -33,6 +36,8 @@ function parseChairId(value: unknown): string | null {
 
 router.post(
   '/chair-display/patient-loaded',
+  // Pushes a patient's name + intraoral images + visit summary to a chair kiosk.
+  authorize(CLINICAL_ROLES),
   validate({ body: chairContract.patientLoaded.body }),
   (req: Request<unknown, unknown, chairContract.PatientLoadedBody>, res: Response): void => {
     res.sendStatus(202);
@@ -54,6 +59,7 @@ router.post(
 
 router.post(
   '/chair-display/patient-cleared',
+  authorize(CLINICAL_ROLES),
   validate({ body: chairContract.patientCleared.body }),
   (req: Request<unknown, unknown, chairContract.PatientClearedBody>, res: Response): void => {
     res.sendStatus(202);

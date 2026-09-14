@@ -13,9 +13,14 @@
 import { describe, it, expect } from 'vitest';
 import { ALL_ROLES, ASSIGNABLE_ROLES, ROLE_LABELS, normalizeRole } from '@shared/auth/roles';
 import { createUser, updateRole } from '@shared/contracts/user-management.contract';
+import { MIN_PASSWORD_LENGTH } from '@shared/validation';
 
 const sorted = (xs: readonly string[]) => [...xs].sort();
 const LEGACY = ['secretary', 'doctor', 'user', 'nonsense', ''] as const;
+
+// Long enough for the shared MIN_PASSWORD_LENGTH floor — this suite is about
+// ROLES, so the password must never be the reason a case fails.
+const VALID_PASSWORD = 'x'.repeat(MIN_PASSWORD_LENGTH);
 
 describe('role registry ↔ contract drift guard', () => {
   it('ROLE_LABELS covers exactly ALL_ROLES (no missing, no extras)', () => {
@@ -30,7 +35,7 @@ describe('role registry ↔ contract drift guard', () => {
     for (const role of ALL_ROLES) {
       expect(updateRole.body.safeParse({ role }).success).toBe(true);
       expect(
-        createUser.body.safeParse({ username: 'u', password: 'secret6', role }).success
+        createUser.body.safeParse({ username: 'u', password: VALID_PASSWORD, role }).success
       ).toBe(true);
     }
   });
@@ -39,7 +44,7 @@ describe('role registry ↔ contract drift guard', () => {
     for (const role of LEGACY) {
       expect(updateRole.body.safeParse({ role }).success).toBe(false);
       expect(
-        createUser.body.safeParse({ username: 'u', password: 'secret6', role }).success
+        createUser.body.safeParse({ username: 'u', password: VALID_PASSWORD, role }).success
       ).toBe(false);
     }
   });

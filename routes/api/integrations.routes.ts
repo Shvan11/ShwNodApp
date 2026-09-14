@@ -70,6 +70,12 @@ router.post(
       await telegramAuth.startLogin(req.body.phone);
       sendData(res, integrations.telegramAuthStart.response, { codeSent: true });
     } catch (err) {
+      // Deliberate leak-rule exemption: every throw in
+      // services/messaging/telegram-auth.ts is already a user-facing string (it runs
+      // GramJS failures through humanizeAuthError first), and this admin-only screen is
+      // useless without them — 'Code is required.', 'Login timed out — request a new
+      // code.', a FLOOD_WAIT the admin has to wait out. Nothing raw reaches here.
+      // eslint-disable-next-line no-restricted-syntax -- see above
       ErrorResponses.badRequest(res, (err as Error).message || 'Could not request a login code');
     }
   }
@@ -87,6 +93,12 @@ router.post(
       const result = await telegramAuth.submitCode(req.body.code);
       sendData(res, integrations.telegramAuthCode.response, result);
     } catch (err) {
+      // Deliberate leak-rule exemption: every throw in
+      // services/messaging/telegram-auth.ts is already a user-facing string (it runs
+      // GramJS failures through humanizeAuthError first), and this admin-only screen is
+      // useless without them — 'Code is required.', 'Login timed out — request a new
+      // code.', a FLOOD_WAIT the admin has to wait out. Nothing raw reaches here.
+      // eslint-disable-next-line no-restricted-syntax -- see above
       ErrorResponses.badRequest(res, (err as Error).message || 'Could not verify the code');
     }
   }
@@ -104,6 +116,12 @@ router.post(
       const result = await telegramAuth.submitPassword(req.body.password);
       sendData(res, integrations.telegramAuthPassword.response, result);
     } catch (err) {
+      // Deliberate leak-rule exemption: every throw in
+      // services/messaging/telegram-auth.ts is already a user-facing string (it runs
+      // GramJS failures through humanizeAuthError first), and this admin-only screen is
+      // useless without them — 'Code is required.', 'Login timed out — request a new
+      // code.', a FLOOD_WAIT the admin has to wait out. Nothing raw reaches here.
+      // eslint-disable-next-line no-restricted-syntax -- see above
       ErrorResponses.badRequest(res, (err as Error).message || 'Could not verify the password');
     }
   }

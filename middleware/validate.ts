@@ -19,7 +19,7 @@ import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import type { ZodType } from 'zod';
 import { ErrorResponses } from '../utils/error-response.js';
 
-export interface ValidationSchemas {
+interface ValidationSchemas {
   body?: ZodType;
   params?: ZodType;
   query?: ZodType;

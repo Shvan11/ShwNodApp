@@ -4,38 +4,42 @@
  */
 import { Router, type Request, type Response } from 'express';
 import { log } from '../utils/logger.js';
+import { ErrorResponses } from '../utils/error-response.js';
 import { authorize } from '../middleware/auth.js';
 import { ADMIN_ROLES } from '../shared/auth/roles.js';
 import driveUploadService from '../services/google-drive/drive-upload.js';
 import * as googleDriveOAuth from '../services/google-drive/oauth.js';
 import * as googleContactsOAuth from '../services/google-contacts/oauth.js';
 import { isGoogleContactAccountId } from '../shared/google-contacts-accounts.js';
+import { validate } from '../middleware/validate.js';
+import {
+  oauthCallbackQuery,
+  type OAuthCallbackQuery,
+} from '../shared/contracts/oauth-callback.contract.js';
 
 const router = Router();
 
-// Every route in this file is admin-only — but the gate MUST stay path-scoped.
-// This router is mounted at the app ROOT (index.ts), not under /api/admin, so
-// the Google OAuth callback keeps its redirect URL as registered in Google
-// Cloud Console — which means every request no earlier route handled falls
-// through it (all /dist assets and the SPA catch-all mount AFTER it). A
-// pathless router.use(authorize(...)) here gates the ENTIRE app: the
-// 2026-07-11 deploy shipped exactly that, 403'ing every page + asset for
-// non-admin staff and 401'ing the public portal's shared /assets chunks.
-// House rule for root-mounted routers: path-scoped or per-route gates only
-// (see routes/api/appointment.routes.ts).
-router.use('/api/admin', authorize(ADMIN_ROLES));
-
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
-// OAuth callback query (Google Drive setup; not part of the staff-app contract
-// surface, so kept as a local type rather than a contract export).
-type OAuthCallbackQuery = {
-  code?: string;
-  state?: string;
-  error?: string;
-};
+// Every route in this file is admin-only, and this pathless gate is now SAFE —
+// but only because the router is mounted AT `/api/admin` (index.ts) and its routes
+// are relative. Read this before changing either.
+//
+// It used to be mounted at the app ROOT with self-prefixed `/api/admin/...` paths,
+// so every request no earlier route handled fell through it (all /dist assets and
+// the SPA catch-all mount AFTER it). A pathless gate in that position gates the
+// ENTIRE app: the 2026-07-11 deploy shipped exactly that, 403'ing every page +
+// asset for non-admin staff and 401'ing the public portal's shared /assets chunks.
+// The fix then was to path-scope the gate; the fix now (audit R9(a), 2026-09-12) is
+// to remove the mismatch that made scoping necessary — a router's effective URL and
+// its gate no longer live in two files ordered by hand.
+//
+// House rule: a router must NOT self-prefix absolute paths. Mount it where it
+// belongs and keep its own paths relative — then a pathless gate covers exactly the
+// router, which is what it looks like it does.
+//
+// The public OAuth *redirect URIs registered in Google Cloud Console are unchanged*:
+// `/api/admin/google-drive/callback` etc. still resolve, because the mount supplies
+// the prefix the paths used to carry.
+router.use(authorize(ADMIN_ROLES));
 
 // Kept at this existing path (not /api/auth/google-drive/*, the convention used by
 // 3Shape) — it's the redirect URI already registered against this Google Cloud
@@ -49,7 +53,7 @@ const GOOGLE_DRIVE_STATE_TTL_MS = 10 * 60 * 1000; // login → callback round-tr
  * Settings → Integrations "Connect" button navigates here directly.)
  */
 router.get(
-  '/api/admin/google-drive/auth-url',
+  '/google-drive/auth-url',
   (req: Request, res: Response): void => {
     if (!googleDriveOAuth.isConfigured()) {
       res.status(503).json({ success: false, error: 'Google Drive is not configured on this server.' });
@@ -71,10 +75,7 @@ router.get(
       });
     } catch (error) {
       log.error('Error generating auth URL', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        error: (error as Error).message
-      });
+      ErrorResponses.internalError(res, 'Could not start Google Drive sign-in.', error as Error);
     }
   }
 );
@@ -84,7 +85,8 @@ router.get(
  * them, and redirect back to the Settings → Integrations card with a flag.
  */
 router.get(
-  '/api/admin/google-drive/callback',
+  '/google-drive/callback',
+  validate({ query: oauthCallbackQuery }),
   async (
     req: Request<unknown, unknown, unknown, OAuthCallbackQuery>,
     res: Response
@@ -141,7 +143,7 @@ const GOOGLE_CONTACTS_STATE_TTL_MS = 10 * 60 * 1000;
  * the Settings → Integrations "Connect" button navigates here directly.)
  */
 router.get(
-  '/api/admin/google-contacts/auth-url',
+  '/google-contacts/auth-url',
   async (
     req: Request<unknown, unknown, unknown, { account?: string }>,
     res: Response
@@ -174,7 +176,7 @@ router.get(
       });
     } catch (error) {
       log.error('[GoogleContacts] error generating auth URL', { error: (error as Error).message });
-      res.status(500).json({ success: false, error: (error as Error).message });
+      ErrorResponses.internalError(res, 'Could not start Google Contacts sign-in.', error as Error);
     }
   }
 );
@@ -184,7 +186,8 @@ router.get(
  * the account stashed at auth-url time, then redirect back to the Settings card.
  */
 router.get(
-  '/api/admin/google-contacts/callback',
+  '/google-contacts/callback',
+  validate({ query: oauthCallbackQuery }),
   async (
     req: Request<unknown, unknown, unknown, OAuthCallbackQuery>,
     res: Response
@@ -232,17 +235,14 @@ router.get(
  * Test Google Drive connection
  */
 router.get(
-  '/api/admin/google-drive/test',
+  '/google-drive/test',
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const result = await driveUploadService.testConnection();
       res.json(result);
     } catch (error) {
       log.error('Error testing connection', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        message: (error as Error).message
-      });
+      ErrorResponses.internalError(res, 'Google Drive connection test failed', error as Error);
     }
   }
 );

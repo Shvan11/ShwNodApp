@@ -16,6 +16,7 @@ export default defineConfig({
       'utils/**/*.test.ts',
       'services/**/*.test.ts',
       'config/**/*.test.ts',
+      'app/**/*.test.ts',
     ],
     exclude: ['node_modules/**', 'e2e/**', 'dist/**', 'dist-server/**'],
   },

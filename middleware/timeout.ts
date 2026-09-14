@@ -12,7 +12,22 @@
 import type { Request, Response, NextFunction } from 'express';
 import { sendError } from '../utils/error-response.js';
 import { log } from '../utils/logger.js';
-import type { Middleware } from '../types/index.js';
+import type { Middleware } from './types.js';
+
+/**
+ * The timeout callback currently registered for a response, so a second
+ * `requestTimeout(...)` on the same request can REPLACE it instead of stacking.
+ *
+ * `res.setTimeout(ms, cb)` sets the socket deadline but *appends* the listener, so
+ * the global `requestTimeout(DEFAULT)` in index.ts plus a route-level
+ * `timeouts.long` left two callbacks on one deadline. The route's longer duration
+ * won (last write to the socket), but the GLOBAL callback still ran first when it
+ * fired — reporting `timeout: 30000` in the 408 body and the log line for a request
+ * that had actually been given 120000. A WeakMap, not a property on `res`, so
+ * nothing is added to an object Express hands to user code and the entry dies with
+ * the response.
+ */
+const activeTimeoutCallback = new WeakMap<Response, () => void>();
 
 /**
  * Default timeout values (in milliseconds)
@@ -36,44 +51,56 @@ export type TimeoutValue = typeof TIMEOUTS[TimeoutType];
  */
 export function requestTimeout(timeout: number = TIMEOUTS.DEFAULT): Middleware {
   return (req: Request, res: Response, next: NextFunction): void => {
-    // Set timeout on the request
-    req.setTimeout(timeout, () => {
-      // Log timeout event
+    // Drop the callback a previous requestTimeout() on this same request left
+    // behind (the global one, when a route also declares its own). Without this
+    // the 408 is written by whichever middleware ran FIRST, i.e. the one with the
+    // *stale* duration. Removing only our own tracked listener leaves any
+    // 'timeout' listener registered elsewhere untouched.
+    const previous = activeTimeoutCallback.get(res);
+    if (previous) res.removeListener('timeout', previous);
+
+    // ONE registration, not two. `req.setTimeout` and `res.setTimeout` are both
+    // `socket.setTimeout` underneath — same socket, same timer — so registering
+    // both did not give two independent deadlines, it gave two callbacks for the
+    // one deadline: the first answered 408 and the second immediately no-op'd on
+    // `headersSent`, logging a second, misleading "Response timeout exceeded"
+    // line for every timeout. `res.setTimeout` is the one that survives the
+    // request→response handoff, so it is the one kept.
+    const onTimeout = (): void => {
       log.warn('Request timeout exceeded', {
         method: req.method,
         url: req.url,
-        timeout: timeout,
+        timeout,
         ip: req.ip
       });
 
-      // Check if response hasn't been sent yet
-      if (!res.headersSent) {
-        // Send 408 Request Timeout error
-        sendError(res, 408, 'Request timeout exceeded', {
-          timeout: `${timeout}ms`,
-          method: req.method,
-          url: req.url
-        });
-      }
-    });
+      // Headers already sent = a response is mid-flight (a file/video stream, a
+      // chunked download). Leave it completely alone: it is not stuck waiting on
+      // a handler, and ending it here would truncate the body the client is
+      // still receiving. Log only.
+      if (res.headersSent) return;
 
-    // Set timeout on the response
-    res.setTimeout(timeout, () => {
-      log.warn('Response timeout exceeded', {
+      sendError(res, 408, 'Request timeout exceeded', {
+        timeout: `${timeout}ms`,
         method: req.method,
-        url: req.url,
-        timeout: timeout,
-        ip: req.ip
+        url: req.url
       });
 
-      if (!res.headersSent) {
-        sendError(res, 408, 'Response timeout exceeded', {
-          timeout: `${timeout}ms`,
-          method: req.method,
-          url: req.url
-        });
-      }
-    });
+      // A timeout cannot abort the handler — nothing in Express can interrupt an
+      // await already in flight — but it CAN stop that handler from crashing the
+      // error path when it eventually finishes. Ending the response here releases
+      // the socket instead of holding it open behind an overrunning request, and
+      // the guard in `utils/error-response.ts#isClosed` turns the handler's
+      // eventual `sendData`/`sendError` into a no-op rather than an
+      // `ERR_HTTP_HEADERS_SENT` throw that its own catch re-throws into the
+      // global handler as a second, phantom 500.
+      //
+      // Not `socket.destroy()`: the 408 just written still has to reach the client.
+      if (!res.writableEnded) res.end();
+    };
+
+    activeTimeoutCallback.set(res, onTimeout);
+    res.setTimeout(timeout, onTimeout);
 
     next();
   };
@@ -98,14 +125,5 @@ export const timeouts = {
   // WhatsApp batch send (5 minutes)
   whatsappSend: requestTimeout(TIMEOUTS.WHATSAPP_SEND),
 } as const;
-
-/**
- * Custom timeout for specific duration
- * @param ms - Timeout in milliseconds
- * @returns Timeout middleware
- */
-export function customTimeout(ms: number): Middleware {
-  return requestTimeout(ms);
-}
 
 export default requestTimeout;

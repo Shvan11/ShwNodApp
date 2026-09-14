@@ -28,7 +28,12 @@
  *    plain string — no `timestampString` needed here.
  */
 import { z } from 'zod';
-import { intId } from '../validation.js';
+import {
+  idParams,
+  intId,
+  moneyInt,
+  numericParam,
+} from '../validation.js';
 import { withPendingOutcome } from './approvals.contract.js';
 
 // ---------------------------------------------------------------------------
@@ -52,8 +57,11 @@ const rowsAffectedOrPending = withPendingOutcome(rowsAffected.shape);
 const optInt = z
   .preprocess((v) => (v === '' || v === null ? undefined : v), z.coerce.number().int().optional())
   .optional();
-const optNum = z
-  .preprocess((v) => (v === '' || v === null ? undefined : v), z.coerce.number().optional())
+/** The MONEY variant of `optInt`. Its three consumers — `total_required`,
+ *  `discount` and `item_cost` — are all `integer` columns, so a fractional entry
+ *  is rejected at the boundary instead of truncating (see `moneyInt`). */
+const optMoney = z
+  .preprocess((v) => (v === '' || v === null ? undefined : v), moneyInt.optional())
   .optional();
 /** WorkStatusType = 1 | 2 | 3 (active/finished/discontinued). */
 const workStatus = z.union([z.literal(1), z.literal(2), z.literal(3)]);
@@ -87,7 +95,7 @@ const workItemFields = {
   // and value ('A3.5' | '2M2' …), stored as text like material.
   shade_system: z.string().optional(),
   shade: z.string().optional(),
-  item_cost: optNum,
+  item_cost: optMoney,
   start_date: z.string().optional(),
   completed_date: z.string().optional(),
   note: z.string().optional(),
@@ -101,7 +109,7 @@ const workCreateFields = {
   person_id: intId,
   dr_id: intId,
   type_of_work: intId,
-  total_required: optNum,
+  total_required: optMoney,
   currency: z.string().optional(),
   notes: z.string().optional(),
   status: workStatus.optional(),
@@ -230,7 +238,7 @@ export type AddWorkBody = z.infer<typeof addWork.body>;
 export const addWorkWithInvoice = {
   body: z.object({
     ...workCreateFields,
-    total_required: z.coerce.number().positive(),
+    total_required: moneyInt.positive(),
     currency: z.string().min(1),
   }),
   response: z.looseObject({ workId: z.number(), invoiceId: z.number() }),
@@ -246,7 +254,7 @@ export const updateWork = {
     workId: intId,
     dr_id: intId,
     person_id: optInt,
-    total_required: optNum,
+    total_required: optMoney,
     currency: z.string().optional(),
     type_of_work: optInt,
     notes: z.string().optional(),
@@ -261,7 +269,7 @@ export const updateWork = {
     keyword_id_3: optInt,
     keyword_id_4: optInt,
     keyword_id_5: optInt,
-    discount: z.union([z.coerce.number(), z.null()]).optional(),
+    discount: z.union([moneyInt, z.null()]).optional(),
     discount_date: z.union([z.string(), z.null()]).optional(),
     discount_reason: z.union([z.string(), z.null()]).optional(),
   }),
@@ -396,11 +404,18 @@ export const transfer = {
 export type TransferBody = z.infer<typeof transfer.body>;
 
 // Shared GET query for the work read endpoints (getworks/getworkdetails/teeth/…).
-// Type-only (handlers parse manually); the schema is the SSoT for the route generic.
+// VALIDATED on the routes that read `workId` (it used to be type-only): the
+// handlers `parseInt` it straight into a query, so a junk id produced PG 22P02 →
+// 500 instead of a 400. `numericParam` keeps it a STRING, so the existing
+// `parseInt` call sites are unchanged.
 export const workQuery = z.object({
   code: z.string().optional(),
-  workId: z.string().optional(),
+  workId: numericParam.optional(),
   permanent: z.string().optional(),
   deciduous: z.string().optional(),
 });
 export type WorkQueryParams = z.infer<typeof workQuery>;
+
+/** `:workId` route param (numeric STRING — see numericParam). */
+export const workIdParams = idParams('workId');
+export type WorkIdParams = z.infer<typeof workIdParams>;

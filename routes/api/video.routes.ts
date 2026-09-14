@@ -8,13 +8,16 @@ import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import { promises as fsp, type Stats } from 'fs';
 import path from 'path';
-import { getMediaMimeType } from '../../utils/video-mime.js';
+import { getMediaMimeType } from '../../utils/file-mime.js';
 import { streamFile } from '../../utils/stream-file.js';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import { authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import * as videoQueries from '../../services/database/queries/video-queries.js';
 import { generateVideoQRCode } from '../../services/imaging/qrcode.js';
+import { normalizeVideoDbPath } from '../../services/files/clinic-paths.js';
 // Aliased `videoContract` — the handlers use a local `const video`, which would
 // shadow a bare `import * as video` (docs/shared-contract-progress.md).
 import * as videoContract from '../../shared/contracts/video.contract.js';
@@ -31,7 +34,7 @@ async function getVideosUploadPath(): Promise<string> {
   if (!cachedVideosPath) {
     cachedVideosPath = await videoQueries.getVideosPath();
   }
-  return normalizePath(cachedVideosPath);
+  return normalizeVideoDbPath(cachedVideosPath);
 }
 
 // Configure multer for video uploads with disk storage
@@ -79,41 +82,6 @@ const upload = multer({
 
 // type definitions
 type VideoIdParams = videoContract.VideoIdParams;
-
-/**
- * Convert the DB-stored absolute video path to a WSL-compatible path.
- *
- * `VideosPath` now stores a LOCAL path — the ovideos folder was moved under
- * clinic1 alongside the patient files. Videos stream *through* this server
- * (`/api/videos/:id/stream`), never opened client-side, so it follows the
- * "server access is LOCAL, not SMB" rule rather than staying a UNC pointer.
- *
- * Database path:   C:\clinic1\ovideos\filename.mp4
- * UNC (LAN share): \\CLINIC\Clinic1\ovideos\filename.mp4
- * WSL path:        /mnt/c/clinic1/ovideos/filename.mp4
- */
-function normalizePath(dbPath: string): string {
-  let normalizedPath = dbPath;
-
-  // Check if running on WSL (Linux) or Windows
-  const isWSL = process.platform === 'linux';
-
-  if (isWSL) {
-    // Convert UNC share path \\CLINIC\Clinic1\ to /mnt/c/clinic1/
-    if (normalizedPath.startsWith('\\\\CLINIC\\Clinic1')) {
-      normalizedPath = normalizedPath.replace('\\\\CLINIC\\Clinic1', '/mnt/c/clinic1');
-    }
-    // Convert Windows path C:\... to /mnt/c/...
-    else if (/^[A-Za-z]:\\/.test(normalizedPath)) {
-      const driveLetter = normalizedPath.charAt(0).toLowerCase();
-      normalizedPath = normalizedPath.replace(/^[A-Za-z]:\\/, `/mnt/${driveLetter}/`);
-    }
-    // Convert remaining backslashes to forward slashes for Linux
-    normalizedPath = normalizedPath.replace(/\\/g, '/');
-  }
-
-  return normalizedPath;
-}
 
 // ==============================
 // READ ENDPOINTS
@@ -190,7 +158,7 @@ router.get('/:id/stream', async (req: Request<VideoIdParams>, res: Response): Pr
       return;
     }
 
-    const filePath = normalizePath(video.Video);
+    const filePath = normalizeVideoDbPath(video.Video);
 
     // Stat the file (async, non-blocking); a missing file surfaces as ENOENT → 404.
     let stat: Stats;
@@ -232,7 +200,7 @@ router.get('/:id/thumbnail', async (req: Request<VideoIdParams>, res: Response):
       return;
     }
 
-    const filePath = normalizePath(video.Image);
+    const filePath = normalizeVideoDbPath(video.Image);
 
     // Stat the file (async, non-blocking); a missing file surfaces as ENOENT → 404.
     let stat: Stats;
@@ -300,6 +268,7 @@ router.get('/:id/qr', async (req: Request<VideoIdParams>, res: Response): Promis
  */
 router.post(
   '/',
+  authorize(CLINICAL_ROLES),
   upload.fields([
     { name: 'video', maxCount: 1 },
     { name: 'thumbnail', maxCount: 1 },
@@ -372,7 +341,7 @@ router.post(
  * Update video metadata
  * PUT /:id
  */
-router.put('/:id', validate({ body: videoContract.update.body }), async (req: Request<VideoIdParams, object, videoContract.UpdateVideoBody>, res: Response): Promise<void> => {
+router.put('/:id', authorize(CLINICAL_ROLES), validate({ body: videoContract.update.body }), async (req: Request<VideoIdParams, object, videoContract.UpdateVideoBody>, res: Response): Promise<void> => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
@@ -420,7 +389,7 @@ router.put('/:id', validate({ body: videoContract.update.body }), async (req: Re
  * Delete video
  * DELETE /:id
  */
-router.delete('/:id', async (req: Request<VideoIdParams>, res: Response): Promise<void> => {
+router.delete('/:id', authorize(CLINICAL_ROLES), async (req: Request<VideoIdParams>, res: Response): Promise<void> => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
@@ -436,7 +405,7 @@ router.delete('/:id', async (req: Request<VideoIdParams>, res: Response): Promis
     }
 
     // Delete video file (async; ignore if already gone).
-    const videoPath = normalizePath(video.Video);
+    const videoPath = normalizeVideoDbPath(video.Video);
     try {
       await fsp.unlink(videoPath);
       log.info('[Videos] Video file deleted', { path: videoPath });
@@ -445,7 +414,7 @@ router.delete('/:id', async (req: Request<VideoIdParams>, res: Response): Promis
     }
 
     // Delete thumbnail file (async; ignore if already gone).
-    const thumbnailPath = normalizePath(video.Image);
+    const thumbnailPath = normalizeVideoDbPath(video.Image);
     try {
       await fsp.unlink(thumbnailPath);
       log.info('[Videos] Thumbnail file deleted', { path: thumbnailPath });

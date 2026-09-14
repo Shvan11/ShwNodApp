@@ -33,7 +33,7 @@ const PatientsList: React.FC = () => {
     });
     const doctor: Doctor | null = isAll
         ? { dr_id: 'all', doctor_name: 'All Doctors' }
-        : (doctorsData?.doctors.find((d) => d.dr_id === parseInt(doctorId || ''))
+        : (doctorsData?.doctors.find((d) => d.dr_id === parseInt(doctorId || '', 10))
             ?? (doctorsData ? { dr_id: 0, doctor_name: 'Unknown Doctor' } : null));
 
     // Patients — two parameterized reads gated by `enabled`; pick whichever

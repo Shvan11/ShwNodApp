@@ -11,7 +11,7 @@
  * See docs/shared-contract-progress.md.
  */
 import { z } from 'zod';
-import { timestampString } from '../validation.js';
+import { numericParam, timestampString } from '../validation.js';
 
 // POST /api/templates — create a template. Mirrors TemplateData.
 export const createTemplate = {
@@ -143,9 +143,15 @@ export const documentTypes = { response: z.array(documentTypeRow) } as const;
 export const getTemplate = { response: documentTemplateRow } as const;
 
 // Path params + list query (type-only; handlers parse the query strings manually).
-export const templateIdParams = z.object({ templateId: z.string() });
+// `numericParam`, not a bare `z.string()`: every handler in template-api.ts
+// `parseInt`s these ten times over with no isNaN guard, so `/templates/abc`
+// used to reach the query layer as NaN and surface as a 500. Kept as a validated
+// STRING (Express 5 coerces route params, and `z.coerce.number()` here fails
+// TS2769 once the handler also types its query generic) — the handlers' own
+// parseInt is unchanged.
+export const templateIdParams = z.object({ templateId: numericParam });
 export type TemplateIdParams = z.infer<typeof templateIdParams>;
-export const workIdParams = z.object({ workId: z.string() });
+export const workIdParams = z.object({ workId: numericParam });
 export type WorkIdParams = z.infer<typeof workIdParams>;
 export const templateQuery = z.object({
   documentTypeId: z.string().optional(),

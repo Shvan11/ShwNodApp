@@ -63,8 +63,12 @@ export const LAB_STAGE_META: { key: LabStage; location: LabStageLocation }[] = L
 export const LAB_CASE_STATUSES = [...LAB_STAGES, 'cancelled'] as const;
 export type LabCaseStatus = (typeof LAB_CASE_STATUSES)[number];
 
+// No `LabCaseEventType` member-union alias beside this one: unlike its siblings
+// (`ApprovalStatus`, `AnnouncementAutoEvent`, `PortalActivityType` — all consumed
+// by services/), nothing anywhere referenced it. The `z.enum(LAB_CASE_EVENT_TYPES)`
+// in `labCaseEventRow` below already gives every consumer the same union through
+// `LabCaseEventRow['event_type']`.
 export const LAB_CASE_EVENT_TYPES = ['stage_change', 'remake', 'hold', 'resume', 'note', 'cancel'] as const;
-export type LabCaseEventType = (typeof LAB_CASE_EVENT_TYPES)[number];
 
 // ── Rows ─────────────────────────────────────────────────────────────────────
 

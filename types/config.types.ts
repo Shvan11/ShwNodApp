@@ -1,6 +1,19 @@
 /**
  * Configuration Types
- * Type definitions for application configuration
+ *
+ * `AppConfig` is the ONLY export — it is what `config/config.ts` imports, and the
+ * `*Config` interfaces below exist to describe its fields. They were all exported
+ * once, but nothing outside this file ever imported one by name, and an exported
+ * name that nothing consumes is free to drift from the shape actually in force:
+ * `DatabaseConfig` here is a different type from the `DatabaseConfig` that
+ * `services/settings/EnvironmentManager.ts` declares and the Settings screen
+ * really uses. Keep them module-private so that stays impossible.
+ *
+ * The `Environment` / `RequiredEnvVars` / `OptionalEnvVars` / `EnvVars` block that
+ * used to close this file is gone: nothing referenced it, and it still listed the
+ * retired SQL Server vars (`DB_SERVER`, `DB_INSTANCE`, …) as REQUIRED, which has
+ * not been true since the PostgreSQL migration. `config/config.ts`'s Zod
+ * `envSchema` is the real env contract.
  */
 
 // ===========================================
@@ -10,7 +23,7 @@
 /**
  * Database authentication options
  */
-export interface DatabaseAuthOptions {
+interface DatabaseAuthOptions {
   userName: string;
   password: string;
 }
@@ -18,7 +31,7 @@ export interface DatabaseAuthOptions {
 /**
  * Database authentication configuration
  */
-export interface DatabaseAuth {
+interface DatabaseAuth {
   type: 'default' | 'ntlm' | 'azure-active-directory-password';
   options: DatabaseAuthOptions;
 }
@@ -26,7 +39,7 @@ export interface DatabaseAuth {
 /**
  * Database connection options
  */
-export interface DatabaseOptions {
+interface DatabaseOptions {
   instanceName?: string;
   encrypt: boolean;
   trustServerCertificate: boolean;
@@ -40,7 +53,7 @@ export interface DatabaseOptions {
 /**
  * Database configuration
  */
-export interface DatabaseConfig {
+interface DatabaseConfig {
   server: string;
   database: string;
   options: DatabaseOptions;
@@ -48,20 +61,18 @@ export interface DatabaseConfig {
 }
 
 /**
- * Active database driver. `mssql` = legacy SQL Server (default during migration);
- * `pg` = PostgreSQL (migration target). Selected by the DB_DRIVER env var.
- */
-export type DbDriver = 'mssql' | 'pg';
-
-/**
  * PostgreSQL connection configuration (node-postgres pool).
  */
-export interface PgDatabaseConfig {
+interface PgDatabaseConfig {
   host: string;
   port: number;
   database: string;
   user: string;
   password: string;
+  /** From `sslmode` (DATABASE_URL query or PG_SSLMODE); absent = plaintext, the local default. */
+  ssl?: false | { rejectUnauthorized: boolean };
+  /** From `application_name`; surfaces in `pg_stat_activity`. */
+  application_name?: string;
   max: number;
   connectionTimeoutMillis: number;
   idleTimeoutMillis: number;
@@ -74,7 +85,7 @@ export interface PgDatabaseConfig {
 /**
  * Telegram configuration
  */
-export interface TelegramConfig {
+interface TelegramConfig {
   apiId?: number;
   apiHash?: string;
 }
@@ -82,24 +93,17 @@ export interface TelegramConfig {
 /**
  * Twilio SMS configuration
  */
-export interface TwilioConfig {
+interface TwilioConfig {
   accountSid?: string;
   authToken?: string;
   fromName?: string;
 }
 
-/**
- * Google OAuth configuration
- */
-export interface GoogleConfig {
-  clientId?: string;
-  clientSecret?: string;
-}
 
 /**
  * Google Drive configuration
  */
-export interface GoogleDriveConfig {
+interface GoogleDriveConfig {
   clientId?: string;
   clientSecret?: string;
   redirectUri?: string;
@@ -115,7 +119,7 @@ export interface GoogleDriveConfig {
  * deliberately set — only those may override a pre-existing credentials.json,
  * whose client issued any grants already on disk.
  */
-export interface GoogleContactsConfig {
+interface GoogleContactsConfig {
   explicit: boolean;
   clientId?: string;
   clientSecret?: string;
@@ -125,7 +129,7 @@ export interface GoogleContactsConfig {
 /**
  * WebCeph integration configuration
  */
-export interface WebCephConfig {
+interface WebCephConfig {
   partnerApiKey?: string;
   userEmail?: string;
   userApiPassword?: string;
@@ -140,7 +144,7 @@ export interface WebCephConfig {
  * (`webServiceBase`, e.g. `https://WORK_PC:5492`). Blank `clientId`/`webServiceBase`
  * disables the integration (status reports "not configured").
  */
-export interface ThreeShapeConfig {
+interface ThreeShapeConfig {
   /** OAuth public client id (blank disables the integration). */
   clientId?: string;
   /** OIDC issuer/authority. Defaults to https://identity.3shape.com. */
@@ -160,22 +164,21 @@ export interface ThreeShapeConfig {
 /**
  * File system configuration
  */
-export interface FileSystemConfig {
+interface FileSystemConfig {
   machinePath?: string;
 }
 
 /**
  * Server configuration
  */
-export interface ServerConfig {
-  port: number | string;
+interface ServerConfig {
+  port: number;
 }
 
 /**
  * URL configuration
  */
-export interface UrlConfig {
-  qrHost?: string;
+interface UrlConfig {
   /** Always set — config.ts supplies the default, so consumers must not re-default it. */
   publicUrl: string;
 }
@@ -183,7 +186,7 @@ export interface UrlConfig {
 /**
  * LocalSend LAN file-sharing configuration
  */
-export interface LocalSendConfig {
+interface LocalSendConfig {
   enabled: boolean;
   port: number;
   alias: string;
@@ -195,7 +198,7 @@ export interface LocalSendConfig {
  * Access email list gating the external aligner portal. All three blank →
  * sync disabled (see services/cloudflare/doctor-email-list.ts).
  */
-export interface CloudflareZeroTrustConfig {
+interface CloudflareZeroTrustConfig {
   /** API token with Account → Zero Trust → Edit permission. */
   apiToken?: string;
   /** Cloudflare account ID (the hex segment in dashboard URLs). */
@@ -207,7 +210,7 @@ export interface CloudflareZeroTrustConfig {
 /**
  * Cloudflare R2 bucket configuration (for aligner case photos).
  */
-export interface R2Config {
+interface R2Config {
   accountId?: string;
   accessKeyId?: string;
   secretAccessKey?: string;
@@ -224,11 +227,9 @@ export interface R2Config {
  */
 export interface AppConfig {
   database: DatabaseConfig;
-  dbDriver: DbDriver;
   databasePg: PgDatabaseConfig;
   telegram: TelegramConfig;
   twilio: TwilioConfig;
-  google: GoogleConfig;
   googleDrive: GoogleDriveConfig;
   googleContacts: GoogleContactsConfig;
   fileSystem: FileSystemConfig;
@@ -244,73 +245,3 @@ export interface AppConfig {
   cs_export?: string;
   gram_session?: string;
 }
-
-// ===========================================
-// ENVIRONMENT
-// ===========================================
-
-/**
- * Environment type
- */
-export type Environment = 'development' | 'production' | 'test';
-
-/**
- * Required environment variables
- */
-export interface RequiredEnvVars {
-  DB_SERVER: string;
-  DB_INSTANCE: string;
-  DB_USER: string;
-  DB_PASSWORD: string;
-}
-
-/**
- * Optional environment variables
- */
-export interface OptionalEnvVars {
-  DB_DATABASE?: string;
-  DB_DRIVER?: 'mssql' | 'pg';
-  PG_HOST?: string;
-  PG_PORT?: string;
-  PG_DATABASE?: string;
-  PG_USER?: string;
-  PG_PASSWORD?: string;
-  DATABASE_URL?: string;
-  PORT?: string;
-  NODE_ENV?: Environment;
-  MACHINE_PATH?: string;
-  TELEGRAM_API_ID?: string;
-  TELEGRAM_API_HASH?: string;
-  TWILIO_ACCOUNT_SID?: string;
-  TWILIO_AUTH_TOKEN?: string;
-  TWILIO_FROM_NAME?: string;
-  GOOGLE_CLIENT_ID?: string;
-  GOOGLE_CLIENT_SECRET?: string;
-  GOOGLE_DRIVE_CLIENT_ID?: string;
-  GOOGLE_DRIVE_CLIENT_SECRET?: string;
-  GOOGLE_DRIVE_REDIRECT_URI?: string;
-  GOOGLE_DRIVE_REFRESH_TOKEN?: string;
-  GOOGLE_DRIVE_FOLDER_ID?: string;
-  QR_HOST_URL?: string;
-  PUBLIC_URL?: string;
-  WEBCEPH_PARTNER_API_KEY?: string;
-  WEBCEPH_USER_EMAIL?: string;
-  WEBCEPH_USER_API_PASSWORD?: string;
-  WEBCEPH_API_BASE_URL?: string;
-  THREESHAPE_CLIENT_ID?: string;
-  THREESHAPE_AUTHORITY?: string;
-  THREESHAPE_SCOPES?: string;
-  THREESHAPE_REDIRECT_URI?: string;
-  THREESHAPE_WEBSERVICE_BASE?: string;
-  THREESHAPE_WEBHOOK_SECRET?: string;
-  THREESHAPE_WEBHOOK_URL?: string;
-  CS_EXPORT?: string;
-  GRAM_SESSION?: string;
-  FAILOVER_SYNC_ENABLED?: string;
-  SUPABASE_FAILOVER_DB_URL?: string;
-}
-
-/**
- * All environment variables
- */
-export type EnvVars = RequiredEnvVars & OptionalEnvVars;

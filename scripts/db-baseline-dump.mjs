@@ -10,6 +10,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { resolveLocalPg } from './_pg-connection.mjs';
 
 const PG_DUMP_CANDIDATES = [
   'C:/Program Files/PostgreSQL/18/bin/pg_dump.exe',
@@ -22,8 +23,11 @@ if (!pgDump) {
   process.exit(2);
 }
 
+// Connection resolved the way the app does it (DATABASE_URL or PG_*, discrete wins
+// per field) — see scripts/_pg-connection.mjs.
+const LOCAL = resolveLocalPg();
 const dbArg = process.argv.find((a) => a.startsWith('--db='));
-const database = dbArg ? dbArg.slice('--db='.length) : process.env.PG_DATABASE;
+const database = dbArg ? dbArg.slice('--db='.length) : LOCAL.database;
 
 const args = [
   '--schema-only',
@@ -32,14 +36,14 @@ const args = [
   // Deliberately NO `--schema=public`: extensions are DATABASE-level objects, so that
   // filter silently drops the `CREATE EXTENSION citext / pg_trgm` lines — and citext
   // columns + trigram indexes make those mandatory for a fresh install.
-  '-h', process.env.PG_HOST ?? '127.0.0.1',
-  '-p', String(process.env.PG_PORT ?? 5432),
-  '-U', process.env.PG_USER ?? 'postgres',
+  '-h', LOCAL.host,
+  '-p', String(LOCAL.port),
+  '-U', LOCAL.user,
   '-d', database,
 ];
 
 const r = spawnSync(pgDump, args.filter((a) => a !== '--no-comments=false'), {
-  env: { ...process.env, PGPASSWORD: process.env.PG_PASSWORD ?? '' },
+  env: { ...process.env, PGPASSWORD: LOCAL.password },
   encoding: 'utf8',
   maxBuffer: 64 * 1024 * 1024,
 });

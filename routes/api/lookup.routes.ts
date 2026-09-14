@@ -24,7 +24,7 @@ import {
   getGenders
 } from '../../services/database/queries/patient-queries.js';
 import { getAlertTypes } from '../../services/database/queries/alert-queries.js';
-import { getImplantManufacturers, getLabs } from '../../services/database/queries/work-queries.js';
+import { getImplantManufacturers, getLabs } from '../../services/database/queries/work-lookup-queries.js';
 import { getShades } from '../../services/database/queries/shade-queries.js';
 import * as lookup from '../../shared/contracts/lookup.contract.js';
 

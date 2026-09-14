@@ -13,10 +13,12 @@ import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
 import config from '../../config/config.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
+import { authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import { resolveShareRef } from '../../services/files/share-ref.js';
 import { sendgramfile, getGramSession } from '../../services/messaging/telegram.js';
-import { PhoneFormatter } from '../../utils/phoneFormatter.js';
+import { PhoneFormatter } from '../../utils/phone-formatter.js';
 import * as telegram from '../../shared/contracts/telegram.contract.js';
 
 const router = Router();
@@ -106,6 +108,9 @@ router.get('/status', async (_req: Request, res: Response): Promise<void> => {
 // the request so it isn't bound by the 30s request timeout).
 router.post(
   '/send',
+  // Same tier as its WhatsApp twin (whatsapp.routes.ts `POST /send`): sharing a
+  // patient file to a phone is a clinical action, not an anonymous one.
+  authorize(CLINICAL_ROLES),
   validate({ body: telegram.send.body }),
   async (req: Request<object, object, telegram.SendBody>, res: Response): Promise<void> => {
     if (!(await telegramEnabled())) {

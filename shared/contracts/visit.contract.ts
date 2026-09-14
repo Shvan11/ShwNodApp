@@ -123,12 +123,15 @@ export const deleteVisit = {
 } as const;
 export type DeleteVisitBody = z.infer<typeof deleteVisit.body>;
 
-// Shared GET query for the visit read endpoints. Type-only (handlers parse manually;
-// the per-endpoint numericParam query schemas above stay the validated boundary).
-export const visitQuery = z.object({
-  PID: z.string().optional(),
-  VID: z.string().optional(),
-  workId: z.string().optional(),
-  visitId: z.string().optional(),
-});
-export type VisitQueryParams = z.infer<typeof visitQuery>;
+// Per-endpoint query TYPES, derived from the very schemas `validate()` runs above.
+//
+// There used to be one loose `visitQuery` view here — four optional strings,
+// including `PID`/`VID`, which no route in this file reads — that all three
+// handlers typed themselves from. Because it made every field optional, each
+// handler kept a `if (!workId) missingParameter(...)` branch for something
+// `numericParam` had already made unreachable, and nothing stopped a handler
+// reading a field its own route never validated. Typing from the endpoint's own
+// schema is what makes those guarantees visible.
+export type LatestWiresQuery = z.infer<typeof latestWires.query>;
+export type VisitsByWorkQuery = z.infer<typeof visitsByWork.query>;
+export type VisitByIdQuery = z.infer<typeof visitById.query>;

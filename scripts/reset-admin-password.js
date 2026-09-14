@@ -17,6 +17,9 @@
 import readline from 'readline';
 import { getKysely } from '../services/database/kysely.js';
 import { hashPassword } from '../middleware/auth.js';
+// Run under tsx (see package.json `auth:emergency-reset`), so the shared TS
+// module is importable — the floor is not hand-mirrored here.
+import { MIN_PASSWORD_LENGTH } from '../shared/validation.js';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -39,10 +42,10 @@ const interactive = !argsMap.password;
 
 async function promptPassword() {
   console.log('\n🔐 Enter new password for this user:');
-  const newPassword = await question('New Password (min 6 characters): ');
+  const newPassword = await question(`New Password (min ${MIN_PASSWORD_LENGTH} characters): `);
 
-  if (newPassword.length < 6) {
-    console.log('\n❌ ERROR: Password must be at least 6 characters\n');
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    console.log(`\n❌ ERROR: Password must be at least ${MIN_PASSWORD_LENGTH} characters\n`);
     process.exit(1);
   }
 
@@ -113,8 +116,8 @@ async function resetAdminPassword() {
   let newPassword = argsMap.password;
   if (!newPassword) {
     newPassword = await promptPassword();
-  } else if (newPassword.length < 6) {
-    console.log('\n❌ ERROR: Password must be at least 6 characters\n');
+  } else if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    console.log(`\n❌ ERROR: Password must be at least ${MIN_PASSWORD_LENGTH} characters\n`);
     process.exit(1);
   }
 

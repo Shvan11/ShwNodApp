@@ -13,6 +13,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import pg from 'pg';
+import { resolveLocalPg } from './_pg-connection.mjs';
 
 const baselineFile = process.argv[2];
 if (!baselineFile) {
@@ -29,9 +30,12 @@ if (!existsSync(SUPER_PW_FILE)) {
   process.exit(2);
 }
 const superPw = readFileSync(SUPER_PW_FILE, 'utf8').trim();
-const HOST = process.env.PG_HOST ?? '127.0.0.1';
-const PORT = Number(process.env.PG_PORT ?? 5432);
-const LIVE = process.env.PG_DATABASE;
+// Host/port/database come from the same resolution the app uses (DATABASE_URL or
+// PG_*, discrete wins per field); the USER here is deliberately the superuser.
+const LOCAL = resolveLocalPg();
+const HOST = LOCAL.host;
+const PORT = LOCAL.port;
+const LIVE = LOCAL.database;
 
 const admin = (db) =>
   new pg.Client({ host: HOST, port: PORT, database: db, user: 'postgres', password: superPw });

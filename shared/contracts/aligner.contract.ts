@@ -22,7 +22,7 @@
  *  - **Row schemas use `z.looseObject`** (Phase 3 hardening): preserves long-tail
  *    fields the UI reads (joined columns, aliases). Array responses carry
  *    `z.array(<rowSchema>)` — runtime-verified on real DB data. Source types in
- *    aligner-queries.ts were flipped from `interface`→`type` to satisfy the
+ *    the aligner-*-queries modules were flipped from `interface`→`type` to satisfy the
  *    looseObject index-signature assignment rule. `allSetsRow` and `alignerPatientRow`
  *    are new schemas for the v_allsets view and patient-list endpoints.
  *
@@ -35,7 +35,7 @@
  *
  *  - **Bodies**: the small fully-enumerable ones (`createNote`, `updateNote`,
  *    the shared `targetDate` of manufacture/deliver) → `z.infer` SSoT. The rest
- *    forward wholesale to `AlignerService.validateAnd*` (the "validateAnd…" service
+ *    forward wholesale to the `Aligner*Service.validateAnd*` (the "validateAnd…" service
  *    owns those shapes) → they keep their EXISTING loose guard relocated verbatim
  *    and the route keeps its local body interface (the documented service-bound
  *    caveat). `archformPatient` keeps the `{ name }`-only guard verbatim (the
@@ -48,7 +48,14 @@
  *    The Archform 503 "unavailable" branches are error responses, left as-is.
  */
 import { z } from 'zod';
-import { idParams, intId, optionalDateString, timestampString } from '../validation.js';
+import {
+  idParams,
+  intId,
+  moneyInt,
+  numericParam,
+  optionalDateString,
+  timestampString,
+} from '../validation.js';
 import { PDF_ARABIC_FONT_IDS } from '../pdf-fonts.js';
 
 // The aligner set/batch forms send numeric fields as STRINGS ('' when blank) and
@@ -340,6 +347,12 @@ export const notesBySetId = {
   response: z.object({ notes: z.array(alignerNoteRow), count: z.number() }),
 } as const;
 
+// DELETE /api/aligner/sets/:setId/photos?path= — the R2 key to remove. Validated
+// so a repeated `?path=a&path=b` (an ARRAY from Express's query parser) 400s here
+// rather than reaching `key.startsWith(...)` and throwing a TypeError → 500.
+export const deletePhotoQuery = z.object({ path: z.string().min(1) });
+export type DeletePhotoQuery = z.infer<typeof deletePhotoQuery>;
+
 // GET /api/aligner/sets/:setId/photos — photos for a set.
 export const getSetPhotos = {
   response: z.object({ photos: z.array(alignerPhotoRow) }),
@@ -385,7 +398,11 @@ export const addPayment = {
   body: z.object({
     workid: intId,
     aligner_set_id: intId,
-    amount_paid: z.coerce.number(),
+    // `invoices.amount_paid` is an `integer` column — a fractional value used to
+    // reach PG as-is and come back as `22P02` → 500. `.positive()` mirrors
+    // `AlignerPaymentService.validateAndCreatePayment`'s own `paymentAmount <= 0` throw, so
+    // the rejection is a field-level 400 rather than a service error the route maps.
+    amount_paid: moneyInt.positive('Payment amount must be greater than zero'),
     date_of_payment: z.string().min(1),
     change: optNum,
     notes: z.string().optional(),
@@ -482,7 +499,7 @@ export type UpdateNoteBody = z.infer<typeof updateNote.body>;
 
 // POST /api/aligner/batches — fully enumerated (mirrors BatchCreateData).
 //
-// Deliberately ABSENT because `aligner-queries.createBatch` derives them and never
+// Deliberately ABSENT because `aligner-batch-queries.createBatch` derives them and never
 // reads a client value: `batch_sequence` + the four upper/lower start/end sequences
 // (computed from MAX() over the set's existing batches) and `validity_period` (a
 // generated column). `AlignersInBatch` is a retired SQL-Server-era column. All six
@@ -660,9 +677,11 @@ export const updateDoctor = { body: doctorBody } as const;
 
 // DELETE /api/aligner-doctors/:drID — sendSuccess(null).
 
-// GET /api/aligner/patients?search=&doctorId= — type-only (handler reads both directly).
+// GET /api/aligner/patients?search=&doctorId= — now VALIDATED (it was type-only).
+// `doctorId` stays a validated STRING (the handler `parseInt`s it), so junk 400s
+// instead of reaching `searchPatients` as NaN; a repeated key is rejected too.
 export const patientsQuery = z.object({
   search: z.string().optional(),
-  doctorId: z.string().optional(),
+  doctorId: numericParam.optional(),
 });
 export type AlignerQueryParams = z.infer<typeof patientsQuery>;

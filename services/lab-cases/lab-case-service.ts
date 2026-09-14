@@ -18,6 +18,7 @@
 import { sql, type Transaction } from 'kysely';
 import { withPgTransaction, type Database } from '../database/kysely.js';
 import { getWorkItemPrefill, COLS } from '../database/queries/lab-case-queries.js';
+import { assertRemakeTarget } from './remake-guard.js';
 import {
   LAB_STAGES,
   LAB_STAGE_META,
@@ -77,28 +78,6 @@ async function assertCaseExists(trx: Transaction<Database>, id: number): Promise
     .forUpdate()
     .executeTakeFirst();
   if (!row) throw new Error('[NOT_FOUND] Lab case');
-}
-
-/**
- * Assert that a remake sends the case BACKWARD.
- *
- * That is the whole meaning of the operation, and `advanceLabCase` enforces the
- * mirror rule for forward moves. This used to check only membership in
- * LAB_STAGES, so a client-supplied `returnToStatus` could jump a case FORWARD —
- * as far as 'delivered', setting the terminal status with no `delivered_at` /
- * `delivered_by` — while incrementing `remake_count`.
- *
- * Exported for the unit tests; the service is its only production caller.
- */
-export function assertRemakeTarget(fromStatus: string, toStatus: string): void {
-  const toIdx = LAB_STAGES.indexOf(toStatus as LabStage);
-  if (toIdx === -1) {
-    throw new Error('[INVALID_STATE_TRANSITION] Invalid returnToStatus');
-  }
-  const fromIdx = LAB_STAGES.indexOf(fromStatus as LabStage);
-  if (fromIdx === -1 || toIdx >= fromIdx) {
-    throw new Error('[INVALID_STATE_TRANSITION] returnToStatus must be an earlier stage than the current one');
-  }
 }
 
 /**

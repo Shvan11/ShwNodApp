@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { LAB_STAGES } from '../../shared/contracts/lab-case.contract.js';
-import { assertRemakeTarget } from './lab-case-service.js';
+import { assertRemakeTarget } from './remake-guard.js';
 
 const BACKWARD = /earlier stage/;
 const INVALID = /Invalid returnToStatus/;

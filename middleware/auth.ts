@@ -4,24 +4,18 @@
  */
 import bcrypt from 'bcryptjs';
 import type { Request, Response, NextFunction } from 'express';
-import { sql } from 'kysely';
-import { getKysely } from '../services/database/kysely.js';
+import {
+  getUserCredentials,
+  stampLastLogin,
+} from '../services/database/queries/user-queries.js';
 import { log } from '../utils/logger.js';
 import { ErrorResponses } from '../utils/error-response.js';
 import { normalizeRole } from '../shared/auth/roles.js';
-import type { AuthResult, ApiErrorResponse, SafeUser, UserRole } from '../types/index.js';
+import type { AuthResult, ApiErrorResponse, SafeUser, UserRole } from './types.js';
 
 /**
  * User data from database
  */
-interface DbUser {
-  userId: number;
-  username: string;
-  passwordHash: string;
-  fullName: string;
-  role: UserRole;
-  isActive: boolean;
-}
 
 /**
  * Authentication middleware - checks if user is logged in
@@ -118,26 +112,33 @@ export function authorize(allowedRoles: readonly UserRole[] = []) {
  * @param password - Plain text password
  * @returns Result with success flag and user data
  */
+/**
+ * A real cost-12 bcrypt hash of a value no one can log in with, compared against
+ * when the username misses so both failure paths cost the same. Cost must match
+ * `hashPassword` below, or the timings diverge again.
+ */
+const DUMMY_PASSWORD_HASH = '$2b$12$uFkOm6XezkwlqY/58ndCwu4v1wQXvDBAe8dGMG1U/xk87x4KxuNLq';
+
 export async function verifyCredentials(
   username: string,
-  password: string
+  password: string,
+  options: { touchLastLogin?: boolean } = {}
 ): Promise<AuthResult> {
+  const { touchLastLogin = true } = options;
   try {
-    const { rows: users } = await sql<DbUser>`
-      SELECT "user_id" AS "userId", "username" AS "username", "password_hash" AS "passwordHash",
-             "full_name" AS "fullName", "role" AS "role", "is_active" AS "isActive"
-      FROM "users"
-      WHERE "username" = ${username}
-    `.execute(getKysely());
+    const user = await getUserCredentials(username);
 
-    if (!users || users.length === 0) {
+    if (!user) {
+      // Burn a bcrypt compare against a fixed hash before answering. Returning
+      // immediately made "no such user" measurably faster than "wrong password",
+      // which is a username-enumeration oracle (the 15-min/IP login limiter caps
+      // how fast it can be sampled, but doesn't remove the signal).
+      await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
       return {
         success: false,
         error: 'Invalid username or password'
       };
     }
-
-    const user = users[0];
 
     if (!user.isActive) {
       return {
@@ -155,8 +156,12 @@ export async function verifyCredentials(
       };
     }
 
-    // Update last login timestamp
-    await sql`UPDATE "users" SET "last_login" = LOCALTIMESTAMP WHERE "user_id" = ${user.userId}`.execute(getKysely());
+    // Update last login timestamp. Re-verification that is NOT a login (the
+    // change-password confirmation) passes `touchLastLogin: false` so it doesn't
+    // record itself as a sign-in.
+    if (touchLastLogin) {
+      await stampLastLogin(user.userId);
+    }
 
     const safeUser: SafeUser = {
       userId: user.userId,
@@ -198,8 +203,11 @@ export function authenticateWeb(
   res: Response,
   next: NextFunction
 ): void {
-  // Skip for API routes - they have their own auth middleware
-  if (req.path.startsWith('/api')) {
+  // Skip for API routes - they have their own auth middleware. Segment-bounded:
+  // a bare `startsWith('/api')` also matches `/apifoo`, which would skip the web
+  // gate and fall through to the SPA catch-all (cf. the /api/portal session trap
+  // documented in CLAUDE.md).
+  if (req.path === '/api' || req.path.startsWith('/api/')) {
     return next();
   }
 

@@ -19,9 +19,26 @@ import {
 } from '../../services/database/queries/lookup-admin-queries.js';
 import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import { authorize } from '../../middleware/auth.js';
+import { FINANCE_ROLES } from '../../shared/auth/roles.js';
 import * as lookupAdmin from '../../shared/contracts/lookup-admin.contract.js';
 
 const router = Router();
+
+// Role gate — pathless is safe here BECAUSE the router is mounted at
+// `/api/admin` (index.ts), so it is naturally scoped (cf. user-management.routes.ts;
+// the opposite of the root-mounted admin.ts trap).
+//
+// This has to live here, not in admin.ts: admin.ts declares
+// `router.use('/api/admin', authorize(ADMIN_ROLES))` but is mounted AFTER this
+// router, and Express matches in registration order — so every
+// `/api/admin/lookups/*` request was fully handled here and never reached that
+// gate. The surface looked admin-only while being open to any staff session.
+//
+// FINANCE (admin + front_desk), not ADMIN: the right-click "Edit values" flow
+// on expense/lab dropdowns is a documented front-desk workflow. It excludes
+// `clinical`, the role that has no business rewriting reference tables.
+router.use(authorize(FINANCE_ROLES));
 
 // Param + body guards live in the shared contract
 // (`shared/contracts/lookup-admin.contract.ts`). The BODY is intentionally dynamic
@@ -35,12 +52,10 @@ const router = Router();
 
 type TableNameParams = lookupAdmin.TableNameParams;
 
-// Raw req.params view for the :tableName/:id routes (the validated boundary is
-// `lookupAdmin.{updateItem,deleteItem}.params`, which coerce id → number). Type-only.
-type TableNameIdParams = {
-  tableName: string;
-  id: string;
-};
+// The :tableName/:id params, straight off the contract that validates them
+// (`lookupAdmin.{updateItem,deleteItem}.params`) instead of a parallel hand-written
+// shape that could drift from it.
+type TableNameIdParams = lookupAdmin.TableIdParams;
 
 /**
  * Get all available lookup table configurations

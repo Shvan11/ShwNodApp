@@ -2,19 +2,23 @@
 // Catches UPDATED rows that row-count parity misses.
 import pg from 'pg';
 import fs from 'node:fs';
+import { resolveLocalPg } from './_pg-connection.mjs';
 
 const env = {};
 for (const line of fs.readFileSync('.env', 'utf8').split('\n')) {
   const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
   if (m) env[m[1]] = m[2].replace(/^["']|["']$/g, '');
 }
-const localUrl = env.DATABASE_URL ||
-  `postgres://${env.PG_USER}:${env.PG_PASSWORD}@${env.PG_HOST}:${env.PG_PORT}/${env.PG_DATABASE}`;
+// The app's precedence, not the reverse: discrete PG_* win PER FIELD over
+// DATABASE_URL (config/pg-connection.ts). Reading the URL first meant that on a box
+// where both forms are set and disagree, this compared the WRONG local database
+// against the mirror.
+const localConn = resolveLocalPg(env);
 const mirrorUrl = env.SUPABASE_FAILOVER_DB_URL.replace(/([?&])sslmode=[^&]*/g,'$1').replace(/[?&]$/,'');
 
 const IGNORE = new Set(['staff_sessions','portal_sessions','change_log','cdc_sink_control','dolphin_sync_map','pgmigrations']);
 
-const local = new pg.Client({ connectionString: localUrl });
+const local = new pg.Client(localConn);
 const mirror = new pg.Client({ connectionString: mirrorUrl, ssl:{ rejectUnauthorized:false } });
 const q = async (c,s,p)=>(await c.query(s,p)).rows;
 

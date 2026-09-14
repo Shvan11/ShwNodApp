@@ -12,6 +12,7 @@
  * TransformedMessage / MessageCount (MessagingService) + ResetResult (messaging-queries).
  */
 import { z } from 'zod';
+import { dateString } from '../validation.js';
 
 // A transformed WhatsApp delivery row (TransformedMessage extends DatabaseMessage).
 // `deliveryStatus` stays a plain string — it's a free-form provider status the table
@@ -84,5 +85,8 @@ export type MessageTextParams = z.infer<typeof messageText.params>;
 export type MessageTextResponse = z.infer<typeof messageText.response>;
 
 // Shared `:date` path param for the messaging endpoints. Type-only.
-export const dateParams = z.object({ date: z.string() });
+// `:date` for the status/count/reset routes. VALIDATED as a real calendar date
+// (it was `z.string()`, type-only): the value goes straight into date-filtered
+// queries, so junk reached the DB and surfaced as a 500 rather than a 400.
+export const dateParams = z.object({ date: dateString });
 export type DateParams = z.infer<typeof dateParams>;

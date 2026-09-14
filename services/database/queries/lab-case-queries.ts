@@ -3,7 +3,7 @@
  * tagged templates typed directly to the contract row type, mirroring
  * slideshow-config-queries.ts). The assembled board/detail view is a Kysely
  * builder join (patient, work type, teeth, lab name) with a GROUP BY, mirroring
- * `getWorkDetailsList` (work-queries.ts). Transactional stage transitions
+ * `getWorkDetailsList` (work-item-queries.ts). Transactional stage transitions
  * (create/advance/remake/hold/resume/cancel) live in
  * `services/lab-cases/lab-case-service.ts`, not here.
  */

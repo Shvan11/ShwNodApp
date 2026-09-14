@@ -15,7 +15,8 @@ import { z } from 'zod';
 import { anyArray, numericParam } from '../validation.js';
 
 // PUT/DELETE param guard — numeric `:id` + a table name.
-const tableIdParams = z.object({ tableName: z.string().min(1), id: numericParam });
+export const tableIdParams = z.object({ tableName: z.string().min(1), id: numericParam });
+export type TableIdParams = z.infer<typeof tableIdParams>;
 // Dynamic per-table key/value map; required columns validated in-handler. This is
 // one of the two principled non-strict bodies (columns vary per `tableName`, so
 // there is NO static field list to enumerate) — `looseObject` BY DESIGN. The

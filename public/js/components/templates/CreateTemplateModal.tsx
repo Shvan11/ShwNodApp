@@ -77,7 +77,7 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
         // Convert string values to numbers
         const submissionData: TemplateSubmissionData = {
             ...formData,
-            document_type_id: parseInt(String(formData.document_type_id)),
+            document_type_id: parseInt(String(formData.document_type_id), 10),
             paper_width: Number(formData.paper_width),
             paper_height: Number(formData.paper_height)
         };

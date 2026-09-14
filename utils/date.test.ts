@@ -74,8 +74,21 @@ describe('formatDatePattern', () => {
     expect(formatDatePattern(new Date(2026, 2, 1, 9, 0), 'dddd')).toBe('Sunday');
   });
 
-  it('passes literal characters through untouched', () => {
-    expect(formatDatePattern(noon, '[on] YYYY')).toBe('[on] 2026');
+  it('emits [bracketed] text literally, brackets stripped', () => {
+    // The single-character tokens (h/a/A/D/M/m/s) match anywhere in the pattern,
+    // so a literal word containing one is corrupted unless it is escaped:
+    // 'at' → 'pmt'. Template authors write these patterns, so this is the escape.
+    expect(formatDatePattern(noon, '[on] YYYY')).toBe('on 2026');
+    expect(formatDatePattern(noon, 'DD MMMM YYYY [at] hh:mm A')).toBe('09 March 2026 at 02:05 PM');
+    expect(formatDatePattern(noon, 'dddd [at] h:mm A')).toBe('Monday at 2:05 PM');
+    // An unclosed bracket is a literal bracket, not a swallowed tail.
+    expect(formatDatePattern(noon, '[YYYY')).toBe('[2026');
+  });
+
+  it('substitutes the un-padded D/M/m/s tokens', () => {
+    expect(formatDatePattern(noon, 'D/M/YYYY')).toBe('9/3/2026');
+    expect(formatDatePattern(new Date(2026, 10, 21, 14, 5, 7), 'D/M/YYYY')).toBe('21/11/2026');
+    expect(formatDatePattern(noon, 'h:m:s')).toBe('2:5:7');
   });
 
   it('returns empty for nullish and echoes an unparseable value', () => {

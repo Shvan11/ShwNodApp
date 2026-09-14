@@ -8,7 +8,11 @@
  * `localhost:5432/shwan_test` as `shwan_app` with an empty password.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { parseDatabaseUrl, resolvePgConnection } from './pg-connection.js';
+import { parseDatabaseUrl, resolvePgConnection, sslFromMode } from './pg-connection.js';
+// The DB scripts are plain .mjs run by bare `node`, so they cannot import the TS
+// module above; scripts/_pg-connection.mjs is a hand-kept mirror of it. This import
+// is what keeps the two honest — see the drift test at the bottom of this file.
+import { resolveLocalPg } from '../scripts/_pg-connection.mjs';
 
 describe('resolvePgConnection', () => {
   it('uses DATABASE_URL when only it is set — the regression', () => {
@@ -69,6 +73,50 @@ describe('resolvePgConnection', () => {
   });
 });
 
+describe('sslmode handling', () => {
+  it('carries sslmode out of the DATABASE_URL query string', () => {
+    // Previously every query parameter was parsed away, so a managed-PG deployment
+    // that asked for TLS connected in the clear.
+    expect(
+      resolvePgConnection({ DATABASE_URL: 'postgres://u:p@db.example:5432/clinic?sslmode=require' })
+    ).toMatchObject({ host: 'db.example', ssl: { rejectUnauthorized: false } });
+  });
+
+  it('verifies the certificate only for verify-ca/verify-full', () => {
+    expect(sslFromMode('require')).toEqual({ rejectUnauthorized: false });
+    expect(sslFromMode('verify-ca')).toEqual({ rejectUnauthorized: true });
+    expect(sslFromMode('verify-full')).toEqual({ rejectUnauthorized: true });
+    expect(sslFromMode('disable')).toBe(false);
+    expect(sslFromMode('prefer')).toBeUndefined();
+    expect(sslFromMode(undefined)).toBeUndefined();
+  });
+
+  it('warns on an unknown sslmode instead of guessing', () => {
+    const onWarn = vi.fn();
+    expect(sslFromMode('sortof', onWarn)).toBeUndefined();
+    expect(onWarn).toHaveBeenCalledOnce();
+  });
+
+  it('omits the ssl key entirely when no mode is given', () => {
+    expect(resolvePgConnection({ PG_HOST: 'localhost' })).not.toHaveProperty('ssl');
+  });
+
+  it('lets PG_SSLMODE win over the URL, like every other field', () => {
+    expect(
+      resolvePgConnection({
+        DATABASE_URL: 'postgres://u:p@db.example/clinic?sslmode=require',
+        PG_SSLMODE: 'disable',
+      })
+    ).toMatchObject({ ssl: false });
+  });
+
+  it('carries application_name through', () => {
+    expect(
+      resolvePgConnection({ DATABASE_URL: 'postgres://u:p@db.example/clinic?application_name=shwan' })
+    ).toMatchObject({ application_name: 'shwan' });
+  });
+});
+
 describe('parseDatabaseUrl', () => {
   it('percent-decodes credentials so a password with @ or / survives', () => {
     const parts = parseDatabaseUrl('postgres://us%40er:p%2Fss%40word@h:5432/db');
@@ -86,5 +134,25 @@ describe('parseDatabaseUrl', () => {
     const onWarn = vi.fn();
     expect(parseDatabaseUrl(undefined, onWarn)).toEqual({});
     expect(onWarn).not.toHaveBeenCalled();
+  });
+});
+
+describe('scripts/_pg-connection.mjs mirrors config/pg-connection.ts', () => {
+  // The seven DB scripts used to read PG_* only (so a DATABASE_URL-only deployment
+  // silently got libpq's defaults) and two read the URL FIRST, inverting the app's
+  // precedence — including `db-migrate-check.mjs`, which is wired as `predb:migrate`
+  // and could therefore certify a DIFFERENT database than `db:migrate` writes to.
+  // They all call `resolveLocalPg` now; these cases pin it to the app's resolver.
+  const cases: Array<Record<string, string>> = [
+    { DATABASE_URL: 'postgres://app_user:s3cret@db.internal:6543/clinic' },
+    { PG_HOST: '127.0.0.1', PG_PORT: '5432', PG_DATABASE: 'shwan', PG_USER: 'shwan_app', PG_PASSWORD: 'pw' },
+    { DATABASE_URL: 'postgres://u:p@db.example:5432/clinic?sslmode=require', PG_PASSWORD: 'from-secret-store' },
+    { DATABASE_URL: 'postgres://u:p@db.example/clinic?sslmode=verify-full&application_name=shwan' },
+    { PG_HOST: 'h', PG_PORT: 'not-a-number', PG_DATABASE: 'd', PG_USER: 'u', PG_PASSWORD: 'p' },
+    {},
+  ];
+
+  it.each(cases)('agrees field-for-field on %o', (env) => {
+    expect(resolveLocalPg(env)).toEqual(resolvePgConnection(env));
   });
 });

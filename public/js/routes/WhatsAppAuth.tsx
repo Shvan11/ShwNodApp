@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { fetchJSON } from '@/core/http';
+import { postJSON } from '@/core/http';
 import { useWhatsAppAuth, AUTH_STATES } from '../hooks/useWhatsAppAuth';
 import { StatusDisplay } from '../components/whatsapp-auth/StatusDisplay';
 import { QRCodeDisplay } from '../components/whatsapp-auth/QRCodeDisplay';
@@ -26,18 +26,19 @@ export default function WhatsAppAuth() {
   // on-demand init happens. Production is untouched: import.meta.env.DEV is
   // false in prod builds and this effect compiles out.
   //
-  // Uses /api/wa/initialize (fire-and-forget, returns 200 immediately) rather
-  // than /api/wa/restart, which awaits the whole init synchronously and 408s
-  // against the 30s global request timeout for a session-restore that takes
-  // longer than that.
+  // Uses POST /api/wa/initialize (fire-and-forget, returns 200 immediately)
+  // rather than /api/wa/restart, which awaits the whole init synchronously and
+  // 408s against the 30s global request timeout for a session-restore that takes
+  // longer than that. It is a POST because starting the client is a mutation —
+  // the GET twin that used to serve this call was removed (a state-changing GET
+  // is exempt from csurf while the session cookie is sameSite: 'lax').
   const initRequestedRef = useRef(false);
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     if (initRequestedRef.current) return;
     initRequestedRef.current = true;
-    // Fire-and-forget: response ignored, so a non-2xx (now thrown by fetchJSON) just logs.
-    // eslint-disable-next-line no-restricted-syntax -- fire-and-forget init; response ignored
-    fetchJSON('/api/wa/initialize').catch((err) => {
+    // Fire-and-forget: response ignored, so a non-2xx (now thrown by postJSON) just logs.
+    postJSON('/api/wa/initialize', {}).catch((err) => {
       console.error('[WhatsAppAuth] dev auto-init request failed:', err);
     });
   }, []);

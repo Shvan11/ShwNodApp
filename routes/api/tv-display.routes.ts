@@ -26,6 +26,7 @@ import { mkdir } from 'fs/promises';
 import { authorize } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
+import { UploadRejectedError, uploadErrorMessage } from '../../middleware/upload.js';
 import { log } from '../../utils/logger.js';
 import { ALL_ROLES } from '../../shared/auth/roles.js';
 import {
@@ -84,7 +85,7 @@ const upload = multer({
   limits: { fileSize: 1024 * 1024 * 1024, files: 20 },
   fileFilter: (_req, file, cb) => {
     if (!classify(path.extname(file.originalname).toLowerCase())) {
-      cb(new Error(`Unsupported file type. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`));
+      cb(new UploadRejectedError(`Unsupported file type. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`));
       return;
     }
     cb(null, true);
@@ -95,7 +96,17 @@ const upload = multer({
 function uploadMediaFiles(req: Request, res: Response, next: NextFunction): void {
   upload.array('media', 20)(req, res, (err: unknown) => {
     if (err) {
-      ErrorResponses.badRequest(res, err instanceof Error ? err.message : 'Upload failed');
+      // Only a real upload verdict (multer's own codes, or the fileFilter's
+      // UploadRejectedError above) has a message meant for the user. This used to
+      // forward `err.message` unconditionally, so a failed staging write answered
+      // with its fs error text and server path.
+      const message = uploadErrorMessage(err, 'File is too large.');
+      if (message) {
+        ErrorResponses.badRequest(res, message);
+        return;
+      }
+      log.error('[TV Display] upload failed', { error: (err as Error).message });
+      ErrorResponses.internalError(res, 'Upload failed', err as Error);
       return;
     }
     next();
@@ -188,8 +199,14 @@ router.post('/tv-display/media', uploadMediaFiles, async (req: Request, res: Res
       await commitUpload(file.path, file.originalname);
     }
   } catch (error) {
+    // `commitUpload` throws one curated message (an extension the store rejects)
+    // but also whatever `mkdir`/`rename` raise — EACCES, ENOSPC, EXDEV — whose text
+    // names a server path. The curated case is already unreachable from here: the
+    // multer `fileFilter` above rejects an unclassified extension before any bytes
+    // are accepted, and it produces the better message. So this is the internal
+    // half: fixed string out, real error into dev-only details.
     log.error('[TV Display] upload commit failed', { error: (error as Error).message });
-    ErrorResponses.badRequest(res, (error as Error).message || 'Upload failed');
+    ErrorResponses.internalError(res, 'Could not save the uploaded file', error as Error);
     return;
   }
   await respondWithState(res, tvDisplay.uploadMedia.response, 'Failed to read TV display state', true);

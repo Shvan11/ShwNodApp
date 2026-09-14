@@ -201,10 +201,10 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
             const result = await postJSON<{ appointment_id?: number }>(
                 '/api/appointments',
                 {
-                    person_id: parseInt(String(formData.PersonID)),
+                    person_id: parseInt(String(formData.PersonID), 10),
                     app_date: appointmentDateTime,
                     app_detail: formData.AppDetail,
-                    dr_id: parseInt(formData.DrID)
+                    dr_id: parseInt(formData.DrID, 10)
                 },
                 { schema: appointment.createAppointment.response }
             );

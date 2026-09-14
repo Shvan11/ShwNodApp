@@ -77,7 +77,7 @@ const AppointmentCard = ({
         const timeParts = timeString.split(':');
         if (timeParts.length < 2) return timeString;
 
-        let hours = parseInt(timeParts[0]);
+        let hours = parseInt(timeParts[0], 10);
         const minutes = timeParts[1];
         const period = hours >= 12 ? t('card.pm') : t('card.am');
 

@@ -200,7 +200,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
     const formatCostInput = (value: string): string => {
         const numericValue = value.replace(/[^0-9]/g, '');
         if (!numericValue) return '';
-        return parseInt(numericValue).toLocaleString('en-US');
+        return parseInt(numericValue, 10).toLocaleString('en-US');
     };
 
     // Parse formatted input to numeric value

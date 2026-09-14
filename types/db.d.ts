@@ -400,6 +400,10 @@ export interface ExpenseCategories {
 export interface Expenses {
   amount: number;
   category_id: number | null;
+  /**
+   * Row insert time (wall clock). The record-age authorization guard reads THIS, never the user-entered expense_date. Backfilled to expense_date::timestamp for rows predating it.
+   */
+  created_at: Generated<Timestamp>;
   currency: string | null;
   employee_id: number | null;
   expense_date: string;

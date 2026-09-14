@@ -11,7 +11,7 @@
  * LOCATION: lives in `shared/` (project root) so it is importable by BOTH the
  * Express side (relative `.js` — `services/imaging/photo-original-tags.ts`,
  * `photo-render.service.ts`) and the React bundle (`@shared` alias —
- * `photo-editor/photoEditorTypes.ts`, `types/api.types.ts`).
+ * `photo-editor/photoEditorTypes.ts`, `middleware/types.ts`).
  */
 
 /**

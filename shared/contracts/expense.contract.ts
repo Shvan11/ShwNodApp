@@ -22,6 +22,7 @@ import { z } from 'zod';
 import {
   idParams,
   dateString,
+  moneyInt,
   optionalPositiveIntQuery,
   optionalNonNegIntQuery,
 } from '../validation.js';
@@ -72,7 +73,10 @@ const expenseSubcategoryRow = z.looseObject({
 // Shared body for create + update — fully enumerated strict `z.object`.
 const expenseBody = z.object({
   expense_date: dateString,
-  amount: z.coerce.number().positive('amount must be a positive number'),
+  // `moneyInt`, not a bare number: `expenses.amount` is an `integer` column and
+  // the route `parseInt`s this, so `12.99 USD` used to be stored as `12` with no
+  // error and no warning. Now it 400s at the boundary.
+  amount: moneyInt.positive('amount must be a positive number'),
   currency: z.string().optional(),
   note: z.string().optional(),
   categoryId: z.coerce.number().int().optional(),
@@ -124,6 +128,7 @@ export const createExpense = {
 // summary = ExpenseSummary[] (per category+currency), totals = ExpenseTotal[]
 // (per currency) — both from expense-queries.
 export const expenseSummary = {
+  query: z.object({ startDate: dateString, endDate: dateString }),
   response: z.object({
     summary: z.array(
       z.object({
@@ -142,6 +147,11 @@ export const expenseSummary = {
     ),
   }),
 } as const;
+
+/** The parsed `/expenses` query — numbers are already coerced by validate(). */
+export type ExpenseListQuery = z.infer<typeof expenseList.query>;
+
+export type ExpenseSummaryQuery = z.infer<typeof expenseSummary.query>;
 
 // GET /api/expenses/:id — single Expense row.
 export const expenseById = {

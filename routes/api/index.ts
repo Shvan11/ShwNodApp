@@ -31,14 +31,28 @@ import type { EventEmitter } from 'events';
 // Import all route modules
 // note: Routes that haven't been migrated yet use .js, migrated ones use .js (ESM resolution)
 import patientRoutes from './patient.routes.js';
+import patientTimepointRoutes from './patient-timepoint.routes.js';
+import alertRoutes from './alert.routes.js';
+import patientPortalAdminRoutes from './patient-portal-admin.routes.js';
 import appointmentRoutes, { setWebSocketEmitter as setAppointmentWS } from './appointment.routes.js';
 import chairDisplayRoutes, { setWebSocketEmitter as setChairDisplayWS } from './chair-display.routes.js';
 import paymentRoutes from './payment.routes.js';
 import workRoutes from './work.routes.js';
+import workItemRoutes from './work-item.routes.js';
+import diagnosisRoutes from './diagnosis.routes.js';
+import workTransferRoutes from './work-transfer.routes.js';
 import visitRoutes from './visit.routes.js';
 import whatsappRoutes from './whatsapp.routes.js';
+import whatsappMediaRoutes from './whatsapp-media.routes.js';
+import whatsappSessionRoutes from './whatsapp-session.routes.js';
 import messagingRoutes from './messaging.routes.js';
 import alignerRoutes from './aligner.routes.js';
+import alignerNoteRoutes from './aligner-note.routes.js';
+import alignerBatchRoutes from './aligner-batch.routes.js';
+import alignerFileRoutes from './aligner-file.routes.js';
+import alignerArchformRoutes from './aligner-archform.routes.js';
+import alignerLabelRoutes from './aligner-label.routes.js';
+import alignerDoctorRoutes from './aligner-doctor.routes.js';
 import employeeRoutes from './employee.routes.js';
 import expenseRoutes from './expense.routes.js';
 import healthRoutes from './health.routes.js';
@@ -70,7 +84,7 @@ import announcementRoutes from './announcement.routes.js';
 import tvDisplayRoutes from './tv-display.routes.js';
 
 // Import template routes (already modular)
-import templateRouter from '../template-api.js';
+import templateRouter from './template.routes.js';
 
 const router = Router();
 
@@ -93,16 +107,37 @@ router.use('/templates', templateRouter);
 
 // Core entity routes
 router.use('/', patientRoutes);       // Patient management
+// The three routers below were split out of patient.routes.ts (C1) and are
+// mounted at the same prefix. They claim disjoint paths (/patients/:id/timepoints*,
+// /patients/:id/alerts + /alerts/*, /patients/:id/portal* + /photos/visibility),
+// none of which any sibling matches, so this order is not load-bearing — but keep
+// them adjacent to patientRoutes so the grouping stays readable.
+router.use('/', patientTimepointRoutes);     // Time points, gallery, X-ray
+router.use('/', alertRoutes);                // Patient alerts / header tasks
+router.use('/', patientPortalAdminRoutes);   // Staff-side portal access + photo privacy
 router.use('/', fileExplorerRoutes);  // Per-patient file explorer (/patients/:id/files*)
 router.use('/', slideshowRoutes);     // Saved slideshow configurations (/slideshow-configs*)
 router.use('/', appointmentRoutes);   // Appointment scheduling
 router.use('/', chairDisplayRoutes);  // Chair-side public display events
 router.use('/', paymentRoutes);       // Payments and invoices
 router.use('/', workRoutes);          // Treatment work/plans
+// The three routers below were split out of work.routes.ts (S2/C5) and mount at the
+// same prefix, in the order their sections appeared in the file — so the registration
+// order of the route table is byte-identical to before the split. They claim disjoint
+// paths (/getworkdetailslist + /addworkdetail…, /diagnosis*, /work/:workId/transfer*),
+// none of which any sibling matches.
+router.use('/', workItemRoutes);      // Work items (treatment details) + their teeth
+router.use('/', diagnosisRoutes);     // Comprehensive orthodontic diagnosis (1 per work)
+router.use('/', workTransferRoutes);  // Move a work to another patient (admin only)
 router.use('/', visitRoutes);         // Visit tracking
 
 // Messaging routes (prefixed)
 router.use('/wa', whatsappRoutes);              // WhatsApp (mounted at /wa)
+// Split out of whatsapp.routes.ts (S2/C6); mounted at the same `/wa` prefix in the
+// order their sections appeared in that file, so the registration order of the route
+// table is unchanged by the split.
+router.use('/wa', whatsappMediaRoutes);         // /sendmedia, /sendmedia2
+router.use('/wa', whatsappSessionRoutes);       // QR/status + client lifecycle
 router.use('/messaging', messagingRoutes);      // Messaging system (mounted at /messaging)
 
 // Aligner routes. Every route in alignerRoutes self-prefixes its full path
@@ -111,6 +146,16 @@ router.use('/messaging', messagingRoutes);      // Messaging system (mounted at 
 // (A second `/aligner` mount would only produce dead `/api/aligner/aligner/*`
 // paths nothing calls — same self-prefix trap as the expense mount above.)
 router.use('/', alignerRoutes);
+// The six routers below were split out of aligner.routes.ts (S2/C4) and mount at the
+// same prefix, in the order their sections appeared in that file — so the registration
+// order of the route table is unchanged by the split. Like alignerRoutes they
+// self-prefix their full paths, hence the single root mount each.
+router.use('/', alignerNoteRoutes);      // Lab↔Doctor note thread on a set
+router.use('/', alignerBatchRoutes);     // Batch CRUD + manufacture/deliver lifecycle
+router.use('/', alignerFileRoutes);      // Set attachments: treatment-plan PDF + portal photos
+router.use('/', alignerArchformRoutes);  // Archform SQLite patient matching
+router.use('/', alignerLabelRoutes);     // Printable aligner-label PDF
+router.use('/', alignerDoctorRoutes);    // /aligner-doctors* CRUD
 
 // Employee and expense routes
 router.use('/', employeeRoutes);      // Employee management

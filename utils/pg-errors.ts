@@ -12,7 +12,7 @@
  */
 
 /** SQLSTATE codes the app branches on. */
-export const PG_SQLSTATE = {
+const PG_SQLSTATE = {
   UNIQUE_VIOLATION: '23505',
   FOREIGN_KEY_VIOLATION: '23503',
   NOT_NULL_VIOLATION: '23502',
@@ -20,7 +20,7 @@ export const PG_SQLSTATE = {
 } as const;
 
 /** The subset of a pg `DatabaseError` the app inspects when classifying failures. */
-export interface PgDatabaseError extends Error {
+interface PgDatabaseError extends Error {
   /** SQLSTATE string, e.g. '23505'. */
   code?: string;
   /** Constraint / index name pg reports for the violation. */
@@ -31,7 +31,7 @@ export interface PgDatabaseError extends Error {
 }
 
 /** Narrow an unknown caught value to the inspectable pg-error shape. */
-export function asPgError(error: unknown): PgDatabaseError {
+function asPgError(error: unknown): PgDatabaseError {
   return (error ?? {}) as PgDatabaseError;
 }
 
@@ -54,14 +54,14 @@ export function isForeignKeyViolation(error: unknown): boolean {
 }
 
 /** True for a pg NOT NULL violation (SQLSTATE 23502); optionally match the column. */
-export function isNotNullViolation(error: unknown, column?: string): boolean {
+function isNotNullViolation(error: unknown, column?: string): boolean {
   const err = asPgError(error);
   if (err.code !== PG_SQLSTATE.NOT_NULL_VIOLATION) return false;
   return !column || err.column === column;
 }
 
 /** True for a pg CHECK violation (SQLSTATE 23514); optionally match the constraint. */
-export function isCheckViolation(error: unknown, constraint?: string): boolean {
+function isCheckViolation(error: unknown, constraint?: string): boolean {
   const err = asPgError(error);
   if (err.code !== PG_SQLSTATE.CHECK_VIOLATION) return false;
   return !constraint || err.constraint === constraint;

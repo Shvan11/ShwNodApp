@@ -143,8 +143,8 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             lowerStart = 1;
         }
 
-        const upperCount = parseInt(String(formData.upper_aligner_count));
-        const lowerCount = parseInt(String(formData.lower_aligner_count));
+        const upperCount = parseInt(String(formData.upper_aligner_count), 10);
+        const lowerCount = parseInt(String(formData.lower_aligner_count), 10);
         return {
             upper_aligner_start_sequence: upperStart,
             lower_aligner_start_sequence: lowerStart,
@@ -181,10 +181,10 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
 
         // Validate upper aligner consumption doesn't exceed remaining
         if (set && formData.upper_aligner_count) {
-            const upperCount = parseInt(String(formData.upper_aligner_count));
+            const upperCount = parseInt(String(formData.upper_aligner_count), 10);
             const upperConsumed = upperCount - (newHasUpperTpl ? 1 : 0);
             // When editing, add back this batch's prior real consumption to get available total
-            const oldUpperCount = batch ? (parseInt(String(batch.upper_aligner_count)) || 0) : 0;
+            const oldUpperCount = batch ? (parseInt(String(batch.upper_aligner_count), 10) || 0) : 0;
             const oldUpperConsumed = batch ? oldUpperCount - (batch.has_upper_template ? 1 : 0) : 0;
             const availableUpper = (set.remaining_upper_aligners || 0) + oldUpperConsumed;
 
@@ -195,9 +195,9 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
 
         // Validate lower aligner consumption doesn't exceed remaining
         if (set && formData.lower_aligner_count) {
-            const lowerCount = parseInt(String(formData.lower_aligner_count));
+            const lowerCount = parseInt(String(formData.lower_aligner_count), 10);
             const lowerConsumed = lowerCount - (newHasLowerTpl ? 1 : 0);
-            const oldLowerCount = batch ? (parseInt(String(batch.lower_aligner_count)) || 0) : 0;
+            const oldLowerCount = batch ? (parseInt(String(batch.lower_aligner_count), 10) || 0) : 0;
             const oldLowerConsumed = batch ? oldLowerCount - (batch.has_lower_template ? 1 : 0) : 0;
             const availableLower = (set.remaining_lower_aligners || 0) + oldLowerConsumed;
 
@@ -230,13 +230,13 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         const newHasUpperTpl = canChangeTemplateOption && hasUpperTemplate;
         const newHasLowerTpl = canChangeTemplateOption && hasLowerTemplate;
 
-        const upperCount = parseInt(String(formData.upper_aligner_count)) || 0;
-        const lowerCount = parseInt(String(formData.lower_aligner_count)) || 0;
+        const upperCount = parseInt(String(formData.upper_aligner_count), 10) || 0;
+        const lowerCount = parseInt(String(formData.lower_aligner_count), 10) || 0;
         const newUpperConsumed = upperCount - (newHasUpperTpl ? 1 : 0);
         const newLowerConsumed = lowerCount - (newHasLowerTpl ? 1 : 0);
 
-        const oldUpperCount = batch ? (parseInt(String(batch.upper_aligner_count)) || 0) : 0;
-        const oldLowerCount = batch ? (parseInt(String(batch.lower_aligner_count)) || 0) : 0;
+        const oldUpperCount = batch ? (parseInt(String(batch.upper_aligner_count), 10) || 0) : 0;
+        const oldLowerCount = batch ? (parseInt(String(batch.lower_aligner_count), 10) || 0) : 0;
         const oldUpperConsumed = batch ? oldUpperCount - (batch.has_upper_template ? 1 : 0) : 0;
         const oldLowerConsumed = batch ? oldLowerCount - (batch.has_lower_template ? 1 : 0) : 0;
 

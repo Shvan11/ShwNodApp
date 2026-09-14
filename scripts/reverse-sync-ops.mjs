@@ -16,6 +16,7 @@
 import pg from 'pg';
 import { readFile } from 'node:fs/promises';
 import dotenv from 'dotenv';
+import { resolveLocalPg } from './_pg-connection.mjs';
 
 dotenv.config({ quiet: true }); // suppress dotenv 17's promotional banner
 const { Pool } = pg;
@@ -29,12 +30,9 @@ function stripSslMode(s) {
 }
 
 function localPool() {
+  // Same resolution as the app (DATABASE_URL or PG_*, discrete wins per field).
   return new Pool({
-    host: process.env.PG_HOST,
-    port: Number(process.env.PG_PORT ?? 5432),
-    database: process.env.PG_DATABASE,
-    user: process.env.PG_USER,
-    password: process.env.PG_PASSWORD,
+    ...resolveLocalPg(),
     max: 2,
     connectionTimeoutMillis: 10_000,
   });

@@ -5,7 +5,12 @@
  * Both persist as `options` rows (`CLINIC_LOGO` filename, `CLINIC_NAME`); the
  * logo bytes live on the clinic volume (services/files/clinic-branding.ts) and
  * stream from `GET /api/branding/logo`. Auth-gated (mounted on the post-auth
- * aggregator); follows the shared-contract pattern: validate(...) then
+ * aggregator); the two reads stay open to any staff session (the SPA shell paints
+ * the header on every page) while all three WRITES are `authorize(ADMIN_ROLES)` —
+ * branding is a clinic-wide identity setting, the same tier as the rest of
+ * Settings. Gates are per-route because this router mounts at `/` inside the api
+ * router (a pathless `router.use` would gate every `/api/*` request). Follows the
+ * shared-contract pattern: validate(...) then
  * sendData(...). The image stream is a deliberately-raw (un-enveloped) response.
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
@@ -14,6 +19,8 @@ import { readFile } from 'fs/promises';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import { authorize } from '../../middleware/auth.js';
+import { ADMIN_ROLES } from '../../shared/auth/roles.js';
 import { getOption, upsertOption } from '../../services/database/queries/options-queries.js';
 import {
   saveLogo,
@@ -101,6 +108,7 @@ router.get('/branding/logo', async (_req: Request, res: Response): Promise<void>
 // PUT /api/branding — set the clinic display name ('' clears it).
 router.put(
   '/branding',
+  authorize(ADMIN_ROLES),
   validate({ body: branding.updateBranding.body }),
   async (
     req: Request<unknown, unknown, branding.UpdateBrandingBody>,
@@ -119,6 +127,7 @@ router.put(
 // POST /api/branding/logo — upload / replace the logo image.
 router.post(
   '/branding/logo',
+  authorize(ADMIN_ROLES),
   uploadLogoFile,
   async (req: Request, res: Response): Promise<void> => {
     const file = req.file;
@@ -145,7 +154,7 @@ router.post(
 );
 
 // DELETE /api/branding/logo — remove the custom logo (revert to name/default).
-router.delete('/branding/logo', async (_req: Request, res: Response): Promise<void> => {
+router.delete('/branding/logo', authorize(ADMIN_ROLES), async (_req: Request, res: Response): Promise<void> => {
   try {
     await upsertOption(LOGO_OPTION, '');
     await pruneLogosExcept(null);

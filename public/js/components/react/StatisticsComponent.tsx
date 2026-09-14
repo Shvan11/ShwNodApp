@@ -127,8 +127,8 @@ const StatisticsComponent = () => {
     const roleKnown = !!user?.role;
     const canViewFinance = roleCaps(user?.role as UserRole | undefined).viewFinance;
     const [searchParams, setSearchParams] = useSearchParams();
-    const [month, setMonth] = useState(parseInt(searchParams.get('month') || '') || new Date().getMonth() + 1);
-    const [year, setYear] = useState(parseInt(searchParams.get('year') || '') || new Date().getFullYear());
+    const [month, setMonth] = useState(parseInt(searchParams.get('month') || '', 10) || new Date().getMonth() + 1);
+    const [year, setYear] = useState(parseInt(searchParams.get('year') || '', 10) || new Date().getFullYear());
     // For Monthly view: separate start month/year for 12-month period
     const [periodStartMonth, setPeriodStartMonth] = useState(1);
     const [periodStartYear, setPeriodStartYear] = useState(new Date().getFullYear());
@@ -556,7 +556,7 @@ const StatisticsComponent = () => {
                     <div className={styles.dateDisplay}>
                         <select
                             value={month}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setMonth(parseInt(e.target.value))}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setMonth(parseInt(e.target.value, 10))}
                             className={styles.formSelect}
                         >
                             {monthNames.map((name, index) => (
@@ -566,7 +566,7 @@ const StatisticsComponent = () => {
                         <input
                             type="number"
                             value={year}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setYear(parseInt(e.target.value))}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setYear(parseInt(e.target.value, 10))}
                             min="2000"
                             max="2100"
                             className={styles.formInput}
@@ -671,7 +671,7 @@ const StatisticsComponent = () => {
                                             <select
                                                 id="period-start-month"
                                                 value={periodStartMonth}
-                                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setPeriodStartMonth(parseInt(e.target.value))}
+                                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setPeriodStartMonth(parseInt(e.target.value, 10))}
                                                 className={styles.formSelect}
                                             >
                                                 {monthNames.map((name, index) => (
@@ -681,7 +681,7 @@ const StatisticsComponent = () => {
                                             <input
                                                 type="number"
                                                 value={periodStartYear}
-                                                onChange={(e: ChangeEvent<HTMLInputElement>) => setPeriodStartYear(parseInt(e.target.value))}
+                                                onChange={(e: ChangeEvent<HTMLInputElement>) => setPeriodStartYear(parseInt(e.target.value, 10))}
                                                 min="2000"
                                                 max="2100"
                                                 className={styles.formInput}
@@ -720,7 +720,7 @@ const StatisticsComponent = () => {
                                                 type="number"
                                                 value={yearRangeStart}
                                                 onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                                    const newStart = parseInt(e.target.value);
+                                                    const newStart = parseInt(e.target.value, 10);
                                                     if (newStart <= yearRangeEnd && newStart >= 2000) {
                                                         setYearRangeStart(newStart);
                                                     }
@@ -740,7 +740,7 @@ const StatisticsComponent = () => {
                                                 type="number"
                                                 value={yearRangeEnd}
                                                 onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                                    const newEnd = parseInt(e.target.value);
+                                                    const newEnd = parseInt(e.target.value, 10);
                                                     if (newEnd >= yearRangeStart && newEnd <= 2100) {
                                                         setYearRangeEnd(newEnd);
                                                     }

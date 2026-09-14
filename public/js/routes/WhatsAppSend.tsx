@@ -194,8 +194,9 @@ export default function WhatsAppSend() {
     }
 
     try {
-      const result = await apiClient.get<{ alreadyInProgress?: boolean }>(
-        API_ENDPOINTS.WA_SEND(currentDate)
+      const result = await apiClient.post<{ alreadyInProgress?: boolean }>(
+        API_ENDPOINTS.WA_SEND,
+        { date: currentDate }
       );
       if (result.alreadyInProgress) {
         toast.warning('A sending batch is already in progress — wait for it to finish');

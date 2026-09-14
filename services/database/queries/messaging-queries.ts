@@ -2,13 +2,31 @@
  * Messaging queries (WhatsApp + SMS) — PostgreSQL / Kysely.
  *
  * The Arabic/English message building, relative-day logic and phone normalisation all live
- * in TS here rather than in the database. Bulk status updates are set-based via PG
- * `unnest($1::int[], …)` rather than row-at-a-time. Reads/writes go through the
- * DatabaseCircuitBreaker wrapper.
+ * in TS rather than in the database: the formatting primitives in
+ * `services/messaging/reminder-format.ts`, and the WhatsApp reminder's own selection and
+ * wording rules in `services/messaging/whatsapp-batch-plan.ts` (pure, unit-tested — this
+ * module supplies the rows and keeps the SQL). The SMS and single-appointment builders
+ * below still compose their text inline; their wording differs from the WhatsApp reminder
+ * on purpose, so they were NOT folded into the shared planner. Bulk status updates are
+ * set-based via PG `unnest($1::int[], …)` rather than row-at-a-time. Reads/writes go
+ * through the DatabaseCircuitBreaker wrapper.
  */
 import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
 import { arabicDay } from '../../../utils/arabic-day.js';
+import {
+  daysFromToday,
+  englishDay,
+  format12h,
+  formatDMY,
+  formatPhone,
+  isValidPhone,
+} from '../../messaging/reminder-format.js';
+import {
+  buildReminderPlan,
+  isReminderDay,
+  type ReminderCandidate,
+} from '../../messaging/whatsapp-batch-plan.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 
@@ -204,60 +222,13 @@ class DatabaseCircuitBreaker {
 
 const dbCircuitBreaker = new DatabaseCircuitBreaker();
 
-// ── Message-building helpers (all message assembly lives in TS, not the DB) ──
-
-const ENGLISH_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-/** Parse a date-only string as LOCAL midnight (avoids the UTC-parse day-shift). */
-function parseLocalDate(value: Date | string): Date {
-  if (value instanceof Date) return value;
-  return /^\d{4}-\d{2}-\d{2}/.test(value) ? new Date(`${value.slice(0, 10)}T00:00:00`) : new Date(value);
-}
-
-/** SQL `DATENAME(dw, ...)` — English weekday name. */
-function englishDay(value: Date | string): string {
-  return ENGLISH_DAYS[parseLocalDate(value).getDay()] ?? '';
-}
-
-/** Whole days from today (local wall-clock) to the target date. */
-function daysFromToday(target: Date | string): number {
-  const t = parseLocalDate(target);
-  const now = new Date();
-  const a = Date.UTC(t.getFullYear(), t.getMonth(), t.getDate());
-  const b = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((a - b) / 86_400_000);
-}
-
-/** SQL `FORMAT(dt, 'h:mm')` / `'h:mm tt'` — 12-hour clock, no leading-zero hour. */
-function format12h(date: Date, withMeridiem = false): string {
-  const h = date.getHours();
-  const m = String(date.getMinutes()).padStart(2, '0');
-  const h12 = h % 12 || 12;
-  return withMeridiem ? `${h12}:${m} ${h < 12 ? 'AM' : 'PM'}` : `${h12}:${m}`;
-}
-
-/** SQL `FORMAT(d, 'dd/MM/yyyy')`. */
-function formatDMY(value: Date | string): string {
-  const d = parseLocalDate(value);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-}
-
-/** Normalise a local phone to `country_code + number` (no '+'), matching the procs' CASE ladder. */
-function formatPhone(phone: string, countryCode: string): string {
-  const p = phone.trim();
-  if (p.startsWith(`+${countryCode}`)) return p.slice(1);
-  if (p.startsWith(`00${countryCode}`)) return p.slice(2);
-  if (p.startsWith(countryCode)) return p;
-  if (p.startsWith('0')) return countryCode + p.slice(1);
-  return countryCode + p;
-}
-
-/** The procs' phone validation: non-empty, digits/'+' only, at least one digit. */
-function isValidPhone(phone: string | null | undefined): phone is string {
-  if (!phone) return false;
-  const p = phone.trim();
-  return p.length > 0 && /^[0-9+]+$/.test(p) && /[0-9]/.test(p);
-}
+// ── Message-building helpers ──
+//
+// The pure formatting primitives (weekday names, 12-hour clock, the procs' phone
+// CASE ladder and validation) moved to `services/messaging/reminder-format.ts`,
+// and the WhatsApp reminder's own selection/wording rules to
+// `services/messaging/whatsapp-batch-plan.ts`, so both can be unit-tested
+// without a database. What stays here is the SQL.
 
 /**
  * Helper function to convert WhatsApp acknowledgment status codes to text
@@ -405,19 +376,9 @@ export async function getWhatsAppMessages(
   return dbCircuitBreaker
     .execute(async () => {
       const dd = daysFromToday(date);
-      if (dd !== 1 && dd !== 2) return [[], [], [], []] as [string[], string[], number[], string[]];
+      if (!isReminderDay(dd)) return [[], [], [], []] as [string[], string[], number[], string[]];
 
       const dateStr = typeof date === 'string' ? date.slice(0, 10) : toDateOnly(date);
-      const aDay = arabicDay(dateStr);
-      const eDay = englishDay(dateStr);
-      const aMes =
-        dd === 1
-          ? `غدا ${aDay} موعدك مع عيادة د.شوان لتقويم الاسنان الساعة`
-          : `بعد غد ${aDay} موعدك مع عيادة د.شوان لتقويم الاسنان الساعة`;
-      const eMes =
-        dd === 1
-          ? `Tomorrow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at`
-          : `The day after tomorrow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at`;
 
       const candidates = await getKysely()
         .selectFrom('appointments as a')
@@ -439,28 +400,33 @@ export async function getWhatsAppMessages(
         ])
         .execute();
 
-      const numbers: string[] = [];
-      const messages: string[] = [];
-      const ids: number[] = [];
-      const names: string[] = [];
+      // Who gets a message and what it says is decided by the pure planner, so
+      // the wording and the skip rules are testable without a database.
+      const plan = buildReminderPlan(candidates satisfies ReminderCandidate[], {
+        date: dateStr,
+        daysAhead: dd,
+      });
 
-      for (const r of candidates) {
-        if (!isValidPhone(r.phone)) continue;
-        const cc = r.countryCode || '964';
-        const appDate = r.appDate as unknown as Date;
-        const time = format12h(appDate);
-        const message =
-          r.language === 1
-            ? `Hello ${r.firstName || r.patientName}. ${eMes} ${time}`
-            : `السلام عليك ${r.patientName}. ${aMes} ${time}`;
-        numbers.push(formatPhone(r.phone, cc));
-        messages.push(message);
-        ids.push(r.id);
-        names.push(r.patientName || '');
+      if (plan.skipped.length > 0) {
+        // Skipped, not failed: these rows keep their eligibility flags and are
+        // picked up by a later batch once the number is corrected.
+        log.debug('WhatsApp reminder candidates skipped', {
+          date,
+          skipped: plan.skipped.length,
+          reason: 'invalid-phone',
+        });
       }
 
-      log.debug('WhatsApp messages retrieved successfully', { messageCount: ids.length, date });
-      return [numbers, messages, ids, names] as [string[], string[], number[], string[]];
+      log.debug('WhatsApp messages retrieved successfully', {
+        messageCount: plan.recipients.length,
+        date,
+      });
+      return [
+        plan.recipients.map((r) => r.number),
+        plan.recipients.map((r) => r.message),
+        plan.recipients.map((r) => r.appointmentId),
+        plan.recipients.map((r) => r.name),
+      ] as [string[], string[], number[], string[]];
     }, operationName)
     .catch((error: Error) => {
       log.error('Failed to retrieve WhatsApp messages', { operationName, error: error.message });

@@ -28,7 +28,7 @@ export function toLocalDateString(date: Date): string {
 
 /**
  * Saturday that starts the working week containing `date` (week = Sat–Thu).
- * Mirrors getWeekStart in routes/calendar.ts.
+ * Mirrors getWeekStart in routes/api/calendar.routes.ts.
  */
 export function getWeekStartSaturday(date: Date | string): Date {
     const start = parseLocalDate(date instanceof Date ? date : date);

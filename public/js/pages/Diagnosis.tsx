@@ -111,13 +111,13 @@ const Diagnosis = () => {
     // structural assertion is the honest bridge — no `unknown` laundering.
     const works = (worksData ?? null) as WorkInfo[] | null;
     const workInfo = works
-        ? works.find(w => w.work_id === parseInt(workId || '0')) ?? null
+        ? works.find(w => w.work_id === parseInt(workId || '0', 10)) ?? null
         : null;
 
     const loading = worksLoading || diagnosisLoading;
 
     const [diagnosisData, setDiagnosisData] = useState<DiagnosisData>({
-        work_id: parseInt(workId || '0'),
+        work_id: parseInt(workId || '0', 10),
         dx_date: formatISODate(),
         diagnosis: '',
         treatment_plan: '',

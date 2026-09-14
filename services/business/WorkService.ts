@@ -24,12 +24,14 @@ import {
   updateWork,
   addWorkWithInvoice as dbAddWorkWithInvoice,
   deleteWork as dbDeleteWork,
+  WORK_STATUS,
+} from '../database/queries/work-queries.js';
+import {
   transferWork as dbTransferWork,
   getWorkRelatedCounts,
-  WORK_STATUS,
   type WorkRelatedCounts,
   type TransferWorkResult,
-} from '../database/queries/work-queries.js';
+} from '../database/queries/work-transfer-queries.js';
 import { getPatientById } from '../database/queries/patient-queries.js';
 import { isToday } from '../../middleware/time-based-auth.js';
 import { ROLES, type UserRole } from '../../shared/auth/roles.js';
@@ -269,8 +271,8 @@ function validateWorkRequiredFields(workData: WorkCreateData): void {
 
   // Validate data types
   if (
-    isNaN(parseInt(String(workData.person_id))) ||
-    isNaN(parseInt(String(workData.dr_id)))
+    isNaN(parseInt(String(workData.person_id), 10)) ||
+    isNaN(parseInt(String(workData.dr_id), 10))
   ) {
     throw new WorkValidationError(
       'person_id and dr_id must be valid numbers',
@@ -322,7 +324,7 @@ async function formatDuplicateActiveWorkError(
   personId: number | string
 ): Promise<WorkErrorDetails> {
   try {
-    const existingWork = await getActiveWork(parseInt(String(personId)));
+    const existingWork = await getActiveWork(parseInt(String(personId), 10));
     return {
       message:
         'This patient already has an active (unfinished) work record. You can finish the existing work and add the new one.',

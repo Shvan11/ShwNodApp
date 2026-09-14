@@ -706,9 +706,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        const actualUSD = parseInt(String(formData.actualUSD)) || 0;
-        const actualIQD = parseInt(String(formData.actualIQD)) || 0;
-        const amountPaid = parseInt(String(formData.amountToRegister)) || 0;
+        const actualUSD = parseInt(String(formData.actualUSD), 10) || 0;
+        const actualIQD = parseInt(String(formData.actualIQD), 10) || 0;
+        const amountPaid = parseInt(String(formData.amountToRegister), 10) || 0;
 
         // Validation based on entry mode
         if (entryMode === 'amount') {
@@ -751,7 +751,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
         // Change is saved exactly when the form tracked it (see isChangeDisabled above):
         // NULL for the untracked scenarios, the entered/auto-calculated value otherwise.
-        const changeToSubmit = isChangeDisabled ? null : (parseInt(String(formData.change)) || 0);
+        const changeToSubmit = isChangeDisabled ? null : (parseInt(String(formData.change), 10) || 0);
 
         // Validate cross-currency change doesn't exceed received amounts
         if (changeToSubmit !== null && changeToSubmit > 0) {

@@ -6,6 +6,7 @@ import { postJSON, httpErrorMessage } from '@/core/http';
 import { authMeQuery } from '@/query/queries';
 import styles from './UserManagement.module.css';
 import { ROLE_LABELS, type UserRole } from '@shared/auth/roles';
+import { MIN_PASSWORD_LENGTH } from '@shared/validation';
 
 interface UserInfo {
   username: string;
@@ -52,8 +53,8 @@ export default function UserManagement() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'New password must be at least 6 characters' });
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      setMessage({ type: 'error', text: `New password must be at least ${MIN_PASSWORD_LENGTH} characters` });
       return;
     }
 

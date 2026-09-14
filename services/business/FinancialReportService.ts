@@ -208,8 +208,8 @@ export function validateMonthYear(
   month: number | string,
   year: number | string
 ): ValidatedMonthYear {
-  const monthNum = parseInt(String(month));
-  const yearNum = parseInt(String(year));
+  const monthNum = parseInt(String(month), 10);
+  const yearNum = parseInt(String(year), 10);
 
   if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
     throw new Error('Month must be between 1 and 12');

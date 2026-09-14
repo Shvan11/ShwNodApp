@@ -151,7 +151,7 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                 // Visits can be shown at work level (with workId) or patient level (all visits)
                 return (
                     <VisitsComponent
-                        workId={workId ? parseInt(workId) : null}
+                        workId={workId ? parseInt(workId, 10) : null}
                         personId={personId}
                     />
                 );
@@ -160,8 +160,8 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                 // New visit form - clean component directly related to parent work
                 return (
                     <NewVisitComponent
-                        workId={workId ? parseInt(workId) : null}
-                        visitId={visitId ? parseInt(visitId) : null}
+                        workId={workId ? parseInt(workId, 10) : null}
+                        visitId={visitId ? parseInt(visitId, 10) : null}
                         onSave={() => {
                             // Navigate back to works page after save
                             if (personId) navigate(`/patient/${personId}/works`);
@@ -204,7 +204,7 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                 return (
                     <NewWorkComponent
                         personId={personId}
-                        workId={workId ? parseInt(workId) : null}
+                        workId={workId ? parseInt(workId, 10) : null}
                         onSave={() => {
                             // Navigate back to works page
                             if (personId) navigate(`/patient/${personId}/works`);

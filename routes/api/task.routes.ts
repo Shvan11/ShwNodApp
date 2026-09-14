@@ -24,7 +24,9 @@ const router = Router();
 /**
  * GET /api/tasks — the header task list.
  */
-router.get('/tasks', authenticate, async (_req: Request, res: Response): Promise<void> => {
+// The header task bell is app-wide: every staff role reads it. Stated with an
+// explicit gate rather than left as the absence of one.
+router.get('/tasks', authenticate, authorize(CLINICAL_ROLES), async (_req: Request, res: Response): Promise<void> => {
   try {
     const tasks = await getHeaderTasks();
     sendData(res, taskContract.tasks.response, tasks);
@@ -39,7 +41,7 @@ router.get('/tasks', authenticate, async (_req: Request, res: Response): Promise
  * (active/snoozed/done/dismissed). Lifecycle actions reuse the shared
  * PUT /api/alerts/:id/status; delete reuses DELETE /api/tasks/:id.
  */
-router.get('/tasks/history', authenticate, async (_req: Request, res: Response): Promise<void> => {
+router.get('/tasks/history', authenticate, authorize(CLINICAL_ROLES), async (_req: Request, res: Response): Promise<void> => {
   try {
     const history = await getAllTasks();
     sendData(res, taskContract.tasksHistory.response, history);

@@ -65,21 +65,28 @@ function walk(dir, exts, acc = []) {
 
 const rel = (f) => relative(ROOT, f);
 
-// ── D1: hand-written request interfaces in routes/ ─────────────────────────────
-// Interface whose NAME ends with Body|Params|Query|Filter(s) — mirrors the ESLint
-// selector `TSInterfaceDeclaration[id.name=/(Body|Params|Query|Filters?)$/]`.
+// ── D1: hand-written request shapes in routes/ ────────────────────────────────
+// A declaration whose NAME ends with Body|Params|Query|Filter(s) and whose body is
+// an object literal — mirrors the two ESLint selectors
+// (`TSInterfaceDeclaration[id.name=…]` and `TSTypeAliasDeclaration[id.name=…] > TSTypeLiteral`).
 // (`SessionData` & friends in `declare module 'express-session'` don't match.)
+//
+// The `type` half matters: both enforcement points used to match `interface` only,
+// so writing `type XParams = { … }` was invisible to the gate and six route files
+// were doing exactly that while D1 reported 0. An ALIAS of a contract export
+// (`type XParams = someContract.XParams`) has no `{` and is correctly not a hit.
 function measureD1() {
   const hits = [];
-  const nameRe = /\binterface\s+([A-Za-z0-9_]+)/g;
+  const declRe = /\b(?:interface\s+([A-Za-z0-9_]+)\s*(?:extends[^{]+)?\{|type\s+([A-Za-z0-9_]+)\s*=\s*\{)/g;
   const suffixRe = /(Body|Params|Query|Filters?)$/;
   for (const file of walk(join(ROOT, 'routes'), ['.ts'])) {
     const lines = readFileSync(file, 'utf8').split('\n');
     lines.forEach((line, i) => {
       let m;
-      nameRe.lastIndex = 0;
-      while ((m = nameRe.exec(line))) {
-        if (suffixRe.test(m[1])) hits.push({ file: rel(file), line: i + 1, name: m[1] });
+      declRe.lastIndex = 0;
+      while ((m = declRe.exec(line))) {
+        const name = m[1] ?? m[2];
+        if (suffixRe.test(name)) hits.push({ file: rel(file), line: i + 1, name });
       }
     });
   }

@@ -31,15 +31,22 @@ rails below are the fix.
 
 ## Current model: one squashed baseline
 
-`migrations/pg/` contains exactly one file:
+`migrations/pg/` starts from one squashed baseline, with ordinary incremental files after
+it:
 
 ```
-1783100000000_baseline-2026-07-30.sql
+1783100000000_baseline-2026-07-30.sql   <- the squash
+1785700253568_notnull-timepoint-and-visit-flags.sql
+1787000000000_cdc-capture-clock-timestamp.sql
+1787000100000_oauth-account-email.sql
+1788812600000_diagnoses-unique-workid.sql
+1788812700000_expenses-created-at.sql
 ```
 
-It is the entire application schema as of 2026-07-30, generated from the live database
-and verified to reproduce it exactly. The ledger holds one matching row. The 21 retired
-files remain in git history at commit **`f83e10a`**.
+The baseline is the entire application schema as of 2026-07-30, generated from the live
+database and verified to reproduce it exactly. Every later file must sort after it. The
+ledger holds one row per file. The 21 retired pre-squash files remain in git history at
+commit **`f83e10a`**.
 
 What a fresh database gets from it: 80 tables, all constraints and indexes, the 2 app
 functions (`cdc_capture`, `set_updated_at`), all 99 CDC/`updated_at` triggers, the 24
@@ -101,6 +108,33 @@ npm run db:baseline:verify    # prove a baseline reproduces the live schema (scr
 5. **Deploying to a live server: apply DDL only against code that already tolerates it.**
    A column drop needs the service restarted onto the new build first, or the running
    build's `SELECT`/`INSERT` of the dropped column 500s. Order: build → restart → migrate.
+
+### Backfilling a new column on a CDC-mirrored table
+
+A migration that only adds DDL is invisible to CDC. A migration that also **backfills rows**
+is not: every `UPDATE` fires `trg_cdc_capture` (one `change_log` row each) *and*
+`trg_set_updated_at`, which stamps `updated_at = localtimestamp` — so a one-line backfill
+across a few thousand rows both floods the sink and destroys the table's real modification
+times, which is what the `updated_at` LWW guard replicates on.
+
+Run the backfill under the sink's own origin guard instead, and have each side compute the
+value itself:
+
+```sql
+SET app.cdc_origin = 'reverse';   -- LOCAL side ('failover' on the Supabase mirror)
+UPDATE expenses SET created_at = expense_date::timestamp WHERE created_at IS NULL;
+RESET app.cdc_origin;
+```
+
+`cdc_capture()` and `set_updated_at()` both return early under that setting (their echo-loop
+guard — see `sync-cdc.md`), so the backfill neither captures nor re-stamps. The mirror half
+carries the identical expression under `app.cdc_origin = 'failover'`, so both databases land
+on the same values with zero replication traffic. Use plain `SET`, not `SET LOCAL`: the file
+must behave the same when applied by hand through `psql`, where `SET LOCAL` outside a
+transaction warns and silently does nothing.
+
+Precedent: `1788812700000_expenses-created-at.sql` + its mirror half (verified afterwards:
+0 `change_log` rows, `updated_at` non-null count unchanged).
 
 ### Recovering a ledger that lost its rows
 

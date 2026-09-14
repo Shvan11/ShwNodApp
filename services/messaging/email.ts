@@ -118,7 +118,7 @@ class EmailService {
 
       // Parse port as integer
       if (config.smtp_port) {
-        config.smtp_port = parseInt(String(config.smtp_port));
+        config.smtp_port = parseInt(String(config.smtp_port), 10);
       }
 
       // Parse secure as boolean

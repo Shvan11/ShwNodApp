@@ -176,7 +176,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
             newErrors.set_sequence = 'Set sequence is required';
         }
 
-        if (!formData.aligner_dr_id || formData.aligner_dr_id === '' || isNaN(parseInt(String(formData.aligner_dr_id)))) {
+        if (!formData.aligner_dr_id || formData.aligner_dr_id === '' || isNaN(parseInt(String(formData.aligner_dr_id), 10))) {
             newErrors.aligner_dr_id = 'Doctor is required';
         }
 

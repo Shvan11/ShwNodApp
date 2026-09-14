@@ -17,6 +17,7 @@
  */
 import { readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import pg from 'pg';
+import { resolveLocalPg } from './_pg-connection.mjs';
 
 const MIGRATIONS_DIR = 'migrations/pg';
 const BACKUP_DIR = 'C:/DBBackup';
@@ -40,13 +41,9 @@ const baseline = baselines[0];
 // unrecorded so db:migrate still applies it.
 const postBaseline = files.filter((f) => f > baseline);
 
-const c = new pg.Client({
-  host: process.env.PG_HOST,
-  port: Number(process.env.PG_PORT ?? 5432),
-  database: process.env.PG_DATABASE,
-  user: process.env.PG_USER,
-  password: process.env.PG_PASSWORD,
-});
+// Resolved the way the APP resolves it (DATABASE_URL or PG_*, discrete wins per
+// field) — see scripts/_pg-connection.mjs.
+const c = new pg.Client(resolveLocalPg());
 await c.connect();
 
 const { rows: hasSchema } = await c.query(

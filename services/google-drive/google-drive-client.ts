@@ -178,6 +178,12 @@ class GoogleDriveClient {
       throw new Error('OAuth2 client not initialized');
     }
 
+    // AUDIT DECISION (services/ batch 2, 2026-08-31) — kept deliberately; do not
+    // "tighten" to drive.file without reading docs/services-audit.md first.
+    // `drive.file` only ever sees files this app itself created, and
+    // GOOGLE_DRIVE_FOLDER_ID points at a folder created BY HAND in the clinic's
+    // Drive — so `files.get` on it fails and `getRootFolder()` breaks on the next
+    // reconnect. Narrowing the scope requires the app to own its root folder first.
     const scopes = [
       'https://www.googleapis.com/auth/drive', // Full access to Google Drive
     ];
@@ -245,7 +251,11 @@ class GoogleDriveClient {
     }
 
     try {
-      // Make file viewable by anyone with the link
+      // AUDIT DECISION (services/ batch 2, 2026-08-31) — `anyone: reader` on every
+      // uploaded PDF was raised as a finding and the clinic explicitly excluded it
+      // from the fix list: it is a product decision about how aligner PDFs are
+      // handed out, not an oversight. Don't "harden" it on your own judgement — ask
+      // first. See docs/services-audit.md.
       await this.drive.permissions.create({
         fileId: fileId,
         requestBody: {

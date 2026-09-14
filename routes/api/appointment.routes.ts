@@ -15,11 +15,13 @@
 
 import { Router, type Request, type Response } from 'express';
 import type { EventEmitter } from 'events';
-import { sql } from 'kysely';
-import { getKysely } from '../../services/database/kysely.js';
 import {
   updatePresent,
-  undoAppointmentState
+  undoAppointmentState,
+  listAppointmentDetails,
+  getPatientAppointments,
+  getAppointmentById,
+  deleteAppointment
 } from '../../services/database/queries/appointment-queries.js';
 import { InternalEmitterEvents } from '../../services/messaging/websocket-events.js';
 import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
@@ -28,8 +30,10 @@ import { authenticate, authorize } from '../../middleware/auth.js';
 import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import * as appointment from '../../shared/contracts/appointment.contract.js';
 import { log } from '../../utils/logger.js';
+import { toDateOnly } from '../../utils/date.js';
 import {
   validateAndCreateAppointment,
+  validateAndUpdateAppointment,
   quickCheckIn,
   getDailyAppointments,
   AppointmentValidationError
@@ -55,6 +59,21 @@ export function setWebSocketEmitter(emitter: EventEmitter): void {
   wsEmitter = emitter;
 }
 
+/**
+ * Emit a DATA_UPDATED frame for each distinct day an appointment write touched.
+ *
+ * Every mutating handler in this file must call this — the realtime refresh is
+ * hand-wired per handler, so an omission is invisible until a second staff
+ * member's board goes stale. Nulls and duplicates are dropped, so a same-day
+ * edit broadcasts once and a row with no `app_day` broadcasts nothing.
+ */
+function broadcastDays(...days: (string | null | undefined)[]): void {
+  if (!wsEmitter) return;
+  for (const day of new Set(days.filter((d): d is string => !!d))) {
+    wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, day);
+  }
+}
+
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
@@ -62,22 +81,6 @@ export function setWebSocketEmitter(emitter: EventEmitter): void {
 type AppointmentQueryParams = appointment.AppointmentQueryParams;
 
 type QuickCheckInBody = appointment.QuickCheckinBody;
-
-// `type` (not `interface`) so these feed the contract's `z.looseObject` sendData
-// args — the index-signature rule (docs/shared-contract-progress.md).
-type AppointmentDetail = {
-  id: number;
-  detail: string;
-};
-
-type AppointmentResult = {
-  appointment_id: number;
-  person_id: number;
-  app_date: string;
-  app_detail: string;
-  dr_id: number;
-  DrName: string | null;
-};
 
 // ============================================================================
 // APPOINTMENT LOOKUP ROUTES
@@ -92,11 +95,7 @@ router.get(
   clinicalOnly,
   async (_req: Request, res: Response): Promise<void> => {
     try {
-      const db = getKysely();
-      const { rows } = await sql<AppointmentDetail>`
-        SELECT "id", "detail" FROM "details" ORDER BY "detail"
-      `.execute(db);
-      sendData(res, appointment.appointmentDetails.response, rows);
+      sendData(res, appointment.appointmentDetails.response, await listAppointmentDetails());
     } catch (error) {
       log.error('Error fetching appointment details:', error);
       ErrorResponses.internalError(
@@ -125,6 +124,7 @@ router.get(
 router.get(
   '/getDailyAppointments',
   clinicalOnly,
+  validate({ query: appointment.appointmentQuery }),
   async (
     req: Request<unknown, unknown, unknown, AppointmentQueryParams>,
     res: Response
@@ -197,18 +197,15 @@ router.post(
       );
 
       // Direct update - no transaction complexity
-      await updatePresent(appointment_id, state, currentTime);
+      const { appDay } = await updatePresent(appointment_id, state, currentTime);
 
-      // Broadcast to WebSocket - just the date, clients will reload
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const appointmentDate = `${year}-${month}-${day}`;
-
-      if (wsEmitter) {
-        log.info(`Broadcasting state change for appointment ${appointment_id}`);
-        wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, appointmentDate);
-      }
+      // Broadcast the APPOINTMENT's own day, not today's. Checking a patient in
+      // for another day used to refresh today's viewers while the day that
+      // actually changed never updated. `app_day` is a `date` column, so the pg
+      // parser already hands it back as 'YYYY-MM-DD' — the broadcast key's exact
+      // shape. Falling back to today only covers a NULL `app_day`.
+      log.info(`Broadcasting state change for appointment ${appointment_id}`);
+      broadcastDays(appDay ?? toDateOnly(now));
 
       sendData(res, appointment.updateAppointmentState.response, {
         appointment_id,
@@ -262,18 +259,11 @@ router.post(
       }
 
       log.info(`Undoing appointment ${appointment_id} state: ${state}`);
-      const result = await undoAppointmentState(appointment_id, state);
-
-      // Broadcast to WebSocket - just the date, clients will reload
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const appointmentDate = `${year}-${month}-${day}`;
-
-      if (wsEmitter) {
-        wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, appointmentDate);
-      }
+      // `appDay` is the SSE broadcast key and is deliberately NOT part of the
+      // contracted response — split it off here (same reasoning as the check-in
+      // handler above: broadcast the appointment's day, not the server's today).
+      const { appDay, ...result } = await undoAppointmentState(appointment_id, state);
+      broadcastDays(appDay ?? toDateOnly(new Date()));
 
       sendData(res, appointment.undoAppointmentState.response, result);
     } catch (error) {
@@ -331,30 +321,20 @@ router.post(
         dr_id
       });
 
-      // Emit WebSocket event for real-time updates
-      if (wsEmitter) {
-        // Use the app_date as-is if it's already in YYYY-MM-DD format
-        // Otherwise extract date from Date object using local time
-        let appointmentDay: string;
-        if (
-          typeof app_date === 'string' &&
-          app_date.match(/^\d{4}-\d{2}-\d{2}$/)
-        ) {
-          appointmentDay = app_date;
-        } else {
-          const appointmentDate = new Date(app_date);
-          const year = appointmentDate.getFullYear();
-          const month = String(appointmentDate.getMonth() + 1).padStart(2, '0');
-          const day = String(appointmentDate.getDate()).padStart(2, '0');
-          appointmentDay = `${year}-${month}-${day}`;
-        }
-        wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, appointmentDay);
-      }
+      // `appDay` is the row's own generated day, split off here so the contracted
+      // payload is unchanged. It replaces a 12-line hand-rolled copy of
+      // `toDateOnly` that parsed the REQUEST's `app_date` — correct for the shapes
+      // the staff forms send, and one more place to fix when they change.
+      const { appDay, ...createdAppointmentPayload } = createdAppointment;
+      broadcastDays(appDay);
 
       sendData(
         res,
         appointment.createAppointment.response,
-        { appointment_id: createdAppointment.appointment_id, appointment: createdAppointment },
+        {
+          appointment_id: createdAppointmentPayload.appointment_id,
+          appointment: createdAppointmentPayload,
+        },
         'Appointment created successfully'
       );
     } catch (error) {
@@ -396,27 +376,14 @@ router.get(
     try {
       const { personId } = req.params;
 
-      if (!personId || isNaN(parseInt(personId))) {
+      if (!personId || isNaN(parseInt(personId, 10))) {
         ErrorResponses.badRequest(res, 'Invalid person id');
         return;
       }
 
-      const db = getKysely();
-      const { rows } = await sql<AppointmentResult>`
-            SELECT
-                a."appointment_id",
-                a."person_id",
-                to_char(a."app_date", 'YYYY-MM-DD"T"HH24:MI:SS') AS "app_date",
-                a."app_detail",
-                a."dr_id",
-                e."employee_name" AS "DrName"
-            FROM "appointments" a
-            LEFT JOIN "employees" e ON a."dr_id" = e."id"
-            WHERE a."person_id" = ${parseInt(personId)}
-            ORDER BY a."app_date" DESC
-        `.execute(db);
+      const appointments = await getPatientAppointments(parseInt(personId, 10));
 
-      sendData(res, appointment.patientAppointments.response, { appointments: rows || [] });
+      sendData(res, appointment.patientAppointments.response, { appointments });
     } catch (error) {
       log.error('Error fetching patient appointments:', error);
       ErrorResponses.internalError(
@@ -442,31 +409,19 @@ router.get(
     try {
       const { appointmentId } = req.params;
 
-      if (!appointmentId || isNaN(parseInt(appointmentId))) {
+      if (!appointmentId || isNaN(parseInt(appointmentId, 10))) {
         ErrorResponses.badRequest(res, 'Invalid appointment id');
         return;
       }
 
-      const db = getKysely();
-      const { rows } = await sql<AppointmentResult>`
-            SELECT
-                a."appointment_id",
-                a."person_id",
-                to_char(a."app_date", 'YYYY-MM-DD"T"HH24:MI:SS') AS "app_date",
-                a."app_detail",
-                a."dr_id",
-                e."employee_name" AS "DrName"
-            FROM "appointments" a
-            LEFT JOIN "employees" e ON a."dr_id" = e."id"
-            WHERE a."appointment_id" = ${parseInt(appointmentId)}
-        `.execute(db);
+      const row = await getAppointmentById(parseInt(appointmentId, 10));
 
-      if (!rows || rows.length === 0) {
+      if (!row) {
         ErrorResponses.notFound(res, 'Appointment');
         return;
       }
 
-      sendData(res, appointment.appointmentById.response, { appointment: rows[0] });
+      sendData(res, appointment.appointmentById.response, { appointment: row });
     } catch (error) {
       log.error('Error fetching appointment:', error);
       ErrorResponses.internalError(
@@ -498,20 +453,33 @@ router.put(
       // (appointment.updateAppointment.params + .body): appointmentId is a
       // digit string, the ids are positive ints, and app_date/app_detail are
       // non-empty strings — so no manual re-check is needed here.
+      //
+      // The service runs the SAME holiday / doctor / double-booking checks the
+      // POST path runs. Without them a slot that could not be booked directly
+      // was reachable by booking elsewhere and editing into it.
+      const { previousDay, newDay } = await validateAndUpdateAppointment(
+        parseInt(appointmentId, 10),
+        { person_id, app_date, app_detail, dr_id }
+      );
 
-      // Cast the app_date string to timestamp on the PG side to avoid timezone conversion
-      const db = getKysely();
-      await sql`
-            UPDATE "appointments"
-            SET "person_id" = ${person_id},
-                "app_date" = ${app_date}::timestamp,
-                "app_detail" = ${app_detail},
-                "dr_id" = ${dr_id}
-            WHERE "appointment_id" = ${parseInt(appointmentId)}
-        `.execute(db);
+      // Refresh viewers of BOTH days — the one the appointment left and the one
+      // it landed on. This used to broadcast nothing at all, so an edited
+      // appointment stayed on every other board until a manual reload.
+      broadcastDays(previousDay, newDay);
 
       sendSuccess(res, null, 'Appointment updated successfully');
     } catch (error) {
+      if (error instanceof AppointmentValidationError) {
+        if (error.code === 'APPOINTMENT_NOT_FOUND') {
+          ErrorResponses.notFound(res, 'Appointment');
+          return;
+        }
+        ErrorResponses.badRequest(res, error.message, {
+          code: error.code,
+          ...(error.details ?? {}),
+        });
+        return;
+      }
       log.error('Error updating appointment:', error);
       ErrorResponses.internalError(
         res,
@@ -537,15 +505,18 @@ router.delete(
     try {
       const { appointmentId } = req.params;
 
-      if (!appointmentId || isNaN(parseInt(appointmentId))) {
+      if (!appointmentId || isNaN(parseInt(appointmentId, 10))) {
         ErrorResponses.badRequest(res, 'Invalid appointment id');
         return;
       }
 
-      const db = getKysely();
-      await sql`
-        DELETE FROM "appointments" WHERE "appointment_id" = ${parseInt(appointmentId)}
-      `.execute(db);
+      // The deleted appointment's day is the broadcast key; the query reads it
+      // BEFORE the DELETE, since after it there is no row left to read it from.
+      // (This handler used to broadcast nothing, so a cancelled appointment
+      // stayed on every other staff member's board until they reloaded.)
+      const deletedDay = await deleteAppointment(parseInt(appointmentId, 10));
+
+      broadcastDays(deletedDay);
 
       sendSuccess(res, null, 'Appointment deleted successfully');
     } catch (error) {
@@ -579,23 +550,17 @@ router.post(
     try {
       const { person_id, app_detail, dr_id } = req.body;
 
-      // Delegate to service layer for quick check-in logic
-      const result = await quickCheckIn({
+      // Delegate to service layer for quick check-in logic. `appDay` is the touched
+      // row's own day (split off — not part of the contracted response); it replaces
+      // a freshly computed "today", which was right only because the walk-in lookup
+      // filters on today anyway.
+      const { appDay, ...result } = await quickCheckIn({
         person_id,
         app_detail,
         dr_id
       });
 
-      // Emit WebSocket event for real-time updates
-      if (wsEmitter) {
-        // Use local date (not UTC) to match client's date format
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const todayDateOnly = `${year}-${month}-${day}`;
-        wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, todayDateOnly);
-      }
+      broadcastDays(appDay);
 
       sendData(res, appointment.quickCheckin.response, result);
     } catch (error) {

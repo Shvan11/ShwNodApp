@@ -243,7 +243,7 @@ async function calculateValidatedChange(
 ): Promise<number | null> {
   const { accountCurrency, usd, iqd, change, paymentDate } = params;
 
-  const changeAmount = parseInt(String(change)) || 0;
+  const changeAmount = parseInt(String(change), 10) || 0;
 
   // Same-currency (IQD→IQD) payments store NULL rather than 0: nothing was handed
   // back and the column means "not tracked".
@@ -289,8 +289,8 @@ export async function validateAndCreateInvoice(
     invoiceData;
 
   // Parse and validate amounts
-  const usd = parseInt(String(usdReceived)) || 0;
-  const iqd = parseInt(String(iqdReceived)) || 0;
+  const usd = parseInt(String(usdReceived), 10) || 0;
+  const iqd = parseInt(String(iqdReceived), 10) || 0;
 
   // Validate currency amounts
   validateCurrencyAmounts(usd, iqd);
@@ -349,6 +349,15 @@ export async function validateAndCreateInvoice(
   if (result.outcome === 'work_not_found') {
     // The work was deleted between the read above and the insert.
     throw new PaymentValidationError('Work record not found', 'WORK_NOT_FOUND');
+  }
+
+  if (result.outcome === 'negative_amount') {
+    // Unreachable over HTTP — `addInvoice.body` rejects it first — so reaching this
+    // means an internal caller bypassed the request boundary.
+    throw new PaymentValidationError(
+      'Payment amount must be greater than zero',
+      'NEGATIVE_AMOUNT'
+    );
   }
 
   if (result.outcome === 'exceeds_remaining') {

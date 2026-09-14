@@ -21,7 +21,9 @@
 --
 -- `integration_oauth_tokens` is LOCAL-ONLY — it carries no cdc_capture trigger precisely so the
 -- clinic's OAuth secrets never replicate — so there is deliberately NO Supabase mirror half to this
--- migration. See migrations/pg/1781900000000_integration-oauth-tokens.sql.
+-- migration. The table itself is created by the 2026-07-30 baseline
+-- (1783100000000_baseline-2026-07-30.sql), which squashed the original
+-- 1781900000000_integration-oauth-tokens.sql.
 
 ALTER TABLE integration_oauth_tokens
   ADD COLUMN IF NOT EXISTS account_email citext;

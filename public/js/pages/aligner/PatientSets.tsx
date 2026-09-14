@@ -147,7 +147,7 @@ const PatientSets: React.FC = () => {
         last_name: loaderData.patient.last_name as string | undefined,
         Phone: loaderData.patient.phone as string | undefined,
         WorkType: loaderData.work.type_name as string | undefined,
-        workid: parseInt(workId || '0'),
+        workid: parseInt(workId || '0', 10),
     } : null;
     const [alignerSets, setAlignerSets] = useState<AlignerSet[]>([]);
     const [doctors, setDoctors] = useState<AlignerDoctorWithAliases[]>([]);
@@ -380,7 +380,7 @@ const PatientSets: React.FC = () => {
         // the mount effect's synchronous body never calls into a setState-bearing
         // async function (react-hooks/set-state-in-effect).
         Promise.resolve()
-            .then(() => loadAlignerSets(parseInt(workId || '0')))
+            .then(() => loadAlignerSets(parseInt(workId || '0', 10)))
             .catch((error) => console.error('Error loading aligner sets:', error))
             .finally(() => setLoading(false));
     };
@@ -1042,7 +1042,7 @@ const PatientSets: React.FC = () => {
         if (!setId) return;
 
         // Upload the PDF
-        await handlePdfUpload(parseInt(setId), file);
+        await handlePdfUpload(parseInt(setId, 10), file);
         e.target.value = ''; // Reset file input
     };
 

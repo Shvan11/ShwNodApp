@@ -113,8 +113,8 @@ function TemplateDesigner() {
         );
 
         // Open preview window
-        const widthPx = parseInt(String(pageWidth)) + 100;
-        const heightPx = pageHeight ? parseInt(String(pageHeight)) + 100 : 800;
+        const widthPx = parseInt(String(pageWidth), 10) + 100;
+        const heightPx = pageHeight ? parseInt(String(pageHeight), 10) + 100 : 800;
 
         const previewWindow = window.open('', '_blank', `width=${widthPx},height=${heightPx}`);
         if (previewWindow) {
@@ -136,8 +136,8 @@ function TemplateDesigner() {
         pageHeight: string | null = '1123px'
     ): string => {
         // Convert px to mm for @page size (96dpi: 1px = 0.2646mm)
-        const widthMm = Math.round(parseInt(pageWidth) * 0.2646);
-        const heightMm = pageHeight ? Math.round(parseInt(pageHeight) * 0.2646) : 'auto';
+        const widthMm = Math.round(parseInt(pageWidth, 10) * 0.2646);
+        const heightMm = pageHeight ? Math.round(parseInt(pageHeight, 10) * 0.2646) : 'auto';
         const pageSize = pageHeight ? `${widthMm}mm ${heightMm}mm` : `${widthMm}mm auto`;
 
         return `<!DOCTYPE html>

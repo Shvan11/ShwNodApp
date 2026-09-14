@@ -23,6 +23,10 @@
 import { doubleCsrf, type CsrfRequestMethod } from 'csrf-csrf';
 import type { ErrorRequestHandler, Request, RequestHandler, Response } from 'express';
 
+// Read at module load, which is safe because `config/process-env.ts` — the first
+// import in index.ts — has already defaulted NODE_ENV to 'production'. Before that
+// bootstrap existed, an unset NODE_ENV on the `npm start` path made this `false`
+// and shipped the CSRF cookie without `secure` while the session cookie had it.
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Mirror the session cookies' flags exactly (httpOnly + lax + secure-in-prod),

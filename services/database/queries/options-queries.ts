@@ -62,6 +62,22 @@ export async function getOption(optionName: string): Promise<string | null> {
 }
 
 /**
+ * Read several options in ONE round trip, as a name → value map. Names the
+ * caller asked for that have no row are simply absent from the map (the caller
+ * owns the fallback). Added for the calendar range view, which needs four
+ * settings before it can decide which slot rows to render.
+ */
+export async function getOptions(optionNames: string[]): Promise<Map<string, string | null>> {
+  if (optionNames.length === 0) return new Map();
+  const rows = await getKysely()
+    .selectFrom('options')
+    .select(['option_name', 'option_value'])
+    .where('option_name', 'in', optionNames)
+    .execute();
+  return new Map(rows.map((r) => [r.option_name, r.option_value]));
+}
+
+/**
  * Update an existing option value (only updates existing options)
  */
 export async function updateOption(optionName: string, optionValue: string): Promise<boolean> {

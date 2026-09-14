@@ -198,6 +198,58 @@ export const revenueBreakdown = {
 } as const;
 export type RevenueBreakdownQuery = z.infer<typeof revenueBreakdown.query>;
 
+// ── Doctor payment drill-down ────────────────────────────────────────────────────
+// GET /api/statistics/doctor-payments/:doctorId?startDate=&endDate=
+// The per-payment detail BEHIND one doctor's aggregate row on the Breakdown and
+// Commissions tabs: every invoice on that doctor's works in the period, with patient
+// and work-type context. Same revenue definition as the aggregates it drills into
+// (invoices.amount_paid keyed on date_of_payment, doctor via works.dr_id), so the list
+// reconciles against the row it was opened from.
+//
+// `date_of_payment` is a PG `date` — already a 'YYYY-MM-DD' STRING off the pg parser, so
+// it is a plain z.string(), NOT timestampString (which is Date-in / ISO-string-out).
+// `currency` is works.currency and is NULLABLE: the aggregates bucket with
+// `FILTER (WHERE currency = 'IQD'|'USD')`, so a NULL-currency work counts toward neither
+// total. Those payments are still listed (real money, shown with an em-dash currency)
+// while the modal's headline totals come from the clicked aggregate row — which is also
+// why truncation can't understate them. CLOSED `z.object` containers — fully modeled, so
+// NOT a D2 loose-response marker (no baseline bump), same as the two schemas above.
+const doctorPaymentRow = z.object({
+  invoice_id: z.number(),
+  date_of_payment: z.string(),
+  patient_name: z.string(),
+  person_id: z.number(),
+  work_id: z.number(),
+  work_type: z.string(),
+  amount_paid: z.number(),
+  currency: z.string().nullable(),
+});
+export type DoctorPaymentRow = z.infer<typeof doctorPaymentRow>;
+
+export const doctorPayments = {
+  // A numeric STRING, not z.coerce.number(): Express 5 infers `:doctorId` from the route
+  // path literal as a string, and a coerced-to-number params type no longer matches that
+  // inferred handler signature (TS2769). The route parses it — same shape as
+  // threeshape.contract.ts's `:personId`.
+  params: z.object({
+    doctorId: z.string().regex(/^\d+$/, 'doctorId must be numeric'),
+  }),
+  query: z.object({
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD'),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD'),
+  }),
+  response: z.object({
+    rows: z.array(doctorPaymentRow),
+    /** true when the period held more payments than the row cap — the list is partial. */
+    truncated: z.boolean(),
+    doctorId: z.number(),
+    startDate: z.string(),
+    endDate: z.string(),
+  }),
+} as const;
+export type DoctorPaymentsParams = z.infer<typeof doctorPayments.params>;
+export type DoctorPaymentsQuery = z.infer<typeof doctorPayments.query>;
+
 // GET statistics query shapes (type-only — handlers parse the strings manually).
 export const statisticsQuery = z.object({
   month: z.string().optional(),

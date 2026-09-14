@@ -1,0 +1,255 @@
+/* Statistics → per-doctor payment drill-down modal. Opened from the Breakdown
+   "Revenue by Doctor" table and the Commissions table. Table styling deliberately
+   mirrors RevenueBreakdownView.module.css so the detail reads as the same surface
+   as the aggregate row it was opened from. */
+
+.modal {
+    width: 1000px;
+    max-width: 95vw;
+    height: 80vh;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.body {
+    flex: 1;
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+}
+
+/* Headline totals — taken from the clicked aggregate row, NOT summed from the
+   listed rows (see the component comment: truncation + NULL-currency works). */
+.totals {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    background: var(--background-secondary);
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+}
+
+.totalItem {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.totalLabel {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.totalValue {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--success-800);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Neutral tone for non-money figures (payment / work counts) */
+.totalValueNeutral {
+    color: var(--text-primary);
+}
+
+/* Loading / empty / error / truncation notices */
+.message {
+    color: var(--text-secondary);
+    padding: var(--spacing-lg);
+    text-align: center;
+}
+
+.messageError {
+    color: var(--error-600);
+    padding: var(--spacing-lg);
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+}
+
+.truncationNote {
+    color: var(--warning-700);
+    font-size: 0.85rem;
+    margin: 0 0 var(--spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+/* Payments table */
+.tableWrapper {
+    overflow-x: auto;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table thead {
+    background: var(--gray-50);
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.table th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    background: var(--gray-50);
+    z-index: 1;
+}
+
+/* Numeric headers must right-align like their cells — `.table th` (0,1,1) would
+   otherwise outweigh `.num` (0,1,0) and left-align them, offsetting the labels. */
+.table th.num {
+    text-align: right;
+}
+
+.table td {
+    padding: 0.7rem 1rem;
+    color: var(--text-primary);
+}
+
+.table tbody tr {
+    border-bottom: 1px solid var(--gray-200);
+    transition: background-color 0.2s ease;
+}
+
+.table tbody tr:hover {
+    background: var(--gray-50);
+}
+
+.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.date {
+    white-space: nowrap;
+    color: var(--text-secondary);
+}
+
+.amount {
+    font-weight: 600;
+}
+
+.invoiceId {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Patient name doubles as the link to that patient's Works page. A button (not a
+   row click) so it stays keyboard-reachable and announces as an action. */
+.patientLink {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: var(--primary-color);
+    cursor: pointer;
+    text-align: inherit;
+}
+
+.patientLink:hover,
+.patientLink:focus-visible {
+    text-decoration: underline;
+}
+
+/* Currency pill */
+.badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.badgeIqd {
+    background: var(--info-100);
+    color: var(--info-800);
+}
+
+.badgeUsd {
+    background: var(--success-100);
+    color: var(--success-800);
+}
+
+/* A work with no currency set — it counts toward neither aggregate total. */
+.badgeNone {
+    background: var(--gray-100);
+    color: var(--text-muted);
+}
+
+.footer {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    flex-shrink: 0;
+}
+
+.closeButton {
+    padding: 0.5rem 1.25rem;
+    border: 1px solid var(--gray-300);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text-primary);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.closeButton:hover {
+    background: var(--gray-50);
+}
+
+@media (max-width: 640px) {
+    .modal {
+        height: 90vh;
+    }
+
+    .table th {
+        display: none;
+    }
+
+    .table tbody tr {
+        display: block;
+        padding: var(--spacing-sm) 0;
+    }
+
+    .table td {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--spacing-md);
+        padding: 0.3rem 1rem;
+        text-align: right;
+    }
+
+    .table td::before {
+        content: attr(data-label);
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+}

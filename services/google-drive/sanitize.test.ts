@@ -10,11 +10,10 @@
  * a path or a Drive `q=` query still do not.
  */
 import { describe, expect, it } from 'vitest';
-import driveUploadService from './drive-upload.js';
+import { sanitizeFilename, sanitizeFolderName } from './sanitize.js';
 
-const { sanitizeFilename, sanitizeFolderName } = driveUploadService;
-const clean = (n: string): string => driveUploadService.sanitizeFilename(n);
-const cleanFolder = (n: string): string => driveUploadService.sanitizeFolderName(n);
+const clean = (n: string): string => sanitizeFilename(n);
+const cleanFolder = (n: string): string => sanitizeFolderName(n);
 
 describe('sanitizeFilename', () => {
   it('keeps Arabic names instead of collapsing them to an underscore', () => {
@@ -46,11 +45,6 @@ describe('sanitizeFilename', () => {
   it('collapses runs of replaced characters and caps the length', () => {
     expect(clean('a!!!!b')).toBe('a_b');
     expect(clean('x'.repeat(80))).toHaveLength(50);
-  });
-
-  it('is exposed as a method on the singleton (the call site uses `this`)', () => {
-    expect(typeof sanitizeFilename).toBe('function');
-    expect(typeof sanitizeFolderName).toBe('function');
   });
 });
 

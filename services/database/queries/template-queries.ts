@@ -330,13 +330,29 @@ export async function updateTemplate(
 }
 
 /**
+ * A template operation refused because the template is a built-in system one.
+ *
+ * A TYPE, not a bare `Error`: the route used to recognise this case by
+ * `(error as Error).message.includes('system template')` and then forward that
+ * message to the client. String-matching an error message couples the route to
+ * this wording, and the `as Error` cast made every OTHER failure here — a pg
+ * SQLSTATE from the delete — eligible to have its raw text forwarded too.
+ */
+export class SystemTemplateError extends Error {
+  constructor(message = 'Cannot delete system templates') {
+    super(message);
+    this.name = 'SystemTemplateError';
+  }
+}
+
+/**
  * Delete a template
  */
 export async function deleteTemplate(templateId: number): Promise<boolean> {
   // Check if it's a system template
   const template = await getTemplateById(templateId);
   if (template && template.is_system) {
-    throw new Error('Cannot delete system templates');
+    throw new SystemTemplateError();
   }
 
   const db = getKysely();

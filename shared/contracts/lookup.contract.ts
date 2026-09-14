@@ -18,7 +18,7 @@ import { z } from 'zod';
 // ---------------------------------------------------------------------------
 // All six are bare arrays of `{ id, name }`-style lookup rows.
 // patient-queries.ts#{getReferralSources,getPatientTypes,getAddresses,getGenders}
-// → LookupItem { id, name }; work-queries.ts#getImplantManufacturers → { id, name };
+// → LookupItem { id, name }; work-lookup-queries.ts#getImplantManufacturers → { id, name };
 // alert-queries.ts#getAlertTypes → { alert_type_id, type_name }.
 // ---------------------------------------------------------------------------
 
@@ -57,7 +57,7 @@ export const implantManufacturers = {
 export type ImplantManufacturersResponse = z.infer<typeof implantManufacturers.response>;
 
 // GET /api/labs — labs for the Bridge/Veneers work-item lab dropdown. Sourced from
-// the "Lab" expense category's subcategories (work-queries.ts#getLabs), so the same
+// the "Lab" expense category's subcategories (work-lookup-queries.ts#getLabs), so the same
 // non-null `{ id, name }` row shape as implant manufacturers.
 export const labs = {
   response: z.array(idNameRowNN),

@@ -73,7 +73,12 @@ export default [
       // TypeScript handles identifier resolution (including type-only references
       // like NodeJS, Express, PDFKit namespaces) better than ESLint's no-undef.
       // See: https://typescript-eslint.io/troubleshooting/faqs/general/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined
-      'no-undef': 'off'
+      'no-undef': 'off',
+      // `parseInt(x)` still reads a `0x`-prefixed string as hex under ES5+
+      // semantics, so `DELETE /api/users/0x10` addressed user 16 on any route
+      // whose param lacked a `validate({ params })` guard. All 208 sites now pass
+      // an explicit 10; this keeps it that way.
+      radix: 'error'
     }
   },
   // Lock-in: forbid hand-written request interfaces (`*Body|*Params|*Query|*Filters`)
@@ -85,12 +90,81 @@ export default [
   {
     files: ['routes/**/*.ts'],
     rules: {
+      // Lock-in for R9(b): NO raw SQL in the route layer. Every query lives in a
+      // `services/database/queries/*` module that takes typed params and returns
+      // typed rows; the route does request adaptation and response shaping only.
+      // Before this, 78 `sql` statements were spread across 11 route files —
+      // which is how the "last active admin" guard came to be enforced in a
+      // router rather than next to the writes it protects, and how the same
+      // `DELETE FROM invoices` ended up written twice.
+      //
+      // `getPgPool` is deliberately NOT banned: routes/sync-webhook.ts reads each
+      // CDC sink's control row through a raw `pg.Pool` so ONE function can read
+      // either the local feed or Supabase's — and the Supabase tables aren't in
+      // `types/db.d.ts`, so Kysely can't type that side at all.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['kysely'],
+              message:
+                'Raw SQL is forbidden in routes/. Move the query into a services/database/queries/*.ts module that takes typed params, and import that function here instead. (See docs/backend-audit-tracker.md, R9(b).)'
+            },
+            {
+              group: ['**/services/database/kysely.js', '@services/database/kysely.js'],
+              importNames: ['getKysely', 'withPgTransaction'],
+              message:
+                'Routes must not reach the query builder directly. Move the query into a services/database/queries/*.ts module and import that function here instead. (`getPgPool` is still allowed — see the comment above.)'
+            }
+          ]
+        }
+      ],
       'no-restricted-syntax': [
         'error',
         {
           selector: 'TSInterfaceDeclaration[id.name=/(Body|Params|Query|Filters?)$/]',
           message:
             'Hand-written request interfaces (`*Body|*Params|*Query|*Filters`) are forbidden in routes/. Author the request shape as Zod in shared/contracts/*.contract.ts and type the handler from its `z.infer`. (A non-request shape that happens to end in one of these words should be renamed.)'
+        },
+        {
+          // Same rule for a `type X = { … }` object literal: the interface-only
+          // selector was evadable by writing `type` instead, and six route files
+          // already had. An ALIAS of a contract export (`type XParams =
+          // fileExplorer.PersonIdParams`) is not an object literal, so it still passes —
+          // that is the shape the convention wants.
+          selector: 'TSTypeAliasDeclaration[id.name=/(Body|Params|Query|Filters?)$/] > TSTypeLiteral',
+          message:
+            'Hand-written request type literals (`type *Body|*Params|*Query|*Filters = { … }`) are forbidden in routes/. Author the request shape as Zod in shared/contracts/*.contract.ts and alias the handler type to its `z.infer` export. (A non-request shape that happens to end in one of these words should be renamed.)'
+        },
+        {
+          // Lock-in for the production error-leak fix. `sendError` dev-gates a caught
+          // error ONLY on its `instanceof Error` branch, so `{ error: err.message }`
+          // as `details` — or `err.message` concatenated into the client-facing
+          // message — ships the raw driver/fs/SQLSTATE text to the browser in
+          // production, which is exactly what middleware/error-handler.ts documents
+          // itself as preventing. Pass the error OBJECT instead
+          // (`ErrorResponses.internalError(res, 'Failed to …', error as Error)`) —
+          // every `details` parameter accepts one.
+          //
+          // Forwarding a CURATED message is still legitimate and deliberately not
+          // matched: `err.message` alone (not `(err as Error).message`) is what a
+          // typed domain error is read through — AlignerValidationError,
+          // FileExplorerError, the `describeFetchError` clients, telegram-auth's
+          // humanizeAuthError. This selector targets only the `as Error` cast, i.e.
+          // a bare `unknown` whose message nobody curated.
+          selector: [
+            // (a) inside a details OBJECT, or interpolated/concatenated into the
+            //     client-facing message string.
+            "CallExpression:matches([callee.object.name='ErrorResponses'], [callee.name='sendError']) > :matches(ObjectExpression, TemplateLiteral, BinaryExpression) TSAsExpression[typeAnnotation.typeName.name='Error']",
+            // (b) the raw message used as a whole argument: `…(res, (err as Error).message)`,
+            //     including the `… || 'fallback'` form, which is how every remaining
+            //     deliberate site is written — so the exemptions are visible as inline
+            //     disables with a reason rather than as an accidental selector gap.
+            "CallExpression:matches([callee.object.name='ErrorResponses'], [callee.name='sendError']) > :matches(MemberExpression, LogicalExpression) TSAsExpression[typeAnnotation.typeName.name='Error']"
+          ].join(', '),
+          message:
+            'Raw `(err as Error).message` must not reach the client. `sendError` only dev-gates an `Error` passed as `details` — a hand-built `{ error: err.message }` object, or a message string with it interpolated, is sent verbatim in production. Pass the error object itself: `ErrorResponses.internalError(res, \'<fixed message>\', error as Error)`. Forwarding a typed domain error\'s curated `err.message` is fine — read it off the typed error, without the `as Error` cast.'
         }
       ]
     }
@@ -126,6 +200,7 @@ export default [
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
+      radix: 'error', // see the backend block — `parseInt('0x10')` is 16 without it
       '@typescript-eslint/no-unused-vars': [
         'warn',
         {

@@ -24,7 +24,7 @@
 
 import config from '../../config/config.js';
 import { log } from '../../utils/logger.js';
-import * as alignerQueries from '../database/queries/aligner-queries.js';
+import * as alignerDoctorQueries from '../database/queries/aligner-doctor-queries.js';
 
 const API_BASE = 'https://api.cloudflare.com/client/v4';
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -167,7 +167,7 @@ async function cfFetch<T>(
 
 async function syncNow(trigger: string): Promise<DoctorEmailListSyncResult> {
   const { accountId, doctorEmailListId } = config.cloudflare;
-  const doctors = await alignerQueries.getAllDoctors();
+  const doctors = await alignerDoctorQueries.getAllDoctors();
   const emails = [
     ...new Set(
       doctors

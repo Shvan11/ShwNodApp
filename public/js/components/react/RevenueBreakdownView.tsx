@@ -7,6 +7,7 @@ import { revenueBreakdownQuery } from '@/query/queries';
 import { httpErrorMessage } from '@/core/http';
 import { formatNumber } from '../../utils/formatters';
 import PeriodNavigator, { currentMonthStart, currentMonthEnd } from './PeriodNavigator';
+import DoctorPaymentsModal, { type DoctorPaymentsTarget } from './DoctorPaymentsModal';
 import type { RevenueRow } from '@shared/contracts/reports.contract';
 import styles from './RevenueBreakdownView.module.css';
 
@@ -19,6 +20,11 @@ interface BreakdownSectionProps {
     nameLabel: string;
     rows: RevenueRow[];
     resolvedTheme: string;
+    /**
+     * When given, each name cell becomes a button that drills into that row. Only the
+     * doctor dimension supplies it today — the work-type table stays plain.
+     */
+    onRowClick?: (row: RevenueRow) => void;
 }
 
 /**
@@ -26,7 +32,7 @@ interface BreakdownSectionProps {
  * revenue (top earners first) above a full table with IQD/USD columns, the emphasized
  * USD-equivalent ranking column, and a totals footer. Owns its own Chart.js instance.
  */
-const BreakdownSection = ({ title, icon, nameLabel, rows, resolvedTheme }: BreakdownSectionProps) => {
+const BreakdownSection = ({ title, icon, nameLabel, rows, resolvedTheme, onRowClick }: BreakdownSectionProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const chartRef = useRef<Chart | null>(null);
 
@@ -143,7 +149,23 @@ const BreakdownSection = ({ title, icon, nameLabel, rows, resolvedTheme }: Break
                             <tbody>
                                 {rows.map((r) => (
                                     <tr key={r.id}>
-                                        <td data-label={nameLabel} className={styles.name}>{r.name}</td>
+                                        <td data-label={nameLabel} className={styles.name}>
+                                            {onRowClick ? (
+                                                // A button, not a row-level onClick — the drill-down
+                                                // has to stay keyboard-reachable.
+                                                <button
+                                                    type="button"
+                                                    className={styles.nameButton}
+                                                    onClick={() => onRowClick(r)}
+                                                    title={`View the payments behind this ${nameLabel.toLowerCase()}'s revenue`}
+                                                >
+                                                    {r.name}
+                                                    <i className="fas fa-chevron-right" aria-hidden="true"></i>
+                                                </button>
+                                            ) : (
+                                                r.name
+                                            )}
+                                        </td>
                                         <td data-label="Collected IQD" className={styles.num}>{formatNumber(r.paid_iqd)}</td>
                                         <td data-label="Collected USD" className={styles.num}>{formatNumber(r.paid_usd)}</td>
                                         <td data-label="USD-equiv" className={`${styles.num} ${styles.usdEq}`}>{r.usd_equivalent == null ? '—' : formatNumber(r.usd_equivalent)}</td>
@@ -179,6 +201,8 @@ const RevenueBreakdownView = () => {
     const { resolvedTheme } = useTheme();
     const [startDate, setStartDate] = useState(currentMonthStart);
     const [endDate, setEndDate] = useState(currentMonthEnd);
+    // The doctor whose payments are being drilled into, or null when the modal is closed.
+    const [drillTarget, setDrillTarget] = useState<DoctorPaymentsTarget | null>(null);
 
     const invalidRange = !!startDate && !!endDate && startDate > endDate;
 
@@ -232,6 +256,13 @@ const RevenueBreakdownView = () => {
                         nameLabel="Doctor"
                         rows={byDoctor}
                         resolvedTheme={resolvedTheme}
+                        onRowClick={(r) => setDrillTarget({
+                            doctorId: r.id,
+                            doctorName: r.name,
+                            paidIqd: r.paid_iqd,
+                            paidUsd: r.paid_usd,
+                            workCount: r.work_count,
+                        })}
                     />
                     <BreakdownSection
                         title="Revenue by Work Type"
@@ -241,6 +272,15 @@ const RevenueBreakdownView = () => {
                         resolvedTheme={resolvedTheme}
                     />
                 </>
+            )}
+
+            {drillTarget && (
+                <DoctorPaymentsModal
+                    target={drillTarget}
+                    startDate={startDate}
+                    endDate={endDate}
+                    onClose={() => setDrillTarget(null)}
+                />
             )}
         </div>
     );

@@ -5,7 +5,7 @@
  * portal INSERTed on the Supabase mirror (RLS pins source/type/own-set — see
  * aligner-portal-external/sql/phase3-announcements.sql) that reverse-sync home.
  * Staff-side flag writes (`source='staff'`, the in-page badges written by
- * aligner-queries.ts) are deliberately invisible here.
+ * aligner-note-queries.ts) are deliberately invisible here.
  *
  * Mark-read flips `is_read`/`read_at` locally; the BEFORE-UPDATE
  * `trg_set_updated_at` bumps `updated_at`, so the read state forward-syncs to

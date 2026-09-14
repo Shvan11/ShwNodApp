@@ -30,14 +30,15 @@
  */
 import { z } from 'zod';
 import {
-  idParams,
-  numericParam,
-  intId,
-  optionalDateString,
   dateString,
-  timestampString,
-  optionalPositiveIntQuery,
+  idParams,
+  intId,
+  moneyInt,
+  numericParam,
+  optionalDateString,
   optionalNonNegIntQuery,
+  optionalPositiveIntQuery,
+  timestampString,
 } from '../validation.js';
 import { withPendingOutcome } from './approvals.contract.js';
 import { XRAY_WORK_TYPE_IDS } from '../treatment-taxonomy.js';
@@ -48,9 +49,11 @@ import { XRAY_WORK_TYPE_IDS } from '../treatment-taxonomy.js';
 const optionalSelectId = z
   .preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().optional())
   .optional();
-/** Same, but allows a non-integer (estimated cost may carry a decimal). */
+/** Same, for a MONEY field. `patients.estimated_cost` is an `integer` column, so
+ *  a decimal has nowhere to land — `moneyInt` rejects it at the boundary rather
+ *  than letting it truncate or 500 downstream (see shared/validation.ts). */
 const optionalSelectAmount = z
-  .preprocess((v) => (v === '' ? undefined : v), z.coerce.number().optional())
+  .preprocess((v) => (v === '' ? undefined : v), moneyInt.optional())
   .optional();
 
 // ---------------------------------------------------------------------------
@@ -335,14 +338,14 @@ const intakeSchema = z.discriminatedUnion('kind', [
     workTypeId: z.coerce
       .number()
       .refine((v) => XRAY_WORK_TYPE_IDS.includes(v), { message: 'workTypeId must be an x-ray work type' }),
-    fee: z.coerce.number().positive('Fee must be greater than 0'),
+    fee: moneyInt.positive('Fee must be greater than 0'),
     currency: z.enum(['IQD', 'USD', 'EUR']),
   }),
   z.object({
     kind: z.literal('consult'),
     // A Consult may be FREE — 0 is allowed (a 0-fee consult creates the work with no
     // invoice, since the invoices table forbids a zero/no-cash payment row).
-    fee: z.coerce.number().min(0, 'Fee cannot be negative'),
+    fee: moneyInt.min(0, 'Fee cannot be negative'),
     currency: z.enum(['IQD', 'USD', 'EUR']),
   }),
 ]);
@@ -427,7 +430,9 @@ export const deletePatient = {
 // PUT /api/patients/:personId/estimated-cost — { estimatedCost, currency };
 // sendSuccess(null) (no response key). Both fields are everything the handler reads.
 export const estimatedCost = {
-  body: z.object({ estimatedCost: z.coerce.number(), currency: z.string() }),
+  // `currency` is `.min(1)`: the handler's `?? 'IQD'` fallback is for an ABSENT
+  // currency, and an empty string used to slip past it and overwrite the stored one.
+  body: z.object({ estimatedCost: moneyInt, currency: z.string().min(1) }),
 } as const;
 export type EstimatedCostBody = z.infer<typeof estimatedCost.body>;
 

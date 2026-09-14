@@ -14,6 +14,7 @@
  */
 import { readdirSync } from 'node:fs';
 import pg from 'pg';
+import { resolveLocalPg } from './_pg-connection.mjs';
 
 const MIGRATIONS_DIR = 'migrations/pg';
 
@@ -22,13 +23,9 @@ const files = readdirSync(MIGRATIONS_DIR)
   .map((f) => f.replace(/\.sql$/, ''))
   .sort();
 
-const c = new pg.Client({
-  host: process.env.PG_HOST,
-  port: Number(process.env.PG_PORT ?? 5432),
-  database: process.env.PG_DATABASE,
-  user: process.env.PG_USER,
-  password: process.env.PG_PASSWORD,
-});
+// Resolved the way the APP resolves it (DATABASE_URL or PG_*, discrete wins per
+// field) — see scripts/_pg-connection.mjs.
+const c = new pg.Client(resolveLocalPg());
 await c.connect();
 
 const { rows: ledgerExists } = await c.query(

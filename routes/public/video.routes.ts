@@ -8,36 +8,16 @@ import { Router, type Request, type Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { log } from '../../utils/logger.js';
-import { getMediaMimeType } from '../../utils/video-mime.js';
+import { getMediaMimeType } from '../../utils/file-mime.js';
 import { streamFile } from '../../utils/stream-file.js';
 import * as videoQueries from '../../services/database/queries/video-queries.js';
+import { normalizeVideoDbPath } from '../../services/files/clinic-paths.js';
 import * as videoContract from '../../shared/contracts/video.contract.js';
 
 const router = Router();
 
 // `:id` path param — contracted in shared/contracts/video.contract.ts (type-only).
 type VideoIdParams = videoContract.VideoIdParams;
-
-/**
- * Convert Windows/UNC path from database to WSL-compatible path
- */
-function normalizePath(dbPath: string): string {
-  let normalizedPath = dbPath;
-  const isWSL = process.platform === 'linux';
-
-  if (isWSL) {
-    // Convert UNC share path \\CLINIC\Clinic1\ to /mnt/c/clinic1/ (see api/video.routes.ts)
-    if (normalizedPath.startsWith('\\\\CLINIC\\Clinic1')) {
-      normalizedPath = normalizedPath.replace('\\\\CLINIC\\Clinic1', '/mnt/c/clinic1');
-    } else if (/^[A-Za-z]:\\/.test(normalizedPath)) {
-      const driveLetter = normalizedPath.charAt(0).toLowerCase();
-      normalizedPath = normalizedPath.replace(/^[A-Za-z]:\\/, `/mnt/${driveLetter}/`);
-    }
-    normalizedPath = normalizedPath.replace(/\\/g, '/');
-  }
-
-  return normalizedPath;
-}
 
 // ==============================
 // PUBLIC VIDEO ENDPOINTS
@@ -61,7 +41,7 @@ router.get('/:id/stream', async (req: Request<VideoIdParams>, res: Response): Pr
       return;
     }
 
-    const filePath = normalizePath(video.Video);
+    const filePath = normalizeVideoDbPath(video.Video);
 
     let stat: fs.Stats;
     try {
@@ -99,7 +79,7 @@ router.get('/:id/download', async (req: Request<VideoIdParams>, res: Response): 
       return;
     }
 
-    const filePath = normalizePath(video.Video);
+    const filePath = normalizeVideoDbPath(video.Video);
 
     let stat: fs.Stats;
     try {
@@ -299,7 +279,7 @@ router.get('/:id', async (req: Request<VideoIdParams>, res: Response): Promise<v
       var cachedBlob = { url: null, blob: null, fetchId: 0 };
       var isSharing = false;
       var videoUrl = '/v/${id}/stream';
-      var videoTitle = '${escapeHtml(video.description).replace(/'/g, "\\'")}';
+      var videoTitle = ${toJsStringLiteral(video.description)};
 
       // Toast notification
       function showToast(message, type) {
@@ -383,7 +363,33 @@ router.get('/:id', async (req: Request<VideoIdParams>, res: Response): Promise<v
 });
 
 /**
- * Escape HTML special characters
+ * Render a value as a JavaScript string LITERAL for embedding in an inline
+ * `<script>` (quotes included).
+ *
+ * `escapeHtml` is the wrong tool inside a script block and was what stood here:
+ * it turned an apostrophe into the six literal characters `&#039;` and `<` into
+ * `&lt;`, because HTML entities are decoded by the HTML parser in text/attribute
+ * position but NOT inside `<script>` — so `Dr O'Brien's video` reached the
+ * share-filename code as `Dr O&#039;Brien&#039;s video`. (It also made the
+ * `.replace(/'/g, "\\'")` that followed it dead code: there were no apostrophes
+ * left to escape.)
+ *
+ * `JSON.stringify` produces a correct JS literal; the extra `<`/`>` escaping
+ * closes the one hole it leaves, a `</script>` sequence in the content ending the
+ * block early, and U+2028/U+2029 are legal in JSON but not in a pre-ES2019 JS
+ * string literal.
+ */
+function toJsStringLiteral(text: string): string {
+  return JSON.stringify(text)
+    .replace(/</g, '\\u003C')
+    .replace(/>/g, '\\u003E')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+/**
+ * Escape HTML special characters (text + attribute positions only — inside a
+ * `<script>` use `toJsStringLiteral` above).
  */
 function escapeHtml(text: string): string {
   const map: Record<string, string> = {

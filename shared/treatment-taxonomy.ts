@@ -65,7 +65,7 @@ export const XRAY_WORK_TYPE_IDS: readonly number[] = [
 
 // The single Aligner-Lab (portal) work type. Portal cases arrive as ACTIVE
 // aligner-lab works via reverse CDC.
-export const ALIGNER_LAB_WORK_TYPE_ID = WORK_TYPE_IDS.ALIGNER_LAB; // 21
+const ALIGNER_LAB_WORK_TYPE_ID = WORK_TYPE_IDS.ALIGNER_LAB; // 21
 
 /**
  * Work status ids (`works.status`). Moved here from work-queries.ts (which now

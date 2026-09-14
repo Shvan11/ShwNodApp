@@ -616,6 +616,6 @@ class AppointmentPDFGenerator {
 // EXPORTS
 // =============================================================================
 
-// Only the singleton is consumed (routes/email-api.ts); the class stays private.
+// Only the singleton is consumed (routes/api/email.routes.ts); the class stays private.
 const defaultGenerator = new AppointmentPDFGenerator();
 export default defaultGenerator;

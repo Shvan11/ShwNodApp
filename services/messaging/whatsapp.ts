@@ -9,12 +9,10 @@ import { messageSessionManager, type MessageLookupResult } from './MessageSessio
 import { type MessageSession } from './MessageSession.js';
 import {
   humanizeWhatsAppError,
-  isConnectionStallError,
-  isMalformedSendResultError,
   MALFORMED_SEND_RESULT_ERROR,
 } from './whatsapp-errors.js';
 import { log } from '../../utils/logger.js';
-import { PhoneFormatter } from '../../utils/phoneFormatter.js';
+import { PhoneFormatter } from '../../utils/phone-formatter.js';
 import pdfGenerator from '../pdf/appointment-pdf-generator.js';
 import { getGroupSettings } from './group-settings.js';
 import qrcode from 'qrcode';
@@ -22,160 +20,42 @@ import pkg from 'whatsapp-web.js';
 
 const { Client, LocalAuth, MessageMedia } = pkg;
 
-// ===========================================
-// TYPES AND INTERFACES
-// ===========================================
-
-/**
- * Client state lifecycle
- */
-export type ClientState = 'DISCONNECTED' | 'INITIALIZING' | 'CONNECTED' | 'ERROR' | 'DESTROYED';
-
-/**
- * Circuit breaker state
- */
-export type CircuitBreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
-
-/**
- * A queued lock acquirer. Both callbacks close over their own acquisition
- * timeout and clear it, so the handle isn't stored on the entry.
- */
-interface LockWaiter {
-  resolve: () => void;
-  reject: () => void;
-}
-
-/**
- * Client status information
- */
-interface ClientStatus {
-  state: ClientState;
-  connected: boolean;
-  initializing: boolean;
-  reconnectAttempts: number;
-  lastError: string | undefined;
-  hasActivePromise: boolean;
-}
-
-/**
- * Circuit breaker status
- */
-interface CircuitBreakerStatus {
-  state: CircuitBreakerState;
-  failureCount: number;
-  lastFailureTime: number | null;
-  isOpen: boolean;
-  timeInCurrentState: number;
-  halfOpenCalls: number;
-}
-
-/**
- * WebSocket emitter interface
- */
-interface WebSocketEmitter {
-  emit(event: string, data: unknown): boolean;
-}
-
-/**
- * Puppeteer browser interface (partial)
- */
-interface PuppeteerBrowser {
-  pages(): Promise<PuppeteerPage[]>;
-  close(): Promise<void>;
-  // The real value is a Node ChildProcess; `pid` is declared because
-  // ensureProfileUnlocked() needs it to confirm the browser is actually gone.
-  process(): { kill(signal: string): void; pid?: number } | null;
-}
-
-/**
- * Puppeteer page interface (partial)
- */
-interface PuppeteerPage {
-  close(): Promise<void>;
-}
-
-/**
- * WhatsApp client interface (partial)
- */
-export interface WhatsAppClient {
-  initialize(): Promise<void>;
-  destroy(): Promise<void>;
-  logout(): Promise<void>;
-  getState(): Promise<string>;
-  getNumberId(number: string): Promise<{ _serialized: string } | null>;
-  sendMessage(chatId: string, content: string | unknown, options?: unknown): Promise<{ id: { id: string } }>;
-  getChats(): Promise<WhatsAppChat[]>;
-  getChatById(chatId: string): Promise<{ fetchMessages(options: { limit: number }): Promise<WhatsAppMessage[]> }>;
-  pupBrowser?: PuppeteerBrowser;
-  pupPage?: PuppeteerPage;
-  on(event: string, listener: (...args: unknown[]) => void): void;
-  once(event: string, listener: (...args: unknown[]) => void): void;
-  removeListener(event: string, listener: (...args: unknown[]) => void): void;
-}
-
-/**
- * LocalAuth strategy (partial) — the bits unlink() needs. `logout()` is the
- * library's own session-clear (`fs.rm(userDataDir, …)`); `userDataDir` is only
- * populated after the client has initialized, so the retained instance must be
- * the one that was actually used.
- */
-interface LocalAuthStrategy {
-  logout(): Promise<void>;
-  userDataDir?: string;
-}
-
-/**
- * WhatsApp message interface
- */
-interface WhatsAppMessage {
-  id: { id: string };
-  ack?: number;
-}
-
-/**
- * WhatsApp chat interface (partial — only the fields group lookup reads)
- */
-interface WhatsAppChat {
-  id: { _serialized: string };
-  name: string;
-  isGroup: boolean;
-}
-
-/**
- * Person data for message events
- */
-interface Person {
-  messageId?: string;
-  appointmentId?: number;
-  name: string;
-  number: string;
-  success: string;
-  error?: string;
-}
-
-/**
- * Send result
- */
-interface SendResult {
-  success: boolean;
-  messageId?: string;
-  error?: string;
-}
-
-/**
- * Session quality result
- */
-type SessionQuality = 'valid' | 'empty' | 'corrupted' | 'none';
-
-/**
- * Cleanup result
- */
-interface CleanupResult {
-  success: boolean;
-  reason: string;
-  attempt?: number;
-  error?: string;
-}
+// Extracted collaborators (S2/C6) — this file keeps only the WhatsAppService class
+// itself: the live client lifecycle and the batch-send engine, which share one set of
+// mutable instance state and are therefore NOT split further.
+import { ClientStateManager } from './whatsapp-client-state.js';
+import { EnhancedCircuitBreaker } from './whatsapp-circuit-breaker.js';
+import {
+  ensureProfileUnlocked,
+  validateSessionQuality,
+  checkExistingSession,
+} from './whatsapp-session-files.js';
+// The batch path's DECISIONS live here as pure functions — who gets a message
+// and what it says, when a run of failures means the connection is dead rather
+// than one bad number, whether ack silence is a zombie send, which acks a report
+// writes back. This file keeps the I/O that surrounds them.
+import {
+  ACK_SILENCE_WINDOW_MS,
+  ackSilenceWarning,
+  advanceBatchGuard,
+  classifySendFailure,
+  INITIAL_BATCH_GUARD,
+  isAckSilenceConfirmed,
+  reconcileAck,
+  REPORT_CONCURRENCY,
+  REPORT_PER_MESSAGE_TIMEOUT_MS,
+  summarizeBatch,
+  type BatchGuard,
+} from './whatsapp-batch-plan.js';
+import type {
+  CleanupResult,
+  LocalAuthStrategy,
+  Person,
+  SendResult,
+  WebSocketEmitter,
+  WhatsAppClient,
+  WhatsAppMessage,
+} from './whatsapp-types.js';
 
 /**
  * Reject if `promise` doesn't settle within `ms`. Bounds a single hung
@@ -191,360 +71,6 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
     return await Promise.race([promise, timeout]);
   } finally {
     if (timer) clearTimeout(timer);
-  }
-}
-
-// ===========================================
-// CLIENT STATE MANAGER
-// ===========================================
-
-class ClientStateManager {
-  public state: ClientState = 'DISCONNECTED';
-  public client: WhatsAppClient | null = null;
-  public browser: PuppeteerBrowser | null = null;
-  public initializationPromise: Promise<boolean> | null = null;
-  /**
-   * Set for the WHOLE of a restart() — the teardown as well as the init that
-   * follows — so callers join the restart instead of racing its teardown.
-   * Deliberately NOT cleared by cleanup(): restart() calls cleanup() partway
-   * through itself and its single-flight guard has to survive that. Owned by
-   * restart(), which clears it by identity.
-   */
-  public restartPromise: Promise<boolean> | null = null;
-  public initializationAbortController: AbortController | null = null;
-  public reconnectTimer: NodeJS.Timeout | null = null;
-  public reconnectAttempts = 0;
-  public lastError: Error | null = null;
-  public destroyInProgress = false;
-  public initializationTimeout: NodeJS.Timeout | null = null;
-  public sessionStabilized = false;
-  public authStabilizationStarted = false;
-
-  private initializationLock: number | false = false;
-  private lockWaiters: LockWaiter[] = [];
-  /**
-   * Identifies the CURRENT lock holder. A holder releases by presenting its token,
-   * so an ABANDONED attempt — one whose lock was force-released by cleanup() while
-   * it was still running — presents a stale token and its release becomes a no-op.
-   * Without this its late release would free the lock out from under whatever
-   * attempt replaced it, letting the next caller launch a second Chrome against the
-   * same LocalAuth profile.
-   */
-  private lockToken = 0;
-
-  // Constants
-  public readonly MAX_RECONNECT_ATTEMPTS = 10;
-  public readonly RECONNECT_BASE_DELAY = 5000;
-  // After the attempt ceiling is hit, wait this long, then reset and retry — so an
-  // unattended server self-heals from a transient outage instead of staying dead.
-  public readonly RECONNECT_COOLDOWN_MS = 300000;
-  public readonly SESSION_RESTORATION_TIMEOUT = 120000;
-  public readonly FRESH_AUTH_TIMEOUT = 90000;
-  public readonly INITIALIZATION_TIMEOUT = 60000;
-  public readonly MAX_LOCK_WAIT_TIME = 30000;
-
-  /**
-   * Take the initialization lock. Resolves with the caller's OWNER TOKEN, which
-   * must be handed back to releaseInitializationLock().
-   */
-  async acquireInitializationLock(timeoutMs: number = this.MAX_LOCK_WAIT_TIME): Promise<number> {
-    if (!this.initializationLock) {
-      this.initializationLock = Date.now();
-      return ++this.lockToken;
-    }
-
-    // A lock older than the timeout is only ORPHANED if no attempt is actually
-    // running behind it — age alone is not evidence. An attempt is NOT bounded by
-    // INITIALIZATION_TIMEOUT: the `qr` handler in createAndInitializeClient cancels
-    // the outer wait and opens a fresh FRESH_AUTH_TIMEOUT scan window, so a
-    // legitimate session→QR fallback runs SESSION_RESTORATION_TIMEOUT +
-    // FRESH_AUTH_TIMEOUT before its cleanup even starts. Stealing on age would
-    // therefore take the lock from a healthy slow attempt and start a second Chrome
-    // on the same LocalAuth profile — which authenticates but never reaches `ready`,
-    // so the watchdog mis-parks a good session as "needs re-link". The in-flight
-    // promise is the liveness signal: present means a real attempt owns this lock
-    // (wait for it), absent means the holder is gone and the lock is free to take.
-    const lockAge = Date.now() - this.initializationLock;
-    const attemptInFlight = this.initializationPromise ?? this.restartPromise;
-    if (lockAge > this.INITIALIZATION_TIMEOUT && !attemptInFlight) {
-      log.warn(`Force releasing orphaned lock (no attempt in flight)`, { lockAge });
-      this.forceReleaseLock();
-      this.initializationLock = Date.now();
-      return ++this.lockToken;
-    }
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        const waiterIndex = this.lockWaiters.findIndex((w) => w.resolve === waitEntry.resolve);
-        if (waiterIndex > -1) {
-          this.lockWaiters.splice(waiterIndex, 1);
-        }
-        reject(new Error(`Initialization lock timeout after ${timeoutMs}ms`));
-      }, timeoutMs);
-
-      const waitEntry: LockWaiter = {
-        resolve: () => {
-          clearTimeout(timeout);
-          this.initializationLock = Date.now();
-          resolve(++this.lockToken);
-        },
-        reject: () => {
-          clearTimeout(timeout);
-          reject(new Error('Lock acquisition cancelled'));
-        },
-      };
-
-      this.lockWaiters.push(waitEntry);
-    });
-  }
-
-  releaseInitializationLock(token: number): void {
-    // Only the CURRENT holder may release. An attempt that was abandoned mid-flight
-    // (cleanup() force-released its lock, a replacement then took it) carries a
-    // stale token — its release has to be a no-op, or it frees the replacement's
-    // lock and a third caller starts a second browser alongside a live attempt.
-    if (!this.initializationLock || token !== this.lockToken) {
-      return;
-    }
-
-    this.initializationLock = false;
-
-    if (this.lockWaiters.length > 0) {
-      const nextWaiter = this.lockWaiters.shift();
-      try {
-        process.nextTick(() => {
-          if (nextWaiter && typeof nextWaiter.resolve === 'function') {
-            nextWaiter.resolve();
-          }
-        });
-      } catch (error) {
-        log.error('Error notifying next lock waiter', error);
-      }
-    }
-  }
-
-  forceReleaseLock(): void {
-    this.initializationLock = false;
-    // Invalidate the outgoing holder's token. Its attempt may still be running, and
-    // its eventual release must not free a lock a newer attempt has since taken.
-    this.lockToken++;
-
-    while (this.lockWaiters.length > 0) {
-      const waiter = this.lockWaiters.shift();
-      try {
-        if (waiter && typeof waiter.reject === 'function') {
-          waiter.reject();
-        }
-      } catch (error) {
-        log.error('Error rejecting lock waiter', error);
-      }
-    }
-  }
-
-  setState(newState: ClientState, error: Error | null = null): void {
-    const oldState = this.state;
-
-    if (oldState === newState && !error) {
-      return;
-    }
-
-    this.state = newState;
-    this.lastError = error;
-
-    if (oldState !== newState) {
-      log.info(
-        `State: ${oldState} → ${newState}`,
-        error ? { error: error.message } : undefined
-      );
-    }
-
-    stateEvents.emit('whatsapp_state_changed', {
-      from: oldState,
-      to: newState,
-      error,
-    });
-  }
-
-  isState(state: ClientState): boolean {
-    return this.state === state;
-  }
-
-  getStatus(): ClientStatus {
-    return {
-      state: this.state,
-      connected: this.isState('CONNECTED'),
-      initializing: this.isState('INITIALIZING'),
-      reconnectAttempts: this.reconnectAttempts,
-      lastError: this.lastError?.message,
-      hasActivePromise: !!(this.initializationPromise ?? this.restartPromise),
-    };
-  }
-
-  clearReconnectTimer(): void {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-  }
-
-  clearInitializationTimeout(): void {
-    if (this.initializationTimeout) {
-      clearTimeout(this.initializationTimeout);
-      this.initializationTimeout = null;
-    }
-  }
-
-  cleanup(): void {
-    log.debug('Cleaning up ClientStateManager');
-
-    this.clearReconnectTimer();
-    this.clearInitializationTimeout();
-
-    if (this.initializationAbortController) {
-      try {
-        this.initializationAbortController.abort();
-      } catch (error) {
-        log.error('Error aborting initialization', error);
-      }
-      this.initializationAbortController = null;
-    }
-
-    // Explicitly ABANDON any in-flight attempt's registration: cleanup() runs when
-    // the caller (restart/unlink) is about to replace that attempt, so joiners must
-    // not be handed the dying one. Safe because an owner now clears by identity —
-    // the abandoned attempt can no longer null its replacement's registration on the
-    // way out. restartPromise is deliberately NOT cleared: restart() calls cleanup()
-    // partway through itself and its single-flight guard has to survive it.
-    this.initializationPromise = null;
-
-    this.forceReleaseLock();
-
-    this.state = 'DISCONNECTED';
-    this.reconnectAttempts = 0;
-    this.lastError = null;
-    this.destroyInProgress = false;
-
-    log.debug('ClientStateManager cleanup completed');
-  }
-}
-
-// ===========================================
-// ENHANCED CIRCUIT BREAKER
-// ===========================================
-
-class EnhancedCircuitBreaker {
-  private failureThreshold: number;
-  private timeout: number;
-  private halfOpenMaxCalls: number;
-  private failureCount = 0;
-  private lastFailureTime: number | null = null;
-  private state: CircuitBreakerState = 'CLOSED';
-  private halfOpenCalls = 0;
-  private lastStateChange: number = Date.now();
-
-  constructor(threshold = 5, timeout = 60000, halfOpenMaxCalls = 3) {
-    this.failureThreshold = threshold;
-    this.timeout = timeout;
-    this.halfOpenMaxCalls = halfOpenMaxCalls;
-  }
-
-  async execute<T>(operation: () => Promise<T>, operationName = 'operation'): Promise<T> {
-    if (this.state === 'OPEN') {
-      if (this.lastFailureTime && Date.now() - this.lastFailureTime > this.timeout) {
-        this.transitionToHalfOpen();
-      } else {
-        const timeUntilRetry = this.timeout - (Date.now() - (this.lastFailureTime || 0));
-        throw new Error(
-          `Circuit breaker is OPEN. Retry in ${Math.ceil(timeUntilRetry / 1000)} seconds`
-        );
-      }
-    }
-
-    if (this.state === 'HALF_OPEN' && this.halfOpenCalls >= this.halfOpenMaxCalls) {
-      throw new Error('Circuit breaker is HALF_OPEN with max calls reached');
-    }
-
-    try {
-      if (this.state === 'HALF_OPEN') {
-        this.halfOpenCalls++;
-      }
-
-      const result = await operation();
-      this.onSuccess(operationName);
-      return result;
-    } catch (error) {
-      this.onFailure(operationName, error as Error);
-      throw error;
-    }
-  }
-
-  private onSuccess(operationName: string): void {
-    if (this.state === 'HALF_OPEN') {
-      log.debug(`Circuit breaker healing: ${operationName}`);
-      this.transitionToClosed();
-    } else if (this.state === 'CLOSED') {
-      this.failureCount = Math.max(0, this.failureCount - 1);
-    }
-  }
-
-  private onFailure(operationName: string, error: Error): void {
-    this.failureCount++;
-    this.lastFailureTime = Date.now();
-
-    log.warn(
-      `Circuit breaker failure ${this.failureCount}/${this.failureThreshold} for ${operationName}`,
-      { error: error.message }
-    );
-
-    if (this.state === 'HALF_OPEN' || this.failureCount >= this.failureThreshold) {
-      this.transitionToOpen();
-    }
-  }
-
-  private transitionToClosed(): void {
-    this.state = 'CLOSED';
-    this.failureCount = 0;
-    this.halfOpenCalls = 0;
-    this.lastStateChange = Date.now();
-    log.info('Circuit breaker → CLOSED');
-  }
-
-  private transitionToOpen(): void {
-    this.state = 'OPEN';
-    this.halfOpenCalls = 0;
-    this.lastStateChange = Date.now();
-    log.warn(`Circuit breaker → OPEN`, { failures: this.failureCount });
-  }
-
-  private transitionToHalfOpen(): void {
-    this.state = 'HALF_OPEN';
-    this.halfOpenCalls = 0;
-    this.lastStateChange = Date.now();
-    log.info('Circuit breaker → HALF_OPEN');
-  }
-
-  reset(): void {
-    this.transitionToClosed();
-    log.info('Circuit breaker manually reset');
-  }
-
-  /**
-   * Record a failure that happened outside execute() — e.g. the reconnect loop
-   * exhausting its attempts. Public so callers don't reach into private onFailure.
-   */
-  recordExternalFailure(operationName: string, error: Error): void {
-    this.onFailure(operationName, error);
-  }
-
-  getStatus(): CircuitBreakerStatus {
-    return {
-      state: this.state,
-      failureCount: this.failureCount,
-      lastFailureTime: this.lastFailureTime,
-      isOpen: this.state === 'OPEN',
-      timeInCurrentState: Date.now() - this.lastStateChange,
-      halfOpenCalls: this.halfOpenCalls,
-    };
   }
 }
 
@@ -856,7 +382,7 @@ class WhatsAppService extends EventEmitter {
       // healthy browser during an overlap.
       if (!this.clientState.client && !this.hasSweptOrphansAtBoot) {
         this.hasSweptOrphansAtBoot = true;
-        await this.ensureProfileUnlocked();
+        await ensureProfileUnlocked();
       }
 
       // No client yet — this is a fresh attempt, so vet what's on disk before
@@ -864,7 +390,7 @@ class WhatsAppService extends EventEmitter {
       // itself, so the session it is about to reload is validated too. The old
       // `forceRestart` flag skipped this check and nothing ever set it.)
       if (!this.clientState.client) {
-        const sessionQuality = await this.validateSessionQuality();
+        const sessionQuality = await validateSessionQuality();
 
         if (sessionQuality === 'valid') {
           log.info('Found existing session - proceeding with client creation');
@@ -940,7 +466,7 @@ class WhatsAppService extends EventEmitter {
       // actually succeed instead of hitting the same collision forever.
       const initErrMsg = (error as Error)?.message || '';
       if (/already running|ProcessSingleton/i.test(initErrMsg)) {
-        await this.ensureProfileUnlocked();
+        await ensureProfileUnlocked();
       }
 
       this.clientState.setState('ERROR', error as Error);
@@ -1081,7 +607,7 @@ class WhatsAppService extends EventEmitter {
 
     await this.setupClientEventHandlers(client);
 
-    const hasSession = await this.checkExistingSession();
+    const hasSession = await checkExistingSession();
 
     const timeoutDuration = hasSession
       ? this.clientState.SESSION_RESTORATION_TIMEOUT
@@ -1116,7 +642,7 @@ class WhatsAppService extends EventEmitter {
           // timeout; re-validate first and only clean if the files are
           // genuinely corrupted. The next attempt restores the slow session.
           if (hasSession) {
-            const recheck = await this.validateSessionQuality();
+            const recheck = await validateSessionQuality();
             if (recheck === 'corrupted') {
               log.info('Init timed out and session is corrupted - cleaning up');
               try {
@@ -1304,7 +830,7 @@ class WhatsAppService extends EventEmitter {
   }
 
   private async handleQR(qr: string): Promise<void> {
-    const sessionQuality = await this.validateSessionQuality();
+    const sessionQuality = await validateSessionQuality();
 
     if (sessionQuality === 'valid') {
       log.info(
@@ -1623,7 +1149,7 @@ class WhatsAppService extends EventEmitter {
       // Fallback clear: release locks (kill orphan Chrome on this profile) then use
       // the library's own session-clear. Skipped if client.logout() already did it.
       if (!cleared) {
-        await this.ensureProfileUnlocked(priorProc);
+        await ensureProfileUnlocked(priorProc);
         if (this.authStrategy) {
           try {
             await this.authStrategy.logout();
@@ -2041,7 +1567,7 @@ class WhatsAppService extends EventEmitter {
 
       // Make absolutely sure no Chrome still owns the profile, else the
       // initialize() below fails with "browser is already running".
-      await this.ensureProfileUnlocked(priorProc);
+      await ensureProfileUnlocked(priorProc);
 
       this.clientState.cleanup();
       this.clientState.setState('DISCONNECTED');
@@ -2180,117 +1706,6 @@ class WhatsAppService extends EventEmitter {
     }
   }
 
-  /**
-   * Guarantee the LocalAuth Chrome profile is free before (re)launching.
-   *
-   * Puppeteer refuses to launch on a profile another Chrome still owns and throws
-   * "The browser is already running for <userDataDir>" — on Windows it detects a
-   * leftover `<dir>\lockfile` plus Chrome's ProcessSingleton mutex held by a live
-   * chrome.exe (BrowserLauncher.js). A bare destroy() can leave the old chrome.exe
-   * still dying, and an unclean prior shutdown (e.g. the SIGHUP console-disconnect
-   * path) can orphan one entirely. So we: (1) hard-kill the browser we had a handle
-   * to and wait for it to actually exit, (2) on Windows kill any orphan chrome.exe
-   * still bound to THIS profile (matched by command line, so the user's own Chrome
-   * is never touched), then (3) delete the stale lock files.
-   */
-  private async ensureProfileUnlocked(
-    trackedProc: { kill?: (signal: string) => void; pid?: number } | null = null
-  ): Promise<void> {
-    const fsMod = await import('fs');
-    const pathMod = await import('path');
-    const sessionDir = pathMod.default.resolve('.wwebjs_auth', 'session-client');
-
-    if (trackedProc?.pid) {
-      await this.killPidAndWait(trackedProc.pid);
-    }
-
-    if (process.platform === 'win32') {
-      await this.killWindowsChromeForProfile(sessionDir);
-    }
-
-    for (const name of ['lockfile', 'SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
-      try {
-        fsMod.default.rmSync(pathMod.default.join(sessionDir, name), {
-          force: true,
-          maxRetries: 3,
-          retryDelay: 200,
-        });
-      } catch (err) {
-        log.debug(`Profile unlock: could not remove ${name}`, {
-          error: (err as Error).message,
-        });
-      }
-    }
-  }
-
-  /** SIGKILL a PID, then poll (signal 0) until it's actually gone or we time out. */
-  private async killPidAndWait(pid: number, timeoutMs = 8000): Promise<void> {
-    try {
-      process.kill(pid, 'SIGKILL');
-      log.info('Killed leftover WhatsApp Chrome process', { pid });
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ESRCH') return; // already gone
-      log.debug('killPidAndWait: initial kill failed', {
-        pid,
-        error: (err as Error).message,
-      });
-    }
-
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      try {
-        process.kill(pid, 0); // probe: throws ESRCH once the process is gone
-      } catch {
-        return;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 150));
-    }
-    log.warn('Leftover Chrome process still alive after kill timeout', { pid });
-  }
-
-  /**
-   * Kill any chrome.exe whose command line references THIS LocalAuth profile dir.
-   * Targeted on purpose — it must never close the staff member's personal Chrome,
-   * only the orphaned WhatsApp-Web browser bound to our --user-data-dir.
-   */
-  private async killWindowsChromeForProfile(sessionDir: string): Promise<void> {
-    if (process.platform !== 'win32') return;
-    try {
-      const { execFile } = await import('child_process');
-      const { promisify } = await import('util');
-      const run = promisify(execFile);
-
-      const needle = sessionDir.replace(/'/g, "''"); // escape single quotes for PS
-      const script =
-        `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" | ` +
-        `Where-Object { $_.CommandLine -and $_.CommandLine -like '*${needle}*' } | ` +
-        `ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; $_.ProcessId } catch {} }`;
-
-      const { stdout } = await run(
-        'powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-Command', script],
-        { timeout: 10000, windowsHide: true, encoding: 'utf8' }
-      );
-      const pids = String(stdout).trim();
-      if (pids) {
-        log.warn('Killed orphan Chrome bound to the WhatsApp profile', {
-          pids: pids.split(/\s+/),
-        });
-      }
-    } catch (err) {
-      log.debug('Orphan-Chrome scan failed (non-fatal)', {
-        error: (err as Error).message,
-      });
-    }
-  }
-
-  /**
-   * Generate the daily appointments PDF (the same report the email path builds)
-   * and post it to the staff WhatsApp group named {@link APPOINTMENTS_GROUP_NAME}.
-   *
-   * Best-effort: any failure (PDF gen, group not found, send error) is logged and
-   * swallowed so it can never interrupt the per-patient notification batch.
-   */
   private async sendAppointmentsPdfToGroup(date: string): Promise<void> {
     try {
       // Runtime-configurable from the /send page (persisted in the options table).
@@ -2429,18 +1844,13 @@ class WhatsAppService extends EventEmitter {
         }
 
         const results: SendResult[] = [];
-        // Early abort on a dead connection: two consecutive stall-type
-        // failures (60s page timeouts) mean every further send is doomed —
-        // each would burn another minute and be misleadingly recorded. Stop,
-        // warn, restart; the unattempted remainder keeps its eligibility
-        // flags, so the next Send picks it up cleanly.
-        const MAX_CONSECUTIVE_STALLS = 2;
-        let consecutiveStalls = 0;
-        let abortedByStalls = false;
-        // Same 2-in-a-row debounce for malformed library results (see the catch
-        // block) so a lone anomaly can't nuke a whole batch.
-        let consecutiveMalformed = 0;
-        let abortedByMalformed = false;
+        // Early abort on a dead connection: two consecutive stall-type failures
+        // (60s page timeouts) mean every further send is doomed — each would
+        // burn another minute and be misleadingly recorded. Same 2-in-a-row
+        // debounce for malformed library results, so a lone anomaly can't nuke a
+        // whole batch. The counting rules (including which counters a given
+        // outcome resets) are `advanceBatchGuard`; this loop only obeys them.
+        let guard: BatchGuard = INITIAL_BATCH_GUARD;
         for (let i = 0; i < numbers.length; i++) {
           if (!this.isReady()) {
             throw new Error('Client disconnected during sending');
@@ -2456,8 +1866,7 @@ class WhatsAppService extends EventEmitter {
               session
             );
             results.push(result);
-            consecutiveStalls = 0;
-            consecutiveMalformed = 0;
+            guard = advanceBatchGuard(guard, 'sent');
 
             if (i < numbers.length - 1) {
               await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -2466,37 +1875,31 @@ class WhatsAppService extends EventEmitter {
             log.error(`Error sending message to ${numbers[i]}`, error);
             results.push({ success: false, error: (error as Error).message });
 
-            if (isMalformedSendResultError((error as Error).message)) {
-              // Systemic library break (WhatsApp Web changed shape) — every send
-              // will hit it. Abort once it repeats; a restart can't fix a
-              // version mismatch, so this path deliberately does NOT restart.
-              consecutiveMalformed += 1;
-              if (consecutiveMalformed >= MAX_CONSECUTIVE_STALLS) {
-                abortedByMalformed = true;
-                log.error('Aborting batch — WhatsApp returned malformed send results; whatsapp-web.js likely needs updating', {
-                  date,
-                  attempted: i + 1,
-                  remaining: numbers.length - i - 1,
-                });
-                break;
-              }
-            } else if (isConnectionStallError((error as Error).message)) {
-              consecutiveStalls += 1;
-              if (consecutiveStalls >= MAX_CONSECUTIVE_STALLS) {
-                abortedByStalls = true;
-                log.error('Aborting batch — consecutive connection stalls, connection is dead', {
-                  date,
-                  stalls: consecutiveStalls,
-                  attempted: i + 1,
-                  remaining: numbers.length - i - 1,
-                });
-                break;
-              }
-            } else {
-              // Per-recipient failure (e.g. not on WhatsApp) — not a systemic
-              // signal, keep going.
-              consecutiveStalls = 0;
-              consecutiveMalformed = 0;
+            // 'stall' / 'malformed' are systemic (every remaining send hits the
+            // same wall); anything else is about this one recipient (not on
+            // WhatsApp, bad number) and the batch carries on.
+            guard = advanceBatchGuard(guard, classifySendFailure((error as Error).message));
+
+            if (guard.abort === 'malformed') {
+              // Systemic library break (WhatsApp Web changed shape). A restart
+              // can't fix a version mismatch, so `summarizeBatch` deliberately
+              // does NOT restart on this one.
+              log.error('Aborting batch — WhatsApp returned malformed send results; whatsapp-web.js likely needs updating', {
+                date,
+                attempted: i + 1,
+                remaining: numbers.length - i - 1,
+              });
+              break;
+            }
+
+            if (guard.abort === 'stalls') {
+              log.error('Aborting batch — consecutive connection stalls, connection is dead', {
+                date,
+                stalls: guard.consecutiveStalls,
+                attempted: i + 1,
+                remaining: numbers.length - i - 1,
+              });
+              break;
             }
           }
         }
@@ -2519,52 +1922,36 @@ class WhatsAppService extends EventEmitter {
           sessionStats: session.getStats(),
         });
 
-        if (abortedByStalls) {
-          // The connection is confirmed dead — don't wait for the ack
-          // watchdog (it would fire a second warning + restart later): warn
-          // now and restart now. The remainder was never attempted and stays
-          // eligible for the next Send.
-          const sentOk = results.filter((r) => r.success).length;
-          const remaining = numbers.length - results.length;
-          if (this.wsEmitter) {
-            this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SEND_UNCONFIRMED, {
-              date,
-              sentCount: sentOk,
-              message:
-                `WhatsApp stopped responding — sending for ${date} was aborted ` +
-                `(${remaining} message(s) not attempted). WhatsApp is restarting automatically. ` +
-                `Verify on the phone whether the ${sentOk} earlier message(s) really delivered, ` +
-                'then press Send again for the rest.',
-            });
-          }
+        // What the run means for the user — the counts, the warning copy, and
+        // whether to restart or arm the zombie-send watchdog — is decided by
+        // `summarizeBatch`. An aborted batch arms no watchdog: ack silence is
+        // expected there, so it would fire a second, misleading warning.
+        const summary = summarizeBatch({
+          date,
+          results,
+          total: numbers.length,
+          abort: guard.abort,
+        });
+
+        if (summary.warning && this.wsEmitter) {
+          this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SEND_UNCONFIRMED, {
+            date,
+            sentCount: summary.sentCount,
+            message: summary.warning,
+          });
+        }
+
+        if (summary.restart) {
+          // The connection is confirmed dead — restart now rather than waiting
+          // for the ack watchdog. The unattempted remainder was never sent and
+          // keeps its eligibility flags, so the next Send picks it up cleanly.
           void this.restart().catch((err) => {
             log.error('Stall-abort restart failed', { error: (err as Error).message });
           });
-        } else if (abortedByMalformed) {
-          // The library returned unusable results — the app needs updating.
-          // Don't restart (a version mismatch survives it) and don't arm the
-          // ack watchdog (the batch was aborted, so ack silence is expected,
-          // not a zombie-send). Just warn the user clearly.
-          const sentOk = results.filter((r) => r.success).length;
-          const remaining = numbers.length - results.length;
-          if (this.wsEmitter) {
-            this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SEND_UNCONFIRMED, {
-              date,
-              sentCount: sentOk,
-              message:
-                `WhatsApp sending for ${date} was aborted — WhatsApp changed and the ` +
-                `app needs updating (${remaining} message(s) not attempted). Verify on ` +
-                `the phone whether the ${sentOk} earlier message(s) delivered, then ` +
-                'contact support before resending.',
-            });
-          }
-        } else {
-          this.armAckSilenceWatchdog(
-            date,
-            session,
-            acksBeforeBatch,
-            results.filter((r) => r.success).length
-          );
+        }
+
+        if (summary.armAckWatchdog) {
+          this.armAckSilenceWatchdog(date, session, acksBeforeBatch, summary.sentCount);
         }
 
         return results;
@@ -2596,16 +1983,16 @@ class WhatsAppService extends EventEmitter {
     acksBeforeBatch: number,
     sentCount: number
   ): void {
-    const ACK_SILENCE_WINDOW_MS = 90000;
-    const MIN_SENT_FOR_SIGNAL = 3;
-
-    if (sentCount < MIN_SENT_FOR_SIGNAL) return;
-
+    // The "is it worth arming at all?" threshold is `shouldArmAckWatchdog`,
+    // applied by `summarizeBatch` at the single call site above.
     const timer = setTimeout(() => {
-      const acksNow = session.getStats().deliveryStatusUpdates;
-      if (acksNow > acksBeforeBatch) return; // acks flowing — healthy
-
-      if (this.messageState.manualDisconnect || this.clientState.destroyInProgress) return;
+      const verdict = isAckSilenceConfirmed({
+        acksBefore: acksBeforeBatch,
+        acksNow: session.getStats().deliveryStatusUpdates,
+        manualDisconnect: this.messageState.manualDisconnect,
+        destroyInProgress: this.clientState.destroyInProgress,
+      });
+      if (!verdict) return;
 
       log.error(
         'ZERO delivery acks after batch — WhatsApp connection was silently dead; messages were queued locally, not delivered. Restarting client.',
@@ -2616,10 +2003,7 @@ class WhatsAppService extends EventEmitter {
         this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SEND_UNCONFIRMED, {
           date,
           sentCount,
-          message:
-            `WhatsApp did not confirm any of the ${sentCount} messages sent for ${date} — ` +
-            'they were most likely NOT delivered. WhatsApp is being restarted automatically; ' +
-            'verify on the phone, then Reset the date and send again.',
+          message: ackSilenceWarning(date, sentCount),
         });
       }
 
@@ -2867,8 +2251,6 @@ class WhatsAppService extends EventEmitter {
           // Previously this was a sequential loop with no timeout, so one hung
           // getChatById/fetchMessages could serialize-block the whole WhatsApp
           // command path for minutes (send/report/queueOperation share one breaker).
-          const CONCURRENCY = 5;
-          const PER_MESSAGE_TIMEOUT_MS = 15000;
           const statusUpdates: Array<{ id: number; ack: number }> = [];
 
           const checkOne = async (msg: (typeof messages)[number]): Promise<void> => {
@@ -2877,10 +2259,10 @@ class WhatsAppService extends EventEmitter {
                 (async () => {
                   const chat = await this.clientState.client!.getChatById(msg.number);
                   const fetchedMessages = await chat.fetchMessages({ limit: 50 });
-                  const ourMessage = fetchedMessages.find((m) => m.id.id === msg.wamid);
-                  return ourMessage ? { id: msg.id, ack: ourMessage.ack || 1 } : null;
+                  // Which ack (if any) to write back is `reconcileAck`.
+                  return reconcileAck(msg, fetchedMessages);
                 })(),
-                PER_MESSAGE_TIMEOUT_MS,
+                REPORT_PER_MESSAGE_TIMEOUT_MS,
                 `report check ${msg.wamid}`
               );
               if (update) statusUpdates.push(update);
@@ -2889,7 +2271,7 @@ class WhatsAppService extends EventEmitter {
             }
           };
 
-          // Simple worker pool: CONCURRENCY workers pull from a shared cursor.
+          // Simple worker pool: REPORT_CONCURRENCY workers pull from a shared cursor.
           let cursor = 0;
           const worker = async (): Promise<void> => {
             while (cursor < messages.length) {
@@ -2898,7 +2280,7 @@ class WhatsAppService extends EventEmitter {
             }
           };
           await Promise.all(
-            Array.from({ length: Math.min(CONCURRENCY, messages.length) }, () => worker())
+            Array.from({ length: Math.min(REPORT_CONCURRENCY, messages.length) }, () => worker())
           );
 
           if (statusUpdates.length > 0) {
@@ -3028,199 +2410,6 @@ class WhatsAppService extends EventEmitter {
     }
   }
 
-  async validateSessionQuality(): Promise<SessionQuality> {
-    try {
-      // Async fs so a large/bloated Chrome profile dir doesn't block the event
-      // loop — this runs on init AND on every QR event (handleQR).
-      const fsp = (await import('fs/promises')).default;
-      const path = await import('path');
-
-      const exists = async (p: string): Promise<boolean> => {
-        try {
-          await fsp.access(p);
-          return true;
-        } catch {
-          return false;
-        }
-      };
-
-      const sessionPath = '.wwebjs_auth/session-client/Default';
-
-      if (!(await exists(sessionPath))) {
-        log.debug('Session quality: none (path does not exist)');
-        return 'none';
-      }
-
-      try {
-        const sessionStats = await fsp.stat(sessionPath);
-        const sessionAgeMs = Date.now() - sessionStats.birthtimeMs;
-
-        if (sessionAgeMs < 10000) {
-          log.debug(
-            `Session quality: new (session created ${Math.floor(sessionAgeMs / 1000)}s ago, assuming valid)`
-          );
-          return 'valid';
-        }
-      } catch {
-        log.debug('Could not determine session age, continuing validation');
-      }
-
-      const indexedDBPath = path.default.join(sessionPath, 'IndexedDB');
-      const indexedDBWhatsAppPath = path.default.join(
-        indexedDBPath,
-        'https_web.whatsapp.com_0.indexeddb.leveldb'
-      );
-
-      if (!(await exists(indexedDBPath))) {
-        try {
-          const parentStats = await fsp.stat(sessionPath);
-          const parentAgeMs = Date.now() - parentStats.mtimeMs;
-
-          if (parentAgeMs < 30000) {
-            log.debug(
-              `Session quality: initializing (modified ${Math.floor(parentAgeMs / 1000)}s ago, waiting for IndexedDB)`
-            );
-            return 'valid';
-          }
-        } catch {
-          // Can't determine age, continue
-        }
-
-        log.debug('Session quality: empty (IndexedDB directory missing after 30s)');
-        return 'empty';
-      }
-
-      let indexedDBDataFileCount = 0;
-      if (await exists(indexedDBWhatsAppPath)) {
-        try {
-          const indexedDBFiles = await fsp.readdir(indexedDBWhatsAppPath);
-          indexedDBDataFileCount = indexedDBFiles.filter((f) => f.endsWith('.ldb')).length;
-
-          log.debug(
-            `IndexedDB contains ${indexedDBDataFileCount} WhatsApp data files`
-          );
-
-          // LevelDB needs a MANIFEST file pointed to by CURRENT. If Chromium
-          // was killed mid-MANIFEST-rewrite, CURRENT can reference a file that
-          // never finished being written. Chromium will then fail to open the
-          // database with "Internal error opening backing store", WA Web will
-          // log out, and every restore retry hits the same wall.
-          const currentPath = path.default.join(indexedDBWhatsAppPath, 'CURRENT');
-          if (await exists(currentPath)) {
-            const manifestName = (await fsp.readFile(currentPath, 'utf8')).trim();
-            if (manifestName) {
-              const manifestPath = path.default.join(indexedDBWhatsAppPath, manifestName);
-              if (!(await exists(manifestPath))) {
-                log.warn(
-                  `Session quality: corrupted (CURRENT references missing ${manifestName})`
-                );
-                return 'corrupted';
-              }
-            }
-          }
-        } catch (error) {
-          log.warn('Session quality: corrupted (IndexedDB read error)', {
-            error: (error as Error).message,
-          });
-          return 'corrupted';
-        }
-      }
-
-      const leveldbPath = path.default.join(sessionPath, 'Local Storage/leveldb');
-
-      if (await exists(leveldbPath)) {
-        try {
-          const leveldbFiles = await fsp.readdir(leveldbPath);
-          log.debug(`Local Storage contains ${leveldbFiles.length} files`);
-        } catch (error) {
-          log.warn('Session quality: corrupted (leveldb read error)', {
-            error: (error as Error).message,
-          });
-          return 'corrupted';
-        }
-      }
-
-      let totalSize = 0;
-      const calculateDirSize = async (dirPath: string): Promise<void> => {
-        try {
-          const files = await fsp.readdir(dirPath, { withFileTypes: true });
-          for (const file of files) {
-            const filePath = path.default.join(dirPath, file.name);
-            try {
-              if (file.isDirectory()) {
-                await calculateDirSize(filePath);
-              } else {
-                const stats = await fsp.stat(filePath);
-                totalSize += stats.size;
-              }
-            } catch {
-              log.debug(`Skipping file in size calculation: ${filePath}`);
-            }
-          }
-        } catch {
-          log.debug(`Skipping directory in size calculation: ${dirPath}`);
-        }
-      };
-
-      await calculateDirSize(sessionPath);
-
-      if (totalSize > 1024 * 1024) {
-        // Mature session by total size, but the WA Web auth keys live
-        // exclusively in IndexedDB. If Chrome was killed mid-write and
-        // wiped the .ldb files, the session is unrecoverable even though
-        // Local Storage / cookies remain.
-        if (indexedDBDataFileCount === 0) {
-          log.warn(
-            `Session quality: corrupted (size ${Math.floor(totalSize / 1024)}KB but 0 IndexedDB data files - auth keys gone)`
-          );
-          return 'corrupted';
-        }
-        log.info(
-          `Session quality: valid (size ${Math.floor(totalSize / 1024)}KB, mature session)`
-        );
-        return 'valid';
-      }
-
-      if (totalSize > 100 * 1024 && indexedDBDataFileCount >= 5) {
-        log.info(
-          `Session quality: valid (size ${Math.floor(totalSize / 1024)}KB, ${indexedDBDataFileCount} IndexedDB files)`
-        );
-        return 'valid';
-      }
-
-      if (totalSize > 10 * 1024 && indexedDBDataFileCount > 0) {
-        log.info(
-          `Session quality: valid (size ${Math.floor(totalSize / 1024)}KB, ${indexedDBDataFileCount} IndexedDB files, fresh session)`
-        );
-        return 'valid';
-      }
-
-      if (totalSize < 10 * 1024) {
-        log.debug(`Session quality: empty (size ${totalSize} bytes < 10KB after 10s)`);
-        return 'empty';
-      }
-
-      if (indexedDBDataFileCount === 0) {
-        log.debug(`Session quality: empty (no IndexedDB data files after 10s)`);
-        return 'empty';
-      }
-
-      log.info(
-        `Session quality: valid (size ${Math.floor(totalSize / 1024)}KB, assuming valid by default)`
-      );
-      return 'valid';
-    } catch (error) {
-      log.error('Error validating session quality', {
-        error: (error as Error).message,
-      });
-      return 'corrupted';
-    }
-  }
-
-  async checkExistingSession(): Promise<boolean> {
-    const quality = await this.validateSessionQuality();
-    return quality === 'valid';
-  }
 
   async cleanupInvalidSession(maxRetries = 3): Promise<CleanupResult> {
     const fs = await import('fs');

@@ -23,6 +23,7 @@ import { idParams } from '../validation.js';
 // Shared `:personId` numeric param (defense-in-depth ahead of the service's path
 // safety; for upload, validated BEFORE any bytes are accepted).
 export const personIdParams = idParams('personId');
+export type PersonIdParams = z.infer<typeof personIdParams>;
 
 // ── Core filesystem shapes (mirror services/files/file-explorer.service.ts) ────
 // `size`/`modified` are omitted in flat-walk mode (no per-file stat), so optional.

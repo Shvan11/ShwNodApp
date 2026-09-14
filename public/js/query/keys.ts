@@ -200,6 +200,9 @@ export const qk = {
     /** GET /api/statistics/revenue-breakdown?startDate=&endDate= — revenue by work type & doctor. */
     revenueBreakdown: (startDate: string, endDate: string) =>
       ['reports', 'revenue-breakdown', startDate, endDate] as const,
+    /** GET /api/statistics/doctor-payments/:doctorId?startDate=&endDate= — one doctor's payments. */
+    doctorPayments: (doctorId: number, startDate: string, endDate: string) =>
+      ['reports', 'doctor-payments', doctorId, startDate, endDate] as const,
   },
   /**
    * Stand / mini-pharmacy. `all()` is the prefix every stand read shares, so a

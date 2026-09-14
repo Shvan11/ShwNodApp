@@ -87,7 +87,9 @@ interface WhatsAppReadyData {
 }
 
 interface WhatsAppQRData {
-  qr: string;
+  /** `null` on streams that may not pair — the server withholds the QR by role. */
+  qr: string | null;
+  clientReady?: boolean;
 }
 
 /**
@@ -158,7 +160,12 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
     const handleWhatsAppQR = (data: unknown): void => {
       const typed = data as WhatsAppQRData;
       setWhatsappQrCode(typed.qr);
-      if (typed.qr) setWhatsappClientReady(false);
+      // Read the frame's OWN `clientReady`, not the presence of `qr`. The server
+      // blanks `qr` for streams whose role may not pair (sse-whatsapp.ts), so
+      // inferring "not ready" from `typed.qr` would leave every non-finance tab
+      // believing WhatsApp is still linked — and `SendMessage`'s gate reads that
+      // flag, so it would keep offering a send that cannot go out.
+      if (typed.clientReady === false) setWhatsappClientReady(false);
     };
 
     // Authoritative reconcile. On REST failure keep the last known state — the

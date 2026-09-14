@@ -8,7 +8,7 @@
  * is logged and swallowed so task creation is never blocked or failed by messaging.
  */
 import whatsapp from './whatsapp.js';
-import PhoneFormatter from '../../utils/phoneFormatter.js';
+import PhoneFormatter from '../../utils/phone-formatter.js';
 import { getEmployeeContact } from '../database/queries/employee-queries.js';
 import { log } from '../../utils/logger.js';
 

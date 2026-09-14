@@ -8,13 +8,13 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { sql } from 'kysely';
-import { getKysely } from '../../services/database/kysely.js';
 import {
   createEmployee,
   updateEmployee,
   deleteEmployee,
   employeeEmailExists,
+  listEmployees,
+  listPositions,
 } from '../../services/database/queries/employee-queries.js';
 import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
@@ -29,36 +29,6 @@ const router = Router();
  * Query parameters for filtering employees
  */
 type EmployeeQuery = employee.EmployeeQuery;
-
-/**
- * Employee record from database.
- * `type` (not `interface`) so an Employee[] feeds the contract's
- * `z.looseObject` sendData arg — the index-signature rule
- * (docs/shared-contract-progress.md).
- */
-type Employee = {
-  id: number;
-  employee_name: string;
-  position: number;
-  position_name: string | null;
-  email: string | null;
-  phone: string | null;
-  percentage: boolean;
-  commission_percentage: number | null;
-  receive_email: boolean;
-  get_appointments: boolean;
-  is_active: boolean;
-  sort_order: number;
-  appointment_color: string | null;
-};
-
-/**
- * position record from database (`type` for the same index-signature reason).
- */
-type position = {
-  id: number;
-  position_name: string;
-};
 
 /**
  * Route params for employee by id
@@ -81,55 +51,16 @@ type EmployeeParams = employee.EmployeeParams;
 router.get('/employees', validate({ query: employee.employees.query }), async (req: Request<object, object, object, EmployeeQuery>, res: Response): Promise<void> => {
   try {
     const { getAppointments, receiveEmail, percentage, position, includeInactive } = req.query;
-    const db = getKysely();
 
-    // Build WHERE clause conditions as composable SQL fragments
-    const conditions = [];
-
-    // Quit employees are kept for historical purposes but hidden everywhere
-    // except the Settings page, which passes includeInactive=true to manage them.
-    if (includeInactive !== 'true') {
-      conditions.push(sql`e."is_active" = true`);
-    }
-
-    if (getAppointments === 'true') {
-      conditions.push(sql`e."get_appointments" = true`);
-    }
-
-    if (receiveEmail === 'true') {
-      conditions.push(sql`e."receive_email" = true`);
-      conditions.push(sql`e."email" IS NOT NULL`);
-      conditions.push(sql`e."email" != ''`);
-    }
-
-    if (percentage === 'true') {
-      conditions.push(sql`e."percentage" = true`);
-    }
-
-    if (position) {
-      // Support filtering by position name or id
-      if (isNaN(Number(position))) {
-        conditions.push(sql`p."position_name" = ${position}`);
-      } else {
-        conditions.push(sql`e."position" = ${parseInt(position)}`);
-      }
-    }
-
-    const whereClause = conditions.length > 0
-      ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
-      : sql``;
-
-    const { rows: employees } = await sql<Employee>`
-      SELECT e."id", e."employee_name", e."position", p."position_name", e."email", e."phone", e."percentage", e."commission_percentage", e."receive_email", e."get_appointments", e."is_active", e."sort_order", e."appointment_color"
-      FROM "employees" e
-      LEFT JOIN "positions" p ON e."position" = p."id"
-      ${whereClause}
-      ORDER BY e."sort_order", e."employee_name"
-    `.execute(db);
-
-    sendData(res, employee.employees.response, {
-      employees: employees || []
+    const employees = await listEmployees({
+      getAppointments: getAppointments === 'true',
+      receiveEmail: receiveEmail === 'true',
+      percentage: percentage === 'true',
+      position,
+      includeInactive: includeInactive === 'true',
     });
+
+    sendData(res, employee.employees.response, { employees });
 
   } catch (error) {
     log.error('Error fetching employees:', error);
@@ -143,16 +74,9 @@ router.get('/employees', validate({ query: employee.employees.query }), async (r
  */
 router.get('/positions', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const db = getKysely();
-    const { rows: positions } = await sql<position>`
-      SELECT "id", "position_name"
-      FROM "positions"
-      ORDER BY "position_name"
-    `.execute(db);
+    const positions = await listPositions();
 
-    sendData(res, employee.positions.response, {
-      positions: positions || []
-    });
+    sendData(res, employee.positions.response, { positions });
 
   } catch (error) {
     log.error('Error fetching positions:', error);
@@ -232,13 +156,13 @@ router.put('/employees/:id', authorize(ADMIN_ROLES), validate({ params: employee
 
     // Check if email already exists for another employee (if provided)
     if (email && email.trim() !== '') {
-      if (await employeeEmailExists(email.trim(), parseInt(id))) {
+      if (await employeeEmailExists(email.trim(), parseInt(id, 10))) {
         ErrorResponses.badRequest(res, 'Another employee with this email already exists');
         return;
       }
     }
 
-    await updateEmployee(parseInt(id), {
+    await updateEmployee(parseInt(id, 10), {
       employee_name: employee_name.trim(),
       position,
       email: email && email.trim() !== '' ? email.trim() : null,
@@ -270,7 +194,7 @@ router.delete('/employees/:id', authorize(ADMIN_ROLES), validate({ params: emplo
   try {
     const { id } = req.params;
 
-    await deleteEmployee(parseInt(id));
+    await deleteEmployee(parseInt(id, 10));
 
     sendSuccess(res, null, 'Employee deleted successfully');
 

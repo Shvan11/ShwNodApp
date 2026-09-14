@@ -2,6 +2,11 @@
  * Sync control + status endpoints for the unified CDC forward sync (PostgreSQL → the single
  * Supabase mirror). The reverse Supabase → local path and its webhook were retired along with the
  * curated portal projection; only the raw mirror remains.
+ *
+ * MOUNTING: this router is mounted at `/` (index.ts) but self-prefixes `/api/...`, so it rides
+ * `app.use('/api', authenticate)` — every route here already requires a staff session. The
+ * `authorize(ADMIN_ROLES)` below adds the missing ROLE tier: kicking a drain is infrastructure
+ * control, not a clinical or front-desk action.
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -9,14 +14,18 @@ import pg from 'pg';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { log } from '../utils/logger.js';
+import { ErrorResponses } from '../utils/error-response.js';
 import { drainCdcNow } from '../services/sync/cdc/index.js';
 import { stripSslMode, getReverseReadPool } from '../services/sync/cdc/supabase-pool.js';
 import { getPgPool } from '../services/database/kysely.js';
 import { validate } from '../middleware/validate.js';
+import { authorize } from '../middleware/auth.js';
+import { ADMIN_ROLES } from '../shared/auth/roles.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import sql from 'mssql';
 import config from '../config/config.js';
+import resourceManager from '../utils/resource-manager.js';
 
 const { Pool: PgPool } = pg;
 
@@ -39,7 +48,8 @@ interface SyncState {
  * POST /api/sync/trigger
  */
 router.post(
-  '/api/sync/trigger',
+  '/trigger',
+  authorize(ADMIN_ROLES),
   validate({ body: syncTriggerBody }),
   async (
     req: Request<unknown, unknown, SyncTriggerBody>,
@@ -59,10 +69,7 @@ router.post(
       }
     } catch (error) {
       log.error('Manual sync error', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        error: (error as Error).message
-      });
+      ErrorResponses.internalError(res, 'Failed to trigger the sync drain', error as Error);
     }
   }
 );
@@ -73,7 +80,8 @@ router.post(
  * Optional low-latency nudge to drain the forward CDC immediately (it also drains on an interval).
  */
 router.post(
-  '/api/sync/queue-notify',
+  '/queue-notify',
+  authorize(ADMIN_ROLES),
   async (_req: Request, res: Response): Promise<void> => {
     try {
       log.info('Received sync drain notification');
@@ -84,10 +92,7 @@ router.post(
       res.json({ success: true, message: 'CDC drain triggered' });
     } catch (error) {
       log.error('Queue notification error', { error: (error as Error).message });
-      res.status(500).json({
-        success: false,
-        error: (error as Error).message
-      });
+      ErrorResponses.internalError(res, 'Failed to trigger the sync drain', error as Error);
     }
   }
 );
@@ -97,7 +102,7 @@ router.post(
  * GET /api/sync/status
  */
 router.get(
-  '/api/sync/status',
+  '/status',
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const stateFile = path.join(process.cwd(), 'data', 'sync-state.json');
@@ -121,7 +126,8 @@ router.get(
         }
       });
     } catch (error) {
-      res.status(500).json({ success: false, error: (error as Error).message });
+      log.error('Sync status error', { error: (error as Error).message });
+      ErrorResponses.internalError(res, 'Failed to read sync status', error as Error);
     }
   }
 );
@@ -139,25 +145,46 @@ interface PingResult {
   error: string | null;
 }
 
+/**
+ * The ping pool is built ONCE and reused, not per request.
+ *
+ * The Settings sync panel polls `/supabase-status` every 10 seconds while it is
+ * open, and this used to construct a `pg.Pool`, complete a full TCP connect + TLS
+ * handshake to the Supabase pooler, and tear it all down again on every tick.
+ * A pool with `idleTimeoutMillis` gives the same answer without that: the
+ * connection stays warm across a burst of polls and pg drops it on its own once
+ * the panel is closed, so an idle server holds nothing open. `max: 1` and the
+ * 5 s connect timeout are unchanged, so a down Supabase still fails fast and
+ * still reports `reachable:false` rather than throwing.
+ */
+let failoverPingPool: Pool | null = null;
+
+function getFailoverPingPool(url: string): Pool {
+  if (!failoverPingPool) {
+    failoverPingPool = new PgPool({
+      connectionString: stripSslMode(url), // match FailoverSink's TLS handling so the verdict is faithful
+      ssl: { rejectUnauthorized: false }, // Supabase pooler terminates TLS; chain not validated here
+      max: 1,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 30_000,
+    });
+    failoverPingPool.on('error', () => {}); // swallow pool-level errors; the query result is what we report
+    resourceManager.register('sync-status-failover-ping-pool', failoverPingPool, async (pool) => {
+      await pool.end().catch(() => {});
+    });
+  }
+  return failoverPingPool;
+}
+
 async function pingFailover(): Promise<PingResult> {
   const url = process.env.SUPABASE_FAILOVER_DB_URL ?? '';
   if (!url) return { reachable: false, latencyMs: null, error: 'not configured' };
   const start = Date.now();
-  const pool = new PgPool({
-    connectionString: stripSslMode(url), // match FailoverSink's TLS handling so the verdict is faithful
-    ssl: { rejectUnauthorized: false }, // Supabase pooler terminates TLS; chain not validated here
-    max: 1,
-    connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 1000,
-  });
-  pool.on('error', () => {}); // swallow pool-level errors; the query result is what we report
   try {
-    await pool.query('SELECT 1');
+    await getFailoverPingPool(url).query('SELECT 1');
     return { reachable: true, latencyMs: Date.now() - start, error: null };
   } catch (e) {
     return { reachable: false, latencyMs: Date.now() - start, error: (e as Error).message };
-  } finally {
-    await pool.end().catch(() => {});
   }
 }
 
@@ -168,33 +195,56 @@ async function pingFailover(): Promise<PingResult> {
  * when the Dolphin server is offline. Builds its own short-lived pool (5 s timeout) rather than the
  * app's long-lived `getPool()` singleton (30 s connect timeout) so a down server can't stall the poll.
  */
+let dolphinPingPool: sql.ConnectionPool | null = null;
+
 async function pingDolphin(): Promise<PingResult> {
   const db = config.database;
   if (!db?.server) return { reachable: false, latencyMs: null, error: 'not configured' };
   const start = Date.now();
-  let cp: sql.ConnectionPool | null = null;
   try {
-    cp = await new sql.ConnectionPool({
-      server: db.server,
-      database: db.database,
-      user: db.authentication.options.userName,
-      password: db.authentication.options.password,
-      options: {
-        instanceName: db.options.instanceName,
-        encrypt: false,
-        trustServerCertificate: true,
-        useUTC: false,
-      },
-      connectionTimeout: 5000,
-      requestTimeout: 5000,
-      pool: { max: 1, min: 0, idleTimeoutMillis: 1000 },
-    }).connect();
-    await cp.request().query('SELECT 1');
+    // Reused across polls, like the Supabase pool above — the Settings panel ticks
+    // every 10 s and this used to open and close a whole mssql ConnectionPool each
+    // time. `min: 0` + a 30 s idle timeout means the connection is dropped once
+    // polling stops, so a closed panel costs nothing. Still its own short-timeout
+    // pool rather than the app's `getPool()` singleton (30 s connect timeout), so a
+    // down Dolphin server can't stall the poll.
+    if (!dolphinPingPool) {
+      const pool = new sql.ConnectionPool({
+        server: db.server,
+        database: db.database,
+        user: db.authentication.options.userName,
+        password: db.authentication.options.password,
+        options: {
+          instanceName: db.options.instanceName,
+          encrypt: false,
+          trustServerCertificate: true,
+          useUTC: false,
+        },
+        connectionTimeout: 5000,
+        requestTimeout: 5000,
+        pool: { max: 1, min: 0, idleTimeoutMillis: 30_000 },
+      });
+      pool.on('error', () => {}); // pool-level errors are reported through the query result
+      dolphinPingPool = pool;
+      resourceManager.register('sync-status-dolphin-ping-pool', pool, async (p) => {
+        await p.close().catch(() => {});
+      });
+    }
+    // `connect()` resolves immediately once the pool is already connected.
+    if (!dolphinPingPool.connected && !dolphinPingPool.connecting) {
+      await dolphinPingPool.connect();
+    }
+    await dolphinPingPool.request().query('SELECT 1');
     return { reachable: true, latencyMs: Date.now() - start, error: null };
   } catch (e) {
+    // A failed connect leaves the pool unusable; drop it so the next poll rebuilds.
+    if (dolphinPingPool && !dolphinPingPool.connected) {
+      const dead = dolphinPingPool;
+      dolphinPingPool = null;
+      resourceManager.unregister('sync-status-dolphin-ping-pool');
+      await dead.close().catch(() => {});
+    }
     return { reachable: false, latencyMs: Date.now() - start, error: (e as Error).message };
-  } finally {
-    if (cp) await cp.close().catch(() => {});
   }
 }
 
@@ -239,7 +289,7 @@ async function readSinkStatus(
  * GET /api/sync/supabase-status
  */
 router.get(
-  '/api/sync/supabase-status',
+  '/supabase-status',
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const configured = !!process.env.SUPABASE_FAILOVER_DB_URL;
@@ -294,7 +344,7 @@ router.get(
       });
     } catch (error) {
       log.error('Supabase status error', { error: (error as Error).message });
-      res.status(500).json({ success: false, error: (error as Error).message });
+      ErrorResponses.internalError(res, 'Failed to read Supabase sink status', error as Error);
     }
   }
 );
@@ -309,7 +359,7 @@ router.get(
  * GET /api/sync/dolphin-status
  */
 router.get(
-  '/api/sync/dolphin-status',
+  '/dolphin-status',
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const configured = !!config.database?.server;
@@ -340,7 +390,7 @@ router.get(
       });
     } catch (error) {
       log.error('Dolphin status error', { error: (error as Error).message });
-      res.status(500).json({ success: false, error: (error as Error).message });
+      ErrorResponses.internalError(res, 'Failed to read Dolphin sink status', error as Error);
     }
   }
 );

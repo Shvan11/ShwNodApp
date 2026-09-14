@@ -10,7 +10,8 @@
  * shared/contracts/portal-activity.contract.ts.
  */
 import { Router, type Request, type Response } from 'express';
-import { authenticate } from '../../middleware/auth.js';
+import { authenticate, authorize } from '../../middleware/auth.js';
+import { ALL_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import { sendData, ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
@@ -50,6 +51,9 @@ router.get(
 router.patch(
   '/portal-activity/read',
   authenticate,
+  // The header bell is visible to every signed-in staff member, so the write
+  // that clears it is ALL_ROLES — stated, rather than left as the absence of a line.
+  authorize(ALL_ROLES),
   validate({ body: portalActivityContract.markActivityRead.body }),
   async (
     req: Request<Record<string, never>, unknown, portalActivityContract.MarkActivityReadBody>,
@@ -69,6 +73,7 @@ router.patch(
 router.patch(
   '/portal-activity/read-all',
   authenticate,
+  authorize(ALL_ROLES),
   async (_req: Request, res: Response): Promise<void> => {
     try {
       const updated = await markAllActivityRead();

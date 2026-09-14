@@ -1,7 +1,7 @@
 import { useState, useEffect, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import { postJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
 import { emailConfigQuery } from '@/query/queries';
 import Modal from './Modal';
@@ -126,11 +126,11 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
     const testConnection = async () => {
         setIsTesting(true);
         try {
-            // Raw read (excluded from contracts): /api/email/test returns a raw top-level
+            // Raw (excluded from contracts): /api/email/test returns a raw top-level
             // { success, message?, error? } at 200 (semantic-success, NOT the envelope) —
             // see docs/shared-contract-progress.md. Left unguarded by design.
-            // eslint-disable-next-line no-restricted-syntax -- raw semantic-success body, not the envelope
-            const data = await fetchJSON<{ success?: boolean; message?: string; error?: string }>('/api/email/test');
+            // It is a POST because it opens an outbound SMTP connection.
+            const data = await postJSON<{ success?: boolean; message?: string; error?: string }>('/api/email/test', {});
 
             if (data.success) {
                 showModal('Success', 'Email connection test successful! Configuration is valid.', 'success');

@@ -21,6 +21,7 @@
  * `TestSendBody` interfaces are dropped for the `z.infer` exports below.
  */
 import { z } from 'zod';
+import { optionalDateString } from '../validation.js';
 
 // GET /api/email/config → { config } (masked config object, dynamic shape).
 // Intentionally loose: EmailConfigService sanitizes and returns a dynamic SMTP config
@@ -59,5 +60,8 @@ export const testSend = {
 export type TestSendBody = z.infer<typeof testSend.body>;
 
 // GET /api/email/send-appointments?date= — type-only (handler reads `date` directly).
-export const sendAppointmentsQuery = z.object({ date: z.string().optional() });
+// POST /api/email/send-appointments?date= — now VALIDATED (it was type-only). The
+// handler keeps its own "Date parameter is required" 400 (hence `optionalDateString`,
+// which admits absent/''), but an array or a non-calendar date now stops here.
+export const sendAppointmentsQuery = z.object({ date: optionalDateString });
 export type SendAppointmentsQuery = z.infer<typeof sendAppointmentsQuery>;

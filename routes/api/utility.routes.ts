@@ -2,7 +2,7 @@
  * Utility Routes Module
  *
  * This module contains miscellaneous utility endpoints for the API:
- * - /sendtwilio: Send SMS reminders via Twilio
+ * - /sendtwilio: Send SMS reminders via Twilio (POST — it is a mutation)
  * - /checktwilio: Check SMS delivery status
  * - /google: Fetch Google contacts via OAuth
  * - /convert-path: Convert web paths to full file system paths
@@ -18,28 +18,33 @@ import { workingFilePath } from '../../services/files/clinic-paths.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
 import * as utility from '../../shared/contracts/utility.contract.js';
+import { validate } from '../../middleware/validate.js';
+import { authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 
 const router = Router();
 
-// Request query types are contracted in shared/contracts/utility.contract.ts
-// (handlers keep their own required-param checks + plain-text/sendData responses).
+// Request query types are contracted in shared/contracts/utility.contract.ts and
+// now VALIDATED at the boundary on every route in this file — a repeated query key
+// (`?date=a&date=b`) arrives from Express as an array, which the handler generics
+// claimed was a `string` and passed on to the SMS/contacts layer unchecked.
+// The handlers keep their own required-param checks + plain-text/sendData responses.
 type DateQuery = utility.TwilioDateQuery;
 type GoogleQuery = utility.GoogleQuery;
 type PathQuery = utility.ConvertPathQuery;
 
 /**
- * GET /sendtwilio
- * Send SMS reminders via Twilio for a specific date
+ * POST /sendtwilio
+ * Send SMS reminders via Twilio for a specific date. Body: { date: 'YYYY-MM-DD' }.
  *
- * Query Parameters:
- * - date: The date for which to send SMS reminders
+ * A MUTATION, and deliberately a POST: as a GET it was exempt from csurf (safe
+ * methods are never challenged) while the session cookie is `sameSite: 'lax'`
+ * and rides along on a top-level cross-site navigation — so one link click sent
+ * the whole day's SMS reminders. `/checktwilio` below is a genuine read and
+ * stays a GET.
  */
-router.get('/sendtwilio', async (req: Request<object, unknown, unknown, DateQuery>, res: Response): Promise<void> => {
-  const dateparam = req.query.date;
-  if (!dateparam) {
-    ErrorResponses.badRequest(res, 'date query parameter is required');
-    return;
-  }
+router.post('/sendtwilio', authorize(CLINICAL_ROLES), validate({ body: utility.sendTwilio.body }), async (req: Request<object, unknown, utility.SendTwilioBody>, res: Response): Promise<void> => {
+  const dateparam = req.body.date;
   try {
     await sms.sendSms(dateparam);
     res.send('SMS sent successfully');
@@ -55,7 +60,7 @@ router.get('/sendtwilio', async (req: Request<object, unknown, unknown, DateQuer
  * Query Parameters:
  * - date: The date for which to check SMS status
  */
-router.get('/checktwilio', async (req: Request<object, unknown, unknown, DateQuery>, res: Response): Promise<void> => {
+router.get('/checktwilio', validate({ query: utility.twilioDate.query }), async (req: Request<object, unknown, unknown, DateQuery>, res: Response): Promise<void> => {
   const dateparam = req.query.date;
   if (!dateparam) {
     ErrorResponses.badRequest(res, 'date query parameter is required');
@@ -79,7 +84,7 @@ router.get('/checktwilio', async (req: Request<object, unknown, unknown, DateQue
  * Returns:
  * - contacts: Array of contacts from Google
  */
-router.get('/google', async (req: Request<object, unknown, unknown, GoogleQuery>, res: Response): Promise<void> => {
+router.get('/google', validate({ query: utility.google.query }), async (req: Request<object, unknown, unknown, GoogleQuery>, res: Response): Promise<void> => {
   try {
     const { source } = req.query;
     if (!source) {
@@ -121,7 +126,7 @@ router.get('/google', async (req: Request<object, unknown, unknown, GoogleQuery>
  * - webPath: The original web path provided
  * - fullPath: The converted full file system path
  */
-router.get('/convert-path', async (req: Request<object, unknown, unknown, PathQuery>, res: Response): Promise<void> => {
+router.get('/convert-path', validate({ query: utility.convertPath.query }), async (req: Request<object, unknown, unknown, PathQuery>, res: Response): Promise<void> => {
   try {
     const webPath = req.query.path;
 

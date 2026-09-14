@@ -9,7 +9,7 @@
  *
  * Two flavors share the table: manual staff-composed rows (auto_event NULL) and
  * system batch events written by `insertBatchAutoAnnouncement` inside
- * aligner-queries.ts#updateBatchStatus (deleted again on UNDO via
+ * aligner-batch-queries.ts#updateBatchStatus (deleted again on UNDO via
  * `deleteBatchAutoAnnouncement` — matched by (auto_event, related_batch_id)).
  *
  * Deletes rely on the local FK CASCADE for receipts; both the announcement and

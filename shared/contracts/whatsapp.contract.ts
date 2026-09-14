@@ -13,6 +13,7 @@
  * `z.infer` exports. See docs/shared-contract-progress.md.
  */
 import { z } from 'zod';
+import { dateString } from '../validation.js';
 
 // POST /api/wa/send-receipt — { workId } (number or numeric string; the handler
 // re-`parseInt`s it). Raw response.
@@ -54,9 +55,17 @@ export type SendMedia2Body = z.infer<typeof sendMedia2.body>;
 export const initialState = { response: z.looseObject({}) } as const;
 export const qr = { response: z.looseObject({}) } as const;
 
-// GET send-by-date endpoints (`?date=`). Type-only — handlers read `date` directly.
-export const sendByDateQuery = z.object({ date: z.string().optional() });
-export type SendByDateQuery = z.infer<typeof sendByDateQuery>;
+// POST /api/wa/send — start the whole-day reminder batch. It was a GET taking
+// `?date=`, which meant csurf never challenged it (safe methods are exempt) while
+// the session cookie is `sameSite: 'lax'` and therefore IS sent on a top-level
+// cross-site navigation: one link click fired a real batch send to every patient
+// booked that day. Now a POST with the date in the BODY, so it crosses the CSRF
+// gate like every other mutation. Response is deliberately raw/un-enveloped (the
+// bespoke whatsapp `apiClient` reads `alreadyInProgress` at the top level).
+export const sendByDate = {
+  body: z.object({ date: dateString }),
+} as const;
+export type SendByDateBody = z.infer<typeof sendByDate.body>;
 
 // POST /api/wa/resend-appointment — { appointmentId }. Re-sends the reminder
 // message for ONE appointment (right-click → "Re-send" on the /send status

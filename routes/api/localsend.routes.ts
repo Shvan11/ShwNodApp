@@ -14,6 +14,8 @@ import config from '../../config/config.js';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import { authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import { localsendService } from '../../services/localsend/index.js';
 import * as localsend from '../../shared/contracts/localsend.contract.js';
 
@@ -40,6 +42,7 @@ router.get(
 // POST /api/localsend/probe — add a device directly by IP (WSL-dev / segmented LAN).
 router.post(
   '/probe',
+  authorize(CLINICAL_ROLES),
   validate({ body: localsend.probe.body }),
   async (req: Request<object, object, localsend.ProbeBody>, res: Response): Promise<void> => {
     if (!config.localsend.enabled) {
@@ -51,6 +54,13 @@ router.post(
       sendData(res, localsend.probe.response, { device });
     } catch (err) {
       log.warn('[LocalSend] probe failed', { ip: req.body.ip, error: (err as Error).message });
+      // Deliberate leak-rule exemption: every throw in
+      // services/localsend/localsend.service.ts is hand-written user copy ('Device not
+      // found — rescan and try again', '<alias> is busy with another transfer'), and its
+      // network failures come through utils/fetch-timeout.ts#describeFetchError, whose
+      // whole purpose is the actionable 'is the workstation on?' message. Suppressing
+      // these would replace real guidance with 'Upload failed'.
+      // eslint-disable-next-line no-restricted-syntax -- see above
       ErrorResponses.badRequest(res, (err as Error).message || 'Could not reach that device');
     }
   }
@@ -59,6 +69,7 @@ router.post(
 // POST /api/localsend/send — start a transfer; returns immediately.
 router.post(
   '/send',
+  authorize(CLINICAL_ROLES),
   validate({ body: localsend.send.body }),
   async (req: Request<object, object, localsend.SendBody>, res: Response): Promise<void> => {
     if (!config.localsend.enabled) {
@@ -72,6 +83,13 @@ router.post(
       sendData(res, localsend.send.response, { transferId });
     } catch (err) {
       log.error('[LocalSend] send failed', { error: (err as Error).message });
+      // Deliberate leak-rule exemption: every throw in
+      // services/localsend/localsend.service.ts is hand-written user copy ('Device not
+      // found — rescan and try again', '<alias> is busy with another transfer'), and its
+      // network failures come through utils/fetch-timeout.ts#describeFetchError, whose
+      // whole purpose is the actionable 'is the workstation on?' message. Suppressing
+      // these would replace real guidance with 'Upload failed'.
+      // eslint-disable-next-line no-restricted-syntax -- see above
       ErrorResponses.badRequest(res, (err as Error).message || 'Failed to start transfer');
     }
   }
@@ -94,6 +112,7 @@ router.get(
 // POST /api/localsend/transfers/:id/cancel — cancel an in-flight transfer.
 router.post(
   '/transfers/:id/cancel',
+  authorize(CLINICAL_ROLES),
   validate({ params: localsend.cancel.params }),
   (req: Request<{ id: string }>, res: Response): void => {
     const ok = localsendService.cancel(req.params.id);

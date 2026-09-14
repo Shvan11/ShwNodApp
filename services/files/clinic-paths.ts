@@ -11,6 +11,8 @@
  * grep (the working gallery used to sit at `working/` on the share root before
  * it moved under this common parent).
  */
+import path from 'path';
+
 import config from '../../config/config.js';
 import { createPathResolver } from '../../utils/path-resolver.js';
 
@@ -107,4 +109,53 @@ export function workingFileNameVariants(
  */
 export function workingFilePath(name: string): string {
   return clinicPath(`working/${name}`);
+}
+
+/**
+ * Containment guard for a caller-supplied absolute path: `true` only when `abs`
+ * resolves inside the clinic volume (`clinic1/`).
+ *
+ * Needed by the few endpoints that accept a whole path from the client rather
+ * than a name/id they resolve themselves (`POST /api/wa/sendmedia2`). Comparison
+ * is separator- and case-insensitive because production is Windows (NTFS is
+ * case-insensitive and the same path arrives with either slash) while dev is
+ * WSL — a byte-comparison would reject legitimate paths on one and, worse,
+ * accept escapes on the other.
+ */
+export function isUnderClinicRoot(abs: string): boolean {
+  // Unify separators, collapse `..`/`.` segments, then compare case-insensitively.
+  // Normalizing BEFORE the prefix test is the whole guard: without it
+  // `C:\\clinic1\\..\\ShwNodApp\\.env` starts with the root string and passes.
+  const norm = (p: string) =>
+    path.posix.normalize(p.replace(/\\/g, '/')).replace(/\/+$/, '').toLowerCase();
+  const root = norm(clinicRoot());
+  const target = norm(abs);
+  return target === root || target.startsWith(`${root}/`);
+}
+
+/**
+ * Convert a `VideosPath`-style DB path to one this process can open.
+ *
+ * `VideosPath` stores a LOCAL Windows path (`C:\clinic1\ovideos\…`) because
+ * videos stream *through* the server rather than being opened client-side, but
+ * older rows can still carry the LAN UNC spelling (`\\CLINIC\Clinic1\…`). On the
+ * WSL dev box both have to become `/mnt/c/clinic1/…`; on Windows the path is
+ * already correct and is returned untouched.
+ *
+ * Lives here, not in either video router: it was copy-pasted verbatim between
+ * `routes/api/video.routes.ts` and `routes/public/video.routes.ts`, whose own
+ * comment pointed at the other copy instead of sharing it.
+ */
+export function normalizeVideoDbPath(dbPath: string): string {
+  // Windows (production) needs no conversion at all.
+  if (process.platform !== 'linux') return dbPath;
+
+  let normalized = dbPath;
+  if (normalized.startsWith('\\\\CLINIC\\Clinic1')) {
+    normalized = normalized.replace('\\\\CLINIC\\Clinic1', '/mnt/c/clinic1');
+  } else if (/^[A-Za-z]:\\/.test(normalized)) {
+    const driveLetter = normalized.charAt(0).toLowerCase();
+    normalized = normalized.replace(/^[A-Za-z]:\\/, `/mnt/${driveLetter}/`);
+  }
+  return normalized.replace(/\\/g, '/');
 }

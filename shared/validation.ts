@@ -9,17 +9,19 @@
  *
  * LOCATION: this file lives in `shared/` (project root) so it is importable by
  * BOTH the Express routes (relative `.js`) and the React bundle (`@shared`
- * alias). `middleware/validation-schemas.ts` is now a re-export barrel onto this
- * file — see docs/shared-contract-progress.md.
+ * alias). Every route imports it directly; the old
+ * `middleware/validation-schemas.ts` re-export barrel had no importers left and
+ * has been deleted.
  */
 import { z } from 'zod';
 
-/** Structural `YYYY-MM-DD` (right digit ranges, but allows e.g. Feb 30). */
-export const YMD_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+/** Structural `YYYY-MM-DD` (right digit ranges, but allows e.g. Feb 30).
+ *  Implementation detail of `dateString` below — not exported. */
+const YMD_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
 /** True iff `s` is a real calendar date — round-trips through a LOCAL Date (the
  *  app stores wall-clock dates, never UTC). Rejects 2024-02-30, 2025-04-31, etc. */
-export function isRealYmd(s: string): boolean {
+function isRealYmd(s: string): boolean {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
   if (!m) return false;
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
@@ -58,8 +60,58 @@ export const idParams = (name: string) => z.object({ [name]: numericParam });
  */
 export const intId = z.coerce.number().int().positive();
 
-/** A non-negative integer (ids that may legitimately be 0, counts, codes). */
-export const nonNegInt = z.coerce.number().int().nonnegative();
+/**
+ * Minimum password length, and the schema that enforces it. The SSoT for every
+ * password rule in the app — the user-management contracts, `POST
+ * /api/auth/change-password`, the two React forms and the emergency reset script
+ * (which runs under `tsx`, so it imports this directly) all read it, so the floor
+ * moves in one place.
+ *
+ * 8, not the historical 6: this database holds PHI. Existing passwords are
+ * unaffected — the floor is only checked when one is set or changed. No
+ * complexity rules on purpose; they push people toward predictable
+ * substitutions without adding real entropy.
+ */
+export const MIN_PASSWORD_LENGTH = 8;
+
+export const passwordString = z
+  .string()
+  .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+
+/**
+ * A MONEY amount crossing a request boundary.
+ *
+ * Every money column in the schema is `integer` — `expenses.amount`,
+ * `invoices.amount_paid`/`usd_received`/`iqd_received`/`change`,
+ * `works.total_required`/`discount`, `work_items.item_cost`,
+ * `patients.estimated_cost`, `sms.exchange_rate` and the whole `stand_*` price
+ * set. That is a deliberate IQD-first choice (the dinar has no minor unit in
+ * daily use), but the contracts used to accept ANY number, so the two halves
+ * disagreed and a fractional amount was resolved differently per route: the
+ * expense + Stand-restock paths `parseInt`ed it and silently stored `12` for
+ * `12.99`, while `PaymentService` passed `12.5` through to an `integer` column
+ * and PG answered `22P02` → a 500. Rejecting it at the boundary is the one
+ * place both halves can agree, and it is visible to the person typing it.
+ *
+ * NOTE: the two money columns that are genuinely `numeric` —
+ * `estimated_cost_presets.amount` (18,2) and `aligner_sets.set_cost` (10,2) —
+ * legitimately take decimals and must NOT use this.
+ *
+ * SIGN: non-negative is the DEFAULT, deliberately. The fractional guard above
+ * originally shipped without one, and 6 of the 12 sites using it did not add a
+ * sign check of their own — so `POST /api/addInvoice` accepted
+ * `amountPaid: -100000`, which does not merely record a wrong number: a negative
+ * invoice INCREASES the work's remaining balance and skews every report that sums
+ * `invoices.amount_paid`, the doctor-commission figures included. No money field
+ * in the schema legitimately takes a negative (a refund is not modeled as one),
+ * so the safe answer is the default rather than something each site must remember.
+ * Add `.positive()` on top wherever 0 is also meaningless (a payment, a fee);
+ * `.nonnegative()` is already implied and needs no repeating.
+ */
+export const moneyInt = z.coerce
+  .number()
+  .int('Amount must be a whole number — fractional amounts are not supported')
+  .nonnegative('Amount cannot be negative');
 
 /**
  * Optional numeric QUERY param that tolerates the empty string. A query like

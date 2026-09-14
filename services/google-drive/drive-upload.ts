@@ -7,6 +7,7 @@ import config from '../../config/config.js';
 import driveClient from './google-drive-client.js';
 import { log } from '../../utils/logger.js';
 import { isInvalidGrantError, handleInvalidGrant } from './oauth.js';
+import { sanitizeFilename, sanitizeFolderName } from './sanitize.js';
 
 // ===========================================
 // TYPES
@@ -87,7 +88,7 @@ class DriveUploadService {
       const rootFolderId = await this.getRootFolder();
 
       // Create patient folder structure
-      const patientFolderName = this.sanitizeFolderName(
+      const patientFolderName = sanitizeFolderName(
         `Patient_${setInfo.patientId}_${setInfo.patientName}_Work_${setInfo.workId}`
       );
       const patientFolderId = await driveClient.findOrCreateFolder(
@@ -195,40 +196,8 @@ class DriveUploadService {
    * @returns Generated filename
    */
   generateFilename(setInfo: SetInfo, timestamp: string): string {
-    const sanitizedPatientName = this.sanitizeFilename(setInfo.patientName);
+    const sanitizedPatientName = sanitizeFilename(setInfo.patientName);
     return `${setInfo.patientId}_${sanitizedPatientName}_Set${setInfo.setSequence}_${timestamp}.pdf`;
-  }
-
-  /**
-   * Sanitize a filename: strip anything that could break a path or a Drive query, KEEP letters and
-   * digits in any script.
-   *
-   * The class was `[^a-zA-Z0-9_-]`, which is every non-ASCII character — and the caller prefers
-   * `patients.patient_name`, the ARABIC name (AlignerPdfService#uploadPdfForSet). So the default
-   * path erased the whole name: every Arabic-named patient produced `123___Set1_….pdf` inside
-   * `Patient_123___Work_45/`. Unique, because the ids are still there, but unbrowsable — which is
-   * the only reason these files are in Drive rather than on the clinic disk.
-   *
-   * `\p{L}` / `\p{N}` (unicode-aware) keep Arabic, Kurdish and Latin letters alike while still
-   * removing `/ \ : * ? " < > |`, control characters, and the `'` that would break a Drive query.
-   */
-  sanitizeFilename(name: string): string {
-    return name
-      .replace(/[^\p{L}\p{N}_-]/gu, '_')
-      .replace(/_+/g, '_')
-      .substring(0, 50);
-  }
-
-  /**
-   * Sanitize a folder name — same unicode-aware class as sanitizeFilename, with spaces collapsed to
-   * underscores rather than dropped.
-   */
-  sanitizeFolderName(name: string): string {
-    return name
-      .replace(/[^\p{L}\p{N}_\-\s]/gu, '_')
-      .replace(/\s+/g, '_')
-      .replace(/_+/g, '_')
-      .substring(0, 100);
   }
 
   /**

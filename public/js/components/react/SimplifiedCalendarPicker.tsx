@@ -201,7 +201,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate = new Date() }
     };
 
     const handleJumpToDays = () => {
-        const days = parseInt(daysAhead);
+        const days = parseInt(daysAhead, 10);
         if (!isNaN(days) && days >= 0) {
             const targetDate = new Date();
             targetDate.setDate(targetDate.getDate() + days);

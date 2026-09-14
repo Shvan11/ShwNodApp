@@ -813,6 +813,21 @@ export const revenueBreakdownQuery = (startDate: string, endDate: string) =>
     enabled: !!startDate && !!endDate,
   });
 
+/**
+ * GET /api/statistics/doctor-payments/:doctorId?startDate=&endDate= — the individual
+ * payments behind one doctor's revenue/commission figure for a period.
+ */
+export const doctorPaymentsQuery = (doctorId: number, startDate: string, endDate: string) =>
+  queryOptions({
+    queryKey: qk.reports.doctorPayments(doctorId, startDate, endDate),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof reportsContract.doctorPayments.response>>(
+        `/api/statistics/doctor-payments/${doctorId}?startDate=${startDate}&endDate=${endDate}`,
+        { signal, schema: reportsContract.doctorPayments.response }
+      ),
+    enabled: doctorId > 0 && !!startDate && !!endDate,
+  });
+
 // ---------------------------------------------------------------------------
 // Admin lookup tables — the generic table editor (LookupEditor/HolidayEditor).
 // ---------------------------------------------------------------------------

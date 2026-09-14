@@ -11,6 +11,7 @@
  * doesn't use their response — calls loadVideos() after).
  */
 import { z } from 'zod';
+import { numericParam } from '../validation.js';
 
 // ROW SCHEMAS (Phase 3, Group 4)
 const videoCategoryRow = z.looseObject({
@@ -91,5 +92,8 @@ export const remove = {
 } as const;
 
 // `:id` path param shared by the video routes (staff + public). Type-only.
-export const videoIdParams = z.object({ id: z.string() });
+// `:id` on every /api/videos/:id* route. `numericParam`, not a bare string: each
+// handler `parseInt`s it, and an un-guarded junk id used to reach the query layer.
+// Kept a validated STRING so the handlers' own parseInt is unchanged.
+export const videoIdParams = z.object({ id: numericParam });
 export type VideoIdParams = z.infer<typeof videoIdParams>;

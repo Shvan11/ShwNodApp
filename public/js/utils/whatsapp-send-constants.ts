@@ -37,7 +37,10 @@ export const API_ENDPOINTS = {
   MESSAGE_RESET: (date: string): string => `/api/messaging/reset/${date}`,
   MESSAGE_STATUS: (date: string): string => `/api/messaging/status/${date}`,
   MESSAGE_TEXT: (appointmentId: number): string => `/api/messaging/message-text/${appointmentId}`,
-  WA_SEND: (date: string): string => `/api/wa/send?date=${date}`,
+  // POST — the date rides in the body. It was a GET, which csurf exempts while
+  // the session cookie is sameSite: 'lax', so one cross-site link click fired the
+  // whole day's reminder batch.
+  WA_SEND: '/api/wa/send',
   WA_RESEND: '/api/wa/resend-appointment',
   WA_GROUP_SETTINGS: '/api/wa/group-settings',
   SEND_EMAIL: (date: string): string => `/api/email/send-appointments?date=${date}`,

@@ -6,11 +6,10 @@
  */
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
-import { sql } from 'kysely';
-import { getKysely } from '../services/database/kysely.js';
 import { getTimePoints } from '../services/database/queries/timepoint-queries.js';
 import { getVisitsSummary } from '../services/database/queries/visit-queries.js';
 import { getPayments } from '../services/database/queries/payment-queries.js';
+import { getNextAppointmentForPatient } from '../services/database/queries/appointment-queries.js';
 import { authenticatePatient, portalLoginLimiter } from '../middleware/patientAuth.js';
 import { validate } from '../middleware/validate.js';
 import {
@@ -309,33 +308,14 @@ router.get(
 // --------------------------------------------------------------------------
 // GET /api/portal/appointments/next
 // --------------------------------------------------------------------------
-interface NextAppointmentRow {
-  appointment_id: number;
-  app_date: string;
-  app_detail: string | null;
-  DrName: string | null;
-}
-
 router.get(
   '/appointments/next',
   authenticatePatient,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const pid = req.session.patientId!;
-      const db = getKysely();
-      const { rows } = await sql<NextAppointmentRow>`
-        SELECT
-           a."appointment_id",
-           to_char(a."app_date", 'YYYY-MM-DD"T"HH24:MI:SS') AS "app_date",
-           a."app_detail",
-           e."employee_name" AS "DrName"
-         FROM "appointments" a
-         LEFT JOIN "employees" e ON a."dr_id" = e."id"
-         WHERE a."person_id" = ${pid}
-           AND a."app_date" >= CURRENT_DATE
-         ORDER BY a."app_date" ASC
-         LIMIT 1`.execute(db);
-      res.json({ success: true, appointment: rows[0] ?? null });
+      const appointment = await getNextAppointmentForPatient(pid);
+      res.json({ success: true, appointment: appointment ?? null });
     } catch (error) {
       log.error('Portal /appointments/next error', { error: (error as Error).message });
       res.status(500).json({ success: false, error: 'Failed to load next appointment' });

@@ -15,7 +15,7 @@
  * `ErrorResponses.*`.
  */
 import { z } from 'zod';
-import { timestampString } from '../validation.js';
+import { passwordString, timestampString } from '../validation.js';
 import { ASSIGNABLE_ROLES } from '../auth/roles.js';
 
 // Numeric `:userId` path param (asserts digits without coercing — keeps it a string).
@@ -44,7 +44,7 @@ export const usersList = {
 export const createUser = {
   body: z.object({
     username: z.string().min(1, 'Username and password are required'),
-    password: z.string().min(6, 'Password must be at least 6 characters'),
+    password: passwordString,
     fullName: z.string().optional(),
     role: z.enum(ASSIGNABLE_ROLES, {
       message: 'Invalid role.',
@@ -58,7 +58,7 @@ export type CreateUserBody = z.infer<typeof createUser.body>;
 export const resetPassword = {
   params: userIdParams,
   body: z.object({
-    newPassword: z.string().min(6, 'Password must be at least 6 characters'),
+    newPassword: passwordString,
   }),
   response: z.object({ message: z.string() }),
 } as const;

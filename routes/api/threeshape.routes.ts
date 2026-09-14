@@ -11,9 +11,11 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
+import { authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import { getPatientById } from '../../services/database/queries/patient-queries.js';
-import { PhoneFormatter } from '../../utils/phoneFormatter.js';
+import { PhoneFormatter } from '../../utils/phone-formatter.js';
 import * as threeShapeClient from '../../services/threeshape/client.js';
 import { sendThreeShapeError } from '../../services/threeshape/route-helpers.js';
 import * as threeshape from '../../shared/contracts/threeshape.contract.js';
@@ -42,6 +44,8 @@ function deriveName(p: {
 // start a scan workflow on the scanner workstation.
 router.post(
   '/threeshape/patients/:personId/initiate-workflow',
+  // Pushes a patient to the scanner workstation and starts a scan — clinical.
+  authorize(CLINICAL_ROLES),
   validate({ params: threeshape.initiateWorkflow.params }),
   async (req: Request<threeshape.InitiateWorkflowParams>, res: Response): Promise<void> => {
     const personId = parseInt(req.params.personId, 10);

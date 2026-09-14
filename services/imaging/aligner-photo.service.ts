@@ -132,12 +132,25 @@ export async function listPhotosForSet(setId: number): Promise<AlignerPhoto[]> {
 }
 
 /**
+ * A photo key that doesn't belong to the set it was requested under.
+ *
+ * Its own class so the route can answer 403 instead of reporting the guard as a
+ * 500 "Failed to delete photo" — the check is a correct refusal, not a fault.
+ */
+export class PhotoOwnershipError extends Error {
+  constructor(message = 'Photo does not belong to this aligner set.') {
+    super(message);
+    this.name = 'PhotoOwnershipError';
+  }
+}
+
+/**
  * Delete a case photo belonging to an aligner set.
  */
 export async function deletePhotoForSet(setId: number, key: string): Promise<void> {
   const expectedPrefix = `sets/${setId}/`;
   if (!key.startsWith(expectedPrefix)) {
-    throw new Error('Forbidden: Photo does not belong to this aligner set.');
+    throw new PhotoOwnershipError();
   }
 
   const client = getS3Client();

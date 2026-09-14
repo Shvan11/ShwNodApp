@@ -10,13 +10,21 @@ import { Router, type Request, type Response } from 'express';
 import HealthCheck from '../../services/monitoring/HealthCheck.js';
 import { ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
+import { authorize } from '../../middleware/auth.js';
+import { ADMIN_ROLES } from '../../shared/auth/roles.js';
 
 const router = Router();
+
+// Paths are relative to the router's OWN mount (`/api/health`, routes/api/index.ts).
+// They used to re-declare the `/health` prefix here as well, so the real URLs were
+// `/api/health/health…` — unreachable at their documented paths and called by
+// nothing. Do not reintroduce the prefix.
+const adminOnly = authorize(ADMIN_ROLES);
 
 /**
  * Basic health status endpoint
  */
-router.get('/health', (_req: Request, res: Response): void => {
+router.get('/', (_req: Request, res: Response): void => {
   try {
     const health = HealthCheck.getHealthStatus();
     const statusCode = health.overall ? 200 : 503;
@@ -34,7 +42,7 @@ router.get('/health', (_req: Request, res: Response): void => {
 /**
  * Detailed health report endpoint
  */
-router.get('/health/detailed', (_req: Request, res: Response): void => {
+router.get('/detailed', (_req: Request, res: Response): void => {
   try {
     const report = HealthCheck.getDetailedReport();
     res.json(report);
@@ -47,7 +55,7 @@ router.get('/health/detailed', (_req: Request, res: Response): void => {
 /**
  * Start health monitoring
  */
-router.post('/health/start', (_req: Request, res: Response): void => {
+router.post('/start', adminOnly, (_req: Request, res: Response): void => {
   try {
     HealthCheck.start();
     res.json({
@@ -63,7 +71,7 @@ router.post('/health/start', (_req: Request, res: Response): void => {
 /**
  * Stop health monitoring
  */
-router.post('/health/stop', (_req: Request, res: Response): void => {
+router.post('/stop', adminOnly, (_req: Request, res: Response): void => {
   try {
     HealthCheck.stop();
     res.json({

@@ -45,13 +45,25 @@ import { log } from '../../utils/logger.js';
 
 const router = Router();
 
+// Every /stand/* READ is FINANCE_ROLES (admin + front desk), matching the writes
+// below. The Stand is the clinic's mini-pharmacy till: its reads carry cost
+// prices, margins, cashier ids and the sales ledger, which is the same class of
+// money data `/api/statistics` gates. Clinical staff therefore don't get the
+// Stand dashboard card either (public/js/routes/Dashboard.tsx filters it the way
+// it already filters Statistics), so nobody lands on an access-denied page.
+// Per-route rather than a pathless `router.use`: this router is mounted at `/`
+// inside the api router, so a pathless gate would apply to every `/api/*`
+// request passing through it (the 2026-07-11 admin-403 incident).
+
 // Request/response shapes (the inline `stand*BodySchema` boundary schemas + the
 // `idParams` param checks) now live in shared/contracts/stand.contract.ts — shared
 // with the client. Item creates still REST-SPREAD `...req.body` into addStandItem;
 // the contract bodies stay `looseObject` so over-posting passes through to the
 // query/service (which map EXPLICIT named columns). POST /stand/sales keeps its
-// service-side cart validation — validateAndCreateSale IS the boundary — so the
-// contract pins only its response.
+// service-side CART validation — validateAndCreateSale owns stock/pricing rules —
+// but its body SHAPE is contracted like every other write: the four writes that
+// used to forward a raw `req.body` (category update, item update, sale create,
+// sale void) now each carry a `body` schema.
 
 
 // ============================================================================
@@ -71,7 +83,7 @@ function handleStandError(res: Response, error: unknown, fallbackMessage: string
 // DASHBOARD
 // ============================================================================
 
-router.get('/stand/dashboard', async (_req: Request, res: Response): Promise<void> => {
+router.get('/stand/dashboard', authorize(FINANCE_ROLES), async (_req: Request, res: Response): Promise<void> => {
   try {
     const kpis = await getStandDashboardKPIs();
     sendData(res, standContract.dashboard.response, kpis);
@@ -84,7 +96,7 @@ router.get('/stand/dashboard', async (_req: Request, res: Response): Promise<voi
 // CATEGORIES
 // ============================================================================
 
-router.get('/stand/categories', async (_req: Request, res: Response): Promise<void> => {
+router.get('/stand/categories', authorize(FINANCE_ROLES), async (_req: Request, res: Response): Promise<void> => {
   try {
     const categories = await getStandCategories();
     sendData(res, standContract.categories.response, categories);
@@ -117,10 +129,16 @@ router.put(
   '/stand/categories/:id',
   authenticate,
   authorize(ADMIN_ROLES),
-  validate({ params: standContract.updateCategory.params }),
-  async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+  validate({
+    params: standContract.updateCategory.params,
+    body: standContract.updateCategory.body,
+  }),
+  async (
+    req: Request<{ id: string }, unknown, standContract.UpdateCategoryBody>,
+    res: Response
+  ): Promise<void> => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid category id'); return; }
       await updateStandCategory(id, req.body);
       sendSuccess(res, null);
@@ -137,7 +155,7 @@ router.delete(
   validate({ params: standContract.deleteCategory.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid category id'); return; }
       await deactivateStandCategory(id);
       sendSuccess(res, null);
@@ -151,7 +169,7 @@ router.delete(
 // ITEMS — specific routes BEFORE parameterized :id
 // ============================================================================
 
-router.get('/stand/items/low-stock', async (_req: Request, res: Response): Promise<void> => {
+router.get('/stand/items/low-stock', authorize(FINANCE_ROLES), async (_req: Request, res: Response): Promise<void> => {
   try {
     const items = await getLowStockItems();
     sendData(res, standContract.itemsLowStock.response, items);
@@ -160,15 +178,23 @@ router.get('/stand/items/low-stock', async (_req: Request, res: Response): Promi
   }
 });
 
-router.get('/stand/items/expiring', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const days = parseInt(req.query.days as string) || 30;
-    const items = await getExpiringItems(days);
-    sendData(res, standContract.itemsExpiring.response, items);
-  } catch (error) {
-    handleStandError(res, error, 'Failed to fetch expiring items');
+router.get(
+  '/stand/items/expiring',
+  authorize(FINANCE_ROLES),
+  validate({ query: standContract.itemsExpiring.query }),
+  async (
+    req: Request<unknown, unknown, unknown, standContract.ItemsExpiringQuery>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const days = req.query.days ?? 30;
+      const items = await getExpiringItems(days);
+      sendData(res, standContract.itemsExpiring.response, items);
+    } catch (error) {
+      handleStandError(res, error, 'Failed to fetch expiring items');
+    }
   }
-});
+);
 
 router.post(
   '/stand/items/scan-vision',
@@ -285,7 +311,7 @@ For item_name, combine the brand name and product name as shown on packaging.`;
   }
 );
 
-router.get('/stand/items/barcode/:barcode', async (req: Request<{ barcode: string }>, res: Response): Promise<void> => {
+router.get('/stand/items/barcode/:barcode', authorize(FINANCE_ROLES), async (req: Request<{ barcode: string }>, res: Response): Promise<void> => {
   try {
     const item = await getStandItemByBarcode(req.params.barcode);
     if (!item) { ErrorResponses.notFound(res, 'Item'); return; }
@@ -297,15 +323,17 @@ router.get('/stand/items/barcode/:barcode', async (req: Request<{ barcode: strin
 
 router.get(
   '/stand/items',
+  authorize(FINANCE_ROLES),
+  validate({ query: standContract.items.query }),
   async (
-    req: Request<unknown, unknown, unknown, { search?: string; categoryId?: string; stockStatus?: string; includeInactive?: string }>,
+    req: Request<unknown, unknown, unknown, standContract.ItemsQuery>,
     res: Response
   ): Promise<void> => {
     try {
       const items = await getStandItems({
         search: req.query.search,
-        categoryId: req.query.categoryId ? parseInt(req.query.categoryId) : undefined,
-        stockStatus: req.query.stockStatus as 'in-stock' | 'low-stock' | 'out-of-stock' | undefined,
+        categoryId: req.query.categoryId,
+        stockStatus: req.query.stockStatus,
         includeInactive: req.query.includeInactive === 'true',
       });
       sendData(res, standContract.items.response, items);
@@ -315,9 +343,9 @@ router.get(
   }
 );
 
-router.get('/stand/items/:id', async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+router.get('/stand/items/:id', authorize(FINANCE_ROLES), async (req: Request<{ id: string }>, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
     if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
     const item = await getStandItemById(id);
     if (!item) { ErrorResponses.notFound(res, 'Item'); return; }
@@ -351,10 +379,16 @@ router.put(
   '/stand/items/:id',
   authenticate,
   authorize(FINANCE_ROLES),
-  validate({ params: standContract.updateItem.params }),
-  async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+  validate({
+    params: standContract.updateItem.params,
+    body: standContract.updateItem.body,
+  }),
+  async (
+    req: Request<{ id: string }, unknown, standContract.UpdateItemBody>,
+    res: Response
+  ): Promise<void> => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
       await updateStandItem(id, req.body);
       sendSuccess(res, null);
@@ -371,7 +405,7 @@ router.delete(
   validate({ params: standContract.deleteItem.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
       await softDeleteStandItem(id);
       sendSuccess(res, null);
@@ -390,7 +424,7 @@ router.post(
   // numbers; the kept `!quantity` guard still rejects a zero-unit restock.
   async (req: Request<{ id: string }, unknown, standContract.RestockBody>, res: Response): Promise<void> => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
       const { quantity, unitCost } = req.body;
       if (!quantity) {
@@ -398,7 +432,10 @@ router.post(
         return;
       }
       const userId = req.session?.userId ?? null;
-      await validateAndRestockItem(id, parseInt(String(quantity)), parseInt(String(unitCost)), userId);
+      // `quantity` and `unitCost` are already numbers (contract-coerced; `unitCost`
+      // through `moneyInt`). The `parseInt(String(...), 10)` that stood here truncated a
+      // fractional restock cost into `stand_stock_movements.unit_cost` unnoticed.
+      await validateAndRestockItem(id, quantity, unitCost, userId);
       sendSuccess(res, null);
     } catch (error) {
       handleStandError(res, error, 'Failed to restock item');
@@ -415,7 +452,7 @@ router.post(
   // (min 1); `delta === undefined` is dropped (TS2367 against the required number).
   async (req: Request<{ id: string }, unknown, standContract.AdjustBody>, res: Response): Promise<void> => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
       const { delta, reason } = req.body;
       if (!reason) {
@@ -423,7 +460,7 @@ router.post(
         return;
       }
       const userId = req.session?.userId ?? null;
-      await validateAndAdjustStock(id, parseInt(String(delta)), reason, userId);
+      await validateAndAdjustStock(id, parseInt(String(delta), 10), reason, userId);
       sendSuccess(res, null);
     } catch (error) {
       handleStandError(res, error, 'Failed to adjust stock');
@@ -431,9 +468,9 @@ router.post(
   }
 );
 
-router.get('/stand/items/:id/movements', async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+router.get('/stand/items/:id/movements', authorize(FINANCE_ROLES), async (req: Request<{ id: string }>, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
     if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid item id'); return; }
     const movements = await getStockMovements(id, {
       startDate: req.query.startDate as string | undefined,
@@ -454,7 +491,11 @@ router.post(
   '/stand/sales',
   authenticate,
   authorize(FINANCE_ROLES),
-  async (req: Request, res: Response): Promise<void> => {
+  validate({ body: standContract.createSale.body }),
+  async (
+    req: Request<unknown, unknown, standContract.CreateSaleBody>,
+    res: Response
+  ): Promise<void> => {
     try {
       const cashierId = req.session?.userId ?? null;
       const result = await validateAndCreateSale({ ...req.body, cashierId });
@@ -467,18 +508,20 @@ router.post(
 
 router.get(
   '/stand/sales',
+  authorize(FINANCE_ROLES),
+  validate({ query: standContract.sales.query }),
   async (
-    req: Request<unknown, unknown, unknown, { startDate?: string; endDate?: string; cashierId?: string; personId?: string; limit?: string; offset?: string }>,
+    req: Request<unknown, unknown, unknown, standContract.SalesQuery>,
     res: Response
   ): Promise<void> => {
     try {
       const sales = await getStandSales({
-        startDate: req.query.startDate,
-        endDate: req.query.endDate,
-        cashierId: req.query.cashierId ? parseInt(req.query.cashierId) : undefined,
-        personId: req.query.personId ? parseInt(req.query.personId) : undefined,
-        limit: req.query.limit ? parseInt(req.query.limit) : undefined,
-        offset: req.query.offset ? parseInt(req.query.offset) : undefined,
+        startDate: req.query.startDate || undefined,
+        endDate: req.query.endDate || undefined,
+        cashierId: req.query.cashierId,
+        personId: req.query.personId,
+        limit: req.query.limit,
+        offset: req.query.offset,
       });
       sendData(res, standContract.sales.response, sales);
     } catch (error) {
@@ -487,9 +530,9 @@ router.get(
   }
 );
 
-router.get('/stand/sales/:id', async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+router.get('/stand/sales/:id', authorize(FINANCE_ROLES), async (req: Request<{ id: string }>, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
     if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid sale id'); return; }
     const sale = await getStandSaleById(id);
     if (!sale) { ErrorResponses.notFound(res, 'Sale'); return; }
@@ -503,16 +546,16 @@ router.post(
   '/stand/sales/:id/void',
   authenticate,
   authorize(ADMIN_ROLES),
-  validate({ params: standContract.voidSale.params }),
-  async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+  validate({ params: standContract.voidSale.params, body: standContract.voidSale.body }),
+  async (
+    req: Request<{ id: string }, unknown, standContract.VoidSaleBody>,
+    res: Response
+  ): Promise<void> => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       if (isNaN(id)) { ErrorResponses.badRequest(res, 'Invalid sale id'); return; }
+      // Presence + non-emptiness of `reason` are the contract's now.
       const { reason } = req.body;
-      if (!reason) {
-        ErrorResponses.badRequest(res, 'Void reason is required');
-        return;
-      }
       const userId = req.session?.userId ?? null;
       await validateAndVoidSale(id, reason, userId);
       sendSuccess(res, null);
@@ -528,6 +571,7 @@ router.post(
 
 router.get(
   '/stand/reports/summary',
+  authorize(FINANCE_ROLES),
   async (
     req: Request<unknown, unknown, unknown, { startDate?: string; endDate?: string }>,
     res: Response
@@ -551,6 +595,7 @@ router.get(
 
 router.get(
   '/stand/reports/top-items',
+  authorize(FINANCE_ROLES),
   async (
     req: Request<unknown, unknown, unknown, { startDate?: string; endDate?: string; limit?: string }>,
     res: Response
@@ -561,7 +606,7 @@ router.get(
         ErrorResponses.badRequest(res, 'Missing required parameters: startDate, endDate');
         return;
       }
-      const limit = parseInt(req.query.limit || '10');
+      const limit = parseInt(req.query.limit || '10', 10);
       const topItems = await getTopSellingItems(startDate, endDate, limit);
       sendData(res, standContract.reportTopItems.response, topItems);
     } catch (error) {

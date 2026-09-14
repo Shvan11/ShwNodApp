@@ -15,6 +15,7 @@ import path from 'path';
 import { createReadStream, promises as fsp } from 'fs';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendError, sendData } from '../../utils/error-response.js';
+import { uploadErrorMessage } from '../../middleware/upload.js';
 import { authorize } from '../../middleware/auth.js';
 import { FINANCE_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
@@ -51,9 +52,10 @@ const MAX_UPLOAD_BYTES =
 // HELPERS
 // ===========================================
 
-// `type` (not `interface`) so it carries an implicit index signature and stays
-// assignable to Express's ParamsDictionary in handler/middleware generics.
-type PersonIdParams = { personId: string };
+// Derived from the contract's own params schema, never hand-written — the alias
+// keeps the handler generics readable while `fileExplorer.personIdParams` stays
+// the single source of truth for what `:personId` is.
+type PersonIdParams = fileExplorer.PersonIdParams;
 
 const isTruthy = (v: unknown): boolean => v === '1' || v === 'true';
 const queryString = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -97,6 +99,10 @@ async function streamFileFallback(
   res.setHeader('Last-Modified', st.mtime.toUTCString());
   if (download) {
     res.setHeader('Content-Disposition', `attachment; filename="${filename.replace(/["\r\n]/g, '')}"`);
+  } else {
+    // Same stored-XSS guard as the `res.sendFile` path — see the comment there.
+    res.setHeader('Content-Security-Policy', 'sandbox');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
   }
 
   const range = req.headers.range;
@@ -202,6 +208,19 @@ router.get(
       if (download) {
         res.download(abs, filename, sendOpts, onDone);
       } else {
+        // Stored-XSS guard. A patient folder is a live NTFS share the clinic
+        // writes to by other means, and `POST …/files/upload` accepts any
+        // extension — so a `.svg` or `.html` sitting there is served INLINE from
+        // the app's own origin with an executable Content-Type. The app runs
+        // helmet with `contentSecurityPolicy: false`, so without this header any
+        // script in that file would run with the viewing staff member's session
+        // (a front-desk account could plant a payload that fires in an admin's
+        // browser). `sandbox` with no allow-tokens puts the response in a unique
+        // opaque origin with scripting disabled — the file still renders, it just
+        // cannot reach the session. `nosniff` is not enough on its own here: the
+        // declared type is already executable.
+        res.setHeader('Content-Security-Policy', 'sandbox');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
         res.setHeader('Content-type', mime);
         res.sendFile(abs, sendOpts, onDone);
       }
@@ -331,15 +350,20 @@ function runUpload(req: Request, res: Response, next: NextFunction): void {
       next();
       return;
     }
-    if ((err as { code?: string }).code === 'LIMIT_FILE_SIZE') {
-      ErrorResponses.badRequest(res, 'File exceeds the size limit');
-      return;
-    }
     if (err instanceof FileExplorerError) {
       sendError(res, err.status, err.message);
       return;
     }
-    ErrorResponses.badRequest(res, `Upload error: ${(err as Error).message}`);
+    const message = uploadErrorMessage(err, 'File exceeds the size limit');
+    if (message) {
+      ErrorResponses.badRequest(res, message);
+      return;
+    }
+    // Not an upload error — the storage `destination` callback also lands here
+    // (`cb(err)` on a failed staging mkdir), and its message is an fs error
+    // carrying a server path. Fixed string out, real error into dev-only details.
+    log.error('[FileExplorer] upload failed', { error: (err as Error).message });
+    ErrorResponses.internalError(res, 'Upload failed', err as Error);
   });
 }
 

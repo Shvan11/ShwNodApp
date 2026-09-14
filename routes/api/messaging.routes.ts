@@ -20,6 +20,8 @@ import { getAppointmentForNotification } from '../../services/database/queries/a
 import messageState from '../../services/messaging/messageState.js';
 import { sendSuccess, sendData, ErrorResponses } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import { authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import {
   transformMessageStatuses,
   calculateMessageCount
@@ -84,6 +86,7 @@ function convertWhatsAppMessagesResult(
  */
 router.get(
   '/status/:date',
+  validate({ params: messaging.dateParams }),
   async (req: Request<DateParams>, res: Response): Promise<void> => {
     try {
       const { date } = req.params;
@@ -128,7 +131,7 @@ router.get(
       sendSuccess(res, result);
     } catch (error) {
       log.error('Error getting message status:', error);
-      ErrorResponses.internalError(res, (error as Error).message, error as Error);
+      ErrorResponses.internalError(res, 'Failed to get message status', error as Error);
     }
   }
 );
@@ -139,6 +142,7 @@ router.get(
  */
 router.get(
   '/count/:date',
+  validate({ params: messaging.dateParams }),
   async (req: Request<DateParams>, res: Response): Promise<void> => {
     try {
       const { date } = req.params;
@@ -178,7 +182,7 @@ router.get(
       sendData(res, messaging.count.response, messageCount);
     } catch (error) {
       log.error('Error getting message count:', error);
-      ErrorResponses.internalError(res, (error as Error).message, error as Error);
+      ErrorResponses.internalError(res, 'Failed to get the message count', error as Error);
     }
   }
 );
@@ -233,6 +237,8 @@ router.get(
  */
 router.post(
   '/reset/:date',
+  authorize(CLINICAL_ROLES),
+  validate({ params: messaging.dateParams }),
   async (req: Request<DateParams>, res: Response): Promise<void> => {
     try {
       const { date } = req.params;

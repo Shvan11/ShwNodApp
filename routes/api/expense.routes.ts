@@ -42,22 +42,15 @@ const router = Router();
 // TYPE DEFINITIONS
 // ============================================================================
 
-type ExpenseQueryParams = {
-  startDate?: string;
-  endDate?: string;
-  categoryId?: string;
-  subcategoryId?: string;
-  labId?: string;
-  employeeId?: string;
-  currency?: string;
-  isMonthly?: string;
-  limit?: string;
-  offset?: string;
-};
+// The `/expenses` query AFTER validate() has parsed and written it back — i.e. the
+// numeric filters are already numbers. Taken from the contract, not re-declared:
+// the old hand-written all-strings copy said `categoryId?: string` for a value the
+// boundary had already coerced to a number, and `parseInt`-ed it a second time.
+type ExpenseListQuery = expense.ExpenseListQuery;
 
-// Internal parsed-filter shape (NOT a request body) + the raw req.query view. The
-// validated query boundary is `expense.expenseList.query` (wired on the list route).
-type ExpenseFilters = {
+// Internal parsed-filter shape passed to the query layer. NOT a request type —
+// it is what this handler hands `getAllExpenses`.
+type ExpenseFilterValues = {
   startDate?: string;
   endDate?: string;
   categoryId?: number | null;
@@ -94,35 +87,31 @@ router.get(
   '/expenses',
   validate({ query: expense.expenseList.query }),
   async (
-    req: Request<unknown, unknown, unknown, ExpenseQueryParams>,
+    req: Request<unknown, unknown, unknown, ExpenseListQuery>,
     res: Response
   ): Promise<void> => {
     try {
-      const filters: ExpenseFilters = {
+      const filters: ExpenseFilterValues = {
         startDate: req.query.startDate,
         endDate: req.query.endDate,
-        categoryId: req.query.categoryId
-          ? parseInt(req.query.categoryId)
-          : null,
-        subcategoryId: req.query.subcategoryId
-          ? parseInt(req.query.subcategoryId)
-          : null,
-        labId: req.query.labId ? parseInt(req.query.labId) : null,
-        employeeId: req.query.employeeId ? parseInt(req.query.employeeId) : null,
+        categoryId: req.query.categoryId ?? null,
+        subcategoryId: req.query.subcategoryId ?? null,
+        labId: req.query.labId ?? null,
+        employeeId: req.query.employeeId ?? null,
         currency: req.query.currency,
         isMonthly: req.query.isMonthly === 'true'
           ? true
           : req.query.isMonthly === 'false'
             ? false
             : undefined,
-        limit: req.query.limit ? parseInt(req.query.limit) : null,
-        offset: req.query.offset ? parseInt(req.query.offset) : null,
+        limit: req.query.limit ?? null,
+        offset: req.query.offset ?? null,
       };
 
       // Remove null/undefined filters
       const cleanFilters: Record<string, unknown> = {};
       Object.keys(filters).forEach((key) => {
-        const value = filters[key as keyof ExpenseFilters];
+        const value = filters[key as keyof ExpenseFilterValues];
         if (value !== null && value !== undefined) {
           cleanFilters[key] = value;
         }
@@ -219,15 +208,20 @@ router.post(
         return;
       }
 
+      // Every numeric field below is already a `number`: the contract coerces them
+      // (`moneyInt` for `amount`, `z.coerce.number().int()` for the ids) and
+      // `validate()` writes the parsed body back. The `parseInt(String(x), 10)` that
+      // used to stand here is what silently stored `12.99` as `12`; a fractional
+      // amount now 400s at the boundary instead.
       const expenseData: ExpenseData = {
         expense_date,
-        amount: parseInt(String(amount)),
+        amount,
         currency: currency || 'IQD',
         note,
-        categoryId: categoryId ? parseInt(String(categoryId)) : undefined,
-        subcategoryId: subcategoryId ? parseInt(String(subcategoryId)) : undefined,
-        labId: labId ? parseInt(String(labId)) : undefined,
-        employeeId: employeeId ? parseInt(String(employeeId)) : undefined,
+        categoryId,
+        subcategoryId,
+        labId,
+        employeeId,
         isMonthly: isMonthly ?? false,
       };
 
@@ -250,20 +244,16 @@ router.post(
  */
 router.get(
   '/expenses/summary',
+  validate({ query: expense.expenseSummary.query }),
   async (
-    req: Request<unknown, unknown, unknown, ExpenseQueryParams>,
+    req: Request<unknown, unknown, unknown, expense.ExpenseSummaryQuery>,
     res: Response
   ): Promise<void> => {
     try {
+      // Presence AND shape are enforced by the contract above — a missing or
+      // malformed date 400s before the handler, rather than reaching the query
+      // layer as `undefined` (this route had no query guard at all).
       const { startDate, endDate } = req.query;
-
-      if (!startDate || !endDate) {
-        ErrorResponses.badRequest(
-          res,
-          'Missing required parameters: startDate, endDate'
-        );
-        return;
-      }
 
       const summary = await getExpenseSummary(startDate, endDate);
       const totals = await getExpenseTotalsByCurrency(startDate, endDate);
@@ -295,7 +285,7 @@ router.get(
       const { id } = req.params;
 
       // Validate that id is a valid number
-      const expenseId = parseInt(id);
+      const expenseId = parseInt(id, 10);
       if (isNaN(expenseId)) {
         ErrorResponses.badRequest(res, 'Invalid expense id. Must be a number.');
         return;
@@ -335,7 +325,7 @@ router.put(
     operation: 'update',
     getRecordDate: getExpenseCreationDate,
     enqueueIfRestricted: async (req, res) => {
-      const id = parseInt((req.params as { id: string }).id);
+      const id = parseInt((req.params as { id: string }).id, 10);
       const { requestId } = await enqueueApproval(
         'expense.update',
         { id, ...req.body as Record<string, unknown> },
@@ -358,7 +348,7 @@ router.put(
         req.body;
 
       // Validate that id is a valid number
-      const expenseId = parseInt(id);
+      const expenseId = parseInt(id, 10);
       if (isNaN(expenseId)) {
         ErrorResponses.badRequest(res, 'Invalid expense id. Must be a number.');
         return;
@@ -381,13 +371,13 @@ router.put(
 
       const expenseData: ExpenseData = {
         expense_date,
-        amount: parseInt(String(amount)),
+        amount,
         currency: currency || 'IQD',
         note,
-        categoryId: categoryId ? parseInt(String(categoryId)) : undefined,
-        subcategoryId: subcategoryId ? parseInt(String(subcategoryId)) : undefined,
-        labId: labId ? parseInt(String(labId)) : undefined,
-        employeeId: employeeId ? parseInt(String(employeeId)) : undefined,
+        categoryId,
+        subcategoryId,
+        labId,
+        employeeId,
         isMonthly: isMonthly ?? false,
       };
 
@@ -420,7 +410,7 @@ router.delete(
     operation: 'delete',
     getRecordDate: getExpenseCreationDate,
     enqueueIfRestricted: async (req, res) => {
-      const id = parseInt((req.params as { id: string }).id);
+      const id = parseInt((req.params as { id: string }).id, 10);
       const { requestId } = await enqueueApproval('expense.delete', { id }, req);
       sendData(res, expense.deleteExpense.response, {
         outcome: 'pending',
@@ -434,7 +424,7 @@ router.delete(
       const { id } = req.params;
 
       // Validate that id is a valid number
-      const expenseId = parseInt(id);
+      const expenseId = parseInt(id, 10);
       if (isNaN(expenseId)) {
         ErrorResponses.badRequest(res, 'Invalid expense id. Must be a number.');
         return;

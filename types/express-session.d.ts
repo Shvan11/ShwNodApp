@@ -4,7 +4,7 @@
  */
 
 import 'express-session';
-import type { UserRole } from './api.types.js';
+import type { UserRole } from '../shared/auth/roles.js';
 
 declare module 'express-session' {
   interface SessionData {

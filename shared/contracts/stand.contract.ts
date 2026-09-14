@@ -25,7 +25,13 @@
  *    primitive; `date` columns (`expiry_date`) are plain `z.string()`.
  */
 import { z } from 'zod';
-import { idParams, timestampString } from '../validation.js';
+import {
+  idParams,
+  moneyInt,
+  optionalDateString,
+  optionalNonNegIntQuery,
+  timestampString,
+} from '../validation.js';
 
 // ===========================================================================
 // Shared response row schemas (looseObject — preserve long-tail for the client,
@@ -181,7 +187,16 @@ export type CreateCategoryResponse = z.infer<typeof createCategory.response>;
 // PUT /api/stand/categories/:id — partial update, sendSuccess(null). The body
 // ({ categoryName?, isActive? }) is NOT route-validated today (forwarded to the
 // service); left unchanged this phase — only `:id` is validated.
-export const updateCategory = { params: idParams('id') } as const;
+// PUT /api/stand/categories/:id — partial update, sendSuccess(null). Both fields
+// optional: the query layer writes only the keys that are present.
+export const updateCategory = {
+  params: idParams('id'),
+  body: z.object({
+    categoryName: z.string().min(1).optional(),
+    isActive: z.boolean().optional(),
+  }),
+} as const;
+export type UpdateCategoryBody = z.infer<typeof updateCategory.body>;
 
 // DELETE /api/stand/categories/:id — deactivate, sendSuccess(null).
 export const deleteCategory = { params: idParams('id') } as const;
@@ -191,7 +206,16 @@ export const deleteCategory = { params: idParams('id') } as const;
 // ===========================================================================
 
 // GET /api/stand/items?search=&categoryId=&stockStatus=&includeInactive=
+// The query is VALIDATED (it used to be an inline handler-generic type only): a
+// repeated key arrives from Express as an array, and `stockStatus` was reaching the
+// query layer through a bare `as` cast that asserted a union it never checked.
 export const items = {
+  query: z.object({
+    search: z.string().optional(),
+    categoryId: z.coerce.number().int().positive().optional(),
+    stockStatus: z.enum(['in-stock', 'low-stock', 'out-of-stock']).optional(),
+    includeInactive: z.enum(['true', 'false']).optional(),
+  }),
   response: z.array(standItemRow),
 } as const;
 export type ItemsResponse = z.infer<typeof items.response>;
@@ -202,7 +226,11 @@ export const itemsLowStock = {
 } as const;
 
 // GET /api/stand/items/expiring?days=
+// GET /api/stand/items/expiring?days= — `days` VALIDATED (it was
+// `parseInt(req.query.days as string) || 30`, which mapped `days=0` to 30 and
+// accepted negatives straight into the interval).
 export const itemsExpiring = {
+  query: z.object({ days: optionalNonNegIntQuery }),
   response: z.array(standItemRow),
 } as const;
 
@@ -249,8 +277,9 @@ export const createItem = {
     sku: z.string().nullable().optional(),
     barcode: z.string().nullable().optional(),
     categoryId: z.coerce.number().int().positive().nullable().optional(),
-    costPrice: z.coerce.number(),
-    sellPrice: z.coerce.number(),
+    // `stand_items.cost_price`/`sell_price` are `integer` columns.
+    costPrice: moneyInt,
+    sellPrice: moneyInt,
     currentStock: z.coerce.number().optional(),
     reorderLevel: z.coerce.number().optional(),
     expiryDate: z.string().nullable().optional(),
@@ -262,9 +291,27 @@ export const createItem = {
 export type CreateItemBody = z.infer<typeof createItem.body>;
 export type CreateItemResponse = z.infer<typeof createItem.response>;
 
-// PUT /api/stand/items/:id — partial update, sendSuccess(null). Body forwarded
-// to the service (unvalidated today); only `:id` is validated.
-export const updateItem = { params: idParams('id') } as const;
+// PUT /api/stand/items/:id — partial update, sendSuccess(null). Every field is
+// optional (the query layer writes only the keys that are present), but each one
+// now has a TYPE: the body used to reach `updateStandItem` unvalidated, so
+// `{costPrice: "abc"}` or `{itemName: {}}` reached a Kysely `.set()` against an
+// integer/citext column and 500-ed.
+export const updateItem = {
+  params: idParams('id'),
+  body: z.object({
+    itemName: z.string().min(1).optional(),
+    sku: z.string().nullable().optional(),
+    barcode: z.string().nullable().optional(),
+    categoryId: z.coerce.number().int().positive().nullable().optional(),
+    costPrice: moneyInt.optional(),
+    sellPrice: moneyInt.optional(),
+    reorderLevel: z.coerce.number().optional(),
+    expiryDate: z.string().nullable().optional(),
+    unit: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
+  }),
+} as const;
+export type UpdateItemBody = z.infer<typeof updateItem.body>;
 
 // DELETE /api/stand/items/:id — soft delete, sendSuccess(null).
 export const deleteItem = { params: idParams('id') } as const;
@@ -272,7 +319,9 @@ export const deleteItem = { params: idParams('id') } as const;
 // POST /api/stand/items/:id/restock — { quantity, unitCost }, sendSuccess(null).
 export const restock = {
   params: idParams('id'),
-  body: z.object({ quantity: z.coerce.number(), unitCost: z.coerce.number() }),
+  // `unitCost` writes `stand_stock_movements.unit_cost` (`integer`), and the route
+  // used to `parseInt` it — silently truncating a fractional restock cost.
+  body: z.object({ quantity: z.coerce.number().int(), unitCost: moneyInt }),
 } as const;
 export type RestockBody = z.infer<typeof restock.body>;
 
@@ -298,15 +347,40 @@ export const itemMovements = {
 // amountPaid, change, items } — the consumer reads saleId + change, so model
 // those (stable) and keep the rest loose.
 export const createSale = {
+  // The CART is still the service's to validate (stock levels, item existence,
+  // totals — `validateAndCreateSale` IS that boundary and raises StandValidationError
+  // → 400). What the contract owns is the SHAPE: line items must be numeric ids and
+  // quantities, and `amountPaid` a number, rather than whatever JSON was posted.
+  body: z.object({
+    items: z
+      .array(z.object({ itemId: z.coerce.number().int().positive(), quantity: z.coerce.number() }))
+      .min(1),
+    amountPaid: moneyInt,
+    paymentMethod: z.string().optional(),
+    customerNote: z.string().nullable().optional(),
+    personId: z.coerce.number().int().positive().nullable().optional(),
+  }),
   response: z.looseObject({ saleId: z.number(), change: z.number() }),
 } as const;
+export type CreateSaleBody = z.infer<typeof createSale.body>;
 export type StandSaleResult = z.infer<typeof createSale.response>;
 
 // GET /api/stand/sales?startDate=&endDate=&cashierId=&personId=&limit=&offset=
 export const sales = {
+  query: z.object({
+    startDate: optionalDateString,
+    endDate: optionalDateString,
+    cashierId: z.coerce.number().int().positive().optional(),
+    personId: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    offset: z.coerce.number().int().nonnegative().optional(),
+  }),
   response: z.array(standSaleRow),
 } as const;
 export type SalesResponse = z.infer<typeof sales.response>;
+export type ItemsQuery = z.infer<typeof items.query>;
+export type ItemsExpiringQuery = z.infer<typeof itemsExpiring.query>;
+export type SalesQuery = z.infer<typeof sales.query>;
 
 // GET /api/stand/sales/:id — sale header + line items (404 when unknown).
 export const saleById = {
@@ -315,7 +389,11 @@ export const saleById = {
 
 // POST /api/stand/sales/:id/void — void a sale, sendSuccess(null). Body { reason }
 // is checked by the handler (not route-validated); only `:id` is validated.
-export const voidSale = { params: idParams('id') } as const;
+export const voidSale = {
+  params: idParams('id'),
+  body: z.object({ reason: z.string().min(1) }),
+} as const;
+export type VoidSaleBody = z.infer<typeof voidSale.body>;
 
 // ===========================================================================
 // REPORTS

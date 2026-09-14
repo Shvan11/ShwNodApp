@@ -5,16 +5,42 @@
 // events and writes one SSE frame per emit. Every connected stream registers
 // as a QR viewer so the `messageState.activeQRViewers > 0` optimization that
 // gates QR data-URL generation and on-demand init keeps working.
+//
+// AUTHORIZATION — the route is deliberately NOT `authorize()`d, the PAYLOAD is
+// filtered per stream. Six of the seven wire events (client-ready, message
+// status, the three sending-progress frames, send-unconfirmed) drive the send
+// screens and the per-patient send gate, which every staff role legitimately
+// uses — sending is CLINICAL_ROLES. Gating the route would take those out for
+// two roles, and would also change WHO registers as a QR viewer, i.e. when
+// WhatsApp initializes at all.
+//
+// The one privileged item is the pairing QR: whoever scans it links a device to
+// the clinic's WhatsApp account. `GET /api/wa/qr` is FINANCE_ROLES and
+// `/api/wa/initial-state` withholds the QR from everyone else, so this channel
+// must not be the way around those gates. Each stream therefore records
+// `mayPair` at open, and `whatsapp_qr_updated` is broadcast with `qr` blanked
+// for streams that can't pair — the frame itself still goes out, because its
+// `clientReady: false` is app-wide state the send gate needs.
 
 import { Router, type Request, type Response } from 'express';
 import type { EventEmitter } from 'events';
 import { InternalEmitterEvents } from './websocket-events.js';
 import messageState from './messageState.js';
+import { FINANCE_ROLES } from '../../shared/auth/roles.js';
 import { log } from '../../utils/logger.js';
 
 interface WhatsappClient {
   res: Response;
   viewerId: string;
+  /**
+   * May this stream receive the pairing QR? Snapshotted from the session role at
+   * open, which is exactly as fresh as every `authorize()` gate — `userRole` is
+   * written only at login. Each EventSource reconnect (the `retry` frame, plus
+   * the client singleton's visibility/bfcache forced reconnect) re-runs
+   * `authenticate` and re-takes this snapshot, so a role change lands at the
+   * next reconnect at the latest.
+   */
+  mayPair: boolean;
   /** Idempotent per-stream teardown (unregisters the QR viewer exactly once). */
   disconnect: () => void;
 }
@@ -37,18 +63,52 @@ function safeWrite(res: Response, data: string): void {
   }
 }
 
-function broadcast(event: string, payload: unknown): void {
+/**
+ * Fan one frame out to every open stream. `redact`, when given, produces the
+ * variant sent to streams whose `mayPair` is false — it is built lazily, so the
+ * common single-audience case still costs exactly one `JSON.stringify`.
+ */
+function broadcast(
+  event: string,
+  payload: unknown,
+  redact?: (payload: unknown) => unknown
+): void {
   if (whatsappClients.size === 0) return;
   const frame = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
-  for (const { res } of whatsappClients.values()) safeWrite(res, frame);
+  let redactedFrame: string | null = null;
+  for (const { res, mayPair } of whatsappClients.values()) {
+    if (!redact || mayPair) {
+      safeWrite(res, frame);
+      continue;
+    }
+    redactedFrame ??= `event: ${event}\ndata: ${JSON.stringify(redact(payload))}\n\n`;
+    safeWrite(res, redactedFrame);
+  }
+}
+
+/**
+ * The non-pairing variant of a `whatsapp_qr_updated` frame. The frame is NOT
+ * dropped: `clientReady: false` is app-wide state — `SendMessage`'s per-patient
+ * gate reads it — so a stream that can't pair still has to learn WhatsApp is
+ * unlinked. Only the scannable data URL is removed.
+ */
+function redactPairingQr(payload: unknown): unknown {
+  return { ...(payload as Record<string, unknown>), qr: null };
+}
+
+function mayPairFromSession(req: Request): boolean {
+  const role = req.session?.userRole;
+  return !!role && (FINANCE_ROLES as readonly string[]).includes(role);
 }
 
 function ensureInitialized(emitter: EventEmitter): void {
   if (initialized) return;
   initialized = true;
 
-  const wire: Array<[string, string]> = [
-    [InternalEmitterEvents.WHATSAPP_QR_UPDATED, 'whatsapp_qr_updated'],
+  // Third slot: the redactor applied to streams that may not pair. Only the
+  // pairing QR has one — every other frame goes to every stream verbatim.
+  const wire: Array<[string, string, ((payload: unknown) => unknown)?]> = [
+    [InternalEmitterEvents.WHATSAPP_QR_UPDATED, 'whatsapp_qr_updated', redactPairingQr],
     [InternalEmitterEvents.WHATSAPP_CLIENT_READY, 'whatsapp_client_ready'],
     [InternalEmitterEvents.WHATSAPP_MESSAGE_STATUS, 'whatsapp_message_status'],
     [InternalEmitterEvents.WHATSAPP_SENDING_STARTED, 'whatsapp_sending_started'],
@@ -57,8 +117,8 @@ function ensureInitialized(emitter: EventEmitter): void {
     [InternalEmitterEvents.WHATSAPP_SEND_UNCONFIRMED, 'whatsapp_send_unconfirmed'],
   ];
 
-  for (const [internal, wireName] of wire) {
-    const fn = (payload: unknown): void => broadcast(wireName, payload ?? {});
+  for (const [internal, wireName, redact] of wire) {
+    const fn = (payload: unknown): void => broadcast(wireName, payload ?? {}, redact);
     emitter.on(internal, fn);
     listenerRefs.push({ event: internal, fn: fn as (...args: unknown[]) => void });
   }
@@ -128,7 +188,7 @@ export function createWhatsappSseRouter(emitter: EventEmitter): Router {
       else closedEarly = true;
     };
 
-    whatsappClients.set(viewerId, { res, viewerId, disconnect });
+    whatsappClients.set(viewerId, { res, viewerId, mayPair: mayPairFromSession(req), disconnect });
     req.on('close', disconnect);
 
     // Every SSE subscriber is a QR viewer. Triggers QR data-URL generation

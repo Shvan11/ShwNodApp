@@ -154,6 +154,7 @@ export interface WorkBalanceSnapshot {
 export type GuardedInvoiceResult =
   | { outcome: 'created'; invoice_id: number }
   | { outcome: 'work_not_found' }
+  | { outcome: 'negative_amount' }
   | { outcome: 'exceeds_remaining'; balance: WorkBalanceSnapshot };
 
 /**
@@ -209,6 +210,17 @@ export function addInvoiceWithBalanceGuard(
     const discount = Number(work.discount ?? 0);
     const totalPaid = Number(paidRow.paid ?? 0);
     const remaining = totalRequired - discount - totalPaid;
+
+    // Lower bound, checked HERE and not only at the contract. The overpayment rule
+    // below asks `amount > remaining`, which a negative amount passes trivially —
+    // and a negative invoice does not just record a wrong figure, it RAISES the
+    // work's outstanding balance and skews every sum over `invoices.amount_paid`
+    // (the doctor-commission report included). The request boundary now rejects it
+    // too, but this is the layer that holds for a caller that never crosses it:
+    // a script, a future service, a reverse-sync path.
+    if ((Number(amountPaid) || 0) <= 0) {
+      return { outcome: 'negative_amount' };
+    }
 
     if ((Number(amountPaid) || 0) > remaining) {
       return {
@@ -302,4 +314,54 @@ export async function deleteInvoiceById(invoiceId: number): Promise<number> {
     DELETE FROM "invoices" WHERE "invoice_id" = ${invoiceId}
   `.execute(db);
   return Number(result.numAffectedRows ?? 0n);
+}
+
+/**
+ * One work's receipt header. `type` (not `interface`) so it feeds the
+ * `z.looseObject` workForReceipt response via `sendData` — the index-signature
+ * rule (CLAUDE.md / TS2345).
+ */
+export type WorkForReceipt = {
+  person_id: number;
+  patient_name: string;
+  phone: string | null;
+  TotalPaid: number;
+  app_date: Date;
+  work_id: number;
+  total_required: number;
+  currency: string;
+  discount: number | null;
+  discount_date: Date | null;
+};
+
+/** Receipt header for a work, or undefined when the work doesn't exist. */
+export async function getWorkForReceipt(workId: number): Promise<WorkForReceipt | undefined> {
+  // V_Report (and its sub-views VTotPaid / VLastApp) inlined for a single work:
+  //  - TotalPaid: SUM(tblInvoice.amount_paid) for the work (NULL when no payments, as VTotPaid yielded)
+  //  - app_date:   the patient's latest FUTURE appointment (VLastApp: per-person MAX(app_date) > now)
+  const { rows } = await sql<WorkForReceipt>`
+    SELECT
+      w."person_id",
+      p."patient_name",
+      p."phone",
+      tp."TotalPaid",
+      la."app_date",
+      w."work_id",
+      w."total_required",
+      w."currency",
+      w."discount",
+      w."discount_date"
+    FROM "works" w
+    JOIN "patients" p ON p."person_id" = w."person_id"
+    LEFT JOIN (
+      SELECT "work_id", SUM("amount_paid") AS "TotalPaid"
+      FROM "invoices" GROUP BY "work_id"
+    ) tp ON tp."work_id" = w."work_id"
+    LEFT JOIN (
+      SELECT "person_id", MAX("app_date") AS "app_date"
+      FROM "appointments" WHERE "app_date" > LOCALTIMESTAMP GROUP BY "person_id"
+    ) la ON la."person_id" = w."person_id"
+    WHERE w."work_id" = ${workId}
+  `.execute(getKysely());
+  return rows[0];
 }

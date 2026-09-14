@@ -12,14 +12,18 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import path from 'path';
 import { readFile } from 'fs/promises';
-import { sql } from 'kysely';
-import { getKysely } from '../../services/database/kysely.js';
 import { log } from '../../utils/logger.js';
 import multer from 'multer';
 import webcephService from '../../services/webceph/webceph-service.js';
+import {
+  findPatientWebcephId,
+  setPatientWebcephLink,
+  getPatientWebcephLink,
+} from '../../services/database/queries/webceph-queries.js';
 import { resolveFileForServe, FileExplorerError } from '../../services/files/file-explorer.service.js';
 import { getFileMimeType } from '../../utils/file-mime.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
+import { uploadErrorMessage } from '../../middleware/upload.js';
 import { validate } from '../../middleware/validate.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
@@ -45,12 +49,14 @@ const upload = multer({ limits: { fileSize: 50 * 1024 * 1024, files: 1 } });
 const uploadImage = (req: Request, res: Response, next: NextFunction): void => {
   upload.single('image')(req, res, (err: unknown) => {
     if (err) {
-      const code = (err as { code?: string }).code;
-      if (code === 'LIMIT_FILE_SIZE') {
-        ErrorResponses.badRequest(res, 'Image is too large. Maximum size is 50MB.');
+      const message = uploadErrorMessage(err, 'Image is too large. Maximum size is 50MB.');
+      if (message) {
+        ErrorResponses.badRequest(res, message);
         return;
       }
-      ErrorResponses.badRequest(res, `Upload error: ${(err as Error).message}`);
+      // Anything that is not an upload error keeps its message server-side.
+      log.error('[Media] image upload failed', { error: (err as Error).message });
+      ErrorResponses.internalError(res, 'Image upload failed', err as Error);
       return;
     }
     next();
@@ -65,12 +71,6 @@ type PersonIdParams = media.PersonIdParams;
 /**
  * WebCeph patient link result
  */
-interface WebCephPatientLink {
-  webcephPatientId: string | null;
-  link: string | null;
-  createdAt: Date | null;
-}
-
 /**
  * Multer file interface
  */
@@ -94,20 +94,6 @@ interface FileRequest extends Omit<Request<object, object, media.UploadImageBody
 // ==============================
 // WEBCEPH API ENDPOINTS
 // ==============================
-
-/**
- * Look up a patient's stored WebCeph id. `undefined` = no such patient;
- * `{ webcephPatientId: null }` = patient exists but isn't in WebCeph yet.
- */
-async function findPatientWebcephId(personId: number): Promise<{ webcephPatientId: string | null } | undefined> {
-  const db = getKysely();
-  const { rows } = await sql<{ webcephPatientId: string | null }>`
-    SELECT "web_ceph_patient_id" AS "webcephPatientId"
-    FROM "patients"
-    WHERE "person_id" = ${personId}
-  `.execute(db);
-  return rows[0];
-}
 
 /**
  * Create patient in WebCeph
@@ -149,14 +135,7 @@ router.post('/webceph/create-patient', validate({ body: media.createPatient.body
     const result = await webcephService.createPatient(patientData);
 
     // Update local database with WebCeph information
-    const db = getKysely();
-    await sql`
-      UPDATE "patients"
-      SET "web_ceph_patient_id" = ${result.webcephPatientId},
-          "web_ceph_link" = ${result.link},
-          "web_ceph_created_at" = LOCALTIMESTAMP
-      WHERE "person_id" = ${personId}
-    `.execute(db);
+    await setPatientWebcephLink(personId, result.webcephPatientId, result.link);
 
     log.info(`[WebCeph] Patient created successfully for person_id: ${personId}`);
 
@@ -339,14 +318,9 @@ router.get('/webceph/patient-link/:personId', async (req: Request<PersonIdParams
       return;
     }
 
-    const db = getKysely();
-    const { rows: result } = await sql<WebCephPatientLink>`
-      SELECT "web_ceph_patient_id" AS "webcephPatientId", "web_ceph_link" AS "link", "web_ceph_created_at" AS "createdAt"
-      FROM "patients"
-      WHERE "person_id" = ${parseInt(personId)}
-    `.execute(db);
+    const link = await getPatientWebcephLink(parseInt(personId, 10));
 
-    if (!result || result.length === 0 || !result[0].webcephPatientId) {
+    if (!link || !link.webcephPatientId) {
       // "No WebCeph link yet" is now a proper 404 (was a raw
       // `res.json({success:false,data:null})`). `sendData(…, null)` can't express
       // this — `sendSuccess` omits a null `data`, so the funnel would return the
@@ -356,7 +330,7 @@ router.get('/webceph/patient-link/:personId', async (req: Request<PersonIdParams
       return;
     }
 
-    sendData(res, media.patientLink.response, result[0]);
+    sendData(res, media.patientLink.response, link);
   } catch (error) {
     log.error('[WebCeph] Error fetching patient link:', error);
     ErrorResponses.serverError(res, 'Failed to fetch WebCeph patient link', error as Error);

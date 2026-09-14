@@ -4,6 +4,7 @@ import { doctorCommissionsQuery } from '@/query/queries';
 import { httpErrorMessage } from '@/core/http';
 import { formatNumber } from '../../utils/formatters';
 import PeriodNavigator, { currentMonthStart, currentMonthEnd } from './PeriodNavigator';
+import DoctorPaymentsModal, { type DoctorPaymentsTarget } from './DoctorPaymentsModal';
 import styles from './DoctorCommissionsView.module.css';
 
 /**
@@ -16,6 +17,8 @@ import styles from './DoctorCommissionsView.module.css';
 const DoctorCommissionsView = () => {
     const [startDate, setStartDate] = useState(currentMonthStart);
     const [endDate, setEndDate] = useState(currentMonthEnd);
+    // The doctor whose payments are being drilled into, or null when the modal is closed.
+    const [drillTarget, setDrillTarget] = useState<DoctorPaymentsTarget | null>(null);
 
     const invalidRange = !!startDate && !!endDate && startDate > endDate;
 
@@ -76,7 +79,24 @@ const DoctorCommissionsView = () => {
                         <tbody>
                             {rows.map((r) => (
                                 <tr key={r.doctor_id}>
-                                    <td data-label="Doctor" className={styles.docName}>{r.doctor_name}</td>
+                                    <td data-label="Doctor" className={styles.docName}>
+                                        {/* A button, not a row-level onClick — the drill-down
+                                            has to stay keyboard-reachable. */}
+                                        <button
+                                            type="button"
+                                            className={styles.docNameButton}
+                                            onClick={() => setDrillTarget({
+                                                doctorId: r.doctor_id,
+                                                doctorName: r.doctor_name,
+                                                paidIqd: r.paid_iqd,
+                                                paidUsd: r.paid_usd,
+                                            })}
+                                            title="View the payments behind this commission"
+                                        >
+                                            {r.doctor_name}
+                                            <i className="fas fa-chevron-right" aria-hidden="true"></i>
+                                        </button>
+                                    </td>
                                     <td data-label="Collected IQD" className={styles.num}>{formatNumber(r.paid_iqd)}</td>
                                     <td data-label="Collected USD" className={styles.num}>{formatNumber(r.paid_usd)}</td>
                                     <td data-label="Rate" className={styles.num}>{r.commission_percentage}%</td>
@@ -97,6 +117,15 @@ const DoctorCommissionsView = () => {
                         </tfoot>
                     </table>
                 </div>
+            )}
+
+            {drillTarget && (
+                <DoctorPaymentsModal
+                    target={drillTarget}
+                    startDate={startDate}
+                    endDate={endDate}
+                    onClose={() => setDrillTarget(null)}
+                />
             )}
         </div>
     );

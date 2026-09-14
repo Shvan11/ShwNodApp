@@ -155,7 +155,7 @@ export async function patientInfoLoader({
   const { personId } = params;
 
   // Skip loading for "new" patient (add patient form)
-  if (personId === 'new' || isNaN(parseInt(personId || ''))) {
+  if (personId === 'new' || isNaN(parseInt(personId || '', 10))) {
     return { patient: null, isNew: true };
   }
 
@@ -235,7 +235,7 @@ export async function patientShellLoader({
   const effectiveWorkId = workId || workIdFromQuery;
 
   // Skip loading for "new" patient (add patient form)
-  if (personId === 'new' || isNaN(parseInt(personId || ''))) {
+  if (personId === 'new' || isNaN(parseInt(personId || '', 10))) {
     return {
       patient: null,
       work: null,
@@ -323,7 +323,7 @@ export async function alignerPatientWorkLoader({
   const { workId } = params;
 
   // Validate workId before making API calls
-  if (!workId || isNaN(parseInt(workId))) {
+  if (!workId || isNaN(parseInt(workId, 10))) {
     throw new Response('Invalid work ID', { status: 400 });
   }
 

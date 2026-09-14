@@ -54,12 +54,15 @@ export default function Dashboard() {
   const { t } = useTranslation('dashboard');
   const { user } = useGlobalState();
 
-  // Statistics is admin + front-desk only (server: authorize(FINANCE_ROLES)) — don't
-  // offer clinical staff a card that lands on an access-denied page. Filtered at RENDER,
-  // not in `cards`, so the saved drag order survives a role change.
+  // Statistics and Stand are admin + front-desk only (server: authorize(FINANCE_ROLES)
+  // on /api/statistics and on every /api/stand/* read — the Stand's reads carry cost
+  // prices, margins and the sales ledger) — don't offer clinical staff a card that
+  // lands on an access-denied page. Filtered at RENDER, not in `cards`, so the saved
+  // drag order survives a role change.
+  const FINANCE_ONLY_CARDS = new Set(['statistics', 'stand']);
   const caps = roleCaps(user?.role as UserRole | undefined);
   const isVisibleCard = (card: DashboardCardType): boolean =>
-    card.key !== 'statistics' || !user?.role || caps.viewFinance;
+    !FINANCE_ONLY_CARDS.has(card.key) || !user?.role || caps.viewFinance;
 
   const [isCustomizeMode, setIsCustomizeMode] = useState(false);
   const [cards, setCards] = useState<DashboardCardType[]>(getInitialCards);

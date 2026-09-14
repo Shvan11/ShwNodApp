@@ -41,14 +41,10 @@ type currency = 'IQD' | 'USD' | 'EUR';
 type CostPresetQuery = costPreset.CostPresetQuery;
 
 /**
- * Route params for cost preset by id.
- * Declared as a `type` (not `interface`) so it carries an implicit index
- * signature and stays assignable to Express's ParamsDictionary on the
- * multi-handler (authenticate + authorize) overload used below.
+ * Route params for cost preset by id — derived from the contract's `presetIdParams`
+ * rather than hand-written, so the `:id` guard and the handler type cannot drift.
  */
-type CostPresetParams = {
-  id: string;
-};
+type CostPresetParams = costPreset.PresetIdParams;
 
 const VALID_CURRENCIES: currency[] = ['IQD', 'USD', 'EUR'];
 
@@ -57,7 +53,7 @@ const VALID_CURRENCIES: currency[] = ['IQD', 'USD', 'EUR'];
  * Get all cost presets or filter by currency
  * @public — no auth (pre-gate mount); read-only reference data.
  */
-router.get('/settings/cost-presets', async (req: Request<object, object, object, CostPresetQuery>, res: Response): Promise<void> => {
+router.get('/settings/cost-presets', validate({ query: costPreset.getPresetsQuery }), async (req: Request<object, object, object, CostPresetQuery>, res: Response): Promise<void> => {
   try {
     const { currency } = req.query;
     const presets = await getCostPresets(currency || null);
@@ -150,7 +146,7 @@ router.put('/settings/cost-presets/:id', authenticate, authorize(ADMIN_ROLES), v
  */
 router.delete('/settings/cost-presets/:id', authenticate, authorize(ADMIN_ROLES), async (req: Request<CostPresetParams>, res: Response): Promise<void> => {
   try {
-    const presetId = parseInt(req.params.id);
+    const presetId = parseInt(req.params.id, 10);
 
     if (isNaN(presetId)) {
       ErrorResponses.badRequest(res, 'Invalid preset id');

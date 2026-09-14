@@ -36,7 +36,8 @@ export type AppointmentErrorCode =
   | 'HOLIDAY_CONFLICT'
   | 'INVALID_PERSON_ID'
   | 'INVALID_STATE_TRANSITION'
-  | 'MISSING_DATE';
+  | 'MISSING_DATE'
+  | 'APPOINTMENT_NOT_FOUND';
 
 /**
  * Error details for appointment validation
@@ -94,6 +95,18 @@ export interface CreatedAppointment {
   app_detail: string;
   dr_id: number;
   doctorName: string;
+  /**
+   * The stored `app_day` of the row just written — the SSE broadcast key. Split
+   * off by the route before `sendData` so the contracted payload is unchanged
+   * (same pattern as `appDay` on the check-in path). Never re-derive this from
+   * `app_date` in JS: the DB owns the cast.
+   *
+   * `string | null` because `app_day` is generated from a nullable `app_date`. It
+   * cannot actually be null here (this path always inserts one), but the null flows
+   * straight into `broadcastDays`, which drops it — a skipped refresh rather than a
+   * frame keyed on "null".
+   */
+  appDay: string | null;
 }
 
 /**
@@ -118,6 +131,12 @@ export interface QuickCheckInData {
  * Quick check-in result
  */
 export interface QuickCheckInResult {
+  /**
+   * Stored `app_day` of the appointment this check-in touched — the SSE broadcast
+   * key, split off by the route before `sendData`. The route used to broadcast a
+   * freshly computed "today", which is right only while the row is today's.
+   */
+  appDay: string | null;
   success: boolean;
   alreadyCheckedIn?: boolean;
   checkedIn?: boolean;
@@ -164,7 +183,7 @@ function validateAppointmentRequiredFields(
   }
 
   // Validate data types
-  if (isNaN(parseInt(String(person_id))) || isNaN(parseInt(String(dr_id)))) {
+  if (isNaN(parseInt(String(person_id), 10)) || isNaN(parseInt(String(dr_id), 10))) {
     throw new AppointmentValidationError(
       'person_id and dr_id must be valid numbers',
       'INVALID_DATA_TYPE'
@@ -193,7 +212,7 @@ async function verifyDoctor(drID: number | string): Promise<DoctorInfo> {
         SELECT e."id", e."employee_name", p."position_name"
         FROM "employees" e
         INNER JOIN "positions" p ON e."position" = p."id"
-        WHERE e."id" = ${parseInt(String(drID))} AND p."position_name" = 'Doctor'
+        WHERE e."id" = ${parseInt(String(drID), 10)} AND p."position_name" = 'Doctor'
     `.execute(db);
 
   if (!doctorCheck || doctorCheck.length === 0) {
@@ -223,7 +242,9 @@ async function verifyDoctor(drID: number | string): Promise<DoctorInfo> {
  */
 async function checkAppointmentConflict(
   personID: number | string,
-  appDate: string
+  appDate: string,
+  /** Edit path: the row being updated is not a conflict with itself. */
+  excludeAppointmentId?: number
 ): Promise<null> {
   interface ConflictResult {
     appointment_id: number;
@@ -233,7 +254,8 @@ async function checkAppointmentConflict(
   const { rows: conflictCheck } = await sql<ConflictResult>`
         SELECT "appointment_id"
         FROM "appointments"
-        WHERE "person_id" = ${parseInt(String(personID))} AND "app_date"::date = ${appDate}::date
+        WHERE "person_id" = ${parseInt(String(personID), 10)} AND "app_date"::date = ${appDate}::date
+          AND (${excludeAppointmentId ?? null}::int IS NULL OR "appointment_id" <> ${excludeAppointmentId ?? null}::int)
     `.execute(db);
 
   if (conflictCheck && conflictCheck.length > 0) {
@@ -327,11 +349,11 @@ export async function validateAndCreateAppointment(
   await checkAppointmentConflict(person_id, app_date);
 
   // Insert new appointment (+ AppoPatientType trigger, in createAppointment)
-  const newAppointmentId = await createAppointment({
-    person_id: parseInt(String(person_id)),
+  const { appointment_id: newAppointmentId, app_day: appDay } = await createAppointment({
+    person_id: parseInt(String(person_id), 10),
     app_date,
     app_detail,
-    dr_id: parseInt(String(dr_id)),
+    dr_id: parseInt(String(dr_id), 10),
   });
 
   log.info(
@@ -340,12 +362,66 @@ export async function validateAndCreateAppointment(
 
   return {
     appointment_id: newAppointmentId,
-    person_id: parseInt(String(person_id)),
+    person_id: parseInt(String(person_id), 10),
     app_date,
     app_detail,
-    dr_id: parseInt(String(dr_id)),
+    dr_id: parseInt(String(dr_id), 10),
     doctorName: doctor.employee_name,
+    appDay,
   };
+}
+
+/**
+ * Validate and update an existing appointment.
+ *
+ * The mirror of `validateAndCreateAppointment` for the edit path. It exists
+ * because the PUT handler used to be a raw UPDATE with no checks at all, so a
+ * slot that could not be booked directly (holiday, unknown doctor, patient
+ * already booked that day) was reachable by booking elsewhere and editing.
+ *
+ * Returns both the row's PREVIOUS day and its new one so the caller can refresh
+ * viewers of the day the appointment left as well as the day it landed on.
+ */
+export async function validateAndUpdateAppointment(
+  appointmentId: number,
+  appointmentData: AppointmentCreateData
+): Promise<{ previousDay: string | null; newDay: string }> {
+  const { person_id, app_date, app_detail, dr_id } = appointmentData;
+
+  validateAppointmentRequiredFields(appointmentData);
+
+  const db = getKysely();
+  const { rows: existing } = await sql<{ app_day: string | null }>`
+        SELECT "app_day" FROM "appointments" WHERE "appointment_id" = ${appointmentId}
+    `.execute(db);
+
+  if (!existing || existing.length === 0) {
+    throw new AppointmentValidationError('Appointment not found', 'APPOINTMENT_NOT_FOUND');
+  }
+
+  await checkHolidayConflict(app_date);
+  await verifyDoctor(dr_id);
+  await checkAppointmentConflict(person_id, app_date, appointmentId);
+
+  // Cast the app_date string to timestamp on the PG side to avoid timezone conversion.
+  // RETURNING the generated `app_day` makes the DB the authority on the new day.
+  // This used to be `app_date.split('T')[0]`, which is correct only for the
+  // `YYYY-MM-DDTHH:mm:ss` shape the staff forms happen to send: `app_date` is
+  // deliberately a loose `z.string().min(1)` (this service owns multi-format date
+  // parsing), so a space-separated `'2026-09-10 14:30'` — which PG accepts and
+  // stores fine — yielded the WHOLE string as the broadcast key, and every board
+  // silently ignored the frame.
+  const { rows: updated } = await sql<{ app_day: string }>`
+        UPDATE "appointments"
+        SET "person_id" = ${parseInt(String(person_id), 10)},
+            "app_date" = ${app_date}::timestamp,
+            "app_detail" = ${app_detail},
+            "dr_id" = ${parseInt(String(dr_id), 10)}
+        WHERE "appointment_id" = ${appointmentId}
+        RETURNING "app_day"
+    `.execute(db);
+
+  return { previousDay: existing[0].app_day, newDay: updated[0]?.app_day ?? null };
 }
 
 /**
@@ -366,7 +442,7 @@ export async function quickCheckIn(
   const { person_id, app_detail, dr_id } = checkInData;
 
   // Validate person_id
-  if (!person_id || isNaN(parseInt(String(person_id)))) {
+  if (!person_id || isNaN(parseInt(String(person_id), 10))) {
     throw new AppointmentValidationError(
       'person_id is required and must be a valid number',
       'INVALID_PERSON_ID'
@@ -375,7 +451,7 @@ export async function quickCheckIn(
 
   // Set defaults for optional fields
   const detail = app_detail || 'Walk-in';
-  const doctorId = dr_id ? parseInt(String(dr_id)) : null;
+  const doctorId = dr_id ? parseInt(String(dr_id), 10) : null;
 
   // Get formatted current date/time. `timeOnly` is the check-in stamp: a wall-clock
   // string, never a Date — a Date would serialize through res.json() as a UTC ISO
@@ -389,6 +465,8 @@ export async function quickCheckIn(
     appointment_id: number;
     /** `timestamp` column → a real `Date` at runtime (see kysely.ts parsers). */
     app_date: Date;
+    /** Generated `date` column → 'YYYY-MM-DD' string. The SSE broadcast key. */
+    app_day: string;
     present: string | null;
     seated: string | null;
     dismissed: string | null;
@@ -396,9 +474,9 @@ export async function quickCheckIn(
 
   const db = getKysely();
   const { rows: existingAppointment } = await sql<ExistingAppointment>`
-        SELECT "appointment_id", "app_date", "present", "seated", "dismissed"
+        SELECT "appointment_id", "app_date", "app_day", "present", "seated", "dismissed"
         FROM "appointments"
-        WHERE "person_id" = ${parseInt(String(person_id))}
+        WHERE "person_id" = ${parseInt(String(person_id), 10)}
           AND "app_date"::date = ${dateOnly}::date
     `.execute(db);
 
@@ -416,13 +494,14 @@ export async function quickCheckIn(
         `Patient ${person_id} already checked in today (Appointment ${apt.appointment_id})`
       );
       return {
+        appDay: apt.app_day,
         success: true,
         alreadyCheckedIn: true,
         appointment_id: apt.appointment_id,
         message: 'Patient already checked in today',
         appointment: {
           appointment_id: apt.appointment_id,
-          person_id: parseInt(String(person_id)),
+          person_id: parseInt(String(person_id), 10),
           app_date: existingAppDate,
           present: apt.present,
         },
@@ -451,13 +530,14 @@ export async function quickCheckIn(
     );
 
     return {
+      appDay: apt.app_day,
       success: true,
       checkedIn: true,
       appointment_id: apt.appointment_id,
       message: 'Patient checked in successfully',
       appointment: {
         appointment_id: apt.appointment_id,
-        person_id: parseInt(String(person_id)),
+        person_id: parseInt(String(person_id), 10),
         app_date: existingAppDate,
         present: presentTimeString,
       },
@@ -475,8 +555,8 @@ export async function quickCheckIn(
   }
 
   // Create new appointment with present time already set (+ AppoPatientType in createAppointment)
-  const newAppointmentId = await createAppointment({
-    person_id: parseInt(String(person_id)),
+  const { appointment_id: newAppointmentId, app_day: appDay } = await createAppointment({
+    person_id: parseInt(String(person_id), 10),
     app_date: dateTime,
     app_detail: detail,
     dr_id: doctorId,
@@ -488,6 +568,7 @@ export async function quickCheckIn(
   );
 
   return {
+    appDay,
     success: true,
     created: true,
     checkedIn: true,
@@ -495,7 +576,7 @@ export async function quickCheckIn(
     message: 'Appointment created and patient checked in successfully',
     appointment: {
       appointment_id: newAppointmentId,
-      person_id: parseInt(String(person_id)),
+      person_id: parseInt(String(person_id), 10),
       app_date: dateTime,
       app_detail: detail,
       dr_id: doctorId,

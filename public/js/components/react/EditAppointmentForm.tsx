@@ -247,10 +247,10 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
             const result = await putJSON<{ success?: boolean; error?: string }>(
                 `/api/appointments/${appointmentId || existingAppointment?.appointment_id}`,
                 {
-                    person_id: parseInt(String(formData.PersonID)),
+                    person_id: parseInt(String(formData.PersonID), 10),
                     app_date: appointmentDateTime,
                     app_detail: formData.AppDetail,
-                    dr_id: parseInt(formData.DrID)
+                    dr_id: parseInt(formData.DrID, 10)
                 }
             );
 

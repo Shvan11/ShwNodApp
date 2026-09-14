@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-**Shwan Orthodontics Management System** — Node.js + Express 5 + React 19 + TypeScript practice-management platform for an orthodontic clinic. Patients, treatments, dental chart, aligners, appointments, multi-channel messaging (WhatsApp/SMS/Telegram), finance/expenses, document templates (GrapesJS), Stand inventory/POS, Patient Portal, doctor-portal announcements + a staff "Portal activity" header bell (two-way over the CDC mirror — see `aligner-portal-external/CLAUDE.md`). NB the staff-session/CSRF portal-path skips in `index.ts`/`middleware/csrf.ts` are **segment-bounded** (`/api/portal` + `/api/portal/*` only) — a broad `startsWith('/api/portal')` silently strips the staff session off staff routes like `/api/portal-activity`.
+**Shwan Orthodontics Management System** — Node.js + Express 5 + React 19 + TypeScript practice-management platform for an orthodontic clinic. Patients, treatments, dental chart, aligners, appointments, multi-channel messaging (WhatsApp/SMS/Telegram), finance/expenses, document templates (GrapesJS), Stand inventory/POS, Patient Portal, doctor-portal announcements + a staff "Portal activity" header bell (two-way over the CDC mirror — see `aligner-portal-external/CLAUDE.md`). NB the staff-session/CSRF portal-path skips in `app/sessions.ts`/`middleware/csrf.ts` are **segment-bounded** (`/api/portal` + `/api/portal/*` only) — a broad `startsWith('/api/portal')` silently strips the staff session off staff routes like `/api/portal-activity`.
 
 > **Product direction — this is a COMMERCIAL, multi-deployment product, not a single-clinic app.** It began bespoke for one clinic but is being built to sell to **many independent dental/orthodontic centers, each running its own instance + database** (the Windows-service deployment model). Two implications shape every design call: **(1) Don't tune schema/indexes/queries/assumptions to *this* clinic's data profile** (e.g. only 5 doctors, `dr_id` ~94% NULL) — design for the general case, including doctor-heavy centers where per-doctor views matter. **(2) But every center is its own bounded single-clinic DB, and the absolute ceiling is known.** The biggest center that can realistically exist — ~20 doctors × ~20 appts/day = 400/day × ~247 working days/yr (after Fri+Sat weekends + ~14 holidays) × a ~20-year lifetime ≈ **~2M appointments** (~100–150K patients); most centers far smaller. So the busiest table (`appointments`) tops out around **~2M rows, everything else in the hundreds of thousands** — NOT web-scale (no billions, no sharding/partitioning), but big enough that **hot access paths a multi-doctor center runs repeatedly must be properly indexed.** E.g. the per-doctor calendar over a date range warrants a partial `(dr_id, app_date)` index (at ~2M rows a per-doctor month view touches ~415 of its ~8,300 rows), even though *this* clinic's data (5 doctors, `dr_id` 94% NULL) wouldn't reveal the need. Net: design for the ~2M-row ceiling — index the real access paths a busy multi-doctor center hits, but don't engineer beyond that, and never tune to one clinic's skew.
 
@@ -25,11 +25,12 @@ npm run gate             # CI gate: typecheck:all + lint + test + contracts:chec
 
 ## Architecture (where to look)
 
-**Backend** — Express 5, ESM, strict TS. Entry: `index.ts`.
-- `routes/` — root routes (admin/auth/portal/calendar/sync-webhook/template-api/user-management/web/email-api) + `routes/api/*.routes.ts` per feature
+**Backend** — Express 5, ESM, strict TS. Entry: `index.ts` (boot ORDER only, ~300 ln).
+- `app/` — what `index.ts` orchestrates: `sessions.ts` (staff+portal session, CSRF), `mount-routes.ts` (**the whole route table** — registration order IS the routing contract, so every mount decision and its rationale lives here), `whatsapp-events.ts` (service↔event-bus wiring + startup auto-init), `shutdown.ts` (graceful teardown + signal/crash handlers). `mount-routes.test.ts` snapshots the resulting 460-odd-route table to `app/__snapshots__/route-table.txt` — **a diff there is a diff in what the server serves**; read it before accepting one (`vitest -u`).
+- `routes/` — root-mounted routers (`admin`/`auth`/`portal`/`sync-webhook`/`web`) + `routes/api/*.routes.ts` per feature + `routes/public/*` (pre-gate)
 - `services/` — 19 domain subdirs (`business/`, `database/`, `messaging/`, `sync/`, `pdf/`, `templates/`, `webceph/`, `google-drive/`, `files/`, `imaging/`, `settings/`, `monitoring/`, …). `messaging/` owns every channel (WhatsApp incl. its runtime state — `messageState`/`stateEvents`/`StateManager` — plus SMS, Telegram, email); `settings/` backs the Settings screen (do not confuse with the root `config/` boot config behind `@config/*`); process-lifecycle infra is `utils/resource-manager.ts`, not a service.
-- `services/database/queries/` — one query module per domain (~24)
-- `middleware/`, `utils/`, `config/`, `types/`; `shared/` — cross-boundary Zod contracts
+- `services/database/queries/` — one query module per domain (~47). The `work-*` and `aligner-*` families are each split by table, not by feature: `work-queries` owns the `works` row, with `work-item-`/`work-lookup-`/`work-transfer-queries` alongside; the aligner side is `aligner-{set,batch,note,doctor,patient,payment,archform}-queries` + `aligner-shared` (S2/C4-C5)
+- `middleware/` (its own types in `middleware/types.ts`), `utils/`, `config/`, `types/` (generated `db.d.ts` + ambient decls + boot-config shape only); `shared/` — cross-boundary Zod contracts
 
 **Frontend** — React 19, React Router v7 Data Router, Vite 7. Entry: `public/js/App.tsx`.
 - `public/js/router/` — `routes.config.tsx` (route table), `loaders.ts` (thin prefetchers into the React Query cache)
@@ -78,7 +79,7 @@ Every enveloped staff-app endpoint's request **and** response is authored once a
 - Loose-but-safe primitives in `shared/validation.ts`: **`timestampString`** (PG `timestamp`: Date server / string client), **`anyArray`** (`z.array(z.unknown())`), **`z.unknown()`** — preserve the payload without forcing an interface→type flip.
 - Leave deliberately-raw endpoints alone: un-enveloped `null` signals, PDF/stream/`res.send` responses, and raw whatsapp `apiClient` consumers (they read top-level fields; nesting under `data` would hide them). Always check the consumer's transport before migrating an envelope.
 
-**Gate (enforced on every push/PR — `.github/workflows/gate.yml`):** `npm run gate` fails if a hand-written request `interface *Body|*Params|*Query|*Filters` appears in `routes/` (ESLint), a `fetchJSON` read lacks `{ schema }`, or `scripts/contracts-dod.mjs` sees D1 (request interfaces, target 0) or D2 (loose response markers, baseline **9**) regress. A new loose response needs an inline `// Intentionally loose:` + a D2 baseline bump.
+**Gate (enforced on every push/PR — `.github/workflows/gate.yml`):** `npm run gate` fails if a hand-written request `interface *Body|*Params|*Query|*Filters` appears in `routes/` (ESLint), a `fetchJSON` read lacks `{ schema }`, or `scripts/contracts-dod.mjs` sees D1 (request interfaces, target 0) or D2 (loose response markers, baseline **9**) regress. A new loose response needs an inline `// Intentionally loose:` + a D2 baseline bump. ESLint `radix` is also an **error** repo-wide: `parseInt` needs an explicit `10` (without it `parseInt('0x10')` is 16, so `DELETE /api/users/0x10` addressed user 16 on any route whose param lacked a `validate({ params })` guard).
 
 Envelope type: `public/js/types/api.types.ts` holds only `ApiResponse<T>` (`{ success, data?, error? }`). Import it as `import type { ApiResponse } from '@/types/api.types'` — the `@types/*` alias resolves in tsconfig but **not** Vite, so use `@/` for value imports.
 
@@ -133,7 +134,7 @@ Validate **untrusted input crossing into the app**, nowhere else: request body/p
 
 **Connection** (`.env`, gitignored, per-machine): `localhost:5432`, db `shwan`, role `shwan_app`. For `PG_HOST`/`DATABASE_URL` use `127.0.0.1` on Windows-native (prod) — NOT the WSL NAT gateway `172.20.0.1` (its vEthernet adapter drops intermittently and silently kills the CDC sinks); from a WSL dev box, point at the host gateway IP (or enable WSL2 mirrored networking).
 
-**Sessions in PostgreSQL** (`express-session` + `connect-pg-simple`, wired in `index.ts`): tables `staff_sessions` (cookie `shwan.sid`) + `portal_sessions` (cookie `shwan.portal`), owned by `migrations/pg` (store never issues DDL), sharing the pool via `getPgPool()`.
+**Sessions in PostgreSQL** (`express-session` + `connect-pg-simple`, wired in `app/sessions.ts`): tables `staff_sessions` (cookie `shwan.sid`) + `portal_sessions` (cookie `shwan.portal`), owned by `migrations/pg` (store never issues DDL), sharing the pool via `getPgPool()`.
 
 **Other DB engines:** the only remaining SQLite is `services/archform/archform-db.ts` (`better-sqlite3`, reads Archform's own file — third-party). `mssql` + `services/database/pool.ts` survive only for the temporary Dolphin sink (see Sync) and go when it's deleted.
 
@@ -162,13 +163,13 @@ Sink status UI: `SupabaseStatusSettings.tsx` → `GET /api/sync/supabase-status`
 
 WebSockets are retired — all server→client realtime is **Server-Sent Events**. The legacy `utils/websocket.ts`, `wsService`, `connectionManager`, `constants/websocket-events.ts` are gone; don't restore them.
 
-**Server:** `index.ts` creates a bare `new EventEmitter()` (`wsEmitter`) and hands it to the broadcasters at boot:
+**Server:** `index.ts` creates a bare `new EventEmitter()` (`wsEmitter`) and `app/mount-routes.ts` hands it to the broadcasters at boot:
 - `services/messaging/sse-broadcaster.ts` — appointments + chair-display channels
 - `services/messaging/sse-whatsapp.ts` — WhatsApp channel (QR, client-ready, message-status, progress)
 
 Routes/services emit internal events (`wsEmitter.emit(InternalEmitterEvents.DATA_UPDATED, …)`, `CHAIR_PATIENT_LOAD`, `WHATSAPP_*`); broadcasters translate them to SSE frames. Add new internal events to `services/messaging/websocket-events.ts` (filename is legacy — these are in-process emitter names, never on the wire) and wire them in the broadcaster's `ensureInitialized()`.
 
-**Routes:** `GET /sse/chair-display/:chairId` is **public** (kiosk has no session, internal-LAN). `GET /api/sse/appointments` + `GET /api/sse/whatsapp` mount **after** the auth gate (a 401 closes the EventSource).
+**Routes:** all three streams — `GET /api/sse/appointments`, `/api/sse/whatsapp`, `/api/sse/chair-display/:chairId` — mount **after** the auth gate, so a 401 closes the EventSource. **The chair kiosk is NOT session-less**: it runs the staff SPA at `/chair-display`, whose shell is served by `routes/web.ts` behind `authenticateWeb` (its `/DolImgs` images only render because the session cookie rides along), so the stream needs no public mount. It was public until 2026-09-12 on the opposite premise, which published patient name + intraoral images + visit summary to anyone who could reach the server on `chairId` 1-10 — including through the cloudflared tunnel, which forwards every path to `:3000`. Don't re-mount it pre-gate. Because EventSource never retries after a 4xx, the kiosk reloads itself on a CLOSED stream (`CLOSED_STREAM_RELOAD_DELAY_MS`) so an expired session lands on the login screen instead of a frozen display.
 
 **Transport hygiene (copy the pattern in each handler):**
 - `req.setTimeout(0); res.setTimeout(0)` — bypasses the global 30s `requestTimeout` (else streams 408 at 30s).

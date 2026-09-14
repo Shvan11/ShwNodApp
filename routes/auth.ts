@@ -5,13 +5,13 @@
 import { Router, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { verifyCredentials, hashPassword, authenticate, authorize } from '../middleware/auth.js';
-import { sql } from 'kysely';
-import { getKysely } from '../services/database/kysely.js';
+import { setUserPassword } from '../services/database/queries/user-queries.js';
 import { log } from '../utils/logger.js';
 import type { LoginBody, ChangePasswordBody } from '../shared/contracts/auth.contract.js';
 import * as threeShapeOAuth from '../services/threeshape/oauth.js';
 import { ThreeShapeError } from '../services/threeshape/errors.js';
 import { normalizeRole, ADMIN_ROLES } from '../shared/auth/roles.js';
+import { MIN_PASSWORD_LENGTH } from '../shared/validation.js';
 
 const router = Router();
 
@@ -219,18 +219,20 @@ router.post(
         return;
       }
 
-      if (newPassword.length < 6) {
+      if (newPassword.length < MIN_PASSWORD_LENGTH) {
         res.status(400).json({
           success: false,
-          error: 'New password must be at least 6 characters long'
+          error: `New password must be at least ${MIN_PASSWORD_LENGTH} characters long`
         });
         return;
       }
 
-      // Verify current password
+      // Verify current password. This is a re-authentication, not a login, so it
+      // must not stamp `last_login` (which would record a password change as a sign-in).
       const result = await verifyCredentials(
         req.session.username!,
-        currentPassword
+        currentPassword,
+        { touchLastLogin: false }
       );
       if (!result.success) {
         res.status(401).json({
@@ -244,20 +246,35 @@ router.post(
       const newHash = await hashPassword(newPassword);
 
       // Update password in database
-      const db = getKysely();
-      await sql`UPDATE "users" SET "password_hash" = ${newHash} WHERE "user_id" = ${req.session.userId}`.execute(db);
+      await setUserPassword(req.session.userId!, newHash);
 
       log.info('Password changed', { username: req.session.username });
 
-      // Regenerate session ID to invalidate the old session cookie; preserve login data
-      const { userId, username, userRole, fullName } = req.session;
-      await new Promise<void>((resolve, reject) => {
-        req.session.regenerate((err) => (err ? reject(err) : resolve()));
-      });
-      req.session.userId = userId;
-      req.session.username = username;
-      req.session.userRole = userRole;
-      req.session.fullName = fullName;
+      // Everything past this point is session hygiene, and the password has ALREADY
+      // changed. A failure here must not report "Failed to change password" — the
+      // user would retry with the old password and be locked out of their own
+      // change. Rotate the session id best-effort and still answer 200.
+      try {
+        // Regenerate session ID to invalidate the old session cookie; preserve login data
+        const { userId, username, userRole, fullName } = req.session;
+        await new Promise<void>((resolve, reject) => {
+          req.session.regenerate((err) => (err ? reject(err) : resolve()));
+        });
+        req.session.userId = userId;
+        req.session.username = username;
+        req.session.userRole = userRole;
+        req.session.fullName = fullName;
+        // Persist the regenerated session before responding, as /login does — else
+        // the client can send the new id before the store has it.
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => (err ? reject(err) : resolve()));
+        });
+      } catch (sessionError) {
+        log.error('Password changed but session rotation failed', {
+          username: req.session?.username,
+          error: (sessionError as Error).message,
+        });
+      }
 
       res.json({
         success: true,

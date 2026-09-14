@@ -65,10 +65,13 @@ if (!envResult.success) {
   throw new Error('Invalid environment configuration — see logs above. Fix .env before starting.');
 }
 
-// Port configuration - always use 3000
-function getDefaultPort(): number {
-  return 3000;
-}
+// The COERCED environment. `envResult.data` used to be discarded, so `PORT` reached
+// config.server.port as the raw string it came in as (typed `number | string`), and
+// LOCALSEND_PORT was re-parsed by hand further down. Read numbers from here.
+const env = envResult.data;
+
+const DEFAULT_PORT = 3000;
+const DEFAULT_LOCALSEND_PORT = 53317;
 
 // PostgreSQL connection settings — DATABASE_URL *or* the discrete PG_* block, per-field, resolved
 // in config/pg-connection.ts (extracted so it is unit-testable; config.ts throws at import time).
@@ -95,10 +98,6 @@ const config: AppConfig = {
       },
     },
   },
-  // PostgreSQL is the only runtime driver as of migration Phase 9. The flag is kept
-  // (defaulting to 'pg') for config-shape continuity; the mssql code path is gone, so
-  // setting DB_DRIVER=mssql no longer changes runtime behavior.
-  dbDriver: (process.env.DB_DRIVER as 'mssql' | 'pg') || 'pg',
   databasePg: {
     ...pgConnection,
     max: 10,
@@ -120,10 +119,9 @@ const config: AppConfig = {
     authToken: process.env.TWILIO_AUTH_TOKEN,
     fromName: process.env.TWILIO_FROM_NAME
   },
-  google: {
-    clientId: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET
-  },
+  // NOTE: there is no shared `google` block. The Drive and Contacts blocks below read
+  // GOOGLE_CLIENT_ID/SECRET directly as their fallback, so a middle layer would only be
+  // a second place for the same two values to drift.
   googleDrive: {
     clientId: process.env.GOOGLE_DRIVE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET,
@@ -145,10 +143,9 @@ const config: AppConfig = {
     machinePath: process.env.MACHINE_PATH
   },
   server: {
-    port: process.env.PORT || getDefaultPort()
+    port: env.PORT ?? DEFAULT_PORT
   },
   urls: {
-    qrHost: process.env.QR_HOST_URL,
     publicUrl: process.env.PUBLIC_URL || 'https://remote.shwan-orthodontics.com'
   },
   webceph: {
@@ -174,7 +171,7 @@ const config: AppConfig = {
   },
   localsend: {
     enabled: process.env.LOCALSEND_ENABLED === 'true',
-    port: parseInt(process.env.LOCALSEND_PORT || '53317', 10),
+    port: env.LOCALSEND_PORT ?? DEFAULT_LOCALSEND_PORT,
     alias: process.env.LOCALSEND_ALIAS || 'Shwan Clinic Server',
     multicast: process.env.LOCALSEND_MULTICAST || '224.0.0.167',
   },

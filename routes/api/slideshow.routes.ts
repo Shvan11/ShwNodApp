@@ -2,11 +2,15 @@
  * Saved slideshow configurations — CRUD for the Patient Presentation Slideshow.
  *
  * Per-patient saved sequences (`person_id` set) + clinic-wide generic templates
- * (`person_id` NULL). Reads + writes ride the global `/api` `authenticate` gate
- * (index.ts); mutations are CSRF-checked by the staff funnel. Backed by the
- * LOCAL-ONLY `slideshow_configs` table.
+ * (`person_id` NULL). Reads ride the global `/api` `authenticate` gate
+ * (index.ts); mutations are CSRF-checked by the staff funnel AND carry an
+ * explicit `authorize(CLINICAL_ROLES)` — a saved sequence is per-patient
+ * clinical content, so the tier matches the photo/timepoint routes it presents.
+ * Backed by the LOCAL-ONLY `slideshow_configs` table.
  */
 import { Router, type Request, type Response } from 'express';
+import { authorize } from '../../middleware/auth.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import { sendData, ErrorResponses } from '../../utils/error-response.js';
 import { log } from '../../utils/logger.js';
@@ -41,6 +45,7 @@ router.get(
 // POST /api/slideshow-configs — create a config.
 router.post(
   '/slideshow-configs',
+  authorize(CLINICAL_ROLES),
   validate({ body: slideshowContract.createConfig.body }),
   async (
     req: Request<unknown, unknown, slideshowContract.CreateConfigBody>,
@@ -59,6 +64,7 @@ router.post(
 // PUT /api/slideshow-configs/:id — rename and/or overwrite the saved sequence.
 router.put(
   '/slideshow-configs/:id',
+  authorize(CLINICAL_ROLES),
   validate({
     params: slideshowContract.updateConfig.params,
     body: slideshowContract.updateConfig.body,
@@ -84,6 +90,7 @@ router.put(
 // DELETE /api/slideshow-configs/:id
 router.delete(
   '/slideshow-configs/:id',
+  authorize(CLINICAL_ROLES),
   validate({ params: slideshowContract.deleteConfig.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {

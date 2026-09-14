@@ -106,7 +106,7 @@ export function convertWSLPathToWindows(wslPath: string): string {
  * @param relativePath - Relative path to append
  * @returns Platform-appropriate full path
  */
-export function resolvePath(basePath: string, relativePath: string = ''): string {
+function resolvePath(basePath: string, relativePath: string = ''): string {
   const platform = detectPlatform();
   let fullPath: string;
 
@@ -148,14 +148,6 @@ export function createPathResolver(basePath: string): PathResolver {
 }
 
 /**
- * Get platform-specific path separator
- * @returns Path separator for current platform
- */
-export function getPathSeparator(): string {
-  return detectPlatform() === 'wsl' ? '/' : '\\';
-}
-
-/**
  * Get current platform information
  * @returns Platform detection info
  */
@@ -168,12 +160,3 @@ export function getPlatformInfo(): PlatformInfo {
     isWSL: !!process.env.WSL_DISTRO_NAME
   };
 }
-
-export default {
-  resolvePath,
-  createPathResolver,
-  getPathSeparator,
-  getPlatformInfo,
-  convertWindowsPathToWSL,
-  convertWSLPathToWindows
-};

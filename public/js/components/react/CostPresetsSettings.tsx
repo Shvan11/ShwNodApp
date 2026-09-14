@@ -62,7 +62,7 @@ const CostPresetsSettings = () => {
             await postJSON('/api/settings/cost-presets', {
                 amount: parseFloat(formData.amount),
                 currency: formData.currency,
-                displayOrder: parseInt(String(formData.displayOrder)) || 0
+                displayOrder: parseInt(String(formData.displayOrder), 10) || 0
             });
 
             toast.success('Preset created successfully');
@@ -101,7 +101,7 @@ const CostPresetsSettings = () => {
             await putJSON(`/api/settings/cost-presets/${editingPreset.preset_id}`, {
                 amount: parseFloat(formData.amount),
                 currency: formData.currency,
-                displayOrder: parseInt(String(formData.displayOrder)) || 0
+                displayOrder: parseInt(String(formData.displayOrder), 10) || 0
             });
 
             toast.success('Preset updated successfully');

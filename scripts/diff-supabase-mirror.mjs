@@ -3,6 +3,7 @@
 // Ignores: session tables, sync/migration infra, and the PG18 named-NOT-NULL artifact.
 import pg from 'pg';
 import fs from 'node:fs';
+import { resolveLocalPg } from './_pg-connection.mjs';
 
 // --- load .env ---
 const env = {};
@@ -11,8 +12,11 @@ for (const line of fs.readFileSync('.env', 'utf8').split('\n')) {
   if (m) env[m[1]] = m[2].replace(/^["']|["']$/g, '');
 }
 
-const localUrl = env.DATABASE_URL ||
-  `postgres://${env.PG_USER}:${env.PG_PASSWORD}@${env.PG_HOST}:${env.PG_PORT}/${env.PG_DATABASE}`;
+// The app's precedence, not the reverse: discrete PG_* win PER FIELD over
+// DATABASE_URL (config/pg-connection.ts). Reading the URL first meant that on a box
+// where both forms are set and disagree, this compared the WRONG local database
+// against the mirror.
+const localConn = resolveLocalPg(env);
 const mirrorUrl = env.SUPABASE_FAILOVER_DB_URL;
 if (!mirrorUrl) { console.error('SUPABASE_FAILOVER_DB_URL missing'); process.exit(1); }
 
@@ -24,7 +28,7 @@ const IGNORE_TABLES = new Set([
 ]);
 
 const cleanMirrorUrl = mirrorUrl.replace(/([?&])sslmode=[^&]*/g, '$1').replace(/[?&]$/, '');
-const local = new pg.Client({ connectionString: localUrl });
+const local = new pg.Client(localConn);
 const mirror = new pg.Client({ connectionString: cleanMirrorUrl, ssl: { rejectUnauthorized: false } });
 
 async function q(client, sql, params) { return (await client.query(sql, params)).rows; }

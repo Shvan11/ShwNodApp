@@ -36,12 +36,6 @@ const router = Router();
 const clinicalOnly = [authenticate, authorize(CLINICAL_ROLES)];
 
 // ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
-type VisitQueryParams = visit.VisitQueryParams;
-
-// ============================================================================
 // wire Management Routes
 // ============================================================================
 
@@ -73,7 +67,7 @@ router.get(
   clinicalOnly,
   validate({ query: visit.latestWires.query }),
   async (
-    req: Request<unknown, unknown, unknown, VisitQueryParams>,
+    req: Request<unknown, unknown, unknown, visit.LatestWiresQuery>,
     res: Response
   ): Promise<void> => {
     try {
@@ -82,7 +76,7 @@ router.get(
         ErrorResponses.missingParameter(res, 'workId');
         return;
       }
-      const latestWires = await getLatestWiresByWorkId(parseInt(workId));
+      const latestWires = await getLatestWiresByWorkId(parseInt(workId, 10));
       sendData(res, visit.latestWires.response, latestWires);
     } catch (error) {
       log.error('Error fetching latest wires:', error);
@@ -109,7 +103,7 @@ router.get(
   clinicalOnly,
   validate({ query: visit.visitsByWork.query }),
   async (
-    req: Request<unknown, unknown, unknown, VisitQueryParams>,
+    req: Request<unknown, unknown, unknown, visit.VisitsByWorkQuery>,
     res: Response
   ): Promise<void> => {
     try {
@@ -118,7 +112,7 @@ router.get(
         ErrorResponses.missingParameter(res, 'workId');
         return;
       }
-      const visits = await getVisitsByWorkId(parseInt(workId));
+      const visits = await getVisitsByWorkId(parseInt(workId, 10));
       sendData(res, visit.visitsByWork.response, visits);
     } catch (error) {
       log.error('Error fetching visits by work:', error);
@@ -141,7 +135,7 @@ router.get(
   clinicalOnly,
   validate({ query: visit.visitById.query }),
   async (
-    req: Request<unknown, unknown, unknown, VisitQueryParams>,
+    req: Request<unknown, unknown, unknown, visit.VisitByIdQuery>,
     res: Response
   ): Promise<void> => {
     try {
@@ -151,7 +145,7 @@ router.get(
         return;
       }
       // `visitRow` (not `visit`) to avoid shadowing the contract import.
-      const visitRow = await getVisitById(parseInt(visitId));
+      const visitRow = await getVisitById(parseInt(visitId, 10));
       if (!visitRow) {
         ErrorResponses.notFound(res, 'Visit');
         return;
@@ -190,12 +184,12 @@ router.post(
         );
         return;
       }
-      // Convert string date to Date object for database query
-      const visitDataWithDate = {
-        ...visitData,
-        visit_date: new Date(visitData.visit_date)
-      };
-      const result = await addVisitByWorkId(visitDataWithDate);
+      // `visit_date` is passed THROUGH as the contract's 'YYYY-MM-DD' string.
+      // `VisitData.visit_date` accepts `Date | string` and the query layer runs it
+      // through `toDateOnly`, whose pass-through guard keeps a plain date string
+      // verbatim — whereas `new Date('YYYY-MM-DD')` parses UTC midnight, which the
+      // local getters then shift back a day on a negative-UTC-offset host.
+      const result = await addVisitByWorkId(visitData);
       sendData(res, visit.addVisit.response, { visitId: result?.id });
     } catch (error) {
       log.error('Error adding visit:', error);
@@ -226,12 +220,8 @@ router.put(
         );
         return;
       }
-      // Convert string date to Date object for database query
-      const visitDataWithDate = {
-        ...visitData,
-        visit_date: new Date(visitData.visit_date)
-      };
-      await updateVisitByWorkId(visitId, visitDataWithDate);
+      // Date string passed through verbatim — see the add handler above.
+      await updateVisitByWorkId(visitId, visitData);
       sendSuccess(res, null);
     } catch (error) {
       log.error('Error updating visit:', error);

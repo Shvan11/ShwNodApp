@@ -1,6 +1,13 @@
 /**
  * Middleware Collection
- * Central export for all middleware modules
+ *
+ * `setupMiddleware` + `errorHandler` (both defined/re-exported here) are what
+ * index.ts imports; every route imports `auth.js` / `validate.js` / `timeout.js` /
+ * `time-based-auth.js` DIRECTLY. The re-exports below are kept only for the
+ * symbols that are actually reachable through this barrel — the type re-exports
+ * (`MemoryFile`, `TimeoutType`, `RecordAgeOptions`, …) had zero importers
+ * repo-wide and were removed rather than left as a second import path to keep
+ * in sync.
  */
 import express, { type Application } from 'express';
 import helmet from 'helmet';
@@ -18,18 +25,14 @@ export {
 // Re-export timeout middleware
 export {
   requestTimeout,
-  customTimeout,
   timeouts,
-  TIMEOUTS,
-  type TimeoutType,
-  type TimeoutValue
+  TIMEOUTS
 } from './timeout.js';
 
 // Re-export upload middleware
 export {
   uploadSinglePdf,
   handleUploadError,
-  type MemoryFile,
   type FileRequest
 } from './upload.js';
 export { default as upload } from './upload.js';
@@ -44,11 +47,7 @@ export {
   getPatientCreationDate,
   getWorkCreationDate,
   getInvoiceCreationDate,
-  getExpenseCreationDate,
-  type ResourceType,
-  type OperationType,
-  type GetRecordDateFn,
-  type RecordAgeOptions
+  getExpenseCreationDate
 } from './time-based-auth.js';
 
 /**

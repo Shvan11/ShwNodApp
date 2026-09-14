@@ -135,7 +135,7 @@ router.post(
   validate({ params: approvalsContract.approveRequest.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
-      const requestId = parseInt(req.params.id);
+      const requestId = parseInt(req.params.id, 10);
       const result = await approve(requestId, req);
 
       if (result.status === 'conflict') {
@@ -176,7 +176,7 @@ router.post(
     res: Response
   ): Promise<void> => {
     try {
-      const requestId = parseInt(req.params.id);
+      const requestId = parseInt(req.params.id, 10);
       const row = await reject(requestId, req.body.note, req);
       if (!row) {
         ErrorResponses.notFound(res, 'Approval request');
@@ -198,7 +198,7 @@ router.post(
   validate({ params: approvalsContract.acknowledgeRequest.params }),
   async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     try {
-      const requestId = parseInt(req.params.id);
+      const requestId = parseInt(req.params.id, 10);
       const row = await acknowledge(requestId, req);
       if (!row) {
         ErrorResponses.notFound(res, 'Approval request');

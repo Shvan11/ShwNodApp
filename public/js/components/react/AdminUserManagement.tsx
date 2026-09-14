@@ -8,6 +8,7 @@ import { qk } from '@/query/keys';
 import Modal from './Modal';
 import styles from './AdminUserManagement.module.css';
 import { ASSIGNABLE_ROLES, ROLE_LABELS, type UserRole } from '@shared/auth/roles';
+import { MIN_PASSWORD_LENGTH } from '@shared/validation';
 
 const ROLE_BADGE_CLASS: Record<UserRole, string> = {
   admin: styles.roleAdmin,
@@ -122,8 +123,8 @@ export default function AdminUserManagement() {
     e.preventDefault();
     if (!resetTarget || resetting) return;
 
-    if (newPasswordInput.length < 6) {
-      toast.error('Password must be at least 6 characters');
+    if (newPasswordInput.length < MIN_PASSWORD_LENGTH) {
+      toast.error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
       return;
     }
 

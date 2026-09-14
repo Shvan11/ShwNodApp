@@ -1,7 +1,8 @@
 // services/messaging/whatsapp-api.ts
 import whatsapp from 'whatsapp-web.js';
 import fs from 'fs';
-import waInstance, { type WhatsAppClient } from './whatsapp.js';
+import waInstance from './whatsapp.js';
+import type { WhatsAppClient } from './whatsapp-types.js';
 import { getPhoneCompatibleFilename } from '../../utils/filename-converter.js';
 import { log } from '../../utils/logger.js';
 

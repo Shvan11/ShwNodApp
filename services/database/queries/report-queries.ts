@@ -387,3 +387,69 @@ export async function getRevenueByDoctor(
 
   return rows;
 }
+
+/**
+ * One payment behind a doctor's revenue figure — the ungrouped drill-down row for the
+ * Statistics "Revenue by Doctor" / "Commissions" tables. `currency` is `works.currency`
+ * and is NULLABLE: the aggregates bucket with `FILTER (WHERE currency = 'IQD'|'USD')`, so
+ * a NULL-currency work contributes to neither total. Such a payment is still listed (the
+ * money is real and must be visible), and the UI renders its currency as an em dash.
+ */
+export interface DoctorPaymentRow {
+  invoice_id: number;
+  date_of_payment: string;
+  patient_name: string;
+  person_id: number;
+  work_id: number;
+  work_type: string;
+  amount_paid: number;
+  currency: string | null;
+}
+
+/** Rows returned to the client; the query probes one past it to detect truncation. */
+export const DOCTOR_PAYMENTS_LIMIT = 2000;
+
+/**
+ * Every payment on one doctor's works within [startDate, endDate] — the per-payment
+ * detail behind getRevenueByDoctor / getDoctorCommissions, with patient + work-type
+ * context. Same revenue definition as those aggregates (invoices.amount_paid keyed on
+ * date_of_payment, doctor via works.dr_id, a NOT NULL real FK; the iqd_received /
+ * usd_received cash-box columns are deliberately NOT used), so the list reconciles
+ * against the row it was opened from.
+ *
+ * Deliberately NO amount filter: the aggregates apply `HAVING SUM(...) > 0` to whole
+ * doctors, not to rows, so a zero or negative (refund) invoice belongs in this list —
+ * omitting it would make the detail disagree with the total.
+ *
+ * Fetches LIMIT+1 so the caller can report truncation without a second COUNT; the cap
+ * only bites on a multi-year range (a month is tens of rows). Index path:
+ * works(ix_works_dr_id) → invoices(ix_wid_date_sum).
+ */
+export async function getDoctorPayments(
+  doctorId: number,
+  startDate: string,
+  endDate: string
+): Promise<DoctorPaymentRow[]> {
+  const { rows } = await sql<DoctorPaymentRow>`
+    SELECT
+      i."invoice_id"       AS invoice_id,
+      i."date_of_payment"  AS date_of_payment,
+      p."patient_name"     AS patient_name,
+      w."person_id"        AS person_id,
+      w."work_id"          AS work_id,
+      wt."work_type"       AS work_type,
+      i."amount_paid"      AS amount_paid,
+      w."currency"         AS currency
+    FROM "invoices" i
+    JOIN "works" w       ON w."work_id"  = i."work_id"
+    JOIN "patients" p    ON p."person_id" = w."person_id"
+    JOIN "work_types" wt ON wt."id"      = w."type_of_work"
+    WHERE w."dr_id" = ${doctorId}
+      AND i."date_of_payment" >= ${startDate}::date
+      AND i."date_of_payment" <= ${endDate}::date
+    ORDER BY i."date_of_payment" DESC, i."invoice_id" DESC
+    LIMIT ${DOCTOR_PAYMENTS_LIMIT + 1}
+  `.execute(getKysely());
+
+  return rows;
+}

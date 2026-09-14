@@ -74,7 +74,10 @@ export interface PatientData {
   phone?: string;
   firstName?: string;
   lastName?: string;
-  dateOfBirth?: Date;
+  // `Date | string`: the routes hand over the contract's 'YYYY-MM-DD' verbatim so
+  // `toDateOnly`'s pass-through guard fires (a `new Date(str)` round-trip parses UTC
+  // midnight and shifts back a day on a negative-offset host).
+  dateOfBirth?: Date | string;
   gender?: string | number;
   phone2?: string;
   email?: string;
@@ -143,7 +146,8 @@ interface UpdatePatientData {
   phone?: string;
   phone2?: string;
   email?: string;
-  date_of_birth?: Date;
+  /** `Date | string` — see `dateOfBirth` above. */
+  date_of_birth?: Date | string;
   gender?: string | number;
   address_id?: string | number;
   referral_source_id?: string | number;
@@ -414,6 +418,43 @@ export function getPatientTypes(): Promise<LookupItem[]> {
 }
 
 /**
+ * Tag / patient-type dropdown feeds for the patient-management search panel.
+ *
+ * These alias their name column differently from the `LookupItem` helpers above
+ * (`tag` / `type`, not `name`) because that is the shape the contract and the
+ * react-select mapping already expect — so they get their own readers rather
+ * than a cast over `getPatientTypes()`. `type` (not interface) so an array of
+ * them feeds the looseObject `sendData` args (CLAUDE.md / TS2345).
+ */
+export type TagOption = {
+  id: number;
+  tag: string;
+};
+
+export type PatientTypeOption = {
+  id: number;
+  type: string | null;
+};
+
+/** Every tag option, alphabetically. */
+export function getTagOptions(): Promise<TagOption[]> {
+  return getKysely()
+    .selectFrom('tag_options')
+    .select(['id as id', 'tag as tag'])
+    .orderBy('tag')
+    .execute();
+}
+
+/** Every patient type, alphabetically — aliased `type` for the search filters. */
+export function getPatientTypeOptions(): Promise<PatientTypeOption[]> {
+  return getKysely()
+    .selectFrom('patient_types')
+    .select(['id as id', 'patient_type as type'])
+    .orderBy('patient_type')
+    .execute();
+}
+
+/**
  * Retrieves all addresses for dropdown lists.
  */
 export function getAddresses(): Promise<LookupItem[]> {
@@ -587,4 +628,24 @@ export async function hasNextAppointment(patientId: number): Promise<boolean> {
     log.error('[PATIENT-QUERIES] Error checking appointment', { patientId, error: (error as Error).message });
     throw error;
   }
+}
+
+
+/**
+ * Set a patient's estimated treatment cost + its currency.
+ *
+ * Both values are written verbatim — the caller has already decided what an
+ * absent one means (the route defaults currency to 'IQD' and keeps a 0 estimate
+ * as 0 rather than NULL; see its comment).
+ */
+export async function updateEstimatedCost(
+  personId: number,
+  estimatedCost: number | null,
+  currency: string
+): Promise<void> {
+  await getKysely()
+    .updateTable('patients')
+    .set({ estimated_cost: estimatedCost, currency })
+    .where('person_id', '=', personId)
+    .execute();
 }

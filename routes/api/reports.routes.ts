@@ -22,6 +22,8 @@ import {
   getDoctorCommissions,
   getRevenueByWorkType,
   getRevenueByDoctor,
+  getDoctorPayments,
+  DOCTOR_PAYMENTS_LIMIT,
   type RevenueBreakdownRow,
 } from '../../services/database/queries/report-queries.js';
 import {
@@ -41,6 +43,8 @@ type MultiYearStatisticsQuery = reports.MultiYearStatisticsQuery;
 type DailyInvoicesQuery = reports.DailyInvoicesQuery;
 type CommissionsQuery = reports.CommissionsQuery;
 type RevenueBreakdownQuery = reports.RevenueBreakdownQuery;
+type DoctorPaymentsParams = reports.DoctorPaymentsParams;
+type DoctorPaymentsQuery = reports.DoctorPaymentsQuery;
 
 /** ISO date of the last day of a 1-based month. UTC math, so no timezone shift. */
 function monthEnd(year: number, month: number): string {
@@ -70,7 +74,7 @@ async function resolveReferenceRate(
   override: string | undefined,
   asOf: string
 ): Promise<number | null> {
-  const explicit = override ? parseInt(override) : NaN;
+  const explicit = override ? parseInt(override, 10) : NaN;
   if (Number.isFinite(explicit) && explicit > 0) {
     return explicit;
   }
@@ -286,8 +290,8 @@ router.get('/statistics/multi-year', authorize(ADMIN_ROLES), async (req: Request
       return;
     }
 
-    const startYearNum = parseInt(startYear);
-    const endYearNum = parseInt(endYear);
+    const startYearNum = parseInt(startYear, 10);
+    const endYearNum = parseInt(endYear, 10);
 
     // Validate year range
     if (isNaN(startYearNum) || startYearNum < 2000 || startYearNum > 2100) {
@@ -323,9 +327,9 @@ router.get('/statistics/multi-year', authorize(ADMIN_ROLES), async (req: Request
         // Get 12 months of data starting from January of this year
         const monthlyData = await getYearlyMonthlyTotals(1, year, exRate);
 
-        // Filter to only include months from this year and aggregate
-        const yearMonths = monthlyData.filter(m => m.Year === year);
-        return yearMonths.reduce<YearTotal>((acc, month) => ({
+        // No filter: getYearlyMonthlyTotals(1, year, …) returns exactly this
+        // year's twelve months, so the old `m.Year === year` pass was a no-op.
+        return monthlyData.reduce<YearTotal>((acc, month) => ({
           Year: year,
           SumIQD: acc.SumIQD + (month.SumIQD || 0),
           SumUSD: acc.SumUSD + (month.SumUSD || 0),
@@ -471,6 +475,54 @@ router.get(
     } catch (error) {
       log.error('Error fetching revenue breakdown:', error);
       ErrorResponses.internalError(res, 'Failed to fetch revenue breakdown', error as Error);
+    }
+  }
+);
+
+/**
+ * GET /statistics/doctor-payments/:doctorId
+ * The per-payment DETAIL behind one doctor's aggregate row on the Statistics "Breakdown"
+ * and "Commissions" tabs: every invoice on that doctor's works in [startDate, endDate],
+ * with patient name, work type, date and amount. Same revenue definition as the two
+ * aggregates it drills into, so the list reconciles against the row it was opened from.
+ *
+ * Capped at DOCTOR_PAYMENTS_LIMIT rows (only reachable on a multi-year range) with a
+ * `truncated` flag — the client shows its headline totals from the already-loaded
+ * aggregate row, never by summing these, so a partial list can't understate the money.
+ * Query params: startDate, endDate (YYYY-MM-DD — validated by the contract).
+ */
+router.get(
+  '/statistics/doctor-payments/:doctorId',
+  authorize(ADMIN_ROLES), // per-doctor earnings — same gate as the tabs this drills into
+  validate({ params: reports.doctorPayments.params, query: reports.doctorPayments.query }),
+  async (
+    req: Request<DoctorPaymentsParams, object, object, DoctorPaymentsQuery>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const doctorId = Number(req.params.doctorId); // regex-validated as digits by the contract
+      const { startDate, endDate } = req.query;
+
+      // YYYY-MM-DD compares lexicographically == chronologically.
+      if (startDate > endDate) {
+        ErrorResponses.badRequest(res, 'startDate must be on or before endDate');
+        return;
+      }
+
+      // The query fetches LIMIT+1 so one extra row is the truncation signal.
+      const fetched = await getDoctorPayments(doctorId, startDate, endDate);
+      const truncated = fetched.length > DOCTOR_PAYMENTS_LIMIT;
+
+      sendData(res, reports.doctorPayments.response, {
+        rows: truncated ? fetched.slice(0, DOCTOR_PAYMENTS_LIMIT) : fetched,
+        truncated,
+        doctorId,
+        startDate,
+        endDate,
+      });
+    } catch (error) {
+      log.error('Error fetching doctor payments:', error);
+      ErrorResponses.internalError(res, 'Failed to fetch doctor payments', error as Error);
     }
   }
 );

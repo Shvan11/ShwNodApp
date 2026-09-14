@@ -5,8 +5,9 @@
  *   node scripts/_pgenv.mjs supa    → PGURL (sslmode stripped) + PGSSLMODE=require
  * Internal helper for scripts/psql.sh; not used by the app.
  */
-import dotenv from 'dotenv';
-dotenv.config({ quiet: true }); // suppress dotenv 17's promotional banner (would pollute the eval'd output)
+// _pg-connection.mjs loads .env itself (quietly — dotenv 17's banner would pollute
+// the eval'd output) and resolves DATABASE_URL / PG_* exactly as the app does.
+import { resolveLocalPg } from './_pg-connection.mjs';
 
 const e = process.env;
 const target = process.argv[2];
@@ -15,12 +16,13 @@ const target = process.argv[2];
 const sq = (s) => "'" + String(s == null ? '' : s).split("'").join("'\\''") + "'";
 
 if (target === 'local') {
+  const c = resolveLocalPg();
   const pairs = [
-    ['PGHOST', e.PG_HOST],
-    ['PGPORT', e.PG_PORT],
-    ['PGDATABASE', e.PG_DATABASE],
-    ['PGUSER', e.PG_USER],
-    ['PGPASSWORD', e.PG_PASSWORD],
+    ['PGHOST', c.host],
+    ['PGPORT', c.port],
+    ['PGDATABASE', c.database],
+    ['PGUSER', c.user],
+    ['PGPASSWORD', c.password],
   ];
   process.stdout.write('export ' + pairs.map(([k, v]) => `${k}=${sq(v)}`).join(' ') + '\n');
 } else if (target === 'supa') {

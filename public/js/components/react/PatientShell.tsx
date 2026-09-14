@@ -121,7 +121,7 @@ const PatientShell = () => {
     const effectivePage = isDiagnosisRoute ? 'diagnosis' : page;
 
     // isNew derived from the route param (replaces the loader's `isNew` flag).
-    const isNewPatient = personId === 'new' || isNaN(parseInt(personId || ''));
+    const isNewPatient = personId === 'new' || isNaN(parseInt(personId || '', 10));
 
     // workId from route or query param (the loader prefetched its details key).
     const workIdFromQuery = searchParams.get('workId');
