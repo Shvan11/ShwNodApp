@@ -12,6 +12,7 @@ import {
   MALFORMED_SEND_RESULT_ERROR,
 } from './whatsapp-errors.js';
 import { log } from '../../utils/logger.js';
+import { parseLocalDate } from '../../utils/date.js';
 import { PhoneFormatter } from '../../utils/phone-formatter.js';
 import pdfGenerator from '../pdf/appointment-pdf-generator.js';
 import { getGroupSettings } from './group-settings.js';
@@ -505,12 +506,10 @@ class WhatsAppService extends EventEmitter {
     }
 
     try {
-      await Promise.race([
-        failedClient.destroy(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Destroy timeout after init failure')), 10000)
-        ),
-      ]);
+      // withTimeout, not an inline Promise.race: the inline form left its timer pending after the
+      // race settled, so a teardown could hold a handle for the full timeout with nothing waiting
+      // on it — on the shutdown path, which is where these run.
+      await withTimeout(failedClient.destroy(), 10000, 'destroy after init failure');
       log.debug('Failed client destroyed gracefully');
       return;
     } catch (destroyError) {
@@ -526,12 +525,7 @@ class WhatsAppService extends EventEmitter {
     }
 
     try {
-      await Promise.race([
-        browser.close(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Browser close timeout')), 5000)
-        ),
-      ]);
+      await withTimeout(browser.close(), 5000, 'browser close after init failure');
       log.info('Browser force-closed after init failure');
       return;
     } catch (closeError) {
@@ -669,6 +663,7 @@ class WhatsAppService extends EventEmitter {
           resolved = true;
           clearTimeout(timeout);
           clearInterval(progressInterval);
+          if (qrWaitTimer) clearTimeout(qrWaitTimer);
           const elapsed = Math.floor((Date.now() - startTime) / 1000);
           log.info(`Client authenticated (${elapsed}s)`);
           client.removeListener('qr', onQR);
@@ -679,11 +674,19 @@ class WhatsAppService extends EventEmitter {
         }
       };
 
+      // WhatsApp re-emits `qr` every ~20s while the code goes unscanned, so this handler runs
+      // repeatedly for one attempt. The scan-wait timer is therefore kept in ONE slot and re-armed
+      // rather than created per event: the original scheduled a fresh FRESH_AUTH_TIMEOUT timer on
+      // every refresh, so a QR left on screen for ten minutes accumulated dozens of live handles,
+      // each holding the event loop open until it fired. unref'd for the same reason — a code
+      // nobody is scanning must not keep the process alive at shutdown.
+      let qrWaitTimer: NodeJS.Timeout | undefined;
       const onQR = () => {
         log.info('QR code generated - waiting for scan');
         clearTimeout(timeout);
         clearInterval(progressInterval);
-        setTimeout(() => {
+        if (qrWaitTimer) clearTimeout(qrWaitTimer);
+        qrWaitTimer = setTimeout(() => {
           if (!resolved) {
             resolved = true;
             log.info('QR scan timeout - client waiting for future scan');
@@ -693,6 +696,7 @@ class WhatsAppService extends EventEmitter {
             resolve(false);
           }
         }, this.clientState.FRESH_AUTH_TIMEOUT);
+        if (typeof qrWaitTimer.unref === 'function') qrWaitTimer.unref();
       };
 
       const onAuthFailure = (error: unknown) => {
@@ -1557,12 +1561,7 @@ class WhatsAppService extends EventEmitter {
 
       if (this.clientState.client) {
         try {
-          await Promise.race([
-            this.clientState.client.destroy(),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Client destroy timeout')), 15000)
-            ),
-          ]);
+          await withTimeout(this.clientState.client.destroy(), 15000, 'client.destroy (restart)');
           log.info('Client destroyed for restart - authentication preserved');
         } catch (error) {
           log.error(
@@ -1628,12 +1627,7 @@ class WhatsAppService extends EventEmitter {
         )
       );
 
-      await Promise.race([
-        this.clientState.browser.close(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Browser close timeout')), 10000)
-        ),
-      ]);
+      await withTimeout(this.clientState.browser.close(), 10000, 'browser close');
 
       log.info('Browser force closed successfully');
     } catch (error) {
@@ -1684,17 +1678,8 @@ class WhatsAppService extends EventEmitter {
 
       if (this.clientState.client) {
         try {
-          await Promise.race([
-            (async () => {
-              await this.clientState.client!.destroy();
-              log.info(
-                `WhatsApp client destroyed for ${reason} (session preserved)`
-              );
-            })(),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Client destroy timeout')), 30000)
-            ),
-          ]);
+          await withTimeout(this.clientState.client.destroy(), 30000, `client.destroy (${reason})`);
+          log.info(`WhatsApp client destroyed for ${reason} (session preserved)`);
         } catch (destroyError) {
           log.error('Graceful destroy failed, attempting force close', destroyError);
           await this.forceCloseBrowser();
@@ -1752,7 +1737,9 @@ class WhatsAppService extends EventEmitter {
         `appointments-${date}.pdf`
       );
 
-      const formattedDate = new Date(date).toLocaleDateString('en-GB', {
+      // parseLocalDate, not `new Date(date)`: a plain 'YYYY-MM-DD' parses as UTC midnight, so the
+      // caption would name the previous day on any negative-offset host (CLAUDE.md §Database).
+      const formattedDate = (parseLocalDate(date) ?? new Date(date)).toLocaleDateString('en-GB', {
         weekday: 'long',
         day: '2-digit',
         month: 'long',

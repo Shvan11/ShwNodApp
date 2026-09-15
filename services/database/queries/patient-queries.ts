@@ -554,19 +554,62 @@ export async function updatePatient(
 }
 
 /**
- * Deletes a patient record.
+ * Deletes a patient record and everything hanging off it.
+ *
+ * The delete order is DERIVED FROM THE FK GRAPH, not from habit. Most children of `patients` and
+ * `works` are `ON DELETE CASCADE` and need no statement here; the ones that are `NO ACTION` block
+ * the parent delete and must go first, explicitly. The previous order deleted `works` before
+ * `work_items` and `screws` — both of which reference `works` with NO ACTION — so **deleting any
+ * patient who had a single treatment item failed** with a raw
+ * `violates foreign key constraint "fk_workitems_work"`, and the four patient-level NO ACTION
+ * children (`lab_cases`, `patient_portal_auth`, `private_photos`, `stand_sales`) were not handled
+ * at all. Confirmed against the live schema, not inferred.
+ *
+ * Order, and why each line exists:
+ *  1. `work_items` for this patient's works — NO ACTION onto `works`. Cascades to `work_item_teeth`
+ *     and `lab_cases` (both CASCADE onto `work_items`), which is what clears `lab_cases`'s own
+ *     NO ACTION reference to `patients`.
+ *  2. `screws` — NO ACTION onto `works` (its reference to `patients` is CASCADE, but that only
+ *     fires at step 5, far too late for step 3).
+ *  3. `works` — cascades `aligner_sets`, `diagnoses`, `implants`, `invoices`, `visits`.
+ *  4. the patient-level NO ACTION children: `carried_wires`, `waiting`, `patient_portal_auth`,
+ *     `private_photos`. `stand_sales` is DETACHED rather than deleted — a POS sale is a financial
+ *     record that outlives the patient it happened to be linked to, and `person_id` is nullable
+ *     there precisely because a sale can be a walk-in.
+ *  5. `patients` — cascades `alerts`, `appointments`, `slideshow_configs`, `time_points`.
+ *
+ * All in ONE transaction, so a mid-cascade failure rolls back fully rather than leaving a
+ * half-deleted patient.
  */
 export async function deletePatient(personId: number): Promise<{ success: boolean }> {
   try {
-    // All child + parent rows are removed in a single transaction so a
-    // mid-cascade failure rolls back fully — no FK orphans / half-deleted patient.
-    // Children before parent, matching the original delete order.
     await withPgTransaction(async (trx) => {
+      // 1 — work-scoped NO ACTION children, before their parent.
+      await trx
+        .deleteFrom('work_items')
+        .where(
+          'work_id',
+          'in',
+          trx.selectFrom('works').select('work_id').where('person_id', '=', personId)
+        )
+        .execute();
+      // 2
+      await trx.deleteFrom('screws').where('person_id', '=', personId).execute();
+      // 3
       await trx.deleteFrom('works').where('person_id', '=', personId).execute();
+
+      // 4 — patient-scoped NO ACTION children.
       await trx.deleteFrom('carried_wires').where('person_id', '=', personId).execute();
       await trx.deleteFrom('waiting').where('person_id', '=', personId).execute();
-      await trx.deleteFrom('appointments').where('person_id', '=', personId).execute();
-      await trx.deleteFrom('screws').where('person_id', '=', personId).execute();
+      await trx.deleteFrom('patient_portal_auth').where('person_id', '=', personId).execute();
+      await trx.deleteFrom('private_photos').where('person_id', '=', personId).execute();
+      await trx
+        .updateTable('stand_sales')
+        .set({ person_id: null })
+        .where('person_id', '=', personId)
+        .execute();
+
+      // 5
       await trx.deleteFrom('patients').where('person_id', '=', personId).execute();
     });
 

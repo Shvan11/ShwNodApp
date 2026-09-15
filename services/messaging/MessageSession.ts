@@ -478,7 +478,13 @@ export class MessageSession {
   }
 
   /**
-   * Get session statistics
+   * Get session statistics.
+   *
+   * NB this reader is not pure: `canAcceptAcks()` below implements LAZY EXPIRY — a session past its
+   * ack window flips to 'EXPIRED' the first time anything asks. That is deliberate (there is no
+   * per-session timer; the periodic sweep and the next read are what notice), but it means a stats
+   * read inside a log payload can legitimately change `status`. Don't "fix" it by caching the
+   * status here — the expiry would then only happen on the 6-hour sweep.
    */
   getStats(): SessionStats {
     return {

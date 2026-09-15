@@ -92,7 +92,11 @@ export class MessageSessionManager {
    */
   getOrCreateSession(date: Date | string): MessageSession {
     // Normalize date to YYYY-MM-DD format
-    const normalizedDate = date instanceof Date ? toDateOnly(date) : date;
+    // toDateOnly unconditionally, NOT `date instanceof Date ? … : date`: the conditional let any
+    // string through verbatim, so a caller passing '2026-09-15T00:00:00' keyed a DIFFERENT session
+    // from one passing '2026-09-15' — the cross-date contamination this class exists to prevent.
+    // toDateOnly passes a plain 'YYYY-MM-DD' through untouched, so the normal path is unchanged.
+    const normalizedDate = toDateOnly(date);
 
     // Check if we already have an active session for this date
     if (this.activeSessions.has(normalizedDate)) {
@@ -174,7 +178,7 @@ export class MessageSessionManager {
    * resend path to register the new message id for live ack tracking.
    */
   getActiveSession(date: Date | string): MessageSession | null {
-    const normalizedDate = date instanceof Date ? toDateOnly(date) : date;
+    const normalizedDate = toDateOnly(date); // see getOrCreateSession on why this is unconditional
     const session = this.activeSessions.get(normalizedDate);
     return session && session.isValid() ? session : null;
   }
@@ -243,7 +247,7 @@ export class MessageSessionManager {
    * Complete a session for a specific date
    */
   completeSession(date: Date | string): void {
-    const normalizedDate = date instanceof Date ? toDateOnly(date) : date;
+    const normalizedDate = toDateOnly(date); // see getOrCreateSession on why this is unconditional
 
     const session = this.activeSessions.get(normalizedDate);
     if (!session) {
