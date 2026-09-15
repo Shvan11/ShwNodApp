@@ -3,6 +3,8 @@
 **Shwan Orthodontics Management System** — Node.js + Express 5 + React 19 + TypeScript practice-management platform for an orthodontic clinic. Patients, treatments, dental chart, aligners, appointments, multi-channel messaging (WhatsApp/SMS/Telegram), finance/expenses, document templates (GrapesJS), Stand inventory/POS, Patient Portal, doctor-portal announcements + a staff "Portal activity" header bell (two-way over the CDC mirror — see `aligner-portal-external/CLAUDE.md`). NB the staff-session/CSRF portal-path skips in `app/sessions.ts`/`middleware/csrf.ts` are **segment-bounded** (`/api/portal` + `/api/portal/*` only) — a broad `startsWith('/api/portal')` silently strips the staff session off staff routes like `/api/portal-activity`.
 
 > **Product direction — this is a COMMERCIAL, multi-deployment product, not a single-clinic app.** It began bespoke for one clinic but is being built to sell to **many independent dental/orthodontic centers, each running its own instance + database** (the Windows-service deployment model). Two implications shape every design call: **(1) Don't tune schema/indexes/queries/assumptions to *this* clinic's data profile** (e.g. only 5 doctors, `dr_id` ~94% NULL) — design for the general case, including doctor-heavy centers where per-doctor views matter. **(2) But every center is its own bounded single-clinic DB, and the absolute ceiling is known.** The biggest center that can realistically exist — ~20 doctors × ~20 appts/day = 400/day × ~247 working days/yr (after Fri+Sat weekends + ~14 holidays) × a ~20-year lifetime ≈ **~2M appointments** (~100–150K patients); most centers far smaller. So the busiest table (`appointments`) tops out around **~2M rows, everything else in the hundreds of thousands** — NOT web-scale (no billions, no sharding/partitioning), but big enough that **hot access paths a multi-doctor center runs repeatedly must be properly indexed.** E.g. the per-doctor calendar over a date range warrants a partial `(dr_id, app_date)` index (at ~2M rows a per-doctor month view touches ~415 of its ~8,300 rows), even though *this* clinic's data (5 doctors, `dr_id` 94% NULL) wouldn't reveal the need. Net: design for the ~2M-row ceiling — index the real access paths a busy multi-doctor center hits, but don't engineer beyond that, and never tune to one clinic's skew.
+>
+> **Corollary — this clinic's IDENTITY is configuration, never a literal.** Anything a patient or doctor reads must come from a setting: the header logo + clinic name (`CLINIC_LOGO`/`CLINIC_NAME`) and, separately, the name inside outbound message bodies (`services/settings/clinic-identity.ts` → `CLINIC_MESSAGE_NAME`/`_AR`, EN + AR, edited in Settings → General). The two are deliberately distinct rows: this clinic's header reads "Shwan Orthodontics" while its reminders read "Dr. Shwan orthodontic clinic", and folding them together silently rewords every message it sends. A hardcoded clinic string is only ever acceptable as the FALLBACK inside that one module (cf. `email.ts`/`sms.ts`/`appointment-pdf-generator.ts`, which do exactly that).
 
 ---
 
@@ -18,6 +20,7 @@ npm run lint:fix
 npm run css:types        # regenerate *.module.css.d.ts
 npm run db:migrate       # apply migrations (also :down, :new-migration)
 npm run db:codegen       # regenerate types/db.d.ts after a schema change
+npm run sync:reconcile   # mirror divergence report (:apply re-enqueues the missing rows)
 npm run gate             # CI gate: typecheck:all + lint + test + contracts:check --strict + build
 ```
 
@@ -155,7 +158,9 @@ Validate **untrusted input crossing into the app**, nowhere else: request body/p
 - Bulk loads/reloads are user-run and must carry `app.cdc_origin='failover'`; web writes to the mirror use the `mirror_rw` role, never the owner URL. Small additive DDL may go directly via `SUPABASE_FAILOVER_DB_URL`.
 - **Don't reintroduce** the retired portal projection (`portal-sink.ts`/`sync-fetch.ts`) or old reverse path (`sync-engine.ts`/`reverse-sync-poller.ts`/`POST /api/sync/webhook`). Not logical replication, not nightly reloads.
 
-Sink status UI: `SupabaseStatusSettings.tsx` → `GET /api/sync/supabase-status`.
+Sink status UI: `SupabaseStatusSettings.tsx` → `GET /api/sync/supabase-status` (sink flags, backlog + its AGE, and `drift`).
+
+**Divergence detection + repair** — CDC guarantees a *recorded* change reaches the mirror and nothing about a change that was never recorded (capture off ⇒ gone, no catch-up scan). So two pieces cover that hole: `services/sync/cdc/drift-check.ts` compares row counts per captured table against the mirror on a timer (5 min after boot, then `FAILOVER_DRIFT_CHECK_HOURS`, default 24; `FAILOVER_DRIFT_DEEP=true` adds a pk-set fingerprint), logs at `error` and shows on the Settings card; `scripts/reconcile-mirror.mjs` (`npm run sync:reconcile[:apply]`) is the repair — it re-enqueues the missing pks as `change_log` pointer rows, which the sink resolves by re-reading the live local row, so **a pointer row IS a complete repair** (no bulk push). Detection is automatic, repair is deliberately not: auto-healing on a timer would paper over the capture fault that caused it.
 
 ---
 

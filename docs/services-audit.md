@@ -1,6 +1,7 @@
 # `services/` audit record
 
-**Status:** three sweeps done (2026-08-13, 2026-08-31, **2026-09-15 — batch 3, the re-review**).
+**Status:** four sweeps done (2026-08-13, 2026-08-31, 2026-09-15 — batch 3 the re-review, and
+2026-09-15 — batch 4, the never-read surfaces). **Every finding from batches 1–4 is CLOSED.**
 This file is the in-repo record.
 **Scope:** `services/` — 19 domain subdirectories, the largest part of the backend.
 **Companion:** `docs/backend-audit-tracker.md` covers everything OUTSIDE `services/` and is far
@@ -84,7 +85,13 @@ a chat log, which is how a later reader "fixes" them and breaks a working instal
 
 ---
 
-# Batch 3 — the re-review (2026-09-15)
+# Batch 3 — the re-review (2026-09-15) — ✅ ALL CLOSED 2026-09-15
+
+> **Closure note.** Every finding below (F1–F8 and all eleven lower-severity items) was fixed on
+> 2026-09-15, in four commits. The write-ups are kept in full, in the present tense they were
+> written in, because the REASONING is the durable part — each one ends with a **✅ Fixed** line
+> saying what was done and how it was verified. Read a finding for why the shape was wrong; read
+> its Fixed line for what the code does now.
 
 The sweep the two bullets above said was missing. Scope: all 19 subdirectories (~39,600 lines),
 with three deliberate priorities — (a) code written **after** the first two sweeps and therefore
@@ -191,6 +198,22 @@ portal's serving source is missing a day of clinic data.
 4. Add to `/supabase-status` (and the Settings card) the two numbers that would have caught this:
    oldest `change_log.changed_at` per sink, and a per-table count diff.
 
+**✅ Fixed** (all six parts).
+- **F1a** — reconciled via the new `scripts/reconcile-mirror.mjs`; 155 pointer rows enqueued, the 7
+  poison rows resolved themselves once their parents landed, re-diff clean across all 73 tables.
+- **F1b** — `services/sync/cdc/drift-check.ts` compares row counts against the mirror on a timer
+  (5 min after boot, then `FAILOVER_DRIFT_CHECK_HOURS`, default 24) and surfaces the result on the
+  status endpoint + the Settings card. Report-only by design; repair stays
+  `npm run sync:reconcile:apply`. Verified against both live DBs: 73 tables, 0 drift.
+- **F1c** — `startCdc()` no longer touches `cdc_sink_control` for an env-disabled sink. The disk
+  bound it was protecting moved to `enforceCaptureBound()`, run from the drain cycle AND a 60s
+  no-drainer watchdog.
+- **F1d** — `CdcEngine.start()` no longer clears `stale`.
+- **F1e** — per-row in-memory attempt counters + a 15-min throttle; a newly-failing row still warns
+  at once, and the line names the worst offenders (`visits/46667 x3412`).
+- **F1f** — `oldestChangeAt` / `backlogAgeSec` on `GET /api/sync/supabase-status` and the card,
+  plus the `drift` block from F1b.
+
 ## 🟠 F2 — aligner payments bypass the locked balance guard the work-payment path was given
 
 `payment-queries.addInvoiceWithBalanceGuard` exists precisely because a read-then-write overpayment
@@ -207,6 +230,12 @@ is overpaid. It also never consults the **work** balance, so an aligner payment 
 Live data is clean (only one work currently carries aligner invoices, nothing overpaid) — this is a
 correctness gap for the multi-doctor aligner-lab deployments the product targets, not a present
 corruption.
+
+**✅ Fixed.** `createAlignerPayment` is now the aligner twin of `addInvoiceWithBalanceGuard`: one
+transaction, `works` locked then `aligner_sets` (a documented lock order — nothing in the codebase
+acquires them the other way), both balances re-summed under the lock, and a discriminated outcome
+the service maps onto 400s. The work-level rule is enforced too, with a message that names the
+cause when the work has no total yet.
 
 ## 🟠 F3 — two aligner-batch paths turn ordinary business-rule rejections into 500s
 
@@ -225,6 +254,12 @@ Note also that `mapBatchUpdateError` keys on `'Cannot update aligner batch: requ
 `createBatch` throws `'Cannot **add** aligner batch: requested upper…'` — so the existing map would
 not match even if it were wired in.
 
+**✅ Fixed.** The three partial maps became one `mapBatchError` + a `withMappedBatchErrors` wrapper
+that every batch path (create, update, delete, manufacture, deliver, undo-manufacture,
+undo-delivery) runs through — which is the point: a path that calls the query layer directly is a
+path whose business rules become 500s. Both message prefixes are matched, and two codes were added
+(`BATCH_ALREADY_DELIVERED`, `SET_COUNTS_NOT_DEFINED`).
+
 ## 🟠 F4 — deleting an aligner batch or set orphans its doctor-portal announcements (5 live rows)
 
 `doctor_announcements.related_batch_id` has **no foreign key**. `deleteBatchAutoAnnouncement` is
@@ -236,6 +271,15 @@ longer exists, until `expires_at` 30 days later.
 Verified in the live DB — announcement ids 9, 16, 52, 53, 67 point at batches 691, 737, 747, all
 deleted. (All five are now past `expires_at`, so nothing is displayed today.)
 
+**✅ Fixed** with a constraint, not a third call site: `doctor_announcements.related_batch_id` now
+has an FK to `aligner_batches` `ON DELETE CASCADE`
+(`migrations/pg/1789460000000_announcement-batch-fk.sql` + its Supabase half), applied to both DBs.
+A constraint cannot be forgotten by the next writer, is atomic with the delete, and covers the
+set-level cascade and any path that skips the service layer. The five orphans were cleared by the
+migration and the deletes replicated through CDC (both sides verified at 110 rows).
+`deleteBatchAutoAnnouncement` remains for the UNDO paths, where the announcement goes and the batch
+stays. Cascade behaviour verified in a rolled-back transaction.
+
 ## 🟡 F5 — `deleteBatch` skips the set-row lock its three sibling writes take
 
 `createBatch`, `updateBatch` and `updateAlignerSet` all `forUpdate()` the `aligner_sets` row before
@@ -243,6 +287,9 @@ touching `remaining_*` — `updateAlignerSet` carries a comment explaining the T
 does not: it issues a relative `remaining_* = remaining_* + N` with no lock. Relative-vs-relative is
 safe; relative-vs-**absolute** is not. `createBatch` reads `remU` under its lock, `deleteBatch`
 commits `+2`, `createBatch` then writes the absolute `remU - consumed` and the restore is lost.
+
+**✅ Fixed.** `deleteBatch` takes the same `forUpdate()` on the `aligner_sets` row before touching
+`remaining_*`.
 
 ## 🟡 F6 — `aligner_sets.set_cost` is the one money field with no sign guard
 
@@ -260,6 +307,12 @@ exceeding the balance, so the set can never be paid at all.
 The same field has no upper bound either: `numeric(10,2)` tops out at 99,999,999.99, and neither
 contract carries a `.max()`, so a larger figure reaches PG as `22003 numeric_field_overflow` → 500.
 
+**✅ Fixed at both layers.** `shared/validation.ts` gained `moneyDecimal(max)` + `NUMERIC_10_2_MAX`
+— the sign rule `moneyInt` states for the whole schema, minus the integer rule the two `numeric`
+columns are exempt from — and `createSet`/`updateSet` use it. A DB `CHECK (set_cost IS NULL OR
+set_cost >= 0)` is applied on both databases, which is the layer a contract cannot reach (a script,
+the reverse sink, a manual UPDATE). Verified in a rolled-back transaction: -500 rejected.
+
 ## 🟡 F7 — the clinic's own name is compiled into ten patient-facing message bodies
 
 CLAUDE.md opens by stating this is a commercial, multi-deployment product. Ten outbound-message
@@ -273,6 +326,15 @@ Distinguish these from the sites that already do it correctly — `email.ts`
 (`this.config?.from_name || 'Shwan Orthodontics'`), `sms.ts` (`config.twilio.fromName || …`) and
 `appointment-pdf-generator.ts` (`options.clinicName || …`) use the hardcoded string only as a
 default, which is fine.
+
+**✅ Fixed.** `services/settings/clinic-identity.ts` serves the name pair (EN + AR) from two
+`options` rows, cached for a minute and invalidated by the branding route; all ten sites read it,
+and Settings → General edits it. It is deliberately NOT the existing header `CLINIC_NAME` row:
+that one says "Shwan Orthodontics" while the messages say "Dr. Shwan orthodontic clinic", so
+reusing it would have silently reworded every reminder this clinic sends — the exact failure
+`whatsapp-batch-plan.ts`'s own header warns about. The rows are seeded with today's wording by
+`migrations/pg/1789460200000_clinic-message-name.sql`, so patients see no change; all 30 planner
+tests pass unmodified, which is the proof.
 
 ## 🟡 F8 — `getSmsMessages` has four defects in one function
 
@@ -290,7 +352,14 @@ Impact here is nil — no SMS has been sent since 2023 (`max(app_date) where sms
 2023-03-11) and only 3 patients are English-language — but the path ships and `whatsapp-batch-plan.ts`
 is the correct implementation to converge on.
 
-## 🔵 Lower-severity / latent
+**✅ Fixed, converged on `whatsapp-batch-plan.ts`.** One phrase per day in the window (so day 0 and
+day 3 are no longer announced as "tomorrow"), both languages always built, `formatPhone` with the
+patient's `country_code`, invalid numbers skipped rather than sent blind, and the spelling
+corrected. The clinic name comes from configuration (F7).
+
+## 🔵 Lower-severity / latent — ✅ ALL CLOSED
+
+Each bullet below states the finding as it was written; the closure for the whole set follows it.
 
 - **`createAlignerPayment` defeats `toDateOnly`'s pass-through guard.** It calls
   `toDateOnly(new Date(date_of_payment))`. `toDateOnly` passes `'YYYY-MM-DD'` through verbatim
@@ -342,6 +411,44 @@ is the correct implementation to converge on.
   left pending on every 60 s tick. Not an unhandled rejection (`race` subscribes to both arms), but
   it can delay a graceful exit by up to 10 s.
 
+**✅ Closed — what was done with each.**
+
+| Finding | Outcome |
+|---|---|
+| `new Date('YYYY-MM-DD')` family | `createAlignerPayment` passes the string through `toDateOnly`; `CalendarViewService`'s week/month boundaries use a local-midnight `parseCalendarDate`; `PaymentService.CreatedInvoice.date_of_payment` is now the date STRING it describes (a `Date` meant a different calendar day on the wire); WhatsApp's group-PDF caption uses `parseLocalDate`. The `AppointmentService` ×2 and PDF-generator parses are validity tests that discard the Date — annotated as such, deliberately unchanged. |
+| Work-type ids outside the taxonomy SSoT | `ALIGNER_SET_WORK_TYPE_IDS` added to `shared/treatment-taxonomy.ts` and imported at all four aligner sites; `appointment-queries`' `isOrthoVisit` binds `ORTHO_WORK_TYPE_IDS` as an array. The `IN (…)` → `= ANY(…)` rewrite was checked against all 70,263 appointments: 0 disagreements. |
+| `remaining_upper_aligners` −1 drift | **Cause found** — see the note below. Repair script written; running it is the owner's call. |
+| Dead exports in `pdf-assets.ts` | Deleted (with the now-unused import). |
+| `aligner-note-queries` dangling JSDoc + 3 pointless transactions | Both fixed; the three single-statement writes go straight through `getKysely()`. |
+| `getDoctorsWithUnreadCounts` → `doctor_email: null` | Selects the column. |
+| `SchemaMetaCache` double catalog load | `seen` is seeded with the table that triggered the load, so the immediate re-query is gone. |
+| `approve()`'s phase-2 window | Annotated in code as a deliberate decision, with the reconciliation query a future reader would need. |
+| `getAllAlignerSets` shape | The four per-row correlated subqueries collapsed into ONE grouped CTE over `aligner_batches`. Verified row-for-row identical against the live DB (136 sets, every column). |
+| `createBatch`'s conflated "not found" | Separate message for a set that exists with no aligner counts, with its own error code. |
+| `heartbeatTick`'s uncleared timer | Cleared in a `finally` and unref'd. |
+
+### The `remaining_*` drift — cause determined (it is not a race)
+
+The split is clean, and it is chronological rather than behavioural:
+
+| | sets | drifted |
+|---|---|---|
+| templated sets created BEFORE the 2026-05-30 PG migration | 16 | **10** |
+| templated sets created AFTER it | 12 | 0 |
+| sets with no template, either era | 101 | 0 |
+
+The retired `usp_AddAlignerBatch` decremented `remaining_*` by the batch's FULL count; the
+TypeScript rewrite (commit `7aa9007`) decrements `count - (has_template ? 1 : 0)`, and `deleteBatch`
+restores on the same basis. So the drifted rows are stale under a rule that no longer exists — and
+the six pre-migration sets that DON'T drift are the ones whose batches were edited after the
+migration, rewriting `remaining_*` under the new rule.
+
+Repair is `scripts/fix-template-remaining-drift.mjs` (dry run by default). It is a script rather
+than a migration **on purpose**: 9 of the 10 sets currently read `remaining = 0` ("fully batched")
+and would become `1`. That is the truth under the current rule — those sets cannot create their
+final batch today — but whether those particular cases are finished is a clinical judgement about
+specific patients, not something a migration should decide on the clinic's behalf.
+
 ## Considered and deliberately NOT filed
 
 Recorded so the next sweep doesn't spend time re-deriving them.
@@ -377,11 +484,12 @@ helpers in `announcement-queries.ts`; the path guards in `files/file-explorer.se
 `messaging-queries.ts`; `CalendarViewService`'s date helpers; `WorkService`'s create path;
 `pdf-assets.ts`; `lab-cases/remake-guard.ts`; `templates/receipt-service.ts#applyFilter`.
 
-**Signature scan only — the honest gaps in this sweep.**
+**Signature scan only — the honest gaps in this sweep.** ✅ **All four were read in batch 4, the
+same day** (see below); this list is kept as the record of what batch 3 itself did not cover.
 - **`services/messaging/whatsapp.ts`** — only the heartbeat and the client-construction casts were
   read. The `WhatsAppService` class core (client lifecycle + the batch-send engine, ~2,000 lines)
-  was deliberately left whole by backend-audit session S2 and has **never had a line-by-line
-  review**. It is the single largest unaudited surface left in `services/`.
+  was deliberately left whole by backend-audit session S2 and had **never had a line-by-line
+  review**. It was the single largest unaudited surface left in `services/`.
 - **`MessageSession.ts` / `MessageSessionManager.ts`** (≈900 lines of ack-tracking state).
 - **The non-aligner query modules** — `patient-`, `visit-`, `report-`, `appointment-`, `expense-`,
   `lookup-admin-`, `template-`, `alert-`, `employee-queries.ts` and the rest (~7,000 lines).
@@ -421,3 +529,70 @@ helpers in `announcement-queries.ts`; the path guards in `files/file-explorer.se
 - **`approval_requests` IS deliberately mirrored** (since `migrations/supabase/mirror-approvals-slideshow-2026-07-21.sql`,
   RLS on with no policies, promoted from local-only **on purpose** and reasoned about in that
   migration's header). Any note still calling it "LOCAL-ONLY, no CDC" is stale.
+
+---
+
+# Batch 4 — the never-read surfaces (2026-09-15)
+
+Batch 3's own coverage map named four areas as "signature scan only". This is the sweep that read
+them. Three real defects, one of them user-facing today.
+
+## 🟠 B4-1 — `deletePatient` could not delete most patients
+
+`work_items` and `screws` reference `works` with **NO ACTION**, and the cascade deleted `works`
+FIRST. So deleting any patient who had a single treatment item failed with a raw
+`violates foreign key constraint "fk_workitems_work"` — which is most patients who have ever been
+treated. Four patient-level NO ACTION children (`lab_cases`, `patient_portal_auth`,
+`private_photos`, `stand_sales`) were not handled at all.
+
+**✅ Fixed.** The order is now derived from the FK graph and documented line by line: work-scoped
+NO ACTION children → `works` → patient-scoped NO ACTION children → `patients`. `stand_sales` is
+DETACHED (`person_id = NULL`) rather than deleted — a POS sale is a financial record that outlives
+the patient link, and that column is nullable precisely because a sale can be a walk-in. Verified
+against live data (patient 15, who has work items) inside a transaction that was rolled back: every
+statement succeeded and the patient is still there.
+
+## 🟡 B4-2 — `WhatsAppService`: three timer/date defects in the never-reviewed class core
+
+- **The QR wait timer accumulated.** WhatsApp re-emits `qr` every ~20s while a code goes unscanned,
+  and each emission scheduled another `FRESH_AUTH_TIMEOUT` timer that was never cleared or
+  unref'd — a QR left on screen for ten minutes stacked dozens of live handles. ✅ One re-armed,
+  unref'd slot.
+- **Four inline `Promise.race([op, setTimeout(reject)])` teardown timeouts** left their timer
+  pending after the race settled — up to 30s of live handle, on the shutdown path, which is exactly
+  where it delays a graceful exit. ✅ They use this file's own `withTimeout`, which clears it.
+- **The group-PDF caption** parsed `'YYYY-MM-DD'` with `new Date()` → UTC midnight → the previous
+  day's name on any negative-offset host. ✅ `parseLocalDate`.
+
+## 🟡 B4-3 — `MessageSessionManager` could key two sessions for the same day
+
+All three date normalizations read `date instanceof Date ? toDateOnly(date) : date`, so any
+non-date-only STRING passed through verbatim: a caller handing `'2026-09-15T00:00:00'` keyed a
+DIFFERENT session from the same day's `'2026-09-15'` — the cross-date contamination the class
+exists to prevent. ✅ `toDateOnly` unconditionally (it passes a plain date string through
+untouched, so the normal path is byte-identical). `MessageSession.getStats()`'s lazy expiry — a
+"reader" that can legitimately flip `status` — is now documented rather than changed.
+
+## ✅ Read and found clean in batch 4 (do not re-derive)
+
+- **`photo-render.service.ts`** — the mirror-rect/θeff conjugation matches its stated algebra, the
+  bounded-concurrency semaphore transfers slots correctly, and the temp-file staging is same-volume
+  + monotonic-suffixed.
+- **`HealthCheck.ts`** — intervals are honoured per check, cleared by `stop()` through
+  ResourceManager, and `runCheck` cannot reject.
+- **`localsend.service.ts`** — every timer unref'd, `timedFetch` clears its timer AND removes the
+  external abort listener in a `finally`.
+- **`archform-db.ts`** — the interpolated table names are module constants, never input; the id
+  chunking respects SQLite's parameter cap.
+- **`EnvironmentManager.ts`** — atomic same-directory write, 0600 temp file, prior mode re-applied,
+  timestamped backups pruned.
+- **`stand-queries.ts` read paths** — the `citext LIKE` search is correct (no trigram index on
+  `stand_items` to bypass), and the low-stock KPI agrees with the panel it sits above.
+- **`visit-queries.ts`** — the photo-flag roll-ups reproduce the retired triggers, all inside one
+  transaction.
+- **`work-queries.ts#deleteWork`** — dependency check covers all seven child tables including
+  `aligner_sets`.
+- **Date-range predicates** in `report-`, `expense-` and `holiday-queries` — every column is a PG
+  `date`, so the inclusive `<=` is right (no timestamp truncation bug).
+- **`patient-search-queries.ts`** — uses `::text ILIKE`, so the `gin_trgm_ops` indexes are usable
+  (the rule CLAUDE.md states).

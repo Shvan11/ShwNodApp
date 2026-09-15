@@ -109,6 +109,27 @@ npm run db:baseline:verify    # prove a baseline reproduces the live schema (scr
    A column drop needs the service restarted onto the new build first, or the running
    build's `SELECT`/`INSERT` of the dropped column 500s. Order: build → restart → migrate.
 
+### Outstanding on the PRODUCTION database — the patient-type backfill
+
+`scripts/backfill-patient-types.mts` has run on the **local/dev** database
+(2026-07-16: 4,666 patients reclassified, legacy `patient_types` rows 6/7/8 retired). It has
+**not** run on the Windows-service production database. Until it does, prod patients keep the
+manually-picked `patient_type_id` values the derived classifier replaced, so their type will not
+agree with their works.
+
+Run it on the prod box AFTER the deploy that carries `classifyPatient`, so no legacy writer can
+resurrect an old value between the backfill and the code:
+
+```powershell
+# On the production server, in C:\ShwNodApp
+node --import tsx scripts/backfill-patient-types.mts            # DRY RUN — prints the plan
+node --import tsx scripts/backfill-patient-types.mts --apply    # write it
+```
+
+Idempotent: a second run reports 0 changes. It runs against LOCAL only — the failover sink
+forwards the row updates and the row-6/7/8 deletes to the Supabase mirror on its own, so there is
+no mirror half to apply by hand.
+
 ### Backfilling a new column on a CDC-mirrored table
 
 A migration that only adds DDL is invisible to CDC. A migration that also **backfills rows**

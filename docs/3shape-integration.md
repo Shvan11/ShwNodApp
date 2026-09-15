@@ -167,7 +167,21 @@ npm run db:codegen   # regenerate types/db.d.ts
 - **Pull:** open "3D Scans" → a finished case's media lists; Download works.
 - **Token smoke test (standalone):** `test-3shape-oauth.ps1` (Desktop) does the full PKCE flow without the app.
 
-> ⚠️ The full OAuth round-trip can't complete on the WSL dev box (redirect URIs are `local.shwan-orthodontics.com` / `localhost:3000`; dev Express is `:3001`) and no `/v3` call has been made against a live WORK_PC. Do the steps above on the server.
+> ⚠️ The full OAuth round-trip can't complete on the WSL dev box (redirect URIs are `local.shwan-orthodontics.com` / `localhost:3000`; dev Express is `:3001`). Do the steps above on the server.
+
+**Verification status (2026-09-15).** Exactly one of the checks above can be made off-server, and it passes:
+
+| Check | Status |
+|---|---|
+| Reachability — `GET https://WORK_PC:5492/version` from the server box | ✅ **401**, measured 2026-09-15 from the dev machine. The Web Service is up, listening, and rejecting an unauthenticated call exactly as documented — so the host, the port, the firewall rule and the TLS listener are all confirmed good. |
+| OAuth PKCE round-trip (Connect → "Connected") | ⛔ **unverified.** Cannot be done from anywhere but the server: the registered redirect URIs are `local.shwan-orthodontics.com` / `localhost:3000`, and it needs a human at the consent screen. |
+| `/v3` response parsing against real data (push, scans list, download) | ⛔ **unverified.** Needs a token, so it is gated behind the row above. The field names are confirmed against the official PDF and `dtos.ts` matches it, but no live response has ever been parsed. |
+
+So the remaining risk is **not** "is the workstation reachable" — it is only whether a real `/v3`
+payload parses. When the OAuth step is done on the server, check the scans list for a patient with
+a finished case: an empty list on a connected, pushed patient means a `safeParse` skipped an
+element whose shape differs from `dtos.ts` — inspect the raw JSON against the confirmed shapes in
+*Known limitations* below rather than loosening the schema.
 
 ## Troubleshooting
 
