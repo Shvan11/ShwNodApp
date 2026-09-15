@@ -16,6 +16,12 @@
  * the cascaded receipt deletes fire cdc_capture and forward-sync (the mirror's
  * own CASCADE makes the receipt half a no-op there).
  *
+ * `related_batch_id` carries its own FK to `aligner_batches` ON DELETE CASCADE since
+ * 2026-09-15 (migrations/pg/1789460000000_announcement-batch-fk.sql). So deleting a
+ * batch — or a whole set, whose batches go by CASCADE — retracts its announcements in
+ * the same statement, with no help from this module. `deleteBatchAutoAnnouncement`
+ * below is for the UNDO paths, where the announcement must go and the batch STAYS.
+ *
  * Row types are `type` aliases (not `interface`) — sendData sources must satisfy
  * the contract looseObject's index signature.
  */
@@ -276,6 +282,12 @@ export async function insertBatchAutoAnnouncement(
 /**
  * UNDO_MANUFACTURE / UNDO_DELIVERY: retract the matching auto announcement.
  * Keyed by (auto_event, related_batch_id) so a re-do announces fresh.
+ *
+ * This is ONLY for undo — the batch survives, so nothing else would remove the
+ * announcement. Batch (and set) DELETION is handled by the FK cascade, deliberately:
+ * this helper was called from the two undo paths and from neither delete path, which
+ * left the portal advertising batches that no longer existed (audit F4). A constraint
+ * cannot be forgotten by the next writer; a third call site can.
  */
 export async function deleteBatchAutoAnnouncement(
   trx: PgTransaction,

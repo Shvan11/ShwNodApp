@@ -27,6 +27,7 @@ import {
   isReminderDay,
   type ReminderCandidate,
 } from '../../messaging/whatsapp-batch-plan.js';
+import { getClinicNames } from '../../settings/clinic-identity.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 
@@ -405,6 +406,8 @@ export async function getWhatsAppMessages(
       const plan = buildReminderPlan(candidates satisfies ReminderCandidate[], {
         date: dateStr,
         daysAhead: dd,
+        // Per-deployment, not hardcoded: see services/settings/clinic-identity.ts (audit F7).
+        clinic: await getClinicNames(),
       });
 
       if (plan.skipped.length > 0) {
@@ -608,7 +611,28 @@ export async function getWhatsAppDeliveryStatus(
 
 /**
  * SMS messages to send for a date. (was: ProcSMS) Returns nothing when the date is outside
- * [today, today+3]. Uses '+964' + raw phone, matching the proc.
+ * [today, today+3].
+ *
+ * Rewritten 2026-09-15 (audit finding F8). The proc-parity version carried four defects in one
+ * function, and every one of them shipped:
+ *
+ *  1. **The window admitted [0,3] but the wording only branched on `dd === 2`**, so an appointment
+ *     TODAY or THREE DAYS OUT was announced as *"Tommorow … is your appointment"*. Each day now
+ *     gets its own phrasing, and a distant one names the weekday and date — the same shape
+ *     `getNewAppointmentMessage` uses for its third branch.
+ *  2. **The Arabic body was `null` outside `dd ∈ {1,2}`**, producing `body = ''`; `sms.ts#sendSms`
+ *     checks only `sms.to`, so Twilio was called with an empty body. A message that cannot be
+ *     built is now omitted from the list entirely rather than emitted blank.
+ *  3. **The recipient was `'+964' + phone`**, ignoring `patients.country_code` — so a foreign
+ *     number was dialled as an Iraqi one. It now goes through `formatPhone`, the same ladder the
+ *     WhatsApp path uses (which also strips the national trunk zero), and an unusable number is
+ *     skipped rather than sent to a malformed address.
+ *  4. ***"Tommorow"* / *"The day after tommorow"* were misspelled**, patient-facing, in both
+ *     branches.
+ *
+ * Impact of the bugs was nil in practice — no SMS has been sent since 2023-03-11 — but this path
+ * ships, and `whatsapp-batch-plan.ts` is the correct implementation it is converged on here
+ * (clinic name from configuration, country code honoured, invalid numbers skipped).
  */
 export async function getSmsMessages(date: Date | string): Promise<SmsMessage[]> {
   const operationName = 'getSmsMessages';
@@ -621,15 +645,26 @@ export async function getSmsMessages(date: Date | string): Promise<SmsMessage[]>
       const dateStr = typeof date === 'string' ? date.slice(0, 10) : toDateOnly(date);
       const aDay = arabicDay(dateStr);
       const eDay = englishDay(dateStr);
-      // A_Mes is only set for DD 1/2 (else NULL → Arabic message empty, as in the proc).
-      const aMes = dd === 1
-        ? `غدا ${aDay} موعدك مع عيادة د.شوان الساعة`
-        : dd === 2
-          ? `بعد غد ${aDay} موعدك مع عيادة د.شوان الساعة`
-          : null;
-      const eMes = dd === 2
-        ? `The day after tommorow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at `
-        : `Tommorow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at `;
+      const clinic = await getClinicNames();
+
+      // One phrase per day in the window, so nothing is announced as the wrong day. `dd === 3`
+      // (and any other in-window day without its own idiom) names the weekday and the date.
+      const eMes =
+        dd === 0
+          ? `Today "${eDay}" is your appointment with ${clinic.en} at`
+          : dd === 1
+            ? `Tomorrow "${eDay}" is your appointment with ${clinic.en} at`
+            : dd === 2
+              ? `The day after tomorrow "${eDay}" is your appointment with ${clinic.en} at`
+              : `Your appointment with ${clinic.en} is on ${eDay} ${formatDMY(dateStr)} at`;
+      const aMes =
+        dd === 0
+          ? `اليوم ${aDay} موعدك مع ${clinic.ar} الساعة`
+          : dd === 1
+            ? `غدا ${aDay} موعدك مع ${clinic.ar} الساعة`
+            : dd === 2
+              ? `بعد غد ${aDay} موعدك مع ${clinic.ar} الساعة`
+              : `موعدك مع ${clinic.ar} يوم ${aDay} ${formatDMY(dateStr)} الساعة`;
 
       const rows = await getKysely()
         .selectFrom('appointments as a')
@@ -640,6 +675,7 @@ export async function getSmsMessages(date: Date | string): Promise<SmsMessage[]>
         .select([
           'a.appointment_id as id',
           'p.phone as phone',
+          'p.country_code as countryCode',
           'p.patient_name as patientName',
           'p.first_name as firstName',
           'p.language as language',
@@ -648,17 +684,26 @@ export async function getSmsMessages(date: Date | string): Promise<SmsMessage[]>
         .execute();
 
       const out: SmsMessage[] = [];
+      let skippedInvalidPhone = 0;
       for (const r of rows) {
-        const time = format12h(r.appDate as unknown as Date);
-        let body: string;
-        if (r.language === 1) {
-          body = `Hello ${r.firstName ?? ''}. ${eMes} ${time}`;
-        } else {
-          body = aMes ? `مرحبا ${r.patientName}. ${aMes} ${time}` : '';
+        if (!isValidPhone(r.phone)) {
+          // Skipped, not sent blind: the row keeps its eligibility flags and goes out once the
+          // number is corrected. Same rule as the WhatsApp planner's skip list.
+          skippedInvalidPhone++;
+          continue;
         }
-        out.push({ id: r.id, to: `+964${r.phone ?? ''}`, body });
+        const time = format12h(r.appDate as unknown as Date);
+        const body =
+          r.language === 1
+            ? `Hello ${r.firstName || r.patientName}. ${eMes} ${time}`
+            : `مرحبا ${r.patientName}. ${aMes} ${time}`;
+        out.push({ id: r.id, to: `+${formatPhone(r.phone!, r.countryCode || '964')}`, body });
       }
-      log.info('SMS messages retrieved successfully', { messageCount: out.length, date });
+      log.info('SMS messages retrieved successfully', {
+        messageCount: out.length,
+        skippedInvalidPhone,
+        date,
+      });
       return out;
     }, operationName)
     .catch((error: Error) => {
@@ -845,22 +890,27 @@ export async function getNewAppointmentMessage(
   const aDay = arabicDay(appDay);
   const eDay = englishDay(appDay);
 
+  // Clinic name from configuration, not compiled in — this is a multi-deployment product and these
+  // six bodies are patient-facing (audit F7). The seeded default is this clinic's own wording, so
+  // the text is unchanged here until somebody edits it in Settings.
+  const clinic = await getClinicNames();
+
   let message: string;
   if (row.language === 1) {
     if (dd === 1) {
-      message = `Hello ${row.firstName || row.patientName}. Tomorrow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at ${timeTt}`;
+      message = `Hello ${row.firstName || row.patientName}. Tomorrow "${eDay}" is your appointment with ${clinic.en} at ${timeTt}`;
     } else if (dd === 2) {
-      message = `Hello ${row.firstName || row.patientName}. The day after tomorrow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at ${timeTt}`;
+      message = `Hello ${row.firstName || row.patientName}. The day after tomorrow "${eDay}" is your appointment with ${clinic.en} at ${timeTt}`;
     } else {
-      message = `Hello ${row.firstName || row.patientName}. Your appointment with Dr. Shwan orthodontic clinic is on ${eDay} ${formatDMY(appDay)} at ${timeTt}`;
+      message = `Hello ${row.firstName || row.patientName}. Your appointment with ${clinic.en} is on ${eDay} ${formatDMY(appDay)} at ${timeTt}`;
     }
   } else {
     if (dd === 1) {
-      message = `السلام عليك ${row.patientName}. غدا ${aDay} موعدك مع عيادة د.شوان لتقويم الاسنان الساعة ${time}`;
+      message = `السلام عليك ${row.patientName}. غدا ${aDay} موعدك مع ${clinic.ar} الساعة ${time}`;
     } else if (dd === 2) {
-      message = `السلام عليك ${row.patientName}. بعد غد ${aDay} موعدك مع عيادة د.شوان لتقويم الاسنان الساعة ${time}`;
+      message = `السلام عليك ${row.patientName}. بعد غد ${aDay} موعدك مع ${clinic.ar} الساعة ${time}`;
     } else {
-      message = `السلام عليك ${row.patientName}. موعدك مع عيادة د.شوان لتقويم الاسنان يوم ${aDay} ${formatDMY(appDay)} الساعة ${time}`;
+      message = `السلام عليك ${row.patientName}. موعدك مع ${clinic.ar} يوم ${aDay} ${formatDMY(appDay)} الساعة ${time}`;
     }
   }
 

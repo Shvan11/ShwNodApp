@@ -30,6 +30,17 @@ import {
   type SendOutcome,
 } from './whatsapp-batch-plan.js';
 import { MALFORMED_SEND_RESULT_ERROR } from './whatsapp-errors.js';
+import {
+  DEFAULT_CLINIC_MESSAGE_NAME,
+  DEFAULT_CLINIC_MESSAGE_NAME_AR,
+} from '../settings/clinic-identity.js';
+
+/**
+ * The clinic name is per-deployment configuration now (audit F7), so the planner takes it as an
+ * argument. These tests pin the DEFAULTS — the wording an install that has never touched Settings
+ * still sends — which is what the message assertions below were written against.
+ */
+const CLINIC = { en: DEFAULT_CLINIC_MESSAGE_NAME, ar: DEFAULT_CLINIC_MESSAGE_NAME_AR };
 
 /** 2026-09-16 is a Wednesday; 2026-09-18 a Friday (the clinic's closed day). */
 const WEDNESDAY = '2026-09-16';
@@ -53,14 +64,14 @@ describe('buildReminderPlan — recipient selection', () => {
     // The rule that makes previewing any other date come back empty.
     for (const daysAhead of [-1, 0, 3, 7]) {
       expect(isReminderDay(daysAhead)).toBe(false);
-      const plan = buildReminderPlan([candidate()], { date: WEDNESDAY, daysAhead });
+      const plan = buildReminderPlan([candidate()], { date: WEDNESDAY, daysAhead, clinic: CLINIC });
       expect(plan.recipients, `daysAhead=${daysAhead}`).toHaveLength(0);
       expect(plan.skipped).toHaveLength(0);
     }
   });
 
   it('writes the Arabic reminder with the weekday and 12-hour time', () => {
-    const plan = buildReminderPlan([candidate()], { date: WEDNESDAY, daysAhead: 1 });
+    const plan = buildReminderPlan([candidate()], { date: WEDNESDAY, daysAhead: 1, clinic: CLINIC });
 
     expect(plan.recipients).toHaveLength(1);
     expect(plan.recipients[0].message).toBe(
@@ -72,6 +83,7 @@ describe('buildReminderPlan — recipient selection', () => {
     const plan = buildReminderPlan([candidate({ language: 1 })], {
       date: WEDNESDAY,
       daysAhead: 2,
+      clinic: CLINIC,
     });
 
     expect(plan.recipients[0].message).toBe(
@@ -83,8 +95,9 @@ describe('buildReminderPlan — recipient selection', () => {
     const [english] = buildReminderPlan([candidate({ language: 1 })], {
       date: WEDNESDAY,
       daysAhead: 1,
+      clinic: CLINIC,
     }).recipients;
-    const [arabic] = buildReminderPlan([candidate()], { date: WEDNESDAY, daysAhead: 1 })
+    const [arabic] = buildReminderPlan([candidate()], { date: WEDNESDAY, daysAhead: 1, clinic: CLINIC })
       .recipients;
 
     expect(english.message).toMatch(/^Hello Sara\. Tomorrow "Wednesday"/);
@@ -94,7 +107,7 @@ describe('buildReminderPlan — recipient selection', () => {
   it('falls back to the full name when an English patient has no first name', () => {
     const plan = buildReminderPlan(
       [candidate({ language: 1, firstName: null, patientName: 'Sara Ahmed' })],
-      { date: WEDNESDAY, daysAhead: 1 }
+      { date: WEDNESDAY, daysAhead: 1, clinic: CLINIC }
     );
 
     expect(plan.recipients[0].message).toMatch(/^Hello Sara Ahmed\./);
@@ -103,7 +116,7 @@ describe('buildReminderPlan — recipient selection', () => {
   it('keeps the empty Arabic weekday on a Friday (the retired proc returned NULL)', () => {
     // Clinic-closed day. Proc parity: the name is blank, leaving the double
     // space — pinned so nobody "fixes" the spacing and changes live message text.
-    const plan = buildReminderPlan([candidate()], { date: FRIDAY, daysAhead: 1 });
+    const plan = buildReminderPlan([candidate()], { date: FRIDAY, daysAhead: 1, clinic: CLINIC });
 
     expect(plan.recipients[0].message).toContain('غدا  موعدك');
   });
@@ -116,7 +129,7 @@ describe('buildReminderPlan — recipient selection', () => {
         candidate({ id: 12, phone: 'call the mother' }),
         candidate({ id: 13, phone: '07501234567' }),
       ],
-      { date: WEDNESDAY, daysAhead: 1 }
+      { date: WEDNESDAY, daysAhead: 1, clinic: CLINIC }
     );
 
     // Skipped rows never reach the send loop, so they keep their eligibility
@@ -140,6 +153,7 @@ describe('buildReminderPlan — recipient selection', () => {
       const plan = buildReminderPlan([candidate({ phone })], {
         date: WEDNESDAY,
         daysAhead: 1,
+      clinic: CLINIC,
       });
       expect(plan.recipients[0]?.number, phone).toBe(expected);
     }
@@ -149,10 +163,12 @@ describe('buildReminderPlan — recipient selection', () => {
     const abroad = buildReminderPlan([candidate({ phone: '07700900123', countryCode: '44' })], {
       date: WEDNESDAY,
       daysAhead: 1,
+      clinic: CLINIC,
     });
     const missing = buildReminderPlan([candidate({ countryCode: null })], {
       date: WEDNESDAY,
       daysAhead: 1,
+      clinic: CLINIC,
     });
 
     expect(abroad.recipients[0].number).toBe('447700900123');
@@ -163,6 +179,7 @@ describe('buildReminderPlan — recipient selection', () => {
     const plan = buildReminderPlan([candidate({ patientName: null, language: 1 })], {
       date: WEDNESDAY,
       daysAhead: 1,
+      clinic: CLINIC,
     });
 
     expect(plan.recipients[0].name).toBe('');

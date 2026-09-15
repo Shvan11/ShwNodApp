@@ -23,6 +23,11 @@ import { authorize } from '../../middleware/auth.js';
 import { ADMIN_ROLES } from '../../shared/auth/roles.js';
 import { getOption, upsertOption } from '../../services/database/queries/options-queries.js';
 import {
+  CLINIC_MESSAGE_NAME_OPTION,
+  CLINIC_MESSAGE_NAME_AR_OPTION,
+  invalidateClinicIdentity,
+} from '../../services/settings/clinic-identity.js';
+import {
   saveLogo,
   pruneLogosExcept,
   logoFilePath,
@@ -56,12 +61,16 @@ function uploadLogoFile(req: Request, res: Response, next: NextFunction): void {
 
 /** Build the contract response from the current option rows. */
 async function readBranding(): Promise<branding.Branding> {
-  const [logoFile, clinicName] = await Promise.all([
+  const [logoFile, clinicName, messageName, messageNameAr] = await Promise.all([
     getOption(LOGO_OPTION),
     getOption(NAME_OPTION),
+    getOption(CLINIC_MESSAGE_NAME_OPTION),
+    getOption(CLINIC_MESSAGE_NAME_AR_OPTION),
   ]);
   return {
     clinicName: clinicName && clinicName.length > 0 ? clinicName : null,
+    messageName: messageName && messageName.length > 0 ? messageName : null,
+    messageNameAr: messageNameAr && messageNameAr.length > 0 ? messageNameAr : null,
     // The `?v=` token (the immutable filename) busts the browser cache when the
     // logo changes; the stream route ignores the query string itself.
     logo:
@@ -105,7 +114,8 @@ router.get('/branding/logo', async (_req: Request, res: Response): Promise<void>
   }
 });
 
-// PUT /api/branding — set the clinic display name ('' clears it).
+// PUT /api/branding — set the clinic display name, and optionally the two names used inside
+// patient messages ('' clears any of them).
 router.put(
   '/branding',
   authorize(ADMIN_ROLES),
@@ -116,6 +126,17 @@ router.put(
   ): Promise<void> => {
     try {
       await upsertOption(NAME_OPTION, req.body.clinicName);
+      // Absent key = "leave unchanged" (an older client, or a header-only rename); '' = clear back
+      // to the built-in default.
+      if (req.body.messageName !== undefined) {
+        await upsertOption(CLINIC_MESSAGE_NAME_OPTION, req.body.messageName);
+      }
+      if (req.body.messageNameAr !== undefined) {
+        await upsertOption(CLINIC_MESSAGE_NAME_AR_OPTION, req.body.messageNameAr);
+      }
+      // The message builders cache the pair for a minute; drop it so a rename takes effect on the
+      // very next reminder rather than up to a TTL later.
+      invalidateClinicIdentity();
       sendData(res, branding.updateBranding.response, await readBranding());
     } catch (error) {
       log.error('Error updating clinic name', { error: (error as Error).message });

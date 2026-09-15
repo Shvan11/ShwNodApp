@@ -113,6 +113,29 @@ export const moneyInt = z.coerce
   .int('Amount must be a whole number — fractional amounts are not supported')
   .nonnegative('Amount cannot be negative');
 
+/** Largest value a PG `numeric(10,2)` column can hold. Above it PG raises 22003 → a 500. */
+export const NUMERIC_10_2_MAX = 99_999_999.99;
+
+/**
+ * The DECIMAL money rule — for the two columns exempt from {@link moneyInt} because they are
+ * genuinely `numeric` (`aligner_sets.set_cost` 10,2 and `estimated_cost_presets.amount` 18,2).
+ *
+ * The exemption is only about the fractional part. It used to drop the SIGN rule with it, which is
+ * how `set_cost` became the one money field in the schema with no sign guard anywhere — not in the
+ * contract, not in the DB — and a negative one is not merely a wrong number: `PaymentStatus` reads
+ * **'Paid'** at zero paid (`0 >= -500`), `Balance` goes negative, and the payment path then rejects
+ * every payment as exceeding the balance, so the set can never be paid at all (audit finding F6).
+ *
+ * `max` is the column's own ceiling, passed in because the two columns have different precisions.
+ * Without it an over-large figure reaches PG as `22003 numeric_field_overflow` → a 500 where the
+ * user should have seen "that is too large".
+ */
+export const moneyDecimal = (max: number) =>
+  z.coerce
+    .number()
+    .nonnegative('Amount cannot be negative')
+    .max(max, `Amount cannot exceed ${max.toLocaleString()}`);
+
 /**
  * Optional numeric QUERY param that tolerates the empty string. A query like
  * `?limit=` arrives as `''`; the handlers treat an absent/empty filter as "no

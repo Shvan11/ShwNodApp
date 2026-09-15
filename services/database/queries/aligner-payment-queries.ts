@@ -6,7 +6,7 @@
  * inline — there is no DB view behind it.
  */
 import { sql } from 'kysely';
-import { getKysely } from '../kysely.js';
+import { getKysely, withPgTransaction } from '../kysely.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 
@@ -30,17 +30,51 @@ interface AlignerSetBalance {
 // ALIGNER PAYMENTS QUERIES
 // ==============================
 
+/** Outcome of {@link createAlignerPayment} — the service maps these onto its own error codes. */
+export type GuardedAlignerPaymentResult =
+  | { outcome: 'created'; invoice_id: number }
+  | { outcome: 'work_not_found' }
+  | { outcome: 'set_not_found' }
+  | { outcome: 'set_cost_not_defined' }
+  | { outcome: 'invalid_amount' }
+  | { outcome: 'exceeds_set_balance'; setCost: number; setPaid: number; setBalance: number }
+  | { outcome: 'exceeds_work_balance'; totalRequired: number; discount: number; workPaid: number; remaining: number };
+
 /**
- * Add payment for an aligner set
+ * Add a payment for an aligner set, re-checking BOTH balances under row locks.
  *
- * FLAG (date-string): `tblInvoice.date_of_payment` is a PG `date` column; the value is
- * bound as a 'YYYY-MM-DD' string (via toDateOnly) wrapped in `sql<string>` so PG infers the
- * date type and the column isn't shifted by a UTC conversion (see CLAUDE.md date gotcha).
- * `amount_paid`/`change`/`usd_received`/`iqd_received` are plain integer columns.
+ * This is the aligner twin of `payment-queries.addInvoiceWithBalanceGuard`, and it exists for the
+ * same reason: a service-layer `paymentAmount > balance` pre-check is a read-then-write. Two
+ * payments registered against the same set at the same moment both read the pre-insert balance,
+ * both pass, and the set is overpaid. Until 2026-09-15 this function was a bare
+ * `insertInto('invoices')` with no transaction, no lock and no re-check, while the work-payment
+ * path writing the SAME table had all three (audit finding F2).
+ *
+ * Two balances are checked, not one:
+ *
+ *  - **the set's** — `set_cost - sum(invoices.amount_paid WHERE aligner_set_id = …)`, the rule the
+ *    service already intended to enforce;
+ *  - **the work's** — `total_required - discount - sum(invoices.amount_paid WHERE work_id = …)`.
+ *    This one was missing entirely. `invoices` is a per-WORK ledger: every other payment path sums
+ *    the whole work, aligner rows included, so a set payment that ignores the work total does not
+ *    merely skip a rule — it drives the work's own displayed balance negative and silently changes
+ *    what the work-payment path will accept next. A set whose work has no total yet is therefore
+ *    unpayable, exactly as that work already is from the work screen; the service says so in words.
+ *
+ * LOCK ORDER — `works` first, then `aligner_sets`. It is the only order in the codebase: the work
+ * path locks `works` alone, and `createBatch`/`updateBatch`/`updateAlignerSet`/`deleteBatch` lock
+ * `aligner_sets` alone, so nothing acquires them the other way round and no cycle exists. Keep it
+ * that way when adding a writer that touches both.
+ *
+ * FLAG (date-string): `invoices.date_of_payment` is a PG `date`; the value is bound as a
+ * 'YYYY-MM-DD' string wrapped in `sql<string>` so PG infers the date type and the column isn't
+ * shifted by a UTC conversion (CLAUDE.md date gotcha). `toDateOnly` is handed the raw value, NOT
+ * `new Date(value)` — the pass-through guard for a plain date string exists precisely so it is
+ * never round-tripped through UTC midnight, and wrapping it first defeated that.
  */
-export async function createAlignerPayment(
+export function createAlignerPayment(
   paymentData: AlignerPaymentData
-): Promise<number> {
+): Promise<GuardedAlignerPaymentResult> {
   const { workid, aligner_set_id, amount_paid, date_of_payment, change } = paymentData;
 
   // Aligner sets are USD-only (enforced by `usdOnlyCurrency` in aligner.contract.ts +
@@ -54,12 +88,63 @@ export async function createAlignerPayment(
     typeof amount_paid === 'string' ? parseFloat(amount_paid) : amount_paid
   );
 
-  log.info('Creating aligner payment', { workid, aligner_set_id, amount_paid, usdReceived: amount });
+  return withPgTransaction(async (trx): Promise<GuardedAlignerPaymentResult> => {
+    // Lower bound checked HERE and not only at the contract: `amount > balance` passes trivially
+    // for a negative, and a negative invoice RAISES the work's outstanding balance and skews every
+    // sum over invoices.amount_paid (the doctor-commission report included).
+    if (!Number.isFinite(amount) || amount <= 0) return { outcome: 'invalid_amount' };
 
-  try {
-    const dateStr = toDateOnly(new Date(date_of_payment as string));
+    const work = await trx
+      .selectFrom('works')
+      .where('work_id', '=', workid)
+      .select(['total_required', 'discount'])
+      .forUpdate()
+      .executeTakeFirst();
+    if (!work) return { outcome: 'work_not_found' };
 
-    const row = await getKysely()
+    if (aligner_set_id) {
+      const set = await trx
+        .selectFrom('aligner_sets')
+        .where('aligner_set_id', '=', aligner_set_id)
+        .select((eb) => [eb.ref('set_cost').$castTo<number | null>().as('set_cost')])
+        .forUpdate()
+        .executeTakeFirst();
+      if (!set) return { outcome: 'set_not_found' };
+      if (set.set_cost === null) return { outcome: 'set_cost_not_defined' };
+
+      // Re-summed AFTER the lock is granted: under READ COMMITTED this statement sees a
+      // concurrent payment's committed insert, which is the whole point of the lock.
+      const setPaidRow = await trx
+        .selectFrom('invoices')
+        .where('aligner_set_id', '=', aligner_set_id)
+        .select((eb) => eb.fn.coalesce(eb.fn.sum('amount_paid'), sql<number>`0`).$castTo<number>().as('paid'))
+        .executeTakeFirstOrThrow();
+
+      const setCost = Number(set.set_cost);
+      const setPaid = Number(setPaidRow.paid ?? 0);
+      const setBalance = setCost - setPaid;
+      if (amount > setBalance) {
+        return { outcome: 'exceeds_set_balance', setCost, setPaid, setBalance };
+      }
+    }
+
+    const workPaidRow = await trx
+      .selectFrom('invoices')
+      .where('work_id', '=', workid)
+      .select((eb) => eb.fn.coalesce(eb.fn.sum('amount_paid'), sql<number>`0`).$castTo<number>().as('paid'))
+      .executeTakeFirstOrThrow();
+
+    const totalRequired = Number(work.total_required ?? 0);
+    const discount = Number(work.discount ?? 0);
+    const workPaid = Number(workPaidRow.paid ?? 0);
+    const remaining = totalRequired - discount - workPaid;
+    if (amount > remaining) {
+      return { outcome: 'exceeds_work_balance', totalRequired, discount, workPaid, remaining };
+    }
+
+    const dateStr = toDateOnly(date_of_payment);
+
+    const row = await trx
       .insertInto('invoices')
       .values({
         work_id: workid,
@@ -73,13 +158,9 @@ export async function createAlignerPayment(
       .returning('invoice_id')
       .executeTakeFirstOrThrow();
 
-    return row.invoice_id;
-  } catch (err) {
-    log.error('Failed to create aligner payment', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    throw err;
-  }
+    log.info('Created aligner payment', { workid, aligner_set_id, invoice_id: row.invoice_id, amount });
+    return { outcome: 'created', invoice_id: row.invoice_id };
+  });
 }
 
 /**

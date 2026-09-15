@@ -652,6 +652,9 @@ export async function updateAlignerSet(
  * Batches are deleted first (FK), then the set, in ONE transaction — previously
  * these were two separate transactions, so a failure/crash between them could
  * leave a set's batches gone while the set itself survived (half-deleted state).
+ *
+ * Each batch's doctor-portal auto announcements go with it, by the FK cascade on
+ * `doctor_announcements.related_batch_id` (see aligner-batch-queries#deleteBatch).
  */
 export async function deleteSetWithBatches(setId: number): Promise<void> {
   try {

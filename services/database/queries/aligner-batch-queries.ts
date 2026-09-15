@@ -200,7 +200,13 @@ export async function createBatch(batchData: BatchData): Promise<number | null> 
       .where('aligner_set_id', '=', aligner_set_id)
       .forUpdate()
       .executeTakeFirst();
-    if (!set || set.remaining_upper_aligners == null) throw new Error('AlignerSet not found');
+    if (!set) throw new Error('AlignerSet not found');
+    // Separate message, deliberately: one `!set || remaining == null` test reported a set that
+    // EXISTS with an unset remaining count as "not found", which sends the reader looking for a
+    // deleted row instead of at the set's own totals. (No live row is in that state — 0 of 136 —
+    // so this is the message, not the behaviour.)
+    if (set.remaining_upper_aligners == null)
+      throw new Error('AlignerSet has no aligner counts set — set the total aligners first');
     const remU = set.remaining_upper_aligners;
     const remL = set.remaining_lower_aligners ?? 0;
     const upConsumed = upper - (hasU ? 1 : 0);
@@ -601,6 +607,19 @@ export async function deleteBatch(batchId: number): Promise<void> {
       .executeTakeFirst();
     if (!batch) throw new Error('Aligner batch not found');
 
+    // Lock the owning set BEFORE touching its remaining_* counts, exactly as createBatch,
+    // updateBatch and updateAlignerSet do. The restore below is a RELATIVE update
+    // (`remaining_* = remaining_* + N`), and relative-vs-relative is indeed safe — but the
+    // siblings write an ABSOLUTE value (`remU - consumed`) computed from a read they took under
+    // this lock. Without it: createBatch reads remU, this transaction commits +2, createBatch then
+    // writes its absolute figure and the restore is silently lost (audit finding F5).
+    await trx
+      .selectFrom('aligner_sets')
+      .select('aligner_set_id')
+      .where('aligner_set_id', '=', batch.aligner_set_id)
+      .forUpdate()
+      .executeTakeFirst();
+
     // Renumbering guard — same rule as updateBatch: deleting a batch shifts every
     // later batch's sequence + starts; refuse while a later batch is already
     // manufactured/delivered (printed labels would be orphaned). Message text is
@@ -623,6 +642,11 @@ export async function deleteBatch(batchId: number): Promise<void> {
       );
     }
 
+    // Auto announcements for this batch go with it: doctor_announcements.related_batch_id carries
+    // an FK ON DELETE CASCADE (migrations/pg/1789460000000_announcement-batch-fk.sql). Each cascaded
+    // row is a real DELETE, so its own cdc_capture trigger fires and the retraction reaches the
+    // portal's mirror. Before that FK existed this left the portal showing "Batch #N ready" with a
+    // live "View case" link for a batch that was gone (audit F4).
     await trx.deleteFrom('aligner_batches').where('aligner_batch_id', '=', batchId).execute();
 
     const upperRestored = (batch.upper_aligner_count ?? 0) - (batch.has_upper_template ? 1 : 0);

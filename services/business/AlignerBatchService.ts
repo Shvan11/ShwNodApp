@@ -198,12 +198,14 @@ export async function validateAndCreateBatch(
   // Persist the values we just validated, not the raw request ones — otherwise the
   // checks above and the stored row are derived by two different code paths (the
   // query layer's `toIntOr` safety net would re-coerce the originals).
-  const newBatchId = (await alignerBatchQueries.createBatch({
-    ...batchData,
-    upper_aligner_count: upperCount,
-    lower_aligner_count: lowerCount,
-    days,
-  })) as number;
+  const newBatchId = (await withMappedBatchErrors({ setId: aligner_set_id }, () =>
+    alignerBatchQueries.createBatch({
+      ...batchData,
+      upper_aligner_count: upperCount,
+      lower_aligner_count: lowerCount,
+      days,
+    })
+  )) as number;
   log.info(`Aligner batch created successfully: Batch ${newBatchId}`);
 
   return {
@@ -213,49 +215,87 @@ export async function validateAndCreateBatch(
 }
 
 /**
- * Map a batch-update business-rule message to its AlignerErrorCode.
+ * Map a business-rule message thrown by `aligner-batch-queries.ts` onto its `AlignerErrorCode`.
  *
- * `aligner-batch-queries.ts#updateBatch` throws plain `Error`s for validation failures
- * — the replacement for the deleted `usp_UpdateAlignerBatch` RAISERROR codes
- * 50010-50020. Under pg there is no numeric `err.number`, so we key off the
- * message text the query layer throws (kept in sync with `updateBatch`). Returns
- * null for messages that aren't recognised batch-validation errors.
+ * ONE map for every batch path — create, update, delete and all four status transitions — because
+ * three partial maps is how the gaps happened (audit finding F3). Until 2026-09-15 `create` and the
+ * two undo paths had no mapping at all, so the commonest data-entry mistake at the front desk
+ * ("this batch needs more aligners than the set has left") answered *500 Failed to create aligner
+ * batch* with the real message — `requested upper aligners (12) exceed remaining count (8)` —
+ * discarded. And the update map keyed on `'Cannot update aligner batch: requested upper'` while
+ * create throws `'Cannot ADD aligner batch: …'`, so wiring the old map into create would have
+ * matched nothing.
+ *
+ * The query layer throws plain `Error`s (the replacement for the deleted stored procedures' numeric
+ * RAISERROR codes, which have no equivalent under pg), so the message text IS the contract between
+ * the two layers. Keep this in sync with the `throw new Error` sites in aligner-batch-queries.ts;
+ * an unrecognised message returns null and stays a 500, which is correct for an infrastructure
+ * fault and wrong for a business rule — so a new rule belongs here in the same commit.
  */
-function mapBatchUpdateError(message: string): AlignerErrorCode | null {
+function mapBatchError(message: string): AlignerErrorCode | null {
+  // -- existence ------------------------------------------------------------------------------
   if (message === 'Aligner batch not found') return 'BATCH_NOT_FOUND';
+  if (message === 'AlignerSet not found') return 'SET_NOT_FOUND';
+  if (message.startsWith('AlignerSet has no aligner counts set')) return 'SET_COUNTS_NOT_DEFINED';
   if (message === 'Cannot change aligner_set_id') return 'INVALID_SET_CHANGE';
-  if (message.startsWith('Cannot update aligner batch: requested upper'))
+
+  // -- capacity: create says "add", update says "update"; both are the same rule to a caller ---
+  if (
+    message.startsWith('Cannot add aligner batch: requested upper') ||
+    message.startsWith('Cannot update aligner batch: requested upper')
+  )
     return 'UPPER_ALIGNER_LIMIT_EXCEEDED';
-  if (message.startsWith('Cannot update aligner batch: requested lower'))
+  if (
+    message.startsWith('Cannot add aligner batch: requested lower') ||
+    message.startsWith('Cannot update aligner batch: requested lower')
+  )
     return 'LOWER_ALIGNER_LIMIT_EXCEEDED';
-  if (message === 'Cannot set is_active: batch must be delivered first')
-    return 'BATCH_NOT_DELIVERED';
+
+  // -- lifecycle ------------------------------------------------------------------------------
+  if (message === 'Cannot set is_active: batch must be delivered first') return 'BATCH_NOT_DELIVERED';
+  if (message === 'Cannot deliver: batch not yet manufactured') return 'BATCH_NOT_MANUFACTURED';
+  if (message.startsWith('Cannot undo manufacture: batch already delivered')) return 'BATCH_ALREADY_DELIVERED';
+  if (
+    message.startsWith('Cannot deliver: delivery date cannot be earlier') ||
+    message.startsWith('Cannot set manufacture date later')
+  )
+    return 'INVALID_DATE_ORDER';
+
+  // -- sequence integrity (update AND delete both refuse to renumber a locked batch) -----------
   if (message.includes('would be renumbered')) return 'SEQUENCE_LOCKED';
+
+  // -- template flags -------------------------------------------------------------------------
   if (
     message.startsWith('Template flag') ||
     message.includes('requires upper_aligner_count') ||
     message.includes('requires lower_aligner_count')
   )
     return 'VALIDATION_ERROR';
+
   return null;
 }
 
 /**
- * Map the plain `Error` messages thrown by `aligner-batch-queries.ts#updateBatchStatus`
- * (MANUFACTURE/DELIVER) onto typed error codes, so the status routes return a
- * 400 with a clear reason instead of a generic 500. Kept in sync with the throws
- * in `updateBatchStatus`. Returns null for unrecognised (infrastructure) errors.
+ * Run a batch query-layer call and convert its business-rule `Error` into a typed
+ * `AlignerValidationError` (which the routes answer as 400 + code). Anything unrecognised is
+ * re-thrown untouched so a genuine infrastructure fault still surfaces as a 500.
+ *
+ * Every batch write goes through this — that is the point. A path that calls the query layer
+ * directly is a path whose business rules become 500s, which is exactly the state F3 found.
  */
-function mapBatchStatusError(message: string): AlignerErrorCode | null {
-  if (message === 'Aligner batch not found') return 'BATCH_NOT_FOUND';
-  if (message === 'Cannot deliver: batch not yet manufactured')
-    return 'BATCH_NOT_MANUFACTURED';
-  if (
-    message.startsWith('Cannot deliver: delivery date cannot be earlier') ||
-    message.startsWith('Cannot set manufacture date later')
-  )
-    return 'INVALID_DATE_ORDER';
-  return null;
+async function withMappedBatchErrors<T>(
+  details: { batchId?: number; setId?: number },
+  run: () => Promise<T>
+): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof AlignerValidationError) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    const code = mapBatchError(message);
+    if (code) throw new AlignerValidationError(message, code, details);
+    throw error;
+  }
 }
 
 /**
@@ -308,39 +348,24 @@ export async function validateAndUpdateBatch(
 
   log.info(`Updating aligner batch ${batchId}:`, batchData);
 
-  try {
-    // Persist the validated values (see validateAndCreateBatch).
-    const result = await alignerBatchQueries.updateBatch(parsedBatchId, {
+  // Persist the validated values (see validateAndCreateBatch).
+  const result = await withMappedBatchErrors({ batchId: parsedBatchId }, () =>
+    alignerBatchQueries.updateBatch(parsedBatchId, {
       ...batchData,
       upper_aligner_count: upperCount,
       lower_aligner_count: lowerCount,
       days,
-    });
-    log.info(`Aligner batch ${batchId} updated successfully`);
+    })
+  );
+  log.info(`Aligner batch ${batchId} updated successfully`);
 
-    if (result && result.deactivatedBatch) {
-      log.info(
-        `Batch #${result.deactivatedBatch.batchSequence} was automatically deactivated`
-      );
-    }
-
-    return result;
-  } catch (error) {
-    // updateBatch (aligner-batch-queries.ts) throws plain Error()s for business-rule
-    // violations — the old usp_UpdateAlignerBatch numeric RAISERROR codes are gone
-    // under pg. Translate the recognised messages into typed AlignerValidationErrors
-    // so the route returns a 400 with a code instead of a generic 500.
-    if (error instanceof AlignerValidationError) throw error;
-    const message = error instanceof Error ? error.message : String(error);
-    const errorCode = mapBatchUpdateError(message);
-    if (errorCode) {
-      throw new AlignerValidationError(message, errorCode, {
-        batchId: parsedBatchId,
-      });
-    }
-    // Re-throw unexpected (infrastructure) errors as-is
-    throw error;
+  if (result && result.deactivatedBatch) {
+    log.info(
+      `Batch #${result.deactivatedBatch.batchSequence} was automatically deactivated`
+    );
   }
+
+  return result;
 }
 
 /**
@@ -366,26 +391,10 @@ export async function validateAndDeleteBatch(
 
   log.info(`Deleting aligner batch ${batchId}`);
 
-  try {
-    await alignerBatchQueries.deleteBatch(parsedBatchId);
-    log.info(`Aligner batch ${batchId} deleted successfully`);
-  } catch (error) {
-    log.error('Error deleting aligner batch:', { error: error instanceof Error ? error.message : String(error) });
-    // Translate the query layer's business-rule Errors into typed 400s (same
-    // convention as mapBatchUpdateError for updates).
-    const message = error instanceof Error ? error.message : String(error);
-    if (message === 'Aligner batch not found') {
-      throw new AlignerValidationError(message, 'BATCH_NOT_FOUND', {
-        batchId: parsedBatchId,
-      });
-    }
-    if (message.includes('would be renumbered')) {
-      throw new AlignerValidationError(message, 'SEQUENCE_LOCKED', {
-        batchId: parsedBatchId,
-      });
-    }
-    throw error;
-  }
+  await withMappedBatchErrors({ batchId: parsedBatchId }, () =>
+    alignerBatchQueries.deleteBatch(parsedBatchId)
+  );
+  log.info(`Aligner batch ${batchId} deleted successfully`);
 }
 
 /**
@@ -418,32 +427,21 @@ export async function markBatchDelivered(
   const parsedBatchId = parseInt(String(batchId), 10);
   log.info(`Marking batch ${parsedBatchId} as delivered`, { targetDate: toDateOnly(targetDate) || 'today' });
 
-  try {
-    const result = await alignerBatchQueries.updateBatchStatus(parsedBatchId, 'DELIVER', targetDate);
+  const result = await withMappedBatchErrors({ batchId: parsedBatchId }, () =>
+    alignerBatchQueries.updateBatchStatus(parsedBatchId, 'DELIVER', targetDate)
+  );
 
-    if (result.wasAlreadyDelivered) {
-      log.info(`Batch #${result.batchSequence} was already delivered`);
-    } else if (result.wasActivated) {
-      log.info(`Batch #${result.batchSequence} delivered and auto-activated (latest batch)`);
-    } else if (result.wasAlreadyActive) {
-      log.info(`Batch #${result.batchSequence} delivered (already active)`);
-    } else {
-      log.info(`Batch #${result.batchSequence} delivered (not latest batch)`);
-    }
-
-    return result;
-  } catch (error) {
-    // updateBatchStatus throws plain Error()s for business-rule violations;
-    // translate the recognised ones to a typed 400 (see mapBatchStatusError).
-    if (error instanceof AlignerValidationError) throw error;
-    const message = error instanceof Error ? error.message : String(error);
-    const errorCode = mapBatchStatusError(message);
-    if (errorCode) {
-      throw new AlignerValidationError(message, errorCode, { batchId: parsedBatchId });
-    }
-    log.error('Error marking batch as delivered:', { error: message });
-    throw error;
+  if (result.wasAlreadyDelivered) {
+    log.info(`Batch #${result.batchSequence} was already delivered`);
+  } else if (result.wasActivated) {
+    log.info(`Batch #${result.batchSequence} delivered and auto-activated (latest batch)`);
+  } else if (result.wasAlreadyActive) {
+    log.info(`Batch #${result.batchSequence} delivered (already active)`);
+  } else {
+    log.info(`Batch #${result.batchSequence} delivered (not latest batch)`);
   }
+
+  return result;
 }
 
 /**
@@ -474,22 +472,11 @@ export async function markBatchManufactured(
   const parsedBatchId = parseInt(String(batchId), 10);
   log.info(`Marking batch ${parsedBatchId} as manufactured`, { targetDate: toDateOnly(targetDate) || 'today' });
 
-  try {
-    const result = await alignerBatchQueries.updateBatchStatus(parsedBatchId, 'MANUFACTURE', targetDate);
-    log.info(`Batch ${parsedBatchId}: ${result.message}`);
-    return result;
-  } catch (error) {
-    // updateBatchStatus throws plain Error()s for business-rule violations;
-    // translate the recognised ones to a typed 400 (see mapBatchStatusError).
-    if (error instanceof AlignerValidationError) throw error;
-    const message = error instanceof Error ? error.message : String(error);
-    const errorCode = mapBatchStatusError(message);
-    if (errorCode) {
-      throw new AlignerValidationError(message, errorCode, { batchId: parsedBatchId });
-    }
-    log.error('Error marking batch as manufactured:', { error: message });
-    throw error;
-  }
+  const result = await withMappedBatchErrors({ batchId: parsedBatchId }, () =>
+    alignerBatchQueries.updateBatchStatus(parsedBatchId, 'MANUFACTURE', targetDate)
+  );
+  log.info(`Batch ${parsedBatchId}: ${result.message}`);
+  return result;
 }
 
 /**
@@ -516,14 +503,11 @@ export async function undoManufactureBatch(
   const parsedBatchId = parseInt(String(batchId), 10);
   log.info(`Undoing manufacture for batch ${parsedBatchId}`);
 
-  try {
-    const result = await alignerBatchQueries.updateBatchStatus(parsedBatchId, 'UNDO_MANUFACTURE');
-    log.info(`Batch ${parsedBatchId}: ${result.message}`);
-    return result;
-  } catch (error) {
-    log.error('Error undoing manufacture:', { error: error instanceof Error ? error.message : String(error) });
-    throw error;
-  }
+  const result = await withMappedBatchErrors({ batchId: parsedBatchId }, () =>
+    alignerBatchQueries.updateBatchStatus(parsedBatchId, 'UNDO_MANUFACTURE')
+  );
+  log.info(`Batch ${parsedBatchId}: ${result.message}`);
+  return result;
 }
 
 /**
@@ -550,12 +534,9 @@ export async function undoDeliverBatch(
   const parsedBatchId = parseInt(String(batchId), 10);
   log.info(`Undoing delivery for batch ${parsedBatchId}`);
 
-  try {
-    const result = await alignerBatchQueries.updateBatchStatus(parsedBatchId, 'UNDO_DELIVERY');
-    log.info(`Batch ${parsedBatchId}: ${result.message}`);
-    return result;
-  } catch (error) {
-    log.error('Error undoing delivery:', { error: error instanceof Error ? error.message : String(error) });
-    throw error;
-  }
+  const result = await withMappedBatchErrors({ batchId: parsedBatchId }, () =>
+    alignerBatchQueries.updateBatchStatus(parsedBatchId, 'UNDO_DELIVERY')
+  );
+  log.info(`Batch ${parsedBatchId}: ${result.message}`);
+  return result;
 }

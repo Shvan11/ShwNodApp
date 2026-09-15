@@ -1,11 +1,12 @@
 /**
- * API contract — clinic branding (header logo + display name).
+ * API contract — clinic branding (header logo + display name + the name used in patient messages).
  *
  * The logo and name shown in the universal header are per-deployment
  * customizable from Settings → General (this is a multi-clinic product; every
  * center brands its own instance). Both values persist as rows in the `options`
  * table — `CLINIC_LOGO` holds the stored logo filename, `CLINIC_NAME` the
- * display name — while the logo bytes live on the clinic disk volume
+ * display name, `CLINIC_MESSAGE_NAME`/`CLINIC_MESSAGE_NAME_AR` the name patients
+ * see inside reminder messages — while the logo bytes live on the clinic disk volume
  * (`clinic1/branding/`, see services/files/clinic-branding.ts) and stream through
  * `GET /api/branding/logo`.
  *
@@ -21,6 +22,16 @@ import { z } from 'zod';
 // configured display name, or null when unset (the header falls back to a default).
 const brandingResponse = z.object({
   clinicName: z.string().nullable(),
+  /**
+   * The clinic's name as it appears INSIDE outbound patient messages, English and Arabic. Separate
+   * from `clinicName` on purpose: that one is the header display name ("Shwan Orthodontics") while
+   * the messages read "…your appointment with Dr. Shwan orthodontic clinic…". Pointing the message
+   * builders at the header name would have silently reworded every reminder the clinic sends
+   * (audit F7 — see services/settings/clinic-identity.ts). Null when unset, in which case the
+   * builders fall back to their defaults.
+   */
+  messageName: z.string().nullable(),
+  messageNameAr: z.string().nullable(),
   logo: z.string().nullable(),
 });
 export type Branding = z.infer<typeof brandingResponse>;
@@ -33,7 +44,14 @@ export const getBranding = {
 // PUT /api/branding → set the clinic display name. An empty string clears it
 // (header reverts to the built-in default). Trimmed + capped so it fits the header.
 export const updateBranding = {
-  body: z.object({ clinicName: z.string().trim().max(80) }),
+  body: z.object({
+    clinicName: z.string().trim().max(80),
+    // Optional so an older client (or a caller that only means to rename the header) leaves the
+    // message names untouched; '' clears one back to its built-in default. 80 chars matches the
+    // header cap — a name longer than that does not belong in an SMS body either.
+    messageName: z.string().trim().max(80).optional(),
+    messageNameAr: z.string().trim().max(80).optional(),
+  }),
   response: brandingResponse,
 } as const;
 export type UpdateBrandingBody = z.infer<typeof updateBranding.body>;

@@ -51,7 +51,9 @@ import { z } from 'zod';
 import {
   idParams,
   intId,
+  moneyDecimal,
   moneyInt,
+  NUMERIC_10_2_MAX,
   numericParam,
   optionalDateString,
   timestampString,
@@ -74,12 +76,10 @@ const optNum = z
 // field and uses '' for "user blanked it", so '' (and null) must survive as null
 // ("clear the column"), distinct from an absent key ("leave unchanged"). optInt/
 // optNum can't be used there: they collapse '' to undefined, making a clear
-// indistinguishable from an omission.
+// indistinguishable from an omission. (There is no plain `clearableNum` — the one
+// clearable numeric field, set_cost, carries its own money rule below.)
 const clearableInt = z
   .preprocess((v) => (v === '' || v === null ? null : v), z.coerce.number().int().nullable())
-  .optional();
-const clearableNum = z
-  .preprocess((v) => (v === '' || v === null ? null : v), z.coerce.number().nullable())
   .optional();
 // Same clearable contract for strings: a plain `z.string().optional()` rejects
 // `null` outright, which broke updateSet whenever the caller round-tripped a
@@ -87,6 +87,16 @@ const clearableNum = z
 // or explicitly cleared a field — both send `null`, not `''`.
 const clearableStr = z
   .preprocess((v) => (v === '' ? null : v), z.string().nullable())
+  .optional();
+
+// `aligner_sets.set_cost` — the optional/clearable pair above, but carrying the sign + ceiling rule
+// every other money field has. It is `numeric(10,2)` (decimals are legitimate, so `moneyInt` does
+// not apply), and that exemption is what dropped the sign rule: a negative set cost makes
+// PaymentStatus read 'Paid' at zero paid and makes the set unpayable forever (audit F6).
+const setCost = moneyDecimal(NUMERIC_10_2_MAX);
+const optSetCost = z.preprocess((v) => (v === '' || v === null ? undefined : v), setCost.optional()).optional();
+const clearableSetCost = z
+  .preprocess((v) => (v === '' || v === null ? null : v), setCost.nullable())
   .optional();
 
 // Aligner-set currency is USD-ONLY, enforced here rather than left to the UI.
@@ -425,7 +435,7 @@ export const createSet = {
     work_id: intId,
     aligner_dr_id: intId,
     is_active: z.boolean().optional(),
-    set_cost: optNum,
+    set_cost: optSetCost,
     notes: z.string().optional(),
     set_sequence: optInt,
     type: z.string().optional(),
@@ -454,7 +464,7 @@ export const updateSet = {
   body: z.object({
     aligner_dr_id: optInt,
     is_active: z.boolean().optional(),
-    set_cost: clearableNum,
+    set_cost: clearableSetCost,
     notes: clearableStr,
     set_sequence: optInt,
     type: clearableStr,

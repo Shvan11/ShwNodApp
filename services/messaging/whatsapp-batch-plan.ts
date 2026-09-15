@@ -15,12 +15,15 @@
  *
  * Deliberately NOT unified with the sibling builders in `messaging-queries.ts`
  * (`getSmsMessages`, `getNewAppointmentMessage`): their wording differs from the
- * WhatsApp reminder — different clinic phrasing, a meridiem on the time, the
- * `Tommorow` typos the retired procs shipped — and collapsing them into one
- * "shared" template would silently rewrite messages patients receive.
+ * WhatsApp reminder — a meridiem on the time, a third "your appointment is on
+ * <date>" branch for a distant appointment — and collapsing them into one
+ * "shared" template would silently rewrite messages patients receive. (The SMS
+ * builder's `Tommorow` typos and its day-0/day-3 mislabelling were NOT part of
+ * that wording and were fixed in 2026-09-15's audit pass — see audit F8.)
  */
 
 import { arabicDay } from '../../utils/arabic-day.js';
+import type { ClinicNames } from '../settings/clinic-identity.js';
 import { englishDay, format12h, formatPhone, isValidPhone } from './reminder-format.js';
 import { isConnectionStallError, isMalformedSendResultError } from './whatsapp-errors.js';
 
@@ -75,7 +78,9 @@ export interface ReminderPlan {
  *
  * `daysAhead` is passed in rather than derived from the clock so the plan is
  * deterministic: the same rows and the same `daysAhead` always yield the same
- * text. Outside the reminder window the plan is empty — the window rule lives
+ * text. `clinic` is passed in for the same reason — the name is per-deployment
+ * configuration (`services/settings/clinic-identity.ts`), and reading it here
+ * would put I/O inside the one module that is guaranteed not to have any. Outside the reminder window the plan is empty — the window rule lives
  * here so it cannot drift from the text that assumes it ("tomorrow" vs "the day
  * after tomorrow").
  *
@@ -84,7 +89,7 @@ export interface ReminderPlan {
  */
 export function buildReminderPlan(
   candidates: readonly ReminderCandidate[],
-  options: { date: Date | string; daysAhead: number }
+  options: { date: Date | string; daysAhead: number; clinic: ClinicNames }
 ): ReminderPlan {
   const plan: ReminderPlan = { recipients: [], skipped: [] };
   if (!isReminderDay(options.daysAhead)) return plan;
@@ -93,12 +98,12 @@ export function buildReminderPlan(
   const eDay = englishDay(options.date);
   const aMes =
     options.daysAhead === 1
-      ? `غدا ${aDay} موعدك مع عيادة د.شوان لتقويم الاسنان الساعة`
-      : `بعد غد ${aDay} موعدك مع عيادة د.شوان لتقويم الاسنان الساعة`;
+      ? `غدا ${aDay} موعدك مع ${options.clinic.ar} الساعة`
+      : `بعد غد ${aDay} موعدك مع ${options.clinic.ar} الساعة`;
   const eMes =
     options.daysAhead === 1
-      ? `Tomorrow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at`
-      : `The day after tomorrow "${eDay}" is your appointment with Dr. Shwan orthodontic clinic at`;
+      ? `Tomorrow "${eDay}" is your appointment with ${options.clinic.en} at`
+      : `The day after tomorrow "${eDay}" is your appointment with ${options.clinic.en} at`;
 
   for (const candidate of candidates) {
     if (!isValidPhone(candidate.phone)) {

@@ -26,10 +26,14 @@ export interface PaymentCreateData {
 // ==============================
 
 /**
- * Validate and create a payment
+ * Validate and create a payment against an aligner set.
  *
- * Business Rules:
- * - workid, amount_paid, and date_of_payment are required
+ * Shape note: the balance rules are NOT enforced here. They live in
+ * `aligner-payment-queries.createAlignerPayment`, inside one transaction with `works` and
+ * `aligner_sets` locked — a check made here would be a read-then-write that two concurrent payments
+ * both pass (audit finding F2). This layer validates what can be validated without touching the
+ * database, calls the guarded write, and turns its outcome into the error the route already maps
+ * onto a 400.
  *
  * @param paymentData - Payment data
  * @returns New invoice id
@@ -48,55 +52,58 @@ export async function validateAndCreatePayment(
   }
 
   const paymentAmount = parseFloat(String(amount_paid));
-  if (paymentAmount <= 0) {
+  if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
     throw new AlignerValidationError(
       'Payment amount must be greater than zero',
       'INVALID_AMOUNT'
     );
   }
 
-  // Validate payment doesn't exceed set balance
-  if (aligner_set_id) {
-    const setBalance = await alignerPaymentQueries.getAlignerSetBalance(aligner_set_id);
-
-    if (!setBalance) {
-      throw new AlignerValidationError(
-        'Aligner set not found',
-        'SET_NOT_FOUND'
-      );
-    }
-
-    if (setBalance.set_cost === null) {
-      throw new AlignerValidationError(
-        'Set cost must be defined before accepting payments',
-        'SET_COST_NOT_DEFINED'
-      );
-    }
-
-    // `Balance` is `set_cost - coalesce(sum(paid), 0)`, so it is NULL only when
-    // set_cost is — already rejected above. The `?? 0` is the type-level narrowing
-    // for that, not a real fallback (it would reject any payment, which is the safe
-    // direction anyway). This used to be an `as SetBalanceInfo` cast that asserted
-    // the column non-null instead of proving it.
-    const balance = setBalance.Balance ?? 0;
-    if (paymentAmount > balance) {
-      throw new AlignerValidationError(
-        `Payment amount (${paymentAmount}) exceeds remaining balance (${balance})`,
-        'PAYMENT_EXCEEDS_BALANCE'
-      );
-    }
-  }
-
   log.info(
     `Adding payment for work id: ${workid}, Set id: ${aligner_set_id || 'general'}, amount: ${amount_paid}`
   );
 
-  try {
-    const invoiceID = await alignerPaymentQueries.createAlignerPayment(paymentData);
-    log.info(`Payment added successfully: Invoice ${invoiceID}`);
-    return invoiceID;
-  } catch (error) {
-    log.error('Error adding payment:', { error: error instanceof Error ? error.message : String(error) });
-    throw error;
+  const result = await alignerPaymentQueries.createAlignerPayment(paymentData);
+
+  switch (result.outcome) {
+    case 'created':
+      log.info(`Payment added successfully: Invoice ${result.invoice_id}`);
+      return result.invoice_id;
+
+    case 'work_not_found':
+      throw new AlignerValidationError('Treatment not found', 'SET_NOT_FOUND', { workId: workid });
+
+    case 'set_not_found':
+      throw new AlignerValidationError('Aligner set not found', 'SET_NOT_FOUND', { setId: aligner_set_id });
+
+    case 'set_cost_not_defined':
+      throw new AlignerValidationError(
+        'Set cost must be defined before accepting payments',
+        'SET_COST_NOT_DEFINED',
+        { setId: aligner_set_id }
+      );
+
+    case 'invalid_amount':
+      throw new AlignerValidationError('Payment amount must be greater than zero', 'INVALID_AMOUNT');
+
+    case 'exceeds_set_balance':
+      throw new AlignerValidationError(
+        `Payment amount (${paymentAmount}) exceeds the set's remaining balance (${result.setBalance})`,
+        'PAYMENT_EXCEEDS_BALANCE',
+        { setId: aligner_set_id, amount: paymentAmount, balance: result.setBalance }
+      );
+
+    // The work-level rule the set path used to skip entirely. Worth a message that names the cause:
+    // the commonest way to hit it is a set priced on a treatment whose own total is still 0, and
+    // "exceeds the remaining balance (0)" on its own reads as a bug rather than as missing data.
+    case 'exceeds_work_balance':
+      throw new AlignerValidationError(
+        result.totalRequired === 0
+          ? `This treatment has no total cost set yet, so it cannot take a payment of ${paymentAmount}. ` +
+            `Set the treatment's total cost first.`
+          : `Payment amount (${paymentAmount}) exceeds the treatment's remaining balance (${result.remaining})`,
+        'PAYMENT_EXCEEDS_BALANCE',
+        { workId: workid, amount: paymentAmount, balance: result.remaining }
+      );
   }
 }

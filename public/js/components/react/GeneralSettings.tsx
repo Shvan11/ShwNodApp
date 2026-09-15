@@ -71,6 +71,12 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     // until Save. All cleared on a successful save.
     const { data: brandingData } = useQuery(brandingQuery());
     const [brandingName, setBrandingName] = useState('');
+    // The name patients see INSIDE reminder messages, EN + AR. Separate from the header name on
+    // purpose (see shared/contracts/branding.contract.ts): this clinic's header reads "Shwan
+    // Orthodontics" while its messages read "Dr. Shwan orthodontic clinic", and folding the two
+    // together would silently reword every reminder it sends.
+    const [messageName, setMessageName] = useState('');
+    const [messageNameAr, setMessageNameAr] = useState('');
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [removeLogoFlag, setRemoveLogoFlag] = useState(false);
@@ -79,6 +85,8 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     if (brandingData && brandingData !== seededBranding) {
         setSeededBranding(brandingData);
         setBrandingName(brandingData.clinicName ?? '');
+        setMessageName(brandingData.messageName ?? '');
+        setMessageNameAr(brandingData.messageNameAr ?? '');
     }
 
     // Build the editable `options` map from the query data during render (keyed on
@@ -148,8 +156,16 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
             } else if (removeLogoFlag) {
                 await deleteJSON('/api/branding/logo', { schema: brandingContract.deleteLogo.response });
             }
-            if (brandingName !== (brandingData?.clinicName ?? '')) {
-                await putJSON('/api/branding', { clinicName: brandingName }, { schema: brandingContract.updateBranding.response });
+            if (
+                brandingName !== (brandingData?.clinicName ?? '') ||
+                messageName !== (brandingData?.messageName ?? '') ||
+                messageNameAr !== (brandingData?.messageNameAr ?? '')
+            ) {
+                await putJSON(
+                    '/api/branding',
+                    { clinicName: brandingName, messageName, messageNameAr },
+                    { schema: brandingContract.updateBranding.response }
+                );
             }
             // Refresh both the header (branding) cache and reset the edit buffers.
             await queryClient.invalidateQueries({ queryKey: qk.branding() });
@@ -319,7 +335,11 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     // staged) the current saved logo. `brandingDirty` gates the Save button.
     const shownLogo = logoPreview ?? (removeLogoFlag ? null : brandingData?.logo ?? null);
     const brandingDirty =
-        logoFile != null || removeLogoFlag || brandingName !== (brandingData?.clinicName ?? '');
+        logoFile != null ||
+        removeLogoFlag ||
+        brandingName !== (brandingData?.clinicName ?? '') ||
+        messageName !== (brandingData?.messageName ?? '') ||
+        messageNameAr !== (brandingData?.messageNameAr ?? '');
 
     return (
         <div>
@@ -530,6 +550,40 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                     />
                     <div className={styles.settingDescription}>
                         Shown when no logo is set, and used as the logo&apos;s text alternative.
+                    </div>
+                </div>
+
+                <div className={styles.settingGroup}>
+                    <label htmlFor="clinic_message_name_input">Clinic name in patient messages</label>
+                    <input
+                        id="clinic_message_name_input"
+                        type="text"
+                        maxLength={80}
+                        value={messageName}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => setMessageName(e.target.value)}
+                        placeholder="Dr. Shwan orthodontic clinic"
+                    />
+                    <div className={styles.settingDescription}>
+                        Used inside appointment reminders sent by WhatsApp and SMS, e.g. &ldquo;Tomorrow
+                        &quot;Wednesday&quot; is your appointment with <em>this name</em> at 2:30&rdquo;.
+                        Kept separate from the header name above, which is usually shorter.
+                    </div>
+                </div>
+
+                <div className={styles.settingGroup}>
+                    <label htmlFor="clinic_message_name_ar_input">Clinic name in Arabic messages</label>
+                    <input
+                        id="clinic_message_name_ar_input"
+                        type="text"
+                        maxLength={80}
+                        dir="rtl"
+                        value={messageNameAr}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => setMessageNameAr(e.target.value)}
+                        placeholder="عيادة د.شوان لتقويم الاسنان"
+                    />
+                    <div className={styles.settingDescription}>
+                        The same name for Arabic-language patients. Most patients receive the Arabic
+                        message, so this one matters most.
                     </div>
                 </div>
 
