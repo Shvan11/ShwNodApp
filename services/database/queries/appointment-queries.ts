@@ -8,6 +8,7 @@
 import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
 import { formatClock12, formatTime12 } from '../../../utils/date.js';
+import { ORTHO_WORK_TYPE_IDS } from '../../../shared/treatment-taxonomy.js';
 
 // type definitions
 interface UpdatePresentResult {
@@ -169,7 +170,9 @@ export async function getDailyAppointmentsOptimized(
       'a.app_date', 'a.app_cost', 'a.dr_id', 'p.patient_name', 'p.patient_type_id',
       'pt.patient_type', 'pt.patient_type_name_ar',
       sql<boolean>`EXISTS(SELECT 1 FROM "alerts" al WHERE al."person_id"=p."person_id" AND al."status"='active' AND (al."expires_at" IS NULL OR al."expires_at" >= CURRENT_DATE))`.as('hasActiveAlert'),
-      sql<boolean>`COALESCE((SELECT (w."type_of_work" IN (1,2,11,19,20)) FROM "works" w WHERE w."person_id"=a."person_id" AND w."status"=1 LIMIT 1), false)`.as('isOrthoVisit'),
+      // Ortho work types from the taxonomy SSoT (= ORTHO_WORK_TYPE_IDS), not a literal `(1,2,11,19,20)`
+      // that has to be kept in step with it by memory. Bound as an array so the list stays data.
+      sql<boolean>`COALESCE((SELECT (w."type_of_work" = ANY(${sql.val(ORTHO_WORK_TYPE_IDS)}::int[])) FROM "works" w WHERE w."person_id"=a."person_id" AND w."status"=1 LIMIT 1), false)`.as('isOrthoVisit'),
       sql<boolean>`EXISTS(SELECT 1 FROM "works" w2 JOIN "visits" vis ON vis."work_id"=w2."work_id" WHERE w2."person_id"=a."person_id" AND vis."visit_date"=${dateStr}::date)`.as('hasVisit'),
     ])
     .execute();

@@ -180,6 +180,8 @@ const isValidDate = (dateString: string | null | undefined): boolean => {
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRegex.test(dateString)) return false;
 
+  // Validity test only (the regex above already fixed the shape): the Date is discarded, so the
+  // UTC-midnight parse of a plain date string never reaches a value here.
   const date = new Date(dateString);
   return date instanceof Date && !isNaN(date.getTime());
 };

@@ -12,11 +12,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import {
-  DEFAULT_PDF_ARABIC_FONT,
-  PDF_ARABIC_FONTS,
-  type PdfArabicFont,
-} from '../../shared/pdf-fonts.js';
+import { DEFAULT_PDF_ARABIC_FONT, type PdfArabicFont } from '../../shared/pdf-fonts.js';
 
 /**
  * Assets (fonts/, public/) live in the repo root and are NOT copied into
@@ -56,11 +52,6 @@ export function isReadableFile(filePath: string | null | undefined): boolean {
   return readable;
 }
 
-/** Drop a memoized probe (used by tests / after an asset is installed at runtime). */
-export function clearReadableCache(): void {
-  readableCache.clear();
-}
-
 /**
  * Resolve a registry font id to a readable TTF path, falling back to the default
  * face and then to `null` (callers then use PDFKit's built-in Helvetica).
@@ -71,13 +62,6 @@ export function resolveArabicFontPath(font: PdfArabicFont | undefined): string |
   if (isReadableFile(primary)) return primary;
   const fallback = ARABIC_PDF_FONT_FILES[DEFAULT_PDF_ARABIC_FONT];
   return isReadableFile(fallback) ? fallback : null;
-}
-
-/** Normalize any caller-supplied value to a registry font id. */
-export function normalizeArabicFont(value: string | undefined | null): PdfArabicFont {
-  return PDF_ARABIC_FONTS.some((f) => f.id === value)
-    ? (value as PdfArabicFont)
-    : DEFAULT_PDF_ARABIC_FONT;
 }
 
 /**

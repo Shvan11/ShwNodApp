@@ -1256,16 +1256,24 @@ class WhatsAppService extends EventEmitter {
     const HEARTBEAT_MAX_MISSES = 2;
     let state: string | null = null;
     let probeFailed = false;
+    // The timeout handle is kept and CLEARED in the finally: the racing timer used to be left
+    // pending on every 60 s tick, so a shutdown could sit waiting up to 10 s for a timer whose
+    // result nobody would read. (Never an unhandled rejection — `race` subscribes to both arms —
+    // just a live handle. unref'd as well, matching every other timer in this codebase.)
+    let probeTimer: NodeJS.Timeout | undefined;
     try {
       state = await Promise.race([
         client.getState(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('getState timeout')), 10000)
-        ),
+        new Promise<never>((_, reject) => {
+          probeTimer = setTimeout(() => reject(new Error('getState timeout')), 10000);
+          if (typeof probeTimer.unref === 'function') probeTimer.unref();
+        }),
       ]);
     } catch (err) {
       probeFailed = true;
       log.debug('WhatsApp heartbeat probe threw', { error: (err as Error).message });
+    } finally {
+      if (probeTimer) clearTimeout(probeTimer);
     }
 
     // 'CONNECTED' is the only healthy value; anything else (or a throw) is a miss.

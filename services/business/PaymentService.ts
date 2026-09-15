@@ -13,6 +13,7 @@
  */
 
 import { log } from '../../utils/logger.js';
+import { toDateOnly } from '../../utils/date.js';
 import {
   addInvoiceWithBalanceGuard,
   getExchangeRateAsOf,
@@ -21,9 +22,15 @@ import { getWorkDetails } from '../database/queries/work-queries.js';
 
 /**
  * The invoice record returned to callers after creation. This is a freshly
- * constructed response object (not a DB row read-back): `date_of_payment` is a
- * real JS `Date` built from the request, and `InvoiceID` is the id returned by
- * the insert. Co-located here because it's a service-layer DTO.
+ * constructed response object (not a DB row read-back): `InvoiceID` is the id
+ * returned by the insert. Co-located here because it's a service-layer DTO.
+ *
+ * `date_of_payment` is the 'YYYY-MM-DD' STRING, matching the PG `date` column it
+ * describes. It used to be `new Date(paymentDate)`, which parses a plain date
+ * string as UTC MIDNIGHT — so the value crossing JSON meant a different calendar
+ * day to any consumer not in a positive-offset zone, for a column that has no
+ * time zone at all (CLAUDE.md §Database). A date-only value has one unambiguous
+ * wire form and this is it.
  */
 // `type` (not `interface`) so it carries an implicit string index signature and
 // is assignable to the `z.looseObject` addInvoice response contract that
@@ -32,7 +39,7 @@ type CreatedInvoice = {
   InvoiceID: number | undefined;
   workid: number;
   amount_paid: number;
-  date_of_payment: Date;
+  date_of_payment: string;
   usd_received: number | null;
   iqd_received: number | null;
   change: number | null;
@@ -385,7 +392,7 @@ export async function validateAndCreateInvoice(
     InvoiceID: result.invoice_id,
     workid,
     amount_paid: amountPaid,
-    date_of_payment: new Date(paymentDate),
+    date_of_payment: toDateOnly(paymentDate),
     usd_received: usd || null,
     iqd_received: iqd || null,
     change: changeToSave,

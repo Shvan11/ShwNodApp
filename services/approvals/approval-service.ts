@@ -264,6 +264,15 @@ export async function approve(
 
   // Phase 2: Apply after the claim has committed. A failure here cannot cause
   // double-apply because the row is already 'approved' in the DB.
+  //
+  // AUDIT DECISION (batch 3, 2026-09-15) — this ordering is DELIBERATE, not an oversight, and the
+  // gap it leaves is known and accepted. A thrown error is caught below and recorded as
+  // status='failed', but a CRASH between the claim's commit and `action.apply()` leaves a row
+  // reading 'approved' whose write never happened, and nothing retries it. Closing that would mean
+  // applying inside the claim transaction — which trades an accepted millisecond-wide gap for the
+  // double-apply risk this ordering exists to remove (a commit failure after a successful apply).
+  // Recorded rather than fixed; if approvals ever need reconciling, the query is
+  // `status='approved'` rows whose effect is absent from the target table.
   const { row, action } = phase1;
   try {
     await action.apply(row.payload);

@@ -68,6 +68,20 @@ export const XRAY_WORK_TYPE_IDS: readonly number[] = [
 const ALIGNER_LAB_WORK_TYPE_ID = WORK_TYPE_IDS.ALIGNER_LAB; // 21
 
 /**
+ * Work types that can carry an ALIGNER SET — the aligner screens' filter.
+ *
+ * Distinct from `ORTHO_WORK_TYPE_IDS` (which excludes lab work and includes braces) and worth its
+ * own name: `[19, 20, 21]` was hardcoded at four sites in the aligner query modules while this file
+ * is the declared source of truth for work-type ids, so a new aligner-bearing type would have had
+ * to be found in four places by grep.
+ */
+export const ALIGNER_SET_WORK_TYPE_IDS: readonly number[] = [
+  WORK_TYPE_IDS.ORTHO_ALIGNERS, // 19
+  WORK_TYPE_IDS.ORTHO_MIXED, // 20
+  WORK_TYPE_IDS.ALIGNER_LAB, // 21
+];
+
+/**
  * Work status ids (`works.status`). Moved here from work-queries.ts (which now
  * re-exports it for existing importers). `FINISHED` (2) is a WORK status —
  * unrelated to patient-type row 2 'Former Patient'.

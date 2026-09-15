@@ -16,6 +16,7 @@ import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
 import { log } from '../../../utils/logger.js';
 import { toIntOr } from './aligner-shared.js';
+import { ALIGNER_SET_WORK_TYPE_IDS } from '../../../shared/treatment-taxonomy.js';
 
 type AlignerSet = {
   aligner_set_id: number;
@@ -144,6 +145,36 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
             ),
           ])
       )
+      // Everything the row needs to know about its batches, computed ONCE per set in a grouped
+      // scan. These five figures used to be four CORRELATED subqueries evaluated per row (the
+      // NextDueDate lookup, the NextBatchPresent EXISTS with its own nested MAX, and the LabStatus
+      // CASE's three EXISTS arms), which is a per-row cost that grows with the aligner-lab
+      // deployments this product targets. Same numbers, one pass.
+      .with('ba', (qb) =>
+        qb
+          .selectFrom('aligner_batches')
+          .groupBy('aligner_set_id')
+          .select((eb) => [
+            eb.ref('aligner_set_id').as('aligner_set_id'),
+            sql<number>`count(*)`.as('total'),
+            sql<number | null>`max("batch_sequence") filter (where "delivered_to_patient_date" is not null)`.as(
+              'max_delivered_seq'
+            ),
+            // "a manufactured-but-undelivered batch exists BEYOND the last delivered one" is
+            // `max(seq) over that set > max delivered seq` — the same test as the old EXISTS.
+            sql<number | null>`max("batch_sequence") filter (where "manufacture_date" is not null and "delivered_to_patient_date" is null)`.as(
+              'max_ready_seq'
+            ),
+            sql<number>`count(*) filter (where "manufacture_date" is not null and "delivered_to_patient_date" is null)`.as(
+              'in_lab_count'
+            ),
+            sql<number>`count(*) filter (where "manufacture_date" is null)`.as('needs_mfg_count'),
+            // batch_expiry_date of the LATEST delivered batch: ordered aggregate, first element.
+            sql<string | null>`(array_agg("batch_expiry_date" order by "batch_sequence" desc) filter (where "delivered_to_patient_date" is not null))[1]`.as(
+              'next_due_date'
+            ),
+          ])
+      )
       .selectFrom('patients as p')
       .innerJoin('works as w', 'w.person_id', 'p.person_id')
       .innerJoin('aligner_sets as s', 'w.work_id', 's.work_id')
@@ -151,13 +182,9 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
       .leftJoin('lb', (join) =>
         join.onRef('s.aligner_set_id', '=', 'lb.aligner_set_id').on('lb.RowNum', '=', 1)
       )
-      .where((eb) =>
-        eb.or([
-          eb('w.type_of_work', '=', 19),
-          eb('w.type_of_work', '=', 20),
-          eb('w.type_of_work', '=', 21),
-        ])
-      )
+      .leftJoin('ba', 'ba.aligner_set_id', 's.aligner_set_id')
+      // Work types that can carry an aligner set, from the taxonomy SSoT (not a literal 19/20/21).
+      .where('w.type_of_work', 'in', ALIGNER_SET_WORK_TYPE_IDS)
       .select((eb) => [
         'w.person_id as person_id',
         'p.patient_name as patient_name',
@@ -170,16 +197,8 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
         eb.fn.coalesce('s.is_active', sql<boolean>`false`).as('SetIsActive'),
         'lb.batch_sequence as batch_sequence',
         'lb.delivered_to_patient_date as delivered_to_patient_date',
-        // NextDueDate: batch_expiry_date of the latest DELIVERED batch
-        eb
-          .selectFrom('aligner_batches as b')
-          .whereRef('b.aligner_set_id', '=', 's.aligner_set_id')
-          .where('b.delivered_to_patient_date', 'is not', null)
-          .orderBy('b.batch_sequence', 'desc')
-          .select('b.batch_expiry_date')
-          .limit(1)
-          .$castTo<string | null>()
-          .as('NextDueDate'),
+        // NextDueDate: batch_expiry_date of the latest DELIVERED batch (from `ba`).
+        eb.ref('ba.next_due_date').$castTo<string | null>().as('NextDueDate'),
         // NextAppointment: earliest upcoming appointment for the patient (today included,
         // so the front desk sees "coming in today"). Served by ix_pid_all (person_id, app_date).
         eb
@@ -191,22 +210,17 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
           .as('NextAppointment'),
         'lb.notes as notes',
         'lb.is_last as is_last',
-        // NextBatchPresent: a manufactured-but-undelivered batch beyond the last delivered seq?
-        sql<boolean>`exists (
-          select 1 from "aligner_batches" "ReadyBatch"
-          where "ReadyBatch"."aligner_set_id" = ${eb.ref('s.aligner_set_id')}
-            and "ReadyBatch"."manufacture_date" is not null
-            and "ReadyBatch"."delivered_to_patient_date" is null
-            and "ReadyBatch"."batch_sequence" > coalesce(
-              (select max("b2"."batch_sequence") from "aligner_batches" "b2"
-               where "b2"."aligner_set_id" = ${eb.ref('s.aligner_set_id')}
-                 and "b2"."delivered_to_patient_date" is not null), 0)
-        )`.as('NextBatchPresent'),
-        // LabStatus
+        // NextBatchPresent: a manufactured-but-undelivered batch beyond the last delivered seq.
+        // `coalesce(..., false)` because both maxima are NULL for a set with no such batches.
+        sql<boolean>`coalesce(${eb.ref('ba.max_ready_seq')} > coalesce(${eb.ref('ba.max_delivered_seq')}, 0), false)`.as(
+          'NextBatchPresent'
+        ),
+        // LabStatus — same four arms, read off the grouped counts. A set with no batch row at all
+        // has no `ba` row either (LEFT JOIN → NULL), which `coalesce(total, 0) = 0` catches.
         sql<string>`case
-          when not exists (select 1 from "aligner_batches" "b2" where "b2"."aligner_set_id" = ${eb.ref('s.aligner_set_id')}) then 'no_batches'
-          when exists (select 1 from "aligner_batches" "b2" where "b2"."aligner_set_id" = ${eb.ref('s.aligner_set_id')} and "b2"."manufacture_date" is not null and "b2"."delivered_to_patient_date" is null) then 'in_lab'
-          when exists (select 1 from "aligner_batches" "b2" where "b2"."aligner_set_id" = ${eb.ref('s.aligner_set_id')} and "b2"."manufacture_date" is null) then 'needs_mfg'
+          when coalesce(${eb.ref('ba.total')}, 0) = 0 then 'no_batches'
+          when ${eb.ref('ba.in_lab_count')} > 0 then 'in_lab'
+          when ${eb.ref('ba.needs_mfg_count')} > 0 then 'needs_mfg'
           else 'all_delivered' end`.as('LabStatus'),
         'ad.doctor_name as doctor_name',
         'w.status as WorkStatus',

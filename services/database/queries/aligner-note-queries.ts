@@ -72,8 +72,6 @@ export async function getNotesBySetId(setId: number): Promise<AlignerNote[]> {
 }
 
 /**
- * Check if aligner set exists
-/**
  * Create a note
  *
  * NOTE (roll-up owned here, not by the DB): a doctor-activity trigger used to fire
@@ -157,13 +155,14 @@ export async function getNoteById(noteId: number): Promise<NoteInfo | null> {
  */
 export async function updateNote(noteId: number, noteText: string): Promise<void> {
   try {
-    await withPgTransaction(async (trx) => {
-      await trx
-        .updateTable('aligner_notes')
-        .set({ note_text: noteText.trim(), is_edited: true })
-        .where('note_id', '=', noteId)
-        .execute();
-    });
+    // No transaction: a single statement is already atomic, and wrapping it paid a BEGIN/COMMIT
+    // round trip for nothing. (Its siblings `createNote` and the batch writers DO need one — they
+    // issue several statements that must stand or fall together.)
+    await getKysely()
+      .updateTable('aligner_notes')
+      .set({ note_text: noteText.trim(), is_edited: true })
+      .where('note_id', '=', noteId)
+      .execute();
   } catch (err) {
     log.error('Failed to update note', {
       error: err instanceof Error ? err.message : String(err),
@@ -177,15 +176,15 @@ export async function updateNote(noteId: number, noteText: string): Promise<void
  */
 export async function toggleNoteReadStatus(noteId: number): Promise<void> {
   try {
-    await withPgTransaction(async (trx) => {
-      await trx
-        .updateTable('aligner_notes')
-        .set((eb) => ({
-          is_read: sql<boolean>`case when ${eb.ref('is_read')} = true then false else true end`,
-        }))
-        .where('note_id', '=', noteId)
-        .execute();
-    });
+    // Single statement — atomic on its own, and the flip is computed in SQL from the stored value,
+    // so there is no read-then-write for a transaction to protect. (See updateNote.)
+    await getKysely()
+      .updateTable('aligner_notes')
+      .set((eb) => ({
+        is_read: sql<boolean>`case when ${eb.ref('is_read')} = true then false else true end`,
+      }))
+      .where('note_id', '=', noteId)
+      .execute();
   } catch (err) {
     log.error('Failed to toggle note read status', {
       error: err instanceof Error ? err.message : String(err),
@@ -199,9 +198,8 @@ export async function toggleNoteReadStatus(noteId: number): Promise<void> {
  */
 export async function deleteNote(noteId: number): Promise<void> {
   try {
-    await withPgTransaction(async (trx) => {
-      await trx.deleteFrom('aligner_notes').where('note_id', '=', noteId).execute();
-    });
+    // Single statement (see updateNote).
+    await getKysely().deleteFrom('aligner_notes').where('note_id', '=', noteId).execute();
   } catch (err) {
     log.error('Failed to delete note', {
       error: err instanceof Error ? err.message : String(err),

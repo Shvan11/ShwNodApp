@@ -18,6 +18,7 @@
  */
 
 import { log } from '../../utils/logger.js';
+import { parseLocalDate } from '../../utils/date.js';
 import { getOption } from '../database/queries/options-queries.js';
 import { ensureCalendarRange } from '../database/queries/calendar-queries.js';
 
@@ -167,6 +168,22 @@ export interface MonthlyDayData {
  * Format a Date object to YYYY-MM-DD using local timezone
  * Avoids UTC conversion that can shift dates by a day
  */
+/**
+ * Parse a `YYYY-MM-DD` calendar boundary to a LOCAL-midnight Date.
+ *
+ * `new Date('2026-09-15')` parses as UTC midnight, which every local getter below then reads back
+ * one day earlier on any negative-UTC-offset host — the whole month grid would shift by a day and
+ * the Saturday-start week maths would land on the wrong weekday. The app is wall-clock throughout
+ * (CLAUDE.md §Database: `date`/`timestamp` are WITHOUT time zone), so a calendar boundary must be
+ * parsed as local. Latent today only because prod runs `TZ=Asia/Baghdad` (+3).
+ *
+ * Falls back to the raw parse for anything that is not a plain date string (the callers all pass
+ * one — these are this module's own formatted outputs — so the fallback is unreachable defence).
+ */
+function parseCalendarDate(value: string): Date {
+  return parseLocalDate(value) ?? new Date(value);
+}
+
 export function formatLocalDate(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -191,7 +208,7 @@ export function getWeekStart(date: Date): string {
 }
 
 export function getWeekEnd(weekStart: string): string {
-  const d = new Date(weekStart);
+  const d = parseCalendarDate(weekStart);
   // Week: Sat, Sun, Mon, Tue, Wed, Thu (6 days, excluding Friday)
   d.setDate(d.getDate() + 5); // Thursday end (5 days after Saturday)
   // Format in local timezone to avoid UTC conversion
@@ -226,14 +243,12 @@ export function getMonthEnd(date: Date): string {
 
 // Get calendar grid start (Saturday before or at month start)
 export function getCalendarGridStart(date: Date): string {
-  const monthStart = new Date(getMonthStart(date));
-  return getWeekStart(monthStart);
+  return getWeekStart(parseCalendarDate(getMonthStart(date)));
 }
 
 // Get calendar grid end (Thursday after or at month end, excluding Friday)
 export function getCalendarGridEnd(date: Date): string {
-  const monthEnd = new Date(getMonthEnd(date));
-  const gridEnd = new Date(monthEnd);
+  const gridEnd = parseCalendarDate(getMonthEnd(date));
   const dayOfWeek = gridEnd.getDay();
   // Add days to get to Thursday (day 4), skip Friday
   let daysToAdd: number;
@@ -415,8 +430,8 @@ export function transformToMonthlyStructure(
   });
 
   // Fill in missing days in the grid range
-  const start = new Date(gridStart);
-  const end = new Date(gridEnd);
+  const start = parseCalendarDate(gridStart);
+  const end = parseCalendarDate(gridEnd);
   const allDays: MonthlyDayData[] = [];
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {

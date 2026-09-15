@@ -43,6 +43,7 @@ export async function getDoctorsWithUnreadCounts(): Promise<AlignerDoctorWithUnr
       .select((eb) => [
         'ad.dr_id',
         'ad.doctor_name',
+        'ad.doctor_email',
         'ad.logo_path',
         eb
           .selectFrom('aligner_notes as n')
@@ -60,7 +61,10 @@ export async function getDoctorsWithUnreadCounts(): Promise<AlignerDoctorWithUnr
     return rows.map((r) => ({
       dr_id: r.dr_id,
       doctor_name: r.doctor_name,
-      doctor_email: null,
+      // Selected, not hardcoded null: the return type declared `string | null`, so a consumer
+      // reading the field always got null and could not tell "no email on file" from "this query
+      // doesn't fetch it".
+      doctor_email: r.doctor_email,
       logo_path: r.logo_path,
       UnreadDoctorNotes: Number(r.UnreadDoctorNotes) || 0,
       // Aliased properties for frontend compatibility (PrintQueueContext expects these)

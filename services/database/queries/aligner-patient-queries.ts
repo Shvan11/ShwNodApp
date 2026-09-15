@@ -9,6 +9,8 @@ import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
 import { log } from '../../../utils/logger.js';
 import type { AlignerPatient } from '../../../shared/contracts/aligner.contract.js';
+// The work-type ids that can carry an aligner set — from the taxonomy SSoT, not a literal.
+import { ALIGNER_SET_WORK_TYPE_IDS } from '../../../shared/treatment-taxonomy.js';
 
 // ==============================
 // ALIGNER PATIENTS QUERIES
@@ -24,7 +26,7 @@ export async function getAllAlignerPatients(): Promise<AlignerPatient[]> {
       .innerJoin('works as w', 'p.person_id', 'w.person_id')
       .innerJoin('work_types as wt', 'w.type_of_work', 'wt.id')
       .innerJoin('aligner_sets as s', 'w.work_id', 's.work_id')
-      .where('wt.id', 'in', [19, 20, 21])
+      .where('wt.id', 'in', ALIGNER_SET_WORK_TYPE_IDS)
       .groupBy([
         'p.person_id',
         'p.first_name',
@@ -85,7 +87,7 @@ export async function getAlignerPatientsByDoctor(doctorId: number): Promise<Alig
       .innerJoin('works as w', 'p.person_id', 'w.person_id')
       .innerJoin('work_types as wt', 'w.type_of_work', 'wt.id')
       .innerJoin('aligner_sets as s', 'w.work_id', 's.work_id')
-      .where('wt.id', 'in', [19, 20, 21])
+      .where('wt.id', 'in', ALIGNER_SET_WORK_TYPE_IDS)
       .where('s.aligner_dr_id', '=', doctorId)
       .groupBy([
         'p.person_id',
@@ -161,7 +163,7 @@ export async function searchAlignerPatients(
       .innerJoin('works as w', 'p.person_id', 'w.person_id')
       .innerJoin('work_types as wt', 'w.type_of_work', 'wt.id')
       .innerJoin('aligner_sets as s', 'w.work_id', 's.work_id')
-      .where('wt.id', 'in', [19, 20, 21])
+      .where('wt.id', 'in', ALIGNER_SET_WORK_TYPE_IDS)
       .where((eb) =>
         eb.or([
           // `::text ILIKE` (not citext LIKE): same case-insensitive semantics as Arabic_CI_AS,

@@ -190,7 +190,9 @@ function validateAppointmentRequiredFields(
     );
   }
 
-  // Validate date format
+  // Validate date format. The parsed Date is used ONLY for this validity test and never for its
+  // value, so the UTC-midnight reading of a plain 'YYYY-MM-DD' (see utils/date.ts#parseLocalDate)
+  // cannot shift anything here — don't copy the shape to a site that keeps the date.
   const appointmentDate = new Date(app_date);
   if (isNaN(appointmentDate.getTime())) {
     throw new AppointmentValidationError(
@@ -599,7 +601,7 @@ export async function getDailyAppointments(
     throw new AppointmentValidationError('AppsDate is required', 'MISSING_DATE');
   }
 
-  // Validate date format
+  // Validity test only — the value is never read (see the note in the create path above).
   const appointmentDate = new Date(AppsDate);
   if (isNaN(appointmentDate.getTime())) {
     throw new AppointmentValidationError(

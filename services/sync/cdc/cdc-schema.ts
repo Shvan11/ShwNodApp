@@ -143,9 +143,11 @@ export class SchemaMetaCache {
   async pkFor(table: string): Promise<string | undefined> {
     if (!this.pkCache || !this.pkSeen) {
       this.pkCache = await loadPks(this.local());
-      this.pkSeen = new Set();
-    }
-    if (!this.pkSeen.has(table)) {
+      // Seeded with `table`: the load that just ran is by definition current for it. Starting from
+      // an empty set made the very first lookup of every table re-run the same catalog query
+      // immediately, doubling the boot-time catalog round trips for no new information.
+      this.pkSeen = new Set([table]);
+    } else if (!this.pkSeen.has(table)) {
       this.pkCache = await loadPks(this.local()); // refresh once for a newly-captured table
       this.pkSeen.add(table);
     }
@@ -156,9 +158,11 @@ export class SchemaMetaCache {
   async generatedColsFor(table: string): Promise<Set<string>> {
     if (!this.genColsCache || !this.genColsSeen) {
       this.genColsCache = await loadGeneratedCols(this.local());
-      this.genColsSeen = new Set();
-    }
-    if (!this.genColsSeen.has(table)) {
+      // Seeded with `table`: the load that just ran is by definition current for it. Starting from
+      // an empty set made the very first lookup of every table re-run the same catalog query
+      // immediately, doubling the boot-time catalog round trips for no new information.
+      this.genColsSeen = new Set([table]);
+    } else if (!this.genColsSeen.has(table)) {
       this.genColsCache = await loadGeneratedCols(this.local());
       this.genColsSeen.add(table);
     }
@@ -169,9 +173,11 @@ export class SchemaMetaCache {
   async isUpdatedAtTable(table: string): Promise<boolean> {
     if (!this.updatedAtCache || !this.updatedAtSeen) {
       this.updatedAtCache = await loadUpdatedAtTables(this.local());
-      this.updatedAtSeen = new Set();
-    }
-    if (!this.updatedAtSeen.has(table)) {
+      // Seeded with `table`: the load that just ran is by definition current for it. Starting from
+      // an empty set made the very first lookup of every table re-run the same catalog query
+      // immediately, doubling the boot-time catalog round trips for no new information.
+      this.updatedAtSeen = new Set([table]);
+    } else if (!this.updatedAtSeen.has(table)) {
       this.updatedAtCache = await loadUpdatedAtTables(this.local());
       this.updatedAtSeen.add(table);
     }
