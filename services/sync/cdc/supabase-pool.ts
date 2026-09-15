@@ -44,7 +44,15 @@ export function stripSslMode(connStr: string): string {
     .replace(/[?&]$/g, ''); // trim a dangling separator
 }
 
-function buildSupabasePool(max: number): Pool {
+/** Per-statement bounds a caller can add (see buildOneShotSupabasePool). */
+export interface SupabasePoolLimits {
+  /** Server-side cap: PG cancels the statement itself. */
+  statement_timeout?: number;
+  /** Client-side cap: `pg` rejects and destroys the connection. Belt AND braces — see below. */
+  query_timeout?: number;
+}
+
+function buildSupabasePool(max: number, limits: SupabasePoolLimits = {}): Pool {
   const url = process.env.SUPABASE_FAILOVER_DB_URL ?? '';
   if (!url) throw new Error('SUPABASE_FAILOVER_DB_URL not set');
   return new PgPool({
@@ -53,16 +61,22 @@ function buildSupabasePool(max: number): Pool {
     max,
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: 30_000,
+    ...limits,
   });
 }
 
 /**
  * A throwaway single-connection pool to the same Supabase database, for a caller that needs ONE
- * statement and must not create (or keep alive) either shared singleton — e.g. the boot-time capture
- * disable for a reverse sink switched off by env. The caller owns it and must `end()` it.
+ * statement and must not create (or keep alive) either shared singleton — e.g. the no-drainer
+ * capture watchdog, or the mirror drift check. The caller owns it and must `end()` it.
+ *
+ * `limits` bounds a long statement. Worth passing for anything that scans rather than reads a
+ * counter: the Supabase pooler can drop a connection mid-statement without closing the socket, and
+ * `pg` then waits forever on an answer that will never come (the failure
+ * `scripts/reconcile-mirror.mjs` hit, and the reason it sets both timeouts too).
  */
-export function buildOneShotSupabasePool(): Pool {
-  const p = buildSupabasePool(1);
+export function buildOneShotSupabasePool(limits: SupabasePoolLimits = {}): Pool {
+  const p = buildSupabasePool(1, limits);
   p.on('error', () => {}); // short-lived and caller-owned: the statement's own result is the signal
   return p;
 }

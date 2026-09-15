@@ -134,7 +134,9 @@ export async function runDriftCheck(): Promise<DriftReport> {
   // A one-shot pool, not the shared forward-write singleton: this runs once a day and must not tag
   // its session with app.cdc_origin (that pool's writes are origin-tagged) nor hold a connection open
   // between runs. Ended in the finally below.
-  const mirror = buildOneShotSupabasePool();
+  // Bounded on BOTH sides: this one scans rather than reading a counter, and an unanswered
+  // statement against the pooler would otherwise hang the check (and its pool) indefinitely.
+  const mirror = buildOneShotSupabasePool({ statement_timeout: 120_000, query_timeout: 130_000 });
   try {
     const local = getPgPool();
     const pks = await loadPks(local);
