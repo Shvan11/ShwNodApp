@@ -150,7 +150,10 @@ export async function runDriftCheck(): Promise<DriftReport> {
     for (const tbl of tables) {
       const a = mine.get(tbl);
       const b = theirs.get(tbl);
-      if (a === undefined || b === undefined) continue; // absent on one side: a DDL-parity problem, not drift
+      // Defensive only: `countAll` asks for every table in ONE statement, so a table missing on the
+      // mirror fails the whole sweep with PG naming the relation — which is the right alarm for a
+      // DDL-parity gap (CDC replicates row data, never DDL), not something to report as "drift".
+      if (a === undefined || b === undefined) continue;
       checked++;
       if (a !== b) {
         drifts.push({ tbl, local: a, mirror: b, missing: Math.max(0, a - b), extra: Math.max(0, b - a) });
