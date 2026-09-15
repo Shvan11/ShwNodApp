@@ -34,7 +34,7 @@ const TARGETS = ['params', 'query', 'body'] as const;
 // overload inference clash with handlers typed `Request<{ id: string }>` when
 // validate() precedes them — `<any, ...>` lets the handler's own params win.
 export function validate(schemas: ValidationSchemas): RequestHandler<any, any, any, any> {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  const guard = (req: Request, res: Response, next: NextFunction): void => {
     for (const key of TARGETS) {
       const schema = schemas[key];
       if (!schema) continue;
@@ -83,6 +83,20 @@ export function validate(schemas: ValidationSchemas): RequestHandler<any, any, a
     }
     next();
   };
+
+  // Name the closure after the request parts it checks, for the same reason
+  // `authorize()` does (see middleware/auth.ts#authorize): the route-table
+  // snapshot prints every layer's function name, so with this stamped on, the
+  // VALIDATION posture of each route is committed text alongside the auth
+  // posture — a mutation that takes an unvalidated `req.body` is a reviewable
+  // diff rather than a finding for the next audit. TARGETS order, so the name
+  // matches the order the parts are actually parsed in.
+  Object.defineProperty(guard, 'name', {
+    value: `validate(${TARGETS.filter((k) => schemas[k]).join(',')})`,
+    configurable: true,
+  });
+
+  return guard;
 }
 
 export default validate;

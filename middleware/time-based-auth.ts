@@ -87,7 +87,7 @@ export function requireRecordAge(options: RecordAgeOptions) {
     enqueueIfRestricted,
   } = options;
 
-  return async (
+  const guard = async (
     req: Request,
     res: Response<ApiErrorResponse>,
     next: NextFunction
@@ -143,6 +143,16 @@ export function requireRecordAge(options: RecordAgeOptions) {
       ErrorResponses.internalError(res, 'Authorization check failed');
     }
   };
+
+  // Named for the same reason as `authorize()` — this is the second half of the
+  // authorization posture (the hold tier), and an anonymous closure would leave
+  // it invisible in the route-table snapshot. See middleware/auth.ts#authorize.
+  Object.defineProperty(guard, 'name', {
+    value: `requireRecordAge(${resourceType}:${operation})`,
+    configurable: true,
+  });
+
+  return guard;
 }
 
 /**

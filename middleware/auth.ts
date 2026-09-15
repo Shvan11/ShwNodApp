@@ -62,7 +62,7 @@ export function authenticate(
  * router.delete('/invoice/:id', authorize(['admin', 'accountant']), handler);
  */
 export function authorize(allowedRoles: readonly UserRole[] = []) {
-  return (
+  const gate = (
     req: Request,
     res: Response<ApiErrorResponse>,
     next: NextFunction
@@ -104,6 +104,23 @@ export function authorize(allowedRoles: readonly UserRole[] = []) {
 
     next();
   };
+
+  // Name the closure after the roles it admits. The route-table snapshot
+  // (`app/mount-routes.test.ts`) prints each layer's function name, and a
+  // factory's closure is anonymous by default — which is precisely why a
+  // mutation with NO gate read identically to a gated one in review. With the
+  // name stamped, the authorization posture of all ~464 routes lives in the
+  // committed snapshot: adding an ungated route, or widening an existing gate,
+  // is a reviewable diff instead of a finding for the next audit.
+  // An empty list is admin-only — the `userRole === 'admin'` bypass above is the
+  // only way through it. `name` is configurable but not writable, so
+  // defineProperty is the only way to set it.
+  Object.defineProperty(gate, 'name', {
+    value: `authorize(${allowedRoles.join('|') || 'admin'})`,
+    configurable: true,
+  });
+
+  return gate;
 }
 
 /**

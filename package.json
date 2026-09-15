@@ -46,6 +46,8 @@
     "db:baseline:stamp": "node --env-file=.env scripts/db-baseline-stamp.mjs",
     "db:baseline:build": "node --env-file=.env scripts/db-baseline-build.mjs",
     "db:baseline:verify": "node --env-file=.env scripts/db-baseline-verify.mjs",
+    "sync:reconcile": "node --env-file=.env scripts/reconcile-mirror.mjs",
+    "sync:reconcile:apply": "node --env-file=.env scripts/reconcile-mirror.mjs --apply",
     "db:codegen": "kysely-codegen --date-parser string --exclude-pattern \"extensions.*\" --out-file types/db.d.ts"
   },
   "author": "",

@@ -110,6 +110,25 @@
     font-weight: 500;
 }
 
+/* Clean result of the scheduled mirror comparison — same shape as .errorBanner, success tone.
+   Stated explicitly rather than shown as nothing: "no news" was indistinguishable from "never ran",
+   which is the ambiguity the whole drift check exists to remove. */
+.driftOk {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--success-50);
+    color: var(--success-700);
+    border-left: 4px solid var(--success-600);
+    padding: 0.85rem 1rem;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.driftOk i {
+    flex-shrink: 0;
+}
+
 /* Sink cards */
 .cards {
     display: grid;

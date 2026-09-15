@@ -1548,14 +1548,50 @@ export interface SyncSinkStatus {
   note: string | null;
   updatedAt: string | null;
   backlog: number;
+  /** `changed_at` of the oldest pending change; null when the backlog is empty. */
+  oldestChangeAt: string | null;
+  /**
+   * Age of that oldest pending change, in seconds. The number that makes a backlog readable: a
+   * handful of rows seconds old is a sink mid-cycle, the same handful three days old is a sink that
+   * has stopped making progress. Size alone cannot tell them apart, which is why this card reported
+   * a mirror 162 rows behind as healthy for a week (audit finding F1f).
+   */
+  backlogAgeSec: number | null;
   reachable: boolean | null;
   latencyMs: number | null;
+  error: string | null;
+}
+
+/** One diverging table in the mirror drift sweep. Counts only — exact rows come from the script. */
+export interface SyncTableDrift {
+  tbl: string;
+  local: number;
+  mirror: number;
+  missing: number;
+  extra: number;
+  setMismatch?: boolean;
+}
+
+/**
+ * The last scheduled row-count comparison of local against the Supabase mirror
+ * (`services/sync/cdc/drift-check.ts`). The only signal on this card that can see a change which was
+ * never CAPTURED — backlog, `stale` and reachability all describe changes the system knows about,
+ * which is why all three stayed green through the 2026-09-08 blackout.
+ */
+export interface SyncDriftReport {
+  checkedAt: string;
+  tablesChecked: number;
+  missing: number;
+  extra: number;
+  tables: SyncTableDrift[];
   error: string | null;
 }
 
 export interface SyncSinkStatusResponse {
   success: boolean;
   checkedAt?: string;
+  /** Absent on the Dolphin endpoint, and null until the first sweep completes (~5 min after boot). */
+  drift?: SyncDriftReport | null;
   sinks?: SyncSinkStatus[];
   error?: string;
 }

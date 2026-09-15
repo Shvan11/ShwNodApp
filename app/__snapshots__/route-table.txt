@@ -1,10 +1,10 @@
 GET     /health/basic
 MOUNT   /api/auth
-POST    /api/auth/login
+POST    /api/auth/login  [<anonymous>]
 POST    /api/auth/logout
 GET     /api/auth/me
 POST    /api/auth/change-password
-GET     /api/auth/3shape/login
+GET     /api/auth/3shape/login  [authenticate -> authorize(admin)]
 GET     /api/auth/3shape/callback
 MOUNT   /
 POST    /api/integrations/3shape/webhook
@@ -19,15 +19,15 @@ GET     /tv-display/settings
 GET     /tv-display/media/:file
 GET     /tv-display
 MOUNT   /api/portal
-POST    /api/portal/login
-POST    /api/portal/logout
-GET     /api/portal/me
-GET     /api/portal/timepoints
-GET     /api/portal/photos/:tp
-GET     /api/portal/photos/:tp/:name
-GET     /api/portal/visits
-GET     /api/portal/appointments/next
-GET     /api/portal/payments
+POST    /api/portal/login  [<anonymous> -> validate(body)]
+POST    /api/portal/logout  [authenticatePatient]
+GET     /api/portal/me  [authenticatePatient]
+GET     /api/portal/timepoints  [authenticatePatient]
+GET     /api/portal/photos/:tp  [authenticatePatient -> validate(params)]
+GET     /api/portal/photos/:tp/:name  [authenticatePatient -> validate(params,query)]
+GET     /api/portal/visits  [authenticatePatient]
+GET     /api/portal/appointments/next  [authenticatePatient]
+GET     /api/portal/payments  [authenticatePatient]
 GET     /login.html
 GET     /portal | /portal/*splat
 USE     /api  [authenticate]
@@ -41,10 +41,10 @@ GET     /api/sse/whatsapp
 MOUNT   /api/sse
 GET     /api/sse/chair-display/:chairId
 MOUNT   /api
-GET     /api/settings/cost-presets
-POST    /api/settings/cost-presets
-PUT     /api/settings/cost-presets/:id
-DELETE  /api/settings/cost-presets/:id
+GET     /api/settings/cost-presets  [validate(query)]
+POST    /api/settings/cost-presets  [authenticate -> authorize(admin) -> validate(body)]
+PUT     /api/settings/cost-presets/:id  [authenticate -> authorize(admin) -> validate(body)]
+DELETE  /api/settings/cost-presets/:id  [authenticate -> authorize(admin)]
 MOUNT   /api
 GET     /api/referral-sources
 GET     /api/patient-types
@@ -57,251 +57,251 @@ GET     /api/labs
 MOUNT   /api
 MOUNT   /api/templates
 GET     /api/templates/document-types
-GET     /api/templates
-GET     /api/templates/:templateId
-POST    /api/templates
-PUT     /api/templates/:templateId
-DELETE  /api/templates/:templateId
-POST    /api/templates/:templateId/save-html
-GET     /api/templates/:templateId/html
-GET     /api/templates/receipt/work/:workId
+GET     /api/templates  [validate(query)]
+GET     /api/templates/:templateId  [validate(params)]
+POST    /api/templates  [authorize(admin|front_desk|clinical) -> validate(body)]
+PUT     /api/templates/:templateId  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+DELETE  /api/templates/:templateId  [authorize(admin|front_desk|clinical) -> validate(params)]
+POST    /api/templates/:templateId/save-html  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+GET     /api/templates/:templateId/html  [validate(params)]
+GET     /api/templates/receipt/work/:workId  [validate(params)]
 GET     /api/templates/receipt/no-work/:personId
 MOUNT   /api
 GET     /api/patients/:personId/info
 GET     /api/settings/patients-folder
 GET     /api/patients/phones
-GET     /api/patients/search
+GET     /api/patients/search  [validate(query)]
 GET     /api/patients/tag-options
 GET     /api/patients/type-options
 GET     /api/patients/:personId
-POST    /api/patients/transliterate-name
-POST    /api/patients
-PUT     /api/patients/:personId
-DELETE  /api/patients/:personId
-PUT     /api/patients/:personId/estimated-cost
+POST    /api/patients/transliterate-name  [authorize(admin|front_desk|clinical) -> validate(body)]
+POST    /api/patients  [authorize(admin|front_desk|clinical) -> validate(body)]
+PUT     /api/patients/:personId  [authorize(admin|front_desk) -> validate(params,body)]
+DELETE  /api/patients/:personId  [authenticate -> authorize(admin|front_desk) -> validate(params) -> requireRecordAge(patient:delete)]
+PUT     /api/patients/:personId/estimated-cost  [authenticate -> authorize(admin|front_desk) -> validate(params,body)]
 GET     /api/patients/:personId/has-appointment
 MOUNT   /api
 GET     /api/patients/:personId/timepoints
 GET     /api/patients/:personId/timepoints/:tp/images
 GET     /api/patients/:personId/timepoints/:tpCode/folder
-PUT     /api/patients/:personId/timepoints/:tpCode
-DELETE  /api/patients/:personId/timepoints/:tpCode
-GET     /api/patients/:personId/gallery/:tp
+PUT     /api/patients/:personId/timepoints/:tpCode  [authorize(admin|front_desk) -> validate(params,body)]
+DELETE  /api/patients/:personId/timepoints/:tpCode  [authorize(admin|front_desk) -> validate(params)]
+GET     /api/patients/:personId/gallery/:tp  [validate(params)]
 GET     /api/patients/:personId/xray
 MOUNT   /api
-GET     /api/patients/:personId/alerts
-POST    /api/patients/:personId/alerts
-PUT     /api/alerts/:alertId/status
-PUT     /api/alerts/:alertId
-PUT     /api/alerts/:alertId/snooze
+GET     /api/patients/:personId/alerts  [authenticate]
+POST    /api/patients/:personId/alerts  [authenticate -> authorize(admin|front_desk|clinical) -> validate(params,body)]
+PUT     /api/alerts/:alertId/status  [authenticate -> authorize(admin|front_desk|clinical) -> validate(params,body)]
+PUT     /api/alerts/:alertId  [authenticate -> authorize(admin|front_desk|clinical) -> validate(params,body)]
+PUT     /api/alerts/:alertId/snooze  [authenticate -> authorize(admin|front_desk|clinical) -> validate(params,body)]
 MOUNT   /api
-GET     /api/patients/:personId/portal
-POST    /api/patients/:personId/portal/reset-pin
-POST    /api/patients/:personId/portal/enable
-POST    /api/patients/:personId/portal/unlock
-GET     /api/patients/:personId/photos/visibility
-POST    /api/patients/:personId/photos/visibility
+GET     /api/patients/:personId/portal  [authorize(admin|front_desk)]
+POST    /api/patients/:personId/portal/reset-pin  [authorize(admin|front_desk) -> validate(params)]
+POST    /api/patients/:personId/portal/enable  [authorize(admin|front_desk) -> validate(params,body)]
+POST    /api/patients/:personId/portal/unlock  [authorize(admin|front_desk) -> validate(params)]
+GET     /api/patients/:personId/photos/visibility  [authorize(admin|front_desk)]
+POST    /api/patients/:personId/photos/visibility  [authorize(admin|front_desk) -> validate(params,body)]
 MOUNT   /api
 GET     /api/patients/:personId/files
 GET     /api/patients/:personId/files/content
 GET     /api/patients/:personId/working-files
 GET     /api/patients/:personId/working-files/content
-POST    /api/patients/:personId/files/upload
-POST    /api/patients/:personId/files/folder
-POST    /api/patients/:personId/files/rename
-DELETE  /api/patients/:personId/files
-POST    /api/patients/:personId/files/delete-batch
+POST    /api/patients/:personId/files/upload  [authorize(admin|front_desk) -> validate(params) -> runUpload]
+POST    /api/patients/:personId/files/folder  [authorize(admin|front_desk) -> validate(params,body)]
+POST    /api/patients/:personId/files/rename  [authorize(admin|front_desk) -> validate(params,body)]
+DELETE  /api/patients/:personId/files  [authorize(admin|front_desk) -> validate(params)]
+POST    /api/patients/:personId/files/delete-batch  [authorize(admin|front_desk) -> validate(params) -> <anonymous>]
 MOUNT   /api
-GET     /api/slideshow-configs
-POST    /api/slideshow-configs
-PUT     /api/slideshow-configs/:id
-DELETE  /api/slideshow-configs/:id
+GET     /api/slideshow-configs  [validate(query)]
+POST    /api/slideshow-configs  [authorize(admin|front_desk|clinical) -> validate(body)]
+PUT     /api/slideshow-configs/:id  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+DELETE  /api/slideshow-configs/:id  [authorize(admin|front_desk|clinical) -> validate(params)]
 MOUNT   /api
-GET     /api/appointment-details
-GET     /api/getDailyAppointments
-POST    /api/updateAppointmentState
-POST    /api/undoAppointmentState
-POST    /api/appointments
-GET     /api/patient-appointments/:personId
-GET     /api/appointments/:appointmentId
-PUT     /api/appointments/:appointmentId
-DELETE  /api/appointments/:appointmentId
-POST    /api/appointments/quick-checkin
+GET     /api/appointment-details  [authenticate -> authorize(admin|front_desk|clinical)]
+GET     /api/getDailyAppointments  [authenticate -> authorize(admin|front_desk|clinical) -> validate(query)]
+POST    /api/updateAppointmentState  [authenticate -> authorize(admin|front_desk|clinical) -> validate(body)]
+POST    /api/undoAppointmentState  [authenticate -> authorize(admin|front_desk|clinical) -> validate(body)]
+POST    /api/appointments  [authenticate -> authorize(admin|front_desk|clinical) -> validate(body)]
+GET     /api/patient-appointments/:personId  [authenticate -> authorize(admin|front_desk|clinical)]
+GET     /api/appointments/:appointmentId  [authenticate -> authorize(admin|front_desk|clinical)]
+PUT     /api/appointments/:appointmentId  [authenticate -> authorize(admin|front_desk|clinical) -> validate(params,body)]
+DELETE  /api/appointments/:appointmentId  [authenticate -> authorize(admin|front_desk|clinical) -> validate(params)]
+POST    /api/appointments/quick-checkin  [authenticate -> authorize(admin|front_desk|clinical) -> validate(body)]
 MOUNT   /api
-POST    /api/chair-display/patient-loaded
-POST    /api/chair-display/patient-cleared
+POST    /api/chair-display/patient-loaded  [authorize(admin|front_desk|clinical) -> validate(body)]
+POST    /api/chair-display/patient-cleared  [authorize(admin|front_desk|clinical) -> validate(body)]
 MOUNT   /api
-GET     /api/getpaymenthistory
-GET     /api/getworkforreceipt/:workId
+GET     /api/getpaymenthistory  [authorize(admin|front_desk|clinical) -> validate(query)]
+GET     /api/getworkforreceipt/:workId  [authorize(admin|front_desk|clinical) -> validate(params)]
 GET     /api/getCurrentExchangeRate
 GET     /api/getExchangeRateForDate
 GET     /api/exchange-rates
-POST    /api/updateExchangeRateForDate
-POST    /api/addInvoice
-DELETE  /api/deleteInvoice/:invoiceId
+POST    /api/updateExchangeRateForDate  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+POST    /api/addInvoice  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+DELETE  /api/deleteInvoice/:invoiceId  [authenticate -> authorize(admin|front_desk) -> validate(params) -> requireRecordAge(invoice:delete)]
 MOUNT   /api
-GET     /api/getworkdetails
+GET     /api/getworkdetails  [validate(query)]
 GET     /api/getworks
-POST    /api/addwork
-POST    /api/addWorkWithInvoice
-PUT     /api/updatework
-POST    /api/finishwork
-POST    /api/discontinuework
-POST    /api/reactivatework
-DELETE  /api/deletework
+POST    /api/addwork  [authenticate -> authorize(admin|front_desk|clinical) -> validate(body)]
+POST    /api/addWorkWithInvoice  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+PUT     /api/updatework  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+POST    /api/finishwork  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+POST    /api/discontinuework  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+POST    /api/reactivatework  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+DELETE  /api/deletework  [authenticate -> authorize(admin|front_desk) -> validate(body) -> requireRecordAge(work:delete)]
 GET     /api/getworktypes
 GET     /api/getworkkeywords
 GET     /api/teeth
 MOUNT   /api
-GET     /api/getworkdetailslist
-POST    /api/addworkdetail
-PUT     /api/updateworkdetail
-DELETE  /api/deleteworkdetail
+GET     /api/getworkdetailslist  [validate(query)]
+POST    /api/addworkdetail  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+PUT     /api/updateworkdetail  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+DELETE  /api/deleteworkdetail  [authenticate -> authorize(admin|front_desk) -> validate(body)]
 MOUNT   /api
-GET     /api/diagnosis/:workId
-POST    /api/diagnosis
-DELETE  /api/diagnosis/:workId
+GET     /api/diagnosis/:workId  [validate(params)]
+POST    /api/diagnosis  [authenticate -> authorize(admin|front_desk|clinical) -> validate(body)]
+DELETE  /api/diagnosis/:workId  [authenticate -> authorize(admin|front_desk|clinical) -> validate(params)]
 MOUNT   /api
-GET     /api/work/:workId/transfer-preview
-POST    /api/work/:workId/transfer
+GET     /api/work/:workId/transfer-preview  [authenticate -> authorize(admin)]
+POST    /api/work/:workId/transfer  [authenticate -> authorize(admin) -> validate(body)]
 MOUNT   /api
-GET     /api/getWires
-GET     /api/getlatestwires
-GET     /api/getvisitsbywork
-GET     /api/getvisitbyid
-POST    /api/addvisitbywork
-PUT     /api/updatevisitbywork
-DELETE  /api/deletevisitbywork
+GET     /api/getWires  [authenticate -> authorize(admin|front_desk|clinical)]
+GET     /api/getlatestwires  [authenticate -> authorize(admin|front_desk|clinical) -> validate(query)]
+GET     /api/getvisitsbywork  [authenticate -> authorize(admin|front_desk|clinical) -> validate(query)]
+GET     /api/getvisitbyid  [authenticate -> authorize(admin|front_desk|clinical) -> validate(query)]
+POST    /api/addvisitbywork  [authenticate -> authorize(admin|front_desk|clinical) -> validate(body)]
+PUT     /api/updatevisitbywork  [authenticate -> authorize(admin|front_desk|clinical) -> validate(body)]
+DELETE  /api/deletevisitbywork  [authenticate -> authorize(admin|front_desk|clinical) -> validate(body)]
 MOUNT   /api/wa
-POST    /api/wa/send
-POST    /api/wa/send-receipt
-POST    /api/wa/send-appointment
-POST    /api/wa/resend-appointment
-GET     /api/wa/group-settings
-PUT     /api/wa/group-settings
+POST    /api/wa/send  [authorize(admin|front_desk|clinical) -> <anonymous> -> validate(body)]
+POST    /api/wa/send-receipt  [authorize(admin|front_desk|clinical) -> validate(body)]
+POST    /api/wa/send-appointment  [authorize(admin|front_desk|clinical) -> validate(body)]
+POST    /api/wa/resend-appointment  [authorize(admin|front_desk|clinical) -> validate(body)]
+GET     /api/wa/group-settings  [authorize(admin|front_desk)]
+PUT     /api/wa/group-settings  [authorize(admin|front_desk) -> validate(body)]
 MOUNT   /api/wa
-POST    /api/wa/sendmedia
-POST    /api/wa/sendmedia2
+POST    /api/wa/sendmedia  [authorize(admin|front_desk|clinical) -> <anonymous> -> validate(body)]
+POST    /api/wa/sendmedia2  [authorize(admin|front_desk|clinical) -> <anonymous> -> multerMiddleware -> validate(body)]
 MOUNT   /api/wa
-GET     /api/wa/qr
+GET     /api/wa/qr  [authorize(admin|front_desk)]
 GET     /api/wa/initial-state
-POST    /api/wa/restart
-POST    /api/wa/refresh-qr
-POST    /api/wa/unlink
-POST    /api/wa/initialize
+POST    /api/wa/restart  [authorize(admin|front_desk)]
+POST    /api/wa/refresh-qr  [authorize(admin|front_desk)]
+POST    /api/wa/unlink  [authorize(admin|front_desk)]
+POST    /api/wa/initialize  [authorize(admin|front_desk)]
 MOUNT   /api/messaging
-GET     /api/messaging/status/:date
-GET     /api/messaging/count/:date
-GET     /api/messaging/message-text/:appointmentId
-POST    /api/messaging/reset/:date
+GET     /api/messaging/status/:date  [validate(params)]
+GET     /api/messaging/count/:date  [validate(params)]
+GET     /api/messaging/message-text/:appointmentId  [validate(params)]
+POST    /api/messaging/reset/:date  [authorize(admin|front_desk|clinical) -> validate(params)]
 MOUNT   /api
 GET     /api/aligner/doctors
 GET     /api/aligner/all-sets
 GET     /api/aligner/patients/all
 GET     /api/aligner/patients/by-doctor/:doctorId
-GET     /api/aligner/patients
+GET     /api/aligner/patients  [validate(query)]
 GET     /api/aligner/sets/:workId
-POST    /api/aligner/payments
+POST    /api/aligner/payments  [authorize(admin|front_desk) -> validate(body)]
 GET     /api/aligner/batches/:setId
-POST    /api/aligner/sets
-PUT     /api/aligner/sets/:setId
-DELETE  /api/aligner/sets/:setId
+POST    /api/aligner/sets  [authorize(admin|front_desk|clinical) -> validate(body)]
+PUT     /api/aligner/sets/:setId  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+DELETE  /api/aligner/sets/:setId  [authorize(admin|front_desk|clinical) -> validate(params)]
 MOUNT   /api
 GET     /api/aligner/notes/:setId
-POST    /api/aligner/notes
-PATCH   /api/aligner/notes/:noteId/toggle-read
-PATCH   /api/aligner/notes/:noteId
-DELETE  /api/aligner/notes/:noteId
+POST    /api/aligner/notes  [authorize(admin|front_desk|clinical) -> validate(body)]
+PATCH   /api/aligner/notes/:noteId/toggle-read  [authorize(admin|front_desk|clinical) -> validate(params)]
+PATCH   /api/aligner/notes/:noteId  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+DELETE  /api/aligner/notes/:noteId  [authorize(admin|front_desk|clinical) -> validate(params)]
 GET     /api/aligner/notes/:noteId/status
 MOUNT   /api
-POST    /api/aligner/batches
-PUT     /api/aligner/batches/:batchId
-PATCH   /api/aligner/batches/:batchId/manufacture
-PATCH   /api/aligner/batches/:batchId/deliver
-PATCH   /api/aligner/batches/:batchId/undo-manufacture
-PATCH   /api/aligner/batches/:batchId/undo-deliver
-DELETE  /api/aligner/batches/:batchId
+POST    /api/aligner/batches  [authorize(admin|front_desk|clinical) -> validate(body)]
+PUT     /api/aligner/batches/:batchId  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+PATCH   /api/aligner/batches/:batchId/manufacture  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+PATCH   /api/aligner/batches/:batchId/deliver  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+PATCH   /api/aligner/batches/:batchId/undo-manufacture  [authorize(admin|front_desk|clinical) -> validate(params)]
+PATCH   /api/aligner/batches/:batchId/undo-deliver  [authorize(admin|front_desk|clinical) -> validate(params)]
+DELETE  /api/aligner/batches/:batchId  [authorize(admin|front_desk|clinical) -> validate(params)]
 MOUNT   /api
-POST    /api/aligner/sets/:setId/upload-pdf
-DELETE  /api/aligner/sets/:setId/pdf
-GET     /api/aligner/sets/:setId/photos
-DELETE  /api/aligner/sets/:setId/photos
+POST    /api/aligner/sets/:setId/upload-pdf  [authorize(admin|front_desk|clinical) -> validate(params) -> <anonymous> -> multerMiddleware -> handleUploadError]
+DELETE  /api/aligner/sets/:setId/pdf  [authorize(admin|front_desk|clinical) -> validate(params)]
+GET     /api/aligner/sets/:setId/photos  [validate(params)]
+DELETE  /api/aligner/sets/:setId/photos  [authorize(admin|front_desk|clinical) -> validate(params,query)]
 MOUNT   /api
 GET     /api/aligner/archform/patients
 GET     /api/aligner/archform/status
 GET     /api/aligner/archform/matches
-PATCH   /api/aligner/sets/:setId/archform
-PUT     /api/aligner/archform/patients/:id
-DELETE  /api/aligner/archform/patients/:id
+PATCH   /api/aligner/sets/:setId/archform  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+PUT     /api/aligner/archform/patients/:id  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+DELETE  /api/aligner/archform/patients/:id  [authorize(admin|front_desk|clinical) -> validate(params)]
 MOUNT   /api
-POST    /api/aligner/labels/generate
+POST    /api/aligner/labels/generate  [authorize(admin|front_desk|clinical) -> validate(body)]
 MOUNT   /api
 GET     /api/aligner-doctors
-POST    /api/aligner-doctors
-PUT     /api/aligner-doctors/:drID
-DELETE  /api/aligner-doctors/:drID
+POST    /api/aligner-doctors  [authorize(admin|front_desk|clinical) -> validate(body)]
+PUT     /api/aligner-doctors/:drID  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+DELETE  /api/aligner-doctors/:drID  [authorize(admin|front_desk|clinical) -> validate(params)]
 MOUNT   /api
-GET     /api/employees
+GET     /api/employees  [validate(query)]
 GET     /api/positions
-POST    /api/employees
-PUT     /api/employees/:id
-DELETE  /api/employees/:id
+POST    /api/employees  [authorize(admin) -> validate(body)]
+PUT     /api/employees/:id  [authorize(admin) -> validate(params,body)]
+DELETE  /api/employees/:id  [authorize(admin) -> validate(params)]
 MOUNT   /api
-GET     /api/expenses
+GET     /api/expenses  [validate(query)]
 GET     /api/expenses/categories
 GET     /api/expenses/subcategories/:categoryId
-POST    /api/expenses
-GET     /api/expenses/summary
+POST    /api/expenses  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+GET     /api/expenses/summary  [validate(query)]
 GET     /api/expenses/:id
-PUT     /api/expenses/:id
-DELETE  /api/expenses/:id
+PUT     /api/expenses/:id  [authenticate -> authorize(admin|front_desk) -> validate(params,body) -> requireRecordAge(expense:update)]
+DELETE  /api/expenses/:id  [authenticate -> authorize(admin|front_desk) -> validate(params) -> requireRecordAge(expense:delete)]
 MOUNT   /api/health
 GET     /api/health
 GET     /api/health/detailed
-POST    /api/health/start
-POST    /api/health/stop
+POST    /api/health/start  [authorize(admin)]
+POST    /api/health/stop  [authorize(admin)]
 MOUNT   /api
 GET     /api/options
-PUT     /api/options/bulk
+PUT     /api/options/bulk  [authorize(admin) -> validate(body)]
 GET     /api/options/:optionName
-PUT     /api/options/:optionName
-GET     /api/config/database
-POST    /api/config/database/test
-PUT     /api/config/database
-GET     /api/config/database/export
-GET     /api/config/database/backup
-POST    /api/system/restart
+PUT     /api/options/:optionName  [authorize(admin) -> validate(params,body)]
+GET     /api/config/database  [authorize(admin)]
+POST    /api/config/database/test  [authorize(admin) -> validate(body)]
+PUT     /api/config/database  [authorize(admin) -> validate(body)]
+GET     /api/config/database/export  [authorize(admin)]
+GET     /api/config/database/backup  [authorize(admin)]
+POST    /api/system/restart  [authorize(admin) -> validate(body)]
 MOUNT   /api
 GET     /api/doctors
 GET     /api/operators
 MOUNT   /api
 USE     /api/webceph  [authenticate]
-USE     /api/webceph  [<anonymous>]
-POST    /api/webceph/create-patient
-POST    /api/webceph/upload-image
-POST    /api/webceph/upload-from-file
+USE     /api/webceph  [authorize(admin|front_desk|clinical)]
+POST    /api/webceph/create-patient  [validate(body)]
+POST    /api/webceph/upload-image  [uploadImage -> validate(body)]
+POST    /api/webceph/upload-from-file  [validate(body)]
 GET     /api/webceph/patient-link/:personId
 GET     /api/webceph/photo-types
 MOUNT   /api
-GET     /api/statistics
-GET     /api/statistics/yearly
-GET     /api/statistics/multi-year
-GET     /api/statistics/commissions
-GET     /api/statistics/revenue-breakdown
-GET     /api/statistics/doctor-payments/:doctorId
-GET     /api/daily-invoices
+GET     /api/statistics  [authorize(admin|front_desk)]
+GET     /api/statistics/yearly  [authorize(admin)]
+GET     /api/statistics/multi-year  [authorize(admin)]
+GET     /api/statistics/commissions  [authorize(admin) -> validate(query)]
+GET     /api/statistics/revenue-breakdown  [authorize(admin) -> validate(query)]
+GET     /api/statistics/doctor-payments/:doctorId  [authorize(admin) -> validate(params,query)]
+GET     /api/daily-invoices  [authorize(admin|front_desk)]
 MOUNT   /api
-POST    /api/sendtwilio
-GET     /api/checktwilio
-GET     /api/google
-GET     /api/convert-path
+POST    /api/sendtwilio  [authorize(admin|front_desk|clinical) -> validate(body)]
+GET     /api/checktwilio  [validate(query)]
+GET     /api/google  [validate(query)]
+GET     /api/convert-path  [validate(query)]
 MOUNT   /api/holidays
 GET     /api/holidays/appointments-on-date
 MOUNT   /api/photo-editor
-POST    /api/photo-editor/:personId/prepare
-POST    /api/photo-editor/:personId/render
-DELETE  /api/photo-editor/:personId/view
-GET     /api/photo-editor/:personId/photo-dates
+POST    /api/photo-editor/:personId/prepare  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+POST    /api/photo-editor/:personId/render  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+DELETE  /api/photo-editor/:personId/view  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+GET     /api/photo-editor/:personId/photo-dates  [validate(params)]
 MOUNT   /api/videos
 GET     /api/videos
 GET     /api/videos/categories
@@ -309,165 +309,165 @@ GET     /api/videos/:id
 GET     /api/videos/:id/stream
 GET     /api/videos/:id/thumbnail
 GET     /api/videos/:id/qr
-POST    /api/videos
-PUT     /api/videos/:id
-DELETE  /api/videos/:id
+POST    /api/videos  [authorize(admin|front_desk|clinical) -> multerMiddleware -> validate(body)]
+PUT     /api/videos/:id  [authorize(admin|front_desk|clinical) -> validate(body)]
+DELETE  /api/videos/:id  [authorize(admin|front_desk|clinical)]
 MOUNT   /api
-GET     /api/stand/dashboard
-GET     /api/stand/categories
-POST    /api/stand/categories
-PUT     /api/stand/categories/:id
-DELETE  /api/stand/categories/:id
-GET     /api/stand/items/low-stock
-GET     /api/stand/items/expiring
-POST    /api/stand/items/scan-vision
-GET     /api/stand/items/barcode/:barcode
-GET     /api/stand/items
-GET     /api/stand/items/:id
-POST    /api/stand/items
-PUT     /api/stand/items/:id
-DELETE  /api/stand/items/:id
-POST    /api/stand/items/:id/restock
-POST    /api/stand/items/:id/adjust
-GET     /api/stand/items/:id/movements
-POST    /api/stand/sales
-GET     /api/stand/sales
-GET     /api/stand/sales/:id
-POST    /api/stand/sales/:id/void
-GET     /api/stand/reports/summary
-GET     /api/stand/reports/top-items
+GET     /api/stand/dashboard  [authorize(admin|front_desk)]
+GET     /api/stand/categories  [authorize(admin|front_desk)]
+POST    /api/stand/categories  [authenticate -> authorize(admin) -> validate(body)]
+PUT     /api/stand/categories/:id  [authenticate -> authorize(admin) -> validate(params,body)]
+DELETE  /api/stand/categories/:id  [authenticate -> authorize(admin) -> validate(params)]
+GET     /api/stand/items/low-stock  [authorize(admin|front_desk)]
+GET     /api/stand/items/expiring  [authorize(admin|front_desk) -> validate(query)]
+POST    /api/stand/items/scan-vision  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+GET     /api/stand/items/barcode/:barcode  [authorize(admin|front_desk)]
+GET     /api/stand/items  [authorize(admin|front_desk) -> validate(query)]
+GET     /api/stand/items/:id  [authorize(admin|front_desk)]
+POST    /api/stand/items  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+PUT     /api/stand/items/:id  [authenticate -> authorize(admin|front_desk) -> validate(params,body)]
+DELETE  /api/stand/items/:id  [authenticate -> authorize(admin) -> validate(params)]
+POST    /api/stand/items/:id/restock  [authenticate -> authorize(admin|front_desk) -> validate(params,body)]
+POST    /api/stand/items/:id/adjust  [authenticate -> authorize(admin) -> validate(params,body)]
+GET     /api/stand/items/:id/movements  [authorize(admin|front_desk)]
+POST    /api/stand/sales  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+GET     /api/stand/sales  [authorize(admin|front_desk) -> validate(query)]
+GET     /api/stand/sales/:id  [authorize(admin|front_desk)]
+POST    /api/stand/sales/:id/void  [authenticate -> authorize(admin) -> validate(params,body)]
+GET     /api/stand/reports/summary  [authorize(admin|front_desk)]
+GET     /api/stand/reports/top-items  [authorize(admin|front_desk)]
 MOUNT   /api/localsend
-GET     /api/localsend/devices
-POST    /api/localsend/probe
-POST    /api/localsend/send
-GET     /api/localsend/transfers/:id
-POST    /api/localsend/transfers/:id/cancel
+GET     /api/localsend/devices  [validate(query)]
+POST    /api/localsend/probe  [authorize(admin|front_desk|clinical) -> validate(body)]
+POST    /api/localsend/send  [authorize(admin|front_desk|clinical) -> validate(body)]
+GET     /api/localsend/transfers/:id  [validate(params)]
+POST    /api/localsend/transfers/:id/cancel  [authorize(admin|front_desk|clinical) -> validate(params)]
 MOUNT   /api/telegram
 GET     /api/telegram/status
-POST    /api/telegram/send
-GET     /api/telegram/send/:jobId
+POST    /api/telegram/send  [authorize(admin|front_desk|clinical) -> validate(body)]
+GET     /api/telegram/send/:jobId  [validate(params)]
 MOUNT   /api/share
-POST    /api/share/stage
+POST    /api/share/stage  [authorize(admin|front_desk|clinical) -> uploadImage -> validate(body)]
 MOUNT   /api
 GET     /api/branding
 GET     /api/branding/logo
-PUT     /api/branding
-POST    /api/branding/logo
-DELETE  /api/branding/logo
+PUT     /api/branding  [authorize(admin) -> validate(body)]
+POST    /api/branding/logo  [authorize(admin) -> uploadLogoFile]
+DELETE  /api/branding/logo  [authorize(admin)]
 MOUNT   /api/integrations
-USE     /api/integrations  [<anonymous>]
+USE     /api/integrations  [authorize(admin)]
 GET     /api/integrations/telegram/status
-POST    /api/integrations/telegram/auth/start
-POST    /api/integrations/telegram/auth/code
-POST    /api/integrations/telegram/auth/password
+POST    /api/integrations/telegram/auth/start  [validate(body)]
+POST    /api/integrations/telegram/auth/code  [validate(body)]
+POST    /api/integrations/telegram/auth/password  [validate(body)]
 POST    /api/integrations/telegram/auth/cancel
 POST    /api/integrations/telegram/logout
 GET     /api/integrations/gemini/status
-POST    /api/integrations/gemini/config
+POST    /api/integrations/gemini/config  [validate(body)]
 POST    /api/integrations/gemini/test
 POST    /api/integrations/gemini/clear
 GET     /api/integrations/3shape/status
 POST    /api/integrations/3shape/disconnect
 POST    /api/integrations/3shape/webhook/register
 GET     /api/integrations/3shape/webhooks
-DELETE  /api/integrations/3shape/webhooks/:subscriptionId
+DELETE  /api/integrations/3shape/webhooks/:subscriptionId  [validate(params)]
 GET     /api/integrations/google-drive/status
 POST    /api/integrations/google-drive/disconnect
 GET     /api/integrations/google-contacts/status
-POST    /api/integrations/google-contacts/disconnect
+POST    /api/integrations/google-contacts/disconnect  [validate(body)]
 GET     /api/integrations/cloudflare-list/status
 POST    /api/integrations/cloudflare-list/sync
 MOUNT   /api
-POST    /api/threeshape/patients/:personId/initiate-workflow
-GET     /api/threeshape/patients/:personId/cases
-GET     /api/threeshape/patients/:personId/media
-GET     /api/threeshape/media/:mediaId/download
-GET     /api/threeshape/media/:mediaId/thumbnail
-GET     /api/threeshape/cases/:caseId/thumbnail
+POST    /api/threeshape/patients/:personId/initiate-workflow  [authorize(admin|front_desk|clinical) -> validate(params)]
+GET     /api/threeshape/patients/:personId/cases  [validate(params,query)]
+GET     /api/threeshape/patients/:personId/media  [validate(params,query)]
+GET     /api/threeshape/media/:mediaId/download  [validate(params,query)]
+GET     /api/threeshape/media/:mediaId/thumbnail  [validate(params)]
+GET     /api/threeshape/cases/:caseId/thumbnail  [validate(params)]
 MOUNT   /api
-GET     /api/tasks
-GET     /api/tasks/history
-POST    /api/tasks
-DELETE  /api/tasks/:alertId
+GET     /api/tasks  [authenticate -> authorize(admin|front_desk|clinical)]
+GET     /api/tasks/history  [authenticate -> authorize(admin|front_desk|clinical)]
+POST    /api/tasks  [authenticate -> authorize(admin|front_desk|clinical) -> validate(body)]
+DELETE  /api/tasks/:alertId  [authenticate -> authorize(admin|front_desk|clinical) -> validate(params)]
 MOUNT   /api
-POST    /api/client-error
+POST    /api/client-error  [<anonymous> -> validate(body)]
 MOUNT   /api
-GET     /api/approvals
-GET     /api/approvals/history
-GET     /api/approvals/mine
-POST    /api/approvals/approve-all
-POST    /api/approvals/acknowledge-all
-POST    /api/approvals/:id/approve
-POST    /api/approvals/:id/reject
-POST    /api/approvals/:id/acknowledge
+GET     /api/approvals  [authenticate -> authorize(admin) -> validate(query)]
+GET     /api/approvals/history  [authenticate -> authorize(admin)]
+GET     /api/approvals/mine  [authenticate]
+POST    /api/approvals/approve-all  [authenticate -> authorize(admin)]
+POST    /api/approvals/acknowledge-all  [authenticate -> authorize(admin)]
+POST    /api/approvals/:id/approve  [authenticate -> authorize(admin) -> validate(params)]
+POST    /api/approvals/:id/reject  [authenticate -> authorize(admin) -> validate(params,body)]
+POST    /api/approvals/:id/acknowledge  [authenticate -> authorize(admin) -> validate(params)]
 MOUNT   /api
-GET     /api/lab-cases
-GET     /api/lab-cases/:id
-POST    /api/lab-cases
-POST    /api/lab-cases/:id/advance
-POST    /api/lab-cases/:id/remake
-POST    /api/lab-cases/:id/hold
-POST    /api/lab-cases/:id/resume
-PATCH   /api/lab-cases/:id
-POST    /api/lab-cases/:id/cancel
-DELETE  /api/lab-cases/:id
+GET     /api/lab-cases  [validate(query)]
+GET     /api/lab-cases/:id  [validate(params)]
+POST    /api/lab-cases  [authorize(admin|front_desk|clinical) -> validate(body)]
+POST    /api/lab-cases/:id/advance  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+POST    /api/lab-cases/:id/remake  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+POST    /api/lab-cases/:id/hold  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+POST    /api/lab-cases/:id/resume  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+PATCH   /api/lab-cases/:id  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+POST    /api/lab-cases/:id/cancel  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+DELETE  /api/lab-cases/:id  [authorize(admin) -> validate(params)]
 MOUNT   /api
-GET     /api/portal-activity
-PATCH   /api/portal-activity/read
-PATCH   /api/portal-activity/read-all
+GET     /api/portal-activity  [authenticate -> validate(query)]
+PATCH   /api/portal-activity/read  [authenticate -> authorize(admin|front_desk|clinical) -> validate(body)]
+PATCH   /api/portal-activity/read-all  [authenticate -> authorize(admin|front_desk|clinical)]
 MOUNT   /api
-GET     /api/announcements
-POST    /api/announcements
-PUT     /api/announcements/:id
-DELETE  /api/announcements/:id
-GET     /api/announcements/:id/receipts
+GET     /api/announcements  [authenticate -> validate(query)]
+POST    /api/announcements  [authenticate -> authorize(admin|front_desk|clinical) -> validate(body)]
+PUT     /api/announcements/:id  [authenticate -> authorize(admin|front_desk|clinical) -> validate(params,body)]
+DELETE  /api/announcements/:id  [authenticate -> authorize(admin|front_desk|clinical) -> validate(params)]
+GET     /api/announcements/:id/receipts  [authenticate -> validate(params)]
 MOUNT   /api
-USE     /api/tv-display  [<anonymous>]
+USE     /api/tv-display  [authorize(admin|front_desk|clinical)]
 GET     /api/tv-display
-PUT     /api/tv-display/settings
-POST    /api/tv-display/media
-DELETE  /api/tv-display/media/:name
-PUT     /api/tv-display/playlist
-POST    /api/tv-display/command
+PUT     /api/tv-display/settings  [validate(body)]
+POST    /api/tv-display/media  [uploadMediaFiles]
+DELETE  /api/tv-display/media/:name  [validate(params)]
+PUT     /api/tv-display/playlist  [validate(body)]
+POST    /api/tv-display/command  [validate(body)]
 MOUNT   /api/calendar
-GET     /api/calendar/week
-GET     /api/calendar/month
-GET     /api/calendar/range
-GET     /api/calendar/stats
-POST    /api/calendar/regenerate
-GET     /api/calendar/available-slots
-GET     /api/calendar/month-availability
+GET     /api/calendar/week  [validate(query)]
+GET     /api/calendar/month  [validate(query)]
+GET     /api/calendar/range  [validate(query)]
+GET     /api/calendar/stats  [validate(query)]
+POST    /api/calendar/regenerate  [authorize(admin|front_desk)]
+GET     /api/calendar/available-slots  [validate(query)]
+GET     /api/calendar/month-availability  [validate(query)]
 MOUNT   /api/email
-POST    /api/email/send-appointments
-GET     /api/email/config
-POST    /api/email/config
-POST    /api/email/test
-POST    /api/email/test-send
+POST    /api/email/send-appointments  [authorize(admin|front_desk|clinical) -> validate(query)]
+GET     /api/email/config  [authorize(admin)]
+POST    /api/email/config  [authorize(admin) -> validate(body)]
+POST    /api/email/test  [authorize(admin)]
+POST    /api/email/test-send  [authorize(admin) -> validate(body)]
 MOUNT   /api/users
-USE     /api/users  [<anonymous>]
+USE     /api/users  [authorize(admin)]
 GET     /api/users
-POST    /api/users
-PUT     /api/users/:userId/password
-PUT     /api/users/:userId/role
-PUT     /api/users/:userId/toggle
-DELETE  /api/users/:userId
+POST    /api/users  [validate(body)]
+PUT     /api/users/:userId/password  [validate(params,body)]
+PUT     /api/users/:userId/role  [validate(params,body)]
+PUT     /api/users/:userId/toggle  [validate(params)]
+DELETE  /api/users/:userId  [validate(params)]
 MOUNT   /api/admin
-USE     /api/admin  [<anonymous>]
+USE     /api/admin  [authorize(admin|front_desk)]
 GET     /api/admin/lookups/tables
 GET     /api/admin/lookups/:tableName
-POST    /api/admin/lookups/:tableName
-PUT     /api/admin/lookups/:tableName/:id
-DELETE  /api/admin/lookups/:tableName/:id
+POST    /api/admin/lookups/:tableName  [validate(body)]
+PUT     /api/admin/lookups/:tableName/:id  [validate(params,body)]
+DELETE  /api/admin/lookups/:tableName/:id  [validate(params)]
 MOUNT   /api/admin
-USE     /api/admin  [<anonymous>]
+USE     /api/admin  [authorize(admin)]
 GET     /api/admin/google-drive/auth-url
-GET     /api/admin/google-drive/callback
+GET     /api/admin/google-drive/callback  [validate(query)]
 GET     /api/admin/google-contacts/auth-url
-GET     /api/admin/google-contacts/callback
+GET     /api/admin/google-contacts/callback  [validate(query)]
 GET     /api/admin/google-drive/test
 MOUNT   /api/sync
-POST    /api/sync/trigger
-POST    /api/sync/queue-notify
+POST    /api/sync/trigger  [authorize(admin) -> validate(body)]
+POST    /api/sync/queue-notify  [authorize(admin)]
 GET     /api/sync/status
 GET     /api/sync/supabase-status
 GET     /api/sync/dolphin-status

@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { log } from '../utils/logger.js';
 import { ErrorResponses } from '../utils/error-response.js';
 import { drainCdcNow } from '../services/sync/cdc/index.js';
+import { getLastDriftReport } from '../services/sync/cdc/drift-check.js';
 import { stripSslMode, getReverseReadPool } from '../services/sync/cdc/supabase-pool.js';
 import { getPgPool } from '../services/database/kysely.js';
 import { validate } from '../middleware/validate.js';
@@ -256,16 +257,32 @@ interface SinkControlRow {
   updated_at: string;
 }
 
+/** A sink's feed health: how much is pending, and — the part size alone cannot say — for how long. */
+interface SinkFeedStatus {
+  control: SinkControlRow | undefined;
+  backlog: number;
+  /** `changed_at` of the oldest pending change, or null when the backlog is empty. */
+  oldestChangeAt: string | null;
+  /** Age of that oldest pending change in seconds, or null when the backlog is empty. */
+  backlogAgeSec: number | null;
+}
+
 /**
  * Read a sink's runtime control flags + pending backlog from the DB that holds its feed. The forward
  * 'failover' feed lives LOCAL; the 'reverse' feed lives on Supabase (reverse-read pool). Returns the
  * control row (or undefined) + the change_log backlog. Never swallows — callers guard the reverse
  * read so a Supabase outage degrades gracefully instead of 500ing the status endpoint.
+ *
+ * The AGE of the backlog is reported alongside its size because size on its own is not a health
+ * signal. A sink 162 rows behind with seven permanently-stuck children reads as `backlog: 7` — the
+ * same as a sink that is simply mid-cycle — and that is exactly what this endpoint showed, green,
+ * for the week following the 2026-09-08 capture blackout. `backlog: 7, backlogAgeSec: 250000` says
+ * what `backlog: 7` cannot. (Conversely a big backlog seconds old is just a bulk write draining.)
+ *
+ * LOCALTIMESTAMP, not clock_timestamp(): `changed_at` is `timestamp WITHOUT time zone` on a
+ * wall-clock schema, so a timestamptz here would offset every age by the UTC delta.
  */
-async function readSinkStatus(
-  pool: Pool,
-  sink: string
-): Promise<{ control: SinkControlRow | undefined; backlog: number }> {
+async function readSinkStatus(pool: Pool, sink: string): Promise<SinkFeedStatus> {
   const control = (
     await pool.query<SinkControlRow>(
       `SELECT sink, enabled, stale, note, updated_at::text AS updated_at
@@ -274,10 +291,23 @@ async function readSinkStatus(
       [sink]
     )
   ).rows[0];
-  const backlog =
-    (await pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM change_log WHERE sink = $1`, [sink])).rows[0]
-      ?.n ?? 0;
-  return { control, backlog };
+  // count + oldest in ONE statement, both served by idx_change_log_drain (sink, changed_at, id).
+  const feed = (
+    await pool.query<{ n: number; oldest: string | null; age_sec: string | null }>(
+      `SELECT count(*)::int AS n,
+              min(changed_at)::text AS oldest,
+              EXTRACT(EPOCH FROM (LOCALTIMESTAMP - min(changed_at)))::bigint::text AS age_sec
+         FROM change_log
+        WHERE sink = $1`,
+      [sink]
+    )
+  ).rows[0];
+  return {
+    control,
+    backlog: feed?.n ?? 0,
+    oldestChangeAt: feed?.oldest ?? null,
+    backlogAgeSec: feed?.age_sec == null ? null : Number(feed.age_sec),
+  };
 }
 
 /**
@@ -298,7 +328,7 @@ router.get(
       const fwd = await readSinkStatus(getPgPool(), 'failover');
 
       // Reverse feed lives ON Supabase — guard so an outage doesn't fail the whole status read.
-      let rev: { control: SinkControlRow | undefined; backlog: number } = { control: undefined, backlog: 0 };
+      let rev: SinkFeedStatus = { control: undefined, backlog: 0, oldestChangeAt: null, backlogAgeSec: null };
       let revError: string | null = null;
       if (configured) {
         try {
@@ -313,6 +343,11 @@ router.get(
       res.json({
         success: true,
         checkedAt: new Date().toISOString(),
+        // The last row-count sweep of the mirror (services/sync/cdc/drift-check.ts). This is the one
+        // field on this endpoint that can see a change which was never CAPTURED — backlog, `stale`
+        // and reachability all report on changes the system knows about. Null until the first sweep
+        // completes (5 min after boot) or on an install that does not mirror.
+        drift: getLastDriftReport(),
         sinks: [
           {
             sink: 'failover',
@@ -323,6 +358,8 @@ router.get(
             note: fwd.control?.note ?? null,
             updatedAt: fwd.control?.updated_at ?? null,
             backlog: fwd.backlog,
+            oldestChangeAt: fwd.oldestChangeAt,
+            backlogAgeSec: fwd.backlogAgeSec,
             reachable: configured ? ping.reachable : null,
             latencyMs: configured ? ping.latencyMs : null,
             error: configured ? ping.error : null,
@@ -336,6 +373,8 @@ router.get(
             note: rev.control?.note ?? (revError ? `status read failed: ${revError}` : null),
             updatedAt: rev.control?.updated_at ?? null,
             backlog: rev.backlog,
+            oldestChangeAt: rev.oldestChangeAt,
+            backlogAgeSec: rev.backlogAgeSec,
             reachable: configured ? ping.reachable : null,
             latencyMs: configured ? ping.latencyMs : null,
             error: configured ? (ping.error ?? revError) : null,
@@ -382,6 +421,8 @@ router.get(
             note: dol.control?.note ?? null,
             updatedAt: dol.control?.updated_at ?? null,
             backlog: dol.backlog,
+            oldestChangeAt: dol.oldestChangeAt,
+            backlogAgeSec: dol.backlogAgeSec,
             reachable: configured ? ping.reachable : null,
             latencyMs: configured ? ping.latencyMs : null,
             error: configured ? ping.error : null,

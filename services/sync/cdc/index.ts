@@ -13,7 +13,8 @@
  *
  * Wired into index.ts boot + gracefulShutdown.
  */
-import { CdcEngine } from './engine.js';
+import { CdcEngine, enforceCaptureBound } from './engine.js';
+import { startDriftWatch, stopDriftWatch } from './drift-check.js';
 import { FailoverSink } from './failover-sink.js';
 import { DolphinSink } from './dolphin-sink.js';
 import { ReverseSink } from './reverse-sink.js';
@@ -28,29 +29,77 @@ function num(v: string | undefined, d: number): number {
 }
 
 /**
- * Turn a sink's capture OFF in its cdc_sink_control row. Called at boot for a sink whose env flag is
- * off: with no drainer running, leaving capture on would let change_log grow with nothing consuming
- * it. (Capture is otherwise never disabled on a normal stop — see engine.ts.) Leaves `stale`
- * untouched.
- *
- * `remote` says the control row lives on Supabase (the reverse sink) rather than locally
- * (failover/dolphin). A remote disable deliberately builds a ONE-SHOT pool and ends it rather than
- * reaching for getReverseReadPool(): that shared singleton would otherwise be created — and held
- * open for the whole process lifetime — purely to run this single UPDATE for a sink that is switched
- * off, leaving idle Supabase connections on every install where reverse sync is disabled.
+ * How often the no-drainer watchdog re-checks an unmanned sink's backlog against its bound.
+ * A minute is far tighter than the bound can plausibly be crossed in, and the check costs one
+ * indexed PK read when capture is off — which, on an install that mirrors nothing, it always is.
  */
-async function disableSinkCapture(sink: string, remote = false): Promise<void> {
-  const sql = `UPDATE cdc_sink_control SET enabled = false, note = 'sink disabled by env', updated_at = now() WHERE sink = $1`;
-  if (!remote) {
-    await getPgPool().query(sql, [sink]);
-    return;
+const CAPTURE_WATCHDOG_INTERVAL_MS = 60_000;
+
+/**
+ * The reverse sink's feed lives on Supabase, so its watchdog check needs a remote connection. It
+ * runs on every Nth tick (≈10 min) over a ONE-SHOT pool rather than every minute over a held one:
+ * an install with reverse sync switched off must not carry an idle Supabase connection for the
+ * whole process lifetime just to poll a counter. Its bound is a remote disk anyway — slower is fine.
+ */
+const REMOTE_WATCHDOG_EVERY_NTH_TICK = 10;
+
+/**
+ * Sinks with NO engine in this process (their env flag is off) whose capture may nevertheless still
+ * be ON in the shared control row.
+ *
+ * This list exists because of what startCdc() deliberately no longer does. Until 2026-09-15 an
+ * env-disabled sink had its capture switched off in `cdc_sink_control` at boot, on the reasoning
+ * that capture with no drainer just grows change_log. But that row is SHARED by every process
+ * pointing at the database — a `tsx` one-off, a test run, a second checkout, a dev box on the same
+ * host — and cdc_capture() records NOTHING while it is false, with no catch-up scan anywhere. So one
+ * sibling process booting without FAILOVER_SYNC_ENABLED silently blinded the live Windows service,
+ * and every row written during that window is missing from the mirror permanently. That is the
+ * 2026-09-08 blackout: 162 rows across 14 tables, unrecoverable.
+ *
+ * An env flag describes THIS process, so it may only decide whether THIS process drains. What it may
+ * not do is reach across and stop the database recording. The growth that reasoning was protecting
+ * against is real, but it is a disk bound, and a disk bound belongs on a watchdog that measures the
+ * disk — enforceCaptureBound below — not on a boot-time guess about who else is running.
+ */
+interface UnmannedSink {
+  name: string;
+  maxBacklog: number;
+  /** Feed (and control row) lives on Supabase rather than locally. */
+  remote: boolean;
+}
+
+const unmannedSinks: UnmannedSink[] = [];
+let watchdogTimer: NodeJS.Timeout | null = null;
+let watchdogTick = 0;
+
+/** One watchdog pass over every unmanned sink. Never throws — a failed check retries next tick. */
+async function runCaptureWatchdog(): Promise<void> {
+  watchdogTick += 1;
+  for (const s of unmannedSinks) {
+    try {
+      if (!s.remote) {
+        await enforceCaptureBound(getPgPool(), s.name, s.maxBacklog);
+        continue;
+      }
+      if (watchdogTick % REMOTE_WATCHDOG_EVERY_NTH_TICK !== 1) continue;
+      const pool = buildOneShotSupabasePool();
+      try {
+        await enforceCaptureBound(pool, s.name, s.maxBacklog);
+      } finally {
+        await pool.end().catch(() => {});
+      }
+    } catch (e) {
+      log.warn(`[cdc:${s.name}] capture watchdog check failed (will retry)`, { error: (e as Error).message });
+    }
   }
-  const pool = buildOneShotSupabasePool();
-  try {
-    await pool.query(sql, [sink]);
-  } finally {
-    await pool.end().catch(() => {});
-  }
+}
+
+/** Start the watchdog if any sink in this process is unmanned. unref()'d: never holds boot open. */
+function startCaptureWatchdog(): void {
+  if (watchdogTimer || unmannedSinks.length === 0) return;
+  watchdogTimer = setInterval(() => void runCaptureWatchdog(), CAPTURE_WATCHDOG_INTERVAL_MS);
+  watchdogTimer.unref();
+  void runCaptureWatchdog();
 }
 
 const engines: CdcEngine[] = [];
@@ -93,26 +142,42 @@ export function startCdc(): void {
 
   for (const d of defs) {
     if (!d.on) {
-      log.info(`⏭️  CDC sink "${d.sink.name}" disabled — turning capture OFF (no drainer will run)`);
-      // The reverse sink's control row lives on Supabase → disable it there, over a one-shot pool.
-      void disableSinkCapture(d.sink.name, d.sink.name === 'reverse').catch((e) =>
-        log.warn(`[cdc:${d.sink.name}] could not disable capture for off sink`, { error: (e as Error).message })
-      );
+      // Capture is deliberately LEFT AS IT IS — see UnmannedSink above. If it is already off (the
+      // usual case: an install that has never mirrored) nothing accumulates; if it is on, another
+      // process is presumably draining it, and if nothing is, the watchdog enforces the bound.
+      log.info(`⏭️  CDC sink "${d.sink.name}" disabled by env — no drainer in this process (capture unchanged)`);
+      const remote = d.sink.name === 'reverse';
+      // A remote check needs SUPABASE_FAILOVER_DB_URL; without it there is nothing to connect to.
+      if (!remote || process.env.SUPABASE_FAILOVER_DB_URL) {
+        unmannedSinks.push({ name: d.sink.name, maxBacklog: d.opts.maxBacklog, remote });
+      }
       continue;
     }
     const engine = new CdcEngine(d.sink, d.opts);
     engines.push(engine);
     engine.start().catch((e) => log.error(`[cdc:${d.sink.name}] failed to start`, { error: (e as Error).message }));
+    // The mirror's row-count sweep — the only signal that can see a change that was never CAPTURED
+    // (see drift-check.ts). Tied to the failover engine running HERE: an install that mirrors nothing
+    // has nothing to compare, and a sibling process must not duplicate the sweep.
+    if (d.sink.name === 'failover') startDriftWatch();
   }
+
+  startCaptureWatchdog();
 }
 
 /**
- * Stop all running engines. Capture is deliberately left ON in cdc_sink_control — a change recorded
- * while we are down must survive the restart so the next boot drains it. See the CdcEngine header:
- * capture is turned off only on purpose (startCdc for an env-disabled sink, the circuit breaker, or
- * the manual kill switch), never by a normal stop.
+ * Stop all running engines, the capture watchdog and the mirror drift check. Capture is deliberately left ON in
+ * cdc_sink_control — a change recorded while we are down must survive the restart so the next boot
+ * drains it. See the CdcEngine header: capture is turned off only on purpose (the circuit breaker
+ * or the manual kill switch), never by a normal stop and never by an env flag.
  */
 export async function stopCdc(): Promise<void> {
+  stopDriftWatch();
+  if (watchdogTimer) {
+    clearInterval(watchdogTimer);
+    watchdogTimer = null;
+  }
+  unmannedSinks.length = 0;
   await Promise.all(engines.map((e) => e.stop().catch(() => {})));
   engines.length = 0;
 }

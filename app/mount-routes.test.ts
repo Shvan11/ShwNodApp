@@ -12,6 +12,30 @@
  * is a diff in what the server serves. Re-run with `vitest -u` to accept an
  * intentional change, and read the diff before you do.
  *
+ * ── What each line carries ──────────────────────────────────────────────────
+ * Method and path, then the middleware chain that runs BEFORE the handler, by
+ * function name:
+ *
+ *   POST  /api/expenses  [authenticate -> authorize(admin|front_desk) -> validate(body)]
+ *
+ * That second half is the authorization AND validation posture of the route,
+ * and it is here because both are opt-in per route in this app: a mutation that
+ * simply forgot its gate — or took an unvalidated `req.body` — used to look
+ * exactly like one that didn't. It no longer does: an un-gated route lands in
+ * the snapshot with an empty or missing chain, and widening `authorize(...)` or
+ * dropping a `validate(...)` part shows up as a changed name.
+ *
+ * `authorize()`, `requireRecordAge()` and `validate()` name their own closures
+ * for this (`Object.defineProperty(fn, 'name', …)` — see middleware/auth.ts).
+ * What still prints `<anonymous>` is a factory that doesn't: the three
+ * `express-rate-limit` limiters and `timeouts.*`. Neither is a gate, so neither
+ * is worth the stamp — but a NEW `<anonymous>` in a chain is worth a look.
+ *
+ * NOTE a route can also be gated ABOVE itself, by a `USE` layer on its mount
+ * (e.g. `USE /api [authenticate]`, or a router-level `router.use(authorize(...))`).
+ * Those lines are in the snapshot too, in registration order — read them as the
+ * prefix they are, not as separate entries.
+ *
  * ── How the paths are recovered ─────────────────────────────────────────────
  * Express 5 does not keep the mount path on a Layer (`layer.path` is a
  * per-request value, `undefined` at rest — only `matchers`, which are opaque
@@ -36,9 +60,10 @@ process.env.PG_USER ??= 'shwan_app';
 process.env.PG_PASSWORD ??= 'route-table-snapshot-test';
 
 type Layer = {
-  route?: { path: string | string[]; methods: Record<string, boolean> };
+  route?: { path: string | string[]; methods: Record<string, boolean>; stack?: Layer[] };
   handle: unknown;
   name: string;
+  method?: string;
   __mountPath?: unknown;
 };
 type RouterLike = { stack: Layer[] };
@@ -107,6 +132,40 @@ function fullPath(prefix: string, raw: unknown): string {
   return join(prefix, describePath(raw));
 }
 
+/**
+ * The handlers registered for one method, as names, minus the last one — the
+ * last layer in a Route's stack IS the handler, everything before it is what
+ * guards it. An empty result means nothing guards this route at the route
+ * level (it may still sit under a gating `USE` layer — see the header).
+ */
+function chainOf(layers: Layer[]): string {
+  return layers
+    .slice(0, -1)
+    .map((l) => l.name || '<anonymous>')
+    .join(' -> ');
+}
+
+/**
+ * `  [a -> b]`, or '' when there is no pre-handler middleware.
+ *
+ * One Route carries one method everywhere in this app today (nothing uses
+ * `router.route('/x').get(...).post(...)` or `router.all`). If that ever
+ * changes, the methods are split and labelled rather than merged — a merged
+ * chain would attribute one method's gate to another, which on a table whose
+ * whole job is the auth posture is worse than a noisier line.
+ */
+function describeChain(route: NonNullable<Layer['route']>): string {
+  const stack = route.stack ?? [];
+  const methods = [...new Set(stack.map((l) => l.method ?? ''))];
+  if (methods.length > 1) {
+    return methods
+      .map((m) => `  [${m.toUpperCase()}: ${chainOf(stack.filter((l) => l.method === m))}]`)
+      .join('');
+  }
+  const chain = chainOf(stack);
+  return chain ? `  [${chain}]` : '';
+}
+
 function walk(router: RouterLike, prefix: string, out: string[]): void {
   for (const layer of router.stack) {
     const here = fullPath(prefix, layer.__mountPath ?? '/');
@@ -116,7 +175,7 @@ function walk(router: RouterLike, prefix: string, out: string[]): void {
         .map((m) => m.toUpperCase())
         .sort()
         .join(',');
-      out.push(`${methods.padEnd(8)}${here}`);
+      out.push(`${methods.padEnd(8)}${here}${describeChain(layer.route)}`);
     } else if (isRouter(layer.handle)) {
       out.push(`${'MOUNT'.padEnd(8)}${here}`);
       // A router's own layers are relative to the mount, so recurse with it as
