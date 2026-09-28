@@ -20,7 +20,6 @@ import {
   expensesQuery,
   expenseCategoriesQuery,
   expenseSubcategoriesQuery,
-  expenseSummaryQuery,
   labsQuery,
   employeesQuery,
 } from '@/query/queries';
@@ -83,22 +82,6 @@ export interface Subcategory {
   subcategory_name: string;
   category_id: number;
   subcategory_name_ar?: string | null;
-  [key: string]: unknown;
-}
-
-/**
- * Expense summary data
- */
-export interface ExpenseSummary {
-  totalExpenses: number;
-  byCategory: Array<{
-    category_name: string;
-    total: number;
-  }>;
-  byCurrency: Array<{
-    currency: string;
-    total: number;
-  }>;
   [key: string]: unknown;
 }
 
@@ -273,24 +256,5 @@ export function useExpenseMutations(): {
     deleteExpense,
     loading,
     error,
-  };
-}
-
-/**
- * Hook for fetching expense summary
- */
-export function useExpenseSummary(
-  startDate: string | null | undefined,
-  endDate: string | null | undefined
-): {
-  summary: ExpenseSummary | null;
-  loading: boolean;
-  error: string | null;
-} {
-  const query = useQuery(expenseSummaryQuery(startDate, endDate));
-  return {
-    summary: query.data ?? null,
-    loading: query.isLoading,
-    error: query.error ? httpErrorMessage(query.error, 'Failed to fetch summary') : null,
   };
 }

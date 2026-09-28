@@ -3,25 +3,13 @@
  * Displays expense summary with totals by currency
  */
 import { useTranslation } from 'react-i18next';
-import { useExpenseSummary } from '../../hooks/useExpenses';
 import type { Expense } from '../../hooks/useExpenses';
 import styles from '../../routes/Expenses.module.css';
 
-// Types
-interface SummaryTotal {
-    currency: string;
-    total_amount: number;
-    ExpenseCount?: number;
-}
-
-interface SummaryData {
-    totals?: SummaryTotal[];
-}
-
 interface ExpenseSummaryProps {
-    startDate?: string | null;
-    endDate?: string | null;
-    expenses?: Expense[];
+    /** The rows the table shows — every filter already applied (the list is never paginated). */
+    expenses: Expense[];
+    loading: boolean;
 }
 
 interface SummaryResult {
@@ -30,36 +18,24 @@ interface SummaryResult {
     count: number;
 }
 
-export default function ExpenseSummary({ startDate, endDate, expenses }: ExpenseSummaryProps) {
+export default function ExpenseSummary({ expenses, loading }: ExpenseSummaryProps) {
     const { t } = useTranslation('expenses');
-    const { summary, loading } = useExpenseSummary(startDate, endDate) as { summary: SummaryData | null; loading: boolean };
 
     const formatNumber = (num: number): string => {
         return new Intl.NumberFormat('en-US').format(num || 0);
     };
 
-    // Calculate summary from API or fallback to client-side calculation
+    // Totals of exactly the rows on screen. This used to prefer GET /api/expenses/summary,
+    // which filters by date only, so a category/lab/employee/currency/type filter narrowed
+    // the table while the cards kept the whole range's totals (FE-F8-1).
+    // `expenses.currency` is citext, so match case-insensitively as the server's filter does.
     const getSummaryData = (): SummaryResult => {
-        if (startDate && endDate && summary) {
-            // Use server-side summary when date range is available
-            const iqd = summary.totals?.find(t => t.currency === 'IQD')?.total_amount || 0;
-            const usd = summary.totals?.find(t => t.currency === 'USD')?.total_amount || 0;
-            const count = summary.totals?.reduce((sum, t) => sum + (t.ExpenseCount || 0), 0) || 0;
-
-            return { iqd, usd, count };
-        }
-
-        // Fallback to client-side calculation
-        if (!expenses || expenses.length === 0) {
-            return { iqd: 0, usd: 0, count: 0 };
-        }
-
         const iqd = expenses
-            .filter(e => (e.currency || '').trim() === 'IQD')
+            .filter(e => (e.currency || '').trim().toUpperCase() === 'IQD')
             .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
         const usd = expenses
-            .filter(e => (e.currency || '').trim() === 'USD')
+            .filter(e => (e.currency || '').trim().toUpperCase() === 'USD')
             .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
         return { iqd, usd, count: expenses.length };

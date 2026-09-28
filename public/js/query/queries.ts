@@ -61,7 +61,6 @@ import type {
   Expense,
   Category,
   Subcategory,
-  ExpenseSummary,
   ExpenseFilters,
 } from '@/hooks/useExpenses';
 
@@ -670,23 +669,6 @@ export const expenseSubcategoriesQuery = (categoryId: number | string | null | u
         schema: expenseContract.expenseSubcategories.response,
       }),
     enabled: !!categoryId,
-  });
-
-/** GET /api/expenses/summary?… — totals rollup (disabled until both dates set). */
-export const expenseSummaryQuery = (
-  startDate: string | null | undefined,
-  endDate: string | null | undefined
-) =>
-  queryOptions({
-    queryKey: qk.expenses.summary(startDate ?? '', endDate ?? ''),
-    queryFn: ({ signal }) => {
-      const params = new URLSearchParams({ startDate: startDate!, endDate: endDate! });
-      return fetchJSON<ExpenseSummary>(`/api/expenses/summary?${params}`, {
-        signal,
-        schema: expenseContract.expenseSummary.response,
-      });
-    },
-    enabled: !!startDate && !!endDate,
   });
 
 // ---------------------------------------------------------------------------

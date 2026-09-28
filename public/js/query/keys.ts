@@ -241,8 +241,6 @@ export const qk = {
     list: (filters: object = {}) => ['expenses', 'list', filters] as const,
     categories: () => ['expenses', 'categories'] as const,
     subcategories: (categoryId: Id) => ['expenses', 'subcategories', categoryId] as const,
-    summary: (startDate: string, endDate: string) =>
-      ['expenses', 'summary', startDate, endDate] as const,
     /** GET /api/expenses/:id — single expense (edit form; disabled until an id is set). */
     byId: (id: Id) => ['expenses', 'by-id', normId(id)] as const,
   },

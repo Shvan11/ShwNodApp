@@ -96,23 +96,20 @@ export default function Expenses() {
   // State for modals
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [currentExpense, setCurrentExpense] = useState<Expense | null>(null);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
-  // Edit flow: an id gates the single-expense fetch; the row click sets it +
-  // opens the modal, and an effect seeds `currentExpense` once the row arrives.
+  // Edit flow: the row click sets `editingId` (which gates the single-expense fetch)
+  // and opens the modal. The expense being edited is DERIVED from that id, not seeded
+  // into state of its own. The old seed was keyed on the fetched object's identity and
+  // never reset, so re-editing the same row got the same cached object back from React
+  // Query, the seed skipped, and the modal opened as a blank Add form whose Save
+  // created a duplicate expense (FE-F8-2).
   const [editingId, setEditingId] = useState<number | null>(null);
   const { data: editingExpense, error: editingError } = useQuery(expenseByIdQuery(editingId));
-
-  // Seed the modal's working copy from the fetched expense (edit flow only). Done
-  // during render (adjust-state-during-render), keyed on the fetched-expense identity,
-  // rather than in an effect so the React Compiler can optimize it. `currentExpense`
-  // is also set by other handlers, so this only seeds when a freshly-fetched row arrives.
-  const [seededExpense, setSeededExpense] = useState<Expense | null>(null);
-  if (editingId != null && editingExpense && seededExpense !== editingExpense) {
-    setSeededExpense(editingExpense as Expense);
-    setCurrentExpense(editingExpense as Expense);
-  }
+  const currentExpense = editingId != null ? ((editingExpense as Expense | undefined) ?? null) : null;
+  // An edit opens once its row is here (a cached row is instant). Opened earlier, the
+  // modal renders as an empty Add form, and a Save from it would create, not update.
+  const expenseModalOpen = isExpenseModalOpen && (editingId == null || currentExpense != null);
 
   // Surface a load failure and abandon the edit flow. The reset is done during
   // render (adjust-during-render, not a setState-in-effect); nulling editingId
@@ -175,12 +172,11 @@ export default function Expenses() {
   // Open add expense modal
   const handleAddExpense = () => {
     setEditingId(null);
-    setCurrentExpense(null);
     setIsExpenseModalOpen(true);
   };
 
-  // Open edit expense modal — the query (gated on editingId) loads the row and
-  // an effect seeds `currentExpense` once it arrives.
+  // Open edit expense modal — the query (gated on editingId) loads the row, and
+  // `currentExpense` is derived from it.
   const handleEditExpense = (id: number) => {
     setEditingId(id);
     setIsExpenseModalOpen(true);
@@ -198,19 +194,18 @@ export default function Expenses() {
   // Save expense (create or update)
   const handleSaveExpense = async (expenseData: ExpenseData) => {
     try {
-      if (currentExpense) {
-        const r = await updateExpense(currentExpense.id, expenseData);
+      if (editingId != null) {
+        const r = await updateExpense(editingId, expenseData);
         toast.success(r.outcome === 'pending' ? 'Submitted for admin approval' : t('toast.updated'));
       } else {
         await createExpense(expenseData);
         toast.success(t('toast.created'));
       }
       setIsExpenseModalOpen(false);
-      setCurrentExpense(null);
       setEditingId(null);
     } catch {
       toast.error(
-        currentExpense ? t('toast.updateFailed') : t('toast.createFailed')
+        editingId != null ? t('toast.updateFailed') : t('toast.createFailed')
       );
     }
   };
@@ -253,11 +248,7 @@ export default function Expenses() {
       />
 
       {/* Summary Section */}
-      <ExpenseSummary
-        startDate={appliedFilters.startDate}
-        endDate={appliedFilters.endDate}
-        expenses={expenses}
-      />
+      <ExpenseSummary expenses={expenses} loading={loading} />
 
       {/* Error Display */}
       {error && (
@@ -280,11 +271,10 @@ export default function Expenses() {
 
       {/* Expense Modal (Add/Edit) */}
       <ExpenseModal
-        isOpen={isExpenseModalOpen}
+        isOpen={expenseModalOpen}
         expense={currentExpense}
         onClose={() => {
           setIsExpenseModalOpen(false);
-          setCurrentExpense(null);
           setEditingId(null);
         }}
         onSave={handleSaveExpense}
