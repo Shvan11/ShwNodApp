@@ -33,7 +33,7 @@ import { MALFORMED_SEND_RESULT_ERROR } from './whatsapp-errors.js';
 import {
   DEFAULT_CLINIC_MESSAGE_NAME,
   DEFAULT_CLINIC_MESSAGE_NAME_AR,
-} from '../settings/clinic-identity.js';
+} from '../settings/clinic-identity-defaults.js';
 
 /**
  * The clinic name is per-deployment configuration now (audit F7), so the planner takes it as an
@@ -153,7 +153,7 @@ describe('buildReminderPlan — recipient selection', () => {
       const plan = buildReminderPlan([candidate({ phone })], {
         date: WEDNESDAY,
         daysAhead: 1,
-      clinic: CLINIC,
+        clinic: CLINIC,
       });
       expect(plan.recipients[0]?.number, phone).toBe(expected);
     }

@@ -22,28 +22,28 @@
  * branding route clears it on write (`invalidateClinicIdentity()`), so a rename takes effect at once
  * rather than up to a TTL later. A read failure falls back to the defaults and never throws: the
  * clinic's name is not worth failing a reminder batch over.
+ *
+ * PURE PARTS LIVE NEXT DOOR. The defaults and the `ClinicNames` shape are in
+ * `clinic-identity-defaults.ts` (re-exported below), because importing THIS module loads the
+ * database layer and its boot-env validation. Pure code and tests import from there.
  */
 import { getOptions } from '../database/queries/options-queries.js';
 import { log } from '../../utils/logger.js';
+import {
+  DEFAULT_CLINIC_MESSAGE_NAME,
+  DEFAULT_CLINIC_MESSAGE_NAME_AR,
+  type ClinicNames,
+} from './clinic-identity-defaults.js';
+
+export {
+  DEFAULT_CLINIC_MESSAGE_NAME,
+  DEFAULT_CLINIC_MESSAGE_NAME_AR,
+  type ClinicNames,
+} from './clinic-identity-defaults.js';
 
 /** Option rows backing the two names (Settings → General). */
 export const CLINIC_MESSAGE_NAME_OPTION = 'CLINIC_MESSAGE_NAME';
 export const CLINIC_MESSAGE_NAME_AR_OPTION = 'CLINIC_MESSAGE_NAME_AR';
-
-/**
- * Fallbacks — this clinic's own historical strings, so an install whose rows are missing (or
- * unreadable) sends exactly what it sent before this module existed. They are the DEFAULT, not the
- * value: nothing outside this file may hardcode them.
- */
-export const DEFAULT_CLINIC_MESSAGE_NAME = 'Dr. Shwan orthodontic clinic';
-export const DEFAULT_CLINIC_MESSAGE_NAME_AR = 'عيادة د.شوان لتقويم الاسنان';
-
-export interface ClinicNames {
-  /** Name to use in an English message body. */
-  en: string;
-  /** Name to use in an Arabic message body. */
-  ar: string;
-}
 
 /** Long enough that a batch loop reads it once; short enough that a rename is never stuck. */
 const CACHE_TTL_MS = 60_000;

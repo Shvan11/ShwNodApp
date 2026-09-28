@@ -23,7 +23,7 @@
  */
 
 import { arabicDay } from '../../utils/arabic-day.js';
-import type { ClinicNames } from '../settings/clinic-identity.js';
+import type { ClinicNames } from '../settings/clinic-identity-defaults.js';
 import { englishDay, format12h, formatPhone, isValidPhone } from './reminder-format.js';
 import { isConnectionStallError, isMalformedSendResultError } from './whatsapp-errors.js';
 import { reminderLanguage } from '../../shared/patient-language.js';
@@ -81,9 +81,11 @@ export interface ReminderPlan {
  * deterministic: the same rows and the same `daysAhead` always yield the same
  * text. `clinic` is passed in for the same reason — the name is per-deployment
  * configuration (`services/settings/clinic-identity.ts`), and reading it here
- * would put I/O inside the one module that is guaranteed not to have any. Outside the reminder window the plan is empty — the window rule lives
- * here so it cannot drift from the text that assumes it ("tomorrow" vs "the day
- * after tomorrow").
+ * would put I/O inside the one module that is guaranteed not to have any.
+ *
+ * Outside the reminder window the plan is empty — the window rule lives here so
+ * it cannot drift from the text that assumes it ("tomorrow" vs "the day after
+ * tomorrow").
  *
  * A row with no usable phone is *skipped, not failed*: it never reaches the
  * send loop, so it stays eligible for a later batch once the number is fixed.
