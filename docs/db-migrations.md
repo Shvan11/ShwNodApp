@@ -53,11 +53,23 @@ functions (`cdc_capture`, `set_updated_at`), all 99 CDC/`updated_at` triggers, t
 reverse-sync sequences carrying `INCREMENT BY 2` (local ODD ids / Supabase EVEN — see
 `sync-cdc.md`), extensions `citext` + `pg_trgm`, and the product seed rows (CDC sink
 registry, WhatsApp group defaults, shade vocabularies, clinic-wide slideshow templates).
+The `pgmigrations` ledger is **not** in the baseline: node-pg-migrate creates it before the
+first file runs (see *Fresh install* below).
 
-What it does **not** include, unchanged from before the squash: clinical lookup
-vocabularies and `options` beyond the two WhatsApp rows. A brand-new clinic still needs a
-separate data load — `options` holds live secrets (e.g. the Telegram `gram_session`) and
-must never be seeded from a repo file.
+`1789460400000_seed-code-constant-lookups.sql` adds the two lookup tables whose ids are
+**code constants** and FK targets: `work_statuses` (`WORK_STATUS`) and `patient_types`
+(`PATIENT_TYPE_IDS`, English + Arabic names). Every row is `ON CONFLICT DO NOTHING`, so it
+is a no-op on a deployment that already has them, including one whose names were edited in
+Settings → Lookups. `services/database/fresh-install.test.ts` fails the gate if a new id is
+added to either constant without a seed row.
+
+What is still **not** included: clinical lookup vocabularies (wires, work types, keywords,
+`tooth_numbers`, …) and `options` beyond the two WhatsApp rows. A brand-new clinic still
+needs a separate data load — `options` holds live secrets (e.g. the Telegram
+`gram_session`) and must never be seeded from a repo file. Note that `tooth_numbers.tooth_code`
+must match the chart SVG names (`public/images/teeth/chart/UR6.svg`, …), and that
+`work_types` ids are code constants too (`WORK_TYPE_IDS`), though `works.type_of_work` has
+no FK, so a missing row degrades a label instead of failing a write.
 
 ---
 
@@ -73,6 +85,8 @@ node-pg-migrate is invoked. The check distinguishes:
 
 | State | Verdict |
 |---|---|
+| No ledger and **no tables at all** in `public` | **fresh install** — every file pending; migrate creates the ledger and applies them |
+| No ledger but tables present | **error** — with `public.patients`: the schema is there without its history, repair with `db:baseline:stamp`; without it: unknown state, investigate |
 | File newer than every applied migration | **pending** — normal, migrate applies it |
 | File older than the newest applied migration, unrecorded | **error** — applied out-of-band, or slipped in behind history |
 | Ledger row whose file no longer exists | **error (ghost)** — history rewritten without re-stamping |
@@ -96,6 +110,28 @@ npm run db:baseline:stamp     # REPAIR: record the baseline as applied, without 
 npm run db:baseline:build     # author a NEW squashed baseline from the live schema
 npm run db:baseline:verify    # prove a baseline reproduces the live schema (scratch DB + diff)
 ```
+
+### Fresh install (a new deployment)
+
+Point `PG_*` (or `DATABASE_URL`) at an **empty** database owned by the app role, then:
+
+```bash
+npm run db:check      # expect: "fresh install — the database is empty, all N migration(s) pending"
+npm run db:migrate    # creates the ledger, applies the baseline and every later file
+npm run db:check      # expect: "ledger matches disk"
+```
+
+The app role needs no superuser: `citext` and `pg_trgm` are trusted extensions, and
+`pg_stat_statements` (monitoring only) is skipped with a NOTICE when it can't be created.
+Then load the clinic's own vocabularies and `options` (see above) and create the first
+user.
+
+Until 2026-09-28 this path did not work at all, for three reasons found by the F9 frontend
+audit: `db:check` refused any database without a ledger; the baseline also created
+`pgmigrations`, which node-pg-migrate had just created (`relation "pgmigrations" already
+exists`); and pg_dump's `COMMENT ON EXTENSION pg_stat_statements` ran even when the extension
+had been skipped. `db:baseline:verify` missed the second one because it applied the Up section
+to a bare database; it now creates the ledger first, exactly as node-pg-migrate does.
 
 ### Adding a migration (the normal path)
 
@@ -184,8 +220,9 @@ npm run db:baseline:stamp
 npm run db:check
 ```
 
-`db-baseline-verify.mjs` builds a throwaway database from the baseline, diffs its schema
-against live, and separately proves the guard fires on a populated database. It needs a
+`db-baseline-verify.mjs` builds a throwaway database from the baseline (creating the ledger
+first, the way node-pg-migrate does), diffs its schema against live, and separately proves
+the guard fires on a populated database. It needs a
 superuser to `CREATE DATABASE` (the app role has neither SUPERUSER nor CREATEDB) and
 reads it from `C:\pg18-migration\super_pw.txt`.
 
@@ -202,7 +239,11 @@ because of these transformations, each of which is a real failure if skipped:
   and trigram indexes make mandatory.
 - `pg_stat_statements` is not a trusted extension (needs superuser), so it is wrapped to
   be skippable — a fresh install running as the app role must not die on a
-  monitoring-only dependency.
+  monitoring-only dependency. Its `COMMENT ON EXTENSION` line is dropped for the same
+  reason (it is not inside the wrapper).
+- The `pgmigrations` ledger is excluded from the dump (`db-baseline-dump.mjs`): it is
+  node-pg-migrate's table, and a baseline that creates it cannot install on an empty
+  database.
 
 ---
 

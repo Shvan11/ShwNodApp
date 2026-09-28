@@ -36,6 +36,10 @@ const args = [
   // Deliberately NO `--schema=public`: extensions are DATABASE-level objects, so that
   // filter silently drops the `CREATE EXTENSION citext / pg_trgm` lines — and citext
   // columns + trigram indexes make those mandatory for a fresh install.
+  // The migration ledger (table + its id sequence) is node-pg-migrate's, created before
+  // the first file runs. A baseline that also creates it cannot install on an empty
+  // database (`relation "pgmigrations" already exists`) — see the baseline's note.
+  '--exclude-table=public.pgmigrations*',
   '-h', LOCAL.host,
   '-p', String(LOCAL.port),
   '-U', LOCAL.user,

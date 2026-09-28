@@ -86,6 +86,15 @@ let s = admin(SCRATCH);
 await s.connect();
 let applyError = null;
 try {
+  // Apply it the way `npm run db:migrate` does: node-pg-migrate creates its ledger
+  // BEFORE the first file runs, with exactly this DDL (node-pg-migrate 8,
+  // dist/bundle/index.js). Applying the Up section to a bare database hid the fact
+  // that the baseline used to create `pgmigrations` too, which made every real fresh
+  // install fail. The ledger also takes part in the diff below, so this proves the
+  // migrator's table matches the live one.
+  await s.query(
+    'CREATE TABLE "public"."pgmigrations" (id SERIAL PRIMARY KEY, name varchar(255) NOT NULL, run_on timestamp NOT NULL)'
+  );
   await s.query(up);
   console.log('baseline Up applied to scratch database');
 } catch (e) {

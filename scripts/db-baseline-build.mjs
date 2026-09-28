@@ -22,8 +22,12 @@
  *  5. pg_stat_statements is wrapped so a non-superuser install can skip it: unlike
  *     citext / pg_trgm it is NOT a trusted extension, so a fresh clinic install running
  *     migrations as the app role would otherwise die on a monitoring-only dependency.
+ *     Its `COMMENT ON EXTENSION` line is dropped for the same reason (see dropLine).
  *  6. A GUARD is prepended that hard-refuses to run against a database that already has
  *     an application schema — the actual disaster prevention.
+ *  7. The `pgmigrations` ledger is left out (db-baseline-dump.mjs excludes it): it is
+ *     node-pg-migrate's table, created before the baseline runs, and a baseline that
+ *     also creates it can never install on an empty database.
  */
 import { spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -51,7 +55,11 @@ const dropLine = (l) =>
   l.startsWith('\\restrict') ||
   l.startsWith('\\unrestrict') ||
   l.includes("set_config('search_path'") ||
-  l.startsWith('SET transaction_timeout');
+  l.startsWith('SET transaction_timeout') ||
+  // Step 5's companion: this line is not wrapped, so it ran even when the extension had
+  // been skipped (non-superuser install) and failed with `extension "pg_stat_statements"
+  // does not exist`. CREATE EXTENSION sets the same comment itself; nothing is lost.
+  l.startsWith('COMMENT ON EXTENSION pg_stat_statements');
 
 let schema = dump.stdout
   .split(/\r?\n/)

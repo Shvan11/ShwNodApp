@@ -8,7 +8,9 @@
  * clinic database. Nothing in the toolchain reported that state; this script does.
  *
  * Run it before and after any migration work, and on any deployment that looks off.
- * Exits non-zero on drift so it can gate a deploy script.
+ * Exits non-zero on drift so it can gate a deploy script. A completely EMPTY database
+ * (no ledger, no tables) is certified as a fresh install, so a new deployment's first
+ * `npm run db:migrate` can proceed; a non-empty database without a ledger is refused.
  *
  * It never writes. To REPAIR a ledger that lost its rows, use db-baseline-stamp.mjs.
  */
@@ -32,8 +34,34 @@ const { rows: ledgerExists } = await c.query(
   `SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'pgmigrations'`
 );
 if (ledgerExists.length === 0) {
-  console.error('✗ no pgmigrations table — this database has never been migrated.');
+  // No ledger. That is a normal FRESH INSTALL only if the database is genuinely empty —
+  // not one table in `public`. Anything else without a ledger is a deployment whose
+  // history was lost, and running the migrations there is exactly what the guard rails
+  // exist to stop (the baseline would refuse anyway; this refuses first, with the fix).
+  const { rows: tables } = await c.query(
+    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`
+  );
   await c.end();
+  if (tables.length === 0) {
+    console.log(`migration files on disk : ${files.length}`);
+    console.log('rows in pgmigrations    : — (no ledger yet)');
+    console.log(`\n✓ fresh install — the database is empty, all ${files.length} migration(s) pending:`);
+    files.forEach((n) => console.log(`    ${n}`));
+    console.log('  `npm run db:migrate` will create the ledger and apply them.');
+    process.exit(0);
+  }
+  const hasSchema = tables.some((t) => t.tablename === 'patients');
+  console.error('✗ no pgmigrations table, but the database is NOT empty:');
+  console.error(`    ${tables.length} table(s) in public, e.g. ${tables.slice(0, 5).map((t) => t.tablename).join(', ')}`);
+  console.error(
+    hasSchema
+      ? '  → it has the application schema without a ledger. If that schema matches the\n' +
+          '    baseline, record it as applied: npm run db:baseline:stamp'
+      : '  → unknown state (tables present, no application schema, no ledger). Point PG_* at an\n' +
+          '    empty database for a fresh install, or investigate before migrating.'
+  );
+  console.error('\nRefusing to certify this ledger. `npm run db:migrate` runs this check first');
+  console.error('(predb:migrate) and will not proceed until the state above is resolved.');
   process.exit(1);
 }
 
