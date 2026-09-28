@@ -17,6 +17,7 @@ import { log } from '../utils/logger.js';
 import { ErrorResponses } from '../utils/error-response.js';
 import { drainCdcNow } from '../services/sync/cdc/index.js';
 import { getLastDriftReport } from '../services/sync/cdc/drift-check.js';
+import { getLastClockReport } from '../services/sync/cdc/clock-check.js';
 import { stripSslMode, getReverseReadPool } from '../services/sync/cdc/supabase-pool.js';
 import { getPgPool } from '../services/database/kysely.js';
 import { validate } from '../middleware/validate.js';
@@ -348,6 +349,10 @@ router.get(
         // and reachability all report on changes the system knows about. Null until the first sweep
         // completes (5 min after boot) or on an install that does not mirror.
         drift: getLastDriftReport(),
+        // Whether the app server, local PostgreSQL and the mirror stamp wall-clock time in the same
+        // zone (services/sync/cdc/clock-check.ts). A disagreement skews every portal-written time and
+        // reverse-sync last-write-wins (audit FE-F5-1). Null until the first check (~1 min after boot).
+        clock: getLastClockReport(),
         sinks: [
           {
             sink: 'failover',

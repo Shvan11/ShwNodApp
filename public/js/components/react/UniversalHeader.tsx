@@ -198,7 +198,12 @@ const UniversalHeader = () => {
                 label: t('nav.appointments'),
                 icon: 'fas fa-calendar-alt',
                 onClick: navigateToAppointments,
-                match: (p: string) => p.includes('/appointment'),
+                // Anchored, not `includes('/appointment')`: this tab navigates to
+                // the daily-appointments screen at `/appointments`, but the loose
+                // test also matched `/patient/:id/appointments`,
+                // `/patient/:id/new-appointment` and `/patient/:id/edit-appointment/:id`,
+                // so it lit up alongside the patient context on all three.
+                match: (p: string) => p === '/appointments' || p.startsWith('/appointments/'),
             },
             {
                 key: 'search',

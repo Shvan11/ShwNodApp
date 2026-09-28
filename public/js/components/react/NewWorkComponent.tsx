@@ -13,11 +13,14 @@ import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { postJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { useToast } from '../../contexts/ToastContext';
 import { qk } from '@/query/keys';
+import { notifyApprovalsChanged } from '@/services/approvals';
 import * as workContract from '@shared/contracts/work.contract';
+import { WORK_CURRENCIES, DEFAULT_WORK_CURRENCY_OPTION, parseWorkCurrency } from '@shared/work-currency';
 import {
     workTypesQuery,
     workKeywordsQuery,
-    employeesQuery,
+    workDoctorsQuery,
+    optionQuery,
     worksQuery,
 } from '../../query/queries';
 import Modal from './Modal';
@@ -127,11 +130,19 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
     // so each `data` is cast to its concrete row type.
     const { data: workTypesData } = useQuery(workTypesQuery());
     const { data: keywordsData } = useQuery(workKeywordsQuery());
-    const { data: employeesData } = useQuery(employeesQuery('?percentage=true'));
+    // Who a work can be attributed to: Doctor-position employees + anyone on commission
+    // (FE-F7-1). It used to be `employees?percentage=true` — the commission flag alone —
+    // which left salaried doctors and the Clinic pseudo-doctor out, and a salaried-only
+    // center with an EMPTY required list.
+    const { data: workDoctorsData } = useQuery(workDoctorsQuery());
+    // The clinic's default work currency (Settings → General). A missing/blank/unknown
+    // value means "no default" — the select then starts empty and must be chosen.
+    const { data: defaultCurrencyOption } = useQuery(optionQuery(DEFAULT_WORK_CURRENCY_OPTION));
+    const defaultCurrency = parseWorkCurrency(defaultCurrencyOption?.value);
 
     const workTypes: WorkType[] = workTypesData ?? [];
     const keywords: Keyword[] = keywordsData ?? [];
-    const doctors: Doctor[] = employeesData?.employees ?? [];
+    const workDoctors: Doctor[] = workDoctorsData ?? [];
 
     // Work record read (edit mode) — fetches the patient's works and the
     // form-population effect below picks out this workId. Matches the original
@@ -155,7 +166,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
     const [formData, setFormData] = useState<WorkFormData>({
         person_id: personId ? String(personId) : '',
         total_required: 0, // Default to 0 instead of empty string (matches DB default)
-        currency: 'USD',
+        // Seeded below from the clinic default (new work) or the work's own currency (edit).
+        // Never a literal: this used to be 'USD' in a clinic whose works are 79 % IQD.
+        currency: '',
         type_of_work: '',
         notes: '',
         status: 1, // 1=Active, 2=Finished, 3=Discontinued
@@ -185,12 +198,33 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
 
     // Existing work financial snapshot (for discount validation)
     const [existingTotalPaid, setExistingTotalPaid] = useState<number>(0);
+    // The work's CURRENT doctor (edit mode), kept so the Doctor select can always show
+    // it — a quit doctor, or anyone else outside the work-doctor list (FE-F7-1).
+    const [currentDoctor, setCurrentDoctor] = useState<Doctor | null>(null);
 
     const { user } = useGlobalState();
-    const isAdmin = user?.role === 'admin';
     // Clinical staff (doctors/assistants) add works without a cost — the cost/
     // currency inputs and the "mark as finished" (paid) shortcut are finance-only.
+    // Editing a work (and finishing one) is `editRecords`; a direct discount is `adminWrites`.
     const caps = roleCaps(user?.role as UserRole | undefined);
+
+    // A NEW work's currency starts at the clinic default once it has loaded — never over
+    // a currency the user already picked, and never in edit mode (the work's own wins).
+    const [defaultCurrencyApplied, setDefaultCurrencyApplied] = useState(false);
+    if (!workId && !defaultCurrencyApplied && defaultCurrency) {
+        setDefaultCurrencyApplied(true);
+        if (!formData.currency) {
+            setFormData(prev => ({ ...prev, currency: defaultCurrency }));
+        }
+    }
+
+    // The select's options: the work-doctor list, plus the work's own doctor when it is
+    // not on it, so opening an old work never blanks a required field and never forces a
+    // re-attribution (which would move that work's commissions retroactively).
+    const doctors: Doctor[] =
+        currentDoctor && !workDoctors.some(d => d.id === currentDoctor.id)
+            ? [...workDoctors, currentDoctor]
+            : workDoctors;
 
     // Auto-format the display value when the matching formData field changes — done
     // during render (keyed on the field) so there's no setState-in-effect.
@@ -228,7 +262,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
             setFormData({
                 person_id: String(work.person_id),
                 total_required: work.total_required ?? 0, // Use nullish coalescing to preserve 0
-                currency: work.currency || 'USD',
+                currency: work.currency ?? '',
                 type_of_work: String(work.type_of_work || ''),
                 notes: work.notes || '',
                 status: work.status ?? 1, // Use nullish coalescing to preserve 0 if somehow status is 0
@@ -250,6 +284,11 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 createAsFinished: false
             });
             setExistingTotalPaid(Number(work.TotalPaid ?? 0));
+            setCurrentDoctor(
+                work.dr_id != null
+                    ? { id: work.dr_id, employee_name: `${work.doctor_name ?? `#${work.dr_id}`} (current)` }
+                    : null
+            );
         }
     }
 
@@ -311,6 +350,9 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 const updateResult = await putJSON<{ outcome: string }>('/api/updatework', updatePayload, { schema: workContract.updateWork.response });
                 if (updateResult.outcome === 'pending') {
                     toast.success('Submitted for admin approval');
+                    // A request was created but no row changed — tell the approval bells
+                    // (they only hear about a RESOLVED request otherwise, and poll every 5 min).
+                    notifyApprovalsChanged();
                     if (onSave) onSave({} as WorkResponse);
                     return;
                 }
@@ -438,6 +480,41 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
         setShowFinishedWorkConfirm(false);
     };
 
+    // The three tabs are CSS-hidden, not unmounted, so a required field left empty on a
+    // tab that is not showing blocks Save with no message at all — the browser cannot
+    // focus a hidden control, so it drops its own bubble (FE-F7-1: saving from Dates or
+    // Keywords). Show the tab holding the FIRST invalid control, then let the browser
+    // report it. Every invalid control fires this; they all resolve to the same tab, and
+    // the re-fired event from reportValidity() finds that tab already active.
+    const handleFormInvalid = (e: FormEvent<HTMLFormElement>) => {
+        const firstInvalid = e.currentTarget.querySelector<HTMLInputElement>(
+            'input:invalid, select:invalid, textarea:invalid'
+        );
+        const tab = firstInvalid?.closest<HTMLElement>('[data-tab]')?.dataset.tab as TabType | undefined;
+        if (!firstInvalid || !tab || tab === activeTab) return;
+        setActiveTab(tab);
+        requestAnimationFrame(() => firstInvalid.reportValidity());
+    };
+
+    // Editing a work is FINANCE_ROLES on the server (PUT /api/updatework). A doctor or
+    // assistant who reaches `new-work?workId=` would otherwise fill the whole form and
+    // learn "Insufficient permissions" only at Save (FE-F7-7). Gated only once the role
+    // is known, so an admin's cold load never flashes this.
+    if (workId && user && !caps.editRecords) {
+        return (
+            <div className={styles.newWorkComponent}>
+                <div className={styles.newWorkError}>
+                    <i className="fas fa-lock"></i> Editing a work is done by the front desk or an admin.
+                    {onCancel && (
+                        <button type="button" onClick={onCancel} className="btn btn-secondary">
+                            <i className="fas fa-arrow-left"></i> Back
+                        </button>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     if (workLoading && workId) {
         return (
             <div className={styles.newWorkLoading}>
@@ -497,17 +574,23 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 </div>
                             </div>
                             <p className={styles.confirmationQuestion}>
-                                Would you like to finish the existing work and add this new one?
+                                {/* Finishing a work is FINANCE_ROLES (POST /api/finishwork) — a
+                                    doctor or assistant is offered only what will succeed. */}
+                                {caps.editRecords
+                                    ? 'Would you like to finish the existing work and add this new one?'
+                                    : 'The existing work has to be finished first — ask the front desk to finish it, then add this one.'}
                             </p>
                         </div>
                         <div className={styles.confirmationActions}>
-                            <button
-                                onClick={handleFinishExistingAndAddNew}
-                                className="btn btn-primary"
-                                disabled={loading}
-                            >
-                                <i className="fas fa-check"></i> Yes, Finish & Add New
-                            </button>
+                            {caps.editRecords && (
+                                <button
+                                    onClick={handleFinishExistingAndAddNew}
+                                    className="btn btn-primary"
+                                    disabled={loading}
+                                >
+                                    <i className="fas fa-check"></i> Yes, Finish & Add New
+                                </button>
+                            )}
                             <button
                                 onClick={handleCancelConfirmation}
                                 className="btn btn-secondary"
@@ -588,7 +671,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
             )}
 
             {/* Form */}
-            <form onSubmit={handleFormSubmit} className={styles.newWorkForm}>
+            <form onSubmit={handleFormSubmit} onInvalid={handleFormInvalid} className={styles.newWorkForm}>
                 {/* Top Action Buttons */}
                 <div className={`${styles.formActions} ${styles.topActions}`}>
                     <button type="submit" className="btn btn-primary" disabled={loading}>
@@ -627,7 +710,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 </div>
 
                 {/* Tab 1: Basic Information */}
-                <div className={`${styles.tabContent} ${activeTab === 'basic' ? styles.tabContentActive : ''}`}>
+                <div data-tab="basic" className={`${styles.tabContent} ${activeTab === 'basic' ? styles.tabContentActive : ''}`}>
                     <div className={styles.formRow}>
                         <div className={styles.formGroup}>
                             <label htmlFor="work-type">Work Type <span className={styles.required}>*</span></label>
@@ -650,6 +733,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                             <label htmlFor="work-doctor">Doctor <span className={styles.required}>*</span></label>
                             <select
                                 id="work-doctor"
+                                name="dr_id"
                                 value={formData.dr_id}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, dr_id: e.target.value})}
                                 required
@@ -702,9 +786,11 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                     value={displayValues.total_required}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                         const numericValue = parseFormattedNumber(e.target.value) || 0;
-                                        // Auto-switch to IQD if amount > 10,000 (USD amounts are typically < 10,000)
-                                        const newCurrency = numericValue > 10000 ? 'IQD' : formData.currency;
-                                        setFormData({...formData, total_required: numericValue, currency: newCurrency});
+                                        // The amount NEVER touches the currency. It used to switch to IQD
+                                        // on any keystroke past 10,000, one way — so editing $2,000 in place
+                                        // (End, 0, Backspace) saved 2,000 IQD (FE-F7-3). The default now
+                                        // comes from the clinic setting instead.
+                                        setFormData(prev => ({ ...prev, total_required: numericValue }));
                                         setDisplayValues(prev => ({...prev, total_required: e.target.value}));
                                     }}
                                     onBlur={() => {
@@ -715,16 +801,29 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                             </div>
 
                             <div className={styles.formGroup}>
-                                <label htmlFor="work-currency">Currency</label>
+                                <label htmlFor="work-currency">Currency <span className={styles.required}>*</span></label>
                                 <select
                                     id="work-currency"
+                                    name="currency"
                                     value={formData.currency}
-                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, currency: e.target.value})}
+                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+                                    required
+                                    // Payments are stored as bare amounts in the work's currency, so
+                                    // once any have been received the currency is part of what they
+                                    // mean. The server refuses the change (CURRENCY_LOCKED) — this
+                                    // just stops the user building an edit that cannot be saved.
+                                    disabled={!!workId && existingTotalPaid > 0}
                                 >
-                                    <option value="USD">USD</option>
-                                    <option value="IQD">IQD</option>
-                                    <option value="EUR">EUR</option>
+                                    <option value="" disabled>Select currency</option>
+                                    {WORK_CURRENCIES.map(c => (
+                                        <option key={c} value={c}>{c}</option>
+                                    ))}
                                 </select>
+                                {!!workId && existingTotalPaid > 0 && (
+                                    <small className={styles.formHint}>
+                                        <i className="fas fa-lock"></i> Locked — this work already has payments
+                                    </small>
+                                )}
                             </div>
                         </div>
                     )}
@@ -756,7 +855,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 <div className={styles.formGroup}>
                                     <label htmlFor="work-discount">
                                         Discount
-                                        {!isAdmin && (
+                                        {!caps.adminWrites && (
                                             <small className={`${styles.formHint} ${styles.adminHint}`}>
                                                 <i className="fas fa-user-check"></i> Requires admin approval
                                             </small>
@@ -854,7 +953,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 </div>
 
                 {/* Tab 2: Dates */}
-                <div className={`${styles.tabContent} ${activeTab === 'dates' ? styles.tabContentActive : ''}`}>
+                <div data-tab="dates" className={`${styles.tabContent} ${activeTab === 'dates' ? styles.tabContentActive : ''}`}>
                     <div className={styles.formRow}>
                         <div className={styles.formGroup}>
                             <label htmlFor="work-i-photo-date">Initial Photo Date</label>
@@ -901,7 +1000,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 </div>
 
                 {/* Tab 3: Keywords */}
-                <div className={`${styles.tabContent} ${activeTab === 'keywords' ? styles.tabContentActive : ''}`}>
+                <div data-tab="keywords" className={`${styles.tabContent} ${activeTab === 'keywords' ? styles.tabContentActive : ''}`}>
                     <div className={styles.keywordsSection}>
                         <p className={styles.sectionHint}>
                             <i className="fas fa-info-circle"></i> Select up to 5 keywords to categorize this work

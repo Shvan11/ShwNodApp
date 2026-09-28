@@ -37,7 +37,13 @@
         if (lang !== 'en' && lang !== 'ar') lang = 'en';
         document.documentElement.setAttribute('lang', lang);
         var p = location.pathname;
-        var rtlRoute = (p === '/' || p === '/dashboard' || p === '/expenses' || p.indexOf('/expenses/') === 0 || p === '/appointments' || /^\/patient\/[^/]+\/works\/?$/.test(p) || /^\/patient\/[^/]+\/appointments\/?$/.test(p) || /^\/patient\/[^/]+\/new-appointment\/?$/.test(p) || /^\/patient\/[^/]+\/edit-appointment(\/.*)?$/.test(p) || /^\/patient\/[^/]+\/patient-info\/?$/.test(p) || /^\/patient\/[^/]+\/edit-patient\/?$/.test(p) || /^\/patient\/[^/]+\/add\/?$/.test(p));
+        // Prefix-match all three static routes, exactly like isRtlRoute's
+        // `path === route || path.startsWith(route + '/')`. This list used to
+        // prefix-match only /expenses/ and exact-match the other two, so the two
+        // implementations of the same rule would have diverged the moment
+        // /dashboard or /appointments grew a child route.
+        var rtlStatic = ['/dashboard', '/expenses', '/appointments'];
+        var rtlRoute = (p === '/' || rtlStatic.some(function (r) { return p === r || p.indexOf(r + '/') === 0; }) || /^\/patient\/[^/]+\/works\/?$/.test(p) || /^\/patient\/[^/]+\/appointments\/?$/.test(p) || /^\/patient\/[^/]+\/new-appointment\/?$/.test(p) || /^\/patient\/[^/]+\/edit-appointment(\/.*)?$/.test(p) || /^\/patient\/[^/]+\/patient-info\/?$/.test(p) || /^\/patient\/[^/]+\/edit-patient\/?$/.test(p) || /^\/patient\/[^/]+\/add\/?$/.test(p));
         document.documentElement.setAttribute('dir', (lang === 'ar' && rtlRoute) ? 'rtl' : 'ltr');
 
         // Arabic webfont — whitelist the font ids (default cairo), set
@@ -226,21 +232,34 @@
 
     <!-- Global Fetch Interceptor for Authentication -->
     <script>
-        // Intercept all fetch requests to handle 401 authentication errors globally
-        // This ensures consistent redirect behavior across all components
+        // Session-expiry net for the STAFF app. This is the one layer that sees
+        // every fetch, including the sanctioned raw-fetch escape hatches that do
+        // not go through core/http.ts (blob downloads, the label POST, the
+        // whatsapp client), so it owns the redirect.
+        //
+        // It must NOT swallow the response. It used to reject with a bare
+        // `new Error('Authentication required')` — no `status`, no `data` — which
+        // meant core/http.ts never saw a 401: `loaderQuery`'s and `withAuth`'s
+        // `status === 401` branches were both unreachable, an expired session
+        // rendered RouteError's generic "something went wrong" card instead of
+        // the purpose-built "Unauthorized / you need to log in" one, and the
+        // `queryClient.clear()` next to them never ran. Passing the Response
+        // through lets the funnel build a real HttpError(401) and those branches
+        // do their job while this navigation is in flight.
+        //
+        // Not installed on portal.html — the Patient Portal is its own bundle
+        // with its own session and its own raw Zod boundary.
         (function() {
             const originalFetch = window.fetch;
+            let redirecting = false;
 
             window.fetch = function(...args) {
                 return originalFetch.apply(this, args)
                     .then(response => {
-                        // Check for 401 Unauthorized
-                        if (response.status === 401) {
+                        if (response.status === 401 && !redirecting) {
+                            redirecting = true;
                             console.warn('[Auth] 401 Unauthorized detected - redirecting to login');
-                            // Redirect to login page
                             window.location.href = '/login.html';
-                            // Return a rejected promise to prevent further processing
-                            return Promise.reject(new Error('Authentication required'));
                         }
                         return response;
                     });

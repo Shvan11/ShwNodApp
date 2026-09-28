@@ -129,7 +129,9 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
       const form = new FormData();
       list.forEach((f) => form.append('files', f));
       const qs = new URLSearchParams({ path: target });
-      await postFormData(`/api/patients/${personId}/files/upload?${qs}`, form);
+      // 120s to match the server's timeouts.long — a photo-session import exceeds
+      // the funnel's 30s default, which would abort it mid-write.
+      await postFormData(`/api/patients/${personId}/files/upload?${qs}`, form, { timeoutMs: 120000 });
       if (folder !== target) setFolder(target);
       void reloadFiles();
       toast.success(`Uploaded ${list.length} photo${list.length === 1 ? '' : 's'}`);
@@ -176,7 +178,9 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
         form.append('files', await fh.getFile());
       }
       const qs = new URLSearchParams({ path: target });
-      await postFormData(`/api/patients/${personId}/files/upload?${qs}`, form);
+      // 120s to match the server's timeouts.long — a photo-session import exceeds
+      // the funnel's 30s default, which would abort it mid-write.
+      await postFormData(`/api/patients/${personId}/files/upload?${qs}`, form, { timeoutMs: 120000 });
 
       // Upload confirmed on the share — now delete each chosen original from the card. Resolve
       // the file within the granted card folder and removeEntry under that read-write grant.

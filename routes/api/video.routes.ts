@@ -13,6 +13,7 @@ import { streamFile } from '../../utils/stream-file.js';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import { timeouts } from '../../middleware/timeout.js';
 import { authorize } from '../../middleware/auth.js';
 import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import * as videoQueries from '../../services/database/queries/video-queries.js';
@@ -269,6 +270,10 @@ router.get('/:id/qr', async (req: Request<VideoIdParams>, res: Response): Promis
 router.post(
   '/',
   authorize(CLINICAL_ROLES),
+  // An educational video is tens/hundreds of MB over the LAN; the global 30s
+  // requestTimeout would 408 the upload mid-stream (the client carries a matching
+  // 120s override). Same reason aligner PDF upload takes timeouts.long.
+  timeouts.long,
   upload.fields([
     { name: 'video', maxCount: 1 },
     { name: 'thumbnail', maxCount: 1 },

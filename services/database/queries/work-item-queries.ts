@@ -210,7 +210,13 @@ export async function updateWorkDetail(
         lab_id: workDetailData.lab_id || null,
         shade_system: workDetailData.shade_system || null,
         shade: workDetailData.shade || null,
-        item_cost: workDetailData.item_cost || null,
+        // PRESENCE-keyed, unlike the columns around it: the route drops `item_cost`
+        // from a clinical caller's body (money is finance-only), and an absent key
+        // must leave the stored cost alone rather than null it. A finance caller's
+        // form always sends the key (blank → undefined → cleared, as before).
+        ...(Object.prototype.hasOwnProperty.call(workDetailData, 'item_cost')
+          ? { item_cost: workDetailData.item_cost || null }
+          : {}),
         start_date: (workDetailData.start_date as string | null) || null,
         completed_date: (workDetailData.completed_date as string | null) || null,
         note: workDetailData.note || null,

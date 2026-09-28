@@ -146,9 +146,10 @@ export default function StandPOS() {
           onClose={() => setLastSale(null)}
           overlayClassName={styles.successOverlay}
           contentClassName={styles.successCard}
+          ariaLabelledBy="sale-complete-modal-title"
         >
             <div className={styles.successIcon}><i className="fas fa-check-circle"></i></div>
-            <h2>Sale Complete!</h2>
+            <h2 id="sale-complete-modal-title">Sale Complete!</h2>
             <p>Sale #{lastSale.saleId}</p>
             {lastSale.change > 0 && (
               <div className={styles.changeAmount}>

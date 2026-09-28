@@ -279,6 +279,14 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                 // the 30s-fresh cache would otherwise serve stale rows.
                 queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
 
+                // …and the calendar's own reads. A booking made from a patient screen
+                // changes slot availability for everyone: `qk.calendar.slots/availability`
+                // back SimplifiedCalendarPicker (the control whose job is to stop a
+                // double-book) and `qk.calendar.range/month/stats` back /calendar, which
+                // subscribes to no SSE and has no refetchInterval. Without this, the 30s
+                // staleTime is exactly long enough to re-offer a slot just taken.
+                queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
+
                 onSuccess && onSuccess(result);
                 onClose && onClose();
             } else {

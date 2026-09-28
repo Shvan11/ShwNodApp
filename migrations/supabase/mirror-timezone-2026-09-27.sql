@@ -1,0 +1,51 @@
+-- Supabase mirror: stamp wall-clock time in the CLINIC'S zone, not UTC (audit FE-F5-1).
+-- Applied via SUPABASE_FAILOVER_DB_URL by the operator — NOT a node-pg-migrate file. There is no
+-- local half: local PostgreSQL takes its zone from its own postgresql.conf.
+--
+-- WHY. Every timestamp in the schema is `timestamp WITHOUT time zone` (single-clinic wall clock), and
+-- both sides stamp with LOCALTIMESTAMP, which evaluates in each server's OWN TimeZone. The mirror
+-- shipped with Supabase's default, UTC, while local runs the clinic's zone. So:
+--   - every row the doctor portal INSERTs on the mirror (24 LOCALTIMESTAMP column defaults: activity
+--     flags, notes, announcement reads, portal-submitted patients/works, …) arrived home 3 h early;
+--   - set_updated_at_remote() stamped every portal EDIT 3 h early, and reverse-sync last-write-wins
+--     compares `updated_at` verbatim across the two sides (cdc-schema.ts#lwwUpdateClause) — so a
+--     portal edit made within 3 h after a staff edit of the same row compared as OLDER and was
+--     silently skipped locally, while the portal (which reads the mirror) showed it saved.
+--
+-- THE VALUE IS PER DEPLOYMENT. It must equal the app server's zone (`TZ` on the service —
+-- config/process-env.ts) and local PostgreSQL's `SHOW TimeZone`. The clock guard
+-- (services/sync/cdc/clock-check.ts) compares all three by UTC offset a minute after boot and every
+-- 6 h, logs an error on a mismatch and shows it on Settings → Supabase status, naming this fix.
+--
+-- WHAT IT DOES NOT TOUCH. The three columns defaulting to `now() AT TIME ZONE 'UTC'`
+-- (invoices.sys_start_time, patient_portal_auth.created_at/updated_at, private_photos.marked_at) are
+-- explicitly UTC on BOTH sides by design and stay so. Rows already stamped in UTC are deliberately
+-- left as they are (owner decision, 2026-09-27): wrong `updated_at` values are only ever too LOW, so
+-- every edit after this change out-dates them and last-write-wins is correct from the first new
+-- write; the ~38 display timestamps involved were all at least 3 days old.
+--
+-- HOW TO APPLY (quiet window, reverse backlog 0 — Settings → Supabase status):
+--   1. Run the ALTER below. It changes the default for NEW sessions only.
+--   2. Recycle the sessions that predate it, or they keep stamping UTC for as long as they live:
+--        - the portal's PostgREST connection (it had been open a month when this was found):
+--            SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+--             WHERE usename = 'authenticator' AND state = 'idle' AND datname = current_database();
+--          (idle only → no request is interrupted; PostgREST reconnects on its next request), or
+--          restart the project's API from the Supabase dashboard;
+--        - the clinic server's own sync pools: restart the service (Restart-Service -Name 'webapp.exe');
+--        - AND the pooler's idle server backends. A connection URL on *.pooler.supabase.com goes through
+--          Supavisor, which REUSES server backends across client sessions, so a fresh client (a
+--          restarted service, a new psql) can still be handed a pre-ALTER backend that reads UTC:
+--            SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+--             WHERE usename IN ('postgres','mirror_rw') AND application_name = 'Supavisor'
+--               AND state = 'idle' AND datname = current_database() AND pid <> pg_backend_pid();
+--            SELECT pg_terminate_backend(pg_backend_pid());  -- then this session's own, or the
+--                                                            -- pooler hands IT back (errors; expected)
+--          Every mirror pool in the app has an 'error' handler, so an idle client killed under it is
+--          dropped and reconnected on the next query.
+--   3. Verify: SHOW timezone;  SELECT localtimestamp;  -- in a fresh session: matches local wall clock
+--      and the Supabase status card reads "Clocks agree".
+-- APPLIED on this clinic's mirror 2026-09-27 ~23:36 Asia/Baghdad (FE-F5-1).
+-- ROLLBACK: ALTER DATABASE postgres RESET timezone;  (then recycle sessions the same way)
+
+ALTER DATABASE postgres SET timezone TO 'Asia/Baghdad';

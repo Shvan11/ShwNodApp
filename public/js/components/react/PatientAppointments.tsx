@@ -52,8 +52,14 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
         try {
             await deleteJSON(`/api/appointments/${appointmentId}`);
 
-            // Refresh appointments after deletion
-            await queryClient.invalidateQueries({ queryKey: qk.patient.appointments(personId ?? '') });
+            // Refresh appointments after deletion. `patient.all` — not the narrower
+            // `patient.appointments` — because `patient.hasAppointment` is its SIBLING,
+            // not its child: invalidating only the list left the Works screen still
+            // claiming an upcoming appointment after the last one was deleted.
+            await queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
+            // Deleting frees the slot for everyone — refresh the calendar + the
+            // booking picker's availability reads, which nothing else refetches.
+            await queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
             setDeleteConfirm(null);
         } catch (err) {
             console.error('Error deleting appointment:', err);

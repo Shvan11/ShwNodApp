@@ -475,9 +475,14 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
           refreshSignal={sidebarRefresh}
         />
       </div>
-      <Modal isOpen={removeTarget !== null} onClose={() => { if (!removing) setRemoveTarget(null); }}>
+      <Modal
+        isOpen={removeTarget !== null}
+        onClose={() => { if (!removing) setRemoveTarget(null); }}
+        ariaLabelledBy="photo-editor-remove-title"
+      >
         <div className={styles.confirm}>
-          <h2 className={styles.confirmTitle}>Remove photo?</h2>
+          {/* data-modal-drag-handle: keeps the explanation below selectable — see Modal.tsx */}
+          <h2 id="photo-editor-remove-title" className={styles.confirmTitle} data-modal-drag-handle>Remove photo?</h2>
           <p className={styles.confirmText}>
             This removes the cropped{' '}
             <strong>{removeTarget ? labelForView(removeTarget) : ''}</strong> photo from this session. The
@@ -503,9 +508,13 @@ const PhotoEditor = ({ personId, tpCode, tpName, tpDate }: Props) => {
           </div>
         </div>
       </Modal>
-      <Modal isOpen={blocker.state === 'blocked'} onClose={() => blocker.reset?.()}>
+      <Modal
+        isOpen={blocker.state === 'blocked'}
+        onClose={() => blocker.reset?.()}
+        ariaLabelledBy="photo-editor-leave-title"
+      >
         <div className={styles.confirm}>
-          <h2 className={styles.confirmTitle}>Leave photo editor?</h2>
+          <h2 id="photo-editor-leave-title" className={styles.confirmTitle} data-modal-drag-handle>Leave photo editor?</h2>
           <p className={styles.confirmText}>
             {placedCount === 1
               ? 'A framed photo hasn’t been saved.'

@@ -78,6 +78,7 @@
     "notesPlaceholder": "Additional notes about the patient...",
     "alerts": "Alerts",
     "alertsPlaceholder": "Important alerts or warnings...",
+    "alertsHint": "Saved to the patient's alert list as a Moderate alert — change it there if needed.",
     "submit": "Add Patient",
     "submitting": "Adding Patient...",
     "toast": {
@@ -90,6 +91,7 @@
     }
   },
   "edit": {
+    "notPermitted": "Editing or deleting a patient is done by the front desk or an admin.",
     "title": "Edit Patient",
     "editingLabel": "Editing:",
     "idSuffix": "(ID: {{id}})",

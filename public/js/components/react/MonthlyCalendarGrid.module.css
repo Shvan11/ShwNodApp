@@ -87,11 +87,6 @@
     }
 }
 
-/* Weekend Styling */
-.weekend {
-    background: linear-gradient(135deg, var(--surface-elevated) 0%, var(--surface) 100%);
-}
-
 /* Holiday Styling */
 .holiday {
     background: linear-gradient(135deg, var(--error-50) 0%, var(--error-100) 100%);

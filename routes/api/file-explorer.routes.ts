@@ -371,6 +371,10 @@ router.post(
   '/patients/:personId/files/upload',
   authorize(FINANCE_ROLES),
   validate({ params: fileExplorer.upload.params }),
+  // A multi-file photo/scan drop is far more than 30s of transfer; without this
+  // the global requestTimeout 408s the upload while it is still streaming (the
+  // client call sites carry a matching 120s override).
+  timeouts.long,
   runUpload,
   async (req: Request<PersonIdParams>, res: Response): Promise<void> => {
     const files = (req.files as Express.Multer.File[]) || [];

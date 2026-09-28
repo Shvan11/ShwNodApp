@@ -47,7 +47,9 @@ const FilePreviewModal = ({ personId, files, startIndex, buildUrl = buildContent
 
   return (
     <Modal isOpen onClose={onClose} ariaLabelledBy="file-preview-title" contentClassName={styles.previewModal}>
-      <div className={styles.previewHeader}>
+      {/* data-modal-drag-handle: scopes dragging to the header, so the previewed
+          text file's content stays selectable (see Modal.tsx#handleDragPointerDown). */}
+      <div className={styles.previewHeader} data-modal-drag-handle>
         <span id="file-preview-title" className={styles.previewTitle} title={entry.name}>
           {entry.name}
         </span>

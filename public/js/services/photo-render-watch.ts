@@ -19,7 +19,7 @@ interface RenderJob {
   tpCode: string;
   /** Slot count submitted — the toast's total when the event omits `total`. */
   slots: number;
-  timer: ReturnType<typeof setTimeout>;
+  timer?: ReturnType<typeof setTimeout>;
   done: boolean;
 }
 
@@ -82,7 +82,6 @@ export function watchRenderJob(opts: {
     tpCode: String(opts.tpCode),
     slots: opts.slots,
     done: false,
-    timer: 0 as unknown as ReturnType<typeof setTimeout>,
   };
   job.timer = setTimeout(() => {
     if (job.done) return;

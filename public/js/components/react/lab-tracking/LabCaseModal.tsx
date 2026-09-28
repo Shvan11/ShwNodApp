@@ -99,7 +99,7 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
     };
 
     // ---- TRACK MODE ---------------------------------------------------------
-    const { data, isLoading, isError } = useLabCase(isCreate ? null : labCaseId);
+    const { data, isLoading, isError, dataUpdatedAt } = useLabCase(isCreate ? null : labCaseId);
     const [mode, setMode] = useState<ActionMode>(null);
 
     const [advanceTo, setAdvanceTo] = useState<LabStage | ''>('');
@@ -277,13 +277,27 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
     const titleId = 'lab-case-modal-title';
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} contentClassName={styles.dialog} ariaLabelledBy={titleId}>
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            contentClassName={styles.dialog}
+            ariaLabelledBy={titleId}
+            // Track mode SAVES AND STAYS OPEN (advance / hold / note edit), so the
+            // guard has to forget what the user typed once it has been written.
+            // `dataUpdatedAt` moves only when this case is refetched, and the only
+            // thing that refetches it is one of those writes invalidating the key
+            // (`refetchOnWindowFocus` is off repo-wide — query/client.ts). Create
+            // mode disables the query, so it stays 0 and never resets; that branch
+            // closes on success anyway.
+            unsavedGuard={{ watchInput: true, resetKey: dataUpdatedAt }}
+        >
+            {(dismiss) => (<>
             <ModalHeader
                 title={isCreate ? 'Start Lab Flow' : `Lab Case — ${caseRow ? labelForStage(caseRow.status as LabStage, caseRow.material) : '…'}`}
                 titleId={titleId}
                 icon={<i className="fas fa-flask" />}
                 subtitle={caseRow ? `${caseRow.patient_name} · ${caseRow.restoration}${caseRow.teeth ? ` · ${caseRow.teeth}` : ''}` : undefined}
-                onClose={onClose}
+                onClose={dismiss}
             />
 
             {isCreate ? (
@@ -358,7 +372,7 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
                         />
                     </div>
                     <div className={styles.footer}>
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                        <button type="button" className="btn btn-secondary" onClick={dismiss}>Cancel</button>
                         <button type="submit" className="btn btn-primary" disabled={createMut.isPending}>
                             {createMut.isPending ? 'Starting…' : 'Start Lab Flow'}
                         </button>
@@ -547,6 +561,7 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
                     </div>
                 </>
             )}
+            </>)}
         </Modal>
     );
 };

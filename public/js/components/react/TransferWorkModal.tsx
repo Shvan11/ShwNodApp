@@ -149,9 +149,10 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
   };
 
   return (
-    <Modal isOpen={true} onClose={onClose} contentClassName={styles.modalContent}>
+    <Modal isOpen={true} onClose={onClose} contentClassName={styles.modalContent} ariaLabelledBy="transfer-work-modal-title">
         {/* Header */}
         <ModalHeader
+          titleId="transfer-work-modal-title"
           title="Transfer Work"
           icon={<i className="fas fa-exchange-alt" />}
           onClose={onClose}

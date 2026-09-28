@@ -7,6 +7,15 @@
  *
  * Mounted at the same `/api` prefix as work.routes.ts, immediately after it, so the
  * registration order of the route table is unchanged by the split.
+ *
+ * WHO WRITES ITEMS — CLINICAL_ROLES, i.e. doctors and assistants too (owner's call,
+ * 2026-09-28, frontend audit FE-F7-7). The items panel is the doctor-facing one
+ * (teeth, canals, implant sizes, shade), yet from `f25bf11` (2026-06-25, no rationale
+ * recorded) until then the three writes were FINANCE_ROLES, so a doctor could read an
+ * item and not record one. The one money field on an item, `item_cost`, stays
+ * finance-only: `withoutClinicalCost()` drops it from a clinical caller's body, and
+ * `updateWorkDetail` writes it only when the key is present, so a doctor's edit leaves
+ * the front desk's cost exactly as it was.
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -17,7 +26,7 @@ import {
   deleteWorkDetail,
 } from '../../services/database/queries/work-item-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
-import { FINANCE_ROLES } from '../../shared/auth/roles.js';
+import { CLINICAL_ROLES, ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import { sendData, sendError, ErrorResponses } from '../../utils/error-response.js';
 import * as workContract from '../../shared/contracts/work.contract.js';
@@ -26,6 +35,22 @@ import { log } from '../../utils/logger.js';
 type WorkQueryParams = workContract.WorkQueryParams;
 
 const router = Router();
+
+/**
+ * `item_cost` is money, and money writes are FINANCE_ROLES — so a clinical caller's
+ * item body loses it here, whatever the client sent (its form hides the input, but
+ * the server never trusts a hidden input). Removing the KEY, not nulling it, is the
+ * point: `updateWorkDetail` leaves a cost it was not given untouched.
+ */
+function withoutClinicalCost<T extends { item_cost?: unknown }>(
+  body: T,
+  userRole: string | undefined
+): T {
+  if (userRole !== ROLES.CLINICAL) return body;
+  const { item_cost: _dropped, ...rest } = body;
+  void _dropped;
+  return rest as T;
+}
 
 
 // ============================================================================
@@ -65,14 +90,14 @@ router.get(
 router.post(
   '/addworkdetail',
   authenticate,
-  authorize(FINANCE_ROLES),
+  authorize(CLINICAL_ROLES),
   validate({ body: workContract.addWorkDetail.body }),
   async (
     req: Request<unknown, unknown, workContract.AddWorkDetailBody>,
     res: Response
   ): Promise<void> => {
     try {
-      const workDetailData = req.body;
+      const workDetailData = withoutClinicalCost(req.body, req.session?.userRole);
 
       // work_id validated + coerced to a positive int by workContract.addWorkDetail.body.
 
@@ -132,14 +157,15 @@ router.post(
 router.put(
   '/updateworkdetail',
   authenticate,
-  authorize(FINANCE_ROLES),
+  authorize(CLINICAL_ROLES),
   validate({ body: workContract.updateWorkDetail.body }),
   async (
     req: Request<unknown, unknown, workContract.UpdateWorkDetailBody>,
     res: Response
   ): Promise<void> => {
     try {
-      const { detailId, itemId, ...workDetailData } = req.body;
+      const { detailId, itemId, ...body } = req.body;
+      const workDetailData = withoutClinicalCost(body, req.session?.userRole);
       const id = detailId ?? itemId; // Support both naming conventions (`??`: id 0 is not "absent")
 
       if (id === undefined) {
@@ -203,7 +229,7 @@ router.put(
 router.delete(
   '/deleteworkdetail',
   authenticate,
-  authorize(FINANCE_ROLES),
+  authorize(CLINICAL_ROLES),
   validate({ body: workContract.deleteWorkDetail.body }),
   async (
     req: Request<unknown, unknown, workContract.WorkDetailIdBody>,

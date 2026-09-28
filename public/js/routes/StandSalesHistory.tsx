@@ -129,9 +129,10 @@ export default function StandSalesHistory() {
           onClose={() => { if (!voiding) setVoidSaleId(null); }}
           closeOnBackdropClick={!voiding}
           closeOnEscape={!voiding}
+          ariaLabelledBy="void-sale-modal-title"
         >
           <div className={styles.voidModal}>
-            <h2>Void Sale #{voidSaleId}</h2>
+            <h2 id="void-sale-modal-title">Void Sale #{voidSaleId}</h2>
             <label htmlFor="void-reason">Reason for voiding this sale</label>
             <textarea
               id="void-reason"

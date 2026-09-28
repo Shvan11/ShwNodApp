@@ -15,6 +15,8 @@ import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { useLookupManager } from '../../hooks/useLookupManager';
 import LabCaseModal from './lab-tracking/LabCaseModal';
 import { labelForStage } from '../../config/labStages';
@@ -139,6 +141,11 @@ const WorkDetailItem = ({
     const queryClient = useQueryClient();
     const toast = useToast();
     const confirm = useConfirm();
+    // Doctors and assistants write treatment items (CLINICAL_ROLES on the server, FE-F7-7) —
+    // except the cost, which is money: its input is finance-only, and the server drops
+    // `item_cost` from a clinical caller's body anyway.
+    const { user } = useGlobalState();
+    const caps = roleCaps(user?.role as UserRole | undefined);
     const config = getWorkTypeConfig(typeOfWork);
     const isNew = detail === null;
 
@@ -453,22 +460,24 @@ const WorkDetailItem = ({
                     <label htmlFor={fid('completed-date')}>Completed Date</label>
                     <input id={fid('completed-date')} type="date" value={draft.completed_date} onChange={(e) => setDraft({ ...draft, completed_date: e.target.value })} />
                 </div>
-                <div className={styles.formGroup}>
-                    <label htmlFor={fid('item-cost')}>Item Cost</label>
-                    <input
-                        id={fid('item-cost')}
-                        type="text"
-                        value={displayItemCost}
-                        onChange={(e) => {
-                            const digits = e.target.value.replace(/[^\d]/g, '');
-                            const num = parseInt(digits, 10) || 0;
-                            setDisplayItemCost(num ? num.toLocaleString('en-US') : '');
-                            setDraft({ ...draft, item_cost: String(num) });
-                        }}
-                        onBlur={() => setDisplayItemCost(draft.item_cost ? formatNumber(draft.item_cost) : '')}
-                        placeholder="Optional"
-                    />
-                </div>
+                {caps.writeFinance && (
+                    <div className={styles.formGroup}>
+                        <label htmlFor={fid('item-cost')}>Item Cost</label>
+                        <input
+                            id={fid('item-cost')}
+                            type="text"
+                            value={displayItemCost}
+                            onChange={(e) => {
+                                const digits = e.target.value.replace(/[^\d]/g, '');
+                                const num = parseInt(digits, 10) || 0;
+                                setDisplayItemCost(num ? num.toLocaleString('en-US') : '');
+                                setDraft({ ...draft, item_cost: String(num) });
+                            }}
+                            onBlur={() => setDisplayItemCost(draft.item_cost ? formatNumber(draft.item_cost) : '')}
+                            placeholder="Optional"
+                        />
+                    </div>
+                )}
             </div>
 
             <div className={cn(styles.formGroup, styles.fullWidth)}>

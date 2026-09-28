@@ -608,10 +608,12 @@ const LabelPreviewModal = ({
     // Queue mode render
     if (queueMode) {
         return (
-            <Modal isOpen={isModalOpen} onClose={handleClose} contentClassName={`${styles.modal} ${styles.modalWide}`}>
+            <Modal isOpen={isModalOpen} onClose={handleClose} contentClassName={`${styles.modal} ${styles.modalWide}`} ariaLabelledBy="label-queue-modal-title">
                     {/* Header */}
-                    <div className={`${styles.header} ${styles.queueModeHeader}`}>
-                        <h2>
+                    {/* data-modal-drag-handle: scopes dragging to the header so the
+                        label list below stays selectable (see Modal.tsx). */}
+                    <div className={`${styles.header} ${styles.queueModeHeader}`} data-modal-drag-handle>
+                        <h2 id="label-queue-modal-title">
                             <i className="fas fa-layer-group"></i>
                             Print Queue
                             <span className={styles.queueHeaderStats}>
@@ -830,10 +832,10 @@ const LabelPreviewModal = ({
 
     // Single batch mode render
     return (
-        <Modal isOpen={isModalOpen} onClose={handleClose} contentClassName={`${styles.modal} ${styles.modalWide}`}>
+        <Modal isOpen={isModalOpen} onClose={handleClose} contentClassName={`${styles.modal} ${styles.modalWide}`} ariaLabelledBy="label-preview-modal-title">
                 {/* Header */}
-                <div className={styles.header}>
-                    <h2>
+                <div className={styles.header} data-modal-drag-handle>
+                    <h2 id="label-preview-modal-title">
                         <i className="fas fa-print"></i>
                         Print Aligner Labels
                     </h2>

@@ -1,17 +1,26 @@
 import React, { useState, useEffect, useRef, useCallback, ChangeEvent } from 'react';
-import { useNavigate, useLoaderData, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 import Select, { MultiValue } from 'react-select';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
-import type { PatientOption } from './PatientQuickSearch';
 import PatientSearchCombobox from './PatientSearchCombobox';
 import PhoneDisplay from './PhoneDisplay';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { formatDate } from '@/core/utils';
 import { qk } from '@/query/keys';
+import {
+    patientPhonesQuery,
+    workTypesQuery,
+    workKeywordsQuery,
+    tagOptionsQuery,
+    typeOptionsQuery,
+} from '@/query/queries';
+import { notifyApprovalsChanged } from '@/services/approvals';
 import { patientSearch as patientSearchContract, deletePatient as deletePatientContract } from '@shared/contracts/patient.contract';
 import * as appointmentContract from '@shared/contracts/appointment.contract';
 import styles from './PatientManagement.module.css';
@@ -88,14 +97,6 @@ interface SavedState {
     hasFinalPhotos?: boolean;
 }
 
-interface LoaderData {
-    allPatients?: PatientOption[];
-    workTypes?: SelectOption[];
-    keywords?: SelectOption[];
-    tags?: SelectOption[];
-    patientTypes?: SelectOption[];
-}
-
 /**
  * Patient Management Component
  * * Architecture Note:
@@ -107,9 +108,11 @@ interface LoaderData {
 const PatientManagement = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    // Patient edit + delete are FINANCE_ROLES on the server (FE-F6-6).
+    const { user } = useGlobalState();
+    const caps = roleCaps(user?.role as UserRole | undefined);
     const toast = useToast();
     const queryClient = useQueryClient();
-    const loaderData = useLoaderData() as LoaderData | undefined;
 
     // --- 1. Synchronous State Initialization ---
     // We read storage ONCE via an IIFE. By passing this result to the useState
@@ -177,12 +180,26 @@ const PatientManagement = () => {
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
     const [deleting, setDeleting] = useState(false);
 
-    // -- Dropdown Data (from loader, no state needed) --
-    const allPatients = loaderData?.allPatients || [];
-    const workTypes = loaderData?.workTypes || [];
-    const keywords = loaderData?.keywords || [];
-    const tags = loaderData?.tags || [];
-    const patientTypes = loaderData?.patientTypes || [];
+    // -- Dropdown Data --
+    // Read straight from the React Query cache, which `patientManagementLoader`
+    // has already filled (so these paint filled on the first render, no flash).
+    // They used to arrive as loader DATA from five raw fetches that bypassed the
+    // cache entirely, which meant a lookup edited in Settings could not reach
+    // these dropdowns without a full route re-navigation.
+    const { data: allPatients = [] } = useQuery(patientPhonesQuery());
+    const { data: workTypeRows = [] } = useQuery(workTypesQuery());
+    const { data: keywordRows = [] } = useQuery(workKeywordsQuery());
+    const { data: tagRows = [] } = useQuery(tagOptionsQuery());
+    const { data: patientTypeRows = [] } = useQuery(typeOptionsQuery());
+
+    // `key_word` and `type` are nullable in the DB (and in the contracts). The
+    // raw-fetch version this replaced declared them `string` by hand, so the lie
+    // was invisible; `?? ''` keeps the rendering identical (react-select renders
+    // nothing for a null label either) without re-introducing it.
+    const workTypes: SelectOption[] = workTypeRows.map((wt) => ({ value: wt.id, label: wt.work_type }));
+    const keywords: SelectOption[] = keywordRows.map((kw) => ({ value: kw.id, label: kw.key_word ?? '' }));
+    const tags: SelectOption[] = tagRows.map((tag) => ({ value: tag.id, label: tag.tag }));
+    const patientTypes: SelectOption[] = patientTypeRows.map((pt) => ({ value: pt.id, label: pt.type ?? '' }));
 
     // -- Refs --
     const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -467,6 +484,10 @@ const PatientManagement = () => {
             setLoading(true);
             const data = await postJSON<{ alreadyCheckedIn?: boolean }>('/api/appointments/quick-checkin', { person_id: patient.person_id }, { schema: appointmentContract.quickCheckin.response });
             toast.success(data.alreadyCheckedIn ? 'Already checked in' : 'Checked in successfully');
+            // Quick check-in CREATES a same-day appointment when none exists — refresh
+            // the patient's appointment-backed reads and the calendar/slot reads.
+            queryClient.invalidateQueries({ queryKey: qk.patient.all(patient.person_id) });
+            queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
         } catch(err) {
             toast.error(httpErrorMessage(err, 'Check-in failed'));
         }
@@ -483,6 +504,9 @@ const PatientManagement = () => {
             setShowDeleteConfirm(false);
             if (data.outcome === 'pending') {
                 toast.success('Submitted for admin approval');
+                // A request was created but no row changed — tell the approval bells
+                // (they only hear about a RESOLVED request otherwise, and poll every 5 min).
+                notifyApprovalsChanged();
                 return;
             }
             queryClient.invalidateQueries({ queryKey: qk.patient.all(selectedPatient.person_id) });
@@ -555,6 +579,7 @@ const PatientManagement = () => {
                         onSubmit={() => executeSearch()}
                         patients={allPatients}
                         mode="name"
+                        nameStartsWith={nameStartsWith}
                         rtl
                         placeholder="اكتب للبحث..."
                     />
@@ -855,8 +880,13 @@ const PatientManagement = () => {
                                         <div className={styles.actionButtons}>
                                             <button onClick={(e) => handleQuickCheckin(e, p)} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionSuccess)} title="Quick Check-in" aria-label={`Quick check-in ${p.patient_name}`}><i className="fas fa-user-check" aria-hidden="true"></i></button>
                                             <button onClick={() => navigate(`/patient/${p.person_id}/works`)} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionPrimary)} title="View Patient" aria-label={`View ${p.patient_name}`}><i className="fas fa-eye" aria-hidden="true"></i></button>
-                                            <button onClick={() => navigate(`/patient/${p.person_id}/edit-patient`, { state: { from: `${location.pathname}${location.search}` } })} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionWarning)} title="Edit Patient" aria-label={`Edit ${p.patient_name}`}><i className="fas fa-edit" aria-hidden="true"></i></button>
-                                            <button onClick={() => handleDeleteClick(p)} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionDanger)} title="Delete Patient" aria-label={`Delete ${p.patient_name}`}><i className="fas fa-trash" aria-hidden="true"></i></button>
+                                            {/* Patient edit + delete are FINANCE_ROLES on the server (FE-F6-6). */}
+                                            {caps.editRecords && (
+                                                <>
+                                                    <button onClick={() => navigate(`/patient/${p.person_id}/edit-patient`, { state: { from: `${location.pathname}${location.search}` } })} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionWarning)} title="Edit Patient" aria-label={`Edit ${p.patient_name}`}><i className="fas fa-edit" aria-hidden="true"></i></button>
+                                                    <button onClick={() => handleDeleteClick(p)} className={cn('btn btn-icon', styles.rowActionBtn, styles.rowActionDanger)} title="Delete Patient" aria-label={`Delete ${p.patient_name}`}><i className="fas fa-trash" aria-hidden="true"></i></button>
+                                                </>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

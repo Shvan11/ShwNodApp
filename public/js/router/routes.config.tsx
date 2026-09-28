@@ -491,7 +491,7 @@ export const routesConfig: RouteObject[] = [
         loader: withPreload(DailyAppointments, dailyAppointmentsLoader), // Pre-fetch initial data + chunk
       },
 
-      // Monthly Calendar (100% SSE-driven)
+      // Monthly Calendar
       {
         path: '/calendar',
         element: (
@@ -499,7 +499,12 @@ export const routesConfig: RouteObject[] = [
             <Calendar />
           </RouteErrorBoundary>
         ),
-        // No loader - 100% SSE-driven real-time data
+        // No loader — the screen fetches through React Query on mount
+        // (calendarRangeQuery/calendarMonthQuery/calendarStatsQuery). It subscribes
+        // to NO SSE and has no refetchInterval, so every appointment write — from
+        // here or from any patient screen — must invalidate `qk.calendar.all()`
+        // itself. (This comment used to read "100% SSE-driven", which is why five
+        // write sites shipped with no calendar invalidation at all.)
       },
 
       // WhatsApp Send (100% SSE-driven)

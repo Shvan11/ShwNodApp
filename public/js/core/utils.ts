@@ -131,63 +131,6 @@ export function generateId(length = 8): string {
 }
 
 /**
- * Deep clone an object
- * @param obj - Object to clone
- * @returns Cloned object
- */
-export function deepClone<T>(obj: T): T {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-
-  if (obj instanceof Date) {
-    return new Date(obj.getTime()) as unknown as T;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map((item) => deepClone(item)) as unknown as T;
-  }
-
-  const clone = {} as Record<string, unknown>;
-
-  Object.keys(obj as object).forEach((key) => {
-    clone[key] = deepClone((obj as Record<string, unknown>)[key]);
-  });
-
-  return clone as T;
-}
-
-/**
- * Format a phone number to standard format
- * @param phoneNumber - Raw phone number
- * @param countryCode - Country code
- * @returns Formatted phone number
- */
-export function formatPhoneNumber(phoneNumber: string | null | undefined, countryCode = '964'): string {
-  if (!phoneNumber) return '';
-
-  // Remove non-digit characters
-  const digits = phoneNumber.replace(/\D/g, '');
-
-  // Handle different formats
-  if (digits.startsWith('00' + countryCode)) {
-    // Remove leading 00 and country code
-    return countryCode + digits.substring(countryCode.length + 2);
-  } else if (digits.startsWith('+' + countryCode)) {
-    // Remove leading + and country code
-    return countryCode + digits.substring(countryCode.length + 1);
-  } else if (digits.startsWith('0')) {
-    // Replace leading 0 with country code
-    return countryCode + digits.substring(1);
-  } else if (!digits.startsWith(countryCode)) {
-    // Add country code if missing
-    return countryCode + digits;
-  }
-
-  return digits;
-}
-
-/**
  * Copy text to clipboard with fallback support
  * Tries modern Clipboard API first (works on HTTPS/localhost),
  * then falls back to document.execCommand for HTTP contexts
@@ -245,13 +188,8 @@ export async function copyToClipboard(text: string | null | undefined): Promise<
   }
 }
 
-export default {
-  formatPhoneNumber,
-  formatDate,
-  formatISODate,
-  debounce,
-  throttle,
-  generateId,
-  deepClone,
-  copyToClipboard,
-};
+// No `export default {…}` here on purpose. Every consumer uses named imports, so
+// the default object was referenced by nothing — while still counting as a "use"
+// of each name inside it, which is what hid `deepClone` (0 callers) and
+// `formatPhoneNumber` (0 callers, and its `digits.startsWith('+' + cc)` branch
+// was unreachable anyway: `digits` is \D-stripped one line above). Both deleted.

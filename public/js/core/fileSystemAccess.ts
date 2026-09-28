@@ -146,7 +146,7 @@ export async function saveHandle(
 /**
  * Get a saved handle from IndexedDB
  */
-export async function getHandle(key: string): Promise<FileSystemHandle | undefined> {
+async function getHandle(key: string): Promise<FileSystemHandle | undefined> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([STORE_NAME], 'readonly');
@@ -192,36 +192,6 @@ export async function removeHandle(key: string): Promise<void> {
     const transaction = db.transaction([STORE_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.delete(key);
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-}
-
-/**
- * List all saved handles
- */
-export async function listHandles(): Promise<StoredHandleEntry[]> {
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.getAll();
-
-    request.onsuccess = () => resolve(request.result as StoredHandleEntry[]);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-/**
- * Clear all saved handles
- */
-export async function clearHandles(): Promise<void> {
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.clear();
 
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
@@ -331,7 +301,7 @@ export async function showFilePicker(
 /**
  * Pick a single file with specific type
  */
-export async function pickFile(
+async function pickFile(
   accept: Record<string, string[]>,
   description?: string
 ): Promise<FileOperationResult<FileSystemFileHandle>> {
@@ -401,8 +371,7 @@ export async function showDirectoryPickerDialog(
  * Read text content from a file handle
  */
 export async function readTextFile(
-  handle: FileSystemFileHandle,
-  _encoding: string = 'utf-8'
+  handle: FileSystemFileHandle
 ): Promise<FileOperationResult<string>> {
   try {
     const file = await handle.getFile();
@@ -493,27 +462,6 @@ export async function navigateToDirectory(
   }
 }
 
-/**
- * Get a file from a directory
- */
-export async function getFileFromDirectory(
-  directory: FileSystemDirectoryHandle,
-  fileName: string,
-  create: boolean = false
-): Promise<FileOperationResult<FileSystemFileHandle>> {
-  try {
-    const fileHandle = await directory.getFileHandle(fileName, { create });
-    return { success: true, data: fileHandle };
-  } catch (error) {
-    const err = error as Error;
-    return {
-      success: false,
-      error: err.message,
-      errorName: err.name
-    };
-  }
-}
-
 // ============================================================================
 // ERROR HANDLING HELPERS
 // ============================================================================
@@ -532,43 +480,7 @@ export function isNotFoundError(error: unknown): boolean {
   return (error as Error)?.name === 'NotFoundError';
 }
 
-/**
- * Check if error is permission denied
- */
-export function isPermissionError(error: unknown): boolean {
-  return (error as Error)?.name === 'NotAllowedError';
-}
-
-export default {
-  // Browser support
-  checkBrowserSupport,
-  isFileSystemAccessSupported,
-  // IndexedDB
-  saveHandle,
-  getHandle,
-  getFileHandle,
-  getDirectoryHandle,
-  removeHandle,
-  listHandles,
-  clearHandles,
-  // Permissions
-  checkPermission,
-  requestPermission,
-  ensurePermission,
-  // File picker
-  showFilePicker,
-  pickFile,
-  pickIniFile,
-  showDirectoryPickerDialog,
-  // File operations
-  readTextFile,
-  writeTextFile,
-  getFile,
-  // Directory navigation
-  navigateToDirectory,
-  getFileFromDirectory,
-  // Error helpers
-  isAbortError,
-  isNotFoundError,
-  isPermissionError
-};
+// No `export default {…}`: all four consumers use named imports. The object was
+// the only reference to listHandles, clearHandles, getFileFromDirectory and
+// isPermissionError, which are now deleted; getHandle and pickFile are
+// module-internal and no longer exported.

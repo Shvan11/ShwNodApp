@@ -14,6 +14,7 @@ import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { postJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { qk } from '@/query/keys';
+import { notifyApprovalsChanged } from '@/services/approvals';
 import {
     worksQuery,
     patientInfoQuery,
@@ -90,9 +91,11 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const confirm = useConfirm();
     const queryClient = useQueryClient();
     const { user } = useGlobalState();
-    const isAdmin = user?.role === 'admin';
     // Clinical staff see payments/receipts read-only — money mutations stay
-    // hidden (Add Payment), reads/printing stay visible (history, receipt).
+    // hidden (Add Payment, payment delete), reads/printing stay visible (history,
+    // receipt). Work edit/lifecycle/delete is `editRecords`, Transfer `adminWrites`
+    // — each mirrors the server gate on its route, so no button leads to a 403
+    // (FE-F7-7).
     const caps = roleCaps(user?.role as UserRole | undefined);
     // Works list read — the headline gap-fix target. On useQuery so a work
     // mutation's invalidateQueries(qk.patient.all) refreshes it live (Phase 3).
@@ -318,6 +321,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
             if (deleteResult.outcome === 'pending') {
                 toast.success('Submitted for admin approval');
+                // A request was created but no row changed — tell the approval bells
+                // (they only hear about a RESOLVED request otherwise, and poll every 5 min).
+                notifyApprovalsChanged();
                 return;
             }
             toast.success(t('toast.deleted'));
@@ -479,6 +485,11 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 toast.success(t('checkin.toastSuccess', { name: patientLabel }));
                 setCheckedIn(true);
             }
+            // Quick check-in CREATES a same-day appointment when none exists, so it
+            // is an appointment write like any other: refresh the patient's
+            // appointment-backed reads and the calendar/slot reads it just changed.
+            queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
+            queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
         } catch (err) {
             toast.error(httpErrorMessage(err, t('checkin.toastFail')), 5000);
         } finally {
@@ -602,7 +613,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         personId={personId}
                         isAlignerWork={isAlignerWork}
                         isExpanded={expandedWorks.has(work.work_id)}
-                        isAdmin={isAdmin}
+                        canTransfer={caps.adminWrites}
+                        editRecords={caps.editRecords}
                         writeFinance={caps.writeFinance}
                         onToggleExpanded={() => toggleWorkExpanded(work.work_id)}
                         onEdit={handleEditWork}
@@ -701,7 +713,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                 <th>{t('paymentHistory.table.date')}</th>
                                                 <th>{t('paymentHistory.table.amountPaid', { currency: selectedWorkForPayment.currency })}</th>
                                                 <th>{t('paymentHistory.table.change')}</th>
-                                                <th>{t('paymentHistory.table.actions')}</th>
+                                                {caps.writeFinance && <th>{t('paymentHistory.table.actions')}</th>}
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -720,51 +732,56 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                         filled — so every change row was labelled 'USD' by the
                                                         fallback in the local formatCurrency wrapper. */}
                                                     <td data-label={t('paymentHistory.table.change')}>{payment.change ? formatCurrency(payment.change, 'IQD') : '-'}</td>
-                                                    <td data-label={t('paymentHistory.table.actions')}>
-                                                        <div className={styles.paymentActions}>
-                                                            <button
-                                                                onClick={() => {
-                                                                    toast.info(t('paymentHistory.editComingSoon', { id: payment.InvoiceID, amount: formatCurrency(payment.amount_paid, selectedWorkForPayment.currency) }));
-                                                                }}
-                                                                className={styles.btnActionEdit}
-                                                                title={t('paymentHistory.editTitle')}
-                                                            >
-                                                                <i className="fas fa-edit"></i>
-                                                            </button>
-                                                            <button
-                                                                onClick={async () => {
-                                                                    if (await confirm(t('paymentHistory.deleteConfirm', { amount: formatCurrency(payment.amount_paid, selectedWorkForPayment.currency), date: formatDate(payment.date_of_payment) }), { title: t('paymentHistory.deleteTitle'), danger: true, confirmText: t('paymentHistory.deleteConfirmButton') })) {
-                                                                        try {
-                                                                            const invResult = await deleteJSON<{ outcome: string }>(`/api/deleteInvoice/${payment.InvoiceID}`, {
-                                                                                schema: deleteInvoiceContract.response,
-                                                                            });
-                                                                            if (invResult.outcome === 'pending') {
-                                                                                toast.success('Submitted for admin approval');
-                                                                                return;
+                                                    {caps.writeFinance && (
+                                                        <td data-label={t('paymentHistory.table.actions')}>
+                                                            <div className={styles.paymentActions}>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        toast.info(t('paymentHistory.editComingSoon', { id: payment.InvoiceID, amount: formatCurrency(payment.amount_paid, selectedWorkForPayment.currency) }));
+                                                                    }}
+                                                                    className={styles.btnActionEdit}
+                                                                    title={t('paymentHistory.editTitle')}
+                                                                >
+                                                                    <i className="fas fa-edit"></i>
+                                                                </button>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (await confirm(t('paymentHistory.deleteConfirm', { amount: formatCurrency(payment.amount_paid, selectedWorkForPayment.currency), date: formatDate(payment.date_of_payment) }), { title: t('paymentHistory.deleteTitle'), danger: true, confirmText: t('paymentHistory.deleteConfirmButton') })) {
+                                                                            try {
+                                                                                const invResult = await deleteJSON<{ outcome: string }>(`/api/deleteInvoice/${payment.InvoiceID}`, {
+                                                                                    schema: deleteInvoiceContract.response,
+                                                                                });
+                                                                                if (invResult.outcome === 'pending') {
+                                                                                    toast.success('Submitted for admin approval');
+                                                                                    // A request was created but no row changed — tell the approval bells
+                                                                                    // (they only hear about a RESOLVED request otherwise, and poll every 5 min).
+                                                                                    notifyApprovalsChanged();
+                                                                                    return;
+                                                                                }
+                                                                                // qk.work.all covers the payment-history child key, so this
+                                                                                // one invalidation refreshes the open modal's list too.
+                                                                                queryClient.invalidateQueries({ queryKey: qk.work.all(selectedWorkForPayment.work_id) });
+                                                                                toast.success(t('paymentHistory.deleteSuccess'));
+                                                                                queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
+                                                                            } catch (error) {
+                                                                                console.error('Error deleting payment:', error);
+                                                                                toast.error(t('paymentHistory.deleteError', { error: httpErrorMessage(error, t('paymentHistory.unknownError')) }));
                                                                             }
-                                                                            // qk.work.all covers the payment-history child key, so this
-                                                                            // one invalidation refreshes the open modal's list too.
-                                                                            queryClient.invalidateQueries({ queryKey: qk.work.all(selectedWorkForPayment.work_id) });
-                                                                            toast.success(t('paymentHistory.deleteSuccess'));
-                                                                            queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
-                                                                        } catch (error) {
-                                                                            console.error('Error deleting payment:', error);
-                                                                            toast.error(t('paymentHistory.deleteError', { error: httpErrorMessage(error, t('paymentHistory.unknownError')) }));
                                                                         }
-                                                                    }
-                                                                }}
-                                                                className={styles.btnActionDelete}
-                                                                title={t('paymentHistory.deleteTitle')}
-                                                            >
-                                                                <i className="fas fa-trash"></i>
-                                                            </button>
-                                                        </div>
-                                                    </td>
+                                                                    }}
+                                                                    className={styles.btnActionDelete}
+                                                                    title={t('paymentHistory.deleteTitle')}
+                                                                >
+                                                                    <i className="fas fa-trash"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    )}
                                                 </tr>
                                             ))}
                                             {paymentHistory.length === 0 && (
                                                 <tr>
-                                                    <td colSpan={6} className={styles.noData}>
+                                                    <td colSpan={caps.writeFinance ? 4 : 3} className={styles.noData}>
                                                         {t('paymentHistory.noPayments')}
                                                     </td>
                                                 </tr>
@@ -776,7 +793,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
                             <div className={styles.paymentHistoryFooter}>
                                 {((selectedWorkForPayment.total_required || 0) - (selectedWorkForPayment.TotalPaid || 0)) > 0 ? (
-                                    <button
+                                    // Recording a payment is FINANCE_ROLES — a clinical user reads the
+                                    // balance here but is not offered the write (FE-F7-7).
+                                    caps.writeFinance && <button
                                         onClick={() => {
                                             setShowPaymentHistoryModal(false);
                                             handleAddPayment(selectedWorkForPayment);

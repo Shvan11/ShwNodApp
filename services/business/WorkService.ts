@@ -33,8 +33,14 @@ import {
   type TransferWorkResult,
 } from '../database/queries/work-transfer-queries.js';
 import { getPatientById } from '../database/queries/patient-queries.js';
+import { getOptions } from '../database/queries/options-queries.js';
 import { isToday } from '../../middleware/time-based-auth.js';
 import { ROLES, type UserRole } from '../../shared/auth/roles.js';
+import {
+  DEFAULT_WORK_CURRENCY_OPTION,
+  parseWorkCurrency,
+  type WorkCurrency,
+} from '../../shared/work-currency.js';
 
 // Re-export WORK_STATUS for convenience
 export { WORK_STATUS };
@@ -57,7 +63,8 @@ export type WorkErrorCode =
   | 'SAME_PATIENT'
   | 'ACTIVE_WORK_CONFLICT'
   | 'INVALID_DISCOUNT'
-  | 'DISCOUNT_EXCEEDS_REMAINING';
+  | 'DISCOUNT_EXCEEDS_REMAINING'
+  | 'CURRENCY_LOCKED';
 
 /**
  * Work error details
@@ -381,6 +388,17 @@ async function rethrowAsWorkError(
 }
 
 /**
+ * The clinic's configured default work currency (Settings → General — see
+ * `shared/work-currency.ts`), or `null` when it is unset or not a ledger currency. Read on every
+ * call: work creation is not a hot loop, and a fresh read means a Settings change applies to the
+ * very next work.
+ */
+export async function getDefaultWorkCurrency(): Promise<WorkCurrency | null> {
+  const rows = await getOptions([DEFAULT_WORK_CURRENCY_OPTION]);
+  return parseWorkCurrency(rows.get(DEFAULT_WORK_CURRENCY_OPTION));
+}
+
+/**
  * Validate and create a new work record
  * @param workData - Work data object
  * @returns Created work record with workId
@@ -398,7 +416,6 @@ export async function validateAndCreateWork(
     // Clinical staff add works without cost — ignore any client-sent money
     // fields rather than trust them.
     normalizedData.total_required = 0;
-    normalizedData.currency = undefined;
     delete normalizedData.discount;
     delete normalizedData.discount_date;
   } else if (
@@ -409,6 +426,26 @@ export async function validateAndCreateWork(
     // Default total_required to 0 if empty or not provided
     normalizedData.total_required = 0;
   }
+
+  // Every work needs a currency: `ck_works_cur` demands one whenever total_required is set, and
+  // total_required is NOT NULL. A clinical caller's is ALWAYS the clinic default — its form has no
+  // currency input and its money fields are not trusted. A finance caller's is the one they chose,
+  // else the default. With neither, refuse in words rather than let the CHECK surface as a 500.
+  // (Until FE-F7-19 the clinical branch set currency to undefined → NULL, so EVERY add-work by a
+  // doctor or assistant failed that CHECK — unnoticed only because no clinical user existed yet.)
+  const currency =
+    userRole === ROLES.CLINICAL
+      ? await getDefaultWorkCurrency()
+      : (parseWorkCurrency(normalizedData.currency) ?? (await getDefaultWorkCurrency()));
+  if (!currency) {
+    throw new WorkValidationError(
+      userRole === ROLES.CLINICAL
+        ? 'No default work currency is configured, so this work cannot be added yet. An admin can set one in Settings → General.'
+        : 'Choose a currency for this work.',
+      'MISSING_CURRENCY'
+    );
+  }
+  normalizedData.currency = currency;
 
   // Normalize date fields
   const dataWithDates = normalizeDateFields(normalizedData);
@@ -577,11 +614,21 @@ export async function validateAndUpdateWork(
     }
   }
 
+  // A work's currency can change (subject to the lock below) but never be CLEARED: total_required
+  // is NOT NULL, so `ck_works_cur` always demands a currency. The contract turns a blank select
+  // into a present-but-undefined key, which the presence-keyed `updateWork()` would write as NULL
+  // and the CHECK would surface as a 500 — so a blank currency means "unchanged".
+  if (Object.prototype.hasOwnProperty.call(workData, 'currency') && workData.currency === undefined) {
+    delete workData.currency;
+  }
+
   // Fetch current work once if a validation below needs it.
   const status = workData.status as WorkStatusType | undefined;
   const financialFields = ['total_required', 'currency'];
   const needsCurrentWork =
     status !== undefined ||
+    // The currency lock below applies to EVERY role, admin included.
+    Object.prototype.hasOwnProperty.call(workData, 'currency') ||
     (userRole !== 'admin' &&
       financialFields.some((field) => Object.prototype.hasOwnProperty.call(workData, field)));
 
@@ -632,7 +679,26 @@ export async function validateAndUpdateWork(
       Number(workData.total_required) !== Number(currentWork.total_required);
     const currencyChanged =
       workData.currency !== undefined &&
-      String(workData.currency) !== String(currentWork.currency);
+      String(workData.currency).toUpperCase() !== String(currentWork.currency ?? '').toUpperCase();
+
+    // ===== CURRENCY LOCK (FE-F7-3) =====
+    // A work's currency is the unit of every payment already booked against it — `invoices` stores
+    // amounts, not currencies — so changing it after money has come in silently re-denominates
+    // those payments: a $2,000 work with $100 paid becomes 2,000 IQD with 100 IQD paid.
+    // TOTAL_BELOW_PAID cannot see that (it compares bare numbers), so it is refused here, for
+    // ADMINS TOO — this is a correctness rule, not a permission. It runs before the role gate so a
+    // front-desk edit 400s now instead of queuing an approval that could never apply.
+    if (currencyChanged) {
+      const alreadyPaid = Number((await loadWorkDetails())?.TotalPaid ?? 0);
+      if (alreadyPaid > 0) {
+        throw new WorkUpdateError(
+          'badRequest',
+          `This work already has ${alreadyPaid.toLocaleString('en-US')} ${currentWork.currency ?? ''} in payments, so its currency can no longer be changed.`,
+          { code: 'CURRENCY_LOCKED' }
+        );
+      }
+    }
+
     if (totalRequiredChanged || currencyChanged) {
       moneyFieldsChanged = true;
       // Non-admins may only change total_required / currency on the work's creation day.

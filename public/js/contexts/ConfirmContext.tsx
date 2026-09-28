@@ -1,16 +1,11 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { useContext, useState, useCallback, useRef, type ReactNode } from 'react';
 import ConfirmDialog from '../components/react/ConfirmDialog';
+import { ConfirmContext, type ConfirmOptions, type ConfirmFn } from './confirm-context';
 
-export interface ConfirmOptions {
-    title?: string;
-    confirmText?: string;
-    cancelText?: string;
-    danger?: boolean;
-}
-
-export type ConfirmFn = (message: string, options?: ConfirmOptions) => Promise<boolean>;
-
-const ConfirmContext = createContext<ConfirmFn | null>(null);
+// The context object itself lives in `confirm-context.ts` so `Modal` can read it
+// without importing this module (which renders ConfirmDialog → Modal). Re-exported
+// here so every existing consumer keeps its single import site.
+export type { ConfirmOptions, ConfirmFn } from './confirm-context';
 
 interface PendingConfirm {
     message: string;
@@ -20,25 +15,31 @@ interface PendingConfirm {
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
     const [pending, setPending] = useState<PendingConfirm | null>(null);
+    // Mirrors `pending` for the replace-an-open-dialog path below. A state updater
+    // must be PURE (React may call it twice, and does under StrictMode), so the
+    // previous promise is settled here rather than inside setPending.
+    const pendingRef = useRef<PendingConfirm | null>(null);
 
     const confirm = useCallback((message: string, options: ConfirmOptions = {}): Promise<boolean> => {
         return new Promise<boolean>((resolve) => {
             // If a confirm is already awaiting an answer, resolve it as cancelled
             // before replacing it — otherwise its promise would leak unresolved.
-            setPending((prev) => {
-                prev?.resolve(false);
-                return { message, options, resolve };
-            });
+            pendingRef.current?.resolve(false);
+            const next = { message, options, resolve };
+            pendingRef.current = next;
+            setPending(next);
         });
     }, []);
 
     const handleConfirm = useCallback(() => {
         pending?.resolve(true);
+        pendingRef.current = null;
         setPending(null);
     }, [pending]);
 
     const handleCancel = useCallback(() => {
         pending?.resolve(false);
+        pendingRef.current = null;
         setPending(null);
     }, [pending]);
 

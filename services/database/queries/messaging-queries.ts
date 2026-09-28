@@ -28,6 +28,7 @@ import {
   type ReminderCandidate,
 } from '../../messaging/whatsapp-batch-plan.js';
 import { getClinicNames } from '../../settings/clinic-identity.js';
+import { reminderLanguage } from '../../../shared/patient-language.js';
 import { toDateOnly } from '../../../utils/date.js';
 import { log } from '../../../utils/logger.js';
 
@@ -694,7 +695,7 @@ export async function getSmsMessages(date: Date | string): Promise<SmsMessage[]>
         }
         const time = format12h(r.appDate as unknown as Date);
         const body =
-          r.language === 1
+          reminderLanguage(r.language) === 'en'
             ? `Hello ${r.firstName || r.patientName}. ${eMes} ${time}`
             : `مرحبا ${r.patientName}. ${aMes} ${time}`;
         out.push({ id: r.id, to: `+${formatPhone(r.phone!, r.countryCode || '964')}`, body });
@@ -896,7 +897,8 @@ export async function getNewAppointmentMessage(
   const clinic = await getClinicNames();
 
   let message: string;
-  if (row.language === 1) {
+  // Codebook: shared/patient-language.ts (the forms label from the same module).
+  if (reminderLanguage(row.language) === 'en') {
     if (dd === 1) {
       message = `Hello ${row.firstName || row.patientName}. Tomorrow "${eDay}" is your appointment with ${clinic.en} at ${timeTt}`;
     } else if (dd === 2) {

@@ -16,6 +16,7 @@ import { allOptionsQuery, brandingQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import * as settings from '@shared/contracts/settings.contract';
 import * as brandingContract from '@shared/contracts/branding.contract';
+import { WORK_CURRENCIES, DEFAULT_WORK_CURRENCY_OPTION } from '@shared/work-currency';
 import styles from './SettingsSection.module.css';
 
 // Per-device appearance options, mirrored by the header toggle.
@@ -218,6 +219,12 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
             setOptions(prev => ({ ...prev, ...pendingChanges }));
             setPendingChanges({});
             queryClient.invalidateQueries({ queryKey: qk.settings.options() });
+            // `settings.option(name)` is a SIBLING of `settings.options()`, not a child, so
+            // the line above never reached a single-option reader. The work form reads
+            // DEFAULT_WORK_CURRENCY that way — refresh each option this save touched.
+            for (const name of Object.keys(pendingChanges)) {
+                queryClient.invalidateQueries({ queryKey: qk.settings.option(name) });
+            }
 
             const message = data.failed && data.failed.length > 0
                 ? `Settings saved successfully! ${data.updated} updated, ${data.failed.length} failed: ${data.failed.join(', ')}`
@@ -282,6 +289,25 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
         const isNumber = !isNaN(Number(value)) && !isNaN(parseFloat(value)) && value !== '';
         const currentValue = pendingChanges[key] !== undefined ? pendingChanges[key] : value;
         const hasChanges = pendingChanges[key] !== undefined;
+
+        // The work form's starting currency (shared/work-currency.ts). A closed list, not
+        // free text: a typo here would silently mean "no default". Blank = no default —
+        // staff pick the currency on every new work.
+        if (key === DEFAULT_WORK_CURRENCY_OPTION) {
+            return (
+                <select
+                    id={settingId}
+                    value={currentValue.trim().toUpperCase()}
+                    onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange(key, e.target.value)}
+                    className={hasChanges ? styles.pendingChange : ''}
+                >
+                    <option value="">Not set — choose on each new work</option>
+                    {WORK_CURRENCIES.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                    ))}
+                </select>
+            );
+        }
 
         if (isBoolean) {
             return (

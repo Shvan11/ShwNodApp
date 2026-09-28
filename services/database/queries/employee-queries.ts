@@ -252,6 +252,30 @@ export async function listActiveDoctors(): Promise<StaffMemberRow[]> {
   return rows;
 }
 
+/**
+ * Who a WORK can be attributed to: active employees whose position is 'Doctor' OR who carry the
+ * commission flag (`percentage`). Feeds the work form's Doctor select.
+ *
+ * WHY THE OR (frontend audit FE-F7-1, owner's call 2026-09-28). The form used to read
+ * `?percentage=true` alone — the commission flag, not "is a doctor" — so a salaried doctor (and the
+ * Clinic pseudo-doctor that owns the intake X-ray/consult works) was missing, and a center whose
+ * doctors are all salaried had an EMPTY required list and could not add a work at all. The flag
+ * stays in the OR on purpose: a commission-earning non-doctor (an assistant who does treatments)
+ * must remain attributable, or their commissions stop. The work's CURRENT doctor is appended by the
+ * form itself when it matches neither (a quit doctor), so an edit never forces a re-attribution.
+ */
+export async function listWorkDoctors(): Promise<StaffMemberRow[]> {
+  const { rows } = await sql<StaffMemberRow>`
+      SELECT e."id", e."employee_name"
+      FROM "employees" e
+      LEFT JOIN "positions" p ON e."position" = p."id"
+      WHERE e."is_active" = true
+        AND (p."position_name" = 'Doctor' OR e."percentage" = true)
+      ORDER BY e."sort_order", e."employee_name"
+    `.execute(getKysely());
+  return rows;
+}
+
 /** All ACTIVE operators (every current employee; quit employees are hidden). */
 export async function listActiveOperators(): Promise<StaffMemberRow[]> {
   const { rows } = await sql<StaffMemberRow>`

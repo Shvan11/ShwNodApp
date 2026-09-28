@@ -430,11 +430,15 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
       onClose={handleClose}
       contentClassName={styles.modalContent}
       ariaLabelledBy="item-form-modal-title"
+      // The sessionStorage draft above survives a RELOAD, not a close — the close
+      // effect drops it — so a stray dismissal still destroys the form.
+      unsavedGuard={{ watchInput: true }}
     >
+        {(dismiss) => (<>
         <ModalHeader
           title={isEditMode ? 'Edit Item' : 'Add New Item'}
           titleId="item-form-modal-title"
-          onClose={handleClose}
+          onClose={dismiss}
         />
 
         <form onSubmit={handleSubmit}>
@@ -696,7 +700,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
           </div>
 
           <div className={styles.modalFooter}>
-            <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={submitting}>
+            <button type="button" className="btn btn-secondary" onClick={dismiss} disabled={submitting}>
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
@@ -704,6 +708,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
             </button>
           </div>
         </form>
+        </>)}
     </Modal>
   );
 }

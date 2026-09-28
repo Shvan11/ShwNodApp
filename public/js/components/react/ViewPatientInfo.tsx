@@ -10,6 +10,9 @@ import { useToast } from '../../contexts/ToastContext';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import { putJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
+import { patientLanguageKey } from '@shared/patient-language';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { notifyTasksChanged } from '@/services/tasks';
 import { patientInfoQuery, patientAlertsQuery, costPresetsQuery, alertTypesQuery } from '@/query/queries';
 import styles from './ViewPatientInfo.module.css';
@@ -77,6 +80,9 @@ const ViewPatientInfo = ({ personId }: Props) => {
     const { t } = useTranslation('patients');
     const navigate = useNavigate();
     const location = useLocation();
+    // Patient edit + estimated cost are FINANCE_ROLES on the server (FE-F6-6).
+    const { user } = useGlobalState();
+    const caps = roleCaps(user?.role as UserRole | undefined);
     const toast = useToast();
     const queryClient = useQueryClient();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -177,13 +183,11 @@ const ViewPatientInfo = ({ personId }: Props) => {
         }
     };
 
-    const getLanguageDisplay = (langId: number | undefined): string => {
-        switch (langId) {
-            case 0: return t('languages.kurdish');
-            case 1: return t('languages.arabic');
-            case 2: return t('languages.english');
-            default: return '-';
-        }
+    // Codebook shared with the reminder senders (shared/patient-language.ts, FE-F6-2):
+    // what this page says is the language the patient's reminders actually go out in.
+    const getLanguageDisplay = (langId: number | null | undefined): string => {
+        const key = patientLanguageKey(langId);
+        return key ? t(`languages.${key}`) : '-';
     };
 
     // Format cost for display
@@ -329,17 +333,20 @@ const ViewPatientInfo = ({ personId }: Props) => {
                     </p>
                 </div>
                 <div className={styles.patientHeaderActions}>
-                    <button
-                        onClick={() => navigate(`/patient/${validPersonId}/edit-patient`, {
-                            // Save/Cancel on the edit form return here instead of the works page
-                            state: { from: `${location.pathname}${location.search}` },
-                        })}
-                        className="btn btn-primary"
-                        disabled={!validPersonId}
-                    >
-                        <i className={`fas fa-edit ${styles.piIconGap}`}></i>
-                        {t('view.editPatient')}
-                    </button>
+                    {/* Patient edit is FINANCE_ROLES on the server (FE-F6-6). */}
+                    {caps.editRecords && (
+                        <button
+                            onClick={() => navigate(`/patient/${validPersonId}/edit-patient`, {
+                                // Save/Cancel on the edit form return here instead of the works page
+                                state: { from: `${location.pathname}${location.search}` },
+                            })}
+                            className="btn btn-primary"
+                            disabled={!validPersonId}
+                        >
+                            <i className={`fas fa-edit ${styles.piIconGap}`}></i>
+                            {t('view.editPatient')}
+                        </button>
+                    )}
                     <button
                         onClick={() => setShowPhotoSessionDialog(true)}
                         className="btn btn-secondary"
@@ -610,13 +617,16 @@ const ViewPatientInfo = ({ personId }: Props) => {
                                 <span className={styles.patientInfoLabel}>{t('view.labels.estimatedCost')}</span>
                                 <span className={`${styles.patientInfoValue} ${styles.patientCostDisplay}`}>
                                     {formatCostDisplay(patientInfo.estimated_cost, patientInfo.currency)}
-                                    <button
-                                        onClick={handleStartEditingCost}
-                                        className={styles.patientCostEditBtn}
-                                        title={t('view.editCostTitle')}
-                                    >
-                                        <i className="fas fa-pencil-alt"></i>
-                                    </button>
+                                    {/* PUT …/estimated-cost is FINANCE_ROLES (FE-F6-6). */}
+                                    {caps.editRecords && (
+                                        <button
+                                            onClick={handleStartEditingCost}
+                                            className={styles.patientCostEditBtn}
+                                            title={t('view.editCostTitle')}
+                                        >
+                                            <i className="fas fa-pencil-alt"></i>
+                                        </button>
+                                    )}
                                 </span>
                             </div>
                         )}

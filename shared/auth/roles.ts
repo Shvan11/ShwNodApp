@@ -54,6 +54,21 @@ export interface RoleCapabilities {
    */
   viewFinance: boolean;
   writeFinance: boolean;
+  /**
+   * May edit a work, complete / discontinue / reactivate / delete it, and edit or delete a
+   * patient (incl. the estimated cost) — the front-desk RECORD tier. Mirrors the server's
+   * `authorize(FINANCE_ROLES)` on exactly those routes; before this flag the screens offered them
+   * to every role, and a doctor learned "Insufficient permissions" only at Save (audit FE-F6-6 /
+   * FE-F7-7). Not in it: ADDING a work or a patient, patient alerts, and treatment ITEMS, which
+   * are CLINICAL_ROLES on the server — doctors and assistants write items, their cost aside.
+   */
+  editRecords: boolean;
+  /**
+   * What only an admin does DIRECTLY: transfer a work to another patient (`authorize(admin)`), and
+   * the discount / old-record money edits that send everyone else's change to the approval queue.
+   * The UI uses it to show Transfer and to say "requires admin approval" beside a discount.
+   */
+  adminWrites: boolean;
   manageUsers: boolean;
 }
 
@@ -64,6 +79,8 @@ export function roleCaps(role: UserRole | undefined): RoleCapabilities {
   return {
     viewFinance: isAdmin || isFrontDesk,
     writeFinance: isAdmin || isFrontDesk,
+    editRecords: isAdmin || isFrontDesk,
+    adminWrites: isAdmin,
     manageUsers: isAdmin,
   };
 }

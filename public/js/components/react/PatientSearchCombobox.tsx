@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useState, ChangeEvent } from 'react';
 import cn from 'classnames';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
+import { matchesPatientName } from '../../utils/patientSearch';
 import type { PatientOption } from './PatientQuickSearch';
 import styles from './PatientSearchCombobox.module.css';
 
@@ -22,6 +23,11 @@ export interface PatientSearchComboboxProps {
     /** Preloaded patient list (route loader) for instant suggestions */
     patients: PatientOption[];
     mode: 'name' | 'phoneId';
+    /** Mirrors PatientManagement's "Match from beginning of name only" checkbox.
+     *  Defaults to false (substring), which is both the checkbox's own default
+     *  and what the server does when `nameStartsWith` is absent — the jump list
+     *  used to ignore the flag and always match a prefix. */
+    nameStartsWith?: boolean;
     rtl?: boolean;
     placeholder?: string;
     /** id forwarded to the inner input so a sibling <label htmlFor> can associate with it */
@@ -31,15 +37,20 @@ export interface PatientSearchComboboxProps {
 const MAX_PER_GROUP = 4;
 const MAX_MATCHES = 8;
 
-// Same matching rules the old quick-search selects used: name startsWith from
-// 2 chars, ID contains from 1 char, phone contains from 2 chars.
-function findMatches(patients: PatientOption[], rawInput: string, mode: 'name' | 'phoneId'): ComboboxMatch[] {
+// Name from 2 chars (prefix or substring per `prefixOnly`, case-folded — see
+// utils/patientSearch), ID contains from 1 char, phone contains from 2 chars.
+function findMatches(
+    patients: PatientOption[],
+    rawInput: string,
+    mode: 'name' | 'phoneId',
+    prefixOnly: boolean
+): ComboboxMatch[] {
     const input = rawInput.trim();
     if (mode === 'name') {
         if (input.length < 2) return [];
         const out: ComboboxMatch[] = [];
         for (const p of patients) {
-            if (p.name?.startsWith(input)) {
+            if (matchesPatientName(p.name, input, prefixOnly)) {
                 out.push({ id: p.id, primary: p.name, secondary: `#${p.id}` });
                 if (out.length >= MAX_MATCHES) break;
             }
@@ -71,6 +82,13 @@ function findMatches(patients: PatientOption[], rawInput: string, mode: 'name' |
  *
  * Keyboard contract: plain Enter = onSubmit (table search); ArrowDown/Up +
  * Enter or click = onJump (open patient); Escape dismisses the dropdown.
+ *
+ * The <li role="option"> elements are deliberately NOT focusable. This is the
+ * `aria-activedescendant` pattern — focus stays on the input and the highlighted
+ * option is named by id — so a `tabIndex={0}` on each option would be wrong even
+ * if it worked, and it could not work: the input's onBlur closes the list before
+ * Tab could land on one, which made the Enter/Space handler they used to carry
+ * unreachable.
  */
 const PatientSearchCombobox: React.FC<PatientSearchComboboxProps> = ({
     value,
@@ -79,6 +97,7 @@ const PatientSearchCombobox: React.FC<PatientSearchComboboxProps> = ({
     onSubmit,
     patients,
     mode,
+    nameStartsWith = false,
     rtl = false,
     placeholder,
     id
@@ -87,7 +106,7 @@ const PatientSearchCombobox: React.FC<PatientSearchComboboxProps> = ({
     const [highlight, setHighlight] = useState(-1);
     const listboxId = useId();
 
-    const matches = findMatches(patients, value, mode);
+    const matches = findMatches(patients, value, mode, nameStartsWith);
     const isOpen = open && matches.length > 0;
 
     useEffect(() => {
@@ -165,15 +184,14 @@ const PatientSearchCombobox: React.FC<PatientSearchComboboxProps> = ({
                             {m.group && m.group !== matches[i - 1]?.group && (
                                 <li className={styles.groupHeader} role="presentation">{m.group}</li>
                             )}
+                            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events -- aria-activedescendant combobox: the listbox is driven from the input's own onKeyDown (ArrowUp/Down + Enter) and options are deliberately not focusable, so a per-option key handler would be unreachable */}
                             <li
                                 id={`${listboxId}-opt-${i}`}
                                 role="option"
                                 aria-selected={i === highlight}
-                                tabIndex={0}
                                 className={cn(styles.option, i === highlight && styles.optionActive)}
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => { setOpen(false); onJump(m.id); }}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(false); onJump(m.id); } }}
                                 onMouseEnter={() => setHighlight(i)}
                             >
                                 <span className={styles.optionPrimary}>{m.primary}</span>

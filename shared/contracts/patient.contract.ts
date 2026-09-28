@@ -42,6 +42,7 @@ import {
 } from '../validation.js';
 import { withPendingOutcome } from './approvals.contract.js';
 import { XRAY_WORK_TYPE_IDS } from '../treatment-taxonomy.js';
+import { WORK_CURRENCIES } from '../work-currency.js';
 
 /** A `<select>`-backed id on the CREATE body: '' (nothing chosen) → undefined (so
  *  the service's `toInt` yields NULL, not 0); a chosen value (form string / number)
@@ -330,7 +331,9 @@ export const deleteTimepoint = {
  *    also gets a full-payment invoice, a FREE consult (fee 0) gets the work alone.
  *  (absent = 'Regular', no auto-work.) The auto-work's dr_id = the 'Clinic'
  *  pseudo-doctor. Fees arrive as form strings → z.coerce.number(); the currency
- *  drives the invoice's usd/iqd split. patient_type is DERIVED afterwards. */
+ *  drives the invoice's usd/iqd split, so it is a WORK currency (USD/IQD — not EUR,
+ *  which the invoice cannot hold; see shared/work-currency.ts). patient_type is
+ *  DERIVED afterwards. */
 const intakeSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('xray'),
@@ -339,14 +342,14 @@ const intakeSchema = z.discriminatedUnion('kind', [
       .number()
       .refine((v) => XRAY_WORK_TYPE_IDS.includes(v), { message: 'workTypeId must be an x-ray work type' }),
     fee: moneyInt.positive('Fee must be greater than 0'),
-    currency: z.enum(['IQD', 'USD', 'EUR']),
+    currency: z.enum(WORK_CURRENCIES),
   }),
   z.object({
     kind: z.literal('consult'),
     // A Consult may be FREE — 0 is allowed (a 0-fee consult creates the work with no
     // invoice, since the invoices table forbids a zero/no-cash payment row).
     fee: moneyInt.min(0, 'Fee cannot be negative'),
-    currency: z.enum(['IQD', 'USD', 'EUR']),
+    currency: z.enum(WORK_CURRENCIES),
   }),
 ]);
 export type PatientIntake = z.infer<typeof intakeSchema>;
@@ -373,6 +376,10 @@ export const createPatient = {
     estimatedCost: optionalSelectAmount,
     currency: z.string().optional(),
     intake: intakeSchema.optional(),
+    // The Add form's "Alerts" box → one context alert on the new patient, written in
+    // the create transaction (PatientService.createPatientWithIntake). It used to be
+    // absent here, so this strict body stripped it and the text was lost (FE-F6-1).
+    alerts: z.string().optional(),
   }),
   response: z.object({
     personId: z.number(),

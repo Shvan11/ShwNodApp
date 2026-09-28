@@ -17,6 +17,7 @@ import {
 } from '@/query/queries';
 import * as patientContract from '@shared/contracts/patient.contract';
 import { WORK_TYPE_IDS } from '@shared/treatment-taxonomy';
+import { PATIENT_LANGUAGE_OPTIONS } from '@shared/patient-language';
 import PhoneInput from './PhoneInput';
 import styles from './AddPatientForm.module.css';
 
@@ -239,8 +240,9 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
         // Build the explicit request payload: the flat patient fields + an `intake`
         // block ONLY when a non-regular intake is chosen (numbers coerced by the
-        // contract). The bare `formData` also carries `alerts`, which the strict
-        // create body strips.
+        // contract). `formData.alerts` rides along and becomes one context alert on
+        // the new patient, created in the same transaction (FE-F6-1 — until then the
+        // strict create body stripped it and the text was silently lost).
         const intake =
             intakeKind === 'xray'
                 ? { kind: 'xray' as const, workTypeId: Number(xrayWorkTypeId), fee: feeNum, currency: intakeCurrency }
@@ -571,9 +573,11 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         onChange={handleInputChange}
                         className="form-control"
                     >
-                        <option value="0">{t('languages.kurdish')}</option>
-                        <option value="1">{t('languages.arabic')}</option>
-                        <option value="2">{t('languages.english')}</option>
+                        {/* The codebook is shared with the reminder senders (FE-F6-2) —
+                            never pair a number with a label by hand here. */}
+                        {PATIENT_LANGUAGE_OPTIONS.map(o => (
+                            <option key={o.code} value={String(o.code)}>{t(`languages.${o.key}`)}</option>
+                        ))}
                     </select>
                 </div>
             </div>
@@ -669,7 +673,11 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         className="form-control"
                         rows={3}
                         placeholder={t('add.alertsPlaceholder')}
+                        aria-describedby="add-alerts-hint"
                     />
+                    <div id="add-alerts-hint" className={styles.fieldHint}>
+                        {t('add.alertsHint')}
+                    </div>
                 </div>
             </div>
         </div>

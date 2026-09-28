@@ -13,6 +13,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { notifyApprovalsChanged } from '@/services/approvals';
 import * as expenseContract from '@shared/contracts/expense.contract';
 import { qk } from '@/query/keys';
 import {
@@ -220,7 +221,15 @@ export function useExpenseMutations(): {
         setError(null);
 
         const data = await putJSON<{ outcome: string }>(`/api/expenses/${id}`, expenseData, { schema: expenseContract.updateExpense.response });
-        if (data.outcome === 'pending') return { outcome: 'pending' };
+        if (data.outcome === 'pending') {
+          // The row did NOT change (so no expense invalidation), but an approval
+          // request was just created — tell the bells. They poll on a 5-minute
+          // timer and otherwise only hear about a request when an admin RESOLVES
+          // one, so without this the submitter's own MyApprovalsBadge and the
+          // admin's ApprovalsBell sit stale and the request looks lost.
+          notifyApprovalsChanged();
+          return { outcome: 'pending' };
+        }
         void queryClient.invalidateQueries({ queryKey: qk.expenses.all() });
         return { outcome: 'applied' };
       } catch (err) {
@@ -240,7 +249,12 @@ export function useExpenseMutations(): {
         setError(null);
 
         const data = await deleteJSON<{ outcome: string }>(`/api/expenses/${id}`, { schema: expenseContract.deleteExpense.response });
-        if (data.outcome === 'pending') return { outcome: 'pending' };
+        if (data.outcome === 'pending') {
+          // Held for approval — no row changed, but a request was created. See the
+          // note in updateExpense above.
+          notifyApprovalsChanged();
+          return { outcome: 'pending' };
+        }
         void queryClient.invalidateQueries({ queryKey: qk.expenses.all() });
         return { outcome: 'applied' };
       } catch (err) {

@@ -21,6 +21,13 @@ export const doctors = {
 } as const;
 export type DoctorsResponse = z.infer<typeof doctors.response>;
 
+// GET /api/work-doctors — who a work can be attributed to: active employees with
+// position 'Doctor' OR the commission flag (FE-F7-1). Same row shape as /doctors.
+export const workDoctors = {
+  response: z.array(staffMemberRow),
+} as const;
+export type WorkDoctorsResponse = z.infer<typeof workDoctors.response>;
+
 // GET /api/operators — all employees.
 export const operators = {
   response: z.array(staffMemberRow),

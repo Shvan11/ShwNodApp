@@ -115,8 +115,6 @@ export const qk = {
     doctors: () => ['aligner', 'doctors'] as const,
     /** GET /api/aligner-doctors — the admin doctors list (a different endpoint/shape from doctors()). */
     doctorsAdmin: () => ['aligner', 'doctors-admin'] as const,
-    /** Parent for a work's aligner data (sets/batches). */
-    work: (workId: Id) => ['aligner', 'work', workId] as const,
     /** GET /api/aligner/all-sets — all sets across doctors. */
     allSets: () => ['aligner', 'all-sets'] as const,
     /** GET /api/aligner/patients/all — all aligner patients. */
@@ -152,6 +150,8 @@ export const qk = {
     patientPhones: () => ['lookups', 'patient-phones'] as const,
     /** GET /api/doctors — doctor options (appointment/calendar filters). */
     doctors: () => ['lookups', 'doctors'] as const,
+    /** GET /api/work-doctors — who a work can be attributed to (the work form's Doctor select). */
+    workDoctors: () => ['lookups', 'work-doctors'] as const,
     /** GET /api/settings/cost-presets — estimated-cost preset chips. */
     costPresets: () => ['lookups', 'cost-presets'] as const,
     /** GET /api/google?source= — Google contact list (a messaging recipient source). */

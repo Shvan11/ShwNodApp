@@ -3,18 +3,25 @@
  */
 
 /**
- * Check if local storage is available
- * @returns Whether local storage is available
+ * Check if local storage is available.
+ *
+ * Memoized per page load: this is called by EVERY get/set/remove, and the probe
+ * is itself a setItem + removeItem — so one read used to cost three localStorage
+ * operations. Availability cannot change mid-session (it is a browser/privacy
+ * mode property), so caching the first answer is safe.
  */
+let localStorageAvailable: boolean | null = null;
 function isLocalStorageAvailable(): boolean {
+  if (localStorageAvailable !== null) return localStorageAvailable;
   try {
     const test = '__storage_test__';
     localStorage.setItem(test, test);
     localStorage.removeItem(test);
-    return true;
+    localStorageAvailable = true;
   } catch {
-    return false;
+    localStorageAvailable = false;
   }
+  return localStorageAvailable;
 }
 
 /**
@@ -90,25 +97,6 @@ export function removeItem(key: string): boolean {
   }
 }
 
-/**
- * Clear all items from storage
- * @returns Success status
- */
-export function clear(): boolean {
-  try {
-    if (isLocalStorageAvailable()) {
-      localStorage.clear();
-    } else {
-      memoryStorage.clear();
-    }
-
-    return true;
-  } catch (e) {
-    console.error('Error clearing storage:', e);
-    return false;
-  }
-}
-
 const CHAIR_ID_KEY = 'chairId';
 
 const CHAIR_ID_PATTERN = /^([1-9]|10)$/;
@@ -148,7 +136,6 @@ export default {
   getItem,
   setItem,
   removeItem,
-  clear,
   chairId,
   setChairId,
 };

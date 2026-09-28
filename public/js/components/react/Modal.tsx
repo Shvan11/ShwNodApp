@@ -1,14 +1,64 @@
-import { useEffect, useRef, useCallback, useId } from 'react';
+import { useEffect, useRef, useCallback, useContext } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
 import { createPortal } from 'react-dom';
+import i18n from 'i18next';
+import { ConfirmContext } from '../../contexts/confirm-context';
 import styles from './Modal.module.css';
+
+/**
+ * Opt-in "this dialog holds unsaved work" policy. Declaring it makes every
+ * dismissal GESTURE ask before it discards, through the app's own `useConfirm`.
+ *
+ * It is opt-in, not the default, on purpose: of the 73 `<Modal>` render sites
+ * roughly 50 are viewers, pickers and confirms, where instant dismiss is the
+ * correct behaviour and a prompt would be noise.
+ */
+export interface UnsavedGuard {
+    /** Explicit "there is unsaved work here". OR-ed with the `watchInput` signal. */
+    isDirty?: boolean;
+    /**
+     * Let the primitive decide: any native input/change event inside the dialog
+     * marks it dirty. React writes controlled values through the DOM property and
+     * dispatches nothing, so programmatic seeding — an edit form populating from
+     * its row, a suggested payment amount — never trips this; only a real user
+     * edit does. Blind spot: state changed by clicking something that is NOT a
+     * form control (a button-grid date picker, a canvas) — pass `isDirty` too.
+     */
+    watchInput?: boolean;
+    /**
+     * Changing this clears the `watchInput` flag. For a modal that SAVES AND
+     * STAYS OPEN: bind it to whatever moves on a successful write (a React Query
+     * `dataUpdatedAt`, a "showing the receipt now" flag), or the work the user
+     * already saved keeps counting as unsaved.
+     */
+    resetKey?: string | number;
+    /** Overrides the confirm body. The default comes from the `common:unsaved.*` catalog. */
+    message?: string;
+}
 
 interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
-    children: ReactNode;
+    /**
+     * The function form receives `dismiss` — the same guarded exit the backdrop
+     * and Escape use. Hand it to the header's ✕ and the footer's Cancel so every
+     * way out of a guarded modal asks the same question. Without it those two
+     * buttons call `onClose` directly and skip the guard.
+     */
+    children: ReactNode | ((dismiss: () => void) => ReactNode);
     closeOnBackdropClick?: boolean;
     closeOnEscape?: boolean;
+    /**
+     * Id of the element that names this dialog — normally the `<ModalHeader>`'s
+     * `titleId`, or the id of the modal's own heading when it renders one.
+     *
+     * Pass it. A `role="dialog"` with no accessible name is announced as just
+     * "dialog", and until 2026-09-17 the default here was WORSE than that: a
+     * bare `useId()` that was never rendered onto anything, so every modal that
+     * omitted this shipped an `aria-labelledby` pointing at a missing element —
+     * a dangling reference also suppresses the content fallback a screen reader
+     * would otherwise use. Undefined now means the attribute is simply omitted.
+     */
     ariaLabelledBy?: string;
     ariaDescribedBy?: string;
     initialFocusRef?: RefObject<HTMLElement | null>;
@@ -16,6 +66,8 @@ interface ModalProps {
     overlayClassName?: string;
     /** Allow dragging the modal by its non-interactive content (header) area. Default true; auto-disabled for drawers + mobile. */
     draggable?: boolean;
+    /** Ask before a dismissal gesture discards unsaved work. See `UnsavedGuard`. */
+    unsavedGuard?: UnsavedGuard;
 }
 
 const FOCUSABLE_SELECTOR =
@@ -76,6 +128,60 @@ function getPortalTarget(): HTMLElement {
     return document.getElementById('modal-root') ?? document.body;
 }
 
+/**
+ * Escape is served by ONE document listener over a stack of the open modals,
+ * and only the TOP entry answers it.
+ *
+ * It cannot be one listener per instance: they all sit on `document`, and
+ * `stopPropagation()` does not stop a sibling listener on the same node — so
+ * every open modal's handler ran and a single Escape closed the whole stack,
+ * taking any half-filled form underneath with it (a `PaymentModal` + its
+ * underpayment confirm went 2 dialogs → 0 on one keypress).
+ *
+ * An open modal ALWAYS registers, even with `closeOnEscape={false}`: the top
+ * modal swallows the key either way, so a deliberately non-dismissible dialog
+ * (`closeOnEscape={!loading}` mid-save) can't let Escape through to close the
+ * modal beneath it.
+ *
+ * Bubble phase on purpose. A cursor-anchored popover that opens OVER a modal —
+ * `LookupContextMenu` — still beats this by listening in the capture phase with
+ * `stopImmediatePropagation()`; registering here in capture would run first and
+ * close the modal out from under it.
+ */
+interface EscapeEntry {
+    /** Reads the live props through a ref, so the entry survives re-renders. */
+    handle: () => void;
+}
+
+const escapeStack: EscapeEntry[] = [];
+let escapeListenerAttached = false;
+
+function handleDocumentEscape(event: KeyboardEvent): void {
+    if (event.key !== 'Escape') return;
+    const top = escapeStack[escapeStack.length - 1];
+    if (!top) return;
+    event.stopPropagation();
+    top.handle();
+}
+
+function pushEscapeEntry(entry: EscapeEntry): void {
+    escapeStack.push(entry);
+    if (!escapeListenerAttached) {
+        document.addEventListener('keydown', handleDocumentEscape);
+        escapeListenerAttached = true;
+    }
+}
+
+function removeEscapeEntry(entry: EscapeEntry): void {
+    // Remove by identity, not pop: a modal lower in the stack can close first.
+    const index = escapeStack.indexOf(entry);
+    if (index !== -1) escapeStack.splice(index, 1);
+    if (escapeStack.length === 0 && escapeListenerAttached) {
+        document.removeEventListener('keydown', handleDocumentEscape);
+        escapeListenerAttached = false;
+    }
+}
+
 const Modal = ({
     isOpen,
     onClose,
@@ -88,14 +194,13 @@ const Modal = ({
     contentClassName,
     overlayClassName,
     draggable = true,
+    unsavedGuard,
 }: ModalProps) => {
     const contentRef = useRef<HTMLDivElement | null>(null);
     const previouslyFocusedRef = useRef<HTMLElement | null>(null);
     const mouseDownOnBackdropRef = useRef(false);
     const dragOffsetRef = useRef({ x: 0, y: 0 });
     const dragStateRef = useRef<DragState | null>(null);
-    const fallbackTitleId = useId();
-    const labelledBy = ariaLabelledBy ?? fallbackTitleId;
 
     // Drawers are docked to a screen edge — dragging them makes no sense.
     const isDrawer = !!overlayClassName && /drawer/i.test(overlayClassName);
@@ -138,19 +243,101 @@ const Modal = ({
         }
     }, [isOpen]);
 
+    // `useConfirm()` throws without a provider and Modal must stay usable outside
+    // RootLayout, so read the raw context and treat null as "cannot ask".
+    const confirmFn = useContext(ConfirmContext);
+
+    /**
+     * Has the user edited a form control in here?
+     *
+     * A REF, and it must stay one: this is not render state, and making it state
+     * silently ate the first keystroke of every guarded form. The listener below
+     * sits on the content node, DEEPER than the node React delegates to (the
+     * portal container), so it runs BEFORE React turns the same event into
+     * `onChange`. A `setState` there forces a synchronous re-render mid-dispatch,
+     * the controlled input is rewritten with its pre-keystroke value, and React's
+     * own handler then reads that stale value back off the DOM — "typed" arrived
+     * as "yped". A ref never renders, so it cannot interleave.
+     */
+    const sawInputRef = useRef(false);
+
+    // A NATIVE listener, deliberately not React's `onInput`: synthetic events
+    // bubble through the REACT tree, so a portaled child — the lookup manager
+    // stacked on the expense form — would mark its parent dirty. A DOM listener
+    // sees only real descendants.
+    const watchInput = unsavedGuard?.watchInput === true;
+    const dirtyResetKey = unsavedGuard?.resetKey;
     useEffect(() => {
-        if (!isOpen || !closeOnEscape) return;
-
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                event.stopPropagation();
-                onClose();
-            }
+        // Also the `resetKey` reset: a modal that saved and stayed open starts clean.
+        sawInputRef.current = false;
+        if (!isOpen || !watchInput) return;
+        const el = contentRef.current;
+        if (!el) return;
+        const mark = () => {
+            sawInputRef.current = true;
         };
+        el.addEventListener('input', mark);
+        el.addEventListener('change', mark);
+        return () => {
+            el.removeEventListener('input', mark);
+            el.removeEventListener('change', mark);
+        };
+    }, [isOpen, watchInput, dirtyResetKey]);
 
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, closeOnEscape, onClose]);
+    /**
+     * The single exit for every dismissal GESTURE — backdrop, Escape, and (via
+     * the children-as-function form) the header's ✕ and the footer's Cancel.
+     *
+     * A programmatic `onClose()` from the consumer is deliberately NOT routed
+     * here: saving and closing must never ask.
+     *
+     * No re-entrancy guard is needed. While the confirm is open it owns the top
+     * of the escape stack and its own overlay covers this dialog, so no second
+     * gesture can reach the modal underneath it.
+     */
+    const requestDismiss = useCallback(() => {
+        const dirty = !!unsavedGuard
+            && (unsavedGuard.isDirty === true || (unsavedGuard.watchInput === true && sawInputRef.current));
+        if (!dirty || !confirmFn) {
+            onClose();
+            return;
+        }
+        void confirmFn(unsavedGuard.message ?? i18n.t('unsaved.message'), {
+            title: i18n.t('unsaved.title'),
+            confirmText: i18n.t('unsaved.discard'),
+            cancelText: i18n.t('unsaved.keepEditing'),
+            danger: true,
+        }).then((discard) => {
+            if (discard) onClose();
+        });
+    }, [unsavedGuard, confirmFn, onClose]);
+
+    // The escape-stack entry must stay the SAME object across re-renders —
+    // re-pushing on every `onClose` identity change would move an already-open
+    // modal back to the top of the stack — so it reads both live values through
+    // refs. Both reads happen inside a document keydown handler, never in render.
+    const escapeOptionsRef = useRef({ closeOnEscape });
+    useEffect(() => {
+        escapeOptionsRef.current = { closeOnEscape };
+    }, [closeOnEscape]);
+
+    const requestDismissRef = useRef(requestDismiss);
+    useEffect(() => {
+        requestDismissRef.current = requestDismiss;
+    }, [requestDismiss]);
+
+    const escapeEntryRef = useRef<EscapeEntry>({
+        handle: () => {
+            if (escapeOptionsRef.current.closeOnEscape) requestDismissRef.current();
+        },
+    });
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const entry = escapeEntryRef.current;
+        pushEscapeEntry(entry);
+        return () => removeEscapeEntry(entry);
+    }, [isOpen]);
 
     const handleContentKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
         if (event.key !== 'Tab') return;
@@ -188,11 +375,11 @@ const Modal = ({
             if (!closeOnBackdropClick) return;
             const clickedBackdrop = event.target === event.currentTarget;
             if (clickedBackdrop && mouseDownOnBackdropRef.current) {
-                onClose();
+                requestDismiss();
             }
             mouseDownOnBackdropRef.current = false;
         },
-        [closeOnBackdropClick, onClose],
+        [closeOnBackdropClick, requestDismiss],
     );
 
     const handleDragPointerDown = useCallback(
@@ -277,7 +464,7 @@ const Modal = ({
                 className={contentClass}
                 role="dialog"
                 aria-modal="true"
-                aria-labelledby={labelledBy}
+                aria-labelledby={ariaLabelledBy}
                 aria-describedby={ariaDescribedBy}
                 tabIndex={-1}
                 data-draggable={dragEnabled || undefined}
@@ -287,7 +474,11 @@ const Modal = ({
                 onPointerUp={dragEnabled ? handleDragPointerEnd : undefined}
                 onPointerCancel={dragEnabled ? handleDragPointerEnd : undefined}
             >
-                {children}
+                {/* eslint-disable-next-line react-hooks/refs -- `dismiss` reads the dirty
+                    ref when the user CLICKS, never during render; consumers only ever
+                    hand it to an onClick/onClose. Keeping the flag out of state is
+                    what stops it eating the first keystroke (see sawInputRef above). */}
+                {typeof children === 'function' ? children(requestDismiss) : children}
             </div>
         </div>,
         getPortalTarget(),

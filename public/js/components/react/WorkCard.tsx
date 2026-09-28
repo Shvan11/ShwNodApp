@@ -44,7 +44,14 @@ interface WorkCardProps {
     personId?: number | null;
     isAlignerWork: (work: Work) => boolean;
     isExpanded: boolean;
-    isAdmin?: boolean;
+    /** Transfer to another patient — admin-only on the server. Pass `caps.adminWrites`. */
+    canTransfer?: boolean;
+    /**
+     * Edit / Mark complete / Mark discontinued / Reactivate / Delete — `authorize(FINANCE_ROLES)`
+     * on the server, so a clinical user must not be offered them (FE-F7-7). Pass
+     * `caps.editRecords`; fail-closed like `writeFinance`.
+     */
+    editRecords?: boolean;
     /**
      * Money mutations (Add Payment) hide when false — clinical role sees finance read-only.
      * Defaults to false (fail-closed): a caller must opt in by passing `caps.writeFinance`,
@@ -75,7 +82,8 @@ const WorkCard = ({
     personId,
     isAlignerWork,
     isExpanded,
-    isAdmin = false,
+    canTransfer = false,
+    editRecords = false,
     writeFinance = false,
     onToggleExpanded,
     onEdit,
@@ -152,8 +160,9 @@ const WorkCard = ({
                 </div>
             </div>
 
-            {/* Actions Menu - Show when expanded */}
-            {isExpanded && (
+            {/* Actions Menu - Show when expanded, and only when it would hold something:
+                every entry is a record write (editRecords) or Transfer (canTransfer). */}
+            {isExpanded && (editRecords || (canTransfer && onTransfer)) && (
                 <div className={styles.actionsMenu}>
                     <button
                         type="button"
@@ -168,15 +177,17 @@ const WorkCard = ({
                     </button>
                     {showActions && (
                         <div className={styles.dropdown}>
-                            <button type="button" onClick={() => { onEdit(work); setShowActions(false); }}>
-                                <i className="fas fa-edit"></i> {t('card.editWork')}
-                            </button>
-                            {isAdmin && onTransfer && (
+                            {editRecords && (
+                                <button type="button" onClick={() => { onEdit(work); setShowActions(false); }}>
+                                    <i className="fas fa-edit"></i> {t('card.editWork')}
+                                </button>
+                            )}
+                            {canTransfer && onTransfer && (
                                 <button type="button" onClick={() => { onTransfer(work); setShowActions(false); }}>
                                     <i className="fas fa-exchange-alt"></i> {t('card.transferWork')}
                                 </button>
                             )}
-                            {isActive && (
+                            {editRecords && isActive && (
                                 <>
                                     <button type="button" onClick={() => { onComplete(work); setShowActions(false); }}>
                                         <i className="fas fa-check-circle"></i> {t('card.markComplete')}
@@ -186,18 +197,20 @@ const WorkCard = ({
                                     </button>
                                 </>
                             )}
-                            {(isFinished || isDiscontinued) && (
+                            {editRecords && (isFinished || isDiscontinued) && (
                                 <button type="button" onClick={() => { onReactivate(work); setShowActions(false); }}>
                                     <i className="fas fa-redo"></i> {t('card.reactivate')}
                                 </button>
                             )}
-                            <button
-                                type="button"
-                                className={styles.dropdownDeleteBtn}
-                                onClick={() => { onDelete(work); setShowActions(false); }}
-                            >
-                                <i className="fas fa-trash-alt"></i> {t('card.deleteWork')}
-                            </button>
+                            {editRecords && (
+                                <button
+                                    type="button"
+                                    className={styles.dropdownDeleteBtn}
+                                    onClick={() => { onDelete(work); setShowActions(false); }}
+                                >
+                                    <i className="fas fa-trash-alt"></i> {t('card.deleteWork')}
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>

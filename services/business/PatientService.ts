@@ -19,6 +19,7 @@ import { getKysely, withPgTransaction } from '../database/kysely.js';
 import { WORK_TYPE_IDS } from '../../shared/treatment-taxonomy.js';
 import type { PatientIntake } from '../../shared/contracts/patient.contract.js';
 import { toDateOnly } from '../../utils/date.js';
+import { createAlert } from '../database/queries/alert-queries.js';
 import {
   getTimePoints,
   getTimePointImgs,
@@ -247,6 +248,9 @@ async function resolveClinicDoctorId(): Promise<number> {
   return row.id;
 }
 
+/** `alerts.alert_severity` 2 — "Moderate", `AlertModal`'s own starting value. */
+const ALERT_SEVERITY_MODERATE = 2;
+
 /**
  * Create a patient and, when an intake selector value is supplied, auto-create the
  * matching FINISHED intake work (X-ray imaging or Consult) + its full-payment invoice
@@ -255,10 +259,20 @@ async function resolveClinicDoctorId(): Promise<number> {
  * (no orphan work/invoice). The derived patient type is recomputed from the new work
  * inside the same txn (classifyPatient). A 'Regular' intake (none) just inserts the
  * patient, seeded NEW_NO_WORKS by insertPatientRow.
+ *
+ * `initialAlert` is the Add form's "Alerts" box — typically an allergy or a medical
+ * warning taken at registration. It becomes ONE context alert on the patient (the list
+ * `ViewPatientInfo` shows), inside the same transaction. From 2025-11-20 (`80b305d`,
+ * when `patients.alerts` moved to the alerts table) until audit FE-F6-1 the box was
+ * stripped by the create contract and thrown away while the success toast fired.
+ * Severity is `ALERT_SEVERITY_MODERATE` — the same default `AlertModal` starts on — and
+ * the type is left NULL: alert types are a per-clinic lookup, so no id can be assumed.
+ * Staff re-grade or re-type it from the patient's info page.
  */
 export async function createPatientWithIntake(
   patientData: PatientData,
-  intake?: PatientIntake
+  intake?: PatientIntake,
+  initialAlert?: string
 ): Promise<{ personId: number; workId?: number; invoiceId?: number }> {
   // Resolve the Clinic pseudo-doctor BEFORE opening the txn so a misconfigured
   // deployment fails fast with an actionable 422 (only needed for an intake work).
@@ -266,6 +280,18 @@ export async function createPatientWithIntake(
 
   return withPgTransaction(async (trx) => {
     const { personId } = await insertPatientRow(trx, patientData);
+
+    if (initialAlert) {
+      await createAlert(
+        {
+          person_id: personId,
+          alert_type_id: null,
+          alert_severity: ALERT_SEVERITY_MODERATE,
+          alert_details: initialAlert,
+        },
+        trx
+      );
+    }
 
     if (!intake || clinicId == null) {
       return { personId };

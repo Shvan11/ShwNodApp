@@ -243,7 +243,13 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
 
             // upload-pdf is sendSuccess-enveloped; fetchJSON unwraps to the inner
             // data (ignored here). A non-2xx throws → caught below.
-            await postFormData(`/api/aligner/sets/${setId}/upload-pdf`, formDataUpload);
+            // 120s to match the server's timeouts.long on this route (and the
+            // sibling call site in PatientSets.tsx): the default 30s funnel
+            // timeout aborts a large PDF client-side while the server is still
+            // completing the upload + the Drive copy, so the user sees "Failed to
+            // upload PDF" for an upload that actually landed — and retries it.
+            // The size cap above admits files up to 100MB.
+            await postFormData(`/api/aligner/sets/${setId}/upload-pdf`, formDataUpload, { timeoutMs: 120000 });
         } catch (error) {
             console.error('Error uploading PDF:', error);
             toast.error(httpErrorMessage(error, 'Failed to upload PDF'));
@@ -327,11 +333,15 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
             overlayClassName="drawer-overlay"
             contentClassName="drawer-container"
             ariaLabelledBy="set-form-drawer-title"
+            // A drawer dismisses on Escape/backdrop like any other modal —
+            // `isDrawer` only disables dragging.
+            unsavedGuard={{ watchInput: true }}
         >
+            {(dismiss) => (<>
             <ModalHeader
                 title={set ? 'Edit Aligner Set' : 'Add New Aligner Set'}
                 titleId="set-form-drawer-title"
-                onClose={handleClose}
+                onClose={dismiss}
             />
 
             <div className="drawer-body">
@@ -372,7 +382,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
 
                         {/* Action Buttons - Top */}
                         <div className="drawer-footer drawer-footer-top">
-                            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+                            <button type="button" className="btn btn-secondary" onClick={dismiss} disabled={saving}>
                                 Cancel
                             </button>
                             <button type="submit" className="btn btn-primary" disabled={saving}>
@@ -675,7 +685,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                         </div>
 
                         <div className="drawer-footer">
-                            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+                            <button type="button" className="btn btn-secondary" onClick={dismiss} disabled={saving}>
                                 Cancel
                             </button>
                             <button type="submit" className="btn btn-primary" disabled={saving}>
@@ -693,6 +703,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                     </form>
                 )}
             </div>
+            </>)}
         </Modal>
     );
 };

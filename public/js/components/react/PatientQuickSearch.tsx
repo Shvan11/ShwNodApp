@@ -1,21 +1,26 @@
 import React, { useCallback } from 'react';
+import type { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
 import AsyncSelect from 'react-select/async';
 import type { StylesConfig } from 'react-select';
 import cn from 'classnames';
+import { patientPhones } from '@shared/contracts/patient.contract';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
+import { matchesPatientName } from '../../utils/patientSearch';
 import { httpErrorMessage } from '@/core/http';
 import { patientPhonesQuery } from '@/query/queries';
 import styles from './PatientQuickSearch.module.css';
 
 /**
- * Patient data from /api/patients/phones endpoint
+ * One row of GET /api/patients/phones, taken from the contract rather than
+ * re-declared. The hand-written interface it replaces weakened `name` to
+ * optional and `phone` to `string | undefined` — which is what forced the
+ * `p.name || ''` fallbacks below and needed an `as PatientOption[]` cast to
+ * bridge the parsed payload into it, the shape CLAUDE.md bans (it defeats the
+ * fail-loud guard on the render path). The contract guarantees `name: string`
+ * and `phone: string | null`.
  */
-export interface PatientOption {
-    id: number;
-    name?: string;
-    phone?: string;
-}
+export type PatientOption = z.infer<typeof patientPhones.response>[number];
 
 /**
  * Select option format for react-select
@@ -79,7 +84,7 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
         enabled: !providedPatients,
     });
 
-    const patients = providedPatients ?? ((data as PatientOption[] | undefined) ?? []);
+    const patients: PatientOption[] = providedPatients ?? data ?? [];
     const loading = providedPatients ? false : isLoading;
     const error = providedPatients
         ? null
@@ -100,8 +105,8 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
         if (patient) {
             onSelect({
                 person_id: patient.id,
-                patient_name: patient.name || '',
-                phone: patient.phone
+                patient_name: patient.name,
+                phone: patient.phone ?? undefined
             });
         }
     }, [filteredPatients, onSelect]);
@@ -112,10 +117,13 @@ const PatientQuickSearch: React.FC<PatientQuickSearchProps> = ({
             callback([]);
             return;
         }
+        // Case-folded substring, shared with PatientSearchCombobox: the old bare
+        // `startsWith` was case-SENSITIVE against a citext server, so `ali` matched
+        // nothing while the server found `Ali`.
         const results = filteredPatients
-            .filter(p => p.name?.startsWith(input))
+            .filter(p => matchesPatientName(p.name, input, false))
             .slice(0, 50)
-            .map(p => ({ value: p.id, label: p.name || '' }));
+            .map(p => ({ value: p.id, label: p.name }));
         callback(results);
     }, [filteredPatients]);
 

@@ -320,8 +320,9 @@ export default function AdminUserManagement() {
           closeOnBackdropClick={!resetting}
           closeOnEscape={!resetting}
           contentClassName={styles.createForm}
+          ariaLabelledBy="reset-password-modal-title"
         >
-          <h3>Reset Password — {resetTarget.username}</h3>
+          <h3 id="reset-password-modal-title">Reset Password — {resetTarget.username}</h3>
           <form onSubmit={submitResetPassword}>
             <div className={styles.formGroup}>
               <label htmlFor="reset-new-password">New Password * (min 6 characters)</label>

@@ -141,7 +141,11 @@ export default function PrintQueueIndicator({ onPrintAll }: PrintQueueIndicatorP
                     <span className={styles.badgeLabels}>({stats.totalLabels} labels)</span>
                 </span>
                 <svg
-                    className={cn(styles.badgeChevron, { up: isExpanded })}
+                    // `[styles.up]`, not a bare `up`: cn's object form emits the KEY
+                    // verbatim, so the bare version put the literal class `up` on the
+                    // element while the rule in this CSS Module compiles to
+                    // `._badgeChevron_x._up_x` — the chevron never turned.
+                    className={cn(styles.badgeChevron, { [styles.up]: isExpanded })}
                     width="16"
                     height="16"
                     viewBox="0 0 24 24"

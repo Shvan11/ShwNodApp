@@ -55,13 +55,12 @@ import '../../../css/components/work-card.css';
 // invoice-form.css -> PaymentModal.module.css
 // CSS Modules: visits-component.css, new-visit-component.css, patient-appointments.css migrated
 
+/** What ContentRenderer actually reads. This used to declare `view`, `filter`,
+ *  `workId` and `phone` as well — four fields PatientShell computed on every
+ *  render for no reader (ContentRenderer pulls workId/visitId from the query
+ *  string itself). */
 interface ContentParams {
     tpCode?: string;
-    view?: string;
-    filter?: string;
-    workId?: string;
-    phone?: string;
-    [key: string]: string | undefined;
 }
 
 const PatientShell = () => {
@@ -116,8 +115,13 @@ const PatientShell = () => {
     const wildcardPath = allParams['*'] || '';
     const tpCode = wildcardPath.match(/^tp(\d+)$/)?.[0] || null;
 
-    // Detect if this is the diagnosis route (/patient/:personId/work/:workId/diagnosis)
-    const isDiagnosisRoute = !!workId && window.location.pathname.endsWith('/diagnosis');
+    // Detect if this is the diagnosis route (/patient/:personId/work/:workId/diagnosis).
+    // `location.pathname` (useLocation, two lines up), NOT `window.location`: the
+    // router writes to history BEFORE it commits the new location into context,
+    // so under v7_startTransition a render can see the NEW window.location beside
+    // the OLD `page`/`workId` params — effectivePage would flip to 'diagnosis'
+    // while workId still belonged to the previous route.
+    const isDiagnosisRoute = !!workId && location.pathname.endsWith('/diagnosis');
     const effectivePage = isDiagnosisRoute ? 'diagnosis' : page;
 
     // isNew derived from the route param (replaces the loader's `isNew` flag).
@@ -168,14 +172,7 @@ const PatientShell = () => {
     // Work display name (from the work-details query above)
     const workTypeName = (work?.type_name as string | undefined) || '';
 
-    // Extract additional params from URL (convert null to undefined)
-    const params: ContentParams = {
-        tpCode: tpCode ?? undefined,
-        view: searchParams.get('view') ?? undefined,
-        filter: searchParams.get('filter') ?? undefined,
-        workId: effectiveWorkId ?? undefined,
-        phone: patient?.phone ?? undefined,
-    };
+    const params: ContentParams = { tpCode: tpCode ?? undefined };
 
     return (
         <div id="patient-shell" className={styles.patientShellContainer}>
@@ -237,7 +234,6 @@ const PatientShell = () => {
                         personId={validatedPersonId}
                         page={effectivePage}
                         params={params}
-                        isNewPatient={isNewPatient}
                     />
                 </div>
             </div>

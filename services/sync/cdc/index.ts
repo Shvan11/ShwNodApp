@@ -15,6 +15,7 @@
  */
 import { CdcEngine, enforceCaptureBound } from './engine.js';
 import { startDriftWatch, stopDriftWatch } from './drift-check.js';
+import { startClockWatch, stopClockWatch } from './clock-check.js';
 import { FailoverSink } from './failover-sink.js';
 import { DolphinSink } from './dolphin-sink.js';
 import { ReverseSink } from './reverse-sink.js';
@@ -106,6 +107,10 @@ const engines: CdcEngine[] = [];
 
 /** Start an engine for each enabled sink (no-op for a sink whose flag is off). */
 export function startCdc(): void {
+  // The clock-alignment guard (clock-check.ts) runs on EVERY install: its app-server-vs-local half
+  // needs no mirror, and a new deployment inherits whatever zone its installers picked.
+  startClockWatch();
+
   const defs: Array<{ on: boolean; sink: SyncSink; opts: EngineOpts }> = [
     {
       on: process.env.FAILOVER_SYNC_ENABLED === 'true',
@@ -166,13 +171,14 @@ export function startCdc(): void {
 }
 
 /**
- * Stop all running engines, the capture watchdog and the mirror drift check. Capture is deliberately left ON in
+ * Stop all running engines, the capture watchdog, the mirror drift check and the clock guard. Capture is deliberately left ON in
  * cdc_sink_control — a change recorded while we are down must survive the restart so the next boot
  * drains it. See the CdcEngine header: capture is turned off only on purpose (the circuit breaker
  * or the manual kill switch), never by a normal stop and never by an env flag.
  */
 export async function stopCdc(): Promise<void> {
   stopDriftWatch();
+  stopClockWatch();
   if (watchdogTimer) {
     clearInterval(watchdogTimer);
     watchdogTimer = null;

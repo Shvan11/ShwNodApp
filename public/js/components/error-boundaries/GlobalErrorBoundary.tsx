@@ -25,8 +25,18 @@ function GlobalErrorFallback() {
           </button>
           <button
             onClick={() => {
-              const appKeys = ['shwan_user_prefs', 'shwan_nav_state', 'shwan_last_route'];
-              appKeys.forEach(k => localStorage.removeItem(k));
+              // Drop the one piece of persisted client state that can actually
+              // poison a load: the label print queue is arbitrary JSON replayed
+              // into a component on every mount. The display preferences
+              // (shwan_theme / shwan_language / shwan_arabic_font) are NOT cleared
+              // — they cannot cause a crash and wiping them would be a surprise.
+              // (This button used to clear three keys — shwan_user_prefs,
+              // shwan_nav_state, shwan_last_route — that exist nowhere in the app,
+              // making it an exact duplicate of "Reload Application".)
+              try {
+                sessionStorage.removeItem('labelPrintQueue');
+                sessionStorage.removeItem('currentUser');
+              } catch { /* private mode / blocked storage — reload anyway */ }
               window.location.reload();
             }}
             className="secondary-btn"
@@ -157,7 +167,7 @@ interface GlobalErrorBoundaryProps {
 
 export function GlobalErrorBoundary({ children }: GlobalErrorBoundaryProps) {
   return (
-    <ErrorBoundary fallback={<GlobalErrorFallback />} showDetails={false}>
+    <ErrorBoundary fallback={<GlobalErrorFallback />}>
       {children}
     </ErrorBoundary>
   );

@@ -84,31 +84,6 @@ export function parseIniContent(
   return config;
 }
 
-/**
- * Validate INI config structure
- */
-export function validateIniConfig(config: unknown): config is IniConfig {
-  if (typeof config !== 'object' || config === null) {
-    return false;
-  }
-
-  for (const [sectionKey, section] of Object.entries(config)) {
-    if (typeof sectionKey !== 'string') {
-      return false;
-    }
-    if (typeof section !== 'object' || section === null) {
-      return false;
-    }
-    for (const [key, value] of Object.entries(section)) {
-      if (typeof key !== 'string' || typeof value !== 'string') {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
-
 // ============================================================================
 // FORMATTING
 // ============================================================================
@@ -218,18 +193,6 @@ export function mergeConfigs(
 }
 
 /**
- * Get a value from config
- */
-export function getValue(
-  config: IniConfig,
-  section: string,
-  key: string,
-  defaultValue?: string
-): string | undefined {
-  return config[section]?.[key] ?? defaultValue;
-}
-
-/**
  * Set a value in config (returns new object)
  */
 export function setValue(
@@ -247,64 +210,7 @@ export function setValue(
   };
 }
 
-/**
- * Remove a key from config (returns new object)
- */
-export function removeKey(
-  config: IniConfig,
-  section: string,
-  key: string
-): IniConfig {
-  const result = { ...config };
-  if (result[section]) {
-    const { [key]: _, ...rest } = result[section];
-    result[section] = rest;
-  }
-  return result;
-}
-
-/**
- * Get all keys from a section
- */
-export function getSectionKeys(config: IniConfig, section: string): string[] {
-  return Object.keys(config[section] ?? {});
-}
-
-/**
- * Get all section names
- */
-export function getSections(config: IniConfig): string[] {
-  return Object.keys(config);
-}
-
-/**
- * Check if config has a specific key
- */
-export function hasKey(config: IniConfig, section: string, key: string): boolean {
-  return config[section]?.[key] !== undefined;
-}
-
-/**
- * Count total keys in config
- */
-export function countKeys(config: IniConfig): number {
-  return Object.values(config).reduce(
-    (sum, section) => sum + Object.keys(section).length,
-    0
-  );
-}
-
-export default {
-  parseIniContent,
-  validateIniConfig,
-  formatIniContent,
-  getProtocolHandlerFormatOptions,
-  mergeConfigs,
-  getValue,
-  setValue,
-  removeKey,
-  getSectionKeys,
-  getSections,
-  hasKey,
-  countKeys
-};
+// No `export default {…}`: its only consumer (ProtocolHandlersSettings) uses named
+// imports, so the object was dead weight that nonetheless made 7 unused exports
+// look used. Those went with it — validateIniConfig, getValue, removeKey,
+// getSectionKeys, getSections, hasKey, countKeys (~110 lines).

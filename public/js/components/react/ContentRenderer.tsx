@@ -77,20 +77,23 @@ function PageFallback() {
     );
 }
 
+/** The only param this component reads. `phone` (declared, never read) and the
+ *  `[key: string]` catch-all went with the `isNewPatient` prop below: PatientShell
+ *  was building five fields of which one had a reader. */
 interface ContentRendererParams {
     tpCode?: string;
-    phone?: string;
-    [key: string]: string | undefined;
 }
 
 interface ContentRendererProps {
     personId?: number | null;  // Validated PersonID from loader (null if invalid/new)
     page?: string;
     params?: ContentRendererParams;
-    isNewPatient?: boolean;
 }
 
-const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient: _isNewPatient = false }: ContentRendererProps) => {
+// `isNewPatient` used to be a prop, destructured to `_isNewPatient` and never
+// read — the "new patient" branch is reached by `page === 'add'`, like every
+// other page, not by a flag.
+const ContentRenderer = ({ personId, page = 'photos', params = {} }: ContentRendererProps) => {
     const navigate = useNavigate();
     const wildcardParams = useParams<{ '*': string }>();
     const [searchParams] = useSearchParams();
@@ -230,39 +233,6 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                     />
                 );
 
-            case 'details':
-                return (
-                    <div className="patient-details">
-                        <div className="coming-soon">
-                            <i className="fas fa-user"></i>
-                            <h3>Patient Details</h3>
-                            <p>Patient details view coming soon...</p>
-                        </div>
-                    </div>
-                );
-
-            case 'history':
-                return (
-                    <div className="patient-history">
-                        <div className="coming-soon">
-                            <i className="fas fa-history"></i>
-                            <h3>Patient History</h3>
-                            <p>Patient history view coming soon...</p>
-                        </div>
-                    </div>
-                );
-
-            case 'messages':
-                return (
-                    <div className="patient-messages">
-                        <div className="coming-soon">
-                            <i className="fas fa-comments"></i>
-                            <h3>Messages</h3>
-                            <p>Patient messaging view coming soon...</p>
-                        </div>
-                    </div>
-                );
-
             case 'appointments':
                 return (
                     <PatientAppointments
@@ -350,6 +320,12 @@ const ContentRenderer = ({ personId, page = 'photos', params = {}, isNewPatient:
                     />
                 );
 
+            // NOTE: 'details', 'history' and 'messages' used to be three cases
+            // here rendering a hardcoded "…view coming soon…" card. None of them
+            // appears in Navigation's item list, so they were reachable only by
+            // typing /patient/7/details — three placeholder screens shipped and
+            // URL-addressable. They now fall through to the unknown-page card
+            // below, which is the honest answer.
             default:
                 return (
                     <div className="unknown-page">

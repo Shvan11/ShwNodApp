@@ -7,7 +7,7 @@
  *   <PhoneDisplay phone="9647501234567" />     -> 750 123 4567
  */
 
-import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
+import { formatPhoneForDisplay, cleanPhone } from '../../utils/phoneFormatter';
 
 interface PhoneDisplayProps {
   phone: string | null | undefined;
@@ -22,7 +22,7 @@ const PhoneDisplay = ({ phone, className, asLink = false }: PhoneDisplayProps) =
   if (!formatted) return null;
 
   if (asLink) {
-    const cleanDigits = phone?.replace(/[^\d]/g, '') || '';
+    const cleanDigits = cleanPhone(phone);
     return (
       // dir="ltr" isolates the number so its space-separated groups aren't
       // bidi-reordered (reversed) inside an RTL/Arabic layout.

@@ -16,8 +16,8 @@
  * so they stay assignable to the contract's `z.input` (z.enum) when passed to
  * `sendData`. They are `type` (not `interface`) for the looseObject index-sig rule.
  */
-import { sql } from 'kysely';
-import { getKysely } from '../kysely.js';
+import { sql, type Kysely } from 'kysely';
+import { getKysely, type Database } from '../kysely.js';
 
 type SurfaceMode = 'context' | 'push';
 type AlertStatus = 'active' | 'done' | 'dismissed';
@@ -191,10 +191,14 @@ export async function getAllTasks(limit = 200): Promise<CompletedTask[]> {
 /**
  * Create an alert/task. surface_mode defaults to the DB default ('context') when
  * omitted; the task route passes 'push'. Empty-string dates are normalized to null.
+ * `executor` lets a caller write it inside its own transaction — patient creation
+ * inserts the intake form's alert that way, so a failed create leaves no orphan alert.
  */
-export async function createAlert(input: CreateAlertInput): Promise<void> {
-  const db = getKysely();
-  await db
+export async function createAlert(
+  input: CreateAlertInput,
+  executor: Kysely<Database> = getKysely()
+): Promise<void> {
+  await executor
     .insertInto('alerts')
     .values({
       person_id: input.person_id,

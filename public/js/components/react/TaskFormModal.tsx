@@ -187,12 +187,14 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
             onClose={onClose}
             contentClassName={`modal-content ${styles.dialog}`}
             ariaLabelledBy="task-modal-title"
+            unsavedGuard={{ watchInput: true }}
         >
+            {(dismiss) => (<>
             <ModalHeader
                 titleId="task-modal-title"
                 icon={<i className="fas fa-bell" />}
                 title={isEdit ? 'Edit Task' : 'New Task'}
-                onClose={onClose}
+                onClose={dismiss}
             />
 
             <div className={`modal-body ${styles.body}`}>
@@ -339,11 +341,12 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
             </div>
 
             <div className={`modal-footer ${styles.footer}`}>
-                <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>Cancel</button>
+                <button type="button" className="btn btn-secondary" onClick={dismiss} disabled={loading}>Cancel</button>
                 <button type="button" className="btn btn-primary" onClick={handleSave} disabled={loading}>
                     {loading ? <><i className="fas fa-spinner fa-spin" /> Saving…</> : <><i className="fas fa-save" /> {isEdit ? 'Save' : 'Create Task'}</>}
                 </button>
             </div>
+            </>)}
         </Modal>
     );
 };

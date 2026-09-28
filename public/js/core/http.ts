@@ -74,16 +74,37 @@ const defaultOptions: FetchOptions = {
 let csrfToken: string | null = null;
 let csrfTokenInFlight: Promise<string> | null = null;
 
+/**
+ * The CSRF pre-flight runs *before* the mutation's own `withTimeout` is armed
+ * (see `attempt()`), so it has to carry its own deadline. Without one, a server
+ * that accepts the connection but never answers `/api/csrf-token` (a proxy
+ * holding it open, a wedged event loop) hangs every mutation in the tab with no
+ * abort, no rejection and no toast — and because the fetch is single-flight,
+ * one stuck request stalls all of them. Shorter than the 30s request budget:
+ * this is a tiny same-origin GET, and failing it fast lets the mutation surface
+ * an ordinary error the caller can toast.
+ */
+const CSRF_TIMEOUT_MS = 10_000;
+
 async function fetchCsrfToken(): Promise<string> {
-  const res = await fetch('/api/csrf-token', {
-    method: 'GET',
-    credentials: 'same-origin',
-    headers: { Accept: 'application/json' },
-  });
-  if (!res.ok) throw new Error(`Failed to fetch CSRF token (HTTP ${res.status})`);
-  const body = (await res.json()) as { csrfToken?: string };
-  if (!body.csrfToken) throw new Error('CSRF token endpoint returned no token');
-  return body.csrfToken;
+  // Deliberately NOT chained to the caller's signal: the token fetch is shared
+  // by every concurrent mutation, so one caller navigating away must not abort
+  // the fetch the others are waiting on.
+  const { signal, cleanup } = withTimeout(null, CSRF_TIMEOUT_MS);
+  try {
+    const res = await fetch('/api/csrf-token', {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+      signal,
+    });
+    if (!res.ok) throw new Error(`Failed to fetch CSRF token (HTTP ${res.status})`);
+    const body = (await res.json()) as { csrfToken?: string };
+    if (!body.csrfToken) throw new Error('CSRF token endpoint returned no token');
+    return body.csrfToken;
+  } finally {
+    cleanup();
+  }
 }
 
 /** Return the cached token, single-flight fetching it if absent. */
@@ -207,7 +228,26 @@ async function handleResponse<T>(response: Response, schema?: ResponseSchema): P
     return (schema ? validateResponse(unwrapped, schema, response.url) : unwrapped) as T;
   }
 
-  return response.text() as unknown as T;
+  // A caller that passed a schema asked for a validated JSON payload. Handing it
+  // the raw text instead would skip the ONLY runtime guard prod has (CLAUDE.md:
+  // "This client schema is the only runtime guard in prod"), and the body it
+  // would hand over is a real shape the server produces: there is no `/api` 404
+  // terminator, so an unmatched `/api/*` GET falls through express.static into
+  // routes/web.ts's catch-all and returns the SPA shell as 200 text/html. Without
+  // this branch, a renamed/removed endpoint resolves with ~11 KB of HTML, React
+  // Query caches it as the payload, and the screen dies later somewhere else.
+  const text = await response.text();
+  if (schema) {
+    const err: HttpError = new Error(
+      `Expected a JSON response for ${response.url} but received ${contentType || 'no content-type'}`
+    );
+    err.url = response.url;
+    err.status = response.status;
+    err.data = text.slice(0, 500);
+    throw err;
+  }
+
+  return text as unknown as T;
 }
 
 /**
@@ -456,11 +496,16 @@ export function postFormData<T = unknown>(
   formData: FormData,
   options: FetchOptions = {}
 ): Promise<T> {
+  // `...options` first, like every other helper here: spreading it last let a
+  // caller-supplied `method`/`body` silently win over the two fields that make
+  // this a form POST. The old `headers: {}` was vestigial — the real
+  // Content-Type removal (so the browser sets its own multipart boundary) is the
+  // `body instanceof FormData` branch inside `attempt()`, which runs after the
+  // caller's headers are merged.
   return fetchData<T>(url, {
+    ...options,
     method: 'POST',
     body: formData,
-    headers: {}, // Remove Content-Type so boundary is set automatically
-    ...options,
   });
 }
 

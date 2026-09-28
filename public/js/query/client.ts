@@ -9,10 +9,13 @@
  * Defaults (carried over verbatim from the original inline client, audit M7/M8):
  *  - staleTime 30s — clinic data changes by the minute, not the second.
  *  - gcTime 5m.
- *  - retry 2 — transient network/5xx retry for idempotent reads.
+ *  - retry — up to 2 transient failures (network / timeout / 5xx). A 4xx and a
+ *    fail-loud contract-drift throw are both deterministic, so they are NOT
+ *    retried; see `isTransientQueryError` below.
  *  - refetchOnWindowFocus off — refetch is driven by SSE + explicit triggers.
  */
 import { QueryClient, QueryCache, MutationCache } from '@tanstack/react-query';
+import type { HttpError } from '../core/http';
 import {
   reportClientError,
   isReportableHttpError,
@@ -48,6 +51,29 @@ const mutationCache = new MutationCache({
   },
 });
 
+/**
+ * Is this failure worth another round-trip?
+ *
+ * A bare numeric `retry` retries *everything* — a 404 on a deleted lab case cost
+ * three requests and ~3s of spinner before the screen could say "not found", and
+ * a contract-drift throw (the fail-loud guard) was replayed twice against a
+ * server that would produce the identical mismatch. Both are deterministic.
+ *
+ * What is left — network failure, our own 30s timeout, 5xx — is transient and
+ * worth retrying. This is the same policy `core/http.ts#isRetriableError`
+ * implements for its own opt-in GET retry layer; the two do not stack, because
+ * `fetchJSON` defaults `retries` to 0 and no factory overrides it.
+ */
+export function isTransientQueryError(error: unknown): boolean {
+  const e = error as HttpError | undefined;
+  if (!e) return false;
+  if (e.name === 'AbortError') return false; // caller navigated away
+  if (e.validation !== undefined) return false; // H11 contract drift — deterministic
+  const status = e.status;
+  if (typeof status === 'number') return status >= 500;
+  return true; // no status = network failure / timeout
+}
+
 export const queryClient = new QueryClient({
   queryCache,
   mutationCache,
@@ -55,7 +81,7 @@ export const queryClient = new QueryClient({
     queries: {
       staleTime: 30_000,
       gcTime: 5 * 60_000,
-      retry: 2,
+      retry: (failureCount, error) => failureCount < 2 && isTransientQueryError(error),
       refetchOnWindowFocus: false,
     },
   },

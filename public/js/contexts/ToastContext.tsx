@@ -75,8 +75,13 @@ function Toast({ id, message, type = 'info', duration = 3000, onClose }: ToastPr
   };
 
   return (
-    <div className={`toast toast-${type} ${isVisible ? 'toast-visible' : 'toast-hidden'}`}>
-      <div className="toast-icon">{icons[type]}</div>
+    <div
+      className={`toast toast-${type} ${isVisible ? 'toast-visible' : 'toast-hidden'}`}
+      // An error is the one toast worth interrupting for — it usually means the
+      // action the user just took did NOT happen.
+      role={type === 'error' ? 'alert' : undefined}
+    >
+      <div className="toast-icon" aria-hidden="true">{icons[type]}</div>
       <div className="toast-message">{message}</div>
       <button className="toast-close" onClick={handleClose} aria-label="Close">
         {'\u00D7'}
@@ -99,7 +104,12 @@ interface ToastContainerProps {
  */
 function ToastContainer({ toasts, removeToast }: ToastContainerProps) {
   return (
-    <div className="toast-container">
+    // Live region: toasts replaced alert() app-wide, and alert() was announced by
+    // construction. Without this the entire async-status channel — every save
+    // confirmation and every failure — is invisible to a screen reader.
+    // `polite` (not `assertive`) so a success toast doesn't interrupt what the
+    // user is reading; errors are escalated per-toast below.
+    <div className="toast-container" role="status" aria-live="polite" aria-atomic="false">
       {toasts.map((toast) => (
         <Toast
           key={toast.id}

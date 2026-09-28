@@ -26,6 +26,7 @@ import { arabicDay } from '../../utils/arabic-day.js';
 import type { ClinicNames } from '../settings/clinic-identity.js';
 import { englishDay, format12h, formatPhone, isValidPhone } from './reminder-format.js';
 import { isConnectionStallError, isMalformedSendResultError } from './whatsapp-errors.js';
+import { reminderLanguage } from '../../shared/patient-language.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Recipient selection — who gets a reminder, and what it says
@@ -113,8 +114,10 @@ export function buildReminderPlan(
 
     const countryCode = candidate.countryCode || '964';
     const time = format12h(candidate.appDate);
+    // The codebook (English = 1, everything else the Arabic body) lives in
+    // shared/patient-language.ts, which the demographics forms label from too.
     const message =
-      candidate.language === 1
+      reminderLanguage(candidate.language) === 'en'
         ? `Hello ${candidate.firstName || candidate.patientName}. ${eMes} ${time}`
         : `السلام عليك ${candidate.patientName}. ${aMes} ${time}`;
 

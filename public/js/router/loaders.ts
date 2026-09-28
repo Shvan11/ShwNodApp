@@ -11,8 +11,6 @@
 import type { LoaderFunctionArgs } from 'react-router-dom';
 import { fetchJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { dailyAppointments } from '@shared/contracts/appointment.contract';
-import { patientPhones, tagOptions, typeOptions } from '@shared/contracts/patient.contract';
-import * as workContract from '@shared/contracts/work.contract';
 import { queryClient } from '../query/client';
 import { loaderQuery } from '../query/loaderQuery';
 import { preloadPatientPage } from '../components/react/ContentRenderer';
@@ -20,6 +18,11 @@ import {
   patientInfoQuery,
   workDetailsQuery,
   timepointsQuery,
+  patientPhonesQuery,
+  workTypesQuery,
+  workKeywordsQuery,
+  tagOptionsQuery,
+  typeOptionsQuery,
   alignerDoctorsQuery,
   templatesQuery,
   templateQuery,
@@ -117,11 +120,12 @@ export function withAuth<T>(
 
       const httpErr = error as HttpError;
 
-      // Auth-only verify path: 401 → redirect to login.
+      // Auth-only verify path: 401 → session over. The redirect to /login.html
+      // is index.html's fetch interceptor's job; this clears the cache and hands
+      // the route boundary the status so it can render the Unauthorized card.
       if (httpErr.status === 401) {
-        console.warn('[withAuth] 401 Unauthorized - redirecting to login');
-        queryClient.clear(); // session over — don't leave cached data for the next user
-        window.location.href = '/login.html';
+        console.warn('[withAuth] 401 Unauthorized - session over, clearing cache');
+        queryClient.clear(); // don't leave cached data for the next user
         throw new Response('Unauthorized', { status: 401 });
       }
 
@@ -138,112 +142,43 @@ export function withAuth<T>(
 }
 
 /**
- * Patient info loader result
- */
-export interface PatientInfoLoaderResult {
-  patient: PatientData | null;
-  isNew: boolean;
-}
-
-/**
- * Patient info loader
- * Used by patient portal routes
- */
-export async function patientInfoLoader({
-  params,
-}: LoaderFunctionArgs): Promise<PatientInfoLoaderResult> {
-  const { personId } = params;
-
-  // Skip loading for "new" patient (add patient form)
-  if (personId === 'new' || isNaN(parseInt(personId || '', 10))) {
-    return { patient: null, isNew: true };
-  }
-
-  const data = (await loaderQuery(patientInfoQuery(personId!))) as PatientData;
-  return { patient: data, isNew: false };
-}
-
-/**
- * Work details loader result
- */
-export interface WorkDetailsLoaderResult {
-  work: WorkData | null;
-}
-
-/**
- * Work details loader
- * Used by visits/diagnosis pages
- */
-export async function workDetailsLoader({
-  params,
-  request,
-}: LoaderFunctionArgs): Promise<WorkDetailsLoaderResult> {
-  const { workId } = params;
-  const url = new URL(request.url);
-  const workIdFromQuery = url.searchParams.get('workId');
-  const effectiveWorkId = workId || workIdFromQuery;
-
-  if (!effectiveWorkId) {
-    return { work: null };
-  }
-
-  const data = (await loaderQuery(workDetailsQuery(effectiveWorkId))) as WorkData;
-  return { work: data };
-}
-
-/**
- * Timepoint data
- */
-export interface TimepointData {
-  tp_code?: string | number;
-  tp_date_time?: string;
-  tp_description?: string;
-  [key: string]: unknown;
-}
-
-/**
- * Patient shell loader result
- */
-export interface PatientShellLoaderResult {
-  patient: PatientData | null;
-  work: WorkData | null;
-  timepoints: TimepointData[];
-  isNew: boolean;
-  currentPage: string;
-  workId: string | null;
-}
-
-/**
- * Patient shell loader (comprehensive)
- * Loads patient demographic data and work details (if applicable)
- * This runs BEFORE PatientShell renders, eliminating the loading flash
+ * Patient shell loader — a pure prefetcher.
+ *
+ * Warms the page chunk and fills the React Query cache so PatientShell paints
+ * from cache with no loading flash. It returns `null` on purpose: PatientShell
+ * has no `useLoaderData` and never did — it reads `useParams` for routing and
+ * the cache for data (3 `useQuery`s), which is the documented design ("thin
+ * prefetchers into the React Query cache"). The old return value was a six-field
+ * object built with three `as` casts out of parsed contract payloads — dead
+ * weight, and three unchecked bridges past the fail-loud guard. `currentPage`
+ * was the sharpest decoy: Navigation's `currentPage` prop comes from
+ * PatientShell's own `effectivePage`, not from here. Shape now matches
+ * `labTrackingLoader`.
  */
 export async function patientShellLoader({
   params,
   request,
-}: LoaderFunctionArgs): Promise<PatientShellLoaderResult> {
+}: LoaderFunctionArgs): Promise<null> {
   const { personId, page, workId } = params;
+
+  const url = new URL(request.url);
+  const workIdFromQuery = url.searchParams.get('workId');
+  const effectiveWorkId = workId || workIdFromQuery;
 
   // Warm the lazy chunk for the tab we're about to render, in parallel with the
   // data fetch below. ContentRenderer code-splits each patient sub-page, so
   // without this the page chunk would only begin downloading after PatientShell
   // mounts — a waterfall. Fire-and-forget (mirrors routes.config's withPreload).
-  preloadPatientPage(page);
-
-  const url = new URL(request.url);
-  const workIdFromQuery = url.searchParams.get('workId');
-  const effectiveWorkId = workId || workIdFromQuery;
+  //
+  // The diagnosis deep-link has no `:page` segment (its route is
+  // ':personId/work/:workId/diagnosis'), so `params.page` is undefined there and
+  // this used to no-op on the largest patient sub-page in the tree. Mirror the
+  // derivation PatientShell already does for rendering.
+  preloadPatientPage(url.pathname.endsWith('/diagnosis') ? 'diagnosis' : page);
 
   // Skip loading for "new" patient (add patient form)
   if (personId === 'new' || isNaN(parseInt(personId || '', 10))) {
-    return {
-      patient: null,
-      work: null,
-      timepoints: [],
-      isNew: true,
-      currentPage: page || 'works',
-      workId: effectiveWorkId,
-    };
+    return null;
   }
 
   // Load patient demographics
@@ -260,21 +195,11 @@ export async function patientShellLoader({
       ? loaderQuery(timepointsQuery(personId!))
       : Promise.resolve(null);
 
-  // Wait for all promises in parallel
-  const [patient, work, timepoints] = await Promise.all([
-    patientPromise,
-    workPromise,
-    timepointsPromise,
-  ]);
+  // Wait for all promises in parallel — the results land in the RQ cache, which
+  // is the whole point; nothing here is returned.
+  await Promise.all([patientPromise, workPromise, timepointsPromise]);
 
-  return {
-    patient: (patient ?? null) as PatientData | null,
-    work: (work ?? null) as WorkData | null,
-    timepoints: (timepoints ?? []) as TimepointData[],
-    isNew: false,
-    currentPage: page || 'works',
-    workId: effectiveWorkId,
-  };
+  return null;
 }
 
 /**
@@ -387,94 +312,47 @@ export async function templateDesignerLoader({
 }
 
 /**
- * Select option format for react-select
+ * PATIENT MANAGEMENT LOADER — a pure prefetcher.
+ *
+ * Warms the five filter lookups in the shared React Query cache so the screen's
+ * dropdowns paint filled on first render, and enables native scroll restoration
+ * via React Router.
+ *
+ * It returns `null`: the component reads the same five keys with `useQuery`.
+ * This used to issue five raw `fetchJSON` calls that duplicated
+ * `patientPhonesQuery`/`workTypesQuery`/`workKeywordsQuery`/`tagOptionsQuery`/
+ * `typeOptionsQuery` verbatim and returned the rows as loader data, so the
+ * results never entered the cache — which is why `typeOptionsQuery` read as dead
+ * code, and why a work type or patient tag edited through Settings → Lookups
+ * could not reach these dropdowns until a full route re-navigation.
+ *
+ * `ensureQueryData` rather than `loaderQuery` on purpose: `loaderQuery` maps a
+ * failure onto a `Response` for the route errorElement, and here each lookup is
+ * individually tolerated (`emptyOnHttpError`) so one bad lookup does not blank
+ * the other four or the screen.
+ *
+ * NOTE: the component still handles its own searching (sessionStorage restore +
+ * `?search=` deep link) — that is the documented loader exception, and it is
+ * about *search*, not about bypassing the cache for these lookups.
  */
-export interface SelectOption {
-  value: number | string;
-  label: string;
-}
-
-/**
- * Patient management loader result
- */
-export interface PatientManagementLoaderResult {
-  allPatients: PatientData[];
-  workTypes: SelectOption[];
-  keywords: SelectOption[];
-  tags: SelectOption[];
-  patientTypes: SelectOption[];
-  error?: string;
-  _loaderTimestamp: number;
-}
-
-/**
- * PATIENT MANAGEMENT LOADER
- * Pre-fetches filter data (work types, keywords, tags, patient list)
- * Enables native scroll restoration via React Router
- */
-export async function patientManagementLoader({
-  request,
-}: LoaderFunctionArgs): Promise<PatientManagementLoaderResult> {
-  const { signal } = request;
-
+export async function patientManagementLoader(): Promise<null> {
   if (import.meta.env.DEV) console.log('[Loader] Pre-fetching patient management filter data');
 
   try {
-    // Fetch all filter data in parallel. Each lookup returns a raw array
-    // (fetchJSON passthrough) and tolerates its own non-2xx (→ empty) so one bad
-    // lookup doesn't blank the rest; a network/abort error still rejects → outer catch.
-    const [allPatients, workTypesData, keywordsData, tagsData, patientTypesData] = await Promise.all([
-      emptyOnHttpError(fetchJSON<PatientData[]>('/api/patients/phones', { signal, schema: patientPhones.response })),
-      emptyOnHttpError(fetchJSON<Array<{ id: number; work_type: string }>>('/api/getworktypes', { signal, schema: workContract.getWorkTypes.response })),
-      emptyOnHttpError(fetchJSON<Array<{ id: number; key_word: string }>>('/api/getworkkeywords', { signal, schema: workContract.getWorkKeywords.response })),
-      emptyOnHttpError(fetchJSON<Array<{ id: number; tag: string }>>('/api/patients/tag-options', { signal, schema: tagOptions.response })),
-      emptyOnHttpError(fetchJSON<Array<{ id: number; type: string }>>('/api/patients/type-options', { signal, schema: typeOptions.response })),
+    await Promise.all([
+      emptyOnHttpError(queryClient.ensureQueryData(patientPhonesQuery())),
+      emptyOnHttpError(queryClient.ensureQueryData(workTypesQuery())),
+      emptyOnHttpError(queryClient.ensureQueryData(workKeywordsQuery())),
+      emptyOnHttpError(queryClient.ensureQueryData(tagOptionsQuery())),
+      emptyOnHttpError(queryClient.ensureQueryData(typeOptionsQuery())),
     ]);
-
-    // Transform to react-select format
-    const workTypes: SelectOption[] = workTypesData.map((wt) => ({
-      value: wt.id,
-      label: wt.work_type,
-    }));
-
-    const keywords: SelectOption[] = keywordsData.map((kw) => ({
-      value: kw.id,
-      label: kw.key_word,
-    }));
-
-    const tags: SelectOption[] = tagsData.map((tag) => ({
-      value: tag.id,
-      label: tag.tag,
-    }));
-
-    const patientTypes: SelectOption[] = patientTypesData.map((pt) => ({
-      value: pt.id,
-      label: pt.type,
-    }));
-
-    // NOTE: the component handles its own searching (sessionStorage restore +
-    // `?search=` deep link); the loader only prefetches the dropdown data.
-    return {
-      allPatients,
-      workTypes,
-      keywords,
-      tags,
-      patientTypes,
-      _loaderTimestamp: Date.now(),
-    };
   } catch (error) {
+    // Network/abort — the screen still renders; its useQuery reads will report
+    // and retry on their own.
     console.error('[Loader] Failed to load filter data:', error);
-    // Return empty arrays on error
-    return {
-      allPatients: [],
-      workTypes: [],
-      keywords: [],
-      tags: [],
-      patientTypes: [],
-      error: error instanceof Error ? error.message : 'Unknown error',
-      _loaderTimestamp: Date.now(),
-    };
   }
+
+  return null;
 }
 
 /**

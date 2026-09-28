@@ -89,6 +89,13 @@
     font-weight: var(--font-weight-bold);
 }
 
+/* Helper text under a field (e.g. where the Alerts box ends up). */
+.fieldHint {
+    margin-top: var(--spacing-xs);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}
+
 /* Alert messages with better styling */
 .alert {
     padding: var(--spacing-md) var(--spacing-lg);

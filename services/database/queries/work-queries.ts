@@ -533,7 +533,14 @@ async function insertFullPaymentInvoice(
   totalRequired: number,
   currency: string | null | undefined
 ): Promise<number> {
-  const usdReceived = currency === 'USD' || currency === 'EUR' ? totalRequired : 0;
+  // USD and IQD are the only cash columns an invoice has. EUR used to be booked into
+  // `usd_received` here — euros counted as dollars in the cash box (FE-F7-5). Every
+  // body that reaches this now enums the currency to WORK_CURRENCIES, so anything
+  // else is a programming error: fail the transaction rather than book cash nowhere.
+  if (currency !== 'USD' && currency !== 'IQD') {
+    throw new Error(`Cannot book a full-payment invoice in currency ${String(currency)}`);
+  }
+  const usdReceived = currency === 'USD' ? totalRequired : 0;
   const iqdReceived = currency === 'IQD' ? totalRequired : 0;
   const invoice = await trx
     .insertInto('invoices')

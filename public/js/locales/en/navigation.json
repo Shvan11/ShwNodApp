@@ -51,8 +51,6 @@
   "toast": {
     "sendingToThreeShape": "Sending patient to 3Shape…",
     "sentToThreeShape": "Sent to 3Shape — opening Unite on the scanner",
-    "threeShapeFailed": "Failed to send to 3Shape",
-    "csImagingFailed": "Failed to open CS Imaging: {{error}}",
-    "dolphinFailed": "Failed to open Dolphin Imaging: {{error}}"
+    "threeShapeFailed": "Failed to send to 3Shape"
   }
 }

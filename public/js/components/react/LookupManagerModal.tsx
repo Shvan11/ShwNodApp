@@ -8,12 +8,12 @@
  * server whitelist (LOOKUP_TABLE_CONFIG) is all that's needed to manage it here.
  *
  * Stacking: the lab dropdown that opens this lives inside the Expense modal, so
- * this can render on top of another <Modal>. Body-scroll lock is refcounted in
- * Modal.tsx (safe to nest), but its Escape handler is document-level, so we close
- * THIS modal ourselves on a captured Escape (stopImmediatePropagation) and pass
- * `closeOnEscape={false}` to the inner Modal — the underlying modal stays open.
+ * this can render on top of another <Modal>. Both halves of that are handled by
+ * the primitive — the body-scroll lock is refcounted and Escape is served from a
+ * stack whose TOP entry alone answers, so this modal closes and the one beneath
+ * it stays open. (Until 2026-09-17 it hand-rolled that itself, with a captured
+ * `stopImmediatePropagation` plus `closeOnEscape={false}`.)
  */
-import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
@@ -69,27 +69,12 @@ const LookupManagerModal = ({ isOpen, onClose, tableKey, title, onChanged }: Loo
   const tables = (data ?? []) as TableConfig[];
   const config = tables.find((t) => t.key === tableKey) ?? null;
 
-  // Close on a captured Escape so a parent <Modal> doesn't also close (see header).
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.stopImmediatePropagation();
-        event.preventDefault();
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKey, true);
-    return () => document.removeEventListener('keydown', handleKey, true);
-  }, [isOpen, onClose]);
-
   const heading = title ?? (config ? `Manage ${config.displayName}` : 'Manage Values');
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      closeOnEscape={false}
       ariaLabelledBy={TITLE_ID}
       contentClassName={styles.modalContent}
     >

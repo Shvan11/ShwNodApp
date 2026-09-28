@@ -10,7 +10,11 @@ import styles from './EditPatientComponent.module.css';
 import { formatISODate } from '../../core/utils';
 import { putJSON, postJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import * as patientContract from '@shared/contracts/patient.contract';
+import { PATIENT_LANGUAGE_OPTIONS } from '@shared/patient-language';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { qk } from '@/query/keys';
+import { notifyApprovalsChanged } from '@/services/approvals';
 import {
     patientByIdQuery,
     gendersQuery,
@@ -74,6 +78,9 @@ interface FormData {
 
 const EditPatientComponent = ({ personId }: Props) => {
     const { t } = useTranslation('patients');
+    // Patient edit + delete are FINANCE_ROLES on the server — see the guard above the render.
+    const { user } = useGlobalState();
+    const caps = roleCaps(user?.role as UserRole | undefined);
     const navigate = useNavigate();
     const location = useLocation();
     const toast = useToast();
@@ -310,6 +317,9 @@ const EditPatientComponent = ({ personId }: Props) => {
             setShowDeleteConfirm(false);
             if (data.outcome === 'pending') {
                 toast.success(t('edit.toast.deletePending'));
+                // A request was created but no row changed — tell the approval bells
+                // (they only hear about a RESOLVED request otherwise, and poll every 5 min).
+                notifyApprovalsChanged();
                 return;
             }
             queryClient.invalidateQueries({ queryKey: qk.patient.all(pid) });
@@ -326,6 +336,21 @@ const EditPatientComponent = ({ personId }: Props) => {
             setDeleting(false);
         }
     };
+
+    // A doctor/assistant who reaches this route used to fill the whole form and learn
+    // "Insufficient permissions" only at Save (FE-F6-6). Gated only once the role is
+    // known, so an admin's cold load never flashes it.
+    if (user && !caps.editRecords) {
+        return (
+            <div className={styles.editPatientContainer}>
+                <div className={styles.editPatientError} role="alert">
+                    <div>
+                        <i className="fas fa-lock"></i> {t('edit.notPermitted')}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (loading) {
         return (
@@ -533,9 +558,10 @@ const EditPatientComponent = ({ personId }: Props) => {
                             value={formData.language}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, language: e.target.value})}
                         >
-                            <option value="0">{t('languages.kurdish')}</option>
-                            <option value="1">{t('languages.arabic')}</option>
-                            <option value="2">{t('languages.english')}</option>
+                            {/* Codebook shared with the reminder senders (FE-F6-2). */}
+                            {PATIENT_LANGUAGE_OPTIONS.map(o => (
+                                <option key={o.code} value={String(o.code)}>{t(`languages.${o.key}`)}</option>
+                            ))}
                         </select>
                     </div>
                 </div>

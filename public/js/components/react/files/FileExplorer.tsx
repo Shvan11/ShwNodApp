@@ -180,7 +180,9 @@ const FileExplorer = ({ personId, subPath }: Props) => {
       const qs = new URLSearchParams({ path: currentPath });
       setBusy(true);
       try {
-        await postFormData(`/api/patients/${personId}/files/upload?${qs}`, form);
+        // 120s to match the server's timeouts.long — a multi-file drop exceeds the
+        // funnel's 30s default, which would abort it while the server was still writing.
+        await postFormData(`/api/patients/${personId}/files/upload?${qs}`, form, { timeoutMs: 120000 });
         toast.success(`Uploaded ${list.length} file(s)`);
         reload();
       } catch (err) {

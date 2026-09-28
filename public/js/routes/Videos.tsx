@@ -319,7 +319,10 @@ export default function Videos() {
         if (formData.details) uploadData.append('details', formData.details);
         if (thumbnailFile) uploadData.append('thumbnail', thumbnailFile);
 
-        await postFormData('/api/videos', uploadData);
+        // 120s to match the server's timeouts.long on this route — an educational
+        // video is far more than 30s of LAN transfer, and the funnel's default
+        // would abort it client-side mid-upload.
+        await postFormData('/api/videos', uploadData, { timeoutMs: 120000 });
 
         toast.success('Video uploaded successfully');
       }

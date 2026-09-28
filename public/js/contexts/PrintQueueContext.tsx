@@ -5,6 +5,13 @@
  *
  * Uses "rich labels" format: { text, patientName, doctorName, includeLogo }
  * Compatible with unified aligner-label-generator API
+ *
+ * Surface is deliberately minimal: `toggleLogo`, `updateLabels`,
+ * `buildLabelsForPrint`, `isModalOpen`/`setIsModalOpen`, the `addedAt` field and
+ * a `RichLabel` type were removed in the F3 audit — none had a consumer, because
+ * LabelPreviewModal carries its own copies of the grouping/label-building logic
+ * and RootLayout holds its own modal flag. If you re-add one, wire it to the
+ * modal rather than leaving a second implementation behind.
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
@@ -52,14 +59,6 @@ export interface PrintQueueItem {
     setId?: number;
     labels: string[];
     includeLogo: boolean;
-    addedAt: number;
-}
-
-export interface RichLabel {
-    text: string;
-    patientName: string;
-    doctorName: string;
-    includeLogo: boolean;
 }
 
 export interface PrintQueueStats {
@@ -82,15 +81,10 @@ export interface PrintQueueContextValue {
     removeByBatchId: (batchId: number | string) => void;
     clearQueue: () => void;
     isInQueue: (batchId: number | string) => boolean;
-    toggleLogo: (id: string) => void;
-    updateLabels: (id: string, labels: string[]) => void;
     getStats: () => PrintQueueStats;
     getGroupedQueue: () => PatientGroup[];
-    buildLabelsForPrint: () => RichLabel[];
     isExpanded: boolean;
     setIsExpanded: React.Dispatch<React.SetStateAction<boolean>>;
-    isModalOpen: boolean;
-    setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const PrintQueueContext = createContext<PrintQueueContextValue | undefined>(undefined);
@@ -115,7 +109,7 @@ function buildDefaultLabels(batch: PrintQueueBatch): string[] {
  * Generate unique ID for queue items
  */
 function generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
 interface PrintQueueProviderProps {
@@ -144,7 +138,6 @@ export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
         return [];
     });
     const [isExpanded, setIsExpanded] = useState(false);
-    const [isModalOpen, setIsModalOpen] = useState(false);
 
     // Save queue to sessionStorage on change
     useEffect(() => {
@@ -188,7 +181,6 @@ export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
                 setId: set?.setId,
                 labels,
                 includeLogo: !!doctor?.logoPath,
-                addedAt: Date.now()
             };
 
             return [...prev, newItem];
@@ -225,24 +217,6 @@ export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
     }, [queue]);
 
     /**
-     * Toggle logo for a specific queue item
-     */
-    const toggleLogo = useCallback((id: string) => {
-        setQueue(prev => prev.map(item =>
-            item.id === id ? { ...item, includeLogo: !item.includeLogo } : item
-        ));
-    }, []);
-
-    /**
-     * Update labels for a specific queue item
-     */
-    const updateLabels = useCallback((id: string, labels: string[]) => {
-        setQueue(prev => prev.map(item =>
-            item.id === id ? { ...item, labels } : item
-        ));
-    }, []);
-
-    /**
      * Get queue statistics
      */
     const getStats = useCallback((): PrintQueueStats => {
@@ -276,25 +250,6 @@ export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
         return Object.values(grouped);
     }, [queue]);
 
-    /**
-     * Build flattened rich labels array for PDF generation
-     * Each label is a rich object: { text, patientName, doctorName, includeLogo }
-     */
-    const buildLabelsForPrint = useCallback((): RichLabel[] => {
-        const labels: RichLabel[] = [];
-        queue.forEach(item => {
-            item.labels.forEach(labelText => {
-                labels.push({
-                    text: labelText,
-                    patientName: item.patientName,
-                    doctorName: item.doctorName || '',
-                    includeLogo: item.includeLogo
-                });
-            });
-        });
-        return labels;
-    }, [queue]);
-
     const value: PrintQueueContextValue = {
         queue,
         addToQueue,
@@ -302,15 +257,10 @@ export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
         removeByBatchId,
         clearQueue,
         isInQueue,
-        toggleLogo,
-        updateLabels,
         getStats,
         getGroupedQueue,
-        buildLabelsForPrint,
         isExpanded,
-        setIsExpanded,
-        isModalOpen,
-        setIsModalOpen
+        setIsExpanded
     };
 
     return (

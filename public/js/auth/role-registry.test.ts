@@ -11,7 +11,15 @@
  * (`vitest.config.ts`); the shared modules import via the `@shared` alias.
  */
 import { describe, it, expect } from 'vitest';
-import { ALL_ROLES, ASSIGNABLE_ROLES, ROLE_LABELS, normalizeRole } from '@shared/auth/roles';
+import {
+  ADMIN_ROLES,
+  ALL_ROLES,
+  ASSIGNABLE_ROLES,
+  FINANCE_ROLES,
+  ROLE_LABELS,
+  normalizeRole,
+  roleCaps,
+} from '@shared/auth/roles';
 import { createUser, updateRole } from '@shared/contracts/user-management.contract';
 import { MIN_PASSWORD_LENGTH } from '@shared/validation';
 
@@ -58,5 +66,36 @@ describe('role registry ↔ contract drift guard', () => {
     }
     expect(normalizeRole(undefined)).toBeUndefined();
     expect(normalizeRole(null)).toBeUndefined();
+  });
+});
+
+/**
+ * The UI's capability flags must say exactly what the SERVER's role sets allow, or a
+ * screen offers a write that 403s at Save (FE-F6-6 / FE-F7-7) — or hides one a role
+ * may make. Each flag is pinned to the role set its routes are gated on in
+ * `app/__snapshots__/route-table.txt`.
+ */
+describe('roleCaps ↔ server role sets drift guard', () => {
+  const inSet = (set: readonly string[], role: string) => set.includes(role);
+
+  it('writeFinance / viewFinance / editRecords are exactly FINANCE_ROLES', () => {
+    for (const role of ALL_ROLES) {
+      const caps = roleCaps(role);
+      expect(caps.writeFinance, role).toBe(inSet(FINANCE_ROLES, role));
+      expect(caps.viewFinance, role).toBe(inSet(FINANCE_ROLES, role));
+      expect(caps.editRecords, role).toBe(inSet(FINANCE_ROLES, role));
+    }
+  });
+
+  it('adminWrites / manageUsers are exactly ADMIN_ROLES', () => {
+    for (const role of ALL_ROLES) {
+      const caps = roleCaps(role);
+      expect(caps.adminWrites, role).toBe(inSet(ADMIN_ROLES, role));
+      expect(caps.manageUsers, role).toBe(inSet(ADMIN_ROLES, role));
+    }
+  });
+
+  it('an unknown / missing role gets no capability at all (fail-closed)', () => {
+    expect(Object.values(roleCaps(undefined)).every((v) => v === false)).toBe(true);
   });
 });

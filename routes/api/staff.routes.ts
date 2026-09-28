@@ -6,6 +6,7 @@ import { Router, type Request, type Response } from 'express';
 import {
   listActiveDoctors,
   listActiveOperators,
+  listWorkDoctors,
 } from '../../services/database/queries/employee-queries.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import * as staff from '../../shared/contracts/staff.contract.js';
@@ -25,6 +26,22 @@ router.get('/doctors', async (_req: Request, res: Response): Promise<void> => {
   } catch (error) {
     log.error('Error fetching doctors:', error);
     ErrorResponses.internalError(res, 'Failed to fetch doctors', error as Error);
+  }
+});
+
+/**
+ * GET /work-doctors
+ * Who a work can be attributed to — active Doctor-position employees plus anyone on commission
+ * (see listWorkDoctors). The work form's Doctor select; the calendar/appointment filters keep
+ * /doctors, which is position-only.
+ */
+router.get('/work-doctors', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const doctors = await listWorkDoctors();
+    sendData(res, staff.workDoctors.response, doctors);
+  } catch (error) {
+    log.error('Error fetching work doctors:', error);
+    ErrorResponses.internalError(res, 'Failed to fetch work doctors', error as Error);
   }
 });
 

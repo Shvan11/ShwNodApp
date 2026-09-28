@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { ReactNode } from 'react';
 import Modal from './Modal';
 import styles from './ConfirmDialog.module.css';
@@ -23,6 +24,10 @@ const ConfirmDialog = ({
     cancelText = 'Cancel',
     isDangerous = false,
 }: ConfirmDialogProps) => {
+    // Generated, not a literal: a confirm can be raised from inside another
+    // ConfirmDialog, so two can be mounted at once.
+    const titleId = useId();
+
     const messageContent = typeof message === 'string'
         ? message.split('\n').filter((l) => l.trim() !== '').map((line, i) => (
             <p key={i} className={styles.line}>{line}</p>
@@ -30,9 +35,12 @@ const ConfirmDialog = ({
         : <div className={styles.line}>{message}</div>;
 
     return (
-        <Modal isOpen={isOpen} onClose={onCancel} closeOnBackdropClick={false} overlayClassName={styles.overlay}>
+        <Modal isOpen={isOpen} onClose={onCancel} closeOnBackdropClick={false} overlayClassName={styles.overlay} ariaLabelledBy={titleId}>
             <div className={styles.dialog}>
-                <h2 className={styles.title}>{title}</h2>
+                {/* data-modal-drag-handle: without a handle the shared Modal treats the
+                    WHOLE body as a drag surface and sets user-select:none on <body> at
+                    pointerdown, so the message text couldn't be selected or copied. */}
+                <h2 id={titleId} className={styles.title} data-modal-drag-handle>{title}</h2>
                 <div className={styles.body}>{messageContent}</div>
                 <div className={styles.actions}>
                     <button className="btn btn-secondary" onClick={onCancel}>

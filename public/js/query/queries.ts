@@ -706,8 +706,9 @@ export const appointmentByIdQuery = (id: number | string | null | undefined) =>
   });
 
 // ---------------------------------------------------------------------------
-// Exchange rates — 404 = "no rate for this date", a normal empty state, so
-// these don't retry (the consumer treats the error as "not set").
+// Exchange rates — 404 = "no rate for this date", a normal empty state the
+// consumer treats as "not set". The client's default retry predicate already
+// skips 4xx (query/client.ts), so these need no local opt-out.
 // ---------------------------------------------------------------------------
 
 /** GET /api/getCurrentExchangeRate — today's USD→IQD rate. */
@@ -719,7 +720,6 @@ export const currentExchangeRateQuery = () =>
         '/api/getCurrentExchangeRate',
         { signal, schema: paymentContract.currentExchangeRate.response }
       ),
-    retry: false,
   });
 
 /** GET /api/getExchangeRateForDate?date= — rate for one date. */
@@ -732,7 +732,6 @@ export const exchangeRateForDateQuery = (date: string) =>
         { signal, schema: paymentContract.exchangeRateForDate.response }
       ),
     enabled: !!date,
-    retry: false,
   });
 
 /** GET /api/exchange-rates?from=&to= — rate history in a range. */
@@ -989,6 +988,11 @@ export const patientsFolderQuery = () =>
         '/api/settings/patients-folder',
         { signal, schema: patientContract.patientsFolder.response }
       ),
+    // A share path that changes about never. 1h rather than the 30s default:
+    // Navigation reads this on every patient page, and this replaced a
+    // localStorage mirror that cached it FOREVER (a Settings change never
+    // reached a browser that had it) — long-but-bounded is the point.
+    staleTime: 60 * 60_000,
   });
 
 // ---------------------------------------------------------------------------
@@ -1003,6 +1007,21 @@ export const doctorsQuery = () =>
       fetchJSON<z.infer<typeof staffContract.doctors.response>>('/api/doctors', {
         signal,
         schema: staffContract.doctors.response,
+      }),
+  });
+
+/**
+ * GET /api/work-doctors — the work form's Doctor options: active Doctor-position
+ * employees plus anyone on commission (FE-F7-1). Not `employeesQuery('?percentage=true')`,
+ * which is the commission flag alone.
+ */
+export const workDoctorsQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.workDoctors(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof staffContract.workDoctors.response>>('/api/work-doctors', {
+        signal,
+        schema: staffContract.workDoctors.response,
       }),
   });
 
@@ -1083,7 +1102,8 @@ export const transferPreviewQuery = (workId: number | null | undefined) =>
  * DELIBERATELY schema-less: the endpoint returns the row or literal `null` (the
  * "no diagnosis yet" signal), not the sendSuccess envelope, so it carries no
  * contract response. Tolerant like the legacy `.catch(() => null)` read — any
- * failure resolves to `null` and the read doesn't retry.
+ * failure resolves to `null`, so the queryFn never rejects and retry never
+ * applies at all.
  */
 export const diagnosisQuery = (workId: Id) =>
   queryOptions({
@@ -1098,7 +1118,6 @@ export const diagnosisQuery = (workId: Id) =>
         return null;
       }
     },
-    retry: false,
   });
 
 // ---------------------------------------------------------------------------
@@ -1325,7 +1344,8 @@ export const allOptionsQuery = () =>
 /**
  * GET /api/options/:name — one named option row. A missing option is a normal
  * empty state (the legacy reads did `.catch(() => null)`), so a 404 resolves to
- * `null` rather than erroring, and the read doesn't retry.
+ * `null` rather than erroring. Anything else still throws — and still retries,
+ * because what is left after the 404 branch is transient (network / 5xx).
  */
 export const optionQuery = (name: string) =>
   queryOptions({
@@ -1341,7 +1361,6 @@ export const optionQuery = (name: string) =>
         throw err;
       }
     },
-    retry: false,
   });
 
 /**
@@ -1489,8 +1508,12 @@ export const integrationsCloudflareListStatusQuery = () =>
       ),
   });
 
-/** GET /api/threeshape/patients/:id/cases — patient's 3Shape cases (live). retry off:
- *  a not-connected / unreachable error is actionable, not transient. */
+/** GET /api/threeshape/patients/:id/cases — patient's 3Shape cases (live).
+ *  `retry: false` is KEPT (not subsumed by the client's skip-4xx default): an
+ *  Unite box that is off or unreachable surfaces as a 5xx/network error, which
+ *  the default would treat as transient — but here it is actionable, and the
+ *  user should be told to check the workstation rather than wait out two
+ *  backoffs. Same for the media read below. */
 export const threeShapeCasesQuery = (personId: number | string) =>
   queryOptions({
     queryKey: qk.threeshape.cases(personId),
@@ -1587,11 +1610,35 @@ export interface SyncDriftReport {
   error: string | null;
 }
 
+/** One clock the schema's wall-clock timestamps depend on: its zone and that zone's UTC offset now. */
+export interface SyncClockReading {
+  tz: string;
+  offsetSec: number;
+}
+
+/**
+ * Whether the app server, local PostgreSQL and the Supabase mirror stamp wall-clock time in the same
+ * zone (`services/sync/cdc/clock-check.ts`). A disagreement skews every portal-written time and the
+ * reverse sync's last-write-wins comparison (audit FE-F5-1).
+ */
+export interface SyncClockReport {
+  checkedAt: string;
+  node: SyncClockReading;
+  local: SyncClockReading | null;
+  mirror: SyncClockReading | null;
+  mirrorConfigured: boolean;
+  /** One sentence per disagreement, each naming its fix. Empty when the clocks agree. */
+  mismatches: string[];
+  error: string | null;
+}
+
 export interface SyncSinkStatusResponse {
   success: boolean;
   checkedAt?: string;
   /** Absent on the Dolphin endpoint, and null until the first sweep completes (~5 min after boot). */
   drift?: SyncDriftReport | null;
+  /** Absent on the Dolphin endpoint, and null until the first check completes (~1 min after boot). */
+  clock?: SyncClockReport | null;
   sinks?: SyncSinkStatus[];
   error?: string;
 }

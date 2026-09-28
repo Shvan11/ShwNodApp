@@ -7,7 +7,7 @@ import { roleCaps, type UserRole } from '@shared/auth/roles';
 // CSS Modules
 import styles from './SettingsContainer.module.css';
 
-import SettingsTabNavigation from './SettingsTabNavigation';
+import SettingsTabNavigation, { settingsPanelId, settingsTabId } from './SettingsTabNavigation';
 import GeneralSettings from './GeneralSettings';
 import DatabaseSettings from './DatabaseSettings';
 import AlignerDoctorsSettings from './AlignerDoctorsSettings';
@@ -267,7 +267,13 @@ const SettingsComponent: React.FC = () => {
                 tabData={tabData}
             />
 
-            <div className={styles.content}>
+            <div
+                className={styles.content}
+                role="tabpanel"
+                id={settingsPanelId(activeTab)}
+                aria-labelledby={settingsTabId(activeTab)}
+                tabIndex={0}
+            >
                 {ActiveTabComponent && (
                     <ActiveTabComponent
                         onChangesUpdate={handleTabChangesUpdate}

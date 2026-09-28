@@ -247,11 +247,16 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
             onClose={handleClose}
             contentClassName={styles.modalContent}
             ariaLabelledBy="expense-modal-title"
+            // The form is seeded during render (the row in edit mode, today's date
+            // in add mode); programmatic writes dispatch no input event, so only a
+            // real edit arms the guard.
+            unsavedGuard={{ watchInput: true }}
         >
+            {(dismiss) => (<>
                 <ModalHeader
                     titleId="expense-modal-title"
                     title={modalTitle}
-                    onClose={handleClose}
+                    onClose={dismiss}
                     closeLabel={t('modal.close')}
                 />
 
@@ -414,7 +419,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                         <button
                             type="button"
                             className="btn btn-secondary"
-                            onClick={handleClose}
+                            onClick={dismiss}
                             disabled={submitting}
                         >
                             {t('modal.cancel')}
@@ -428,6 +433,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                         </button>
                     </div>
                 </form>
+            </>)}
         </Modal>
         {labLookup.overlay}
         </>

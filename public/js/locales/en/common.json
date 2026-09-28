@@ -45,5 +45,11 @@
     "logoutConfirm": "Are you sure you want to log out?",
     "logoutTitle": "Log out",
     "logoutFailed": "Logout failed"
+  },
+  "unsaved": {
+    "title": "Unsaved changes",
+    "message": "You have unsaved changes. Discard them?",
+    "discard": "Discard",
+    "keepEditing": "Keep editing"
   }
 }

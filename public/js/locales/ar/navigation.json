@@ -51,8 +51,6 @@
   "toast": {
     "sendingToThreeShape": "جارٍ إرسال المريض إلى 3Shape…",
     "sentToThreeShape": "تم الإرسال إلى 3Shape — جارٍ فتح Unite على جهاز المسح",
-    "threeShapeFailed": "فشل الإرسال إلى 3Shape",
-    "csImagingFailed": "فشل فتح CS Imaging: {{error}}",
-    "dolphinFailed": "فشل فتح Dolphin Imaging: {{error}}"
+    "threeShapeFailed": "فشل الإرسال إلى 3Shape"
   }
 }

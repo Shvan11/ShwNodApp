@@ -97,7 +97,7 @@ function getDefaultDate(): string {
 /**
  * Format date label with relative time
  */
-function formatDateLabel(date: Date, _currentDate: string): string {
+function formatDateLabel(date: Date): string {
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   const dateStr = getLocalDateString(date);
@@ -168,7 +168,7 @@ function generateDateOptions(currentDate: string): DateOption[] {
 
   return dates.map((date) => ({
     value: getLocalDateString(date),
-    label: formatDateLabel(date, currentDate),
+    label: formatDateLabel(date),
     isToday: getLocalDateString(date) === getLocalDateString(today),
     isDefault: getLocalDateString(date) === currentDate,
   }));
@@ -176,7 +176,7 @@ function generateDateOptions(currentDate: string): DateOption[] {
 
 /**
  * Check if a date is within the sendable range (1-2 days from today).
- * The database stored procedure only returns messages for tomorrow or day after tomorrow.
+ * The reminder query only returns messages for tomorrow or the day after.
  */
 function getDateSendability(dateStr: string): DateSendability {
   const today = new Date();

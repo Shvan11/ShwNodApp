@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import { isInvalidStateTransition } from '@/query/useApiMutation';
 import { dailyAppointments, type DailyAppointmentsResponse } from '@shared/contracts/appointment.contract';
 import { qk } from '@/query/keys';
 
@@ -143,15 +144,10 @@ export function useAppointments(
   // right recovery is a silent reload of the truth. Returns true if it handled it.
   const recoverFromConflict = useCallback(
     async (err: unknown, currentDate: string): Promise<boolean> => {
-      const httpErr = err as HttpError;
-      if (httpErr.status !== 400) return false;
-      const errorData = httpErr.data as { details?: { code?: string } } | undefined;
-      if (errorData?.details?.code === 'INVALID_STATE_TRANSITION') {
-        window.toast?.warning('Patient state changed — refreshing');
-        await loadAppointments(currentDate);
-        return true;
-      }
-      return false;
+      if (!isInvalidStateTransition(err)) return false;
+      window.toast?.warning('Patient state changed — refreshing');
+      await loadAppointments(currentDate);
+      return true;
     },
     [loadAppointments]
   );

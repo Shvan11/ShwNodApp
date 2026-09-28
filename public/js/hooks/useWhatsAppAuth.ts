@@ -9,7 +9,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useGlobalState } from '../contexts/GlobalStateContext';
 import { useToast } from '../contexts/ToastContext';
 import sseWhatsapp from '../services/sse-whatsapp';
-import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
 import * as whatsappContract from '@shared/contracts/whatsapp.contract';
 
 // Authentication States
@@ -58,7 +58,6 @@ export interface WhatsAppAuthActions {
   handleRefreshQR: () => Promise<void>;
   handleRestart: () => Promise<void>;
   handleReLink: () => Promise<void>;
-  fetchQRCode: () => Promise<string | null>;
 }
 
 /**
@@ -69,7 +68,6 @@ export interface UseWhatsAppAuthReturn {
   clientReady: boolean;
   qrCode: string | null;
   error: string | null;
-  connectionAttempts: number;
   actions: WhatsAppAuthActions;
 }
 
@@ -82,7 +80,6 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
 
   const [authState, setAuthState] = useState<AuthState>(AUTH_STATES.INITIALIZING);
   const [error, setError] = useState<string | null>(null);
-  const [connectionAttempts, setConnectionAttempts] = useState(0);
 
   const qrRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -146,20 +143,6 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     }
   }, [handleInitialState]);
 
-  // Fetch QR code from API (fallback method)
-  const fetchQRCode = useCallback(async (): Promise<string | null> => {
-    try {
-      // Flat `{ qr, status, … }` (no `data` key) → fetchJSON passthrough.
-      const qrResponse = await fetchJSON<{ qr?: string }>('/api/wa/qr', { schema: whatsappContract.qr.response });
-      return qrResponse.qr || null;
-    } catch (err) {
-      // 404 = QR not available yet (a normal signal, not an error).
-      if ((err as HttpError).status === 404) return null;
-      console.error('Failed to fetch QR code:', err);
-      return null;
-    }
-  }, []);
-
   // React to qrCode / clientReady arriving from GlobalStateContext (via the
   // whatsapp_qr_updated and whatsapp_client_ready SSE events). Done during render
   // (keyed on the two inputs) so it's not a setState-in-effect.
@@ -181,7 +164,6 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   useEffect(() => {
     const handleConnected = () => {
       setAuthState(AUTH_STATES.CONNECTED);
-      setConnectionAttempts(0);
       void requestInitialState();
     };
 
@@ -203,7 +185,6 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     };
 
     const handleReconnected = () => {
-      setConnectionAttempts(0);
       void requestInitialState();
     };
 
@@ -277,7 +258,6 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   // Action handlers
   const handleRetry = useCallback(() => {
     setAuthState(AUTH_STATES.INITIALIZING);
-    setConnectionAttempts(0);
     setError(null);
     void requestInitialState();
   }, [requestInitialState]);
@@ -418,13 +398,11 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     clientReady,
     qrCode,
     error,
-    connectionAttempts,
     actions: {
       handleRetry,
       handleRefreshQR,
       handleRestart,
       handleReLink,
-      fetchQRCode,
     },
   };
 };

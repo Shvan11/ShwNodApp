@@ -410,8 +410,13 @@ router.post(
         currency: patientData.currency?.trim() || undefined
       };
 
-      // Create the patient (+ intake work/invoice when an intake selector is set).
-      const result = await PatientService.createPatientWithIntake(processedData, patientData.intake);
+      // Create the patient (+ intake work/invoice when an intake selector is set, + one
+      // context alert when the form's Alerts box was filled — FE-F6-1).
+      const result = await PatientService.createPatientWithIntake(
+        processedData,
+        patientData.intake,
+        patientData.alerts?.trim() || undefined
+      );
 
       sendData(
         res,

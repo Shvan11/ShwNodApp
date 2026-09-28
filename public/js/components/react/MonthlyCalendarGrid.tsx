@@ -1,8 +1,14 @@
 /**
  * MonthlyCalendarGrid Component
  *
- * Renders a monthly calendar view with clean appointment indicators
- * Week starts from Saturday as per configuration
+ * Renders a monthly calendar view with clean appointment indicators.
+ *
+ * The clinic works a SIX-day week, Sat–Thu, with **Friday** the only day off —
+ * so the grid has six columns and `CalendarViewService` never emits a Friday
+ * (`if (d.getDay() === 5) continue`). Every cell rendered here is therefore a
+ * WORKING day: there is no weekend cell to tint, which is why this component has
+ * no weekend styling. It used to shade `getDay() === 0 || === 6` — the Western
+ * Sat+Sun weekend — which greyed out two of the busiest days of the week.
  */
 
 import { useState, useEffect, useRef, type MouseEvent } from 'react';
@@ -58,12 +64,6 @@ const MonthlyCalendarGrid = ({
         return today.toDateString() === checkDate.toDateString();
     };
 
-    // Helper to check if day is weekend (Saturday or Sunday)
-    const isWeekend = (date: string): boolean => {
-        const day = parseLocalDate(date).getDay();
-        return day === 0 || day === 6; // Sunday = 0, Saturday = 6
-    };
-
     // Helper to check if day is in current month
     const isCurrentMonth = (date: string): boolean => {
         const checkDate = parseLocalDate(date);
@@ -92,7 +92,6 @@ const MonthlyCalendarGrid = ({
                     const appointmentCount = day.appointmentCount || 0;
                     const currentMonth = isCurrentMonth(day.date);
                     const todayClass = isToday(day.date);
-                    const weekendClass = isWeekend(day.date);
                     const isHoliday = day.isHoliday || false;
 
                     const isExpanded = expandedDay === day.date;
@@ -101,7 +100,6 @@ const MonthlyCalendarGrid = ({
                         styles.monthDayCell,
                         !currentMonth ? styles.otherMonth : '',
                         todayClass ? styles.today : '',
-                        weekendClass ? styles.weekend : '',
                         appointmentCount > 0 ? styles.hasAppointments : '',
                         isHoliday ? styles.holiday : '',
                         isExpanded ? styles.expanded : ''

@@ -375,18 +375,20 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             overlayClassName="drawer-overlay"
             contentClassName="drawer-container"
             ariaLabelledBy="batch-form-drawer-title"
+            unsavedGuard={{ watchInput: true }}
         >
+            {(dismiss) => (<>
             <ModalHeader
                 title={batch ? 'Edit Batch' : 'Add New Batch'}
                 titleId="batch-form-drawer-title"
-                onClose={handleClose}
+                onClose={dismiss}
             />
 
             <div className="drawer-body">
                 <form onSubmit={handleSubmit} className="drawer-form-flex">
                     {/* Action Buttons - Top */}
                     <div className="drawer-footer drawer-footer-top">
-                        <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={saving}>
+                        <button type="button" className="btn btn-secondary" onClick={dismiss} disabled={saving}>
                             Cancel
                         </button>
                         <button type="submit" className="btn btn-primary" disabled={saving}>
@@ -812,7 +814,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                     </div>
 
                     <div className="drawer-footer">
-                        <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={saving}>
+                        <button type="button" className="btn btn-secondary" onClick={dismiss} disabled={saving}>
                             Cancel
                         </button>
                         <button type="submit" className="btn btn-primary" disabled={saving}>
@@ -829,6 +831,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                     </div>
                 </form>
             </div>
+            </>)}
         </Modal>
     );
 };

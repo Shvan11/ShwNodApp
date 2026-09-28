@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { httpErrorMessage } from '@/core/http';
-import type { SyncDriftReport, SyncSinkStatus, SyncSinkStatusResponse } from '@/query/queries';
+import type { SyncClockReport, SyncDriftReport, SyncSinkStatus, SyncSinkStatusResponse } from '@/query/queries';
 import styles from './SyncStatusPanel.module.css';
 
 /**
@@ -110,6 +110,53 @@ const DriftBanner = ({ drift }: { drift: SyncDriftReport }) => {
     );
 };
 
+function formatOffset(offsetSec: number): string {
+    const sign = offsetSec < 0 ? '-' : '+';
+    const abs = Math.abs(offsetSec);
+    return `UTC${sign}${String(Math.floor(abs / 3600)).padStart(2, '0')}:${String(Math.floor((abs % 3600) / 60)).padStart(2, '0')}`;
+}
+
+/**
+ * The clock-alignment check: the app server, local PostgreSQL and the mirror must stamp wall-clock
+ * time in one zone, or every portal-written time is off by the gap and reverse-sync last-write-wins
+ * misjudges which edit is newer (audit FE-F5-1). Like the drift banner, a clean result is stated —
+ * with the zone — so the reader can see what was actually compared.
+ */
+const ClockBanner = ({ clock }: { clock: SyncClockReport }) => {
+    if (clock.mismatches.length > 0) {
+        return (
+            <div className={styles.errorBanner}>
+                <i className="fas fa-clock"></i>
+                <span>
+                    Clocks disagree — {clock.mismatches.join(' ')}
+                    <span className={styles.subtle}> · checked {formatTime(clock.checkedAt)}</span>
+                </span>
+            </div>
+        );
+    }
+    if (clock.error || !clock.local) {
+        return (
+            <div className={styles.errorBanner}>
+                <i className="fas fa-exclamation-triangle"></i>
+                <span>
+                    Clock check could not read every clock — {clock.error ?? 'local database unreadable'}
+                    <span className={styles.subtle}> · attempted {formatTime(clock.checkedAt)}</span>
+                </span>
+            </div>
+        );
+    }
+    return (
+        <div className={styles.driftOk}>
+            <i className="fas fa-clock"></i>
+            <span>
+                Clocks agree — {clock.local.tz} ({formatOffset(clock.local.offsetSec)}) on the app server, local
+                database{clock.mirror ? ' and mirror' : ''}
+                <span className={styles.subtle}> · checked {formatTime(clock.checkedAt)}</span>
+            </span>
+        </div>
+    );
+};
+
 export interface SyncStatusPanelProps {
     /**
      * The already-run status query. The caller owns the `useQuery` because
@@ -146,8 +193,9 @@ const SyncStatusPanel = ({
     const { data: status, isLoading, isError, error: queryError, refetch } = result;
     const sinks = status?.sinks ?? null;
     const checkedAt = status?.checkedAt ?? null;
-    // Only the Supabase endpoint sends this; the Dolphin one omits the field entirely.
+    // Only the Supabase endpoint sends these two; the Dolphin one omits both fields entirely.
     const drift = status?.drift ?? null;
+    const clock = status?.clock ?? null;
 
     // Surface either a transport error (thrown) or a server-reported failure
     // ({ success:false } / no sinks) — these endpoints answer 200 on a sink
@@ -197,6 +245,7 @@ const SyncStatusPanel = ({
                 </div>
             )}
 
+            {clock && <ClockBanner clock={clock} />}
             {drift && <DriftBanner drift={drift} />}
 
             {isLoading && !sinks ? (

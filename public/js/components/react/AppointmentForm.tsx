@@ -230,6 +230,14 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
             // otherwise serve a stale list until a hard refresh.
             queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
 
+            // …and the calendar's own reads. A booking made from a patient screen
+            // changes slot availability for everyone: `qk.calendar.slots/availability`
+            // back SimplifiedCalendarPicker (the control whose job is to stop a
+            // double-book) and `qk.calendar.range/month/stats` back /calendar, which
+            // subscribes to no SSE and has no refetchInterval. Without this, the 30s
+            // staleTime is exactly long enough to re-offer a slot just taken.
+            queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
+
             // Only call onSuccess, it will handle navigation
             // Don't call onClose as it might interfere with navigation
             if (onSuccess) {

@@ -50,7 +50,7 @@ export type TimeoutValue = typeof TIMEOUTS[TimeoutType];
  * @returns Express middleware function
  */
 export function requestTimeout(timeout: number = TIMEOUTS.DEFAULT): Middleware {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  const middleware = (req: Request, res: Response, next: NextFunction): void => {
     // Drop the callback a previous requestTimeout() on this same request left
     // behind (the global one, when a route also declares its own). Without this
     // the 408 is written by whichever middleware ran FIRST, i.e. the one with the
@@ -104,6 +104,14 @@ export function requestTimeout(timeout: number = TIMEOUTS.DEFAULT): Middleware {
 
     next();
   };
+
+  // Name the closure so it reads as `timeout(120000ms)` — not `<anonymous>` — in
+  // `app/__snapshots__/route-table.txt`. That snapshot is the committed record of
+  // what runs before each handler, and a route's timeout budget is part of its
+  // posture: a large upload route silently losing its `timeouts.long` should show
+  // up as a snapshot diff, the same way a dropped `authorize()` does.
+  Object.defineProperty(middleware, 'name', { value: `timeout(${timeout}ms)` });
+  return middleware;
 }
 
 /**

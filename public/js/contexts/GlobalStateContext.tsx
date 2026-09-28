@@ -1,22 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchJSON } from '@/core/http';
 import { authMeQuery } from '@/query/queries';
 import * as whatsappContract from '@shared/contracts/whatsapp.contract';
 import sseWhatsapp from '../services/sse-whatsapp';
-
-/**
- * Patient data structure
- */
-export interface PatientData {
-  code?: number;
-  id?: number;
-  patient_name?: string;
-  first_name?: string;
-  last_name?: string;
-  Phone?: string;
-  [key: string]: unknown;
-}
 
 /**
  * User data structure
@@ -29,48 +16,19 @@ export interface UserData {
 }
 
 /**
- * Appointment data structure
- */
-export interface AppointmentData {
-  appointment_id?: number;
-  PatientID?: number;
-  patient_name?: string;
-  AppsDate?: string;
-  AppsTime?: string;
-  State?: string;
-  [key: string]: unknown;
-}
-
-/**
- * Appointments cache by date
- */
-export type AppointmentsCache = Record<string, AppointmentData[]>;
-
-/** Cap on distinct dates retained in the in-memory appointments cache (LRU-ish). */
-const MAX_CACHED_APPOINTMENT_DATES = 14;
-
-/**
- * Global state context value
+ * Read-only by design. Every member here has a consumer (grep `useGlobalState`);
+ * the setters, the `currentPatient` slot and the per-date `appointmentsCache`
+ * that used to sit beside them were removed in the F3 audit — nothing had read
+ * them since React Query took over server state, and the day's appointments now
+ * live under `qk.appointments.daily`. Add a member only with a consumer.
  */
 export interface GlobalStateContextValue {
-  // User
+  /** Authoritative identity, mirrored from `authMeQuery`. */
   user: UserData | null;
-  setUser: React.Dispatch<React.SetStateAction<UserData | null>>;
 
-  // Patient
-  currentPatient: PatientData | null;
-  updateCurrentPatient: (patient: PatientData | null) => void;
-  clearCurrentPatient: () => void;
-
-  // WhatsApp
+  // WhatsApp client status, mirrored from the shared SSE channel (see below).
   whatsappClientReady: boolean;
-  setWhatsappClientReady: React.Dispatch<React.SetStateAction<boolean>>;
   whatsappQrCode: string | null;
-  setWhatsappQrCode: React.Dispatch<React.SetStateAction<string | null>>;
-
-  // Appointments
-  appointmentsCache: AppointmentsCache;
-  updateAppointmentsCache: (date: string, appointments: AppointmentData[]) => void;
 }
 
 const GlobalStateContext = createContext<GlobalStateContextValue | null>(null);
@@ -108,9 +66,9 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
     }
   });
 
-  // Authoritative identity from React Query; synced into the setState-able `user`
-  // (consumers still call `setUser`, e.g. after login) + sessionStorage for an
-  // instant initial paint on the next load.
+  // Authoritative identity from React Query, mirrored into local state (so the
+  // sessionStorage seed can paint before the query resolves) + written back to
+  // sessionStorage for an instant initial paint on the next load.
   const { data: meData } = useQuery(authMeQuery());
 
   // Sync into `user` during render (keyed on the query result) — no setState-in-effect.
@@ -131,8 +89,6 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
     }
   }, [meData]);
 
-  const [currentPatient, setCurrentPatient] = useState<PatientData | null>(null);
-  const [appointmentsCache, setAppointmentsCache] = useState<AppointmentsCache>({});
   const [whatsappClientReady, setWhatsappClientReady] = useState(false);
   const [whatsappQrCode, setWhatsappQrCode] = useState<string | null>(null);
 
@@ -208,44 +164,14 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
     };
   }, []);
 
-  const updateCurrentPatient = (patient: PatientData | null): void => {
-    setCurrentPatient(patient);
-  };
-
-  const clearCurrentPatient = (): void => {
-    setCurrentPatient(null);
-  };
-
-  const updateAppointmentsCache = (date: string, appointments: AppointmentData[]): void => {
-    setAppointmentsCache((prev) => {
-      // Bound the cache to the most-recently-touched dates so it can't grow
-      // unbounded over a long-lived tab (one entry per unique date viewed).
-      // Re-insert `date` last (refresh its recency), then drop the oldest keys.
-      const { [date]: _drop, ...rest } = prev;
-      const next: AppointmentsCache = { ...rest, [date]: appointments };
-      const keys = Object.keys(next);
-      if (keys.length > MAX_CACHED_APPOINTMENT_DATES) {
-        for (const stale of keys.slice(0, keys.length - MAX_CACHED_APPOINTMENT_DATES)) {
-          delete next[stale];
-        }
-      }
-      return next;
-    });
-  };
-
-  const value: GlobalStateContextValue = {
-    user,
-    setUser,
-    currentPatient,
-    updateCurrentPatient,
-    clearCurrentPatient,
-    whatsappClientReady,
-    setWhatsappClientReady,
-    whatsappQrCode,
-    setWhatsappQrCode,
-    appointmentsCache,
-    updateAppointmentsCache,
-  };
+  // Memoized so the identity only changes when one of the three published values
+  // does — every other context in the tree does the same, and without it any
+  // provider re-render hands every consumer a fresh object (ToastContext carries
+  // the note about the refetch storm that causes).
+  const value = useMemo<GlobalStateContextValue>(
+    () => ({ user, whatsappClientReady, whatsappQrCode }),
+    [user, whatsappClientReady, whatsappQrCode]
+  );
 
   return <GlobalStateContext.Provider value={value}>{children}</GlobalStateContext.Provider>;
 }

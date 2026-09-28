@@ -35,6 +35,7 @@ import {
   numericParam,
 } from '../validation.js';
 import { withPendingOutcome } from './approvals.contract.js';
+import { WORK_CURRENCIES } from '../work-currency.js';
 
 // ---------------------------------------------------------------------------
 // Shared building blocks.
@@ -63,6 +64,26 @@ const optInt = z
 const optMoney = z
   .preprocess((v) => (v === '' || v === null ? undefined : v), moneyInt.optional())
   .optional();
+/**
+ * A work's currency: one of the two the ledger holds (see `shared/work-currency.ts` for why EUR is
+ * not one). `''`/null collapse to "absent" like the numeric fields — a clinical user's form hides
+ * the select and may send it blank, and the server resolves the clinic default in that case.
+ */
+const optCurrency = z
+  .preprocess((v) => (v === '' || v === null ? undefined : v), z.enum(WORK_CURRENCIES).optional())
+  .optional();
+/**
+ * An implant length/diameter in millimetres. The columns are `numeric(5,2)` and standard sizes are
+ * fractional (Ø 3.3 / 3.5 / 4.1 …, L 11.5), so this is NOT `optInt` — it was, from the 2026-06-05
+ * enumeration, and every fractional size 400'd (FE-F7-2). Capped at the column's own ceiling so an
+ * over-large entry is a 400, not PG `22003` → a 500.
+ */
+const optMillimetres = z
+  .preprocess(
+    (v) => (v === '' || v === null ? undefined : v),
+    z.coerce.number().nonnegative('Size cannot be negative').max(999.99, 'Size cannot exceed 999.99 mm').optional()
+  )
+  .optional();
 /** WorkStatusType = 1 | 2 | 3 (active/finished/discontinued). */
 const workStatus = z.union([z.literal(1), z.literal(2), z.literal(3)]);
 
@@ -84,8 +105,8 @@ const workItemFields = {
   filling_depth: z.string().optional(),
   canals_no: optInt,
   working_length: z.string().optional(),
-  implant_length: optInt,
-  implant_diameter: optInt,
+  implant_length: optMillimetres,
+  implant_diameter: optMillimetres,
   implant_manufacturer_id: optInt,
   material: z.string().optional(),
   // Bridge/Veneers lab: a real FK to `labs` (the joined `lab_name` comes back on the
@@ -110,7 +131,9 @@ const workCreateFields = {
   dr_id: intId,
   type_of_work: intId,
   total_required: optMoney,
-  currency: z.string().optional(),
+  // Optional: a clinical user's form sends none, and the server then applies the clinic's
+  // configured default (WorkService.validateAndCreateWork).
+  currency: optCurrency,
   notes: z.string().optional(),
   status: workStatus.optional(),
   start_date: z.string().optional(),
@@ -239,7 +262,7 @@ export const addWorkWithInvoice = {
   body: z.object({
     ...workCreateFields,
     total_required: moneyInt.positive(),
-    currency: z.string().min(1),
+    currency: z.enum(WORK_CURRENCIES),
   }),
   response: z.looseObject({ workId: z.number(), invoiceId: z.number() }),
 } as const;
@@ -249,13 +272,19 @@ export type AddWorkWithInvoiceBody = z.infer<typeof addWorkWithInvoice.body>;
 // The handler peels off workId and forwards the rest as Record<string,unknown> to
 // validateAndUpdateWork. Discount fields stay NULLABLE — null is the "clear it"
 // signal the service's change-detection relies on. → { rowsAffected }.
+//
+// `updateWork()` is PRESENCE-keyed: a key missing from this object is a column
+// the update never writes. So a field the form edits but this body omits is
+// silently stripped while the user gets "Work updated" — which is what happened
+// to `estimated_duration` from 2026-06-05 until FE-F7-4. Keep this list in step
+// with the form's payload.
 export const updateWork = {
   body: z.object({
     workId: intId,
     dr_id: intId,
     person_id: optInt,
     total_required: optMoney,
-    currency: z.string().optional(),
+    currency: optCurrency,
     type_of_work: optInt,
     notes: z.string().optional(),
     status: workStatus.optional(),
@@ -264,12 +293,17 @@ export const updateWork = {
     f_photo_date: z.string().optional(),
     i_photo_date: z.string().optional(),
     notes_date: z.string().optional(),
+    estimated_duration: optInt,
     keyword_id_1: optInt,
     keyword_id_2: optInt,
     keyword_id_3: optInt,
     keyword_id_4: optInt,
     keyword_id_5: optInt,
-    discount: z.union([moneyInt, z.null()]).optional(),
+    // `z.null()` FIRST: a union returns its first match, and `moneyInt` is a
+    // `z.coerce.number()`, which turns null into 0 — so with moneyInt first the
+    // "null = clear" signal never arrived and every edit of an undiscounted work
+    // wrote discount = 0 (FE-F7-4b).
+    discount: z.union([z.null(), moneyInt]).optional(),
     discount_date: z.union([z.string(), z.null()]).optional(),
     discount_reason: z.union([z.string(), z.null()]).optional(),
   }),

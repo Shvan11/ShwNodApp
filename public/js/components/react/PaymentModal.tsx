@@ -918,16 +918,22 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             isOpen={true}
             onClose={paymentSuccess ? handleCloseAfterSuccess : onClose}
             contentClassName={`${styles.modalContent} ${styles.invoiceModal} ${styles.paymentModalCompact}`}
+            ariaLabelledBy="payment-modal-title"
+            // A stray backdrop click or Escape must not destroy a filled payment.
+            // `resetKey` flips once the payment is saved: the receipt view is not
+            // unsaved work, so closing it must not ask about the typing behind it.
+            unsavedGuard={{ watchInput: true, resetKey: paymentSuccess ? 1 : 0 }}
         >
-                {!paymentSuccess ? (
+            {(dismiss) => (!paymentSuccess ? (
                     <>
                         {/* Compact Header with Balance Info */}
                         <ModalHeader
                             dense
+                            titleId="payment-modal-title"
                             title={t('modal.title')}
                             icon={<i className="fas fa-credit-card" />}
                             subtitle={workData.type_name || t('modal.workFallback', { id: workData.work_id })}
-                            onClose={onClose}
+                            onClose={dismiss}
                             actions={
                                 <div className={styles.paymentBalanceBadge}>
                                     <span className={styles.balanceLabel}>{t('balance.label')}</span>
@@ -1228,7 +1234,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
                             {/* Actions - Compact */}
                             <div className={styles.paymentActionsCompact}>
-                                <button type="button" className={`btn ${styles.btnCancel}`} onClick={onClose}>
+                                <button type="button" className={`btn ${styles.btnCancel}`} onClick={dismiss}>
                                     {t('actions.cancel')}
                                 </button>
                                 <button type="submit" className="btn btn-primary" disabled={loading || (rateRequired && !exchangeRate)}>
@@ -1249,7 +1255,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                         <div className={styles.successIcon}>
                             <i className="fas fa-check-circle"></i>
                         </div>
-                        <h2>{t('success.title')}</h2>
+                        <h2 id="payment-modal-title">{t('success.title')}</h2>
                         <p className={styles.successAmount}>
                             {formatCurrency(receiptData?.amountPaidToday || 0, receiptData?.currency || 'IQD')}
                         </p>
@@ -1263,7 +1269,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                         </div>
                         </div>
                     </>
-                )}
+                ))}
         </Modal>
     );
 };

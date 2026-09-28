@@ -31,7 +31,7 @@ export function toLocalDateString(date: Date): string {
  * Mirrors getWeekStart in routes/api/calendar.routes.ts.
  */
 export function getWeekStartSaturday(date: Date | string): Date {
-    const start = parseLocalDate(date instanceof Date ? date : date);
+    const start = parseLocalDate(date);
     const d = new Date(start);
     const day = d.getDay();            // Sun=0 … Sat=6
     const diff = day === 6 ? 0 : day + 1; // back up to Saturday
