@@ -15,8 +15,7 @@
  * id filters are `coerce.number().int().optional()` WITHOUT `.positive()` so the
  * form's "no category" empty value can't 400 (the handler's truthy check maps it
  * to undefined). Phase 3: list/categories/subcategories/byId responses are now
- * modeled with looseObject row schemas. expenseSummary is intentionally loose
- * (rollup aggregate — computed server-side, structure varies by filter).
+ * modeled with looseObject row schemas.
  */
 import { z } from 'zod';
 import {
@@ -55,6 +54,8 @@ const expenseRow = z.looseObject({
   employee_name: z.string().nullable(),
   is_monthly: z.boolean().optional(),
 });
+
+export type ExpenseRow = z.infer<typeof expenseRow>;
 
 const expenseCategoryRow = z.looseObject({
   category_id: z.number(),
@@ -123,35 +124,10 @@ export const createExpense = {
   body: expenseBody,
   response: z.object({ NewID: z.number() }),
 } as const;
-
-// GET /api/expenses/summary?startDate=&endDate= — { summary[], totals[] }.
-// summary = ExpenseSummary[] (per category+currency), totals = ExpenseTotal[]
-// (per currency) — both from expense-queries.
-export const expenseSummary = {
-  query: z.object({ startDate: dateString, endDate: dateString }),
-  response: z.object({
-    summary: z.array(
-      z.object({
-        category_name: z.string().nullable(),
-        currency: z.string(),
-        ExpenseCount: z.number(),
-        total_amount: z.number(),
-      })
-    ),
-    totals: z.array(
-      z.object({
-        currency: z.string(),
-        ExpenseCount: z.number(),
-        total_amount: z.number(),
-      })
-    ),
-  }),
-} as const;
+export type CreateExpenseResponse = z.infer<typeof createExpense.response>;
 
 /** The parsed `/expenses` query — numbers are already coerced by validate(). */
 export type ExpenseListQuery = z.infer<typeof expenseList.query>;
-
-export type ExpenseSummaryQuery = z.infer<typeof expenseSummary.query>;
 
 // GET /api/expenses/:id — single Expense row.
 export const expenseById = {

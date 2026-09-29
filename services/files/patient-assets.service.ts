@@ -20,12 +20,14 @@ import { patientPath } from './clinic-paths.js';
 import { log } from '../../utils/logger.js';
 
 /** One X-ray file plus whatever CS-Imaging preview/date metadata we could resolve. */
-export interface XrayInfo {
+// `type`, not `interface` — it flows into the patient-info `sendData` payload
+// (z.looseObject), which only a type alias can satisfy (CLAUDE.md, TS2345).
+export type XrayInfo = {
   name: string;
   detailsDirName?: string;
   previewImagePartialPath?: string;
   date?: string | null;
-}
+};
 
 // `type`, not `interface`: this flows into a `sendData` payload validated against a
 // `z.looseObject` contract, and only a type alias gets the implicit string index
@@ -40,6 +42,14 @@ const XRAY_SUFFIXES = ['.dcm', '.pano', '.ceph', '.rvg'];
 
 /** Relative path (under the patient dir) of the CS-Imaging per-image details root. */
 const CSI_DETAILS_REL = 'OPG/.csi_data/.version_4.4';
+
+/**
+ * Absolute path of an X-ray's CS-Imaging preview thumbnail (`…/<detailsDir>/t.png`).
+ * `detailsDir` must already be charset-checked by the caller (it is a path segment).
+ */
+export function xrayPreviewPath(pid: string | number, detailsDir: string): string {
+  return patientPath(pid, `${CSI_DETAILS_REL}/${detailsDir}/t.png`);
+}
 
 async function pathExists(path: string): Promise<boolean> {
   try {
@@ -127,7 +137,7 @@ async function getXrays(xrayDir: string, pid: number): Promise<XrayInfo[]> {
         if (subDir.endsWith(xrayName)) {
           xray.detailsDirName = subDir;
 
-          const previewPath = patientPath(pid, `${CSI_DETAILS_REL}/${subDir}/t.png`);
+          const previewPath = xrayPreviewPath(pid, subDir);
           if (await pathExists(previewPath)) {
             xray.previewImagePartialPath = `/${CSI_DETAILS_REL}/${subDir}/t.png`;
           }

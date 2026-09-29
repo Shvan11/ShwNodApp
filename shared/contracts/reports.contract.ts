@@ -109,6 +109,7 @@ const enrichedInvoiceRow = z.object({
   iqd_received: z.number(),
   usd_received: z.number(),
 });
+export type EnrichedInvoiceRow = z.infer<typeof enrichedInvoiceRow>;
 
 // GET /api/statistics → { month, year, exchangeRate, dailyData, summary }.
 export const statistics = {

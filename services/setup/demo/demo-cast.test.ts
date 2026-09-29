@@ -96,6 +96,12 @@ describe('demo cast', () => {
     expect(days).toContain(2);
   });
 
+  it('bills every aligner case in USD (aligner payments are refused on any other work — FE-F8-6)', () => {
+    const aligner = DEMO_PATIENTS.flatMap((p) => (p.story.kind === 'ortho' && p.story.aligner ? [p.story] : []));
+    expect(aligner.length).toBeGreaterThan(0);
+    for (const s of aligner) expect(s.currency).toBe('USD');
+  });
+
   it('the photo pack has all eight views for each of its four timepoints', () => {
     const dirs = readdirSync(PHOTOS).sort();
     expect(dirs).toEqual(['01-initial', '02-progress', '03-progress', '04-final']);

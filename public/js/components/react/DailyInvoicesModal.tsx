@@ -3,20 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { httpErrorMessage } from '@/core/http';
 import { dailyInvoicesQuery } from '@/query/queries';
 import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters';
+import type { EnrichedInvoiceRow } from '@shared/contracts/reports.contract';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 import styles from './StatisticsComponent.module.css';
 
-interface Invoice {
-    invoice_id: number;
-    patient_name: string;
-    sys_start_time: string;
-    currency: 'IQD' | 'USD';
-    amount_paid: number;
-    iqd_received?: number;
-    usd_received?: number;
-    change?: number;
-}
+// The contract row — `currency` is nullable and `amount_paid` may arrive as a
+// numeric string, so it is not narrowed with a cast (FE-F8-11).
+type Invoice = EnrichedInvoiceRow;
 
 interface SelectedDateData {
     Day?: string;
@@ -67,7 +61,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
 
     // Invoices for the chosen day (factory is gated on a truthy date).
     const { data, isLoading: loading, error: queryError, refetch } = useQuery(dailyInvoicesQuery(dateValue));
-    const invoices = (data?.invoices ?? []) as Invoice[];
+    const invoices: Invoice[] = data?.invoices ?? [];
     const error = queryError ? httpErrorMessage(queryError, 'Failed to fetch daily invoices') : null;
 
     // Jump to the Expenses page pre-filtered to this day + currency.
@@ -79,7 +73,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
         navigate(`/expenses?startDate=${day}&endDate=${day}&currency=${currency}`);
     };
 
-    const formatCurrency = (amount: number, currency: 'IQD' | 'USD'): string => {
+    const formatCurrency = (amount: number, currency: string): string => {
         return formatCurrencyUtil(amount, currency);
     };
 
@@ -92,7 +86,8 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
         });
     };
 
-    const formatTime = (dateString: string): string => {
+    const formatTime = (dateString: string | undefined): string => {
+        if (!dateString) return '-';
         const date = new Date(dateString);
         return date.toLocaleTimeString(undefined, {
             hour: '2-digit',
@@ -122,7 +117,11 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
         };
     };
 
-    const totals = invoices.length > 0 ? calculateTotals() : null;
+    // The day's figures (expenses, expected cash) come from the statistics row and
+    // are shown even on a day with no payments: a day with expenses only used to
+    // show just "No invoices found" (FE-F8-10). Opened from a bare date string there
+    // is no row, and nothing to show but the invoices.
+    const totals = invoices.length > 0 || selectedDateObj ? calculateTotals() : null;
 
     if (!selectedDate) return null;
 
@@ -159,14 +158,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                         </div>
                     )}
 
-                    {!loading && !error && invoices.length === 0 && (
-                        <div className={styles.emptyState}>
-                            <i className="fas fa-inbox"></i>
-                            <p>No invoices found for this date</p>
-                        </div>
-                    )}
-
-                    {!loading && !error && invoices.length > 0 && (
+                    {!loading && !error && (invoices.length > 0 || totals) && (
                         <>
                             {/* Summary Cards */}
                             {totals && (
@@ -220,7 +212,13 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                                 </div>
                             )}
 
-                            {/* Invoices Table */}
+                            {invoices.length === 0 ? (
+                                <div className={styles.emptyState}>
+                                    <i className="fas fa-inbox"></i>
+                                    <p>No invoices found for this date</p>
+                                </div>
+                            ) : (
+                            /* Invoices Table */
                             <div className={styles.statisticsTableWrapper}>
                                 <table className={styles.statisticsInvoicesTable}>
                                     <thead>
@@ -248,11 +246,11 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                                                         classes live in a CSS module, so the global names never
                                                         matched and the pill rendered completely unstyled. */}
                                                     <span className={`${styles.badge} ${invoice.currency === 'USD' ? styles.badgeUsd : styles.badgeIqd}`}>
-                                                        {invoice.currency}
+                                                        {invoice.currency ?? '—'}
                                                     </span>
                                                 </td>
                                                 <td data-label="Amount Paid" className={styles.amount}>
-                                                    {invoice.amount_paid} {invoice.currency}
+                                                    {formatCurrency(Number(invoice.amount_paid ?? 0), invoice.currency ?? '')}
                                                 </td>
                                                 <td data-label="IQD Received" className={`${styles.amount} ${styles.iqd}`}>
                                                     {invoice.iqd_received ? formatCurrency(invoice.iqd_received, 'IQD') : '-'}
@@ -268,7 +266,15 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                                     </tbody>
                                 </table>
                             </div>
+                            )}
                         </>
+                    )}
+
+                    {!loading && !error && invoices.length === 0 && !totals && (
+                        <div className={styles.emptyState}>
+                            <i className="fas fa-inbox"></i>
+                            <p>No invoices found for this date</p>
+                        </div>
                     )}
                 </div>
 

@@ -102,7 +102,12 @@ interface WebCephApiResponse {
   thumbnail?: string;
 }
 
-/** Cap on one WebCeph round trip — generous for an X-ray upload, tight for the JSON calls. */
+/**
+ * Cap on one WebCeph round trip — generous for an X-ray upload, tight for the JSON calls.
+ * The upload routes' own request timeout (`WEBCEPH_UPLOAD_TIMEOUT_MS` in
+ * shared/contracts/media.contract.ts) is derived from these two caps, `maxRetries` and
+ * `retryDelay` below — change them together.
+ */
 const DEFAULT_TIMEOUT_MS = 20_000;
 const UPLOAD_TIMEOUT_MS = 60_000;
 

@@ -35,7 +35,7 @@ import lookupAdminRoutes from '../routes/api/lookup-admin.routes.js';
 import publicVideoRoutes from '../routes/public/video.routes.js';
 import tvDisplayRoutes from '../routes/public/tv-display.routes.js';
 import portalRoutes from '../routes/portal.js';
-import { clinicRoot, workingDir } from '../services/files/clinic-paths.js';
+import { workingDir } from '../services/files/clinic-paths.js';
 import { log } from '../utils/logger.js';
 
 /**
@@ -163,7 +163,10 @@ export async function mountRoutes(app: Express, wsEmitter: EventEmitter): Promis
           }
       }
   }));
-  app.use('/clinic-assets', express.static(clinicRoot()));
+  // (There used to be a `/clinic-assets` static mount of the WHOLE clinic volume
+  // here. Its only consumer, the X-ray card's thumbnails, never rendered through
+  // it — CS-Imaging previews sit under dot-folders that `express.static` refuses —
+  // and now reads GET /api/patients/:personId/xray/preview instead (FE-F9-5).)
 
   // All SSE — mounted under /api so they inherit the auth gate above, and a
   // dropped session closes the stream with a 401 instead of a login redirect.

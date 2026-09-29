@@ -8,6 +8,11 @@
     overflow: hidden;
 }
 
+/* Direction scope for the whole dialog (see the TSX) — contributes no box. */
+.ltrScope {
+    display: contents;
+}
+
 /* ── Body ─────────────────────────────────────────────────────────────────── */
 .body {
     padding: var(--spacing-lg);

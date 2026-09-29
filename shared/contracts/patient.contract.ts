@@ -69,8 +69,21 @@ export const timepointParams = z.object({ personId: numericParam, tpCode: numeri
 // ROW SCHEMAS (Phase 3 — all fields the consumers read)
 // ===========================================================================
 
+/** One CS-Imaging X-ray under the patient's `OPG/` folder
+ *  (services/files/patient-assets.service.ts#getXrays). `detailsDirName`,
+ *  `previewImagePartialPath` and `date` exist only when CS-Imaging wrote its
+ *  per-image details folder; `date` is the raw `seriesDate` from its `meta` file. */
+const xrayRow = z.looseObject({
+  name: z.string(),
+  detailsDirName: z.string().optional(),
+  previewImagePartialPath: z.string().optional(),
+  date: z.string().nullable().optional(),
+});
+export type XrayRow = z.infer<typeof xrayRow>;
+
 /** Rich patient info returned by PatientService.getPatientInfo.
- *  date_added and DateOfBirth are PG `date` columns → string (already). */
+ *  date_added and DateOfBirth are PG `date` columns → string (already).
+ *  `xrays` is merged in from the patient's folder (always present, maybe empty). */
 const patientInfoRow = z.looseObject({
   person_id: z.number(),
   patient_name: z.string().nullable(),
@@ -97,6 +110,7 @@ const patientInfoRow = z.looseObject({
   name: z.string().nullable(),
   estimatedCost: z.number().nullable(),
   start_date: z.string().nullable(),
+  xrays: z.array(xrayRow),
 });
 
 /** Time-point row: three scalar fields, all strings. */
@@ -205,6 +219,34 @@ export const timepointImages = { response: z.array(z.string()) } as const;
 export const timepointFolder = {
   response: z.object({ folder: z.string().nullable(), exists: z.boolean() }),
 } as const;
+
+// GET /api/patients/:personId/xray/send-path?file=&detailsDir= — the processed
+// X-ray image's server path, for `/send-message?file=` → `/api/wa/sendmedia2`
+// (which takes clinic FILESYSTEM paths, never an API URL — FE-F9-3). Rendering it
+// is the same `processXrayImage` the viewer runs; both params become path
+// segments, so they carry the service's own charset allowlist here too.
+export const xraySendPath = {
+  params: personIdParams,
+  query: z.object({
+    file: z.string().regex(/^[A-Za-z0-9._-]+$/, 'Invalid X-ray file name'),
+    detailsDir: z.string().regex(/^[A-Za-z0-9._-]*$/, 'Invalid X-ray details directory').optional(),
+  }),
+  response: z.object({ path: z.string() }),
+} as const;
+export type XraySendPathQuery = z.infer<typeof xraySendPath.query>;
+export type XraySendPathResponse = z.infer<typeof xraySendPath.response>;
+
+// GET /api/patients/:personId/xray/preview?detailsDir= — the X-ray's CS-Imaging
+// preview thumbnail (raw image, no envelope). It lives under dot-folders
+// (`OPG/.csi_data/.version_4.4/…`), which a plain static mount refuses — the
+// `/clinic-assets` mount the card used 404'd every one (FE-F9-5).
+export const xrayPreview = {
+  params: personIdParams,
+  query: z.object({
+    detailsDir: z.string().regex(/^[A-Za-z0-9._-]+$/, 'Invalid X-ray details directory'),
+  }),
+} as const;
+export type XrayPreviewQuery = z.infer<typeof xrayPreview.query>;
 
 // GET /api/patients/:personId/gallery/:tp — the 8 Dolphin photo views, KEYED BY
 // VIEW CODE (not a positional array) so neither side depends on slot order. The

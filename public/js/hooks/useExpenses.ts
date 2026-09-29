@@ -39,30 +39,12 @@ export interface ExpenseFilters {
 }
 
 /**
- * Expense data
+ * One expense row — the contract's row (list + by-id share it), so what the
+ * screens read is exactly what the boundary validated. It used to be a
+ * hand-written interface with non-null `currency`/`note`/ids, bridged onto the
+ * parsed row with an `as` cast (FE-F8-11).
  */
-export interface Expense {
-  id: number;
-  amount: number;
-  currency: string;
-  category_id?: number;
-  category_name?: string;
-  subcategory_id?: number;
-  subcategory_name?: string;
-  // Arabic display names (nullable) — paired with the base names for client-side
-  // per-language resolution via useLocalizedName. See "DB-stored lookup values".
-  category_name_ar?: string | null;
-  subcategory_name_ar?: string | null;
-  // Entity sub-level for the Lab (7) / Employees (5) categories (joined name for display).
-  lab_id?: number | null;
-  lab_name?: string | null;
-  employee_id?: number | null;
-  employee_name?: string | null;
-  note?: string;
-  expense_date?: string;
-  is_monthly?: boolean;
-  [key: string]: unknown;
-}
+export type Expense = expenseContract.ExpenseRow;
 
 /**
  * Category data
@@ -165,31 +147,39 @@ export function useActiveEmployees(): { employees: Array<{ id: number; employee_
 }
 
 /**
+ * Every employee, quit ones included — for the expense FILTER, where a quit
+ * employee's salary history must stay reachable (FE-F8-12). Entry forms keep
+ * `useActiveEmployees`: a new expense is never booked to someone who has left.
+ */
+export function useAllEmployees(): { employees: Array<{ id: number; employee_name: string; is_active: boolean }>; loading: boolean } {
+  const query = useQuery(employeesQuery('?includeInactive=true'));
+  return { employees: query.data?.employees ?? [], loading: query.isLoading };
+}
+
+/**
  * Hook for expense mutations (create, update, delete)
  */
+/**
+ * A failed write rejects with the funnel's error: callers show it through
+ * `httpErrorMessage(err, …)`, so the server's reason (a 400's message) reaches
+ * the user. (A computed `error` field used to sit here unread — FE-F8-8.)
+ */
 export function useExpenseMutations(): {
-  createExpense: (expenseData: ExpenseData) => Promise<Expense>;
+  createExpense: (expenseData: ExpenseData) => Promise<expenseContract.CreateExpenseResponse>;
   updateExpense: (id: number, expenseData: ExpenseData) => Promise<{ outcome: 'applied' | 'pending' }>;
   deleteExpense: (id: number) => Promise<{ outcome: 'applied' | 'pending' }>;
   loading: boolean;
-  error: string | null;
 } {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const createExpense = useCallback(
-    async (expenseData: ExpenseData): Promise<Expense> => {
+    async (expenseData: ExpenseData): Promise<expenseContract.CreateExpenseResponse> => {
       try {
         setLoading(true);
-        setError(null);
-
-        const data = await postJSON<Expense>('/api/expenses', expenseData, { schema: expenseContract.createExpense.response });
+        const data = await postJSON<expenseContract.CreateExpenseResponse>('/api/expenses', expenseData, { schema: expenseContract.createExpense.response });
         void queryClient.invalidateQueries({ queryKey: qk.expenses.all() });
         return data;
-      } catch (err) {
-        setError(httpErrorMessage(err, 'Failed to create expense'));
-        throw err;
       } finally {
         setLoading(false);
       }
@@ -201,8 +191,6 @@ export function useExpenseMutations(): {
     async (id: number, expenseData: ExpenseData): Promise<{ outcome: 'applied' | 'pending' }> => {
       try {
         setLoading(true);
-        setError(null);
-
         const data = await putJSON<{ outcome: string }>(`/api/expenses/${id}`, expenseData, { schema: expenseContract.updateExpense.response });
         if (data.outcome === 'pending') {
           // The row did NOT change (so no expense invalidation), but an approval
@@ -215,9 +203,6 @@ export function useExpenseMutations(): {
         }
         void queryClient.invalidateQueries({ queryKey: qk.expenses.all() });
         return { outcome: 'applied' };
-      } catch (err) {
-        setError(httpErrorMessage(err, 'Failed to update expense'));
-        throw err;
       } finally {
         setLoading(false);
       }
@@ -229,8 +214,6 @@ export function useExpenseMutations(): {
     async (id: number): Promise<{ outcome: 'applied' | 'pending' }> => {
       try {
         setLoading(true);
-        setError(null);
-
         const data = await deleteJSON<{ outcome: string }>(`/api/expenses/${id}`, { schema: expenseContract.deleteExpense.response });
         if (data.outcome === 'pending') {
           // Held for approval — no row changed, but a request was created. See the
@@ -240,9 +223,6 @@ export function useExpenseMutations(): {
         }
         void queryClient.invalidateQueries({ queryKey: qk.expenses.all() });
         return { outcome: 'applied' };
-      } catch (err) {
-        setError(httpErrorMessage(err, 'Failed to delete expense'));
-        throw err;
       } finally {
         setLoading(false);
       }
@@ -255,6 +235,5 @@ export function useExpenseMutations(): {
     updateExpense,
     deleteExpense,
     loading,
-    error,
   };
 }

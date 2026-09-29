@@ -4,7 +4,7 @@
  */
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCategories, useSubcategories, useLabs, useActiveEmployees } from '../../hooks/useExpenses';
+import { useCategories, useSubcategories, useLabs, useAllEmployees } from '../../hooks/useExpenses';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import type { ExpenseFilters as ExpenseFiltersType } from '../../hooks/useExpenses';
 import { EMPLOYEE_EXPENSE_CATEGORY, LAB_EXPENSE_CATEGORY } from '../../config/expenseCategories';
@@ -20,25 +20,14 @@ interface ExpenseFiltersProps {
     onReset: () => void;
 }
 
-interface Category {
-    category_id: number;
-    category_name: string;
-    category_name_ar?: string | null;
-}
-
-interface Subcategory {
-    subcategory_id: number;
-    subcategory_name: string;
-    subcategory_name_ar?: string | null;
-}
-
 export default function ExpenseFilters({ filters, onFilterChange, onApply, onReset }: ExpenseFiltersProps) {
     const { t } = useTranslation('expenses');
     const localizedName = useLocalizedName();
-    const { categories } = useCategories() as { categories: Category[] };
-    const { subcategories } = useSubcategories(filters.categoryId) as { subcategories: Subcategory[] };
+    const { categories } = useCategories();
+    const { subcategories } = useSubcategories(filters.categoryId);
     const { labs } = useLabs();
-    const { employees } = useActiveEmployees();
+    // Quit employees too: their salary history must stay filterable (FE-F8-12).
+    const { employees } = useAllEmployees();
 
     // The Lab / Employees categories filter by entity instead of subcategory.
     const catNum = Number(filters.categoryId);
@@ -147,7 +136,9 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                             >
                                 <option value="">{t('filters.allEmployees')}</option>
                                 {employees.map(emp => (
-                                    <option key={emp.id} value={emp.id}>{emp.employee_name}</option>
+                                    <option key={emp.id} value={emp.id}>
+                                        {emp.is_active ? emp.employee_name : t('filters.formerEmployee', { name: emp.employee_name })}
+                                    </option>
                                 ))}
                             </select>
                             <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>

@@ -24,8 +24,41 @@ import { authenticate, authorize } from '../../middleware/auth.js';
 import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import * as visit from '../../shared/contracts/visit.contract.js';
 import { log } from '../../utils/logger.js';
+import { isCheckViolation, isUniqueViolation } from '../../utils/pg-errors.js';
 
 const router = Router();
+
+/**
+ * A visit's photo flags roll up into its WORK (visit-queries.ts: Initial Photo →
+ * i_photo_date, Final Photo → finished + f_photo_date, Appliance Removed →
+ * debond_date; un-ticking or deleting reverses them). When that roll-up breaks
+ * a works constraint the whole visit write rolls back — and used to surface as a
+ * generic "Failed to add/update visit", so the form could not say why. These are
+ * the two states a user can actually cause; answer them as 409s the form shows.
+ */
+function visitRollupConflict(error: unknown): string | null {
+  // One Initial-Photo and one Final-Photo visit per work (partial unique indexes
+  // `photo_index` / `photof_index`). Reachable from the UI: finish a work through a
+  // Final-Photo visit, Reactivate it on the Works page, then tick Final Photo on a
+  // later visit.
+  if (isUniqueViolation(error, 'photof_index')) {
+    return 'This treatment already has a Final Photo visit. Untick Final Photo here, or edit that visit instead.';
+  }
+  if (isUniqueViolation(error, 'photo_index')) {
+    return 'This treatment already has an Initial Photo visit. Untick Initial Photo here, or edit that visit instead.';
+  }
+  if (isUniqueViolation(error, 'unq_tblwork_active')) {
+    return 'This patient already has another active treatment, so this one cannot be reopened. Finish or discontinue the other treatment first.';
+  }
+  if (
+    isCheckViolation(error, 'ck_works')
+    || isCheckViolation(error, 'ck_works_deb')
+    || isCheckViolation(error, 'ck_works_debiph')
+  ) {
+    return "These photo dates conflict with the treatment's dates: the initial photo must come before both the final photo and appliance removal (so the two can't share a visit), and appliance removal can't come after the final photo.";
+  }
+  return null;
+}
 
 // Every visit/wire route is clinical (visit CRUD, wire tracking), but the
 // gate is attached PER ROUTE, never via a pathless router.use(): this router
@@ -192,6 +225,11 @@ router.post(
       const result = await addVisitByWorkId(visitData);
       sendData(res, visit.addVisit.response, { visitId: result?.id });
     } catch (error) {
+      const conflict = visitRollupConflict(error);
+      if (conflict) {
+        ErrorResponses.conflict(res, conflict);
+        return;
+      }
       log.error('Error adding visit:', error);
       ErrorResponses.internalError(res, 'Failed to add visit', error as Error);
     }
@@ -221,9 +259,18 @@ router.put(
         return;
       }
       // Date string passed through verbatim — see the add handler above.
-      await updateVisitByWorkId(visitId, visitData);
+      const result = await updateVisitByWorkId(visitId, visitData);
+      if (!result.success) {
+        ErrorResponses.notFound(res, 'Visit');
+        return;
+      }
       sendSuccess(res, null);
     } catch (error) {
+      const conflict = visitRollupConflict(error);
+      if (conflict) {
+        ErrorResponses.conflict(res, conflict);
+        return;
+      }
       log.error('Error updating visit:', error);
       ErrorResponses.internalError(
         res,
@@ -256,6 +303,11 @@ router.delete(
       await deleteVisitByWorkId(visitId);
       sendSuccess(res, null);
     } catch (error) {
+      const conflict = visitRollupConflict(error);
+      if (conflict) {
+        ErrorResponses.conflict(res, conflict);
+        return;
+      }
       log.error('Error deleting visit:', error);
       ErrorResponses.internalError(
         res,

@@ -63,14 +63,12 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
     const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     // Error raised by the delete mutation / dismissed by the banner's close
-    // button. Kept separate from the query's read error so each can clear
-    // independently. The visitsByWork response is a loose contract array (only
-    // `id` is modeled), so the rows are cast to Visit below.
+    // button. Kept separate from the query's read error, which only Retry clears.
     const [actionError, setActionError] = useState<string | null>(null);
 
     // Visit list now reads from React Query (keyed by workId; the monotonic
     // request guard is handled by RQ's per-key in-flight dedup + cancellation).
-    const { data, isLoading: loading, error: queryError } = useQuery({
+    const { data, isLoading: loading, error: queryError, refetch } = useQuery({
         ...visitsByWorkQuery(workId ?? ''),
         enabled: !!workId,
     });
@@ -81,28 +79,61 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
         (a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()
     );
 
-    const error = actionError ?? (queryError ? httpErrorMessage(queryError, 'An error occurred') : null);
+    const loadError = queryError ? httpErrorMessage(queryError, 'Failed to load visits') : null;
 
+    // `from=visits` sends the form back here after Save / Cancel (not to Works).
     const handleAddVisit = () => {
-        navigate(`/patient/${personId}/new-visit?workId=${workId}`);
+        navigate(`/patient/${personId}/new-visit?workId=${workId}&from=visits`);
     };
 
     const handleEditVisit = (visitId: number) => {
-        navigate(`/patient/${personId}/new-visit?workId=${workId}&visitId=${visitId}`);
+        navigate(`/patient/${personId}/new-visit?workId=${workId}&visitId=${visitId}&from=visits`);
     };
 
-    const handleDeleteVisit = async (visitId: number) => {
-        if (!await confirm('Are you sure you want to delete this visit? This action cannot be undone.', { title: 'Delete Visit', danger: true, confirmText: 'Delete' })) return;
+    const handleDeleteVisit = async (visit: Visit) => {
+        // Deleting the final-photo visit reopens the treatment (visit-queries.ts
+        // applyPhotoDelete) — say so rather than a bare "cannot be undone".
+        const message = visit.f_photo
+            ? 'This is the treatment\'s Final Photo visit: deleting it reopens the treatment as Active.\n\nDelete this visit? This action cannot be undone.'
+            : 'Are you sure you want to delete this visit? This action cannot be undone.';
+        if (!await confirm(message, { title: 'Delete Visit', danger: true, confirmText: 'Delete' })) return;
 
         try {
-            await deleteJSON('/api/deletevisitbywork', { body: JSON.stringify({ visitId }) });
-            // Invalidate the work's data (qk.work.all covers qk.work.visits) so the
-            // list refreshes here AND in any other observer of this work's visits.
+            await deleteJSON('/api/deletevisitbywork', { body: JSON.stringify({ visitId: visit.id }) });
+            // qk.work.all covers this list (and any other observer of the work's
+            // visits); qk.patient.all covers the Works page + patient type, which a
+            // photo-flagged visit's roll-up moves (FE-F9-4). The deleted row's own
+            // single-visit entry is dropped.
+            queryClient.removeQueries({ queryKey: qk.visit.byId(visit.id) });
+            if (personId) void queryClient.invalidateQueries({ queryKey: qk.patient.all(personId) });
             await queryClient.invalidateQueries({ queryKey: qk.work.all(workId ?? '') });
         } catch (err) {
             setActionError(httpErrorMessage(err, 'Failed to delete visit'));
         }
     };
+
+    if (!workId) {
+        // Visit history is per treatment; there is no patient-wide list. This
+        // used to render an empty "No visits recorded yet" (for a patient with
+        // visits) and an Add Visit that posted `workId=null` (FE-F9-8).
+        return (
+            <div className={styles.container}>
+                <div className={styles.emptyState}>
+                    <i className="fas fa-folder-open" aria-hidden="true"></i>
+                    <p>Visits are kept per treatment. Open one from the Works page.</p>
+                    {personId && (
+                        <button
+                            type="button"
+                            onClick={() => navigate(`/patient/${personId}/works`)}
+                            className="btn btn-primary"
+                        >
+                            <i className="fas fa-arrow-left" aria-hidden="true"></i> Go to Works
+                        </button>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     if (loading) return <div className={styles.loading}>Loading visits...</div>;
 
@@ -129,10 +160,27 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                 </div>
             </div>
 
-            {error && (
-                <div className={styles.error}>
-                    {error}
-                    <button onClick={() => setActionError(null)} className={styles.errorClose}>×</button>
+            {actionError && (
+                <div className={styles.error} role="alert">
+                    {actionError}
+                    <button
+                        type="button"
+                        onClick={() => setActionError(null)}
+                        className={styles.errorClose}
+                        aria-label="Dismiss error"
+                    >
+                        ×
+                    </button>
+                </div>
+            )}
+            {/* A failed list read can't be dismissed away — only retried (the × used
+                to clear the delete error alone, so this banner stuck). */}
+            {loadError && (
+                <div className={styles.error} role="alert">
+                    {loadError}
+                    <button type="button" onClick={() => void refetch()} className="btn btn-secondary">
+                        <i className="fas fa-redo" aria-hidden="true"></i> Retry
+                    </button>
                 </div>
             )}
 
@@ -198,7 +246,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                                     Edit
                                 </button>
                                 <button
-                                    onClick={() => handleDeleteVisit(visit.id)}
+                                    onClick={() => handleDeleteVisit(visit)}
                                     className="btn-delete"
                                     title="Delete visit"
                                 >
@@ -275,7 +323,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                         )}
                     </div>
                 ))}
-                {visits.length === 0 && (
+                {visits.length === 0 && !loadError && (
                     <div className={styles.emptyState}>
                         <i className="fas fa-calendar-times"></i>
                         <p>No visits recorded yet.</p>

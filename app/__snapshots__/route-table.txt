@@ -33,7 +33,6 @@ GET     /portal | /portal/*splat
 USE     /api  [authenticate]
 USE     /  [authenticateWeb]
 USE     /DolImgs  [serveStatic]
-USE     /clinic-assets  [serveStatic]
 MOUNT   /api/sse
 GET     /api/sse/appointments
 MOUNT   /api/sse
@@ -88,6 +87,8 @@ PUT     /api/patients/:personId/timepoints/:tpCode  [authorize(admin|front_desk)
 DELETE  /api/patients/:personId/timepoints/:tpCode  [authorize(admin|front_desk) -> validate(params)]
 GET     /api/patients/:personId/gallery/:tp  [validate(params)]
 GET     /api/patients/:personId/xray
+GET     /api/patients/:personId/xray/preview  [validate(params,query)]
+GET     /api/patients/:personId/xray/send-path  [validate(params,query)]
 MOUNT   /api
 GET     /api/patients/:personId/alerts  [authenticate]
 POST    /api/patients/:personId/alerts  [authenticate -> authorize(admin|front_desk|clinical) -> validate(params,body)]
@@ -132,7 +133,6 @@ POST    /api/chair-display/patient-loaded  [authorize(admin|front_desk|clinical)
 POST    /api/chair-display/patient-cleared  [authorize(admin|front_desk|clinical) -> validate(body)]
 MOUNT   /api
 GET     /api/getpaymenthistory  [authorize(admin|front_desk|clinical) -> validate(query)]
-GET     /api/getworkforreceipt/:workId  [authorize(admin|front_desk|clinical) -> validate(params)]
 GET     /api/getCurrentExchangeRate
 GET     /api/getExchangeRateForDate
 GET     /api/exchange-rates
@@ -251,7 +251,6 @@ GET     /api/expenses  [validate(query)]
 GET     /api/expenses/categories
 GET     /api/expenses/subcategories/:categoryId
 POST    /api/expenses  [authenticate -> authorize(admin|front_desk) -> validate(body)]
-GET     /api/expenses/summary  [validate(query)]
 GET     /api/expenses/:id
 PUT     /api/expenses/:id  [authenticate -> authorize(admin|front_desk) -> validate(params,body) -> requireRecordAge(expense:update)]
 DELETE  /api/expenses/:id  [authenticate -> authorize(admin|front_desk) -> validate(params) -> requireRecordAge(expense:delete)]
@@ -279,8 +278,8 @@ MOUNT   /api
 USE     /api/webceph  [authenticate]
 USE     /api/webceph  [authorize(admin|front_desk|clinical)]
 POST    /api/webceph/create-patient  [validate(body)]
-POST    /api/webceph/upload-image  [uploadImage -> validate(body)]
-POST    /api/webceph/upload-from-file  [validate(body)]
+POST    /api/webceph/upload-image  [timeout(255000ms) -> uploadImage -> validate(body)]
+POST    /api/webceph/upload-from-file  [timeout(255000ms) -> validate(body)]
 GET     /api/webceph/patient-link/:personId
 GET     /api/webceph/photo-types
 MOUNT   /api

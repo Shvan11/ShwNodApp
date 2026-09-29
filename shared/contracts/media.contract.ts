@@ -15,7 +15,7 @@
  * omits a null `data`); the found path returns the link row as a loose guard.
  */
 import { z } from 'zod';
-import { intId } from '../validation.js';
+import { intId, timestampString } from '../validation.js';
 
 // Patient block forwarded to `webcephService.{validate,create}Patient` — mirrors
 // that service's `PatientData` (all-optional strings; the client sends all six).
@@ -31,8 +31,21 @@ const webcephPatientData = z.object({
 // POST /api/webceph/create-patient → { webcephPatientId, link, linkId }.
 export const createPatient = {
   body: z.object({ personId: intId, patientData: webcephPatientData }),
-  response: z.looseObject({}),
+  response: z.looseObject({
+    webcephPatientId: z.string(),
+    link: z.string().optional(),
+    linkId: z.string().optional(),
+  }),
 } as const;
+export type CreateWebCephPatientResponse = z.infer<typeof createPatient.response>;
+
+/** What both upload routes answer: WebCeph's image URLs + the patient's viewer link. */
+const uploadResult = z.looseObject({
+  big: z.string().optional(),
+  thumbnail: z.string().optional(),
+  link: z.string().optional(),
+});
+export type WebCephUploadResponse = z.infer<typeof uploadResult>;
 export type CreateWebCephPatientBody = z.infer<typeof createPatient.body>;
 
 // POST /api/webceph/upload-image → { big, thumbnail, link }. Multipart body, so
@@ -47,7 +60,7 @@ export const uploadImage = {
     recordDate: z.string(),
     targetClass: z.string(),
   }),
-  response: z.looseObject({}),
+  response: uploadResult,
 } as const;
 export type UploadImageBody = z.infer<typeof uploadImage.body>;
 
@@ -65,16 +78,32 @@ export const uploadFromFile = {
     recordDate: z.string(),
     targetClass: z.string(),
   }),
-  response: z.looseObject({}),
+  response: uploadResult,
 } as const;
 export type UploadFromFileBody = z.infer<typeof uploadFromFile.body>;
 
-// GET /api/webceph/patient-link/:personId → link object | null (404 when not found).
-// Intentionally loose: the WebCeph patient link row schema comes from the webceph
-// service and contains a variable set of API-specific fields.
+// GET /api/webceph/patient-link/:personId → the patient's stored WebCeph link
+// (webceph-queries.ts#getPatientWebcephLink — three `patients` columns), or a 404
+// when there is none. Modelled rather than left as an unknown blob: the row is fixed-shape
+// SQL, not a WebCeph API payload, and the modal reads all three fields.
 export const patientLink = {
-  response: z.unknown(),
+  response: z.looseObject({
+    webcephPatientId: z.string(),
+    link: z.string().nullable(),
+    createdAt: timestampString.nullable(),
+  }),
 } as const;
+export type PatientLinkResponse = z.infer<typeof patientLink.response>;
+
+/**
+ * Request timeout for the two WebCeph upload routes, and the client's funnel
+ * timeout for them. It must cover the service's worst case for one upload —
+ * `addNewRecord` then the upload, each up to 3 attempts (20 s + 60 s caps in
+ * webceph-service.ts) with 1 s + 2 s back-off between attempts: 3 × 80 s + 6 s =
+ * 246 s. At the old 30 s a slow upload was reported as failed while it
+ * completed (FE-F9-11). Change it together with those service constants.
+ */
+export const WEBCEPH_UPLOAD_TIMEOUT_MS = 255_000;
 
 // GET /api/webceph/photo-types → PhotoType[] (the webceph service's static list).
 export const photoTypes = {

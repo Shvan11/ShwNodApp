@@ -36,6 +36,7 @@ export type GuardedAlignerPaymentResult =
   | { outcome: 'work_not_found' }
   | { outcome: 'set_not_found' }
   | { outcome: 'set_cost_not_defined' }
+  | { outcome: 'work_not_usd'; currency: string | null }
   | { outcome: 'invalid_amount' }
   | { outcome: 'exceeds_set_balance'; setCost: number; setPaid: number; setBalance: number }
   | { outcome: 'exceeds_work_balance'; totalRequired: number; discount: number; workPaid: number; remaining: number };
@@ -97,12 +98,20 @@ export function createAlignerPayment(
     const work = await trx
       .selectFrom('works')
       .where('work_id', '=', workid)
-      .select(['total_required', 'discount'])
+      .select(['total_required', 'discount', 'currency'])
       .forUpdate()
       .executeTakeFirst();
     if (!work) return { outcome: 'work_not_found' };
 
+    // Every row written here is booked as DOLLARS (amount_paid = usd_received, below),
+    // but `amount_paid` is read in the WORK's currency by its balance, commissions and
+    // statistics. On an IQD work a $500 set payment credited 500 dinars, and the
+    // work-balance guard compared it to the IQD balance and let it through (audit
+    // FE-F8-6). Refuse it until aligner billing carries a real currency.
+    if (work.currency !== 'USD') return { outcome: 'work_not_usd', currency: work.currency };
+
     if (aligner_set_id) {
+
       const set = await trx
         .selectFrom('aligner_sets')
         .where('aligner_set_id', '=', aligner_set_id)

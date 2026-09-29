@@ -4,6 +4,9 @@ import { Link } from 'react-router-dom';
 import { httpErrorMessage } from '@/core/http';
 import { formatDate } from '@/core/utils';
 import { threeShapeCasesQuery, threeShapeMediaQuery } from '@/query/queries';
+import { useGlobalState } from '@/contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
+import { unnToPalmer } from '@/utils/toothNotation';
 import styles from './ThreeShapeScansView.module.css';
 
 interface Props {
@@ -12,11 +15,32 @@ interface Props {
 
 type Indication = { from: number | null; to: number | null; type: string | null; material: string | null };
 
-/** "Crown 3", "Bridge 14–16" — type + tooth range (UNN) for one indication. */
-const indicationLabel = (i: Indication): string => {
-  const teeth = i.from == null ? '' : i.to != null && i.to !== i.from ? ` ${i.from}–${i.to}` : ` ${i.from}`;
-  return `${i.type ?? 'Item'}${teeth}`;
+/** A 3Shape (UNN) tooth number in the app's own notation; an unmappable value stays visibly UNN. */
+const tooth = (unn: number): string => unnToPalmer(unn) ?? `UNN ${unn}`;
+
+/** One indication's teeth — "UR6", "UL6–UL8" — or `null` when it names none. */
+const indicationTeeth = (i: Indication, notation: (n: number) => string): string | null => {
+  if (i.from == null) return null;
+  return i.to != null && i.to !== i.from ? `${notation(i.from)}–${notation(i.to)}` : notation(i.from);
 };
+
+/**
+ * "Crown UR6", "Bridge UL6–UL8" — type + teeth for one indication. 3Shape sends
+ * UNN integers; printing them raw ("Bridge 14–16") read as FDI puts the bridge on
+ * the other side of the mouth, so they are shown in the app's Palmer-style
+ * notation (FE-F9-6). The raw UNN rides in the tooltip for cross-checking in Unite.
+ */
+const indicationLabel = (i: Indication): string => {
+  const teeth = indicationTeeth(i, tooth);
+  return `${i.type ?? 'Item'}${teeth ? ` ${teeth}` : ''}`;
+};
+
+const indicationUnnTitle = (inds: Indication[]): string =>
+  inds
+    .map((i) => indicationTeeth(i, String))
+    .filter((t): t is string => !!t)
+    .map((t) => `UNN ${t}`)
+    .join(' · ');
 
 /** Distinct indication types, for the card title (e.g. "Crown, Bridge"). */
 const summarizeTypes = (inds: Indication[]): string | null => {
@@ -24,7 +48,12 @@ const summarizeTypes = (inds: Indication[]): string | null => {
   return types.length ? types.join(', ') : null;
 };
 
-/** Build the proxied download URL; the media id is already percent-encoded by 3Shape. */
+/**
+ * Build the proxied download URL; the media id is already percent-encoded by 3Shape.
+ * The links carry `download`, so a failed download (workstation off, 3Shape
+ * disconnected) shows up as a failed download instead of navigating this SPA tab
+ * to the raw JSON error (FE-F9-14).
+ */
 const downloadHref = (mediaId: string, fileId: string | null): string =>
   `/api/threeshape/media/${mediaId}/download${fileId ? `?fileId=${encodeURIComponent(fileId)}` : ''}`;
 
@@ -37,6 +66,9 @@ const downloadHref = (mediaId: string, fileId: string | null): string =>
  */
 const ThreeShapeScansView = ({ personId }: Props) => {
   const enabled = !!personId;
+  // Settings → Integrations is an admin-only tab; only an admin can act on the link.
+  const { user } = useGlobalState();
+  const canConnect = roleCaps(user?.role as UserRole | undefined).adminWrites;
   const casesQ = useQuery({ ...threeShapeCasesQuery(personId ?? ''), enabled });
   const mediaQ = useQuery({ ...threeShapeMediaQuery(personId ?? ''), enabled });
 
@@ -70,9 +102,13 @@ const ThreeShapeScansView = ({ personId }: Props) => {
       <div className="error-message">
         <i className="fas fa-exclamation-triangle" />
         <span>{httpErrorMessage(error, 'Could not load 3Shape scans')}</span>
-        <p>
-          <Link to="/settings/integrations">Open Settings → Integrations</Link> to connect 3Shape.
-        </p>
+        {canConnect ? (
+          <p>
+            <Link to="/settings/integrations">Open Settings → Integrations</Link> to connect 3Shape.
+          </p>
+        ) : (
+          <p>Ask an administrator to check the 3Shape connection in Settings → Integrations.</p>
+        )}
       </div>
     );
   }
@@ -113,7 +149,9 @@ const ThreeShapeScansView = ({ personId }: Props) => {
                       </div>
                     )}
                     {c.indications.length > 0 && (
-                      <div className={styles.meta}>{c.indications.map(indicationLabel).join(' · ')}</div>
+                      <div className={styles.meta} title={indicationUnnTitle(c.indications)}>
+                        {c.indications.map(indicationLabel).join(' · ')}
+                      </div>
                     )}
                     {c.creationDate && <div className={styles.meta}>Created {formatDate(c.creationDate)}</div>}
                   </div>
@@ -147,12 +185,13 @@ const ThreeShapeScansView = ({ personId }: Props) => {
                           key={f.id ?? f.name}
                           className={`btn btn-primary btn-sm ${styles.download}`}
                           href={downloadHref(m.id, f.id)}
+                          download
                         >
                           <i className="fas fa-download" /> {m.files.length > 1 ? (f.name ?? 'Download') : 'Download'}
                         </a>
                       ))
                     ) : (
-                      <a className={`btn btn-primary btn-sm ${styles.download}`} href={downloadHref(m.id, null)}>
+                      <a className={`btn btn-primary btn-sm ${styles.download}`} href={downloadHref(m.id, null)} download>
                         <i className="fas fa-download" /> Download
                       </a>
                     )}

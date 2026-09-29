@@ -44,7 +44,9 @@ const STRICT = process.env.STRICT === '1' || process.argv.includes('--strict');
 //             appointment quick-checkin (QuickCheckInResult); media photo-types. The remaining 9
 //             are Tier-A principled-dynamic: lookup-admin (3), settings db-config (2), email-api,
 //             utility google, payment raw UpdateResult[], media patient-link).
-const BASELINE = { D1: 0, D2: 9 };
+//       → 8  (media patient-link modeled — it is three fixed `patients` columns
+//             (getPatientWebcephLink), not a WebCeph API payload; audit FE-F9-13).
+const BASELINE = { D1: 0, D2: 8 };
 
 /** Recursively collect files under `dir` whose name ends with one of `exts`. */
 function walk(dir, exts, acc = []) {

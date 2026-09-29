@@ -14,6 +14,7 @@ import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
 import { parseLocalDate } from '../../utils/date.js';
 import * as imaging from '../../services/imaging/index.js';
+import { xrayPreviewPath } from '../../services/files/patient-assets.service.js';
 import { authorize } from '../../middleware/auth.js';
 import { FINANCE_ROLES } from '../../shared/auth/roles.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
@@ -378,6 +379,64 @@ router.get(
       ErrorResponses.internalError(
         res,
         'X-ray processing failed — the processing tool may not be available on this server',
+        error as Error
+      );
+    }
+  }
+);
+
+/**
+ * An X-ray's CS-Imaging preview thumbnail.
+ * GET /patients/:personId/xray/preview?detailsDir={directory}
+ *
+ * Served here rather than through a static mount: the file sits under
+ * CS-Imaging's dot-folders, and `send`'s default `dotfiles: 'ignore'` 404s any
+ * such path (FE-F9-5). `dotfiles: 'allow'` is scoped to this one fixed,
+ * charset-validated location.
+ */
+router.get(
+  '/patients/:personId/xray/preview',
+  validate({ params: patientContract.xrayPreview.params, query: patientContract.xrayPreview.query }),
+  (req: Request<{ personId: string }, unknown, unknown, patientContract.XrayPreviewQuery>, res: Response): void => {
+    const { personId } = req.params;
+    const { detailsDir } = req.query;
+    res.sendFile(
+      xrayPreviewPath(personId, detailsDir),
+      { dotfiles: 'allow', headers: { 'Content-Type': 'image/png', 'Cache-Control': 'private, no-cache' } },
+      (err) => {
+        if (err && !res.headersSent) res.status(404).end();
+      }
+    );
+  }
+);
+
+/**
+ * The processed X-ray image's server path, for sending it as a message.
+ * GET /patients/:personId/xray/send-path?file={filename}&detailsDir={directory}
+ *
+ * `/api/wa/sendmedia2` takes clinic FILESYSTEM paths (its containment guard
+ * rejects anything outside `clinic1/`), so the X-ray card cannot hand it the
+ * viewer's API URL — that 400'd on every Send (FE-F9-3). This renders the image
+ * exactly as the viewer does and returns where it landed, the way
+ * `/api/convert-path` serves the photo senders.
+ */
+router.get(
+  '/patients/:personId/xray/send-path',
+  validate({ params: patientContract.xraySendPath.params, query: patientContract.xraySendPath.query }),
+  async (
+    req: Request<{ personId: string }, unknown, unknown, patientContract.XraySendPathQuery>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { personId } = req.params;
+      const { file, detailsDir } = req.query;
+      const imagePath = await imaging.processXrayImage(personId, file, detailsDir || '');
+      sendData(res, patientContract.xraySendPath.response, { path: imagePath });
+    } catch (error) {
+      log.error('Error preparing X-ray for sending:', error);
+      ErrorResponses.internalError(
+        res,
+        'Could not prepare this X-ray for sending — the processing tool may not be available on this server',
         error as Error
       );
     }

@@ -5,6 +5,8 @@ import ModalHeader from './ModalHeader';
 import type { PaymentSaveData } from '@/types/api.types';
 import { formatNumber } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
+import { ENTRY_DATE_MIN, unusualEntryDate } from '../../utils/entryDate';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 // Types
 interface SetInfo {
@@ -13,11 +15,6 @@ interface SetInfo {
     set_cost?: number | null;
     TotalPaid?: number | null;
     currency?: string | null;
-}
-
-interface WorkInfo {
-    workid?: number;
-    // Add other work info fields as needed
 }
 
 interface PaymentFormData {
@@ -36,10 +33,10 @@ interface PaymentFormDrawerProps {
     onClose: () => void;
     onSave: (data: PaymentSaveData) => Promise<void>;
     set: SetInfo | null;
-    workInfo?: WorkInfo;
 }
 
-const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }: PaymentFormDrawerProps) => {
+const PaymentFormDrawer = ({ isOpen, onClose, onSave, set }: PaymentFormDrawerProps) => {
+    const confirm = useConfirm();
     // The drawer is mounted fresh each time it opens (parent renders it only while
     // open), so the initial form state IS the on-open reset — seed it lazily here
     // instead of syncing it in an effect.
@@ -107,6 +104,15 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
 
         if (!validate()) {
             return;
+        }
+
+        // A slipped year digit saves silently otherwise, outside every daily total (FE-F8-9).
+        const unusualDate = unusualEntryDate(formData.date_of_payment, formatISODate());
+        if (unusualDate) {
+            const message = unusualDate === 'future'
+                ? `The payment date ${formData.date_of_payment} is in the future. It counts toward the treatment's paid total, but not toward today's cash count or any past day's totals. Save it with this date?`
+                : `The payment date ${formData.date_of_payment} is more than a year ago. Save it with this date?`;
+            if (!await confirm(message, { title: 'Check the payment date', confirmText: 'Save with this date' })) return;
         }
 
         setSaving(true);
@@ -207,6 +213,7 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set, workInfo: _workInfo }
                             type="date"
                             id="date_of_payment"
                             name="date_of_payment"
+                            min={ENTRY_DATE_MIN}
                             value={formData.date_of_payment}
                             onChange={handleChange}
                             className={errors.date_of_payment ? 'error' : ''}

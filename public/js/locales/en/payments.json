@@ -81,7 +81,14 @@
     "underpaymentConfirm": "Continue",
     "backdatedRateMessage": "This records 1 USD = {{rate}} IQD as the rate for {{date}}, a past date. That date's Grand Total in Statistics will be recalculated at this rate. Continue?",
     "backdatedRateTitle": "Set a past date's rate",
-    "backdatedRateConfirm": "Record rate"
+    "backdatedRateConfirm": "Record rate",
+    "rateDeviationMessage": "1 USD = {{rate}} IQD is {{percent}}% away from the rate in use ({{current}} IQD). A wrong rate mis-converts every cross-currency payment that day and restates its statistics. Record it anyway?",
+    "rateDeviationTitle": "Check the exchange rate",
+    "rateDeviationConfirm": "Record rate",
+    "futureDateMessage": "The payment date {{date}} is in the future. The payment counts toward the treatment's paid total, but not toward today's cash count or any past day's totals. Save it with this date?",
+    "oldDateMessage": "The payment date {{date}} is more than a year ago. Save it with this date?",
+    "unusualDateTitle": "Check the payment date",
+    "unusualDateConfirm": "Save with this date"
   },
   "toast": {
     "rateError": "Error setting exchange rate: {{error}}",

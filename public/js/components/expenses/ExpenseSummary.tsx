@@ -5,6 +5,7 @@
 import { useTranslation } from 'react-i18next';
 import type { Expense } from '../../hooks/useExpenses';
 import styles from '../../routes/Expenses.module.css';
+import { formatNumber } from '../../utils/formatters';
 
 interface ExpenseSummaryProps {
     /** The rows the table shows — every filter already applied (the list is never paginated). */
@@ -20,10 +21,6 @@ interface SummaryResult {
 
 export default function ExpenseSummary({ expenses, loading }: ExpenseSummaryProps) {
     const { t } = useTranslation('expenses');
-
-    const formatNumber = (num: number): string => {
-        return new Intl.NumberFormat('en-US').format(num || 0);
-    };
 
     // Totals of exactly the rows on screen. This used to prefer GET /api/expenses/summary,
     // which filters by date only, so a category/lab/employee/currency/type filter narrowed

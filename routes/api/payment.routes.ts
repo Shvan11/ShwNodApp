@@ -22,7 +22,6 @@ import {
   getExchangeRateAsOf,
   updateExchangeRateForDate,
   listExchangeRates,
-  getWorkForReceipt,
   deleteInvoiceById
 } from '../../services/database/queries/payment-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
@@ -35,7 +34,6 @@ import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import {
   paymentHistory,
-  workForReceipt,
   currentExchangeRate,
   exchangeRateForDate,
   exchangeRates,
@@ -43,11 +41,9 @@ import {
   addInvoice,
   deleteInvoice,
   paymentQuery,
-  workIdParams,
   type UpdateExchangeRateBody,
   type AddInvoiceBody,
   type PaymentQueryParams,
-  type WorkIdParams,
 } from '../../shared/contracts/payment.contract.js';
 import {
   validateAndCreateInvoice,
@@ -102,44 +98,6 @@ router.get(
       ErrorResponses.internalError(
         res,
         'Failed to fetch payment history',
-        error as Error
-      );
-    }
-  }
-);
-
-/**
- * Get work data for receipt generation
- * GET /api/getworkforreceipt/:workId
- */
-router.get(
-  '/getworkforreceipt/:workId',
-  authorize(CLINICAL_ROLES), // read-only receipt view — see /getpaymenthistory above
-  validate({ params: workIdParams }),
-  async (
-    req: Request<WorkIdParams>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { workId } = req.params;
-      if (!workId) {
-        ErrorResponses.missingParameter(res, 'workId');
-        return;
-      }
-
-      const work = await getWorkForReceipt(parseInt(workId, 10));
-
-      if (!work) {
-        ErrorResponses.notFound(res, 'Work');
-        return;
-      }
-
-      sendData(res, workForReceipt.response, work);
-    } catch (error) {
-      log.error('Error fetching work for receipt:', error);
-      ErrorResponses.internalError(
-        res,
-        'Failed to fetch work data',
         error as Error
       );
     }

@@ -1,4 +1,3 @@
-import React, { useCallback, useMemo } from 'react';
 import cn from 'classnames';
 import styles from './TeethSelector.module.css';
 
@@ -39,7 +38,9 @@ interface TeethByQuadrant {
     deciduous: Record<QuadrantKey, ToothOption[]>;
 }
 
-const TeethSelector = React.memo(({
+// Plain component: React Compiler memoizes it (CLAUDE.md — no hand memoization;
+// the React.memo + 7 useMemo + 3 useCallback here predated the compiler).
+const TeethSelector = ({
     teethOptions = [],
     selectedTeethIds = [],
     onSelectionChange,
@@ -48,8 +49,8 @@ const TeethSelector = React.memo(({
     onFilterChange,
     readOnly = false
 }: TeethSelectorProps) => {
-    // Memoize teeth groupings by quadrant
-    const teethByQuadrant = useMemo((): TeethByQuadrant => {
+    // Teeth grouped by quadrant, in Palmer display order
+    const teethByQuadrant = ((): TeethByQuadrant => {
         const sortTeeth = (teeth: ToothOption[], quadrant: QuadrantKey): ToothOption[] => {
             return [...teeth].sort((a, b) => {
                 // Sort by tooth_number for consistent Palmer notation display
@@ -81,52 +82,45 @@ const TeethSelector = React.memo(({
         });
 
         return grouped;
-    }, [teethOptions]);
+    })();
 
-    // Memoize selected IDs as Set for O(1) lookup
-    const selectedSet = useMemo(() => new Set(selectedTeethIds), [selectedTeethIds]);
+    // Selected IDs as a Set for O(1) lookup
+    const selectedSet = new Set(selectedTeethIds);
 
     // Handle tooth click - toggle selection (no-op in read-only mode)
-    const handleToothClick = useCallback((toothId: number) => {
+    const handleToothClick = (toothId: number) => {
         if (readOnly) return;
         const newSelection = selectedSet.has(toothId)
             ? selectedTeethIds.filter(id => id !== toothId)
             : [...selectedTeethIds, toothId];
         onSelectionChange(newSelection);
-    }, [readOnly, selectedTeethIds, selectedSet, onSelectionChange]);
+    };
 
     // Handle filter changes
-    const handleFilterChange = useCallback((type: 'permanent' | 'deciduous', value: boolean) => {
+    const handleFilterChange = (type: 'permanent' | 'deciduous', value: boolean) => {
         onFilterChange?.(type, value);
-    }, [onFilterChange]);
+    };
 
     // Handle clear all
-    const handleClearAll = useCallback(() => {
+    const handleClearAll = () => {
         onSelectionChange([]);
-    }, [onSelectionChange]);
+    };
 
-    // Memoize computed values
-    const hasPermanentTeeth = useMemo(() => teethOptions.some(t => t.is_permanent), [teethOptions]);
-    const hasDeciduousTeeth = useMemo(() => teethOptions.some(t => !t.is_permanent), [teethOptions]);
+    const hasPermanentTeeth = teethOptions.some(t => t.is_permanent);
+    const hasDeciduousTeeth = teethOptions.some(t => !t.is_permanent);
 
     // Read-only mode shows only the arches that actually contain selected teeth.
-    const hasSelectedPermanent = useMemo(
-        () => teethOptions.some(t => t.is_permanent && selectedSet.has(t.id)),
-        [teethOptions, selectedSet]
-    );
-    const hasSelectedDeciduous = useMemo(
-        () => teethOptions.some(t => !t.is_permanent && selectedSet.has(t.id)),
-        [teethOptions, selectedSet]
-    );
+    const hasSelectedPermanent = teethOptions.some(t => t.is_permanent && selectedSet.has(t.id));
+    const hasSelectedDeciduous = teethOptions.some(t => !t.is_permanent && selectedSet.has(t.id));
     const effShowPermanent = readOnly ? hasSelectedPermanent : showPermanent;
     const effShowDeciduous = readOnly ? hasSelectedDeciduous : showDeciduous;
 
     // Get selected teeth display text
-    const selectedDisplay = useMemo(() => {
+    const selectedDisplay = (() => {
         if (selectedTeethIds.length === 0) return '';
         const teethMap = new Map(teethOptions.map(t => [t.id, t.tooth_code]));
         return selectedTeethIds.map(id => teethMap.get(id)).filter(Boolean).join(', ');
-    }, [selectedTeethIds, teethOptions]);
+    })();
 
     // Render a single graphical tooth for permanent teeth
     const renderPermanentTooth = (tooth: ToothOption, isLower: boolean) => {
@@ -279,8 +273,6 @@ const TeethSelector = React.memo(({
             )}
         </div>
     );
-});
-
-TeethSelector.displayName = 'TeethSelector';
+};
 
 export default TeethSelector;
