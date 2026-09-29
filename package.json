@@ -48,7 +48,10 @@
     "db:baseline:verify": "node --env-file=.env scripts/db-baseline-verify.mjs",
     "sync:reconcile": "node --env-file=.env scripts/reconcile-mirror.mjs",
     "sync:reconcile:apply": "node --env-file=.env scripts/reconcile-mirror.mjs --apply",
-    "db:codegen": "kysely-codegen --date-parser string --exclude-pattern \"extensions.*\" --out-file types/db.d.ts"
+    "db:codegen": "kysely-codegen --date-parser string --exclude-pattern \"extensions.*\" --out-file types/db.d.ts",
+    "db:setup": "tsx scripts/db-setup.mts",
+    "db:seed:demo": "tsx scripts/db-seed-demo.mts",
+    "db:seed:demo:remove": "tsx scripts/db-seed-demo.mts remove"
   },
   "author": "",
   "license": "ISC",

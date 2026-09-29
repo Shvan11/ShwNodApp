@@ -63,13 +63,20 @@ is a no-op on a deployment that already has them, including one whose names were
 Settings → Lookups. `services/database/fresh-install.test.ts` fails the gate if a new id is
 added to either constant without a seed row.
 
-What is still **not** included: clinical lookup vocabularies (wires, work types, keywords,
-`tooth_numbers`, …) and `options` beyond the two WhatsApp rows. A brand-new clinic still
-needs a separate data load — `options` holds live secrets (e.g. the Telegram
-`gram_session`) and must never be seeded from a repo file. Note that `tooth_numbers.tooth_code`
-must match the chart SVG names (`public/images/teeth/chart/UR6.svg`, …), and that
-`work_types` ids are code constants too (`WORK_TYPE_IDS`), though `works.type_of_work` has
-no FK, so a missing row degrades a label instead of failing a write.
+`1789460500000_seed-product-constants.sql` adds everything else the CODE names, by id or by
+value, that an empty install was missing (found 2026-09-29 while building `db:setup` and the
+demo seeder on a throwaway PG 18): `work_types` (`WORK_TYPE_IDS`), `tooth_numbers` (codes =
+the chart SVG names), `document_types` + the default receipt template row (receipt-service
+renders type 1 with no file fallback, so every "print receipt" failed), expense categories 5
+`Employees` / 7 `Lab` (`EMPLOYEE_EXPENSE_CATEGORY` / `LAB_EXPENSE_CATEGORY`), the `Doctor`
+position every doctor list filters on, the `Clinic` intake pseudo-doctor, and the 0..366
+`numbers` tally that `fillCalendar()` needs. Same posture: `ON CONFLICT DO NOTHING` /
+`WHERE NOT EXISTS`, a no-op on existing deployments; `fresh-install.test.ts` guards each.
+
+What stays **out** of migrations: the clinic's own vocabularies (time slots, appointment types,
+wires, alert types, the other expense categories, …), its identity and the first user. Those
+come from `npm run db:setup` (below). `options` holds live secrets (e.g. the Telegram
+`gram_session`) and must never be seeded from a repo file.
 
 ---
 
@@ -123,8 +130,23 @@ npm run db:check      # expect: "ledger matches disk"
 
 The app role needs no superuser: `citext` and `pg_trgm` are trusted extensions, and
 `pg_stat_statements` (monitoring only) is skipped with a NOTICE when it can't be created.
-Then load the clinic's own vocabularies and `options` (see above) and create the first
-user.
+Then run the first-run setup:
+
+```bash
+npm run db:setup      # interactive; or: npm run db:setup -- --yes --admin-user … --admin-password … \
+                      #   --clinic-name … --message-name … --message-name-ar … --whatsapp-group … --currency IQD
+```
+
+It creates the first admin (only while `users` is empty), sets the clinic's identity and
+default work currency, fills each starter vocabulary **only while its table is still empty**
+(`services/setup/starter-vocabulary.ts`), and generates the appointment calendar. Every step is
+safe to repeat, and it ends by listing what still needs a human — including any identity row
+that still holds the original clinic's wording (the baseline seeded "Dr. Shwan orthodontic
+clinic" into the message-name rows so that clinic's reminders stayed byte-identical; a new
+center that skips setup would send its patients another clinic's name).
+
+For a demo or test install, `npm run db:seed:demo` then fills the EMPTY install with a
+fictional clinic — see [demo-data.md](demo-data.md).
 
 Until 2026-09-28 this path did not work at all, for three reasons found by the F9 frontend
 audit: `db:check` refused any database without a ledger; the baseline also created
