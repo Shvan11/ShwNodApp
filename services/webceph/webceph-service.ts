@@ -10,6 +10,7 @@ import config from '../../config/config.js';
 import FormData from 'form-data';
 import fetch, { type Response, type BodyInit } from 'node-fetch';
 import { log } from '../../utils/logger.js';
+import { WEBCEPH_DEFAULT_RACE, WEBCEPH_RACES } from '../../shared/webceph-race.js';
 
 // ===========================================
 // TYPES
@@ -302,7 +303,9 @@ class WebCephService {
       formData.append('lastname', patientData.lastName || '');
       formData.append('gender', (patientData.gender || '').toLowerCase());
       formData.append('birthdate', patientData.birthday || '');
-      formData.append('race', (patientData.race || 'asian').toLowerCase());
+      // The modal always sends a race; the fallback covers any other caller (see
+      // shared/webceph-race.ts for why the default is Caucasian, not Asian).
+      formData.append('race', (patientData.race || WEBCEPH_DEFAULT_RACE).toLowerCase());
       formData.append('agreement', 'yes'); // Required by API
 
       log.debug('[WebCeph] Request body prepared');
@@ -483,9 +486,9 @@ class WebCephService {
       errors.push('Gender must be "male" or "female"');
     }
 
-    const validRaces = ['african', 'asian', 'caucasian', 'hispanic'];
+    const validRaces: readonly string[] = WEBCEPH_RACES;
     if (patientData.race && !validRaces.includes(patientData.race.toLowerCase())) {
-      errors.push('Race must be one of: african, asian, caucasian, hispanic');
+      errors.push(`Race must be one of: ${WEBCEPH_RACES.join(', ')}`);
     }
 
     // WebCeph requires a valid birthdate — an empty/missing one is rejected

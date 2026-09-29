@@ -93,6 +93,15 @@
     color: var(--text-secondary);
 }
 
+/* The race (norm set) picker on the Create card — left-aligned inside the centred card. */
+.raceField {
+    display: flex;
+    flex-direction: column;
+    max-width: 22rem;
+    margin: 0 auto var(--spacing-lg);
+    text-align: start;
+}
+
 .createWarn {
     margin: var(--spacing-md) 0 0;
     color: var(--warning-700);

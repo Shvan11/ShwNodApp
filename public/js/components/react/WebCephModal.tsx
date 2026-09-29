@@ -10,6 +10,12 @@ import { qk } from '@/query/keys';
 import { formatDate, formatISODate } from '../../core/utils';
 import { buildContentUrl } from './files/fileHelpers';
 import * as mediaContract from '@shared/contracts/media.contract';
+import {
+    WEBCEPH_DEFAULT_RACE,
+    WEBCEPH_RACES,
+    WEBCEPH_RACE_LABELS,
+    type WebcephRace,
+} from '@shared/webceph-race';
 import styles from './WebCephModal.module.css';
 
 /** Minimal slice of the patient `/info` payload the WebCeph create step needs. */
@@ -51,6 +57,11 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
     const [webcephError, setWebcephError] = useState<string | null>(null);
     const [webcephSuccess, setWebcephSuccess] = useState('');
     const [showPicker, setShowPicker] = useState(false);
+    // The norm set WebCeph analyses this patient against. Pre-selected to the
+    // clinic default (Caucasian — the Middle Eastern norm set; see
+    // shared/webceph-race.ts) and shown as such, so it is never an invisible
+    // assumption. Staff change it for a patient of another background.
+    const [race, setRace] = useState<WebcephRace>(WEBCEPH_DEFAULT_RACE);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // One success-banner timer at a time: a second upload used to leave the first
@@ -126,7 +137,7 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
                 lastName: patientInfo.last_name || '',
                 gender: genderName,
                 birthday,
-                race: 'Asian', // Default value
+                race,
             };
 
             const result = await postJSON<mediaContract.CreateWebCephPatientResponse>(
@@ -272,6 +283,40 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
                         <p className={styles.createDesc}>
                             Get AI-powered cephalometric analysis by creating this patient in WebCeph.
                         </p>
+                        <div className={styles.raceField}>
+                            <label className={styles.label} htmlFor="webceph-race">
+                                Race (cephalometric norms)
+                            </label>
+                            <select
+                                id="webceph-race"
+                                value={race}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setRace(WEBCEPH_RACES.find((r) => r === e.target.value) ?? WEBCEPH_DEFAULT_RACE)}
+                                className={styles.input}
+                                aria-describedby="webceph-race-hint"
+                                disabled={webcephLoading}
+                            >
+                                {WEBCEPH_RACES.map((r) => (
+                                    <option key={r} value={r}>
+                                        {WEBCEPH_RACE_LABELS[r]}{r === WEBCEPH_DEFAULT_RACE ? ' (default)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <p id="webceph-race-hint" className={styles.helpText}>
+                                {race === WEBCEPH_DEFAULT_RACE ? (
+                                    <>
+                                        <i className="fas fa-info-circle" aria-hidden="true" />{' '}
+                                        <strong>{WEBCEPH_RACE_LABELS[WEBCEPH_DEFAULT_RACE]} is chosen by default</strong>
+                                        {' '}— the norm set used for Middle Eastern (Iraqi) patients. Change it only for a patient of another background.
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-exclamation-circle" aria-hidden="true" />{' '}
+                                        Changed from the default ({WEBCEPH_RACE_LABELS[WEBCEPH_DEFAULT_RACE]}) for this patient.
+                                    </>
+                                )}
+                                {' '}It is sent once, when the patient is created in WebCeph.
+                            </p>
+                        </div>
                         <button
                             type="button"
                             className={styles.primaryBtn}

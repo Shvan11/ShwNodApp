@@ -105,7 +105,7 @@ matching photo class"). The X-ray codes are `lateral_ceph` / `pa_ceph` / `orthop
 - **Gender is required** (`male` / `female`) — WebCeph rejects an empty one with a
   cryptic "invalid format" error, so the app blocks it first.
 - **Date of birth is required**, `YYYY-MM-DD`.
-- **Race** must be one of `african` / `asian` / `caucasian` / `hispanic` (default `asian`).
+- **Race** must be one of `african` / `asian` / `caucasian` / `hispanic`. The default is **`caucasian`** — the norm set for Middle Eastern (Iraqi) patients — defined once in `shared/webceph-race.ts`. The WebCeph dialog pre-selects it, labels it "(default)", and lets staff pick another value for a patient of another background before creating them.
 - **Patient ID** must be 6–20 chars, or empty to let WebCeph auto-generate one.
 - **Upload field name must be `file`** — WebCeph rejects `photo` with "invalid upload".
 - The service retries failed requests up to 3 times with linear backoff.

@@ -16,6 +16,7 @@
  */
 import { z } from 'zod';
 import { intId, timestampString } from '../validation.js';
+import { WEBCEPH_RACES } from '../webceph-race.js';
 
 // Patient block forwarded to `webcephService.{validate,create}Patient` — mirrors
 // that service's `PatientData` (all-optional strings; the client sends all six).
@@ -25,7 +26,8 @@ const webcephPatientData = z.object({
   lastName: z.string().optional(),
   gender: z.string().optional(),
   birthday: z.string().optional(),
-  race: z.string().optional(),
+  // WebCeph's four norm sets; the modal pre-selects WEBCEPH_DEFAULT_RACE.
+  race: z.enum(WEBCEPH_RACES).optional(),
 });
 
 // POST /api/webceph/create-patient → { webcephPatientId, link, linkId }.
