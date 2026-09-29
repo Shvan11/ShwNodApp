@@ -9,8 +9,8 @@
  */
 
 import type { LoaderFunctionArgs } from 'react-router-dom';
-import { fetchJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import { dailyAppointments } from '@shared/contracts/appointment.contract';
+import { fetchJSON, type HttpError } from '@/core/http';
+import { toLocalDateString } from '@/utils/calendarDate';
 import { queryClient } from '../query/client';
 import { loaderQuery } from '../query/loaderQuery';
 import { preloadPatientPage } from '../components/react/ContentRenderer';
@@ -20,6 +20,7 @@ import {
   timepointsQuery,
   patientPhonesQuery,
   workTypesQuery,
+  dailyAppointmentsQuery,
   workKeywordsQuery,
   tagOptionsQuery,
   typeOptionsQuery,
@@ -77,16 +78,6 @@ export interface TemplateData {
   type?: string;
   content?: string;
   [key: string]: unknown;
-}
-
-/**
- * Appointment stats
- */
-export interface AppointmentStats {
-  total: number;
-  checkedIn: number;
-  absent: number;
-  waiting: number;
 }
 
 /**
@@ -356,82 +347,41 @@ export async function patientManagementLoader(): Promise<null> {
 }
 
 /**
- * Appointment data
- */
-export interface AppointmentData {
-  appointment_id?: number;
-  person_id?: number;
-  patient_name?: string;
-  app_date?: string | Date;
-  app_detail?: string;
-  apptime?: string | null;
-  [key: string]: unknown;
-}
-
-/**
- * Daily appointments loader result
+ * Daily appointments loader result — only the date it loaded. The rows go into
+ * the React Query cache under `qk.appointments.daily(date)`, where the page's
+ * `useAppointments` reads them.
  */
 export interface DailyAppointmentsLoaderResult {
-  allAppointments: AppointmentData[];
-  checkedInAppointments: AppointmentData[];
-  stats: AppointmentStats;
   loadedDate: string;
-  error?: string;
-  _loaderTimestamp: number;
 }
 
 /**
  * DAILY APPOINTMENTS LOADER
- * Fetches initial data BEFORE component renders
- * Enables native scroll restoration via React Router
+ * Fetches the day BEFORE the page renders (no loading flash; native scroll
+ * restoration) and writes it straight into the query cache.
+ *
+ * It used to return the rows as `initialData`, which React Query ignores
+ * whenever the key is already cached — so on a return to the board within 30 s
+ * the fresh fetch was thrown away and the stale cache painted, e.g. without the
+ * walk-in just checked in from the patient screens (audit FE-F11-17). `fetchQuery`
+ * with `staleTime: 0` always fetches and always lands in the cache.
+ *
+ * A failed read is not thrown: the page renders its header and a retry, and the
+ * query reports the error itself.
  */
 export async function dailyAppointmentsLoader({
   request,
 }: LoaderFunctionArgs): Promise<DailyAppointmentsLoaderResult> {
-  // Helper to get today's date in YYYY-MM-DD format
-  const getToday = (): string => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  // Read date from URL (source of truth)
   const url = new URL(request.url);
-  const targetDate = url.searchParams.get('date') || getToday();
-
-  if (import.meta.env.DEV) console.log(`[Loader] Pre-fetching appointments for: ${targetDate}`);
+  const loadedDate = url.searchParams.get('date') || toLocalDateString(new Date());
 
   try {
-    const data = await fetchJSON<{
-      allAppointments?: AppointmentData[];
-      checkedInAppointments?: AppointmentData[];
-      stats?: AppointmentStats;
-    }>(`/api/getDailyAppointments?AppsDate=${targetDate}`, {
-      signal: request.signal, // Abort on navigation
-      schema: dailyAppointments.response, // Validate the boundary (audit H11)
-    });
-
-    return {
-      allAppointments: data.allAppointments || [],
-      checkedInAppointments: data.checkedInAppointments || [],
-      stats: data.stats || { total: 0, checkedIn: 0, absent: 0, waiting: 0 },
-      loadedDate: targetDate,
-      _loaderTimestamp: Date.now(), // For debugging
-    };
+    await queryClient.fetchQuery({ ...dailyAppointmentsQuery(loadedDate), staleTime: 0 });
   } catch (error) {
-    // Don't throw - return empty state (component will show error)
-    console.error('[Loader] Failed:', error);
-    return {
-      allAppointments: [],
-      checkedInAppointments: [],
-      stats: { total: 0, checkedIn: 0, absent: 0, waiting: 0 },
-      loadedDate: targetDate,
-      error: httpErrorMessage(error, 'Unknown error'),
-      _loaderTimestamp: Date.now(),
-    };
+    if (error instanceof Error && error.name === 'AbortError') throw error;
+    console.error('[Loader] Daily appointments failed:', error);
   }
+  return { loadedDate };
 }
 
 /**

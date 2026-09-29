@@ -181,6 +181,8 @@ interface ServerConfig {
 interface UrlConfig {
   /** Always set — config.ts supplies the default, so consumers must not re-default it. */
   publicUrl: string;
+  /** True when PUBLIC_URL is unset and `publicUrl` is the built-in fallback (another clinic's domain on any other install). */
+  publicUrlIsDefault: boolean;
 }
 
 /**

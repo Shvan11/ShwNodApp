@@ -490,6 +490,8 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             // appointment-backed reads and the calendar/slot reads it just changed.
             queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
             queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
+            // …and today's daily board, so a return to it shows the walk-in (FE-F11-17).
+            queryClient.invalidateQueries({ queryKey: qk.appointments.all() });
         } catch (err) {
             toast.error(httpErrorMessage(err, t('checkin.toastFail')), 5000);
         } finally {

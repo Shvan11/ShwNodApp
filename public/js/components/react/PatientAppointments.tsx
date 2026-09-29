@@ -42,10 +42,8 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
     const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
     const handleEdit = (appointment: PatientAppointment): void => {
-        // Navigate to edit page with appointment data as state
-        navigate(`/patient/${personId}/edit-appointment/${appointment.appointment_id}`, {
-            state: { appointment }
-        });
+        // The form reads the appointment by id itself (audit FE-F10-1).
+        navigate(`/patient/${personId}/edit-appointment/${appointment.appointment_id}`);
     };
 
     const handleDelete = async (appointmentId: number): Promise<void> => {
@@ -60,6 +58,8 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
             // Deleting frees the slot for everyone — refresh the calendar + the
             // booking picker's availability reads, which nothing else refetches.
             await queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
+            // …and the daily board of that day (FE-F11-17).
+            void queryClient.invalidateQueries({ queryKey: qk.appointments.all() });
             setDeleteConfirm(null);
         } catch (err) {
             console.error('Error deleting appointment:', err);

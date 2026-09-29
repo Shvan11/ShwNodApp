@@ -663,6 +663,23 @@ export const expenseSubcategoriesQuery = (categoryId: number | string | null | u
 // Appointments
 // ---------------------------------------------------------------------------
 
+/**
+ * GET /api/getDailyAppointments?AppsDate= — one day's board: the not-yet-arrived
+ * list, the checked-in list and the whole-day stats. Read by `useAppointments`
+ * (with `keepPreviousData` + the SSE refresh) and written into the cache by the
+ * route loader, so the loader's fetch is the board's first paint.
+ */
+export const dailyAppointmentsQuery = (date: string) =>
+  queryOptions({
+    queryKey: qk.appointments.daily(date),
+    queryFn: ({ signal }) =>
+      fetchJSON<appointmentContract.DailyAppointmentsResponse>(
+        `/api/getDailyAppointments?AppsDate=${encodeURIComponent(date)}`,
+        { signal, schema: appointmentContract.dailyAppointments.response }
+      ),
+    enabled: !!date,
+  });
+
 /** GET /api/appointments/:id — single appointment (edit form; disabled until an id is set). */
 export const appointmentByIdQuery = (id: number | string | null | undefined) =>
   queryOptions({

@@ -26,8 +26,6 @@ export interface CalendarAppointment {
     personID?: number | null;
     drID?: number | null;
     time?: string;
-    app_date?: string;
-    person_id?: number | null;
 }
 
 // Time slot info containing appointments

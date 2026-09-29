@@ -9,7 +9,9 @@
 //  - No JSON envelope per event — single string allocation per send.
 //  - No Last-Event-ID buffer — clients fall back to REST refetch on reconnect.
 //  - One module-scoped keep-alive interval (25 s), not per connection.
-//  - Comment frames (`:\n\n`) for keep-alive — no client allocation.
+//  - The keep-alive is a named `ping` event, not a comment frame: a comment is
+//    invisible to EventSource, so a client could not tell a quiet stream from a
+//    dead one. The clients reopen a stream silent for 60 s (audit FE-F11-7).
 
 import { Router, type Request, type Response } from 'express';
 import type { EventEmitter } from 'events';
@@ -32,6 +34,8 @@ const CHAIR_PATIENT_REPLAY_TTL_MS = 12 * 60 * 60 * 1000;
 // 25 s undercuts typical proxy idle drops (Caddy default ~30 s) and the
 // browser's silent-fail window for EventSource.
 const KEEP_ALIVE_MS = 25_000;
+/** The liveness frame the clients watch for (public/js/services/sse-channel.ts). */
+const PING_FRAME = 'event: ping\ndata: 0\n\n';
 
 let initialized = false;
 let keepAliveHandle: ReturnType<typeof setInterval> | null = null;
@@ -107,11 +111,12 @@ function ensureInitialized(emitter: EventEmitter): void {
     { event: InternalEmitterEvents.PHOTO_TIMEPOINT_RENDERED, fn: onPhotoTimepointRendered as (...args: unknown[]) => void },
   ];
 
-  // Single shared timer fans `:\n\n` (SSE comment frame) to every open stream.
-  // Cheaper than per-connection timers and proves transport health to proxies.
+  // Single shared timer fans a `ping` event to every open stream. Cheaper than
+  // per-connection timers; keeps proxies from idling the stream out AND lets the
+  // client's liveness watchdog see the transport is alive.
   keepAliveHandle = setInterval(() => {
-    for (const res of appointmentsClients) safeWrite(res, ':\n\n');
-    for (const res of chairClients.values()) safeWrite(res, ':\n\n');
+    for (const res of appointmentsClients) safeWrite(res, PING_FRAME);
+    for (const res of chairClients.values()) safeWrite(res, PING_FRAME);
   }, KEEP_ALIVE_MS);
   keepAliveHandle.unref();
 

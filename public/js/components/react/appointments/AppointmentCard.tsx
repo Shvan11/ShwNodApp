@@ -2,37 +2,12 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../../hooks/useLocalizedName';
 import { PATIENT_TYPE_IDS } from '@shared/treatment-taxonomy';
+import type { DailyAppointmentRow } from '@shared/contracts/appointment.contract';
 import type { DoctorColor } from '../calendar.types';
 import styles from './AppointmentCard.module.css';
 
-// Daily appointment interface matching getDailyAppointmentsOptimized output
-export interface DailyAppointment {
-    appointment_id?: number;
-    person_id?: number;
-    dr_id?: number | null;
-    patient_name?: string;
-    patient_type?: string | null;
-    patient_type_id?: number | null;
-    patient_type_name_ar?: string | null;
-    Phone?: string | null;
-    apptime?: string | null;
-    app_detail?: string | null;
-    Notes?: string | null;
-    present?: string | null;
-    seated?: string | null;
-    dismissed?: string | null;
-    present_time?: string | null;
-    seated_time?: string | null;
-    dismissed_time?: string | null;
-    hasActiveAlert?: boolean;
-    is_ortho_visit?: boolean;
-    has_visit?: boolean | number | null;
-    app_date?: Date | string | null;
-    app_cost?: number | null;
-}
-
 interface AppointmentCardProps {
-    appointment: DailyAppointment;
+    appointment: DailyAppointmentRow;
     showStatus: boolean;
     // Assigned doctor's name. Drives the per-card doctor icon's tooltip; omitted
     // when redundant (the list is already filtered to a single doctor) or unknown.
@@ -53,8 +28,7 @@ interface AppointmentCardProps {
  * Performance: Automatically optimized by React Compiler (React 19).
  * No manual memoization needed - the compiler handles it automatically.
  *
- * Note: IsOrthoVisit flag is computed in SQL stored procedure.
- * Business logic lives in database (single source of truth), not frontend.
+ * `is_ortho_visit` is computed by the daily query from the active work's type.
  */
 const AppointmentCard = ({
     appointment,
@@ -69,43 +43,21 @@ const AppointmentCard = ({
     const { t } = useTranslation('appointments');
     const localizedName = useLocalizedName();
 
-    // Format SQL Server TIME value (HH:MM:SS) to 12-hour format. Digits stay
-    // Western (product decision); only the AM/PM marker localizes (ص/م in Arabic).
+    // Format a 24-hour `HH:MM[:SS]` wall-clock time (the contract's `clockTime`)
+    // as 12-hour `h:mm` + the active language's marker (ص/م in Arabic). Digits
+    // stay Western (product decision). The server sends 24-hour on purpose: it
+    // used to send 12-hour with no marker, and this then read every afternoon
+    // stamp as AM (audit FE-F11-1).
     const formatTime = (timeString: string | null | undefined): string => {
         if (!timeString) return '';
 
-        const timeParts = timeString.split(':');
-        if (timeParts.length < 2) return timeString;
+        const [hourPart, minutes] = timeString.split(':');
+        const hours24 = parseInt(hourPart, 10);
+        if (Number.isNaN(hours24) || minutes === undefined) return timeString;
 
-        let hours = parseInt(timeParts[0], 10);
-        const minutes = timeParts[1];
-        const period = hours >= 12 ? t('card.pm') : t('card.am');
-
-        hours = hours % 12;
-        hours = hours ? hours : 12; // 0 should be 12
-
-        return `${hours}:${minutes} ${period}`;
+        const period = hours24 >= 12 ? t('card.pm') : t('card.am');
+        return `${hours24 % 12 || 12}:${minutes} ${period}`;
     };
-
-    // Determine current status. NOTE: the returned values are logical/CSS keys
-    // (drive `data-status` selectors + the `=== 'Checked In'` checks below), NOT
-    // visible text — so they stay English and are deliberately not translated.
-    const getCurrentStatus = (): string => {
-        if (!showStatus) {
-            return appointment.present || appointment.seated || appointment.dismissed ? 'Checked In' : 'Scheduled';
-        }
-
-        if (appointment.dismissed) return 'Dismissed';
-        if (appointment.seated) return 'Seated';
-        if (appointment.present) return 'Present';
-        return 'Scheduled';
-    };
-
-    const status = getCurrentStatus();
-    const statusClass = status.toLowerCase().replace(' ', '-');
-
-    // Check if patient is waiting (present but not seated and not dismissed)
-    const isWaiting = showStatus && appointment.present && !appointment.seated && !appointment.dismissed;
 
     const navigate = useNavigate();
 
@@ -118,7 +70,7 @@ const AppointmentCard = ({
         }
     };
 
-    // Get state times
+    // Workflow stamps
     const presentTime = appointment.present_time ? formatTime(appointment.present_time) : null;
     const seatedTime = appointment.seated_time ? formatTime(appointment.seated_time) : null;
     const dismissedTime = appointment.dismissed_time ? formatTime(appointment.dismissed_time) : null;
@@ -137,21 +89,19 @@ const AppointmentCard = ({
         if (!appointmentId) return <></>;
 
         if (!showStatus) {
-            // All appointments table - show only check-in button (gray/dim - not checked in yet)
-            const isCheckedIn = status === 'Checked In';
-
+            // Not-yet-arrived list (every row has present IS NULL): the check-in
+            // button. Hidden on a future day, which the server refuses (FE-F11-4).
+            if (!onCheckIn) return <></>;
             return (
                 <button
                     type="button"
-                    className={isCheckedIn ? styles.statusActive : styles.statusInactiveClickable}
+                    className={styles.statusInactiveClickable}
                     onClick={(e: React.MouseEvent) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (!isCheckedIn && onCheckIn) {
-                            onCheckIn(appointmentId);
-                        }
+                        onCheckIn(appointmentId);
                     }}
-                    title={isCheckedIn ? t('actions.checkedIn') : t('actions.clickToCheckIn')}
+                    title={t('actions.clickToCheckIn')}
                 >
                     <i className="fas fa-user-check"></i>
                 </button>
@@ -238,20 +188,16 @@ const AppointmentCard = ({
         }
     };
 
-    // Build card classes dynamically. The fade-in animation plays once when the
-    // card mounts: a CSS animation runs only on the element's first paint and
-    // doesn't replay on re-render (the DOM node persists), so no mount flag is
-    // needed — the previous setState-on-mount actually cut the animation short.
-    const cardClass = isWaiting ? styles.waiting : styles.card;
-
+    // The fade-in animation plays once when the card mounts: a CSS animation runs
+    // only on the element's first paint and doesn't replay on re-render (the DOM
+    // node persists), so no mount flag is needed.
     return (
         <div
-            className={`${cardClass} ${styles.fadeInUp}`}
+            className={`${styles.card} ${styles.fadeInUp}`}
             data-appointment-id={appointment.appointment_id}
-            data-status={statusClass}
         >
             <div className={styles.time}>
-                {appointment.apptime || t('card.noTime')}
+                {appointment.apptime ? formatTime(appointment.apptime) : t('card.noTime')}
             </div>
 
             <div className={styles.info}>

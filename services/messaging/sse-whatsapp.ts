@@ -48,6 +48,12 @@ interface WhatsappClient {
 const whatsappClients = new Map<string, WhatsappClient>();
 
 const KEEP_ALIVE_MS = 25_000;
+/**
+ * The keep-alive is a named `ping` event, not a comment frame: a comment is
+ * invisible to EventSource, so the client could not tell a quiet stream from a
+ * dead one. It reopens a stream silent for 60 s (audit FE-F11-7).
+ */
+const PING_FRAME = 'event: ping\ndata: 0\n\n';
 
 let initialized = false;
 let keepAliveHandle: ReturnType<typeof setInterval> | null = null;
@@ -124,7 +130,7 @@ function ensureInitialized(emitter: EventEmitter): void {
   }
 
   keepAliveHandle = setInterval(() => {
-    for (const { res } of whatsappClients.values()) safeWrite(res, ':\n\n');
+    for (const { res } of whatsappClients.values()) safeWrite(res, PING_FRAME);
   }, KEEP_ALIVE_MS);
   keepAliveHandle.unref();
 

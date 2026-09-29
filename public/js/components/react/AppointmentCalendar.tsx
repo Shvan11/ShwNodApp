@@ -260,6 +260,17 @@ const AppointmentCalendar = ({
         [queryClient]
     );
 
+    // An appointment moved or deleted here also changes the patient's own list
+    // and the daily boards, which used to stay stale for up to 30 s (a patient's
+    // list kept showing an appointment the server no longer had; audit FE-F10-10).
+    const refreshAppointmentReads = useCallback(
+        (personID: number | null | undefined) => {
+            void queryClient.invalidateQueries({ queryKey: qk.appointments.all() });
+            if (personID) void queryClient.invalidateQueries({ queryKey: qk.patient.all(personID) });
+        },
+        [queryClient]
+    );
+
     // ── Navigation ──────────────────────────────────────────────────────────
     const navigate = useCallback(
         (direction: 'next' | 'prev') => {
@@ -349,7 +360,7 @@ const AppointmentCalendar = ({
             newTime: string,
             appt: CalendarAppointment
         ) => {
-            const personID = appt.personID ?? appt.person_id;
+            const personID = appt.personID;
             if (!personID || !appt.drID || !appt.appDetail) {
                 toast.error('Cannot reschedule: appointment is missing required details');
                 return;
@@ -364,12 +375,13 @@ const AppointmentCalendar = ({
                 });
 
                 toast.success('Appointment rescheduled');
+                refreshAppointmentReads(personID);
                 await refetch();
             } catch (error) {
                 toast.error(httpErrorMessage(error, 'Failed to reschedule appointment'));
             }
         },
-        [refetch, toast]
+        [refetch, refreshAppointmentReads, toast]
     );
 
     const handleSlotClick = useCallback((slot: SlotData, _event: MouseEvent<HTMLDivElement>) => {
@@ -544,6 +556,7 @@ const AppointmentCalendar = ({
             await deleteJSON(`/api/appointments/${deleteConfirmation.appointment_id}`);
 
             // Refresh calendar data after successful delete
+            refreshAppointmentReads(deleteConfirmation.personID);
             await refetch();
 
             // Close delete confirmation modal
@@ -552,7 +565,7 @@ const AppointmentCalendar = ({
             console.error('Error deleting appointment:', error);
             toast.error('Failed to delete appointment: ' + httpErrorMessage(error, 'Unknown error'));
         }
-    }, [deleteConfirmation, refetch, toast]);
+    }, [deleteConfirmation, refetch, refreshAppointmentReads, toast]);
 
     // Handler to close context menu
     const handleCloseContextMenu = useCallback(() => {

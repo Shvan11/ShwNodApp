@@ -90,8 +90,13 @@ export const qk = {
     byId: (visitId: Id) => ['visit', normId(visitId)] as const,
   },
   appointments: {
-    /** GET /api/getDailyAppointments?AppsDate= — keeps the legacy key shape. */
-    daily: (date: string) => ['daily-appointments', date] as const,
+    /** Parent — every appointment write invalidates this: the daily boards of
+     *  every day and every single-appointment entry. (The daily key used to be
+     *  `['daily-appointments', d]`, which no parent could reach, so a write made
+     *  away from the board never refreshed it: audit FE-F2-8 / FE-F11-17.) */
+    all: () => ['appointments'] as const,
+    /** GET /api/getDailyAppointments?AppsDate= — one day's board. */
+    daily: (date: string) => ['appointments', 'daily', date] as const,
     /** GET /api/appointments/:id — single appointment (edit form). */
     byId: (id: Id) => ['appointments', 'by-id', normId(id)] as const,
   },

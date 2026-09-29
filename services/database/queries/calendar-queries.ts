@@ -97,6 +97,47 @@ export async function getWeeklyCalendarSlots(
   return rows;
 }
 
+/** One appointment as the calendar grid places it. */
+export interface CalendarAppointmentRow {
+  appointment_id: number;
+  person_id: number;
+  dr_id: number | null;
+  app_detail: string | null;
+  patient_name: string | null;
+  /** Local wall-clock 'YYYY-MM-DD HH:MM:SS' (to_char — no UTC conversion). */
+  slotDateTime: string;
+}
+
+/**
+ * Every appointment in `[startDate, endDate]` (whole days), EVERY doctor, oldest
+ * first. The week/day grid and the month view are built from these, not from the
+ * materialised `calendar` slot table: that table starts at the last Regenerate,
+ * has no row for a walk-in's arrival minute or a time deleted after booking, and
+ * so dropped real appointments from the grid (audit FE-F10-2). The doctor filter
+ * is applied by the caller, which also needs the clinic-wide count per slot for
+ * `MaxAppointmentsPerSlot`. One range scan of ix_tblappointments_appdate_optimized.
+ */
+export async function getAppointmentsInRange(
+  startDate: string,
+  endDate: string
+): Promise<CalendarAppointmentRow[]> {
+  const { rows } = await sql<CalendarAppointmentRow>`
+    SELECT
+      a."appointment_id",
+      a."person_id",
+      a."dr_id",
+      a."app_detail",
+      p."patient_name",
+      to_char(a."app_date", 'YYYY-MM-DD HH24:MI:SS') AS "slotDateTime"
+    FROM "appointments" a
+    LEFT JOIN "patients" p ON p."person_id" = a."person_id"
+    WHERE a."app_date" >= ${startDate}::date
+      AND a."app_date" < (${endDate}::date + INTERVAL '1 day')
+    ORDER BY a."app_date", a."appointment_id"
+  `.execute(getKysely());
+  return rows;
+}
+
 /**
  * The configured appointment time slots ('HH:MM'), ascending — the source of
  * truth for the grid's time rows. Edited in Calendar Times settings (the `times`
@@ -160,13 +201,17 @@ export async function ensureCalendarRange(daysAhead = 60): Promise<EnsureRangeRe
 }
 
 /**
- * Regenerate calendar slots: drop past entries, add any missing future date×time-slot rows.
- * (was: FillCalender — VFillCal/CalStep1/CalStep2 inlined.) Returns the number of slots added.
+ * Regenerate calendar slots: add any missing future date×time-slot rows. Purely
+ * additive and idempotent. (was: FillCalender — VFillCal/CalStep1/CalStep2 inlined.)
+ * Returns the number of slots added.
+ *
+ * It used to open with `DELETE FROM calendar WHERE app_date < CURRENT_DATE`, and
+ * since the week grid was drawn from this table, every Regenerate erased the
+ * clinic's calendar history (audit FE-F10-2). The grid no longer reads this table
+ * (it is the booking picker's availability only), and past rows are kept anyway.
  */
 export async function fillCalendar(): Promise<{ DaysAdded: number }> {
   return withPgTransaction(async (trx) => {
-    await sql`DELETE FROM "calendar" WHERE "app_date" < CURRENT_DATE`.execute(trx);
-
     const result = await sql`
       INSERT INTO "calendar" ("app_date")
       SELECT (d.precal + t."my_time")

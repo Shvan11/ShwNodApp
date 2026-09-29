@@ -3,13 +3,15 @@
  *
  * Database queries for educational video management.
  *
- * There is no videos view in the PG schema, so the URL assembly is inlined here: the
- * `VideosPath` row from `options` is concatenated with `file_name`/`video_extension` to
- * build the `Video` and `Image` URLs. CRUD targets the `videos` table.
+ * There is no videos view in the PG schema, so the path assembly is inlined here: the
+ * videos folder (`getVideosPath()`: the `VideosPath` option, else the default under
+ * MACHINE_PATH) is concatenated with `file_name`/`video_extension` to build the
+ * `Video` and `Image` paths. CRUD targets the `videos` table.
  */
 import { sql } from 'kysely';
 import { getKysely } from '../kysely.js';
 import { log } from '../../../utils/logger.js';
+import { defaultVideosPath } from '../../files/clinic-paths.js';
 
 // type definitions
 export type Video = {
@@ -41,23 +43,14 @@ interface UpdateVideoData {
 export async function getAllVideos(): Promise<Video[]> {
   try {
     const db = getKysely();
+    const base = await getVideosPath();
     return await db
       .selectFrom('videos as v')
-      .crossJoin(
-        (eb) =>
-          eb
-            .selectFrom('options')
-            .select('option_value as Path')
-            .where('option_name', '=', 'VideosPath')
-            .as('p')
-      )
       .select((eb) => [
         'v.id',
         'v.description',
-        sql<string>`${eb.ref('p.Path')} || ${eb.ref('v.file_name')} || '.' || ${eb.ref('v.video_extension')}`.as(
-          'Video'
-        ),
-        sql<string>`${eb.ref('p.Path')} || ${eb.ref('v.file_name')} || '.jpg'`.as('Image'),
+        sql<string>`${base} || ${eb.ref('v.file_name')} || '.' || ${eb.ref('v.video_extension')}`.as('Video'),
+        sql<string>`${base} || ${eb.ref('v.file_name')} || '.jpg'`.as('Image'),
         'v.category',
         'v.details',
       ])
@@ -75,24 +68,15 @@ export async function getAllVideos(): Promise<Video[]> {
 export async function getVideoById(id: number): Promise<Video | null> {
   try {
     const db = getKysely();
+    const base = await getVideosPath();
     const row = await db
       .selectFrom('videos as v')
-      .crossJoin(
-        (eb) =>
-          eb
-            .selectFrom('options')
-            .select('option_value as Path')
-            .where('option_name', '=', 'VideosPath')
-            .as('p')
-      )
       .where('v.id', '=', id)
       .select((eb) => [
         'v.id',
         'v.description',
-        sql<string>`${eb.ref('p.Path')} || ${eb.ref('v.file_name')} || '.' || ${eb.ref('v.video_extension')}`.as(
-          'Video'
-        ),
-        sql<string>`${eb.ref('p.Path')} || ${eb.ref('v.file_name')} || '.jpg'`.as('Image'),
+        sql<string>`${base} || ${eb.ref('v.file_name')} || '.' || ${eb.ref('v.video_extension')}`.as('Video'),
+        sql<string>`${base} || ${eb.ref('v.file_name')} || '.jpg'`.as('Image'),
         'v.category',
         'v.details',
       ])
@@ -106,7 +90,8 @@ export async function getVideoById(id: number): Promise<Video | null> {
 }
 
 /**
- * Get videos folder path from the `options` table
+ * The videos folder: the `VideosPath` option when set, else `clinic1/ovideos/`
+ * under MACHINE_PATH (audit FE-F11-16 — a fresh install has no row).
  */
 export async function getVideosPath(): Promise<string> {
   try {
@@ -117,11 +102,7 @@ export async function getVideosPath(): Promise<string> {
       .where('option_name', '=', 'VideosPath')
       .executeTakeFirst();
 
-    if (!row || !row.option_value) {
-      throw new Error('VideosPath not configured in tbloptions');
-    }
-
-    return row.option_value;
+    return row?.option_value?.trim() || defaultVideosPath();
   } catch (error) {
     log.error('Error fetching videos path', { error: (error as Error).message });
     throw error;

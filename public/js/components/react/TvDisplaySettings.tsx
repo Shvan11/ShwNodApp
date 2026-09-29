@@ -183,8 +183,11 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
         invalidate: () => [qk.tvDisplay()],
     });
 
+    // 10 minutes, matching the route's `timeouts.upload`: signage clips are
+    // hundreds of MB, and the funnel's 30 s default failed every one that took
+    // longer to transfer (audit FE-F11-5).
     const uploadMedia = useApiMutation<State, FormData>({
-        mutationFn: (form) => postFormData<State>('/api/tv-display/media', form),
+        mutationFn: (form) => postFormData<State>('/api/tv-display/media', form, { timeoutMs: 600_000 }),
         invalidate: () => [qk.tvDisplay()],
     });
 
@@ -974,22 +977,9 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
 
                     <dt>TV scheduler (separate service on this server)</dt>
                     <dd>
-                        <code>C:\Users\Administrator\lgtv-scheduler\tv_daemon.py</code>, log{' '}
-                        <code>lgtv-watch.log</code>, Windows scheduled task{' '}
-                        <code>LG TV Signage</code> — this deployment&apos;s install location
-                    </dd>
-
-                    <dt>Source files (this app)</dt>
-                    <dd>
-                        <code>routes/public/tv-display.routes.ts</code> — the slideshow page the TV loads
-                        <br />
-                        <code>routes/api/tv-display.routes.ts</code> — the admin API behind this tab
-                        <br />
-                        <code>services/files/tv-display-store.ts</code> — media folder + settings file
-                        <br />
-                        <code>shared/contracts/tv-display.contract.ts</code> — the shared API contract
-                        <br />
-                        <code>public/js/components/react/TvDisplaySettings.tsx</code> — this page
+                        A scheduled task on this server that powers the TV on and off. Where it is
+                        installed and how to restart it are in the deployment notes
+                        (<code>docs/tv-display.md</code>).
                     </dd>
                 </dl>
                 <p className={styles.hint}>

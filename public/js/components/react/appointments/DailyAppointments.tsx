@@ -4,14 +4,14 @@ import { useLoaderData, useSearchParams } from 'react-router-dom';
 import AppointmentsHeader, { type DoctorFilter } from './AppointmentsHeader';
 import MobileViewToggle, { type ViewType } from './MobileViewToggle';
 import AppointmentsList from './AppointmentsList';
-import type { DailyAppointment } from './AppointmentCard';
-import type { ConnectionStatusType, FreshnessType } from './ConnectionStatus';
+import type { DailyAppointmentRow, DailyAppointmentStats } from '@shared/contracts/appointment.contract';
 import styles from './DailyAppointments.module.css';
 
 import { useAppointments } from '../../../hooks/useAppointments';
-import type { Appointment, AppointmentStats } from '../../../hooks/useAppointments';
 import { useAppointmentsSync } from '../../../hooks/useAppointmentsSync';
 import { useAppointmentDoctors } from '../../../hooks/useAppointmentDoctors';
+import { toLocalDateString } from '../../../utils/calendarDate';
+import type { dailyAppointmentsLoader } from '../../../router/loaders';
 
 // Parse the URL `?dr=` param into a DoctorFilter (defaults to 'all').
 const parseDrParam = (raw: string | null): DoctorFilter => {
@@ -22,22 +22,12 @@ const parseDrParam = (raw: string | null): DoctorFilter => {
     return 'all';
 };
 
-interface LoaderData {
-    loadedDate?: string;
-    allAppointments?: DailyAppointment[];
-    checkedInAppointments?: DailyAppointment[];
-    stats?: AppointmentStats;
-    error?: string;
-    _loaderTimestamp?: number;
-    [key: string]: unknown; // Allow additional properties from loader
-}
-
 /**
  * DailyAppointments Component
  * Main application for daily appointments management
  *
  * HYBRID APPROACH:
- * - Loader pre-fetches initial data (eliminates loading flash)
+ * - Loader fetches the day into the query cache (eliminates loading flash)
  * - URL searchParams as single source of truth for date
  * - SSE for real-time updates
  * - Native scroll restoration via React Router
@@ -45,30 +35,37 @@ interface LoaderData {
 const DailyAppointments = () => {
     const { t } = useTranslation('appointments');
 
-    // 1. Get initial data from loader
-    const loaderData = useLoaderData() as LoaderData;
+    // 1. The date the loader fetched into the query cache
+    const loaderData = useLoaderData<typeof dailyAppointmentsLoader>();
 
     // 2. Get/set URL search params (source of truth for date)
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // 3. Helper to get today's date
-    const getTodayDate = (): string => {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
+    const getTodayDate = (): string => toLocalDateString(new Date());
 
-    // 4. Initialize date from URL (loader guarantees URL has date)
+    // 3. Initialize date from URL (the loader resolved a missing one to today)
     const [selectedDate, setSelectedDate] = useState<string>(
         loaderData.loadedDate || searchParams.get('date') || getTodayDate()
     );
 
+    // 4. React Query owns the read, keyed by selectedDate; the loader already
+    // put the loaded date in the cache (no first-paint flash).
+    const {
+        allAppointments,
+        checkedInAppointments,
+        loading,
+        error,
+        loadAppointments,
+        checkInPatient,
+        markSeated,
+        markDismissed,
+        undoState
+    } = useAppointments(selectedDate);
+
     // Before anyone arrives the checked-in list is an empty screen on mobile —
     // land on whichever list actually has content.
     const [mobileView, setMobileView] = useState<ViewType>(() =>
-        (loaderData.checkedInAppointments?.length ?? 0) > 0 ? 'checked-in' : 'all'
+        checkedInAppointments.length > 0 ? 'checked-in' : 'all'
     );
     const [showFlash, setShowFlash] = useState<boolean>(false);
     const [searchTerm, setSearchTerm] = useState<string>('');
@@ -88,29 +85,6 @@ const DailyAppointments = () => {
     // The per-card doctor icon is only useful when viewing all doctors; once the
     // list is filtered to one doctor it's redundant noise on every card.
     const showDoctorName = selectedDrId === 'all';
-
-    // 5. React Query owns the read, keyed by selectedDate; seed its cache with
-    // the loader payload for the loaded date (no first-paint flash). The loader
-    // types appointments as DailyAppointment[] (UI shape); the hook wants
-    // Appointment[] (data shape) — they differ only nominally, so assert per-array.
-    const {
-        allAppointments,
-        checkedInAppointments,
-        loading,
-        error,
-        loadAppointments,
-        checkInPatient,
-        markSeated,
-        markDismissed,
-        undoState
-    } = useAppointments(selectedDate, {
-        loadedDate: loaderData.loadedDate,
-        allAppointments: loaderData.allAppointments as Appointment[] | undefined,
-        checkedInAppointments: loaderData.checkedInAppointments as Appointment[] | undefined,
-        stats: loaderData.stats,
-        error: loaderData.error,
-        _loaderTimestamp: loaderData._loaderTimestamp,
-    });
 
     // 6. Flash update indicator
     const flashUpdateIndicator = useCallback((): void => {
@@ -173,45 +147,28 @@ const DailyAppointments = () => {
         loadAppointments(today);
     };
 
-    // Handle check-in
-    const handleCheckIn = async (appointmentId: number): Promise<void> => {
-        try {
-            await checkInPatient(appointmentId, selectedDate);
-        } catch (err) {
-            console.error('Check-in failed:', err);
-        }
+    // The four workflow actions. Failures are reported by the hook (a toast), so
+    // there is nothing to catch here.
+    const handleCheckIn = (appointmentId: number): void => {
+        void checkInPatient(appointmentId, selectedDate);
+    };
+    const handleMarkSeated = (appointmentId: number): void => {
+        void markSeated(appointmentId, selectedDate);
+    };
+    const handleMarkDismissed = (appointmentId: number): void => {
+        void markDismissed(appointmentId, selectedDate);
+    };
+    const handleUndoState = (appointmentId: number, stateToUndo: string): void => {
+        void undoState(appointmentId, stateToUndo, selectedDate);
     };
 
-    // Handle mark seated
-    const handleMarkSeated = async (appointmentId: number): Promise<void> => {
-        try {
-            await markSeated(appointmentId, selectedDate);
-        } catch (err) {
-            console.error('Seat failed:', err);
-        }
-    };
-
-    // Handle mark dismissed
-    const handleMarkDismissed = async (appointmentId: number): Promise<void> => {
-        try {
-            await markDismissed(appointmentId, selectedDate);
-        } catch (err) {
-            console.error('Dismiss failed:', err);
-        }
-    };
-
-    // Handle undo state
-    const handleUndoState = async (appointmentId: number, stateToUndo: string): Promise<void> => {
-        try {
-            await undoState(appointmentId, stateToUndo, selectedDate);
-        } catch (err) {
-            console.error('Undo failed:', err);
-        }
-    };
+    // A day that hasn't come yet: the server refuses check-in / seat / dismiss
+    // there (FE-F11-4), so the board doesn't offer them. Undo stays available.
+    const isFutureDay = selectedDate > getTodayDate();
 
     // Doctor + patient-name predicates, applied together to each list.
     const matchesDoctor = useCallback(
-        (apt: DailyAppointment): boolean => {
+        (apt: DailyAppointmentRow): boolean => {
             if (selectedDrId === 'all') return true;
             return apt.dr_id === selectedDrId;
         },
@@ -219,25 +176,25 @@ const DailyAppointments = () => {
     );
 
     const matchesSearch = useCallback(
-        (apt: DailyAppointment): boolean =>
+        (apt: DailyAppointmentRow): boolean =>
             !searchTerm || !!apt.patient_name?.toLowerCase().includes(searchTerm.toLowerCase()),
         [searchTerm]
     );
 
     const filteredAllAppointments = useMemo(
-        () => (allAppointments as DailyAppointment[]).filter((a) => matchesDoctor(a) && matchesSearch(a)),
+        () => allAppointments.filter((a) => matchesDoctor(a) && matchesSearch(a)),
         [allAppointments, matchesDoctor, matchesSearch]
     );
 
     const filteredCheckedInAppointments = useMemo(
-        () => (checkedInAppointments as DailyAppointment[]).filter((a) => matchesDoctor(a) && matchesSearch(a)),
+        () => checkedInAppointments.filter((a) => matchesDoctor(a) && matchesSearch(a)),
         [checkedInAppointments, matchesDoctor, matchesSearch]
     );
 
     // Stats reflect the active filters (doctor + search). Derived from the two
     // filtered lists, so they equal the server's whole-day stats when unfiltered
     // (checkedIn = present IS NOT NULL; waiting = checked-in but not seated/dismissed).
-    const stats = useMemo<AppointmentStats>(() => {
+    const stats = useMemo<DailyAppointmentStats>(() => {
         const checkedIn = filteredCheckedInAppointments.length;
         const absent = filteredAllAppointments.length;
         return {
@@ -247,18 +204,6 @@ const DailyAppointments = () => {
             waiting: filteredCheckedInAppointments.filter((a) => !a.seated_time && !a.dismissed_time).length,
         };
     }, [filteredAllAppointments, filteredCheckedInAppointments]);
-
-    // Error state
-    if (error) {
-        return (
-            <div className={styles.view}>
-                <div className={styles.errorMessage}>
-                    <i className="fas fa-exclamation-circle"></i>
-                    {t('errors.failedToLoad', { error })}
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className={styles.view}>
@@ -273,13 +218,26 @@ const DailyAppointments = () => {
                 doctors={doctors}
                 selectedDrId={selectedDrId}
                 onDoctorChange={setSelectedDrId}
-                connectionStatus={connectionStatus as ConnectionStatusType}
-                freshness={dataFreshness as FreshnessType}
+                connectionStatus={connectionStatus}
+                freshness={dataFreshness}
                 isViewingToday={selectedDate === getTodayDate()}
                 showFlash={showFlash}
                 stats={stats}
             />
 
+            {/* A failed READ keeps the header (so another date is one click away)
+                and offers a retry, instead of replacing the whole screen. */}
+            {error && (
+                <div className={styles.errorMessage} role="alert">
+                    <i className="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span>{error}</span>
+                    <button type="button" className={styles.retryButton} onClick={() => void loadAppointments(selectedDate)}>
+                        {t('errors.retry')}
+                    </button>
+                </div>
+            )}
+
+            {!error && (<>
             {/* Mobile view toggle */}
             <MobileViewToggle
                 activeView={mobileView}
@@ -298,7 +256,7 @@ const DailyAppointments = () => {
                     doctorNames={doctorNames}
                     doctorColors={doctorColors}
                     showDoctorName={showDoctorName}
-                    onCheckIn={handleCheckIn}
+                    onCheckIn={isFutureDay ? undefined : handleCheckIn}
                     emptyMessage={searchTerm ? t('lists.noMatching') : t('lists.noAppointments')}
                     className={mobileView === 'all' ? 'active-view' : ''}
                 />
@@ -311,14 +269,14 @@ const DailyAppointments = () => {
                     doctorNames={doctorNames}
                     doctorColors={doctorColors}
                     showDoctorName={showDoctorName}
-                    onMarkSeated={handleMarkSeated}
-                    onMarkDismissed={handleMarkDismissed}
+                    onMarkSeated={isFutureDay ? undefined : handleMarkSeated}
+                    onMarkDismissed={isFutureDay ? undefined : handleMarkDismissed}
                     onUndoState={handleUndoState}
                     emptyMessage={searchTerm ? t('lists.noMatching') : t('lists.noCheckedIn')}
                     className={mobileView === 'checked-in' ? 'active-view' : ''}
                 />
             </div>
-
+            </>)}
         </div>
     );
 };

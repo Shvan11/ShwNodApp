@@ -1,7 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { brandingQuery } from '@/query/queries';
 import AnalogClock from '../components/react/AnalogClock';
-import { VISIBILITY_RESUME_THRESHOLD_MS, CLOSED_STREAM_RELOAD_DELAY_MS } from '../constants/sse-liveness';
+import {
+    VISIBILITY_RESUME_THRESHOLD_MS,
+    CLOSED_STREAM_RELOAD_DELAY_MS,
+    SILENT_STREAM_TIMEOUT_MS,
+    LIVENESS_CHECK_INTERVAL_MS,
+} from '../constants/sse-liveness';
 import { applyResolvedTheme, getStoredThemePreference, resolveTheme } from '../core/theme';
 import { applyLanguageAttributes, getStoredLanguagePreference } from '../core/language';
 import styles from './ChairDisplay.module.css';
@@ -51,10 +58,15 @@ const ChairDisplay = () => {
     const chairId = useMemo(() => (chairParam && /^([1-9]|10)$/.test(chairParam) ? chairParam : null), [chairParam]);
 
     const [connected, setConnected] = useState(false);
+    // The clinic's own name (Settings → General). The idle screen read "Welcome to
+    // Shwan Orthodontics" as a literal on every center's kiosk (audit FE-F11-6).
+    const { data: branding } = useQuery(brandingQuery());
+    const clinicName = branding?.clinicName?.trim() || null;
     const [patient, setPatient] = useState<PatientPayload | null>(null);
     const esRef = useRef<EventSource | null>(null);
     const hiddenSinceRef = useRef<number | null>(null);
     const reloadTimerRef = useRef<number | null>(null);
+    const lastActivityRef = useRef(0);
 
     // The kiosk is pinned to LIGHT + LTR regardless of the operator's device
     // theme/language. ChairDisplay lives outside RootLayout (no Theme/Language
@@ -75,9 +87,12 @@ const ChairDisplay = () => {
 
         let cancelled = false;
 
-        // Native EventSource auto-reconnects per the server's `retry: 3000`
-        // directive — no manual reconnect loop or liveness timer needed.
-        // visibilitychange / pageshow handle the silent-NAT-drop case.
+        // Native EventSource auto-reconnects per the server's `retry:` directive.
+        // A transport that goes quiet WITHOUT closing is caught by the liveness
+        // check below: the server pings every 25 s, and a stream silent for
+        // SILENT_STREAM_TIMEOUT_MS is reopened. visibilitychange can't cover it —
+        // a wall kiosk is never hidden — and before the check, a kiosk in that
+        // state kept showing the last patient to whoever sat down next (FE-F11-7).
         const open = () => {
             if (cancelled) return;
             // Tear down any previous handle before opening a new one.
@@ -89,11 +104,17 @@ const ChairDisplay = () => {
             // Same-origin EventSource sends the session cookie automatically.
             const es = new EventSource(`/api/sse/chair-display/${chairId}`);
             esRef.current = es;
+            lastActivityRef.current = Date.now();
 
             es.onopen = () => {
                 if (cancelled) return;
+                lastActivityRef.current = Date.now();
                 setConnected(true);
             };
+
+            es.addEventListener('ping', () => {
+                lastActivityRef.current = Date.now();
+            });
 
             es.onerror = () => {
                 if (cancelled) return;
@@ -118,6 +139,7 @@ const ChairDisplay = () => {
 
             es.addEventListener('chair_display_patient_loaded', (evt) => {
                 if (cancelled) return;
+                lastActivityRef.current = Date.now();
                 try {
                     setPatient(JSON.parse((evt as MessageEvent).data) as PatientPayload);
                 } catch {
@@ -127,11 +149,21 @@ const ChairDisplay = () => {
 
             es.addEventListener('chair_display_patient_cleared', () => {
                 if (cancelled) return;
+                lastActivityRef.current = Date.now();
                 setPatient(null);
             });
         };
 
         open();
+
+        const livenessTimer = window.setInterval(() => {
+            const es = esRef.current;
+            if (cancelled || !es || es.readyState !== EventSource.OPEN) return;
+            if (Date.now() - lastActivityRef.current > SILENT_STREAM_TIMEOUT_MS) {
+                setConnected(false);
+                open();
+            }
+        }, LIVENESS_CHECK_INTERVAL_MS);
 
         const handleVisibility = () => {
             if (cancelled) return;
@@ -155,6 +187,7 @@ const ChairDisplay = () => {
 
         return () => {
             cancelled = true;
+            window.clearInterval(livenessTimer);
             document.removeEventListener('visibilitychange', handleVisibility);
             window.removeEventListener('pageshow', handlePageShow);
             if (reloadTimerRef.current !== null) {
@@ -251,7 +284,7 @@ const ChairDisplay = () => {
                         <AnalogClock size={Math.min(window.innerHeight * 0.5, window.innerWidth * 0.5)} />
                     </div>
                     <div className={styles.clinicCaption}>
-                        Welcome to <strong>Shwan Orthodontics</strong>
+                        {clinicName ? <>Welcome to <strong>{clinicName}</strong></> : 'Welcome'}
                     </div>
                 </div>
             )}

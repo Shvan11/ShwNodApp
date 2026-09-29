@@ -51,7 +51,6 @@
     "pm": "PM"
   },
   "actions": {
-    "checkedIn": "Checked In",
     "clickToCheckIn": "Click to Check In",
     "checkedInUndo": "Checked In: {{time}} - Click to undo",
     "cannotUndoSeated": "Cannot undo: Patient is already seated",
@@ -63,7 +62,14 @@
     "notSeatedYet": "Not seated yet"
   },
   "errors": {
-    "failedToLoad": "Failed to load appointments: {{error}}"
+    "loadFailed": "Could not load the appointments.",
+    "retry": "Retry",
+    "stateConflict": "Patient state changed — refreshing",
+    "checkInFailed": "Could not check the patient in. Please try again.",
+    "seatFailed": "Could not seat the patient. Please try again.",
+    "dismissFailed": "Could not complete the visit. Please try again.",
+    "undoFailed": "Could not undo. Please try again.",
+    "futureDay": "This appointment is on a later day. Patients can be checked in on the day itself."
   },
   "calendar": {
     "daysAheadPlaceholder": "Days ahead...",
@@ -104,6 +110,7 @@
     "errorSelectType": "Select appointment type",
     "errorHolidayConflict": "Cannot create appointment: {{holiday}} is a holiday. No appointments are allowed on this date.",
     "errorAppointmentConflict": "Patient already has an appointment on this date.",
+    "errorSlotFull": "This time slot is already full. Please pick another time.",
     "errorUnknown": "Unknown error",
     "errorUpdateFailed": "Failed to update appointment",
     "waSent": "Appointment confirmation sent via WhatsApp!",

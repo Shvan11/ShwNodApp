@@ -5,7 +5,8 @@ import { useTranslation } from 'react-i18next';
 import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
 import { useToast } from '../../contexts/ToastContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { postJSON, httpErrorMessage } from '@/core/http';
+import { bookingError } from './bookingError';
 import { formatAppointmentDateTime } from '@/utils/formatters';
 import * as appointment from '@shared/contracts/appointment.contract';
 import { qk } from '@/query/keys';
@@ -38,15 +39,6 @@ interface AppointmentFormProps {
     personId?: number | null;
     onClose?: () => void;
     onSuccess?: (result: unknown) => void;
-}
-
-interface ApiErrorResponse {
-    error?: string;
-    code?: string;
-    details?: {
-        code?: string;
-        holidayName?: string;
-    };
 }
 
 /**
@@ -238,6 +230,9 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
             // staleTime is exactly long enough to re-offer a slot just taken.
             queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
 
+            // …and the daily board of the booked day (FE-F11-17).
+            queryClient.invalidateQueries({ queryKey: qk.appointments.all() });
+
             // Only call onSuccess, it will handle navigation
             // Don't call onClose as it might interfere with navigation
             if (onSuccess) {
@@ -246,21 +241,12 @@ const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps)
                 onClose();
             }
         } catch (err) {
-            // postJSON throws on non-2xx; the conflict codes ride the thrown
-            // HttpError's parsed body. Appointment/work conflicts route through
-            // ErrorResponses.conflict() (nested details.code); patient routes put
-            // it at the root — read both so the friendly messages fire either way (M1).
-            const errorData = (err as HttpError).data as ApiErrorResponse | undefined;
-            const errorCode = errorData?.code ?? errorData?.details?.code;
-
-            if (errorCode === 'HOLIDAY_CONFLICT') {
-                const holidayName = errorData?.details?.holidayName || t('calendar.holiday');
-                setError(t('form.errorHolidayConflict', { holiday: holidayName }));
-            } else if (errorCode === 'APPOINTMENT_CONFLICT') {
-                setError(t('form.errorAppointmentConflict'));
-            } else {
-                console.error('Error creating appointment:', err);
-                setError(httpErrorMessage(err, t('form.errorUnknown')));
+            const { code, message } = bookingError(err, t);
+            setError(message);
+            // The picker's slots are a cached read: after a refusal for a full slot,
+            // show the slot as it really is now.
+            if (code === 'SLOT_FULL') {
+                queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
             }
         } finally {
             setLoading(false);

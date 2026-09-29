@@ -1,10 +1,11 @@
-import AppointmentCard, { type DailyAppointment } from './AppointmentCard';
+import AppointmentCard from './AppointmentCard';
+import type { DailyAppointmentRow } from '@shared/contracts/appointment.contract';
 import type { DoctorColor } from '../calendar.types';
 import styles from './AppointmentsList.module.css';
 
 interface AppointmentsListProps {
     title: string;
-    appointments: DailyAppointment[];
+    appointments: DailyAppointmentRow[];
     showStatus: boolean;
     loading: boolean;
     // drID → doctor name, for the per-card doctor icon's tooltip.
@@ -18,7 +19,7 @@ interface AppointmentsListProps {
     onMarkSeated?: (appointmentId: number) => void;
     onMarkDismissed?: (appointmentId: number) => void;
     onUndoState?: (appointmentId: number, state: string) => void;
-    emptyMessage?: string;
+    emptyMessage: string;
     className?: string;
 }
 
@@ -41,7 +42,7 @@ const AppointmentsList = ({
     onMarkSeated,
     onMarkDismissed,
     onUndoState,
-    emptyMessage = 'No appointments found.',
+    emptyMessage,
     className = ''
 }: AppointmentsListProps) => {
     // Trust database ordering - the query already sorts by present_time

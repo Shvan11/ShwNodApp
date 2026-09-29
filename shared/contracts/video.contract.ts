@@ -67,7 +67,16 @@ export const byId = {
 
 // GET /api/videos/:id/qr → { qr, url, title }.
 export const qr = {
-  response: z.looseObject({ qr: z.string(), url: z.string() }),
+  response: z.looseObject({
+    qr: z.string(),
+    url: z.string(),
+    title: z.string(),
+    // True when the server has no PUBLIC_URL and the link uses the built-in
+    // fallback domain — on any install but the original one, another clinic's
+    // server. The share modal warns instead of letting it be printed silently
+    // (audit FE-F11-6).
+    usesDefaultAddress: z.boolean(),
+  }),
 } as const;
 
 // POST /api/videos → created Video. Multipart body. The handler returns

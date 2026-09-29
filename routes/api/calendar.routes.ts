@@ -1,8 +1,10 @@
 /**
  * Calendar API Routes for Shwan Orthodontics
  *
- * Week / month / range / day-slot / month-availability reads over the
- * pre-generated `calendar` slot table, plus the admin `regenerate` write.
+ * The week/day grid (`/range`) and the month view (`/month`) are built from the
+ * appointments themselves; the booking picker's two reads (`/available-slots`,
+ * `/month-availability`) use the pre-generated `calendar` slot table, which the
+ * admin `regenerate` write fills.
  *
  * This file is the HTTP layer only: validate, call the query module, hand the
  * rows to `CalendarViewService` and send. The grid math and the view-model
@@ -20,10 +22,12 @@ import { getHolidaysInRange } from '../../services/database/queries/holiday-quer
 import { getOptions } from '../../services/database/queries/options-queries.js';
 import {
   getWeeklyCalendarSlots,
+  getAppointmentsInRange,
   getCalendarStats,
   getConfiguredTimeSlots,
   fillCalendar,
 } from '../../services/database/queries/calendar-queries.js';
+import { parseLocalDate } from '../../utils/date.js';
 // The view-model types, the Sat→Thu grid math and the two transforms live in the
 // service — see services/business/CalendarViewService.ts (C2).
 import {
@@ -37,7 +41,8 @@ import {
   getCalendarGridStart,
   getCalendarGridEnd,
   transformToCalendarStructure,
-  transformToMonthlyStructure,
+  buildGridDays,
+  buildMonthDays,
   type Holiday,
   type AppointmentInfo,
 } from '../../services/business/CalendarViewService.js';
@@ -47,84 +52,9 @@ const router = Router();
 
 
 /**
- * GET /api/calendar/week
- * Returns complete weekly calendar data with time slots
- * Uses existing tblcalender system for optimal performance
- */
-router.get(
-  '/week',
-  validate({ query: calendar.week.query }),
-  async (
-    req: Request<unknown, unknown, unknown, calendar.CalendarWeekQuery>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { date, doctorId } = req.query;
-
-      const weekStart = getWeekStart(new Date(date));
-      const weekEnd = getWeekEnd(weekStart);
-
-      const filterMsg = doctorId
-        ? ` (filtered by doctor id: ${doctorId})`
-        : '';
-      log.info(
-        `📅 Fetching calendar data for week: ${weekStart} to ${weekEnd}${filterMsg}`
-      );
-
-      const maxAppointmentsPerSlot = await getMaxAppointmentsPerSlot();
-
-      log.info(`⚙️ Max appointments per slot: ${maxAppointmentsPerSlot}`);
-
-      noteCalendarRange(60);
-
-      // Fetch calendar data using optimized query with optional doctor filter
-      const calendarData = await getWeeklyCalendarSlots(
-        weekStart,
-        weekEnd,
-        doctorId ? parseInt(doctorId, 10) : null
-      );
-
-      // Fetch holidays for the week
-      const holidays = await getHolidaysInRange(weekStart, weekEnd);
-      const holidayMap = new Map<string, Holiday>(
-        holidays.map((h) => {
-          // holiday_date arrives as a 'YYYY-MM-DD' string from the pg date parser.
-          const dateStr = String(h.holiday_date).split('T')[0];
-          return [dateStr, h] as [string, Holiday];
-        })
-      );
-
-      // Transform flat data into structured calendar format
-      const structuredData = transformToCalendarStructure(
-        calendarData,
-        maxAppointmentsPerSlot,
-        holidayMap
-      );
-
-      log.info(
-        `✅ Calendar data retrieved: ${calendarData.length} slots, ${structuredData.days.length} days, ${holidays.length} holidays`
-      );
-
-      sendData(res, calendar.week.response, {
-        weekStart,
-        weekEnd,
-        totalSlots: calendarData.length,
-        doctorId: doctorId || null,
-        maxAppointmentsPerSlot,
-        holidays: holidays.length,
-        ...structuredData
-      });
-    } catch (error) {
-      log.error('❌ Calendar week API error:', error);
-      ErrorResponses.internalError(res, 'Failed to fetch calendar data', error as Error);
-    }
-  }
-);
-
-/**
  * GET /api/calendar/month
- * Returns complete monthly calendar data with daily summaries
- * Uses existing tblcalender system for optimal performance
+ * The month view: every working day of the Sat–Thu grid around `date`, with its
+ * appointments and slot tallies, built from the appointments (audit FE-F10-2).
  */
 router.get(
   '/month',
@@ -135,54 +65,40 @@ router.get(
   ): Promise<void> => {
     try {
       const { date, doctorId } = req.query;
-      const dateStr = date;
+      // Local midnight, not `new Date('YYYY-MM-DD')` (UTC) — the validator already
+      // proved it is a calendar date (FE-F10-16).
+      const day = parseLocalDate(date) ?? new Date();
 
-      const gridStart = getCalendarGridStart(new Date(dateStr));
-      const gridEnd = getCalendarGridEnd(new Date(dateStr));
-      const monthStart = getMonthStart(new Date(dateStr));
-      const monthEnd = getMonthEnd(new Date(dateStr));
-
-      const filterMsg = doctorId
-        ? ` (filtered by doctor id: ${doctorId})`
-        : '';
-      log.info(
-        `📅 Fetching monthly calendar data: ${gridStart} to ${gridEnd}${filterMsg}`
-      );
+      const gridStart = getCalendarGridStart(day);
+      const gridEnd = getCalendarGridEnd(day);
+      const monthStart = getMonthStart(day);
+      const monthEnd = getMonthEnd(day);
 
       const maxAppointmentsPerSlot = await getMaxAppointmentsPerSlot();
-
-      log.info(`⚙️ Max appointments per slot: ${maxAppointmentsPerSlot}`);
-
       noteCalendarRange(90);
 
-      // Fetch calendar data using optimized query with optional doctor filter
-      const calendarData = await getWeeklyCalendarSlots(
-        gridStart,
-        gridEnd,
-        doctorId ? parseInt(doctorId, 10) : null
-      );
-
-      // Fetch holidays for the grid range
-      const holidays = await getHolidaysInRange(gridStart, gridEnd);
+      const [appointments, holidays, configuredTimes] = await Promise.all([
+        getAppointmentsInRange(gridStart, gridEnd),
+        getHolidaysInRange(gridStart, gridEnd),
+        getConfiguredTimeSlots(),
+      ]);
       const holidayMap = new Map<string, Holiday>(
-        holidays.map((h) => {
-          // holiday_date arrives as a 'YYYY-MM-DD' string from the pg date parser.
-          const dateStr = String(h.holiday_date).split('T')[0];
-          return [dateStr, h] as [string, Holiday];
-        })
+        // holiday_date arrives as a 'YYYY-MM-DD' string from the pg date parser.
+        holidays.map((h) => [String(h.holiday_date).split('T')[0], h] as [string, Holiday])
       );
 
-      // Transform to monthly structure
-      const monthlyData = transformToMonthlyStructure(
-        calendarData,
+      const monthlyData = buildMonthDays({
         gridStart,
         gridEnd,
+        appointments,
+        doctorId: doctorId ? parseInt(doctorId, 10) : null,
+        configuredTimes,
         maxAppointmentsPerSlot,
-        holidayMap
-      );
+        holidayMap,
+      });
 
       log.info(
-        `✅ Monthly calendar data retrieved: ${monthlyData.days.length} days, ${holidays.length} holidays`
+        `✅ Monthly calendar: ${gridStart}..${gridEnd}, ${appointments.length} appointments, ${holidays.length} holidays`
       );
 
       sendData(res, calendar.month.response, {
@@ -204,11 +120,10 @@ router.get(
 
 /**
  * GET /api/calendar/range
- * Returns week-shaped calendar data for an ARBITRARY span of working days
- * (start..end inclusive; Fridays excluded by getWeeklyCalendarSlots), plus the
- * utilisation stats for that span. Powers the density-zoom Week grid, where the
- * client picks N day-columns and pages the anchor forward. Mirrors /week but with
- * an explicit range and stats folded in (one round-trip).
+ * The week/day grid for an ARBITRARY span of working days (start..end inclusive;
+ * Fridays have no column), plus the utilisation stats for that span. Powers the
+ * density-zoom Week grid, where the client picks N day-columns and pages the
+ * anchor forward. One round-trip.
  */
 router.get(
   '/range',
@@ -248,37 +163,33 @@ router.get(
 
       noteCalendarRange(90);
 
-      const calendarData = await getWeeklyCalendarSlots(
+      const [appointments, holidays, configuredTimes] = await Promise.all([
+        getAppointmentsInRange(start, end),
+        getHolidaysInRange(start, end),
+        getConfiguredTimeSlots(),
+      ]);
+      const holidayMap = new Map<string, Holiday>(
+        holidays.map((h) => [String(h.holiday_date).split('T')[0], h] as [string, Holiday])
+      );
+
+      // Built from the appointments (owner decision, audit FE-F10-2): every working
+      // day of the span is a column, and the rows are the visible configured times
+      // plus every time that has an appointment — so a past day, a walk-in, an
+      // appointment in a hidden early/late row or at a deleted time all render.
+      const hidden = showExtended ? new Set<string>() : new Set([...earlySlots, ...lateSlots]);
+      const { days, timeSlots, stats } = buildGridDays({
         start,
         end,
-        doctorId ? parseInt(doctorId, 10) : null
-      );
-
-      const holidays = await getHolidaysInRange(start, end);
-      const holidayMap = new Map<string, Holiday>(
-        holidays.map((h) => {
-          const dateStr = String(h.holiday_date).split('T')[0];
-          return [dateStr, h] as [string, Holiday];
-        })
-      );
-
-      const structuredData = transformToCalendarStructure(
-        calendarData,
+        appointments,
+        doctorId: doctorId ? parseInt(doctorId, 10) : null,
+        configuredTimes,
+        hiddenTimes: hidden,
         maxAppointmentsPerSlot,
-        holidayMap
-      );
-
-      // The time rows come from the CONFIGURED times (tbltimes) — the live source
-      // of truth — not the materialised calendar data, so deletes/adds reflect
-      // immediately. Early/late rows are hidden unless "show extended" is on.
-      const configuredTimes = await getConfiguredTimeSlots();
-      const hidden = showExtended ? new Set<string>() : new Set([...earlySlots, ...lateSlots]);
-      const timeSlots = configuredTimes.filter((t) => !hidden.has(t));
-
-      const stats = await getCalendarStats(start, end);
+        holidayMap,
+      });
 
       log.info(
-        `✅ Calendar range retrieved: ${structuredData.days.length} days, ${timeSlots.length} time rows, ${holidays.length} holidays`
+        `✅ Calendar range ${start}..${end}: ${days.length} days, ${timeSlots.length} rows, ${appointments.length} appointments`
       );
 
       sendData(res, calendar.range.response, {
@@ -288,7 +199,7 @@ router.get(
         maxAppointmentsPerSlot,
         holidays: holidays.length,
         stats,
-        days: structuredData.days,
+        days,
         timeSlots,
       });
     } catch (error) {
@@ -312,7 +223,7 @@ router.get(
     try {
       const { date } = req.query;
 
-      const weekStart = getWeekStart(new Date(date));
+      const weekStart = getWeekStart(parseLocalDate(date) ?? new Date());
       const weekEnd = getWeekEnd(weekStart);
 
       log.info(

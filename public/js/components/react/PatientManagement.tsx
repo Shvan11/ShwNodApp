@@ -488,6 +488,8 @@ const PatientManagement = () => {
             // the patient's appointment-backed reads and the calendar/slot reads.
             queryClient.invalidateQueries({ queryKey: qk.patient.all(patient.person_id) });
             queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
+            // …and today's daily board, so a return to it shows the walk-in (FE-F11-17).
+            queryClient.invalidateQueries({ queryKey: qk.appointments.all() });
         } catch(err) {
             toast.error(httpErrorMessage(err, 'Check-in failed'));
         }

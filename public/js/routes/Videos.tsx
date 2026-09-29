@@ -2,24 +2,15 @@ import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../contexts/ToastContext';
 import { fetchJSON, putJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
-import { videosQuery, videoCategoriesQuery } from '@/query/queries';
+import { videosQuery, videoCategoriesQuery, brandingQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import * as videoContract from '@shared/contracts/video.contract';
 import Modal from '../components/react/Modal';
 import ModalHeader from '../components/react/ModalHeader';
 import styles from './Videos.module.css';
 
-/**
- * Video interface from API
- */
-interface Video {
-  id: number;
-  description: string;
-  Video: string;
-  Image: string;
-  category: number | null;
-  details: string | null;
-}
+type Video = videoContract.VideoRow;
+type QrData = { qr: string; url: string; title: string; usesDefaultAddress: boolean };
 
 /**
  * Video form data for create/edit
@@ -28,14 +19,6 @@ interface VideoFormData {
   description: string;
   category: string;
   details: string;
-}
-
-/**
- * Video category from API
- */
-interface VideoCategory {
-  id: number;
-  name: string;
 }
 
 /**
@@ -48,10 +31,13 @@ export default function Videos() {
 
   // Video list + categories (server state via React Query).
   const { data: videosData, isLoading: loading, error: videosError, refetch } = useQuery(videosQuery());
-  const videos = (videosData ?? []) as Video[];
+  const videos = videosData ?? [];
   const error = videosError ? httpErrorMessage(videosError, 'Failed to load videos') : null;
   const { data: categoriesData } = useQuery(videoCategoriesQuery());
-  const categories = (categoriesData ?? []) as VideoCategory[];
+  const categories = categoriesData ?? [];
+  // The clinic's own name for the printed QR handout (was this clinic's name as a
+  // literal on every center's handout; audit FE-F11-6).
+  const { data: branding } = useQuery(brandingQuery());
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,7 +63,7 @@ export default function Videos() {
 
   // QR Modal state
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
-  const [qrData, setQRData] = useState<{ qr: string; url: string; title: string } | null>(null);
+  const [qrData, setQRData] = useState<QrData | null>(null);
   const [isLoadingQR, setIsLoadingQR] = useState(false);
 
   // Surface a video-load failure with a toast (categories fail silently, as before).
@@ -160,14 +146,14 @@ export default function Videos() {
     setIsQRModalOpen(true);
 
     try {
-      const data = await fetchJSON<{ qr: string; url: string; title: string }>(
-        `/api/videos/${video.id}/qr`,
-        { schema: videoContract.qr.response }
-      );
+      const data = await fetchJSON<QrData>(`/api/videos/${video.id}/qr`, {
+        schema: videoContract.qr.response,
+      });
       setQRData({
         qr: data.qr,
         url: data.url,
         title: data.title,
+        usesDefaultAddress: data.usesDefaultAddress,
       });
     } catch (err) {
       toast.error(httpErrorMessage(err, 'Failed to generate QR code'));
@@ -217,6 +203,8 @@ export default function Videos() {
       s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const safeTitle = esc(qrData.title);
     const safeUrl = esc(qrData.url);
+    const clinicName = branding?.clinicName?.trim();
+    const footer = clinicName ? `<p class="footer">${esc(clinicName)}</p>` : '';
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -244,7 +232,7 @@ export default function Videos() {
           <img src="${qrData.qr}" alt="QR Code" />
           <h2>${safeTitle}</h2>
           <p>${safeUrl}</p>
-          <p class="footer">Shwan Orthodontics</p>
+          ${footer}
           <script>window.onload = () => { window.print(); window.close(); }</script>
         </body>
       </html>
@@ -694,6 +682,13 @@ export default function Videos() {
                 <>
                   <img src={qrData.qr} alt="QR Code" className={styles.qrImage} />
                   <h3 className={styles.qrTitle}>{qrData.title}</h3>
+                  {qrData.usesDefaultAddress && (
+                    <p className={styles.qrWarning} role="alert">
+                      <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>{' '}
+                      This link uses the app&apos;s built-in address, not your clinic&apos;s. Set
+                      PUBLIC_URL on the server to your clinic&apos;s public address before sharing it.
+                    </p>
+                  )}
                   <div className={styles.shareUrlContainer}>
                     <input
                       type="text"

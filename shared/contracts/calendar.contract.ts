@@ -30,8 +30,8 @@ import { dateString } from '../validation.js';
 
 // ── Nested row schemas (mirror the interfaces in routes/api/calendar.routes.ts) ───────────
 
-// One appointment inside a slot/day. `app_date`/`person_id`/`time` are the
-// compatibility aliases the route adds for EditAppointmentForm.
+// One appointment inside a slot/day. (The `app_date`/`person_id` aliases once
+// added for EditAppointmentForm are gone: the form reads the appointment by id.)
 const appointmentInfo = z.object({
   appointment_id: z.number(),
   appDetail: z.string().nullable(),
@@ -40,8 +40,6 @@ const appointmentInfo = z.object({
   personID: z.number().nullable(),
   slotStatus: z.string().optional(),
   slotDateTime: z.string().optional(),
-  app_date: z.string().optional(),
-  person_id: z.number().nullable().optional(),
   time: z.string().optional(),
 });
 
@@ -112,13 +110,6 @@ const dayAvailability = z.object({
   holidayName: z.string().nullable(),
   holidayDescription: z.string().nullable(),
 });
-
-// GET /api/calendar/week?date=&doctorId= → { weekStart, …, days, timeSlots }.
-export const week = {
-  query: z.object({ date: dateString, doctorId: z.string().optional() }),
-  response: z.looseObject({ days: z.array(weekDay), timeSlots: z.array(z.string()) }),
-} as const;
-export type CalendarWeekResponse = z.infer<typeof week.response>;
 
 // GET /api/calendar/month?date=&doctorId= → { monthStart, …, days }.
 export const month = {
@@ -200,7 +191,6 @@ export type MonthAvailabilityResponse = z.infer<typeof monthAvailability.respons
 // guaranteed, and `/month-availability` could read `req.query.date` (always
 // undefined there) without a compile error. Typing from the endpoint's own schema
 // makes each handler see exactly the query its route validated.
-export type CalendarWeekQuery = z.infer<typeof week.query>;
 export type CalendarMonthQuery = z.infer<typeof month.query>;
 export type CalendarRangeQuery = z.infer<typeof range.query>;
 export type CalendarStatsQuery = z.infer<typeof stats.query>;

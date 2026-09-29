@@ -37,8 +37,13 @@ describe('qk query-key factory', () => {
     expect(isPrefix(all, qk.templates.one(3))).toBe(true);
   });
 
-  it('preserves the legacy wire keys for the SSE-driven screens', () => {
-    expect(qk.appointments.daily('2026-06-12')).toEqual(['daily-appointments', '2026-06-12']);
+  it('appointments.all is a prefix of every day and every single appointment', () => {
+    const all = qk.appointments.all();
+    expect(isPrefix(all, qk.appointments.daily('2026-06-12'))).toBe(true);
+    expect(isPrefix(all, qk.appointments.byId(7))).toBe(true);
+  });
+
+  it('preserves the legacy key shape for the WhatsApp SSE screen', () => {
     expect(qk.whatsapp.messages('2026-06-12')).toEqual(['whatsapp-messages', '2026-06-12']);
   });
 

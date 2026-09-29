@@ -55,9 +55,8 @@ const CalendarContextMenu = ({ position, appointment, onClose, onDelete }: Calen
     const handleEdit = (e: SyntheticEvent<HTMLDivElement>) => {
         e.stopPropagation();
         if (appointment.personID && appointment.appointment_id) {
-            navigate(`/patient/${appointment.personID}/edit-appointment/${appointment.appointment_id}`, {
-                state: { appointment }
-            });
+            // The form reads the appointment by id itself (audit FE-F10-1).
+            navigate(`/patient/${appointment.personID}/edit-appointment/${appointment.appointment_id}`);
         }
         onClose();
     };

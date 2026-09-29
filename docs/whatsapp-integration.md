@@ -334,10 +334,12 @@ WebSockets are retired; all server→client realtime is **Server-Sent Events**.
   `whatsapp_message_status`, `whatsapp_sending_started`/`progress`/`finished`).
 - **Route.** `GET /api/sse/whatsapp` mounts **after** the auth gate (a 401 closes the EventSource). Every
   subscriber is registered as a **QR viewer** (`registerQRViewer`/`unregisterQRViewer`, paired exactly once
-  even if the socket closes mid-registration). A module-scoped 25 s keep-alive writes comment frames to
-  undercut idle proxy drops.
-- **Client singleton.** `public/js/services/sse-whatsapp.ts` is refcounted (`ensureConnected()`/`release()`),
-  opened on first acquire and closed at refcount zero, with liveness + forced-reconnect on tab-resume/bfcache.
+  even if the socket closes mid-registration). A module-scoped 25 s keep-alive writes a named `ping` event
+  (not a comment frame, which EventSource never surfaces) to undercut idle proxy drops and prove liveness.
+- **Client singleton.** `public/js/services/sse-whatsapp.ts` is an instance of the shared `SseChannel`
+  (`services/sse-channel.ts`): refcounted (`ensureConnected()`/`release()`), opened on first acquire and
+  closed at refcount zero, reopened after 60 s without a ping, retried with backoff after EventSource gives
+  up (CLOSED — e.g. a proxy's 502 during a restart), and force-reconnected on tab-resume/bfcache.
   **Never `new EventSource` directly** for this channel.
 
 > **Nuance — `activeQRViewers` is the master gate.** It gates both QR generation *and* on-demand init. It is

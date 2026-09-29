@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, type FormEvent } from 'react';
-import { useLocation } from 'react-router-dom';
 import cn from 'classnames';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +9,8 @@ import { postJSON, putJSON, httpErrorMessage } from '@/core/http';
 import { formatAppointmentDateTime } from '@/utils/formatters';
 import { qk } from '@/query/keys';
 import { employeesQuery, appointmentDetailsQuery, appointmentByIdQuery } from '@/query/queries';
+import type { AppointmentByIdResponse } from '@shared/contracts/appointment.contract';
+import { bookingError } from './bookingError';
 import styles from './AppointmentForm.module.css';
 
 interface AppointmentFormData {
@@ -34,14 +35,6 @@ interface AppointmentDetail {
     detail: string | null; // details.detail is nullable in the DB
 }
 
-interface ExistingAppointment {
-    appointment_id?: number;
-    person_id?: number;
-    app_date: string;
-    app_detail?: string;
-    dr_id?: number | string;
-}
-
 interface EditAppointmentFormProps {
     personId?: number | null;
     appointmentId?: number | string;
@@ -59,10 +52,8 @@ interface EditAppointmentFormProps {
 const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: EditAppointmentFormProps) => {
     const { t } = useTranslation('appointments');
     const { language } = useLanguage();
-    const location = useLocation();
     const toast = useToast();
     const queryClient = useQueryClient();
-    const existingAppointment = (location.state as { appointment?: ExistingAppointment } | null)?.appointment;
 
     const [formData, setFormData] = useState<AppointmentFormData>({
         PersonID: personId ?? '',
@@ -97,7 +88,11 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     const { data: detailsData } = useQuery(appointmentDetailsQuery());
     const details: AppointmentDetail[] = detailsData ?? [];
 
-    // Fetch the appointment only when it wasn't handed to us via router state.
+    // Always read the appointment itself, fresh on every open. The callers used
+    // to hand over a row as router state and the form trusted it: the calendar's
+    // row names its fields `appDetail`/`drID`, so Edit from the calendar opened
+    // with Doctor and Type blank, and a Back/Forward into an old edit entry
+    // re-seeded pre-edit values (audit FE-F10-1). Router state is no longer read.
     const {
         data: appointmentData,
         isLoading: appointmentLoading,
@@ -105,15 +100,12 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
         error: appointmentError,
     } = useQuery({
         ...appointmentByIdQuery(appointmentId),
-        enabled: !existingAppointment && !!appointmentId,
+        refetchOnMount: 'always',
     });
 
-    // The appointment to seed the form from — router state wins, else the fetch.
-    const sourceAppointment: ExistingAppointment | null =
-        existingAppointment ?? (appointmentData?.appointment as ExistingAppointment | undefined) ?? null;
+    const sourceAppointment = appointmentData?.appointment ?? null;
 
-    // We're still loading only while a fetch is genuinely in flight.
-    const loadingData = !existingAppointment && !!appointmentId && appointmentLoading;
+    const loadingData = !!appointmentId && appointmentLoading;
 
     // Surface either a submit error or an appointment-load failure.
     const displayError =
@@ -122,7 +114,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     // Seed the editable form once the source appointment resolves. Declared before
     // the effect so it isn't "used before declaration"; the setState lives inside
     // this function (not inline in the effect), so it isn't a cascading effect write.
-    const prefillFormData = (appt: ExistingAppointment): void => {
+    const prefillFormData = (appt: AppointmentByIdResponse['appointment']): void => {
         const dateTime = new Date(appt.app_date);
         const year = dateTime.getFullYear();
         const month = String(dateTime.getMonth() + 1).padStart(2, '0');
@@ -132,11 +124,11 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
         const datePart = `${year}-${month}-${day}`;
         setFormData({
-            PersonID: appt.person_id ?? '',
+            PersonID: appt.person_id,
             AppDate: datePart,
             AppTime: `${hours}:${minutes}`,
             AppDetail: appt.app_detail || '',
-            DrID: String(appt.dr_id || '')
+            DrID: appt.dr_id != null ? String(appt.dr_id) : ''
         });
         setOriginalDate(datePart);
     };
@@ -145,7 +137,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
     // render (keyed on the appointment identity) rather than in an effect, so the
     // React Compiler can optimize and there's no extra post-paint render.
     const sourceKey = sourceAppointment
-        ? String(sourceAppointment.appointment_id ?? `${sourceAppointment.person_id ?? ''}|${sourceAppointment.app_date}`)
+        ? `${sourceAppointment.appointment_id}|${sourceAppointment.app_date}|${sourceAppointment.dr_id ?? ''}|${sourceAppointment.app_detail ?? ''}`
         : '';
     const [prefilledKey, setPrefilledKey] = useState('');
     if (sourceKey !== prefilledKey) {
@@ -245,7 +237,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
         try {
             const appointmentDateTime = `${formData.AppDate}T${formData.AppTime}:00`;
             const result = await putJSON<{ success?: boolean; error?: string }>(
-                `/api/appointments/${appointmentId || existingAppointment?.appointment_id}`,
+                `/api/appointments/${appointmentId}`,
                 {
                     person_id: parseInt(String(formData.PersonID), 10),
                     app_date: appointmentDateTime,
@@ -256,7 +248,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
 
             if (result.success) {
                 const dateChanged = formData.AppDate !== originalDate;
-                const apptId = appointmentId || existingAppointment?.appointment_id;
+                const apptId = appointmentId;
 
                 if (dateChanged && apptId) {
                     postJSON<{ success: boolean; message?: string }>('/api/wa/send-appointment', {
@@ -287,16 +279,21 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
                 // staleTime is exactly long enough to re-offer a slot just taken.
                 queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
 
+                // …and the daily boards (old and new day) plus this appointment's own
+                // entry, so reopening Edit shows what was just saved.
+                queryClient.invalidateQueries({ queryKey: qk.appointments.all() });
+
                 onSuccess && onSuccess(result);
                 onClose && onClose();
             } else {
                 throw new Error(result.error || t('form.errorUpdateFailed'));
             }
         } catch (err) {
-            // putJSON throws on non-2xx; httpErrorMessage surfaces the server's
-            // error message (this form has no conflict-code branching — M1).
-            console.error('Error updating appointment:', err);
-            setError(httpErrorMessage(err, t('form.errorUnknown')));
+            const { code, message } = bookingError(err, t);
+            setError(message);
+            if (code === 'SLOT_FULL') {
+                queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
+            }
         } finally {
             setLoading(false);
         }
