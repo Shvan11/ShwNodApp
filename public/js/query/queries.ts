@@ -129,18 +129,6 @@ export const workDetailsQuery = (workId: Id) =>
       ),
   });
 
-/** GET /api/getworkforreceipt/:workId — receipt-enriched work row (disabled until a workId is set). */
-export const workForReceiptQuery = (workId: number | null | undefined) =>
-  queryOptions({
-    queryKey: qk.work.forReceipt(workId ?? 0),
-    queryFn: ({ signal }) =>
-      fetchJSON<z.infer<typeof paymentContract.workForReceipt.response>>(
-        `/api/getworkforreceipt/${workId}`,
-        { signal, schema: paymentContract.workForReceipt.response }
-      ),
-    enabled: workId != null,
-  });
-
 // ---------------------------------------------------------------------------
 // Templates
 // ---------------------------------------------------------------------------
@@ -1083,23 +1071,19 @@ export const transferPreviewQuery = (workId: number | null | undefined) =>
  * GET /api/diagnosis/:workId — the work's diagnosis row, or `null` when none.
  * DELIBERATELY schema-less: the endpoint returns the row or literal `null` (the
  * "no diagnosis yet" signal), not the sendSuccess envelope, so it carries no
- * contract response. Tolerant like the legacy `.catch(() => null)` read — any
- * failure resolves to `null`, so the queryFn never rejects and retry never
- * applies at all.
+ * contract response.
+ *
+ * Only that `200 null` means "none yet". A FAILED read throws like every other
+ * factory (RQ's transient-retry policy applies): until FE-F9-1 it was caught and
+ * returned as `null`, which cached the failure as "no diagnosis", seeded a blank
+ * form, and let Save overwrite the stored work-up.
  */
 export const diagnosisQuery = (workId: Id) =>
   queryOptions({
     queryKey: qk.work.diagnosis(workId),
-    queryFn: async ({ signal }) => {
-      try {
-        // eslint-disable-next-line no-restricted-syntax -- raw literal-null signal; no contract response
-        return await fetchJSON<Record<string, unknown> | null>(`/api/diagnosis/${workId}`, {
-          signal,
-        });
-      } catch {
-        return null;
-      }
-    },
+    queryFn: ({ signal }) =>
+      // eslint-disable-next-line no-restricted-syntax -- raw literal-null signal; no contract response
+      fetchJSON<Record<string, unknown> | null>(`/api/diagnosis/${workId}`, { signal }),
   });
 
 // ---------------------------------------------------------------------------
@@ -1670,9 +1654,8 @@ export const photoTypesQuery = () =>
 
 /**
  * GET /api/webceph/patient-link/:personId — the WebCeph link row, or `null` when
- * the patient has no link yet (a 404 — the common case, not an error). The
- * contract response is deliberately loose (`z.unknown()` — variable API fields),
- * so the consumer casts to its concrete `WebcephData` shape.
+ * the patient has no link yet (a 404 — the common case, not an error). Any other
+ * failure throws, so the modal can tell "not in WebCeph" from "couldn't check".
  */
 export const webcephLinkQuery = (personId: Id) =>
   queryOptions({

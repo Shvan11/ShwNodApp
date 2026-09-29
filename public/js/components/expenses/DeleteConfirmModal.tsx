@@ -8,6 +8,7 @@ import { useLocalizedName } from '../../hooks/useLocalizedName';
 import Modal from '../react/Modal';
 import ModalHeader from '../react/ModalHeader';
 import styles from '../../routes/Expenses.module.css';
+import { formatNumber } from '../../utils/formatters';
 
 interface DeleteConfirmModalProps {
     isOpen: boolean;
@@ -21,10 +22,6 @@ export default function DeleteConfirmModal({ isOpen, expense, onConfirm, onCance
     const localizedName = useLocalizedName();
 
     if (!expense) return null;
-
-    const formatNumber = (num: number | undefined): string => {
-        return new Intl.NumberFormat('en-US').format(num || 0);
-    };
 
     const formatDate = (dateString: string | undefined): string => {
         if (!dateString) return '-';

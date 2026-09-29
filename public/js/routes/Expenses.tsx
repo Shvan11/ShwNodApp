@@ -106,7 +106,7 @@ export default function Expenses() {
   // created a duplicate expense (FE-F8-2).
   const [editingId, setEditingId] = useState<number | null>(null);
   const { data: editingExpense, error: editingError } = useQuery(expenseByIdQuery(editingId));
-  const currentExpense = editingId != null ? ((editingExpense as Expense | undefined) ?? null) : null;
+  const currentExpense: Expense | null = editingId != null ? (editingExpense ?? null) : null;
   // An edit opens once its row is here (a cached row is instant). Opened earlier, the
   // modal renders as an empty Add form, and a Save from it would create, not update.
   const expenseModalOpen = isExpenseModalOpen && (editingId == null || currentExpense != null);
@@ -117,8 +117,11 @@ export default function Expenses() {
   // so it runs once. The message is captured into state here — as a fresh object
   // per failure — because nulling editingId clears `editingError`; the effect then
   // fires the toast (a side effect, not derived state) once per failure object.
+  // Only a FIRST load failure abandons the edit: once the row is here, a failed
+  // background refetch (window focus, staleness) must not close a modal holding
+  // the user's typing — `editingExpense` keeps the last good row (RB2's note).
   const [loadErrorToast, setLoadErrorToast] = useState<{ msg: string } | null>(null);
-  if (editingId != null && editingError) {
+  if (editingId != null && editingError && !editingExpense) {
     setLoadErrorToast({ msg: httpErrorMessage(editingError, t('toast.loadFailed')) });
     setEditingId(null);
     setIsExpenseModalOpen(false);
@@ -196,17 +199,16 @@ export default function Expenses() {
     try {
       if (editingId != null) {
         const r = await updateExpense(editingId, expenseData);
-        toast.success(r.outcome === 'pending' ? 'Submitted for admin approval' : t('toast.updated'));
+        toast.success(r.outcome === 'pending' ? t('toast.pendingApproval') : t('toast.updated'));
       } else {
         await createExpense(expenseData);
         toast.success(t('toast.created'));
       }
       setIsExpenseModalOpen(false);
       setEditingId(null);
-    } catch {
-      toast.error(
-        editingId != null ? t('toast.updateFailed') : t('toast.createFailed')
-      );
+    } catch (err) {
+      // The server's reason (e.g. a 400's validation message), else the generic line.
+      toast.error(httpErrorMessage(err, editingId != null ? t('toast.updateFailed') : t('toast.createFailed')));
     }
   };
 
@@ -216,11 +218,11 @@ export default function Expenses() {
 
     try {
       const r = await deleteExpense(expenseToDelete.id);
-      toast.success(r.outcome === 'pending' ? 'Submitted for admin approval' : t('toast.deleted'));
+      toast.success(r.outcome === 'pending' ? t('toast.pendingApproval') : t('toast.deleted'));
       setIsDeleteModalOpen(false);
       setExpenseToDelete(null);
-    } catch {
-      toast.error(t('toast.deleteFailed'));
+    } catch (err) {
+      toast.error(httpErrorMessage(err, t('toast.deleteFailed')));
     }
   };
 

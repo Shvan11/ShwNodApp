@@ -72,8 +72,6 @@ export const qk = {
     all: (workId: Id) => ['work', normId(workId)] as const,
     /** GET /api/getworkdetails?workId= — single work row. */
     details: (workId: Id) => ['work', normId(workId), 'details'] as const,
-    /** GET /api/getworkforreceipt/:workId — receipt-enriched work row. */
-    forReceipt: (workId: Id) => ['work', normId(workId), 'for-receipt'] as const,
     /** GET /api/getvisitsbywork?workId= — visit list for a work. */
     visits: (workId: Id) => ['work', normId(workId), 'visits'] as const,
     /** GET /api/getworkpayments?workId= — payment history for a work. */

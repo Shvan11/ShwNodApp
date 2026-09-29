@@ -54,17 +54,6 @@ export const paymentHistory = {
 export type PaymentHistoryResponse = z.infer<typeof paymentHistory.response>;
 
 // ---------------------------------------------------------------------------
-// GET /api/getworkforreceipt/:workId — single work row (inline SQL in the route).
-// Consumer (PaymentModal) keeps its richer local `WorkData` type; the contract
-// is the runtime boundary guard, so model only the stable id + stay loose.
-// ---------------------------------------------------------------------------
-
-export const workForReceipt = {
-  response: z.looseObject({ work_id: z.number() }),
-} as const;
-export type WorkForReceiptResponse = z.infer<typeof workForReceipt.response>;
-
-// ---------------------------------------------------------------------------
 // GET /api/getCurrentExchangeRate — { exchangeRate } (closed container).
 // ---------------------------------------------------------------------------
 
@@ -204,7 +193,4 @@ export const paymentQuery = z.object({
   date: optionalDateString,
 });
 
-/** `:workId` route param for `/getworkforreceipt/:workId`. */
-export const workIdParams = idParams('workId');
-export type WorkIdParams = z.infer<typeof workIdParams>;
 export type PaymentQueryParams = z.infer<typeof paymentQuery>;

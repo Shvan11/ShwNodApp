@@ -28,6 +28,11 @@ import { validate } from '../../middleware/validate.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import * as media from '../../shared/contracts/media.contract.js';
+import { requestTimeout } from '../../middleware/timeout.js';
+
+// An upload is `addNewRecord` + the image itself, each with WebCeph retries — the
+// global 30 s cut reported slow-but-successful uploads as failed (FE-F9-11).
+const webcephUploadTimeout = requestTimeout(media.WEBCEPH_UPLOAD_TIMEOUT_MS);
 
 const router = Router();
 
@@ -133,14 +138,19 @@ router.post('/webceph/create-patient', validate({ body: media.createPatient.body
 
     // Create patient in WebCeph
     const result = await webcephService.createPatient(patientData);
+    // The WebCeph patient id is the one we submit (`patientID`, the padded
+    // person_id). If the response omits it, store the submitted id rather than
+    // NULL: the patient-link read treats an id-less row as "not in WebCeph" and
+    // would offer Create again for a patient WebCeph already has.
+    const webcephPatientId = result.webcephPatientId || patientData.patientID || String(personId).padStart(6, '0');
 
     // Update local database with WebCeph information
-    await setPatientWebcephLink(personId, result.webcephPatientId, result.link);
+    await setPatientWebcephLink(personId, webcephPatientId, result.link);
 
     log.info(`[WebCeph] Patient created successfully for person_id: ${personId}`);
 
     sendData(res, media.createPatient.response, {
-      webcephPatientId: result.webcephPatientId,
+      webcephPatientId,
       link: result.link,
       linkId: result.linkId
     }, 'Patient created in WebCeph successfully');
@@ -155,7 +165,7 @@ router.post('/webceph/create-patient', validate({ body: media.createPatient.body
  * POST /webceph/upload-image
  * Form data: image (file), patientID, recordDate, targetClass
  */
-router.post('/webceph/upload-image', uploadImage, validate({ body: media.uploadImage.body }), async (req: FileRequest, res: Response): Promise<void> => {
+router.post('/webceph/upload-image', webcephUploadTimeout, uploadImage, validate({ body: media.uploadImage.body }), async (req: FileRequest, res: Response): Promise<void> => {
   try {
     const { personId, recordDate, targetClass } = req.body;
 
@@ -231,7 +241,7 @@ router.post('/webceph/upload-image', uploadImage, validate({ body: media.uploadI
  * WebCeph calls; the only differences are the image source (disk vs req.file)
  * and the patient id (resolved from the DB vs sent by the client).
  */
-router.post('/webceph/upload-from-file', validate({ body: media.uploadFromFile.body }), async (req: Request<object, object, media.UploadFromFileBody>, res: Response): Promise<void> => {
+router.post('/webceph/upload-from-file', webcephUploadTimeout, validate({ body: media.uploadFromFile.body }), async (req: Request<object, object, media.UploadFromFileBody>, res: Response): Promise<void> => {
   try {
     const { personId, relPath, recordDate, targetClass } = req.body;
 
@@ -330,7 +340,7 @@ router.get('/webceph/patient-link/:personId', async (req: Request<PersonIdParams
       return;
     }
 
-    sendData(res, media.patientLink.response, link);
+    sendData(res, media.patientLink.response, { ...link, webcephPatientId: link.webcephPatientId });
   } catch (error) {
     log.error('[WebCeph] Error fetching patient link:', error);
     ErrorResponses.serverError(res, 'Failed to fetch WebCeph patient link', error as Error);

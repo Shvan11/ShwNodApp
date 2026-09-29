@@ -4,61 +4,38 @@
  * Compact, space-efficient form with dental chart integration
  */
 
-import React, { useState, useRef, useCallback, type FormEvent, type ChangeEvent } from 'react';
+import { useState, useRef, type FormEvent, type ChangeEvent } from 'react';
 import cn from 'classnames';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatISODate } from '../../core/utils';
 import { putJSON, postJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
-import * as visitContract from '@shared/contracts/visit.contract';
+import type * as visitContract from '@shared/contracts/visit.contract';
 import { wiresQuery, operatorsQuery, latestWiresQuery, visitByIdQuery } from '../../query/queries';
 import DentalChart from './DentalChart';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
+import { useUnsavedRouteGuard } from '../../hooks/useUnsavedRouteGuard';
 import styles from './NewVisitComponent.module.css';
 
-interface Wire {
-    id: number;
-    name: string;
-}
+// The form IS the add body: every field the contract enumerates, required here
+// because the form always sends it. The three `<select>`-backed ids hold the
+// option's string value ('' = none) until the contract coerces them.
+type SelectIdField = 'upper_wire_id' | 'lower_wire_id' | 'operator_id';
+type VisitFormData = Required<Omit<visitContract.AddVisitBody, SelectIdField>>
+    & Record<SelectIdField, number | string>;
 
-interface Operator {
-    id: number;
-    employee_name: string;
-}
-
-interface LatestWires {
-    upper_wire_id: number | null;
-    UpperWireName: string | null;
-    lower_wire_id: number | null;
-    LowerWireName: string | null;
-}
-
-interface VisitFormData {
-    work_id: number;
-    visit_date: string;
-    upper_wire_id: number | string;
-    lower_wire_id: number | string;
-    bracket_change: string;
-    wire_bending: string;
-    elastics: string;
-    opg: boolean;
-    p_photo: boolean;
-    i_photo: boolean;
-    f_photo: boolean;
-    others: string;
-    next_visit: string;
-    appliance_removed: boolean;
-    operator_id: number | string;
-}
-
-// Full visit row as returned by GET /api/getvisitbyid (visitById.response is a
-// loose container; this annotates the long-tail fields the form reads).
-// The visit wire row is owned by the visit contract (the /getvisitbyid response).
-type VisitRow = visitContract.VisitRow;
+/** The flags whose change moves the WORK (dates, finished/active) — see visit-queries.ts. */
+type LifecycleFlags = Pick<VisitFormData, 'i_photo' | 'f_photo' | 'appliance_removed'>;
 
 interface NewVisitComponentProps {
     workId: number | null;
     visitId?: number | null;
+    /**
+     * The visit's patient. A photo flag can finish or reopen the work and
+     * reclassify the patient, so a save refreshes the patient's cache too.
+     */
+    personId?: string | number | null;
     // Add returns { visitId }; update returns void.
     onSave?: (result: visitContract.AddVisitResponse | void) => void;
     onCancel?: () => void;
@@ -66,39 +43,33 @@ interface NewVisitComponentProps {
 
 type TextFieldKey = 'others' | 'next_visit';
 
-const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisitComponentProps) => {
+const NewVisitComponent = ({ workId, visitId = null, personId = null, onSave, onCancel }: NewVisitComponentProps) => {
     const toast = useToast();
+    const confirm = useConfirm();
     const queryClient = useQueryClient();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [dirty, setDirty] = useState(false);
+    const { allowNextNavigation } = useUnsavedRouteGuard(dirty);
 
     // Dropdown reads — each its own independent query (one failing can't blank
-    // the others). Loose contract responses expose long-tail fields as unknown,
-    // so `data` is cast to its concrete row type.
-    const { data: wiresData } = useQuery(wiresQuery());
-    const { data: operatorsData } = useQuery(operatorsQuery());
-    const { data: latestWiresData } = useQuery({
+    // the others), each typed by its contract.
+    const { data: wires = [] } = useQuery(wiresQuery());
+    const { data: operators = [] } = useQuery(operatorsQuery());
+    const { data: latestWires } = useQuery({
         ...latestWiresQuery(workId ?? ''),
         enabled: !!workId,
     });
 
-    const wires: Wire[] = wiresData ?? [];
-    const operators: Operator[] = operatorsData ?? [];
-    const latestWires: LatestWires = (latestWiresData as LatestWires | undefined) ?? {
-        upper_wire_id: null,
-        UpperWireName: null,
-        lower_wire_id: null,
-        LowerWireName: null
-    };
-
-    // Visit record read (edit mode) — populates the form via the effect below.
-    const {
-        data: visitData,
-        isLoading: visitLoading,
-        error: visitError,
-    } = useQuery({
+    // Visit record read (edit mode). `refetchOnMount: 'always'` + the post-mount
+    // seed below mean the form only ever takes the row THIS mount read. Before
+    // FE-F9-2 it seeded from whatever `qk.visit.byId` held — a save never
+    // refreshed that key, so re-editing a visit within minutes opened its
+    // pre-edit values and Update (a whole-row PUT) reverted the first edit.
+    const visitRead = useQuery({
         ...visitByIdQuery(visitId ?? ''),
         enabled: !!visitId,
+        refetchOnMount: 'always',
     });
 
     const othersTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -124,94 +95,114 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
         appliance_removed: false,
         operator_id: ''
     });
+    // The lifecycle flags as stored (edit mode) — what the finish/reopen confirm compares against.
+    const [storedFlags, setStoredFlags] = useState<LifecycleFlags | null>(null);
 
-
-    // Populate the form when the visit record arrives (edit mode). Mirrors the
-    // old loadVisitData population exactly — same field coercion / falsy→default.
-    // Done during render (adjust-state-during-render), keyed on the visit identity,
-    // so the React Compiler can optimize and there's no extra post-paint render.
-    const visitKey = visitData ? String(visitId ?? '') : '';
-    const [initializedVisitKey, setInitializedVisitKey] = useState('');
-    if (visitKey !== initializedVisitKey) {
-        setInitializedVisitKey(visitKey);
-        if (visitData) {
-            const visit: VisitRow = visitData;
-            setFormData({
-                work_id: visit.work_id,
-                visit_date: visit.visit_date ? formatISODate(visit.visit_date) : '',
-                upper_wire_id: visit.upper_wire_id || '',
-                lower_wire_id: visit.lower_wire_id || '',
-                bracket_change: visit.bracket_change || '',
-                wire_bending: visit.wire_bending || '',
-                elastics: visit.elastics || '',
-                opg: visit.opg || false,
-                p_photo: visit.p_photo || false,
-                i_photo: visit.i_photo || false,
-                f_photo: visit.f_photo || false,
-                others: visit.others || '',
-                next_visit: visit.next_visit || '',
-                appliance_removed: visit.appliance_removed || false,
-                operator_id: visit.operator_id || ''
-            });
-        }
+    // Seed the edit form once, during render (no set-state-in-effect), from the
+    // read made after mount. The parent keys this component by work + visit, so
+    // "once" is once per visit.
+    const [seeded, setSeeded] = useState(!visitId);
+    if (!seeded && visitRead.isFetchedAfterMount && !visitRead.isFetching && visitRead.data) {
+        const visit = visitRead.data;
+        setSeeded(true);
+        setFormData({
+            work_id: visit.work_id,
+            visit_date: visit.visit_date ? formatISODate(visit.visit_date) : '',
+            upper_wire_id: visit.upper_wire_id || '',
+            lower_wire_id: visit.lower_wire_id || '',
+            bracket_change: visit.bracket_change || '',
+            wire_bending: visit.wire_bending || '',
+            elastics: visit.elastics || '',
+            opg: visit.opg || false,
+            p_photo: visit.p_photo || false,
+            i_photo: visit.i_photo || false,
+            f_photo: visit.f_photo || false,
+            others: visit.others || '',
+            next_visit: visit.next_visit || '',
+            appliance_removed: visit.appliance_removed || false,
+            operator_id: visit.operator_id || ''
+        });
+        setStoredFlags({
+            i_photo: visit.i_photo,
+            f_photo: visit.f_photo,
+            appliance_removed: visit.appliance_removed,
+        });
     }
+    // An edit whose visit could not be read shows no form: a blank "Edit Visit"
+    // form over a failed read used to be submittable (FE-F9-8).
+    const loadFailed = !seeded
+        && visitRead.isFetchedAfterMount
+        && !visitRead.isFetching
+        && (visitRead.isError || (visitRead.isSuccess && !visitRead.data));
 
-    // Surface a visit-record load failure in the existing error banner (the old
-    // loadVisitData did setError(...) on its catch). Done during render
-    // (adjust-state-during-render) so the React Compiler can optimize it.
-    const [prevVisitError, setPrevVisitError] = useState(visitError);
-    if (visitError !== prevVisitError) {
-        setPrevVisitError(visitError);
-        if (visitError) {
-            setError(httpErrorMessage(visitError, 'Failed to fetch visit data'));
+    const updateField = <K extends keyof VisitFormData>(field: K, value: VisitFormData[K]) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+        setDirty(true);
+    };
+
+    /**
+     * The Final Photo box finishes the work (status 2, f_photo_date, carried
+     * wires cleared on the first finish); un-ticking it reopens the work. Ask
+     * before a save does either, the way the Works page's own status change does.
+     */
+    const confirmLifecycleChange = async (): Promise<boolean> => {
+        const wasFinal = storedFlags?.f_photo ?? false;
+        if (formData.f_photo && !wasFinal) {
+            return confirm(
+                'Final Photo marks this treatment as Finished, dated this visit, and clears the patient\'s carried wires.\n\nSave the visit and finish the treatment?',
+                { title: 'Finish treatment?', confirmText: 'Save & finish' }
+            );
         }
-    }
+        if (!formData.f_photo && wasFinal) {
+            return confirm(
+                'Un-ticking Final Photo reopens this treatment as Active.\n\nSave the visit and reopen the treatment?',
+                { title: 'Reopen treatment?', confirmText: 'Save & reopen' }
+            );
+        }
+        return true;
+    };
 
-    // Memoized form submit handler
-    const handleFormSubmit = useCallback(async (e: FormEvent<HTMLFormElement>) => {
+    const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError(null);
+        if (!await confirmLifecycleChange()) return;
 
+        setLoading(true);
+        // Save responses differ from the read row: add returns { visitId },
+        // update returns no payload (sendSuccess(null) → void).
+        let result: visitContract.AddVisitResponse | void;
         try {
-            setLoading(true);
-
-            // Save responses differ from the read row: add returns { visitId },
-            // update returns no payload (sendSuccess(null) → void). Type them
-            // accordingly rather than reusing the full-row VisitRow shape.
-            const result = visitId
+            result = visitId
                 ? await putJSON<void>('/api/updatevisitbywork', { visitId, ...formData })
                 : await postJSON<visitContract.AddVisitResponse>('/api/addvisitbywork', formData);
-
-            // Show success toast notification
-            if (visitId) {
-                toast.success('Visit updated successfully!');
-            } else {
-                toast.success('Visit added successfully!');
-            }
-
-            // Refresh the work's visit list (qk.work.all covers qk.work.visits) so
-            // the added/edited visit appears immediately — the 30s-fresh cache would
-            // otherwise serve a stale list until a hard refresh.
-            if (workId) {
-                queryClient.invalidateQueries({ queryKey: qk.work.all(workId) });
-            }
-
-            if (onSave) {
-                onSave(result);
-            }
         } catch (err) {
             const errorMessage = httpErrorMessage(err, 'Failed to save visit');
             setError(errorMessage);
             toast.error(`Failed to save visit: ${errorMessage}`);
-        } finally {
             setLoading(false);
+            return;
         }
-    }, [visitId, workId, formData, onSave, toast, queryClient]);
 
-    // Memoized tooth click handler - prevents DentalChart re-renders
-    const handleToothClick = useCallback((palmerNotation: string) => {
+        toast.success(visitId ? 'Visit updated successfully!' : 'Visit added successfully!');
+
+        // qk.work.all covers the visit list, the latest-wires prefill and the
+        // shell's work details. qk.patient.all covers the Works page and the
+        // patient header: a photo flag can finish or reopen the work and
+        // reclassify the patient (FE-F9-4). The single-visit row this form read
+        // is stale now — marked so without a refetch, since the form is leaving.
+        if (workId) void queryClient.invalidateQueries({ queryKey: qk.work.all(workId) });
+        if (personId) void queryClient.invalidateQueries({ queryKey: qk.patient.all(personId) });
+        if (visitId) void queryClient.invalidateQueries({ queryKey: qk.visit.byId(visitId), refetchType: 'none' });
+
+        allowNextNavigation();
+        setDirty(false);
+        setLoading(false);
+        onSave?.(result);
+    };
+
+    const handleToothClick = (palmerNotation: string) => {
+        const targetField = lastFocusedField;
         setFormData(prevData => {
-            const targetField = lastFocusedField;
             const currentValue = prevData[targetField] || '';
             const newValue = currentValue
                 ? `${currentValue} ${palmerNotation}`
@@ -219,37 +210,38 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
 
             return { ...prevData, [targetField]: newValue };
         });
+        setDirty(true);
 
-        const targetRef = lastFocusedField === 'others' ? othersTextareaRef : nextVisitTextareaRef;
-        if (targetRef.current) {
-            targetRef.current.focus();
+        const targetRef = targetField === 'others' ? othersTextareaRef : nextVisitTextareaRef;
+        targetRef.current?.focus();
+    };
+
+    if (visitId && !seeded) {
+        if (loadFailed) {
+            const message = visitRead.isError
+                ? httpErrorMessage(visitRead.error, 'Failed to fetch visit data')
+                : 'This visit no longer exists.';
+            return (
+                <div className={styles.container}>
+                    <div className={styles.error} role="alert">
+                        <span><i className="fas fa-exclamation-circle" aria-hidden="true"></i> {message}</span>
+                    </div>
+                    <div className={styles.formActions}>
+                        <button type="button" className="btn btn-primary" onClick={() => void visitRead.refetch()}>
+                            <i className="fas fa-redo" aria-hidden="true"></i> Retry
+                        </button>
+                        {onCancel && (
+                            <button type="button" onClick={onCancel} className="btn btn-secondary">
+                                <i className="fas fa-arrow-left" aria-hidden="true"></i> Back
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
         }
-    }, [lastFocusedField]);
-
-    // Generic memoized field change handler
-    const handleFieldChange = useCallback((field: keyof VisitFormData, value: string | boolean | number) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
-    }, []);
-
-    // Memoized tab change handler
-    const handleTabChange = useCallback((tab: 'basic' | 'treatment') => {
-        setActiveTab(tab);
-    }, []);
-
-    // Memoized focus handler
-    const handleFieldFocus = useCallback((field: TextFieldKey) => {
-        setLastFocusedField(field);
-    }, []);
-
-    // Memoized error clear handler
-    const handleClearError = useCallback(() => {
-        setError(null);
-    }, []);
-
-    if (visitLoading && visitId) {
         return (
             <div className={styles.loading}>
-                <i className="fas fa-spinner fa-spin"></i> Loading visit data...
+                <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading visit data...
             </div>
         );
     }
@@ -265,9 +257,9 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
 
             {/* Error Display */}
             {error && (
-                <div className={styles.error}>
-                    <i className="fas fa-exclamation-circle"></i> {error}
-                    <button onClick={handleClearError} className={styles.errorClose}>×</button>
+                <div className={styles.error} role="alert">
+                    <span><i className="fas fa-exclamation-circle" aria-hidden="true"></i> {error}</span>
+                    <button type="button" onClick={() => setError(null)} className={styles.errorClose} aria-label="Dismiss error">×</button>
                 </div>
             )}
 
@@ -286,25 +278,38 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 </div>
 
                 {/* Tabs */}
-                <div className={styles.tabs}>
+                <div className={styles.tabs} role="tablist" aria-label="Visit sections">
                     <button
                         type="button"
+                        id="new-visit-tab-basic"
+                        role="tab"
+                        aria-selected={activeTab === 'basic'}
+                        aria-controls="new-visit-panel-basic"
                         className={cn(styles.tab, { [styles.active]: activeTab === 'basic' })}
-                        onClick={() => handleTabChange('basic')}
+                        onClick={() => setActiveTab('basic')}
                     >
                         <i className="fas fa-calendar"></i> Basic Info
                     </button>
                     <button
                         type="button"
+                        id="new-visit-tab-treatment"
+                        role="tab"
+                        aria-selected={activeTab === 'treatment'}
+                        aria-controls="new-visit-panel-treatment"
                         className={cn(styles.tab, { [styles.active]: activeTab === 'treatment' })}
-                        onClick={() => handleTabChange('treatment')}
+                        onClick={() => setActiveTab('treatment')}
                     >
                         <i className="fas fa-teeth"></i> Treatment Details
                     </button>
                 </div>
 
                 {/* Tab 1: Basic Information */}
-                <div className={cn(styles.tabContent, { [styles.active]: activeTab === 'basic' })}>
+                <div
+                    id="new-visit-panel-basic"
+                    role="tabpanel"
+                    aria-labelledby="new-visit-tab-basic"
+                    className={cn(styles.tabContent, { [styles.active]: activeTab === 'basic' })}
+                >
                     {/* Basic Information */}
                     <div className={styles.formRow}>
                     <div className={styles.formGroup}>
@@ -313,7 +318,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                             id="new-visit-date"
                             type="date"
                             value={formData.visit_date}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('visit_date', e.target.value)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => updateField('visit_date', e.target.value)}
                             required
                         />
                     </div>
@@ -322,7 +327,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         <select
                             id="new-visit-operator"
                             value={formData.operator_id}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFieldChange('operator_id', e.target.value)}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => updateField('operator_id', e.target.value)}
                         >
                             <option value="">Select Operator</option>
                             {operators.map(op => (
@@ -335,7 +340,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 </div>
 
                 {/* Latest Wires - Quick Select (only for new visits) */}
-                {!visitId && (latestWires.UpperWireName || latestWires.LowerWireName) && (
+                {!visitId && latestWires && (latestWires.UpperWireName || latestWires.LowerWireName) && (
                     <div className={styles.latestWiresSection}>
                         <div className={styles.sectionLabel}>
                             <i className="fas fa-info-circle"></i> Most Recent Wires:
@@ -344,7 +349,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                             {latestWires.UpperWireName && (
                                 <button
                                     type="button"
-                                    onClick={() => handleFieldChange('upper_wire_id', latestWires.upper_wire_id!)}
+                                    onClick={() => updateField('upper_wire_id', latestWires.upper_wire_id ?? '')}
                                     className={cn(styles.wireBtn, styles.upper, { [styles.active]: formData.upper_wire_id === latestWires.upper_wire_id })}
                                 >
                                     <div className={styles.wireLabel}>Upper:</div>
@@ -354,7 +359,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                             {latestWires.LowerWireName && (
                                 <button
                                     type="button"
-                                    onClick={() => handleFieldChange('lower_wire_id', latestWires.lower_wire_id!)}
+                                    onClick={() => updateField('lower_wire_id', latestWires.lower_wire_id ?? '')}
                                     className={cn(styles.wireBtn, styles.lower, { [styles.active]: formData.lower_wire_id === latestWires.lower_wire_id })}
                                 >
                                     <div className={styles.wireLabel}>Lower:</div>
@@ -372,7 +377,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                             <select
                                 id="new-visit-upper-wire"
                                 value={formData.upper_wire_id}
-                                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFieldChange('upper_wire_id', e.target.value)}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => updateField('upper_wire_id', e.target.value)}
                             >
                                 <option value="">Select Wire</option>
                                 {wires.map(wire => (
@@ -387,7 +392,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                             <select
                                 id="new-visit-lower-wire"
                                 value={formData.lower_wire_id}
-                                onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFieldChange('lower_wire_id', e.target.value)}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => updateField('lower_wire_id', e.target.value)}
                             >
                                 <option value="">Select Wire</option>
                                 {wires.map(wire => (
@@ -401,7 +406,12 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                 </div>
 
                 {/* Tab 2: Treatment Details */}
-                <div className={cn(styles.tabContent, { [styles.active]: activeTab === 'treatment' })}>
+                <div
+                    id="new-visit-panel-treatment"
+                    role="tabpanel"
+                    aria-labelledby="new-visit-tab-treatment"
+                    className={cn(styles.tabContent, { [styles.active]: activeTab === 'treatment' })}
+                >
                     {/* Treatment Details */}
                     <div className={styles.formGroup}>
                         <label htmlFor="new-visit-bracket-change">Bracket Change</label>
@@ -409,7 +419,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                             id="new-visit-bracket-change"
                             type="text"
                             value={formData.bracket_change}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('bracket_change', e.target.value)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => updateField('bracket_change', e.target.value)}
                             placeholder="e.g., Replaced upper left bracket"
                         />
                     </div>
@@ -420,7 +430,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                             id="new-visit-wire-bending"
                             type="text"
                             value={formData.wire_bending}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('wire_bending', e.target.value)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => updateField('wire_bending', e.target.value)}
                             placeholder="e.g., Omega loop on upper wire"
                         />
                     </div>
@@ -431,7 +441,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                             id="new-visit-elastics"
                             type="text"
                             value={formData.elastics}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('elastics', e.target.value)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => updateField('elastics', e.target.value)}
                             placeholder="e.g., Class II elastics"
                         />
                     </div>
@@ -452,7 +462,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
 
                 {/* Notes */}
                 <div className={cn(styles.formGroup, styles.fullWidth)}>
-                    <label>
+                    <label htmlFor="new-visit-others">
                         Other Notes
                         {lastFocusedField === 'others' && (
                             <span className={styles.activeIndicator}>
@@ -461,10 +471,11 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         )}
                     </label>
                     <textarea
+                        id="new-visit-others"
                         ref={othersTextareaRef}
                         value={formData.others}
-                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleFieldChange('others', e.target.value)}
-                        onFocus={() => handleFieldFocus('others')}
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => updateField('others', e.target.value)}
+                        onFocus={() => setLastFocusedField('others')}
                         rows={4}
                         placeholder="Any additional notes about this visit..."
                         className={lastFocusedField === 'others' ? styles.active : ''}
@@ -473,7 +484,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
 
                 {/* Next Visit Instructions */}
                 <div className={cn(styles.formGroup, styles.fullWidth)}>
-                    <label>
+                    <label htmlFor="new-visit-next-visit">
                         Next Visit Instructions
                         {lastFocusedField === 'next_visit' && (
                             <span className={styles.activeIndicator}>
@@ -482,10 +493,11 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         )}
                     </label>
                     <textarea
+                        id="new-visit-next-visit"
                         ref={nextVisitTextareaRef}
                         value={formData.next_visit}
-                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleFieldChange('next_visit', e.target.value)}
-                        onFocus={() => handleFieldFocus('next_visit')}
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => updateField('next_visit', e.target.value)}
+                        onFocus={() => setLastFocusedField('next_visit')}
                         rows={4}
                         placeholder="Instructions or notes for the next visit..."
                         className={lastFocusedField === 'next_visit' ? styles.active : ''}
@@ -498,7 +510,7 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         <input
                             type="checkbox"
                             checked={formData.opg}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('opg', e.target.checked)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => updateField('opg', e.target.checked)}
                         />
                         <span>OPG Taken</span>
                     </label>
@@ -506,15 +518,16 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         <input
                             type="checkbox"
                             checked={formData.i_photo}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('i_photo', e.target.checked)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => updateField('i_photo', e.target.checked)}
                         />
                         <span>Initial Photo</span>
+                        <span className={styles.flagHint}>sets the treatment&apos;s initial-photo date</span>
                     </label>
                     <label className={styles.checkboxLabel}>
                         <input
                             type="checkbox"
                             checked={formData.p_photo}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('p_photo', e.target.checked)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => updateField('p_photo', e.target.checked)}
                         />
                         <span>Progress Photo</span>
                     </label>
@@ -522,17 +535,19 @@ const NewVisitComponent = ({ workId, visitId = null, onSave, onCancel }: NewVisi
                         <input
                             type="checkbox"
                             checked={formData.f_photo}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('f_photo', e.target.checked)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => updateField('f_photo', e.target.checked)}
                         />
                         <span>Final Photo</span>
+                        <span className={styles.flagHint}>marks the treatment Finished</span>
                     </label>
                     <label className={styles.checkboxLabel}>
                         <input
                             type="checkbox"
                             checked={formData.appliance_removed}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFieldChange('appliance_removed', e.target.checked)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => updateField('appliance_removed', e.target.checked)}
                         />
                         <span>Appliance Removed</span>
+                        <span className={styles.flagHint}>sets the treatment&apos;s debond date</span>
                     </label>
                 </div>
 

@@ -22,7 +22,8 @@
     "allTypes": "جميع الأنواع",
     "dailyOnly": "يومي فقط",
     "monthlyOnly": "شهري فقط",
-    "apply": "تطبيق التصفية"
+    "apply": "تطبيق التصفية",
+    "formerEmployee": "{{name}} (سابق)"
   },
   "summary": {
     "totalExpenses": "إجمالي المصروفات",
@@ -75,7 +76,11 @@
     "update": "تحديث المصروف",
     "errorDateRequired": "التاريخ مطلوب",
     "errorAmountRequired": "يجب إدخال مبلغ صحيح",
-    "errorCurrencyRequired": "العملة مطلوبة"
+    "errorCurrencyRequired": "العملة مطلوبة",
+    "futureDateMessage": "تاريخ المصروف {{date}} في المستقبل، لذلك لن يظهر في مجاميع اليوم أو هذا الشهر حتى ذلك الحين. هل تريد حفظه بهذا التاريخ؟",
+    "oldDateMessage": "تاريخ المصروف {{date}} قبل أكثر من سنة. هل تريد حفظه بهذا التاريخ؟",
+    "unusualDateTitle": "تحقق من تاريخ المصروف",
+    "unusualDateConfirm": "حفظ بهذا التاريخ"
   },
   "delete": {
     "title": "حذف المصروف",
@@ -95,6 +100,7 @@
     "createFailed": "فشل في إنشاء المصروف",
     "updateFailed": "فشل في تحديث المصروف",
     "deleteFailed": "فشل في حذف المصروف",
-    "loadFailed": "فشل في تحميل بيانات المصروف"
+    "loadFailed": "فشل في تحميل بيانات المصروف",
+    "pendingApproval": "أُرسل إلى المسؤول للموافقة"
   }
 }

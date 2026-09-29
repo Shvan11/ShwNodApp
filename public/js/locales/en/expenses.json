@@ -22,7 +22,8 @@
     "allTypes": "All Types",
     "dailyOnly": "Daily Only",
     "monthlyOnly": "Monthly Only",
-    "apply": "Apply Filters"
+    "apply": "Apply Filters",
+    "formerEmployee": "{{name}} (former)"
   },
   "summary": {
     "totalExpenses": "Total Expenses",
@@ -75,7 +76,11 @@
     "update": "Update Expense",
     "errorDateRequired": "Date is required",
     "errorAmountRequired": "Valid amount is required",
-    "errorCurrencyRequired": "Currency is required"
+    "errorCurrencyRequired": "Currency is required",
+    "futureDateMessage": "The expense date {{date}} is in the future, so it won't appear in today's or this month's totals until then. Save it with this date?",
+    "oldDateMessage": "The expense date {{date}} is more than a year ago. Save it with this date?",
+    "unusualDateTitle": "Check the expense date",
+    "unusualDateConfirm": "Save with this date"
   },
   "delete": {
     "title": "Delete Expense",
@@ -95,6 +100,7 @@
     "createFailed": "Failed to create expense",
     "updateFailed": "Failed to update expense",
     "deleteFailed": "Failed to delete expense",
-    "loadFailed": "Failed to load expense data"
+    "loadFailed": "Failed to load expense data",
+    "pendingApproval": "Submitted for admin approval"
   }
 }

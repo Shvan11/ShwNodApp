@@ -104,13 +104,13 @@ const ContentRenderer = ({ personId, page = 'photos', params = {} }: ContentRend
     // For edit-appointment/:appointmentId pattern
     const appointmentId = wildcardPath;
 
-    // For work/:workId/diagnosis pattern
-    const workPathMatch = wildcardPath.match(/^(\d+)\/diagnosis$/);
-    const workIdFromPath = workPathMatch ? workPathMatch[1] : null;
-
     // Extract workId and visitId from query params for work-specific pages like visits
-    const workId = workIdFromPath || searchParams.get('workId');
+    const workId = searchParams.get('workId');
     const visitId = searchParams.get('visitId');
+    // `from=visits`: the visit form was opened from Visit History, so it returns there.
+    const visitFormReturnsTo = searchParams.get('from') === 'visits' && workId
+        ? `/patient/${personId}/visits?workId=${workId}`
+        : `/patient/${personId}/works`;
 
     // Get tpCode from params (passed from PatientShell)
     const tpCode = params.tpCode;
@@ -151,7 +151,8 @@ const ContentRenderer = ({ personId, page = 'photos', params = {} }: ContentRend
                 return <WorkingFilesView personId={personId} />;
 
             case 'visits':
-                // Visits can be shown at work level (with workId) or patient level (all visits)
+                // Visit history is per work (`?workId=`). Without one there is no list
+                // to show — VisitsComponent says so and points back to Works.
                 return (
                     <VisitsComponent
                         workId={workId ? parseInt(workId, 10) : null}
@@ -160,29 +161,28 @@ const ContentRenderer = ({ personId, page = 'photos', params = {} }: ContentRend
                 );
 
             case 'new-visit':
-                // New visit form - clean component directly related to parent work
+                // New visit form - clean component directly related to parent work.
+                // Keyed by work + visit: each visit is its own form with its own
+                // post-mount read and seed, never the previous visit's state.
                 return (
                     <NewVisitComponent
+                        key={`${workId ?? ''}:${visitId ?? ''}`}
                         workId={workId ? parseInt(workId, 10) : null}
                         visitId={visitId ? parseInt(visitId, 10) : null}
+                        personId={personId}
                         onSave={() => {
-                            // Navigate back to works page after save
-                            if (personId) navigate(`/patient/${personId}/works`);
+                            if (personId) navigate(visitFormReturnsTo);
                         }}
                         onCancel={() => {
-                            // Navigate back to works page on cancel
-                            if (personId) navigate(`/patient/${personId}/works`);
+                            if (personId) navigate(visitFormReturnsTo);
                         }}
                     />
                 );
 
             case 'work':
-                // Handle work/:workId/diagnosis nested route
-                if (workIdFromPath && wildcardPath.endsWith('/diagnosis')) {
-                    // Diagnosis component uses useParams() to get patientId and workId
-                    return <Diagnosis />;
-                }
-                // If just /work, redirect to /works. Must use <Navigate> (not the
+                // Only the bare `/work` reaches here — `/work/:workId/diagnosis`
+                // always matches its own route, which PatientShell renders as
+                // page 'diagnosis' (below). Redirect to /works. Must use <Navigate> (not the
                 // navigate() function) because this runs during render — calling
                 // navigate() here updates RouterProvider mid-render ("Cannot update a
                 // component while rendering a different component"). <Navigate> defers

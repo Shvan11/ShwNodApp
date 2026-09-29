@@ -61,7 +61,7 @@ function isNotNullViolation(error: unknown, column?: string): boolean {
 }
 
 /** True for a pg CHECK violation (SQLSTATE 23514); optionally match the constraint. */
-function isCheckViolation(error: unknown, constraint?: string): boolean {
+export function isCheckViolation(error: unknown, constraint?: string): boolean {
   const err = asPgError(error);
   if (err.code !== PG_SQLSTATE.CHECK_VIOLATION) return false;
   return !constraint || err.constraint === constraint;

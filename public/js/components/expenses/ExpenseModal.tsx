@@ -5,6 +5,8 @@
 import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useConfirm } from '../../contexts/ConfirmContext';
+import { ENTRY_DATE_MIN, unusualEntryDate } from '../../utils/entryDate';
 import { useCategories, useSubcategories, useLabs, useActiveEmployees } from '../../hooks/useExpenses';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import { useLookupManager } from '../../hooks/useLookupManager';
@@ -18,18 +20,6 @@ import ModalHeader from '../react/ModalHeader';
 import styles from '../../routes/Expenses.module.css';
 
 // Types
-interface Category {
-    category_id: number;
-    category_name: string;
-    category_name_ar?: string | null;
-}
-
-interface Subcategory {
-    subcategory_id: number;
-    subcategory_name: string;
-    subcategory_name_ar?: string | null;
-}
-
 interface FormData {
     expenseDate: string;
     amount: string | number;
@@ -59,12 +49,23 @@ interface ExpenseModalProps {
 export default function ExpenseModal({ isOpen, expense, onClose, onSave }: ExpenseModalProps) {
     const { t } = useTranslation('expenses');
     const localizedName = useLocalizedName();
-    const { categories } = useCategories() as { categories: Category[] };
+    const confirm = useConfirm();
+    const { categories } = useCategories();
     const [categoryId, setCategoryId] = useState<string | number>('');
     const [submitting, setSubmitting] = useState(false);
-    const { subcategories } = useSubcategories(categoryId) as { subcategories: Subcategory[] };
-    const { labs } = useLabs();
-    const { employees } = useActiveEmployees();
+    const { subcategories } = useSubcategories(categoryId);
+    const { labs: activeLabs } = useLabs();
+    const { employees: activeEmployees } = useActiveEmployees();
+    // The lists hold only ACTIVE labs / employees. An expense booked to a lab since
+    // deactivated, or to someone who has since quit, keeps its id — so its own
+    // entity is appended rather than showing "Select …" over an id that is still
+    // re-sent (FE-F8-12, the fix FE-F7-1 gave the work form's doctor).
+    const labs = expense?.lab_id != null && !activeLabs.some(l => l.id === expense.lab_id)
+        ? [...activeLabs, { id: expense.lab_id, name: expense.lab_name ?? `#${expense.lab_id}` }]
+        : activeLabs;
+    const employees = expense?.employee_id != null && !activeEmployees.some(emp => emp.id === expense.employee_id)
+        ? [...activeEmployees, { id: expense.employee_id, employee_name: expense.employee_name ?? `#${expense.employee_id}` }]
+        : activeEmployees;
 
     // Right-click the Lab dropdown → "Edit labs" → manage the labs lookup inline
     // (stacks on top of this modal). Edits refresh the shared labs feed.
@@ -198,6 +199,20 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
             return;
         }
 
+        // A slipped year digit saves silently otherwise, outside every period total
+        // (FE-F8-9). Asked only when the date is new — re-saving an old expense
+        // unchanged must not nag.
+        const originalDate = expense?.expense_date?.split('T')[0];
+        const unusualDate = formData.expenseDate !== originalDate
+            ? unusualEntryDate(formData.expenseDate, formatISODate())
+            : null;
+        if (unusualDate) {
+            const message = unusualDate === 'future'
+                ? t('modal.futureDateMessage', { date: formData.expenseDate })
+                : t('modal.oldDateMessage', { date: formData.expenseDate });
+            if (!await confirm(message, { title: t('modal.unusualDateTitle'), confirmText: t('modal.unusualDateConfirm') })) return;
+        }
+
         const expenseData: ExpenseData = {
             expense_date: formData.expenseDate,
             amount: parseInt(String(formData.amount), 10),
@@ -286,6 +301,7 @@ export default function ExpenseModal({ isOpen, expense, onClose, onSave }: Expen
                             <input
                                 type="date"
                                 id="expense-date"
+                                min={ENTRY_DATE_MIN}
                                 value={formData.expenseDate}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('expenseDate', e.target.value)}
                                 className={`${styles.formInput} ${errors.expenseDate ? styles.inputError : ''}`}

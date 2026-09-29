@@ -149,6 +149,10 @@ const PatientSets: React.FC = () => {
         WorkType: loaderData.work.type_name as string | undefined,
         workid: parseInt(workId || '0', 10),
     } : null;
+    // Set payments are booked in USD into the WORK's ledger, so they are only
+    // offered on a USD work (the server refuses the rest — FE-F8-6).
+    const workCurrency = typeof loaderData?.work?.currency === 'string' ? loaderData.work.currency : null;
+    const workIsUsd = workCurrency === 'USD';
     const [alignerSets, setAlignerSets] = useState<AlignerSet[]>([]);
     const [doctors, setDoctors] = useState<AlignerDoctorWithAliases[]>([]);
     const [expandedSets, setExpandedSets] = useState<Record<number, boolean>>({});
@@ -551,7 +555,10 @@ const PatientSets: React.FC = () => {
             throw new Error(httpErrorMessage(err, 'Failed to save payment'), { cause: err });
         }
 
+        // The work's ledger AND the patient's Works page (Paid / Remaining / Add
+        // Payment) — the latter kept the pre-payment balance for up to 30 s (FE-F8-7).
         queryClient.invalidateQueries({ queryKey: qk.work.all(patient.workid) });
+        queryClient.invalidateQueries({ queryKey: qk.patient.all(patient.person_id) });
         toast.success('Payment saved successfully');
         setShowPaymentDrawer(false);
         setCurrentSetForPayment(null);
@@ -1493,7 +1500,10 @@ const PatientSets: React.FC = () => {
                                                         e.stopPropagation();
                                                         openPaymentDrawer(set);
                                                     }}
-                                                    title="Add Payment"
+                                                    disabled={!workIsUsd}
+                                                    title={workIsUsd
+                                                        ? 'Add Payment'
+                                                        : `Set payments are recorded in USD, but this treatment is billed in ${workCurrency ?? 'no currency'} — record the payment from the Works page`}
                                                 >
                                                     <i className="fas fa-money-bill-wave"></i>
                                                     <span>Add Payment</span>

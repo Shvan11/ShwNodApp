@@ -160,14 +160,31 @@ async function applyPhotoInsert(
   if (f.appliance_removed) await trx.updateTable('works').set({ debond_date: visitDate }).where('work_id', '=', workId).execute();
 }
 
-/** AFTER UPDATE (MyTrigger): only a *changed* flag adjusts the work; set→date, clear→NULL. */
+/**
+ * AFTER UPDATE (MyTrigger): a *changed* flag adjusts the work; set→date, clear→NULL.
+ *
+ * Unlike the legacy trigger, a flag that stays SET while the visit's date is
+ * corrected also moves the work's matching date (`dateChanged`). Before, the
+ * work kept the old date, and a later unrelated edit could trip the works CHECK
+ * constraints (`ck_works`, `ck_works_deb`, `ck_works_debiph`) against it.
+ */
 async function applyPhotoUpdate(
   trx: Transaction<Database>,
   workId: number,
   visitDate: string,
   oldF: PhotoFlags,
-  newF: PhotoFlags
+  newF: PhotoFlags,
+  dateChanged: boolean
 ): Promise<void> {
+  if (oldF.i_photo && newF.i_photo && dateChanged) {
+    await trx.updateTable('works').set({ i_photo_date: visitDate }).where('work_id', '=', workId).execute();
+  }
+  if (oldF.f_photo && newF.f_photo && dateChanged) {
+    await trx.updateTable('works').set({ f_photo_date: visitDate }).where('work_id', '=', workId).execute();
+  }
+  if (oldF.appliance_removed && newF.appliance_removed && dateChanged) {
+    await trx.updateTable('works').set({ debond_date: visitDate }).where('work_id', '=', workId).execute();
+  }
   if (!oldF.i_photo && newF.i_photo) {
     await trx.updateTable('works').set({ i_photo_date: visitDate }).where('work_id', '=', workId).execute();
   } else if (oldF.i_photo && !newF.i_photo) {
@@ -485,6 +502,8 @@ export async function addVisitByWorkId(visitData: VisitData): Promise<{ id: numb
 
 /**
  * Updates a visit by visit id (+ MyTrigger roll-up for changed photo flags).
+ * `success: false` = no such visit (deleted meanwhile) — nothing was written,
+ * and the route answers 404 instead of a success toast over 0 updated rows.
  */
 export async function updateVisitByWorkId(
   visitId: number,
@@ -496,12 +515,13 @@ export async function updateVisitByWorkId(
     f_photo: visitData.f_photo ?? false,
     appliance_removed: visitData.appliance_removed ?? false,
   };
-  await withPgTransaction(async (trx) => {
+  return withPgTransaction(async (trx) => {
     const existing = await trx
       .selectFrom('visits')
       .where('id', '=', visitId)
-      .select(['work_id', 'i_photo', 'f_photo', 'appliance_removed'])
+      .select(['work_id', 'visit_date', 'i_photo', 'f_photo', 'appliance_removed'])
       .executeTakeFirst();
+    if (!existing) return { success: false };
     await trx
       .updateTable('visits')
       .set({
@@ -522,15 +542,13 @@ export async function updateVisitByWorkId(
       })
       .where('id', '=', visitId)
       .execute();
-    if (existing) {
-      await applyPhotoUpdate(trx, existing.work_id, visitDate, {
-        i_photo: existing.i_photo,
-        f_photo: existing.f_photo,
-        appliance_removed: existing.appliance_removed,
-      }, newF);
-    }
+    await applyPhotoUpdate(trx, existing.work_id, visitDate, {
+      i_photo: existing.i_photo,
+      f_photo: existing.f_photo,
+      appliance_removed: existing.appliance_removed,
+    }, newF, toDateOnly(existing.visit_date) !== visitDate);
+    return { success: true };
   });
-  return { success: true };
 }
 
 /**

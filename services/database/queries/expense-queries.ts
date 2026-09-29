@@ -80,19 +80,6 @@ interface ExpenseData {
   isMonthly?: boolean;
 }
 
-interface ExpenseSummary {
-  category_name: string | null;
-  currency: string;
-  ExpenseCount: number;
-  total_amount: number;
-}
-
-interface ExpenseTotal {
-  currency: string;
-  ExpenseCount: number;
-  total_amount: number;
-}
-
 /**
  * Retrieves all expenses with optional filtering
  */
@@ -292,51 +279,4 @@ export async function deleteExpense(id: number): Promise<{ success: boolean; id:
   const db = getKysely();
   await db.deleteFrom('expenses').where('id', '=', id).execute();
   return { success: true, id };
-}
-
-/**
- * Gets expense summary by category and currency
- */
-export async function getExpenseSummary(
-  startDate: string,
-  endDate: string
-): Promise<ExpenseSummary[]> {
-  const db = getKysely();
-  return db
-    .selectFrom('expenses as e')
-    .leftJoin('expense_categories as c', 'e.category_id', 'c.category_id')
-    .where('e.expense_date', '>=', sql<string>`${startDate}`)
-    .where('e.expense_date', '<=', sql<string>`${endDate}`)
-    .groupBy(['c.category_name', sql`btrim(${sql.ref('e.currency')})`])
-    .orderBy('c.category_name')
-    .orderBy(sql`btrim(${sql.ref('e.currency')})`)
-    .select((eb) => [
-      'c.category_name',
-      sql<string>`btrim(${sql.ref('e.currency')})`.as('currency'),
-      eb.fn.countAll<number>().as('ExpenseCount'),
-      eb.fn.sum('e.amount').$castTo<number>().as('total_amount'),
-    ])
-    .execute();
-}
-
-/**
- * Gets total expenses by currency for a date range
- */
-export async function getExpenseTotalsByCurrency(
-  startDate: string,
-  endDate: string
-): Promise<ExpenseTotal[]> {
-  const db = getKysely();
-  return db
-    .selectFrom('expenses')
-    .where('expense_date', '>=', sql<string>`${startDate}`)
-    .where('expense_date', '<=', sql<string>`${endDate}`)
-    .groupBy(sql`btrim(${sql.ref('currency')})`)
-    .orderBy(sql`btrim(${sql.ref('currency')})`)
-    .select((eb) => [
-      sql<string>`btrim(${sql.ref('currency')})`.as('currency'),
-      eb.fn.countAll<number>().as('ExpenseCount'),
-      eb.fn.sum('amount').$castTo<number>().as('total_amount'),
-    ])
-    .execute();
 }

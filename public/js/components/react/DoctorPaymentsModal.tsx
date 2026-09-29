@@ -31,11 +31,11 @@ interface DoctorPaymentsModalProps {
  * date and amount.
  *
  * The headline totals come from the aggregate row that was CLICKED (`target`), never
- * from summing the listed rows. Two reasons they can differ: a very long period is
- * truncated server-side, and `works.currency` is nullable while the aggregates bucket
- * with `FILTER (WHERE currency = 'IQD'|'USD')` — so a NULL-currency work counts toward
- * neither total. Those payments are still listed (the money is real) with an em-dash
- * currency pill, while the headline stays the figure the user clicked on.
+ * from summing the listed rows, because a very long period is truncated server-side.
+ * The aggregates bucket with `FILTER (WHERE currency = 'IQD'|'USD')`; `works.currency`
+ * can no longer be NULL on a priced work (`ck_works_cur`, and `total_required` is NOT
+ * NULL), and no UI writes anything but IQD/USD since RB1 — the em-dash pill for any
+ * other value is defensive only.
  */
 const DoctorPaymentsModal = ({ target, startDate, endDate, onClose }: DoctorPaymentsModalProps) => {
     const navigate = useNavigate();
@@ -87,8 +87,11 @@ const DoctorPaymentsModal = ({ target, startDate, endDate, onClose }: DoctorPaym
                     </div>
                     <div className={styles.totalItem}>
                         <span className={styles.totalLabel}>Payments</span>
+                        {/* The LISTED rows, which the server caps: on a truncated period the
+                            count is a floor ("2,000+"), unlike the two totals beside it,
+                            which cover the whole period (FE-F8-10). */}
                         <span className={`${styles.totalValue} ${styles.totalValueNeutral}`}>
-                            {formatNumber(rows.length)}
+                            {isPending ? '…' : `${formatNumber(rows.length)}${truncated ? '+' : ''}`}
                         </span>
                     </div>
                     {target.workCount !== undefined && (

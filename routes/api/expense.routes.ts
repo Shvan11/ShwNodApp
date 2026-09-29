@@ -21,8 +21,6 @@ import {
   addExpense,
   updateExpense,
   deleteExpense,
-  getExpenseSummary,
-  getExpenseTotalsByCurrency
 } from '../../services/database/queries/expense-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { FINANCE_ROLES } from '../../shared/auth/roles.js';
@@ -239,44 +237,9 @@ router.post(
 );
 
 /**
- * Get expense summary by category and currency
- * Query params: startDate, endDate (required)
- */
-router.get(
-  '/expenses/summary',
-  validate({ query: expense.expenseSummary.query }),
-  async (
-    req: Request<unknown, unknown, unknown, expense.ExpenseSummaryQuery>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      // Presence AND shape are enforced by the contract above — a missing or
-      // malformed date 400s before the handler, rather than reaching the query
-      // layer as `undefined` (this route had no query guard at all).
-      const { startDate, endDate } = req.query;
-
-      const summary = await getExpenseSummary(startDate, endDate);
-      const totals = await getExpenseTotalsByCurrency(startDate, endDate);
-
-      sendData(res, expense.expenseSummary.response, {
-        summary,
-        totals
-      });
-    } catch (error) {
-      log.error('Error fetching expense summary:', error);
-      ErrorResponses.internalError(
-        res,
-        'Failed to fetch expense summary',
-        error as Error
-      );
-    }
-  }
-);
-
-/**
  * Get a single expense by id
  * NOTE: This route MUST come after all specific /expenses/* routes
- * to avoid matching paths like /expenses/categories or /expenses/summary
+ * to avoid matching paths like /expenses/categories or /expenses/subcategories
  */
 router.get(
   '/expenses/:id',

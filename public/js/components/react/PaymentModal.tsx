@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { ChangeEvent, FormEvent, FocusEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ApiResponse } from '@/types/api.types';
 import styles from './PaymentModal.module.css';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
-import { parseFormattedNumber } from '../../utils/formatters';
+import { formatNumber, formatCurrency } from '../../utils/formatters';
+import { ENTRY_DATE_MIN, unusualEntryDate } from '../../utils/entryDate';
 import { formatISODate } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { postJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
-import { workForReceiptQuery, exchangeRateForDateQuery } from '@/query/queries';
+import { exchangeRateForDateQuery } from '@/query/queries';
 import {
     updateExchangeRate as updateExchangeRateContract,
     addInvoice as addInvoiceContract,
@@ -31,20 +31,16 @@ interface WorkData {
     discount_reason?: string | null;
 }
 
-interface ReceiptData extends WorkData {
-    amountPaidToday: number;
-    paymentDate: string;
-    paymentDateTime: string;
-    usdReceived: number;
-    iqdReceived: number;
-    change: number;
-    newBalance: number;
+/** What the success view shows: the amount just registered, in the work's currency. */
+interface PaidToday {
+    amount: number;
+    currency: 'USD' | 'IQD';
 }
 
 interface PaymentModalProps {
     workData: WorkData | null;
     onClose: () => void;
-    onSuccess?: (result: ApiResponse) => void;
+    onSuccess?: () => void;
 }
 
 interface FormData {
@@ -63,7 +59,6 @@ interface DisplayValues {
     actualUSD: string;
     actualIQD: string;
     change: string;
-    newRateValue: string;
 }
 
 interface Calculations {
@@ -74,28 +69,27 @@ interface Calculations {
     calculatedChange: number;
     totalReceived: number;
     isShort: boolean;
-    isExact: boolean;
     isOver: boolean;
 }
 
 type EntryMode = 'amount' | 'cash';
 
 /**
- * Payment Modal Component
- * Memoized to prevent unnecessary re-renders
- * Re-renders only when workData, onClose, or onSuccess props change
- * Uses useCallback for event handlers to prevent breaking memoization
+ * Money is whole units in both currencies (the contract's `moneyInt`), so every
+ * money field keeps DIGITS ONLY and shows exactly the number it will send. The old
+ * fields took `-`, `.` and `e` (`1e3` parsed as 1,000) and displayed a rounded
+ * value while submit `parseInt`-truncated it: `99.5` showed $100 and saved $99
+ * (audit FE-F8-4). The same rule backs the rate editor, whose display used to
+ * `parseFloat` a grouped string (`"1,56"` → 1) while Save stripped the commas
+ * (→ 156) (FE-F8-3).
  */
-
-// Pure display formatter — module-scoped so every reference (incl. the during-render
-// display formatting below) is lexically after its declaration (react-hooks/immutability).
-const formatNumber = (num: number | string | undefined): string => {
-    const numVal = typeof num === 'string' ? parseFloat(num) : num;
-    if (isNaN(numVal as number) || numVal === null || numVal === undefined) {
-        return '0';
-    }
-    return Math.round(numVal as number).toLocaleString('en-US');
+const digitsOnly = (raw: string): number | '' => {
+    const digits = raw.replace(/\D/g, '');
+    return digits ? Number(digits) : '';
 };
+
+/** Ask before recording a rate this far from the one in use (FE-F8-3). */
+const RATE_DEVIATION_CONFIRM = 0.1;
 
 const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const { t } = useTranslation('payments');
@@ -104,9 +98,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const queryClient = useQueryClient();
     const [loading, setLoading] = useState(false);
     const [showRateInput, setShowRateInput] = useState(false);
-    const [newRateValue, setNewRateValue] = useState('');
+    // The rate being typed, digits only (`''` = empty).
+    const [newRateValue, setNewRateValue] = useState<number | ''>('');
     const [paymentSuccess, setPaymentSuccess] = useState(false);
-    const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+    const [paidToday, setPaidToday] = useState<PaidToday | null>(null);
 
     // Entry mode: 'amount' = enter amount first (current), 'cash' = enter cash first (reverse)
     const [entryMode, setEntryMode] = useState<EntryMode>('amount');
@@ -130,8 +125,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         amountToRegister: '',
         actualUSD: '',
         actualIQD: '',
-        change: '',
-        newRateValue: ''
+        change: ''
     });
 
     // Calculations and suggestions
@@ -143,18 +137,12 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         calculatedChange: 0,
         totalReceived: 0,
         isShort: false,
-        isExact: false,
         isOver: false
     });
 
-    // Receipt-enriched work row + the exchange rate in force on the payment date, both
-    // on useQuery. The contract response is a loose boundary guard (work_id); the richer
-    // local WorkData stays the consumer type. The endpoint carries the last known rate
-    // forward, so its 404 — which drives the inline "Set Rate" prompt, no throw — now
-    // means no rate has EVER been recorded, not just none for this day.
-    const { data: completeWorkDataRaw } = useQuery(workForReceiptQuery(workData?.work_id ?? null));
-    const completeWorkData = (completeWorkDataRaw ?? null) as WorkData | null;
-
+    // The exchange rate in force on the payment date. The endpoint carries the last
+    // known rate forward, so its 404 — which drives the inline "Set Rate" prompt, no
+    // throw — means no rate has EVER been recorded, not just none for this day.
     const { data: rateData } = useQuery(exchangeRateForDateQuery(formData.paymentDate));
     const exchangeRate = rateData?.exchangeRate ?? null;
     // True when the day has no rate of its own and an earlier one stood in for it.
@@ -187,7 +175,11 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const [seededSuggestKey, setSeededSuggestKey] = useState<string | null>(null);
     if (suggestKey !== seededSuggestKey) {
         setSeededSuggestKey(suggestKey);
-        if (entryMode === 'amount' && formData.amountToRegister && exchangeRate) {
+        // Only the CROSS-currency arms need a rate: an IQD work paid in IQD (or USD in
+        // USD) suggests the amount itself. Gating the whole block on the rate left
+        // "Auto" at 0 on a deployment that has never recorded one — day one of every
+        // new center (audit FE-F8-5).
+        if (entryMode === 'amount' && formData.amountToRegister) {
             const amountToRegister = parseFloat(String(formData.amountToRegister)) || 0;
             const accountCurrency = calculations.accountCurrency;
             const paymentCurrency = formData.paymentCurrency;
@@ -203,14 +195,14 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                 if (paymentCurrency === 'USD') {
                     if (accountCurrency === 'USD') {
                         suggestedUSD = amountToRegister;
-                    } else {
+                    } else if (exchangeRate) {
                         // Account is IQD, paying in USD - Round UP to collect more
                         suggestedUSD = Math.ceil(amountToRegister / exchangeRate);
                     }
                 } else if (paymentCurrency === 'IQD') {
                     if (accountCurrency === 'IQD') {
                         suggestedIQD = amountToRegister;
-                    } else {
+                    } else if (exchangeRate) {
                         // Account is USD, paying in IQD - Round UP to nearest 1000 to collect more
                         suggestedIQD = Math.ceil(amountToRegister * exchangeRate / 1000) * 1000;
                     }
@@ -270,17 +262,18 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                 }
             }
 
-            // Update change only if not manually overridden
-            if (!formData.changeManualOverride) {
-                setFormData(prev => ({ ...prev, change: changeInIQD }));
-            }
+            // The cash, the amount or the rate moved, so the change is recomputed —
+            // a manual override included. It used to stick: override 5,000, then lower
+            // the cash, and the stale 5,000 was submitted (only an entry-mode switch
+            // cleared it — FE-F8-13). Editing the Change field itself doesn't move
+            // this block's key, so an override holds until the inputs behind it change.
+            setFormData(prev => ({ ...prev, change: changeInIQD, changeManualOverride: false }));
 
             setCalculations(prev => ({
                 ...prev,
                 totalReceived: Math.round(totalInAccountCurrency),
                 calculatedChange: changeInIQD,
                 isShort: totalInAccountCurrency < amountToRegister,
-                isExact: Math.abs(totalInAccountCurrency - amountToRegister) < 0.01,
                 isOver: totalInAccountCurrency > amountToRegister
             }));
         }
@@ -302,16 +295,6 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         }));
     }
 
-    // Auto-format exchange rate input.
-    const [seededRateValue, setSeededRateValue] = useState<string | null>(null);
-    if (newRateValue !== seededRateValue) {
-        setSeededRateValue(newRateValue);
-        setDisplayValues(prev => ({
-            ...prev,
-            newRateValue: formatNumber(newRateValue)
-        }));
-    }
-
     // The rate editor writes to whatever date the form currently holds, so it must never
     // outlive the date it was opened for. Changing the payment date closes it: otherwise
     // staff could open it on a day with no rate, switch to an earlier date that HAS one,
@@ -324,7 +307,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     }
 
     const handleSetExchangeRate = async () => {
-        const rate = parseFormattedNumber(newRateValue);
+        const rate = newRateValue;
         if (!rate || rate <= 0) {
             toast.warning(t('validation.enterValidRate'));
             return;
@@ -342,6 +325,21 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             return;
         }
 
+        // A rate far from the one in use (the carried-forward rate it replaces) is far
+        // more likely a typo than a market move — one digit short converts every
+        // cross-currency payment that day at a tenth of the real rate. Ask first.
+        if (exchangeRate && Math.abs(rate - exchangeRate) / exchangeRate > RATE_DEVIATION_CONFIRM) {
+            const proceed = await confirm(
+                t('confirm.rateDeviationMessage', {
+                    rate: formatNumber(rate),
+                    current: formatNumber(exchangeRate),
+                    percent: Math.round(Math.abs(rate - exchangeRate) / exchangeRate * 100),
+                }),
+                { title: t('confirm.rateDeviationTitle'), confirmText: t('confirm.rateDeviationConfirm') }
+            );
+            if (!proceed) return;
+        }
+
         // Recording a rate for a PAST day is legitimate (it's the rate that really stood
         // that day) but it does restate that day's totals — so it's confirmed, not silent.
         if (formData.paymentDate < formatISODate()) {
@@ -357,7 +355,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             // Enveloped (sendSuccess); a non-2xx now throws and is handled below.
             await postJSON('/api/updateExchangeRateForDate', {
                 date: formData.paymentDate,
-                exchangeRate: Math.round(rate)
+                exchangeRate: rate
             }, { schema: updateExchangeRateContract.response });
 
             // Invalidate the exchange-rate cache so this date's rate (and every other
@@ -411,80 +409,19 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     }
 
     // Smart calculation for mixed payments
-    const handleMixedUSDChange = (value: string) => {
-        const usd = parseFormattedNumber(value) || 0;
+    // MIXED payments: both cash fields are typed by hand (no suggestion is shown in
+    // MIXED — the per-field "collect" hints belong to the single-currency branch).
+    const handleMixedCashChange = (field: 'actualUSD' | 'actualIQD', value: string) => {
+        const amount = digitsOnly(value);
 
         // Auto-detect mode for mixed payments (only if not locked)
-        if (!modeLocked && usd > 0 && !formData.amountToRegister) {
+        if (!modeLocked && amount && !formData.amountToRegister) {
             setEntryMode('cash');
             setModeLocked(true);
         }
 
-        setFormData(prev => ({ ...prev, actualUSD: usd }));
-        setDisplayValues(prev => ({ ...prev, actualUSD: value }));
-
-        // Only calculate suggestions in amount mode
-        if (entryMode === 'amount' && usd > 0 && !formData.actualIQD && exchangeRate) {
-            // Calculate remaining IQD needed
-            const amountToRegister = parseFloat(String(formData.amountToRegister)) || 0;
-            const accountCurrency = calculations.accountCurrency;
-
-            // Round DOWN what patient gave (you benefit)
-            const usdValueInAccount = accountCurrency === 'USD'
-                ? usd
-                : Math.floor(usd * exchangeRate / 1000) * 1000;
-            const remainingInAccount = amountToRegister - usdValueInAccount;
-
-            if (remainingInAccount > 0) {
-                // Round UP what patient owes (you benefit)
-                const neededIQD = accountCurrency === 'USD'
-                    ? Math.ceil(remainingInAccount * exchangeRate / 1000) * 1000
-                    : Math.ceil(remainingInAccount / 1000) * 1000;
-
-                setCalculations(prev => ({
-                    ...prev,
-                    suggestedIQD: neededIQD
-                }));
-            }
-        }
-    };
-
-    const handleMixedIQDChange = (value: string) => {
-        const iqd = parseFormattedNumber(value) || 0;
-
-        // Auto-detect mode for mixed payments (only if not locked)
-        if (!modeLocked && iqd > 0 && !formData.amountToRegister) {
-            setEntryMode('cash');
-            setModeLocked(true);
-        }
-
-        setFormData(prev => ({ ...prev, actualIQD: iqd }));
-        setDisplayValues(prev => ({ ...prev, actualIQD: value }));
-
-        // Only calculate suggestions in amount mode
-        if (entryMode === 'amount' && iqd > 0 && !formData.actualUSD && exchangeRate) {
-            // Calculate remaining USD needed
-            const amountToRegister = parseFloat(String(formData.amountToRegister)) || 0;
-            const accountCurrency = calculations.accountCurrency;
-
-            // Round DOWN what patient gave (you benefit)
-            const iqdValueInAccount = accountCurrency === 'IQD'
-                ? iqd
-                : Math.floor(iqd / exchangeRate);
-            const remainingInAccount = amountToRegister - iqdValueInAccount;
-
-            if (remainingInAccount > 0) {
-                // Round UP what patient owes (you benefit)
-                const neededUSD = accountCurrency === 'IQD'
-                    ? Math.ceil(remainingInAccount / exchangeRate)
-                    : Math.ceil(remainingInAccount);
-
-                setCalculations(prev => ({
-                    ...prev,
-                    suggestedUSD: neededUSD
-                }));
-            }
-        }
+        setFormData(prev => ({ ...prev, [field]: amount }));
+        setDisplayValues(prev => ({ ...prev, [field]: formatNumber(amount) }));
     };
 
     const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -525,9 +462,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     };
 
     // Handle formatted money input changes with auto-detect mode (only before mode is locked)
-    const handleMoneyInputChange = (fieldName: keyof FormData, value: string) => {
-        // Parse the formatted input
-        const numericValue = parseFormattedNumber(value);
+    const handleMoneyInputChange = (fieldName: 'amountToRegister' | 'actualUSD' | 'actualIQD', value: string) => {
+        const numericValue = digitsOnly(value);
 
         // Auto-detect entry mode ONLY if mode is not locked yet
         if (!modeLocked && numericValue && numericValue > 0) {
@@ -548,10 +484,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             [fieldName]: numericValue
         }));
 
-        // Update display value immediately (user is typing)
+        // Show exactly the number that will be sent (grouped as it is typed).
         setDisplayValues(prev => ({
             ...prev,
-            [fieldName]: value
+            [fieldName]: formatNumber(numericValue)
         }));
     };
 
@@ -590,7 +526,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     };
 
     const handleChangeOverride = (value: string) => {
-        const numericValue = parseFormattedNumber(value) || 0;
+        const numericValue = digitsOnly(value) || 0;
         setFormData(prev => ({
             ...prev,
             change: numericValue,
@@ -598,7 +534,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         }));
         setDisplayValues(prev => ({
             ...prev,
-            change: value
+            change: formatNumber(numericValue)
         }));
     };
 
@@ -612,10 +548,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
     // Handle USD input when in override mode - recalculates IQD change
     const handleOverrideUSDChange = (value: string) => {
-        const usd = parseFormattedNumber(value) || 0;
+        const usd = digitsOnly(value);
 
         setFormData(prev => ({ ...prev, actualUSD: usd }));
-        setDisplayValues(prev => ({ ...prev, actualUSD: value }));
+        setDisplayValues(prev => ({ ...prev, actualUSD: formatNumber(usd) }));
 
         // Change will be auto-calculated by the total/change render block
     };
@@ -749,6 +685,15 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             if (!await confirm(t('confirm.underpaymentMessage'), { title: t('confirm.underpaymentTitle'), confirmText: t('confirm.underpaymentConfirm') })) return;
         }
 
+        // A slipped year digit saves silently otherwise, outside every daily total (FE-F8-9).
+        const unusualDate = unusualEntryDate(formData.paymentDate, formatISODate());
+        if (unusualDate) {
+            const message = unusualDate === 'future'
+                ? t('confirm.futureDateMessage', { date: formData.paymentDate })
+                : t('confirm.oldDateMessage', { date: formData.paymentDate });
+            if (!await confirm(message, { title: t('confirm.unusualDateTitle'), confirmText: t('confirm.unusualDateConfirm') })) return;
+        }
+
         // Change is saved exactly when the form tracked it (see isChangeDisabled above):
         // NULL for the untracked scenarios, the entered/auto-calculated value otherwise.
         const changeToSubmit = isChangeDisabled ? null : (parseInt(String(formData.change), 10) || 0);
@@ -776,27 +721,15 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
             // Enveloped (sendSuccess) → postJSON unwraps to the inner result; a non-2xx
             // (validation/insufficient-balance) now throws and is handled in the catch.
-            const result = await postJSON<AddInvoiceResponse>('/api/addInvoice', invoiceData, {
+            await postJSON<AddInvoiceResponse>('/api/addInvoice', invoiceData, {
                 schema: addInvoiceContract.response,
             });
             queryClient.invalidateQueries({ queryKey: qk.work.all(workData!.work_id) });
 
-            // Set success state and prepare receipt data with complete work data
+            // The success view shows what was registered, in the work's currency. (The
+            // printed receipt is rendered server-side from the saved invoice.)
             setPaymentSuccess(true);
-            setReceiptData({
-                ...workData!,
-                // Override with complete data from V_Report if available
-                ...(completeWorkData || {}),
-                amountPaidToday: amountPaid,
-                paymentDate: formData.paymentDate,
-                paymentDateTime: new Date().toISOString(),
-                usdReceived: actualUSD,
-                iqdReceived: actualIQD,
-                // The receipt must show what was RECORDED, not what the field happened to
-                // hold — those diverged whenever change was submitted as NULL.
-                change: changeToSubmit ?? 0,
-                newBalance: ((workData!.total_required || 0) - Number(workData!.discount ?? 0) - (workData!.TotalPaid || 0) - amountPaid)
-            });
+            setPaidToday({ amount: amountPaid, currency: calculations.accountCurrency });
 
             // Flat { success, messageId } / { success:false, message } at HTTP 200 → passthrough.
             postJSON<{ success: boolean; message?: string }>('/api/wa/send-receipt', { workId: workData!.work_id })
@@ -811,12 +744,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                     toast.error(t('toast.whatsappError', { error: httpErrorMessage(err, 'unknown error') }));
                 });
 
-            if (onSuccess) {
-                // postJSON unwrapped the envelope; reconstruct an ApiResponse for the
-                // (arg-ignoring) consumer so the prop type is honoured. `timestamp` is
-                // required on the shared type (H4), so stamp one on the shim.
-                onSuccess({ success: true, data: result, timestamp: new Date().toISOString() });
-            }
+            onSuccess?.();
         } catch (error) {
             console.error('Error adding payment:', error);
             toast.error(t('toast.paymentError', { error: httpErrorMessage(error, 'unknown error') }));
@@ -859,17 +787,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
     const handleCloseAfterSuccess = () => {
         setPaymentSuccess(false);
-        setReceiptData(null);
+        setPaidToday(null);
         onClose();
-    };
-
-    const formatCurrency = (amount: number | string | undefined, currency: string): string => {
-        const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-        if (isNaN(numAmount as number) || numAmount === null || numAmount === undefined) {
-            return `0 ${currency}`;
-        }
-        // Use toLocaleString with 'en-US' for comma separators
-        return `${Math.round(numAmount as number).toLocaleString('en-US')} ${currency}`;
     };
 
     if (!workData) return null;
@@ -896,11 +815,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         <div className={styles.rateInputInline}>
             <input
                 type="text"
-                value={displayValues.newRateValue}
-                onChange={(e) => {
-                    setNewRateValue(e.target.value);
-                    setDisplayValues(prev => ({ ...prev, newRateValue: e.target.value }));
-                }}
+                inputMode="numeric"
+                aria-label={t('exchangeRate.setRate')}
+                value={formatNumber(newRateValue)}
+                onChange={(e) => setNewRateValue(digitsOnly(e.target.value))}
                 placeholder="1,406"
                 className={styles.rateInputSmall}
             />
@@ -1014,6 +932,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                         id="payment-date"
                                         type="date"
                                         name="paymentDate"
+                                        min={ENTRY_DATE_MIN}
                                         value={formData.paymentDate}
                                         onChange={handleInputChange}
                                         className={styles.inputCompact}
@@ -1032,6 +951,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                     </label>
                                     <input
                                         type="text"
+                                        inputMode="numeric"
                                         value={displayValues.amountToRegister}
                                         onChange={(e) => handleMoneyInputChange('amountToRegister', e.target.value)}
                                         onBlur={() => handleMoneyInputBlur('amountToRegister')}
@@ -1073,6 +993,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                     <div className={styles.inputWithLock}>
                                                         <input
                                                             type="text"
+                                                            inputMode="numeric"
                                                             value={displayValues.actualUSD}
                                                             onChange={(e) => isOverriding
                                                                 ? handleOverrideUSDChange(e.target.value)
@@ -1107,6 +1028,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                     <div className={styles.inputWithLock}>
                                                         <input
                                                             type="text"
+                                                            inputMode="numeric"
                                                             value={displayValues.actualIQD}
                                                             onChange={(e) => handleMoneyInputChange('actualIQD', e.target.value)}
                                                             onBlur={() => handleMoneyInputBlur('actualIQD')}
@@ -1148,8 +1070,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                             <input
                                                 id="payment-usd-received"
                                                 type="text"
+                                                inputMode="numeric"
                                                 value={displayValues.actualUSD}
-                                                onChange={(e) => handleMixedUSDChange(e.target.value)}
+                                                onChange={(e) => handleMixedCashChange('actualUSD', e.target.value)}
                                                 onBlur={() => handleMoneyInputBlur('actualUSD')}
                                                 onFocus={handleMoneyInputFocus}
                                                 placeholder="USD"
@@ -1161,8 +1084,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                             <input
                                                 id="payment-iqd-received"
                                                 type="text"
+                                                inputMode="numeric"
                                                 value={displayValues.actualIQD}
-                                                onChange={(e) => handleMixedIQDChange(e.target.value)}
+                                                onChange={(e) => handleMixedCashChange('actualIQD', e.target.value)}
                                                 onBlur={() => handleMoneyInputBlur('actualIQD')}
                                                 onFocus={handleMoneyInputFocus}
                                                 placeholder="IQD"
@@ -1188,6 +1112,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                     ) : (
                                         <input
                                             type="text"
+                                            inputMode="numeric"
                                             value={displayValues.change}
                                             onChange={(e) => handleChangeOverride(e.target.value)}
                                             onBlur={() => handleMoneyInputBlur('change')}
@@ -1221,7 +1146,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                     )}
                                     <div className={`${styles.summaryItem} ${styles.summaryTotal}`}>
                                         <span className={styles.summaryLabel}>{t('summary.register')}</span>
-                                        <span className={styles.summaryValue}>{formatCurrency(formData.amountToRegister || 0, calculations.accountCurrency)}</span>
+                                        <span className={styles.summaryValue}>{formatCurrency(Number(formData.amountToRegister) || 0, calculations.accountCurrency)}</span>
                                     </div>
                                     {calculations.isShort && (
                                         <div className={styles.summaryWarningText}>
@@ -1250,14 +1175,20 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                 ) : (
                     /* Payment Success State - Compact */
                     <>
-                        <button className={styles.modalClose} onClick={handleCloseAfterSuccess} aria-label={t('success.close')}>{t('actions.closeX')}</button>
+                        <ModalHeader
+                            dense
+                            variant="success"
+                            titleId="payment-modal-title"
+                            title={t('success.title')}
+                            closeLabel={t('success.close')}
+                            onClose={handleCloseAfterSuccess}
+                        />
                         <div className={styles.paymentSuccessCompact}>
                         <div className={styles.successIcon}>
                             <i className="fas fa-check-circle"></i>
                         </div>
-                        <h2 id="payment-modal-title">{t('success.title')}</h2>
                         <p className={styles.successAmount}>
-                            {formatCurrency(receiptData?.amountPaidToday || 0, receiptData?.currency || 'IQD')}
+                            {formatCurrency(paidToday?.amount ?? 0, paidToday?.currency ?? calculations.accountCurrency)}
                         </p>
                         <div className={styles.successActions}>
                             <button onClick={handlePrint} className="btn btn-primary">

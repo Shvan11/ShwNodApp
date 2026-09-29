@@ -8,6 +8,11 @@
     overflow: hidden;
 }
 
+/* Direction scope for the whole dialog (see the TSX) — contributes no box. */
+.ltrScope {
+    display: contents;
+}
+
 /* ── Body ─────────────────────────────────────────────────────────────────── */
 .body {
     padding: var(--spacing-lg);
@@ -86,6 +91,15 @@
 .createDesc {
     margin: 0 0 var(--spacing-lg);
     color: var(--text-secondary);
+}
+
+/* The race (norm set) picker on the Create card — left-aligned inside the centred card. */
+.raceField {
+    display: flex;
+    flex-direction: column;
+    max-width: 22rem;
+    margin: 0 auto var(--spacing-lg);
+    text-align: start;
 }
 
 .createWarn {

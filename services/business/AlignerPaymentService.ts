@@ -83,6 +83,14 @@ export async function validateAndCreatePayment(
         { setId: aligner_set_id }
       );
 
+    case 'work_not_usd':
+      throw new AlignerValidationError(
+        `Aligner-set payments are recorded in USD, but this treatment is billed in ${result.currency ?? 'no currency'}. ` +
+          `Record the payment from the patient's Works page instead.`,
+        'WORK_CURRENCY_NOT_USD',
+        { workId: workid }
+      );
+
     case 'invalid_amount':
       throw new AlignerValidationError('Payment amount must be greater than zero', 'INVALID_AMOUNT');
 
