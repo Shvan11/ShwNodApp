@@ -7,8 +7,6 @@ interface StatsCardsProps {
     checkedIn?: number;
     absent?: number;
     waiting?: number;
-    /** 'cards' = standalone row (default); 'header' = compact chips embedded in the appointments header bar */
-    variant?: 'cards' | 'header';
 }
 
 interface StatValues {
@@ -20,12 +18,13 @@ interface StatValues {
 
 /**
  * StatsCards Component
- * Displays statistics with animated count-up effect
+ * The daily board's stat chips, embedded in the appointments header, with an
+ * animated count-up. (A standalone `cards` layout had no caller; audit FE-F11-9.)
  *
  * Performance: Automatically optimized by React Compiler (React 19).
  * No manual memoization needed - the compiler handles it automatically.
  */
-const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0, variant = 'cards' }: StatsCardsProps) => {
+const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0 }: StatsCardsProps) => {
     const { t } = useTranslation('appointments');
     const [animatedTotal, setAnimatedTotal] = useState<number>(0);
     const [animatedCheckedIn, setAnimatedCheckedIn] = useState<number>(0);
@@ -91,19 +90,14 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0, variant
         };
     }, [total, checkedIn, absent, waiting]);
 
-    const isHeader = variant === 'header';
-    const containerClass = isHeader ? styles.headerContainer : styles.container;
-    // "Total Appointments" is too wide for the inline header chip — trim it there.
-    const totalLabel = isHeader ? t('stats.total') : t('stats.totalAppointments');
-
     return (
-        <div className={containerClass}>
+        <div className={styles.headerContainer}>
             <div className={styles.cardTotal}>
                 <div className={styles.icon}>
                     <i className="fas fa-calendar-check"></i>
                 </div>
                 <div className={styles.content}>
-                    <div className={styles.label}>{totalLabel}</div>
+                    <div className={styles.label}>{t('stats.total')}</div>
                     <div className={styles.value}>{isNaN(animatedTotal) ? 0 : animatedTotal}</div>
                 </div>
             </div>

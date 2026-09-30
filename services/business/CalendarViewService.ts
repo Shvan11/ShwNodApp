@@ -22,7 +22,7 @@
 
 import { log } from '../../utils/logger.js';
 import { parseLocalDate } from '../../utils/date.js';
-import { getOption } from '../database/queries/options-queries.js';
+import { getOption, getOptions } from '../database/queries/options-queries.js';
 import {
   ensureCalendarRange,
   fillCalendar,
@@ -49,6 +49,42 @@ export async function getMaxAppointmentsPerSlot(): Promise<number> {
   const raw = await getOption('MaxAppointmentsPerSlot');
   const parsed = raw != null ? parseInt(raw, 10) : NaN;
   return Number.isNaN(parsed) ? DEFAULT_MAX_APPOINTMENTS_PER_SLOT : parsed;
+}
+
+/** The slot settings the week grid and the month view both need. */
+export interface SlotSettings {
+  maxAppointmentsPerSlot: number;
+  /** Configured times hidden by the early/late setting (a booked one still renders). */
+  hiddenTimes: ReadonlySet<string>;
+}
+
+/**
+ * Read `MaxAppointmentsPerSlot`, the early/late slot lists and the "show
+ * extended" default in one query. `/range` read them inline; `/month` needs the
+ * same hidden set now that it computes the month's own utilisation, so both use
+ * this and the two strips count the same rows (audit FE-F10-6).
+ */
+export async function getSlotSettings(): Promise<SlotSettings> {
+  const optionMap = await getOptions([
+    'MaxAppointmentsPerSlot',
+    'CALENDAR_EARLY_SLOTS',
+    'CALENDAR_LATE_SLOTS',
+    'CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT',
+  ]);
+  const rawMax = optionMap.get('MaxAppointmentsPerSlot');
+  const parsedMax = rawMax != null ? parseInt(rawMax, 10) : NaN;
+  const parseList = (v: string | null | undefined): string[] =>
+    v ? v.split(',').map((s) => s.trim()).filter(Boolean) : [];
+  const showExtended = optionMap.get('CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT') === 'true';
+  return {
+    maxAppointmentsPerSlot: Number.isNaN(parsedMax) ? DEFAULT_MAX_APPOINTMENTS_PER_SLOT : parsedMax,
+    hiddenTimes: showExtended
+      ? new Set<string>()
+      : new Set([
+          ...parseList(optionMap.get('CALENDAR_EARLY_SLOTS')),
+          ...parseList(optionMap.get('CALENDAR_LATE_SLOTS')),
+        ]),
+  };
 }
 
 /**
@@ -201,17 +237,6 @@ export function getWeekStart(date: Date): string {
   const year = weekStart.getFullYear();
   const month = String(weekStart.getMonth() + 1).padStart(2, '0');
   const dayNum = String(weekStart.getDate()).padStart(2, '0');
-  return `${year}-${month}-${dayNum}`;
-}
-
-export function getWeekEnd(weekStart: string): string {
-  const d = parseCalendarDate(weekStart);
-  // Week: Sat, Sun, Mon, Tue, Wed, Thu (6 days, excluding Friday)
-  d.setDate(d.getDate() + 5); // Thursday end (5 days after Saturday)
-  // Format in local timezone to avoid UTC conversion
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const dayNum = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${dayNum}`;
 }
 
@@ -533,9 +558,14 @@ export function buildGridDays(input: GridBuildInput): {
 export interface MonthBuildInput {
   gridStart: string;
   gridEnd: string;
+  /** The month itself — the grid spills into its neighbours; the stats do not. */
+  monthStart: string;
+  monthEnd: string;
   appointments: CalendarAppointmentRow[];
   doctorId: number | null;
   configuredTimes: string[];
+  /** Configured times hidden by the early/late setting; left out of the stats, as in the week grid. */
+  hiddenTimes?: ReadonlySet<string>;
   maxAppointmentsPerSlot: number;
   holidayMap: Map<string, Holiday>;
   now?: Date;
@@ -546,10 +576,26 @@ export interface MonthBuildInput {
  * appointments (every one, whatever its time) and the slot tallies. Capacity is
  * the configured times; a slot is available while its clinic-wide count is under
  * `MaxAppointmentsPerSlot` and it is still ahead of `now`.
+ *
+ * `stats` is the month's own utilisation, counted exactly like the week grid's
+ * (the visible configured rows of the non-holiday days, following the doctor
+ * filter), over `monthStart..monthEnd` only. The month strip used to show
+ * `/api/calendar/stats`, which answered for one week whatever the view, and
+ * ignored the doctor filter (audit FE-F10-6).
  */
-export function buildMonthDays(input: MonthBuildInput): { days: MonthlyDayData[] } {
+export function buildMonthDays(input: MonthBuildInput): { days: MonthlyDayData[]; stats: CalendarStatsRow } {
   const now = input.now ?? new Date();
   const { shown, clinicCount } = indexAppointments(input.appointments, input.doctorId);
+  const capacityTimes = input.configuredTimes.filter((t) => !input.hiddenTimes?.has(t));
+  const stats: CalendarStatsRow = {
+    weekStart: input.monthStart,
+    weekEnd: input.monthEnd,
+    totalSlots: 0,
+    availableSlots: 0,
+    bookedSlots: 0,
+    pastSlots: 0,
+    utilizationPercent: 0,
+  };
 
   const days = eachWorkingDay(input.gridStart, input.gridEnd).map((d): MonthlyDayData => {
     const date = formatLocalDate(d);
@@ -572,6 +618,14 @@ export function buildMonthDays(input: MonthBuildInput): { days: MonthlyDayData[]
           availableSlots++;
         }
       }
+      if (date >= input.monthStart && date <= input.monthEnd) {
+        for (const time of capacityTimes) {
+          stats.totalSlots++;
+          if ((dayShown?.get(time)?.length ?? 0) > 0) stats.bookedSlots++;
+          else if (new Date(`${date}T${time}:00`) < now) stats.pastSlots++;
+          else stats.availableSlots++;
+        }
+      }
     }
 
     return {
@@ -588,5 +642,7 @@ export function buildMonthDays(input: MonthBuildInput): { days: MonthlyDayData[]
     };
   });
 
-  return { days };
+  stats.utilizationPercent =
+    stats.totalSlots > 0 ? Math.round((stats.bookedSlots / stats.totalSlots) * 10000) / 100 : 0;
+  return { days, stats };
 }

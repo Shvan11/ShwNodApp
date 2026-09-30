@@ -101,10 +101,15 @@ export const qk = {
     byId: (id: Id) => ['appointments', 'by-id', normId(id)] as const,
   },
   whatsapp: {
-    /** WhatsApp message-status table — keeps the legacy key shape. */
-    messages: (date: string) => ['whatsapp-messages', date] as const,
+    /** Parent — both reads of the WhatsApp send screen, every date. (The two
+     *  leaves used to be `['whatsapp-messages', d]` and
+     *  `['whatsapp-message-count', d]`, a grouping no parent key could reach;
+     *  audit FE-F2-8.) */
+    all: () => ['whatsapp'] as const,
+    /** WhatsApp message-status table for a date (SSE → invalidate). */
+    messages: (date: string) => ['whatsapp', 'messages', date] as const,
     /** GET message-count for a date (WhatsApp send screen). */
-    messageCount: (date: string) => ['whatsapp-message-count', date] as const,
+    messageCount: (date: string) => ['whatsapp', 'message-count', date] as const,
   },
   templates: {
     /** Parent — invalidates the list and every single-template entry. */
@@ -367,16 +372,18 @@ export const qk = {
     /** GET /api/webceph/patient-link/:personId — WebCeph link row (null when none). */
     webcephLink: (personId: Id) => ['media', 'webceph-link', normId(personId)] as const,
   },
-  /** Calendar — month grid / stats / availability / slots (AppointmentCalendar + pickers). */
+  /** Calendar — grid / month / the booking picker's availability + slots. */
   calendar: {
     all: () => ['calendar'] as const,
-    month: (params: string) => ['calendar', 'month', params] as const,
-    stats: (params: string) => ['calendar', 'stats', params] as const,
+    /** GET /api/calendar/month?date=&doctorId= — month grid + the month's stats. */
+    month: (date: string, doctorId: Id) => ['calendar', 'month', date, normId(doctorId)] as const,
     /** GET /api/calendar/range?start=&end=&doctorId= — the grid (day/week/zoom) window. */
     range: (start: string, end: string, doctorId: Id) =>
       ['calendar', 'range', start, end, normId(doctorId)] as const,
-    availability: (year: number, month: number, doctorId: Id) =>
-      ['calendar', 'availability', year, month, normId(doctorId)] as const,
-    slots: (date: string, doctorId: Id) => ['calendar', 'slots', date, normId(doctorId)] as const,
+    /** GET /api/calendar/month-availability?startDate=&endDate= — the picker's month. */
+    availability: (startDate: string, endDate: string) =>
+      ['calendar', 'availability', startDate, endDate] as const,
+    /** GET /api/calendar/available-slots?date= — the picker's day. */
+    slots: (date: string) => ['calendar', 'slots', date] as const,
   },
 } as const;

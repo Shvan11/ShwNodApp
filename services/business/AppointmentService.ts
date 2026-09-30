@@ -39,7 +39,8 @@ export type AppointmentErrorCode =
   | 'INVALID_STATE_TRANSITION'
   | 'MISSING_DATE'
   | 'APPOINTMENT_NOT_FOUND'
-  | 'SLOT_FULL';
+  | 'SLOT_FULL'
+  | 'PAST_SLOT';
 
 /**
  * Error details for appointment validation
@@ -205,7 +206,10 @@ function validateAppointmentRequiredFields(
 }
 
 /**
- * Verify that an employee is a doctor
+ * Verify that an employee is a calendar doctor: ACTIVE, position 'Doctor' — the same
+ * set `/api/doctors` lists for the booking forms (audit FE-F10-13). The update path
+ * skips this when the doctor is unchanged, so an appointment whose doctor has since
+ * left stays editable without re-attributing it.
  * @param drID - Doctor/Employee id
  * @returns Doctor information
  * @throws AppointmentValidationError If employee is not a doctor
@@ -217,6 +221,7 @@ async function verifyDoctor(drID: number | string): Promise<DoctorInfo> {
         FROM "employees" e
         INNER JOIN "positions" p ON e."position" = p."id"
         WHERE e."id" = ${parseInt(String(drID), 10)} AND p."position_name" = 'Doctor'
+          AND e."is_active" = true
     `.execute(db);
 
   if (!doctorCheck || doctorCheck.length === 0) {
@@ -438,8 +443,8 @@ export async function validateAndUpdateAppointment(
   validateAppointmentRequiredFields(appointmentData);
 
   const db = getKysely();
-  const { rows: existing } = await sql<{ app_day: string | null }>`
-        SELECT "app_day" FROM "appointments" WHERE "appointment_id" = ${appointmentId}
+  const { rows: existing } = await sql<{ app_day: string | null; dr_id: number | null }>`
+        SELECT "app_day", "dr_id" FROM "appointments" WHERE "appointment_id" = ${appointmentId}
     `.execute(db);
 
   if (!existing || existing.length === 0) {
@@ -447,19 +452,32 @@ export async function validateAndUpdateAppointment(
   }
 
   await checkHolidayConflict(app_date);
-  await verifyDoctor(dr_id);
+  // Only a CHANGED doctor must be a current one: keeping a doctor who has since
+  // left is not a re-attribution, and the edit form offers them as "(current)".
+  if (existing[0].dr_id !== parseInt(String(dr_id), 10)) {
+    await verifyDoctor(dr_id);
+  }
   await checkAppointmentConflict(person_id, app_date, appointmentId);
 
   return withPgTransaction(async (trx) => {
-    // A move into another slot must find room there (FE-F10-7). An edit that keeps
-    // its slot (a doctor or type change) is not re-checked, so an appointment in a
-    // slot that is already over the limit stays editable.
-    const { rows: current } = await sql<{ same_slot: boolean }>`
-          SELECT ("app_date" = ${app_date}::timestamp) AS same_slot
+    // A move into another slot must find room there (FE-F10-7), and must not land
+    // in the past: the calendar drag used to accept a slot that had already gone,
+    // after which nothing on screen could edit the appointment back (FE-F10-8).
+    // An edit that keeps its slot (a doctor or type change) is not re-checked, so
+    // an appointment in a full or already-passed slot stays editable.
+    const { rows: current } = await sql<{ same_slot: boolean; into_past: boolean }>`
+          SELECT ("app_date" = ${app_date}::timestamp) AS same_slot,
+                 (${app_date}::timestamp < LOCALTIMESTAMP) AS into_past
           FROM "appointments" WHERE "appointment_id" = ${appointmentId}
           FOR UPDATE
       `.execute(trx);
     if (current[0] && !current[0].same_slot) {
+      if (current[0].into_past) {
+        throw new AppointmentValidationError(
+          'Cannot move an appointment into a time that has already passed',
+          'PAST_SLOT'
+        );
+      }
       await assertSlotHasRoom(trx, app_date, appointmentId);
     }
 

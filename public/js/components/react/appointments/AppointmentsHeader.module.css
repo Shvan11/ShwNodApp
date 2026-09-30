@@ -67,6 +67,13 @@
     font-size: var(--font-size-sm);
 }
 
+/* The day chevrons point the way the day moves: under RTL "previous day" sits
+   on the right, so its glyph must point right (audit FE-F11-11b; postcss-rtlcss
+   flips layout, not icon glyphs). */
+[dir='rtl'] .dayNavButton i {
+    transform: scaleX(-1);
+}
+
 /* Combined date label + picker — the visible pill is the trigger, an invisible
    native <input type="date"> overlays it. */
 .datePill {

@@ -14,7 +14,17 @@ import type { DailyAppointmentRow } from '@shared/contracts/appointment.contract
 export interface UseAppointmentsReturn {
   allAppointments: DailyAppointmentRow[];
   checkedInAppointments: DailyAppointmentRow[];
-  loading: boolean;
+  /** No data for the day yet: the lists show skeletons. */
+  initialLoading: boolean;
+  /**
+   * A click is in flight, or another day's data is on screen while this one
+   * loads: the lists dim and take no clicks. A background refetch (another
+   * desk's write, the 5-minute net) is neither, so it no longer dims the board
+   * or swaps an empty list for skeletons (audit FE-F11-12).
+   */
+  busy: boolean;
+  /** Any read in flight (the refresh button's spinner). */
+  refreshing: boolean;
   /** The day's READ failed (a failed check-in is a toast, not this). */
   error: string | null;
   loadAppointments: (date: string) => Promise<boolean>;
@@ -65,9 +75,8 @@ export function useAppointments(date: string): UseAppointmentsReturn {
 
   const query = useQuery({
     ...dailyAppointmentsQuery(date),
-    // Keep the previously-selected day's snapshot visible (dimmed via the list's
-    // refreshing state) while a newly-selected date loads, instead of dropping to
-    // skeletons.
+    // Keep the previously-selected day's snapshot visible (dimmed via `busy`)
+    // while a newly-selected date loads, instead of dropping to skeletons.
     placeholderData: keepPreviousData,
   });
 
@@ -166,7 +175,9 @@ export function useAppointments(date: string): UseAppointmentsReturn {
   return {
     allAppointments: data?.allAppointments ?? [],
     checkedInAppointments: data?.checkedInAppointments ?? [],
-    loading: mutating || query.isFetching,
+    initialLoading: query.isPending,
+    busy: mutating || query.isPlaceholderData,
+    refreshing: query.isFetching,
     // Translated, not the server's English text: this renders on the Arabic board.
     error: query.isError ? t('errors.loadFailed') : null,
     loadAppointments,

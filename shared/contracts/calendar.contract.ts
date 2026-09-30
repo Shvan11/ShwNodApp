@@ -79,7 +79,8 @@ const monthDay = z.object({
   holidayDescription: z.string().nullable(),
 });
 
-// Weekly utilization stats (CalendarStatsRow).
+// Utilisation stats (CalendarStatsRow) — the week grid's span, or the month's own
+// days on `/month`. `weekStart`/`weekEnd` are the span's first and last day.
 const calendarStats = z.object({
   weekStart: z.string(),
   weekEnd: z.string(),
@@ -111,10 +112,13 @@ const dayAvailability = z.object({
   holidayDescription: z.string().nullable(),
 });
 
-// GET /api/calendar/month?date=&doctorId= → { monthStart, …, days }.
+// GET /api/calendar/month?date=&doctorId= → { monthStart, …, days, stats }.
+// `stats` covers the month itself (not the grid's spill-over days) and follows
+// the doctor filter. It replaced `/api/calendar/stats`, which always answered for
+// one week (audit FE-F10-6).
 export const month = {
   query: z.object({ date: dateString, doctorId: z.string().optional() }),
-  response: z.looseObject({ days: z.array(monthDay) }),
+  response: z.looseObject({ days: z.array(monthDay), stats: calendarStats }),
 } as const;
 export type CalendarMonthResponse = z.infer<typeof month.response>;
 
@@ -155,13 +159,6 @@ export const range = {
 } as const;
 export type CalendarRangeResponse = z.infer<typeof range.response>;
 
-// GET /api/calendar/stats?date= → { stats }.
-export const stats = {
-  query: z.object({ date: dateString }),
-  response: z.object({ stats: calendarStats }),
-} as const;
-export type CalendarStatsResponse = z.infer<typeof stats.response>;
-
 // POST /api/calendar/regenerate → { entriesAdded, message }.
 export const regenerate = {
   response: z.looseObject({ message: z.string() }),
@@ -185,7 +182,7 @@ export type MonthAvailabilityResponse = z.infer<typeof monthAvailability.respons
 //
 // There used to be ONE loose `calendarQuery` view here — every field optional,
 // every field a plain `string` — that all six handlers typed themselves from. It
-// was a type-lie in the direction that hurts: `validate({ query: week.query })`
+// was a type-lie in the direction that hurts: `validate({ query: month.query })`
 // had already proved `date` present and a real calendar date, but the handler's
 // generic said `string | undefined`, so each one re-checked what the boundary
 // guaranteed, and `/month-availability` could read `req.query.date` (always
@@ -193,6 +190,5 @@ export type MonthAvailabilityResponse = z.infer<typeof monthAvailability.respons
 // makes each handler see exactly the query its route validated.
 export type CalendarMonthQuery = z.infer<typeof month.query>;
 export type CalendarRangeQuery = z.infer<typeof range.query>;
-export type CalendarStatsQuery = z.infer<typeof stats.query>;
 export type AvailableSlotsQuery = z.infer<typeof availableSlots.query>;
 export type MonthAvailabilityQuery = z.infer<typeof monthAvailability.query>;

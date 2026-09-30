@@ -489,6 +489,12 @@ export const routesConfig: RouteObject[] = [
           </RouteErrorBoundary>
         ),
         loader: withPreload(DailyAppointments, dailyAppointmentsLoader), // Pre-fetch initial data + chunk
+        // The loader only warms the first paint; after that the page's own query,
+        // keyed by the date, does the fetching. Re-running the loader on every
+        // `?date=`/`?dr=` change fetched the day a second time (a doctor-filter
+        // change refetched it too; audit FE-F11-12).
+        shouldRevalidate: ({ currentUrl, nextUrl, defaultShouldRevalidate }) =>
+          currentUrl.pathname !== nextUrl.pathname ? defaultShouldRevalidate : false,
       },
 
       // Monthly Calendar
@@ -500,7 +506,7 @@ export const routesConfig: RouteObject[] = [
           </RouteErrorBoundary>
         ),
         // No loader — the screen fetches through React Query on mount
-        // (calendarRangeQuery/calendarMonthQuery/calendarStatsQuery). It subscribes
+        // (calendarRangeQuery/calendarMonthQuery). It subscribes
         // to NO SSE and has no refetchInterval, so every appointment write — from
         // here or from any patient screen — must invalidate `qk.calendar.all()`
         // itself. (This comment used to read "100% SSE-driven", which is why five

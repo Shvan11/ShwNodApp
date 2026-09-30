@@ -172,6 +172,22 @@ const formatClock12 = (date: Date, lang: Language): string => {
 };
 
 /**
+ * A 24-hour "HH:MM[:SS]" wall-clock string as "h:mm" + the language's marker:
+ * "15:30" → "3:30 PM" / "3:30 م". Returns the input unchanged when it is not a
+ * clock time. Used by the booking picker's slot tiles (which showed a bare
+ * 24-hour "15:30" beside the form's "3:30 PM", audit FE-F10-17) and the daily
+ * board's cards.
+ */
+export const formatClockTime = (time24: string | null | undefined, lang: Language): string => {
+  if (!time24) return '';
+  const [h, m] = time24.split(':');
+  const hours = parseInt(h, 10);
+  if (Number.isNaN(hours) || m === undefined) return time24;
+  const period = hours >= 12 ? MERIDIEM[lang].pm : MERIDIEM[lang].am;
+  return `${hours % 12 || 12}:${m.slice(0, 2)} ${period}`;
+};
+
+/**
  * Compact date+time for the "Selected Time" readout on the booking forms.
  * en: "Sat, Dec 25, 2:30 PM" (Intl) · ar: "سبت 25/12 2:30 م".
  */

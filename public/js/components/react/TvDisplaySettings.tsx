@@ -94,6 +94,22 @@ function serialize(s: Settings): string {
     });
 }
 
+/**
+ * The entries `after` has beyond `before`, counting repeats: what the server
+ * appended to its playlist (an upload adds each new file once, at the end).
+ */
+function appendedEntries(before: readonly string[], after: readonly string[]): string[] {
+    const remaining = new Map<string, number>();
+    for (const name of before) remaining.set(name, (remaining.get(name) ?? 0) + 1);
+    const added: string[] = [];
+    for (const name of after) {
+        const left = remaining.get(name) ?? 0;
+        if (left > 0) remaining.set(name, left - 1);
+        else added.push(name);
+    }
+    return added;
+}
+
 const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
     const toast = useToast();
     const confirm = useConfirm();
@@ -114,6 +130,10 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
     const [playlistDraft, setPlaylistDraft] = useState<string[] | null>(null);
     const [uploading, setUploading] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
+    // The "Seconds per picture" box while it is being typed in. Clamping every
+    // keystroke snapped a cleared box straight back to 1 (FE-F11-14); it is
+    // clamped when the box is left instead.
+    const [photoSecondsText, setPhotoSecondsText] = useState<string | null>(null);
 
     const serverSettings = data?.settings ?? null;
     const serverKey = serverSettings ? serialize(serverSettings) : '';
@@ -140,10 +160,6 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
         [draft, serverSettings]
     );
 
-    useEffect(() => {
-        onChangesUpdate?.(dirty);
-    }, [dirty, onChangesUpdate]);
-
     // The media library (every file on disk, with size/type) and the play
     // sequence (ordered, repeats allowed) are now separate: the library is the
     // pool, the playlist is the single source of truth for what plays.
@@ -153,6 +169,12 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
     const playlist = playlistDraft ?? serverPlaylist;
     const playlistDirty =
         playlistDraft !== null && JSON.stringify(playlistDraft) !== JSON.stringify(serverPlaylist);
+
+    // The tab's unsaved flag covers the playlist too: it used to report only the
+    // settings draft, so leaving the tab dropped a reorder silently (FE-F11-14).
+    useEffect(() => {
+        onChangesUpdate?.(dirty || playlistDirty);
+    }, [dirty, playlistDirty, onChangesUpdate]);
     const byName = useMemo(() => new Map(media.map((m) => [m.name, m])), [media]);
 
     // Files sitting in the folder that AREN'T in the playlist — the "you dropped
@@ -265,10 +287,15 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
         const form = new FormData();
         for (const file of Array.from(files)) form.append('media', file);
         setUploading(true);
+        const before = serverPlaylist;
         try {
-            await uploadMedia.mutateAsync(form);
-            // The server appended the upload(s) to the playlist; take its copy.
-            setPlaylistDraft(null);
+            const state = await uploadMedia.mutateAsync(form);
+            // The server appended the upload(s) to ITS playlist. A pending
+            // arrangement keeps its order and gains the same new entries at the
+            // end; it used to be thrown away, silently reverting a reorder
+            // (FE-F11-14). With nothing pending the server's copy shows as is.
+            const added = appendedEntries(before, state.playlist);
+            setPlaylistDraft((prev) => (prev === null ? null : [...prev, ...added]));
             toast.success(files.length === 1 ? 'File added to the playlist' : `${files.length} files added to the playlist`);
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Upload failed'));
@@ -298,7 +325,9 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
         if (!await confirm(warning, { title: 'Delete file', danger: true, confirmText: 'Delete' })) return;
         try {
             await removeMedia.mutateAsync(name);
-            setPlaylistDraft(null);
+            // The server removed every instance of the file; do the same to a
+            // pending arrangement instead of discarding it (FE-F11-14).
+            setPlaylistDraft((prev) => (prev === null ? null : prev.filter((n) => n !== name)));
             setDraft((prev) => {
                 if (!prev || !(name in prev.photoMsByName)) return prev;
                 const photoMsByName = { ...prev.photoMsByName };
@@ -597,11 +626,16 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                             min={1}
                             max={120}
                             className={styles.input}
-                            value={Math.round(draft.photoMs / 1000)}
+                            value={photoSecondsText ?? String(Math.round(draft.photoMs / 1000))}
                             onChange={(e) => {
-                                const seconds = Math.min(120, Math.max(1, Number(e.target.value) || 1));
-                                patch({ photoMs: seconds * 1000 });
+                                const text = e.target.value;
+                                setPhotoSecondsText(text);
+                                const seconds = Number(text);
+                                if (text.trim() && Number.isFinite(seconds) && seconds > 0) {
+                                    patch({ photoMs: Math.min(120, Math.max(1, Math.round(seconds))) * 1000 });
+                                }
                             }}
+                            onBlur={() => setPhotoSecondsText(null)}
                         />
                         <span className={styles.hint}>
                             The starting point for every picture — give any single picture its own time

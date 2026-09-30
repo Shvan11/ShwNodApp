@@ -1,14 +1,17 @@
-import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties, type MouseEvent } from 'react';
-import CalendarGrid, { CORE_TIME_SLOTS, type DropTarget, type MoreMenu } from './CalendarGrid';
+import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties } from 'react';
+import CalendarGrid, { type DropTarget, type MoreMenu } from './CalendarGrid';
 import CalendarHeader from './CalendarHeader';
 import MonthlyCalendarGrid from './MonthlyCalendarGrid';
 import CalendarContextMenu from './CalendarContextMenu';
 import CalendarDayContextMenu from './CalendarDayContextMenu';
 import HolidayQuickModal from './HolidayQuickModal';
-import Modal from './Modal';
 import CalendarLegend from './CalendarLegend';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { useAppointmentDoctors } from '../../hooks/useAppointmentDoctors';
+import type { MenuAnchor } from '../../hooks/useFloatingMenu';
 import {
     parseLocalDate,
     toLocalDateString,
@@ -18,17 +21,14 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
-import { calendarRangeQuery, calendarMonthQuery, calendarStatsQuery } from '@/query/queries';
+import { calendarRangeQuery, calendarMonthQuery } from '@/query/queries';
 import * as holiday from '@shared/contracts/holiday.contract';
 import type {
     ViewMode,
-    CalendarMode,
     CalendarAppointment,
     CalendarDay,
     CalendarData,
     CalendarStats,
-    SlotData,
-    MenuPosition,
     ExistingHoliday,
     AppointmentWarning,
     SaveHolidayData
@@ -52,6 +52,7 @@ const ROW_MAX = 132;
 const MIN_COL_W = 90; // px — Fit keeps day columns at least this wide
 const N_STORAGE_KEY = 'cal-day-count';
 const FETCH_DEBOUNCE_MS = 250;
+const MOBILE_MAX_WIDTH = 768;
 
 const clampN = (n: number): number => Math.min(N_MAX, Math.max(N_MIN, Math.round(n)));
 
@@ -76,6 +77,8 @@ const readStoredDayCount = (): number => {
     }
 };
 
+const isMobileWidth = (): boolean => typeof window !== 'undefined' && window.innerWidth <= MOBILE_MAX_WIDTH;
+
 const shortDate = (d: string): string =>
     parseLocalDate(d).toLocaleDateString(undefined, {
         weekday: 'short',
@@ -83,13 +86,27 @@ const shortDate = (d: string): string =>
         day: 'numeric'
     });
 
+/** First of the month `delta` months from `d`. Always the 1st, so it never overflows. */
+const monthStep = (d: Date, delta: number): Date => new Date(d.getFullYear(), d.getMonth() + delta, 1);
+
+/** Appointments on a day: the month view lists them, the week grid buckets them per slot. */
+const countDayAppointments = (day: CalendarDay): number => {
+    const appts = day.appointments;
+    if (!appts) return 0;
+    if (Array.isArray(appts)) return appts.length;
+    return Object.values(appts).reduce(
+        (sum, slot) => sum + (Array.isArray(slot) ? slot.length : (slot.appointments?.length ?? 0)),
+        0
+    );
+};
+
 interface ContextMenuState {
-    position: MenuPosition;
+    position: MenuAnchor;
     appointment: CalendarAppointment;
 }
 
-interface DayContextMenuState {
-    position: MenuPosition;
+interface DayMenuState {
+    position: MenuAnchor;
     day: CalendarDay;
 }
 
@@ -97,46 +114,34 @@ interface HolidayModalState {
     date: string;
     existingHoliday: ExistingHoliday | null;
     appointmentWarning: AppointmentWarning | null;
-}
-
-interface AppointmentCalendarProps {
-    initialDate?: Date | string;
-    initialViewMode?: ViewMode;
-    mode?: CalendarMode;
-    onSlotSelect?: (slot: SlotData) => void;
-    selectedSlot?: SlotData | null;
+    /** The appointments-on-date check failed, so the modal cannot say whether any exist. */
+    appointmentCheckFailed: boolean;
 }
 
 /**
- * AppointmentCalendar Main Component
- *
- * The primary calendar component that orchestrates all calendar functionality
- * Integrates with existing tblcalender system via optimized API endpoints
+ * AppointmentCalendar — the `/calendar` screen: the density-zoom week/day grid
+ * (built from the appointments, see `CalendarViewService`) and the month view,
+ * with drag-to-reschedule and holiday management.
  */
-const AppointmentCalendar = ({
-    initialDate,
-    initialViewMode = 'week',
-    mode = 'view',
-    onSlotSelect,
-    selectedSlot: externalSelectedSlot
-}: AppointmentCalendarProps) => {
+const AppointmentCalendar = () => {
     const toast = useToast();
+    const confirm = useConfirm();
     const queryClient = useQueryClient();
+    const { user } = useGlobalState();
+    // Holiday writes go through `/api/admin/lookups`, which is admin + front desk.
+    const canManageHolidays = roleCaps(user?.role as UserRole | undefined).manageLookups;
     const { byId: doctorColors, legend: doctorLegend } = useAppointmentDoctors();
 
-    // State management
-    const [currentDate, setCurrentDate] = useState<Date>(
-        initialDate ? parseLocalDate(initialDate) : new Date()
-    );
-    const [internalSelectedSlot, setInternalSelectedSlot] = useState<SlotData | null>(null);
-    const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
+    // State management. `currentDate` is the month view's month (always its 1st).
+    const [currentDate, setCurrentDate] = useState<Date>(() => monthStep(new Date(), 0));
+    const [viewMode, setViewMode] = useState<ViewMode>('week');
     const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
-    const [isMobile, setIsMobile] = useState(false);
+    const [isMobile, setIsMobile] = useState(isMobileWidth);
 
     // Density-zoom: the grid window is `dayCount` working days forward from
     // `anchorDate` (the current week's Saturday at init / on Today).
     const [anchorDate, setAnchorDate] = useState<string>(() =>
-        toLocalDateString(getWeekStartSaturday(initialDate ?? new Date()))
+        toLocalDateString(getWeekStartSaturday(new Date()))
     );
     const [dayCount, setDayCount] = useState<number>(readStoredDayCount);
     const boardRef = useRef<HTMLDivElement>(null);
@@ -146,75 +151,60 @@ const AppointmentCalendar = ({
     const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
     const [moreMenu, setMoreMenu] = useState<MoreMenu | null>(null);
 
-    // Context menu and delete confirmation state
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-    const [deleteConfirmation, setDeleteConfirmation] = useState<CalendarAppointment | null>(null);
-
-    // Day context menu and holiday modal state
-    const [dayContextMenu, setDayContextMenu] = useState<DayContextMenuState | null>(null);
+    const [dayMenu, setDayMenu] = useState<DayMenuState | null>(null);
     const [holidayModal, setHolidayModal] = useState<HolidayModalState | null>(null);
-    const [deleteHolidayConfirm, setDeleteHolidayConfirm] = useState<CalendarDay | null>(null);
+    const deletingRef = useRef(false);
 
-    // Use external selected slot if provided (for controlled mode)
-    const selectedSlot = externalSelectedSlot || internalSelectedSlot;
-
-    // Mobile detection — force a single-day grid on phones.
+    // Phones get a single-day grid. That is derived, not written into `dayCount`:
+    // writing it used to persist `cal-day-count = 1`, so narrowing the window once
+    // lost the desktop zoom for good (audit FE-F10-20).
     useEffect(() => {
-        const checkMobile = () => {
-            const mobile = window.innerWidth <= 768;
-            setIsMobile(mobile);
-            if (mobile) {
-                setViewMode(prev => (prev === 'month' ? prev : 'day'));
-                setDayCount(prev => (prev === 1 ? prev : 1));
-            }
-        };
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
+        const onResize = () => setIsMobile(isMobileWidth());
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
     }, []);
+    const effectiveDayCount = isMobile ? 1 : dayCount;
+    const effectiveView: ViewMode = isMobile && viewMode !== 'month' ? 'day' : viewMode;
 
     // Cell metrics derived from N — applied as CSS vars on the root.
-    const rowH = rowHForN(dayCount);
+    const rowH = rowHForN(effectiveDayCount);
     const fontScale = fontScaleForRowH(rowH);
 
     // The window's last working day (inclusive).
     const gridEnd = useMemo(
-        () => addWorkingDays(anchorDate, dayCount - 1),
-        [anchorDate, dayCount]
+        () => addWorkingDays(anchorDate, effectiveDayCount - 1),
+        [anchorDate, effectiveDayCount]
     );
 
     // Toolbar title — main line (month + year) + sub line (range / single day).
-    const titleMain = useMemo(() => {
-        const base = viewMode === 'month' ? currentDate : parseLocalDate(anchorDate);
-        return base.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-    }, [viewMode, currentDate, anchorDate]);
+    const titleMain = (effectiveView === 'month' ? currentDate : parseLocalDate(anchorDate))
+        .toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 
-    const titleSub = useMemo(() => {
-        if (viewMode === 'month') return '';
-        if (dayCount === 1) {
-            return parseLocalDate(anchorDate).toLocaleDateString(undefined, {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-            });
-        }
-        return `${shortDate(anchorDate)} – ${shortDate(gridEnd)} · ${dayCount} days`;
-    }, [viewMode, dayCount, anchorDate, gridEnd]);
-
-    const rangeLabel = titleSub || titleMain;
+    let titleSub = '';
+    if (effectiveView !== 'month') {
+        titleSub = effectiveDayCount === 1
+            ? parseLocalDate(anchorDate).toLocaleDateString(undefined, {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric'
+              })
+            : `${shortDate(anchorDate)} – ${shortDate(gridEnd)} · ${effectiveDayCount} days`;
+    }
 
     // ── Data fetching (React Query) ─────────────────────────────────────────
     // Grid (day/week/zoom): one round-trip to /range returns days + timeSlots +
-    // stats. The grid window's end depends on `dayCount`; debounce it into the
+    // stats. The grid window's end depends on the day count; debounce it into the
     // query key so dragging the zoom slider through several N values issues one
-    // request (the live `dayCount` still drives the layout/labels immediately).
-    const isGrid = viewMode !== 'month';
-    const [debouncedDayCount, setDebouncedDayCount] = useState(dayCount);
+    // request (the live count still drives the layout/labels immediately). Both
+    // reads keep the previous data on screen while the next loads (FE-F10-4).
+    const isGrid = effectiveView !== 'month';
+    const [debouncedDayCount, setDebouncedDayCount] = useState(effectiveDayCount);
     useEffect(() => {
-        const t = setTimeout(() => setDebouncedDayCount(dayCount), FETCH_DEBOUNCE_MS);
+        const t = setTimeout(() => setDebouncedDayCount(effectiveDayCount), FETCH_DEBOUNCE_MS);
         return () => clearTimeout(t);
-    }, [dayCount]);
+    }, [effectiveDayCount]);
     const queryEnd = useMemo(
         () => addWorkingDays(anchorDate, debouncedDayCount - 1),
         [anchorDate, debouncedDayCount]
@@ -223,18 +213,11 @@ const AppointmentCalendar = ({
         ...calendarRangeQuery(anchorDate, queryEnd, selectedDoctorId),
         enabled: isGrid,
     });
+    const monthQ = useQuery({
+        ...calendarMonthQuery(toLocalDateString(currentDate), selectedDoctorId),
+        enabled: !isGrid,
+    });
 
-    // Month view keeps its own endpoints (separate summary grid).
-    const monthDateStr = toLocalDateString(currentDate);
-    const monthParams = `date=${monthDateStr}${selectedDoctorId ? `&doctorId=${selectedDoctorId}` : ''}`;
-    const monthQ = useQuery({ ...calendarMonthQuery(monthParams), enabled: !isGrid });
-    const statsQ = useQuery({ ...calendarStatsQuery(`date=${monthDateStr}`), enabled: !isGrid });
-
-    // The contract's day/stat rows (shared/contracts/calendar.contract.ts) are now
-    // structurally assignable to the local CalendarData/CalendarStats view models —
-    // calendar.types.ts widened the holiday/patient fields to `… | null` to match — so
-    // the grid/month/stats payloads flow in cast-free, and contract drift surfaces as a
-    // compile error right here on the render path. Month view doesn't render time rows.
     const calendarData: CalendarData | null = useMemo(
         () =>
             isGrid
@@ -246,23 +229,24 @@ const AppointmentCalendar = ({
                   : null,
         [isGrid, rangeQ.data, monthQ.data]
     );
+    // Each view's strip covers what that view shows, and follows the doctor
+    // filter: the month used to show one week's numbers (FE-F10-6).
     const calendarStats: CalendarStats | null = isGrid
         ? (rangeQ.data?.stats ?? null)
-        : (statsQ.data?.stats ?? null);
-    const loading = isGrid ? rangeQ.isFetching : monthQ.isFetching || statsQ.isFetching;
-    const activeError = isGrid ? rangeQ.error : (monthQ.error ?? statsQ.error);
-    const error = activeError ? httpErrorMessage(activeError, 'Unknown error') : null;
+        : (monthQ.data?.stats ?? null);
+    const fetching = isGrid ? rangeQ.isFetching : monthQ.isFetching;
+    const activeQuery = isGrid ? rangeQ : monthQ;
+    const error = activeQuery.isError ? httpErrorMessage(activeQuery.error, 'Unknown error') : null;
 
     // Refetch the active view (used after reschedule/delete/holiday mutations) —
-    // invalidating the whole calendar prefix covers grid + month + stats.
+    // invalidating the whole calendar prefix covers grid + month + the picker.
     const refetch = useCallback(
         () => queryClient.invalidateQueries({ queryKey: qk.calendar.all() }),
         [queryClient]
     );
 
     // An appointment moved or deleted here also changes the patient's own list
-    // and the daily boards, which used to stay stale for up to 30 s (a patient's
-    // list kept showing an appointment the server no longer had; audit FE-F10-10).
+    // and the daily boards (audit FE-F10-10).
     const refreshAppointmentReads = useCallback(
         (personID: number | null | undefined) => {
             void queryClient.invalidateQueries({ queryKey: qk.appointments.all() });
@@ -271,28 +255,31 @@ const AppointmentCalendar = ({
         [queryClient]
     );
 
+    // A holiday written here is also a row in Settings → Holidays (FE-F10-10).
+    const refreshHolidayReads = useCallback(async () => {
+        void queryClient.invalidateQueries({ queryKey: qk.adminLookups.table('tblHolidays') });
+        await refetch();
+    }, [queryClient, refetch]);
+
     // ── Navigation ──────────────────────────────────────────────────────────
     const navigate = useCallback(
         (direction: 'next' | 'prev') => {
-            if (viewMode === 'month') {
-                setCurrentDate(prev => {
-                    const d = new Date(prev);
-                    d.setMonth(d.getMonth() + (direction === 'next' ? 1 : -1));
-                    return d;
-                });
+            if (effectiveView === 'month') {
+                // From the 1st, so Jan 31 → Next is February, not March (FE-F10-5).
+                setCurrentDate(prev => monthStep(prev, direction === 'next' ? 1 : -1));
                 return;
             }
             // Page the anchor by exactly the visible span (gap-free, forward-extend).
             setAnchorDate(prev =>
-                addWorkingDays(prev, direction === 'next' ? dayCount : -dayCount)
+                addWorkingDays(prev, direction === 'next' ? effectiveDayCount : -effectiveDayCount)
             );
         },
-        [viewMode, dayCount]
+        [effectiveView, effectiveDayCount]
     );
 
     const goToToday = useCallback(() => {
         const today = new Date();
-        setCurrentDate(today);
+        setCurrentDate(monthStep(today, 0));
         setAnchorDate(toLocalDateString(getWeekStartSaturday(today)));
     }, []);
 
@@ -308,12 +295,11 @@ const AppointmentCalendar = ({
     const handleZoomOut = useCallback(() => applyDayCount(dayCount + 1), [applyDayCount, dayCount]);
     const handleZoomSlider = useCallback((n: number) => applyDayCount(n), [applyDayCount]);
 
-    // Fit: largest cells that still show every configured time row, columns kept
-    // readable. Row count comes from the live time slots (falls back to the
-    // hardcoded set before the first load).
+    // Fit: largest cells that still show every time row, columns kept readable.
     const handleZoomFit = useCallback(() => {
         const board = boardRef.current;
-        if (!board) return;
+        const rowCount = calendarData?.timeSlots?.length ?? 0;
+        if (!board || rowCount === 0) return;
         const headers = board.querySelector<HTMLElement>('.cal-day-headers');
         const headerH = headers?.getBoundingClientRect().height ?? 0;
         const availH = board.clientHeight - headerH - 4;
@@ -321,7 +307,6 @@ const AppointmentCalendar = ({
             parseFloat(getComputedStyle(board).getPropertyValue('--cal-grid-time-w')) || 70;
         const availW = board.clientWidth - timeW;
         if (availH <= 0 || availW <= 0) return;
-        const rowCount = calendarData?.timeSlots?.length || CORE_TIME_SLOTS.length;
         const byHeight = Math.ceil((rowCount * ROW_REF) / availH);
         const byWidth = Math.floor(availW / MIN_COL_W);
         applyDayCount(Math.min(byHeight, byWidth));
@@ -334,7 +319,7 @@ const AppointmentCalendar = ({
 
             if (newViewMode === 'month') {
                 // Open the month containing the current grid anchor.
-                setCurrentDate(parseLocalDate(anchorDate));
+                setCurrentDate(monthStep(parseLocalDate(anchorDate), 0));
                 setViewMode('month');
                 return;
             }
@@ -349,20 +334,29 @@ const AppointmentCalendar = ({
         [isMobile, viewMode, currentDate, anchorDate]
     );
 
-    const handleDoctorChange = useCallback((doctorId: number | null) => {
-        setSelectedDoctorId(doctorId);
+    const openDay = useCallback((day: CalendarDay) => {
+        setAnchorDate(day.date);
+        setDayCount(1);
+        setViewMode('day');
     }, []);
 
+    // ── Reschedule (drag) ───────────────────────────────────────────────────
     const handleReschedule = useCallback(
         async (
             appointmentID: number | string,
             newDate: string,
             newTime: string,
-            appt: CalendarAppointment
+            appt: CalendarAppointment,
+            fromDate: string
         ) => {
             const personID = appt.personID;
             if (!personID || !appt.drID || !appt.appDetail) {
                 toast.error('Cannot reschedule: appointment is missing required details');
+                return;
+            }
+            // The grid refuses the drop too; the server refuses it as PAST_SLOT (FE-F10-8).
+            if (new Date(`${newDate}T${newTime}:00`) < new Date()) {
+                toast.error('You cannot move an appointment into the past');
                 return;
             }
 
@@ -373,111 +367,104 @@ const AppointmentCalendar = ({
                     app_detail: appt.appDetail,
                     app_date: `${newDate}T${newTime}:00`
                 });
-
-                toast.success('Appointment rescheduled');
-                refreshAppointmentReads(personID);
-                await refetch();
             } catch (error) {
                 toast.error(httpErrorMessage(error, 'Failed to reschedule appointment'));
+                return;
+            }
+
+            toast.success('Appointment rescheduled');
+            refreshAppointmentReads(personID);
+            void refetch();
+
+            // A move to another DAY tells the patient, as the edit form does on a
+            // date change; the drag used to move them silently (FE-F10-8).
+            if (newDate !== fromDate) {
+                postJSON<{ success: boolean; message?: string }>('/api/wa/send-appointment', {
+                    appointmentId: appointmentID
+                })
+                    .then(waResult => {
+                        if (waResult.success) toast.success('WhatsApp confirmation sent');
+                        else toast.warning(waResult.message || 'WhatsApp confirmation was not sent');
+                    })
+                    .catch(err => {
+                        toast.error(`WhatsApp confirmation failed: ${httpErrorMessage(err, 'send failed')}`);
+                    });
             }
         },
         [refetch, refreshAppointmentReads, toast]
     );
 
-    const handleSlotClick = useCallback((slot: SlotData, _event: MouseEvent<HTMLDivElement>) => {
-        if (mode === 'selection') {
-            // In selection mode, only allow selecting available slots
-            if (slot.slotStatus !== 'available') {
-                return;
-            }
-
-            // Update internal state if no external control
-            if (!externalSelectedSlot) {
-                setInternalSelectedSlot(slot);
-            }
-
-            // Call external selection handler
-            if (onSlotSelect) {
-                onSlotSelect(slot);
-            }
-        } else {
-            // View mode: appointments are managed via their individual cards
-            // (handleAppointmentClick) or the "+N more" overflow popover. A bare
-            // slot click only updates highlighting — no redundant picker list.
-            setInternalSelectedSlot(slot);
-        }
-    }, [mode, externalSelectedSlot, onSlotSelect]);
-
-    // Clicking a specific appointment card goes straight to its Edit/Delete
-    // menu — each card is individually rendered, so there's no list to pick from.
+    // Clicking a card opens its Edit/Delete menu.
     const handleAppointmentClick = useCallback((
         appt: CalendarAppointment,
         date: string,
         time: string,
-        event: MouseEvent<HTMLDivElement>
+        anchor: MenuAnchor
     ) => {
-        // Card clicks are for managing existing appointments; selection mode
-        // books empty slots, so ignore them there.
-        if (mode === 'selection') return;
-
-        // Block edits/deletes on past appointments, matching slot-click behaviour.
+        // Block edits/deletes on past appointments.
         if (new Date(`${date}T${time}:00`) < new Date()) {
             toast.error('You cannot edit or delete past appointments');
             return;
         }
+        setContextMenu({ position: anchor, appointment: appt });
+    }, [toast]);
 
-        setContextMenu({
-            position: { x: event.clientX, y: event.clientY },
-            appointment: appt
-        });
-    }, [mode, toast]);
+    const handleCloseContextMenu = useCallback(() => setContextMenu(null), []);
 
-    // Handler for clicking on a day in monthly view
-    const handleDayClick = useCallback((day: CalendarDay) => {
-        // Switch to a single-day grid for the selected day
-        setAnchorDate(day.date);
-        setDayCount(1);
-        setViewMode('day');
+    // ── Delete ──────────────────────────────────────────────────────────────
+    const handleDeleteRequest = useCallback(async (appointment: CalendarAppointment) => {
+        if (!appointment.appointment_id || deletingRef.current) return;
+        const who = appointment.patientName || 'this patient';
+        const ok = await confirm(
+            `Delete the appointment for ${who}${appointment.appDetail ? ` (${appointment.appDetail})` : ''}?`,
+            { title: 'Delete appointment', danger: true, confirmText: 'Delete' }
+        );
+        if (!ok || deletingRef.current) return;
+
+        // One DELETE per confirmation, however fast the second click (FE-F10-20).
+        deletingRef.current = true;
+        try {
+            await deleteJSON(`/api/appointments/${appointment.appointment_id}`);
+            toast.success('Appointment deleted');
+            refreshAppointmentReads(appointment.personID);
+            await refetch();
+        } catch (error) {
+            toast.error(httpErrorMessage(error, 'Failed to delete appointment'));
+        } finally {
+            deletingRef.current = false;
+        }
+    }, [confirm, refetch, refreshAppointmentReads, toast]);
+
+    // ── Day menu + holidays ─────────────────────────────────────────────────
+    const handleDayMenu = useCallback((day: CalendarDay, anchor: MenuAnchor) => {
+        setDayMenu({ position: anchor, day });
     }, []);
+    const handleCloseDayMenu = useCallback(() => setDayMenu(null), []);
 
-    // Handler for right-clicking on a day in monthly view (holiday management)
-    const handleDayContextMenu = useCallback((day: CalendarDay, event: MouseEvent<HTMLDivElement>) => {
-        setDayContextMenu({
-            position: { x: event.clientX, y: event.clientY },
-            day
-        });
-    }, []);
-
-    // Close day context menu
-    const handleCloseDayContextMenu = useCallback(() => {
-        setDayContextMenu(null);
-    }, []);
-
-    // Add holiday from context menu
     const handleAddHoliday = useCallback(async (day: CalendarDay) => {
-        // Check for existing appointments on this date
+        // Check for existing appointments on this date. A failed check no longer
+        // disappears silently: the modal says it could not check (FE-F10-14).
         try {
             const data = await fetchJSON<AppointmentWarning>(
                 `/api/holidays/appointments-on-date?date=${day.date}`,
                 { schema: holiday.appointmentsOnDate.response }
             );
-
             setHolidayModal({
                 date: day.date,
                 existingHoliday: null,
-                appointmentWarning: data.count > 0 ? data : null
+                appointmentWarning: data.count > 0 ? data : null,
+                appointmentCheckFailed: false
             });
         } catch {
-            // If check fails, still allow adding holiday
             setHolidayModal({
                 date: day.date,
                 existingHoliday: null,
-                appointmentWarning: null
+                appointmentWarning: null,
+                appointmentCheckFailed: true
             });
         }
     }, []);
 
-    // Edit holiday from context menu
     const handleEditHoliday = useCallback((day: CalendarDay) => {
         setHolidayModal({
             date: day.date,
@@ -486,21 +473,29 @@ const AppointmentCalendar = ({
                 HolidayName: day.holidayName ?? undefined,
                 Description: day.holidayDescription ?? undefined
             },
-            appointmentWarning: null
+            appointmentWarning: null,
+            appointmentCheckFailed: false
         });
     }, []);
 
-    // Remove holiday from context menu
-    const handleRemoveHoliday = useCallback((day: CalendarDay) => {
-        setDeleteHolidayConfirm(day);
-    }, []);
+    const handleRemoveHoliday = useCallback(async (day: CalendarDay) => {
+        if (!day.holidayId) return;
+        const ok = await confirm(
+            `Remove ${day.holidayName || 'this holiday'}? Appointments can be booked on this date again.`,
+            { title: 'Remove holiday', danger: true, confirmText: 'Remove holiday' }
+        );
+        if (!ok) return;
+        try {
+            await deleteJSON(`/api/admin/lookups/tblHolidays/${day.holidayId}`);
+            toast.success('Holiday removed');
+            await refreshHolidayReads();
+        } catch (error) {
+            toast.error(httpErrorMessage(error, 'Failed to remove holiday'));
+        }
+    }, [confirm, refreshHolidayReads, toast]);
 
-    // Close holiday modal
-    const handleCloseHolidayModal = useCallback(() => {
-        setHolidayModal(null);
-    }, []);
+    const handleCloseHolidayModal = useCallback(() => setHolidayModal(null), []);
 
-    // Save holiday (add or update)
     const handleSaveHoliday = useCallback(async ({ date, holidayName, description, existingId }: SaveHolidayData) => {
         try {
             const isEdit = !!existingId;
@@ -518,66 +513,14 @@ const AppointmentCalendar = ({
 
             toast.success(isEdit ? 'Holiday updated' : 'Holiday added');
             setHolidayModal(null);
-
-            // Refresh calendar to show updated holidays
-            await refetch();
+            await refreshHolidayReads();
         } catch (error) {
             toast.error(httpErrorMessage(error, 'Failed to save holiday'));
         }
-    }, [refetch, toast]);
+    }, [refreshHolidayReads, toast]);
 
-    // Confirm delete holiday
-    const handleDeleteHolidayConfirm = useCallback(async () => {
-        if (!deleteHolidayConfirm?.holidayId) return;
-
-        try {
-            await deleteJSON(`/api/admin/lookups/tblHolidays/${deleteHolidayConfirm.holidayId}`);
-
-            toast.success('Holiday removed');
-            setDeleteHolidayConfirm(null);
-
-            // Refresh calendar
-            await refetch();
-        } catch (error) {
-            toast.error(httpErrorMessage(error, 'Failed to remove holiday'));
-        }
-    }, [deleteHolidayConfirm, refetch, toast]);
-
-    // Handler for delete action from context menu
-    const handleDeleteRequest = useCallback((appointment: CalendarAppointment) => {
-        setDeleteConfirmation(appointment);
-    }, []);
-
-    // Handler for confirmed delete
-    const handleDeleteConfirm = useCallback(async () => {
-        if (!deleteConfirmation?.appointment_id) return;
-
-        try {
-            await deleteJSON(`/api/appointments/${deleteConfirmation.appointment_id}`);
-
-            // Refresh calendar data after successful delete
-            refreshAppointmentReads(deleteConfirmation.personID);
-            await refetch();
-
-            // Close delete confirmation modal
-            setDeleteConfirmation(null);
-        } catch (error) {
-            console.error('Error deleting appointment:', error);
-            toast.error('Failed to delete appointment: ' + httpErrorMessage(error, 'Unknown error'));
-        }
-    }, [deleteConfirmation, refetch, refreshAppointmentReads, toast]);
-
-    // Handler to close context menu
-    const handleCloseContextMenu = useCallback(() => {
-        setContextMenu(null);
-    }, []);
-
-    // Effects
-    // (The grid/month data now loads via React Query above — the query keys carry
-    //  viewMode/date/anchor/dayCount/doctor, so navigation refetches automatically;
-    //  the zoom debounce lives in the debouncedDayCount effect.)
-
-    // Persist the zoom (day count) per-browser.
+    // Persist the zoom (day count) per-browser — the user's choice only; the
+    // phone's single day is derived above and never written here.
     useEffect(() => {
         try {
             localStorage.setItem(N_STORAGE_KEY, String(dayCount));
@@ -586,72 +529,34 @@ const AppointmentCalendar = ({
         }
     }, [dayCount]);
 
-    // Loading state — only the initial load replaces the grid with a spinner;
-    // refetches (nav, zoom, mutations) keep the current grid visible.
-    if (loading && !calendarData) {
-        return (
-            <div className="appointment-calendar loading">
-                <div className="calendar-loading">
-                    <div className="loading-spinner">
-                        <i className="fas fa-spinner fa-spin"></i>
-                    </div>
-                    <h3>Loading Calendar...</h3>
-                    <p>Fetching appointment data for {rangeLabel}</p>
-                </div>
-            </div>
-        );
-    }
+    // The day menu has something to offer: day view (unless it is the day already
+    // open) and/or the holiday actions.
+    const dayMenuOpenDay = dayMenu && !(effectiveView === 'day' && dayMenu.day.date === anchorDate)
+        ? openDay
+        : undefined;
+    const showDayMenu = !!dayMenu && (!!dayMenuOpenDay || canManageHolidays);
 
-    // Error state
-    if (error) {
-        return (
-            <div className="appointment-calendar error">
-                <div className="calendar-error">
-                    <i className="fas fa-exclamation-triangle"></i>
-                    <h3>Calendar Loading Error</h3>
-                    <p className="error-message">{error}</p>
-                    <div className="error-actions">
-                        <button
-                            className="btn btn-primary"
-                            onClick={() => refetch()}
-                        >
-                            <i className="fas fa-refresh"></i>
-                            Retry
-                        </button>
-                        <button
-                            className="btn btn-secondary"
-                            onClick={goToToday}
-                        >
-                            <i className="fas fa-calendar-day"></i>
-                            Go to Today
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // Main render
+    // The toolbar stays on screen through loads and errors; only the body below
+    // it changes (FE-F10-4).
     return (
         <div
             className="appointment-calendar"
             style={{ '--cal-row-h': `${rowH}px`, '--cal-font-scale': fontScale } as CSSProperties}
         >
-            {/* Calendar Header */}
             <CalendarHeader
                 titleMain={titleMain}
                 titleSub={titleSub}
                 onPreviousWeek={() => navigate('prev')}
                 onNextWeek={() => navigate('next')}
                 onTodayClick={goToToday}
-                viewMode={viewMode}
+                viewMode={effectiveView}
                 onViewModeChange={handleViewModeChange}
                 calendarStats={calendarStats}
-                loading={loading}
+                fetching={fetching}
                 selectedDoctorId={selectedDoctorId}
-                onDoctorChange={handleDoctorChange}
-                showZoom={viewMode !== 'month' && !isMobile}
-                dayCount={dayCount}
+                onDoctorChange={setSelectedDoctorId}
+                showZoom={effectiveView !== 'month' && !isMobile}
+                dayCount={effectiveDayCount}
                 minDayCount={N_MIN}
                 maxDayCount={N_MAX}
                 onZoomIn={handleZoomIn}
@@ -661,28 +566,37 @@ const AppointmentCalendar = ({
             />
 
             {/* Doctor colour legend (week/day views only — month cells aren't tinted) */}
-            {viewMode !== 'month' && <CalendarLegend doctors={doctorLegend} />}
+            {effectiveView !== 'month' && <CalendarLegend doctors={doctorLegend} />}
 
-            {/* Calendar Grid - Show different grid based on view mode */}
-            {viewMode === 'month' ? (
+            {error ? (
+                <div className="calendar-error" role="alert">
+                    <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                    <h3>Calendar Loading Error</h3>
+                    <p className="error-message">{error}</p>
+                    <div className="calendar-error-actions">
+                        <button className="btn btn-primary" onClick={() => void refetch()}>
+                            <i className="fas fa-refresh" aria-hidden="true"></i> Retry
+                        </button>
+                        <button className="btn btn-secondary" onClick={goToToday}>
+                            <i className="fas fa-calendar-day" aria-hidden="true"></i> Go to Today
+                        </button>
+                    </div>
+                </div>
+            ) : effectiveView === 'month' ? (
                 <MonthlyCalendarGrid
                     calendarData={calendarData}
-                    onDayClick={handleDayClick}
-                    onDayContextMenu={handleDayContextMenu}
+                    onOpenDay={openDay}
+                    onDayMenu={canManageHolidays ? handleDayMenu : undefined}
                     currentDate={currentDate}
-                    mode={mode}
                 />
             ) : (
                 <CalendarGrid
                     calendarData={calendarData}
                     doctorColors={doctorColors}
                     hideEmptySlots={selectedDoctorId != null}
-                    selectedSlot={selectedSlot}
-                    onSlotClick={handleSlotClick}
                     onAppointmentClick={handleAppointmentClick}
-                    onDayContextMenu={handleDayContextMenu}
-                    mode={mode}
-                    viewMode={viewMode}
+                    onDayMenu={handleDayMenu}
+                    viewMode={effectiveView}
                     draggingId={draggingId}
                     setDraggingId={setDraggingId}
                     dropTarget={dropTarget}
@@ -694,7 +608,6 @@ const AppointmentCalendar = ({
                 />
             )}
 
-            {/* Context Menu */}
             {contextMenu && (
                 <CalendarContextMenu
                     position={contextMenu.position}
@@ -704,54 +617,20 @@ const AppointmentCalendar = ({
                 />
             )}
 
-            {/* Delete Confirmation Modal */}
-            <Modal
-                isOpen={deleteConfirmation !== null}
-                onClose={() => setDeleteConfirmation(null)}
-                contentClassName="modal-content delete-modal"
-                ariaLabelledBy="appt-delete-modal-title"
-            >
-                {deleteConfirmation && (
-                    <>
-                        <h3 id="appt-delete-modal-title">
-                            <i className="fas fa-exclamation-triangle"></i> Confirm Delete
-                        </h3>
-                        <p>
-                            Are you sure you want to delete the appointment for{' '}
-                            <strong>{deleteConfirmation.patientName || 'this patient'}</strong>
-                            {deleteConfirmation.appDetail && ` (${deleteConfirmation.appDetail})`}?
-                        </p>
-                        <div className="modal-actions">
-                            <button
-                                className="btn btn-cancel"
-                                onClick={() => setDeleteConfirmation(null)}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                className="btn btn-delete"
-                                onClick={handleDeleteConfirm}
-                            >
-                                <i className="fas fa-trash"></i> Delete
-                            </button>
-                        </div>
-                    </>
-                )}
-            </Modal>
-
-            {/* Day Context Menu (for holiday management) */}
-            {dayContextMenu && (
+            {dayMenu && showDayMenu && (
                 <CalendarDayContextMenu
-                    position={dayContextMenu.position}
-                    day={dayContextMenu.day}
-                    onClose={handleCloseDayContextMenu}
+                    position={dayMenu.position}
+                    day={dayMenu.day}
+                    appointmentCount={countDayAppointments(dayMenu.day)}
+                    onClose={handleCloseDayMenu}
+                    onOpenDay={dayMenuOpenDay}
+                    canManageHolidays={canManageHolidays}
                     onAddHoliday={handleAddHoliday}
                     onEditHoliday={handleEditHoliday}
                     onRemoveHoliday={handleRemoveHoliday}
                 />
             )}
 
-            {/* Holiday Quick Modal */}
             <HolidayQuickModal
                 isOpen={!!holidayModal}
                 onClose={handleCloseHolidayModal}
@@ -759,44 +638,8 @@ const AppointmentCalendar = ({
                 date={holidayModal?.date}
                 existingHoliday={holidayModal?.existingHoliday}
                 appointmentWarning={holidayModal?.appointmentWarning}
+                appointmentCheckFailed={holidayModal?.appointmentCheckFailed ?? false}
             />
-
-            {/* Delete Holiday Confirmation Modal */}
-            <Modal
-                isOpen={deleteHolidayConfirm !== null}
-                onClose={() => setDeleteHolidayConfirm(null)}
-                contentClassName="modal-content delete-modal"
-                ariaLabelledBy="holiday-delete-modal-title"
-            >
-                {deleteHolidayConfirm && (
-                    <>
-                        <h3 id="holiday-delete-modal-title">
-                            <i className="fas fa-exclamation-triangle"></i> Remove Holiday
-                        </h3>
-                        <p>
-                            Are you sure you want to remove{' '}
-                            <strong>{deleteHolidayConfirm.holidayName || 'this holiday'}</strong>?
-                        </p>
-                        <p className="text-muted">
-                            This will allow appointments to be scheduled on this date again.
-                        </p>
-                        <div className="modal-actions">
-                            <button
-                                className="btn btn-cancel"
-                                onClick={() => setDeleteHolidayConfirm(null)}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                className="btn btn-delete"
-                                onClick={handleDeleteHolidayConfirm}
-                            >
-                                <i className="fas fa-trash"></i> Remove Holiday
-                            </button>
-                        </div>
-                    </>
-                )}
-            </Modal>
         </div>
     );
 };

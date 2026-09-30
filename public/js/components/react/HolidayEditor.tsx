@@ -221,6 +221,9 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
             await deleteJSON(`/api/admin/lookups/${tableKey}/${itemId}`);
             toast.success('Holiday deleted successfully');
             void queryClient.invalidateQueries({ queryKey: qk.adminLookups.table(tableKey) });
+            // …and the calendar + the booking picker, which mark holidays (the
+            // calendar's own holiday writes refresh this table; FE-F10-10's mirror).
+            void queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to delete holiday'));
         } finally {
@@ -295,6 +298,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
             setAppointmentWarning(null);
             setPendingHolidayData(null);
             void queryClient.invalidateQueries({ queryKey: qk.adminLookups.table(tableKey) });
+            void queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to save holiday'));
         }

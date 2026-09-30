@@ -1,19 +1,14 @@
 /**
  * DoctorFilter Component
  *
- * Dropdown filter for selecting a doctor to filter calendar appointments
- * Fetches doctor list from /api/doctors and provides selection UI
+ * The calendar's doctor filter. Lists `/api/doctors` — active employees whose
+ * position is Doctor, the same set the booking forms, the legend, the daily
+ * board and the server use (audit FE-F10-13).
  */
 
 import type { ChangeEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { httpErrorMessage } from '@/core/http';
 import { doctorsQuery } from '@/query/queries';
-
-interface Doctor {
-    id: number;
-    employee_name: string;
-}
 
 interface DoctorFilterProps {
     selectedDoctorId: number | null;
@@ -22,9 +17,8 @@ interface DoctorFilterProps {
 }
 
 const DoctorFilter = ({ selectedDoctorId, onDoctorChange, className = '' }: DoctorFilterProps) => {
-    const { data, isLoading: loading, error: queryError } = useQuery(doctorsQuery());
-    const doctors: Doctor[] = data ?? [];
-    const error = queryError ? httpErrorMessage(queryError, 'Unknown error') : null;
+    const { data, isLoading: loading, isError } = useQuery(doctorsQuery());
+    const doctors = data ?? [];
 
     const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
         const value = event.target.value;
@@ -43,7 +37,7 @@ const DoctorFilter = ({ selectedDoctorId, onDoctorChange, className = '' }: Doct
         );
     }
 
-    if (error) {
+    if (isError) {
         return (
             <div className={`doctor-filter ${className}`}>
                 <select className="doctor-filter-select" disabled>
@@ -58,6 +52,7 @@ const DoctorFilter = ({ selectedDoctorId, onDoctorChange, className = '' }: Doct
             <select
                 id="doctor-select"
                 className="doctor-filter-select"
+                aria-label="Filter by doctor"
                 value={selectedDoctorId || ''}
                 onChange={handleChange}
             >

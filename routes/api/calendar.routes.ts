@@ -19,11 +19,9 @@ import { authorize } from '../../middleware/auth.js';
 import { FINANCE_ROLES } from '../../shared/auth/roles.js';
 import { sendData, ErrorResponses } from '../../utils/error-response.js';
 import { getHolidaysInRange } from '../../services/database/queries/holiday-queries.js';
-import { getOptions } from '../../services/database/queries/options-queries.js';
 import {
   getWeeklyCalendarSlots,
   getAppointmentsInRange,
-  getCalendarStats,
   getConfiguredTimeSlots,
   fillCalendar,
 } from '../../services/database/queries/calendar-queries.js';
@@ -31,11 +29,9 @@ import { parseLocalDate } from '../../utils/date.js';
 // The view-model types, the Sat→Thu grid math and the two transforms live in the
 // service — see services/business/CalendarViewService.ts (C2).
 import {
-  DEFAULT_MAX_APPOINTMENTS_PER_SLOT,
   getMaxAppointmentsPerSlot,
+  getSlotSettings,
   noteCalendarRange,
-  getWeekStart,
-  getWeekEnd,
   getMonthStart,
   getMonthEnd,
   getCalendarGridStart,
@@ -74,7 +70,7 @@ router.get(
       const monthStart = getMonthStart(day);
       const monthEnd = getMonthEnd(day);
 
-      const maxAppointmentsPerSlot = await getMaxAppointmentsPerSlot();
+      const { maxAppointmentsPerSlot, hiddenTimes } = await getSlotSettings();
       noteCalendarRange(90);
 
       const [appointments, holidays, configuredTimes] = await Promise.all([
@@ -87,12 +83,17 @@ router.get(
         holidays.map((h) => [String(h.holiday_date).split('T')[0], h] as [string, Holiday])
       );
 
+      // `stats` is the month's own utilisation, following the doctor filter
+      // (audit FE-F10-6: the strip used to show one week's numbers).
       const monthlyData = buildMonthDays({
         gridStart,
         gridEnd,
+        monthStart,
+        monthEnd,
         appointments,
         doctorId: doctorId ? parseInt(doctorId, 10) : null,
         configuredTimes,
+        hiddenTimes,
         maxAppointmentsPerSlot,
         holidayMap,
       });
@@ -142,24 +143,9 @@ router.get(
       const filterMsg = doctorId ? ` (filtered by doctor id: ${doctorId})` : '';
       log.info(`📅 Fetching calendar range: ${start} to ${end}${filterMsg}`);
 
-      // Read the slot settings in one shot: max-per-slot + the early/late
-      // categories and the "show extended" toggle that decide which rows render.
-      const optionMap = await getOptions([
-        'MaxAppointmentsPerSlot',
-        'CALENDAR_EARLY_SLOTS',
-        'CALENDAR_LATE_SLOTS',
-        'CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT',
-      ]);
-      const rawMax = optionMap.get('MaxAppointmentsPerSlot');
-      const parsedMax = rawMax != null ? parseInt(rawMax, 10) : NaN;
-      const maxAppointmentsPerSlot = Number.isNaN(parsedMax)
-        ? DEFAULT_MAX_APPOINTMENTS_PER_SLOT
-        : parsedMax;
-      const parseList = (v: string | null | undefined): string[] =>
-        v ? v.split(',').map((s) => s.trim()).filter(Boolean) : [];
-      const earlySlots = parseList(optionMap.get('CALENDAR_EARLY_SLOTS'));
-      const lateSlots = parseList(optionMap.get('CALENDAR_LATE_SLOTS'));
-      const showExtended = optionMap.get('CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT') === 'true';
+      // Max-per-slot + the early/late categories and the "show extended"
+      // toggle that decide which rows render, in one read.
+      const { maxAppointmentsPerSlot, hiddenTimes } = await getSlotSettings();
 
       noteCalendarRange(90);
 
@@ -176,14 +162,13 @@ router.get(
       // day of the span is a column, and the rows are the visible configured times
       // plus every time that has an appointment — so a past day, a walk-in, an
       // appointment in a hidden early/late row or at a deleted time all render.
-      const hidden = showExtended ? new Set<string>() : new Set([...earlySlots, ...lateSlots]);
       const { days, timeSlots, stats } = buildGridDays({
         start,
         end,
         appointments,
         doctorId: doctorId ? parseInt(doctorId, 10) : null,
         configuredTimes,
-        hiddenTimes: hidden,
+        hiddenTimes,
         maxAppointmentsPerSlot,
         holidayMap,
       });
@@ -205,51 +190,6 @@ router.get(
     } catch (error) {
       log.error('❌ Calendar range API error:', error);
       ErrorResponses.internalError(res, 'Failed to fetch calendar range', error as Error);
-    }
-  }
-);
-
-/**
- * GET /api/calendar/stats
- * Returns calendar utilization statistics for the specified week
- */
-router.get(
-  '/stats',
-  validate({ query: calendar.stats.query }),
-  async (
-    req: Request<unknown, unknown, unknown, calendar.CalendarStatsQuery>,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const { date } = req.query;
-
-      const weekStart = getWeekStart(parseLocalDate(date) ?? new Date());
-      const weekEnd = getWeekEnd(weekStart);
-
-      log.info(
-        `📊 Fetching calendar stats for week: ${weekStart} to ${weekEnd}`
-      );
-
-      const stats = await getCalendarStats(weekStart, weekEnd);
-
-      log.info(
-        `✅ Calendar stats retrieved: ${stats?.utilizationPercent}% utilization`
-      );
-
-      sendData(res, calendar.stats.response, {
-        stats: stats || {
-          weekStart,
-          weekEnd,
-          totalSlots: 0,
-          availableSlots: 0,
-          bookedSlots: 0,
-          pastSlots: 0,
-          utilizationPercent: 0
-        }
-      });
-    } catch (error) {
-      log.error('❌ Calendar stats API error:', error);
-      ErrorResponses.internalError(res, 'Failed to fetch calendar statistics', error as Error);
     }
   }
 );

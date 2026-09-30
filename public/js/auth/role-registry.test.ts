@@ -78,12 +78,13 @@ describe('role registry ↔ contract drift guard', () => {
 describe('roleCaps ↔ server role sets drift guard', () => {
   const inSet = (set: readonly string[], role: string) => set.includes(role);
 
-  it('writeFinance / viewFinance / editRecords are exactly FINANCE_ROLES', () => {
+  it('writeFinance / viewFinance / editRecords / manageLookups are exactly FINANCE_ROLES', () => {
     for (const role of ALL_ROLES) {
       const caps = roleCaps(role);
       expect(caps.writeFinance, role).toBe(inSet(FINANCE_ROLES, role));
       expect(caps.viewFinance, role).toBe(inSet(FINANCE_ROLES, role));
       expect(caps.editRecords, role).toBe(inSet(FINANCE_ROLES, role));
+      expect(caps.manageLookups, role).toBe(inSet(FINANCE_ROLES, role));
     }
   });
 

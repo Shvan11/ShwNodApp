@@ -1,23 +1,16 @@
-import { useState } from 'react';
+import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import cn from 'classnames';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import Modal from './Modal';
 import { deleteJSON, httpErrorMessage } from '@/core/http';
 import { formatAppointmentListDateTime } from '@/utils/formatters';
 import { patientAppointmentsQuery } from '@/query/queries';
-import { qk } from '@/query/keys';
+import { refreshAfterBooking } from './bookingError';
 import styles from './PatientAppointments.module.css';
-
-interface PatientAppointment {
-    appointment_id: number;
-    app_date: string;
-    app_detail?: string | null;
-    DrName?: string | null;
-}
 
 interface PatientAppointmentsProps {
     personId?: number | null;
@@ -32,38 +25,44 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
     const { language } = useLanguage();
     const navigate = useNavigate();
     const toast = useToast();
+    const confirm = useConfirm();
     const queryClient = useQueryClient();
     const { data, isLoading: loading, error: queryError, refetch } = useQuery({
         ...patientAppointmentsQuery(personId ?? ''),
         enabled: !!personId,
     });
-    const appointments: PatientAppointment[] = data?.appointments ?? [];
-    const error = queryError ? httpErrorMessage(queryError, 'Unknown error') : null;
-    const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+    const appointments = data?.appointments ?? [];
+    const error = queryError ? httpErrorMessage(queryError, t('form.errorUnknown')) : null;
+    const deletingRef = useRef(false);
 
-    const handleEdit = (appointment: PatientAppointment): void => {
+    const handleEdit = (appointmentId: number): void => {
         // The form reads the appointment by id itself (audit FE-F10-1).
-        navigate(`/patient/${personId}/edit-appointment/${appointment.appointment_id}`);
+        navigate(`/patient/${personId}/edit-appointment/${appointmentId}`);
     };
 
+    // The shared confirm dialog, a success toast, and one DELETE per confirmation
+    // however fast the second click (audit FE-F10-20: this was a bespoke modal).
     const handleDelete = async (appointmentId: number): Promise<void> => {
+        if (deletingRef.current) return;
+        const ok = await confirm(t('list.confirmDeleteText'), {
+            title: t('list.confirmDeleteTitle'),
+            danger: true,
+            confirmText: t('list.delete'),
+            cancelText: t('list.cancel'),
+        });
+        if (!ok || deletingRef.current) return;
+        deletingRef.current = true;
         try {
             await deleteJSON(`/api/appointments/${appointmentId}`);
-
-            // Refresh appointments after deletion. `patient.all` — not the narrower
-            // `patient.appointments` — because `patient.hasAppointment` is its SIBLING,
-            // not its child: invalidating only the list left the Works screen still
-            // claiming an upcoming appointment after the last one was deleted.
-            await queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
-            // Deleting frees the slot for everyone — refresh the calendar + the
-            // booking picker's availability reads, which nothing else refetches.
-            await queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
-            // …and the daily board of that day (FE-F11-17).
-            void queryClient.invalidateQueries({ queryKey: qk.appointments.all() });
-            setDeleteConfirm(null);
+            toast.success(t('list.deleted'));
+            // `patient.all`, not just its list: `patient.hasAppointment` is a sibling,
+            // and the Works screen kept claiming an upcoming appointment. Deleting also
+            // frees the slot (calendar + picker) and changes that day's board.
+            refreshAfterBooking(queryClient, personId);
         } catch (err) {
-            console.error('Error deleting appointment:', err);
             toast.error(httpErrorMessage(err, t('list.deleteFailed')));
+        } finally {
+            deletingRef.current = false;
         }
     };
 
@@ -158,7 +157,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
                                     {!isPast && (
                                         <button
                                             className="btn-edit"
-                                            onClick={() => handleEdit(appointment)}
+                                            onClick={() => handleEdit(appointment.appointment_id)}
                                             title={t('list.editTitle')}
                                         >
                                             {t('list.edit')}
@@ -166,7 +165,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
                                     )}
                                     <button
                                         className="btn-delete"
-                                        onClick={() => setDeleteConfirm(appointment.appointment_id)}
+                                        onClick={() => void handleDelete(appointment.appointment_id)}
                                         title={t('list.deleteTitle')}
                                     >
                                         {t('list.delete')}
@@ -177,33 +176,6 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
                     })}
                 </div>
             )}
-
-            {/* Delete Confirmation Modal */}
-            <Modal
-                isOpen={deleteConfirm !== null}
-                onClose={() => setDeleteConfirm(null)}
-                contentClassName={styles.modalContent}
-                ariaLabelledBy="patient-appointments-delete-title"
-            >
-                <h3 id="patient-appointments-delete-title">
-                    <i className="fas fa-exclamation-triangle"></i> {t('list.confirmDeleteTitle')}
-                </h3>
-                <p>{t('list.confirmDeleteText')}</p>
-                <div className={styles.modalActions}>
-                    <button
-                        className={cn('btn', styles.btnCancel)}
-                        onClick={() => setDeleteConfirm(null)}
-                    >
-                        {t('list.cancel')}
-                    </button>
-                    <button
-                        className="btn-delete"
-                        onClick={() => deleteConfirm !== null && handleDelete(deleteConfirm)}
-                    >
-                        {t('list.delete')}
-                    </button>
-                </div>
-            </Modal>
         </div>
     );
 };

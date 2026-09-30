@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLoaderData, useSearchParams } from 'react-router-dom';
 import AppointmentsHeader, { type DoctorFilter } from './AppointmentsHeader';
@@ -11,7 +11,10 @@ import { useAppointments } from '../../../hooks/useAppointments';
 import { useAppointmentsSync } from '../../../hooks/useAppointmentsSync';
 import { useAppointmentDoctors } from '../../../hooks/useAppointmentDoctors';
 import { toLocalDateString } from '../../../utils/calendarDate';
+import { rememberAppointmentDate } from '../../../utils/appointmentsDate';
 import type { dailyAppointmentsLoader } from '../../../router/loaders';
+
+const getTodayDate = (): string => toLocalDateString(new Date());
 
 // Parse the URL `?dr=` param into a DoctorFilter (defaults to 'all').
 const parseDrParam = (raw: string | null): DoctorFilter => {
@@ -41,8 +44,6 @@ const DailyAppointments = () => {
     // 2. Get/set URL search params (source of truth for date)
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const getTodayDate = (): string => toLocalDateString(new Date());
-
     // 3. Initialize date from URL (the loader resolved a missing one to today)
     const [selectedDate, setSelectedDate] = useState<string>(
         loaderData.loadedDate || searchParams.get('date') || getTodayDate()
@@ -53,7 +54,9 @@ const DailyAppointments = () => {
     const {
         allAppointments,
         checkedInAppointments,
-        loading,
+        initialLoading,
+        busy,
+        refreshing,
         error,
         loadAppointments,
         checkInPatient,
@@ -77,7 +80,18 @@ const DailyAppointments = () => {
     // Appointment-eligible doctors (shared with the calendar) — drives the header
     // dropdown plus the drID → name/colour lookups for the per-card doctor icon.
     // `byId` carries the calendar colour (neutral doctors intentionally omitted).
-    const { legend: doctors, byId: doctorColors } = useAppointmentDoctors();
+    const { legend: doctors, byId: doctorColors, loading: doctorsLoading } = useAppointmentDoctors();
+
+    // A `?dr=` naming a doctor who is not on the list (a stale bookmark, a doctor
+    // who has left) used to filter by that id under an "All doctors" label (audit
+    // FE-F11-8c). Once the list is in, fall back to all doctors.
+    if (
+        selectedDrId !== 'all' &&
+        !doctorsLoading &&
+        !doctors.some((d) => d.id === selectedDrId)
+    ) {
+        setSelectedDrId('all');
+    }
     const doctorNames = useMemo(
         () => new Map(doctors.map((d) => [d.id, d.name])),
         [doctors]
@@ -86,10 +100,16 @@ const DailyAppointments = () => {
     // list is filtered to one doctor it's redundant noise on every card.
     const showDoctorName = selectedDrId === 'all';
 
-    // 6. Flash update indicator
+    // 6. Flash update indicator. One timer at a time: overlapping flashes used to
+    // cut each other short, and the timer outlived the page (FE-F11-12).
+    const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const flashUpdateIndicator = useCallback((): void => {
         setShowFlash(true);
-        setTimeout(() => setShowFlash(false), 1000);
+        if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+        flashTimerRef.current = setTimeout(() => setShowFlash(false), 1000);
+    }, []);
+    useEffect(() => () => {
+        if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
     }, []);
 
     // 7. SSE update handler — return success so the hook can detect
@@ -118,11 +138,29 @@ const DailyAppointments = () => {
             setSearchParams(next, { replace: true });
         }
 
-        // Save current date to sessionStorage for return visits
-        if (selectedDate) {
-            sessionStorage.setItem('lastAppointmentDate', selectedDate);
-        }
+        // Remember a PICKED date for return visits; following today stores nothing (FE-F11-8b).
+        rememberAppointmentDate(selectedDate);
     }, [selectedDate, selectedDrId, searchParams, setSearchParams]);
+
+    // A board showing today follows today: at midnight (or when a sleeping tab
+    // wakes after it) it rolls to the new day. An explicitly picked other date
+    // stays put (FE-F3-9's call, made in F11: audit FE-F11-8a).
+    useEffect(() => {
+        const followed = getTodayDate();
+        if (selectedDate !== followed) return;
+        const rollIfNewDay = () => {
+            const today = getTodayDate();
+            if (today !== followed) setSelectedDate(today);
+        };
+        const nextMidnight = new Date();
+        nextMidnight.setHours(24, 0, 1, 0);
+        const timer = setTimeout(rollIfNewDay, nextMidnight.getTime() - Date.now());
+        document.addEventListener('visibilitychange', rollIfNewDay);
+        return () => {
+            clearTimeout(timer);
+            document.removeEventListener('visibilitychange', rollIfNewDay);
+        };
+    }, [selectedDate]);
 
     // 10. Date-change fetching is automatic: useAppointments keys React Query on
     // selectedDate, so changing the date fetches the new day (from cache if warm)
@@ -138,13 +176,16 @@ const DailyAppointments = () => {
         // URL sync happens in useEffect above
     };
 
-    // 13. Handle refresh - reload today's appointments
+    // 13. Handle refresh - reload today's appointments. From another date the
+    // invalidation only marks today's (inactive) entry stale, and the date change
+    // then reads it once. It used to be read twice, because the route re-ran its
+    // loader on every search-param change as well (FE-F11-12).
     const handleRefresh = (): void => {
         const today = getTodayDate();
         setSelectedDate(today);
         setSearchTerm(''); // Clear search on refresh
         setSelectedDrId('all'); // Clear doctor filter on refresh
-        loadAppointments(today);
+        void loadAppointments(today);
     };
 
     // The four workflow actions. Failures are reported by the hook (a toast), so
@@ -212,7 +253,7 @@ const DailyAppointments = () => {
                 selectedDate={selectedDate}
                 onDateChange={handleDateChange}
                 onRefresh={handleRefresh}
-                isRefreshing={loading}
+                isRefreshing={refreshing}
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 doctors={doctors}
@@ -252,7 +293,8 @@ const DailyAppointments = () => {
                     title={t('lists.allTitle')}
                     appointments={filteredAllAppointments}
                     showStatus={false}
-                    loading={loading}
+                    initialLoading={initialLoading}
+                    busy={busy}
                     doctorNames={doctorNames}
                     doctorColors={doctorColors}
                     showDoctorName={showDoctorName}
@@ -265,7 +307,8 @@ const DailyAppointments = () => {
                     title={t('lists.checkedInTitle')}
                     appointments={filteredCheckedInAppointments}
                     showStatus={true}
-                    loading={loading}
+                    initialLoading={initialLoading}
+                    busy={busy}
                     doctorNames={doctorNames}
                     doctorColors={doctorColors}
                     showDoctorName={showDoctorName}

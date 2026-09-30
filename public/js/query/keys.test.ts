@@ -43,8 +43,12 @@ describe('qk query-key factory', () => {
     expect(isPrefix(all, qk.appointments.byId(7))).toBe(true);
   });
 
-  it('preserves the legacy key shape for the WhatsApp SSE screen', () => {
-    expect(qk.whatsapp.messages('2026-06-12')).toEqual(['whatsapp-messages', '2026-06-12']);
+  it('whatsapp.all is a prefix of both reads of the send screen (FE-F2-8)', () => {
+    const all = qk.whatsapp.all();
+    expect(isPrefix(all, qk.whatsapp.messages('2026-06-12'))).toBe(true);
+    expect(isPrefix(all, qk.whatsapp.messageCount('2026-06-12'))).toBe(true);
+    // …and the two leaves of one date stay distinct entries.
+    expect(qk.whatsapp.messages('2026-06-12')).not.toEqual(qk.whatsapp.messageCount('2026-06-12'));
   });
 
   it('separates entities by id', () => {

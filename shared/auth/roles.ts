@@ -69,6 +69,13 @@ export interface RoleCapabilities {
    * The UI uses it to show Transfer and to say "requires admin approval" beside a discount.
    */
   adminWrites: boolean;
+  /**
+   * May write the admin lookup tables (`/api/admin/lookups/*`, mounted behind
+   * `authorize(FINANCE_ROLES)`) — which includes the calendar's holidays. The calendar
+   * used to offer Mark / Edit / Remove Holiday to every role, and a clinical user met a
+   * 403 at Save (audit FE-F10-14).
+   */
+  manageLookups: boolean;
   manageUsers: boolean;
 }
 
@@ -81,6 +88,7 @@ export function roleCaps(role: UserRole | undefined): RoleCapabilities {
     writeFinance: isAdmin || isFrontDesk,
     editRecords: isAdmin || isFrontDesk,
     adminWrites: isAdmin,
+    manageLookups: isAdmin || isFrontDesk,
     manageUsers: isAdmin,
   };
 }

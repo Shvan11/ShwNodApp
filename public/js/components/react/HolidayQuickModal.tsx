@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, type FormEvent, type ChangeEvent } from 'r
 import { useToast } from '../../contexts/ToastContext';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
+import { parseLocalDate } from '../../utils/calendarDate';
 import type { ExistingHoliday, AppointmentWarning, SaveHolidayData } from './calendar.types';
 
 interface HolidayQuickModalProps {
@@ -11,6 +12,8 @@ interface HolidayQuickModalProps {
     date?: string;
     existingHoliday?: ExistingHoliday | null;
     appointmentWarning?: AppointmentWarning | null;
+    /** The appointments-on-date check failed: say so rather than show no warning (FE-F10-14). */
+    appointmentCheckFailed?: boolean;
 }
 
 /**
@@ -23,7 +26,8 @@ const HolidayQuickModal = ({
     onSave,
     date,
     existingHoliday = null,
-    appointmentWarning = null
+    appointmentWarning = null,
+    appointmentCheckFailed = false
 }: HolidayQuickModalProps) => {
     const toast = useToast();
     const inputRef = useRef<HTMLInputElement>(null);
@@ -69,9 +73,10 @@ const HolidayQuickModal = ({
 
     if (!date) return null;
 
+    // Local midnight: `new Date('YYYY-MM-DD')` is UTC, so west of UTC the modal
+    // named the previous weekday (FE-F10-16).
     const formatDate = (dateStr: string): string => {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString(undefined, {
+        return parseLocalDate(dateStr).toLocaleDateString(undefined, {
             weekday: 'long',
             year: 'numeric',
             month: 'long',
@@ -149,6 +154,20 @@ const HolidayQuickModal = ({
                             </div>
                         )}
 
+                        {appointmentCheckFailed && (
+                            <div className="holiday-warning-banner" role="alert">
+                                <div className="warning-icon">
+                                    <i className="fas fa-exclamation-triangle"></i>
+                                </div>
+                                <div className="warning-content">
+                                    <strong>Could not check this date for appointments.</strong>
+                                    <div className="warning-note">
+                                        Any appointments already booked will NOT be cancelled
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Holiday name */}
                         <div className="form-group">
                             <label htmlFor="holidayName">Holiday Name *</label>
@@ -189,7 +208,7 @@ const HolidayQuickModal = ({
                         </button>
                         <button
                             type="submit"
-                            className={`btn ${showWarning ? 'btn-warning' : 'btn-primary'}`}
+                            className={`btn ${showWarning || appointmentCheckFailed ? 'btn-warning' : 'btn-primary'}`}
                             disabled={saving}
                         >
                             {saving ? (

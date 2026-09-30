@@ -351,21 +351,6 @@
   }
 }
 
-.playerHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  background: rgba(0, 0, 0, 0.8);
-}
-
-.playerHeader h2 {
-  margin: 0;
-  color: var(--color-white);
-  font-size: 18px;
-  font-weight: var(--font-weight-medium);
-}
-
 .playerBody {
   position: relative;
   padding-top: 56.25%; /* 16:9 */
@@ -389,25 +374,6 @@
   max-height: 90vh;
   overflow-y: auto;
   animation: slideUp 0.3s ease;
-}
-
-.deleteModal {
-  max-width: 450px;
-}
-
-.closeBtn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 4px;
-  line-height: 1;
-  transition: color 0.2s;
-}
-
-.closeBtn:hover {
-  color: var(--text-primary);
 }
 
 .modalBody {
@@ -481,26 +447,6 @@ textarea.formInput {
   color: var(--success-color);
 }
 
-/* Warning Styles */
-.warningText {
-  color: var(--warning-600);
-  font-weight: var(--font-weight-medium);
-  margin-bottom: 16px;
-  padding: 12px;
-  background-color: var(--warning-50);
-  border-left: 4px solid var(--warning-orange);
-  border-radius: var(--radius-sm);
-}
-
-.warningText i {
-  margin-right: 8px;
-}
-
-.deleteWarning {
-  color: var(--text-secondary);
-  font-size: 14px;
-  margin-top: 12px;
-}
 
 /* ==============================
    QR CODE MODAL STYLES

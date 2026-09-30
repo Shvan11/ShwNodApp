@@ -432,7 +432,6 @@ POST    /api/tv-display/command  [validate(body)]
 MOUNT   /api/calendar
 GET     /api/calendar/month  [validate(query)]
 GET     /api/calendar/range  [validate(query)]
-GET     /api/calendar/stats  [validate(query)]
 POST    /api/calendar/regenerate  [authorize(admin|front_desk)]
 GET     /api/calendar/available-slots  [validate(query)]
 GET     /api/calendar/month-availability  [validate(query)]

@@ -7,7 +7,10 @@ interface AppointmentsListProps {
     title: string;
     appointments: DailyAppointmentRow[];
     showStatus: boolean;
-    loading: boolean;
+    /** No data yet: skeleton cards. */
+    initialLoading: boolean;
+    /** A click in flight or another day on screen: dim and block clicks. */
+    busy: boolean;
     // drID → doctor name, for the per-card doctor icon's tooltip.
     doctorNames?: Map<number, string>;
     // drID → doctor colour, for tinting the per-card doctor icon.
@@ -34,7 +37,8 @@ const AppointmentsList = ({
     title,
     appointments,
     showStatus,
-    loading,
+    initialLoading,
+    busy,
     doctorNames,
     doctorColors,
     showDoctorName = false,
@@ -48,12 +52,10 @@ const AppointmentsList = ({
     // Trust database ordering - the query already sorts by present_time
     const sortedAppointments = appointments;
 
-    // Only show skeletons on INITIAL load (no data yet)
-    // During refresh, keep existing list visible to prevent height collapse
-    const showSkeletons = loading && (!sortedAppointments || sortedAppointments.length === 0);
-
-    // Check if we're refreshing (loading with existing data)
-    const isRefreshing = loading && sortedAppointments && sortedAppointments.length > 0;
+    // Skeletons only before the day's first data. A background refetch leaves an
+    // empty list empty and a full one undimmed (audit FE-F11-12).
+    const showSkeletons = initialLoading;
+    const isRefreshing = busy && sortedAppointments.length > 0;
 
     // Helper to get section class based on state
     const getSectionClass = (isActiveView: boolean, isRefreshingState: boolean): string => {
@@ -83,7 +85,7 @@ const AppointmentsList = ({
     }
 
     // Render empty state
-    if (!sortedAppointments || sortedAppointments.length === 0) {
+    if (sortedAppointments.length === 0) {
         return (
             <div className={getSectionClass(isActiveView, false)}>
                 <h3 className={styles.title}>{title}</h3>

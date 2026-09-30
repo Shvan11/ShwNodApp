@@ -8,7 +8,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 // The service's two DB-touching helpers are not under test; keep the DB layer out.
-vi.mock('../database/queries/options-queries.js', () => ({ getOption: vi.fn() }));
+vi.mock('../database/queries/options-queries.js', () => ({ getOption: vi.fn(), getOptions: vi.fn() }));
 vi.mock('../database/queries/calendar-queries.js', () => ({
   ensureCalendarRange: vi.fn(),
   fillCalendar: vi.fn(),
@@ -103,6 +103,8 @@ describe('buildMonthDays', () => {
     const { days } = buildMonthDays({
       gridStart: '2026-09-26',
       gridEnd: '2026-10-01',
+      monthStart: '2026-09-01',
+      monthEnd: '2026-09-30',
       appointments: [appt(1, '2026-09-30 10:00:00', 3), appt(2, '2026-09-30 15:07:00', 3), appt(3, '2026-09-30 10:00:00', 5)],
       doctorId: 3,
       configuredTimes: base.configuredTimes,
@@ -115,6 +117,33 @@ describe('buildMonthDays', () => {
     expect(wed?.appointments.map((a) => a.time)).toEqual(['10:00', '15:07']);
     // 10:00 is full clinic-wide (2 of 2), so 4 of the 5 configured slots stay open
     expect(wed).toMatchObject({ totalSlots: 5, bookedSlots: 1, availableSlots: 4 });
+  });
+
+  it("returns the month's own stats: its days only, the visible rows, the doctor filter (FE-F10-6)", () => {
+    const holidayMap = new Map([['2026-09-28', { id: 1, holiday_date: '2026-09-28', holiday_name: 'Holiday', description: '' }]]);
+    const { stats } = buildMonthDays({
+      // The grid spills into October; the stats must not.
+      gridStart: '2026-09-26',
+      gridEnd: '2026-10-01',
+      monthStart: '2026-09-01',
+      monthEnd: '2026-09-30',
+      appointments: [
+        appt(1, '2026-09-30 10:00:00', 3),
+        appt(2, '2026-09-30 10:30:00', 5), // another doctor: not booked for doctor 3
+        appt(3, '2026-10-01 10:00:00', 3), // next month
+        appt(4, '2026-09-30 20:00:00', 3), // hidden row: not a capacity slot
+      ],
+      doctorId: 3,
+      configuredTimes: base.configuredTimes,
+      hiddenTimes: base.hiddenTimes,
+      maxAppointmentsPerSlot: 2,
+      holidayMap,
+      now: NOW,
+    });
+    // Sep 26, 27, 29, 30 (28 is a holiday) × 3 visible rows
+    expect(stats).toMatchObject({ weekStart: '2026-09-01', weekEnd: '2026-09-30', totalSlots: 12, bookedSlots: 1 });
+    expect(stats.pastSlots + stats.availableSlots + stats.bookedSlots).toBe(12);
+    expect(stats.utilizationPercent).toBe(8.33);
   });
 });
 

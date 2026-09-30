@@ -401,6 +401,7 @@ body:has(.appointment-calendar) {
 }
 
 .cal-day-head {
+    cursor: pointer;
     padding: 10px 14px;
     border-right: 1px solid var(--cal-line);
     display: flex;
@@ -602,7 +603,6 @@ body:has(.appointment-calendar) {
        proportional and the fixed chrome never crowds the text on zoom-out. */
     gap: calc(3px * var(--cal-font-scale));
     padding: calc(4px * var(--cal-font-scale));
-    cursor: pointer;
 }
 
 .cal-slot.count-1 {
@@ -761,18 +761,6 @@ body:has(.appointment-calendar) {
     font-weight: var(--font-weight-semibold);
     color: var(--cal-ink-3);
     margin-top: 1px;
-}
-
-/* empty slot — extremely quiet, tap-target only on hover */
-.cal-empty-mark {
-    color: transparent;
-    font-size: calc(1rem * var(--cal-font-scale));
-    font-weight: var(--font-weight-light);
-    transition: color 0.12s ease;
-}
-
-.cal-slot-wrap:hover .cal-empty-mark {
-    color: rgba(0, 0, 0, 0.18);
 }
 
 /* shown when a doctor filter leaves no booked rows in the visible range */
@@ -965,45 +953,45 @@ body:has(.appointment-calendar) {
     line-height: 1.4;
 }
 
-/* Loading States */
-.appointment-calendar.loading {
+/* A read in flight — the previous grid stays on screen, so a small spinner
+   beside the title is the whole loading state (audit FE-F10-4). */
+.cal-fetching {
+    margin-inline-start: 8px;
+    font-size: 0.875rem;
+    color: var(--cal-ink-3);
+}
+
+/* Error state — shown under the toolbar, which stays usable */
+.calendar-error {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 400px;
+    gap: var(--spacing-sm);
+    padding: 40px;
+    min-height: 300px;
+    text-align: center;
+    color: var(--text-primary);
 }
 
-.header-loading {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 4px;
-    border: 1px solid var(--calendar-border);
+.calendar-error > i {
+    font-size: 2rem;
+    color: var(--error-color);
 }
 
-.loading-text {
-    font-size: var(--font-size-sm);
+.calendar-error h3 {
+    margin: 0;
+}
+
+.calendar-error .error-message {
+    margin: 0;
     color: var(--text-secondary);
 }
 
-.loading-spinner-small {
-    width: 16px;
-    height: 16px;
-    border: 2px solid var(--calendar-border);
-    border-top: 2px solid var(--primary-color);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-/* Error States */
-.appointment-calendar.error {
+.calendar-error-actions {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 40px;
-    min-height: 400px;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
 }
 
 /* Animations */
@@ -1116,10 +1104,6 @@ body:has(.appointment-calendar) {
     .cal-popover,
     .appointment-calendar {
         transition: none;
-        animation: none;
-    }
-
-    .loading-spinner-small {
         animation: none;
     }
 }
@@ -1258,12 +1242,6 @@ body:has(.appointment-calendar) {
 .modal-content p strong {
     color: var(--primary-color);
     font-weight: var(--font-weight-bold);
-}
-
-.modal-actions {
-    display: flex;
-    gap: var(--spacing-md);
-    justify-content: flex-end;
 }
 
 /* Button styles use global definitions from /css/components/buttons.css */

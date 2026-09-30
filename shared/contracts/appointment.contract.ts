@@ -193,6 +193,9 @@ export const appointmentById = {
       app_date: z.string(),
       app_detail: z.string().nullable(),
       dr_id: z.number().nullable(),
+      // The doctor's name, so the form can still offer a doctor who has since
+      // left as "<name> (current)" (audit FE-F10-13).
+      DrName: z.string().nullable(),
     }),
   }),
 } as const;

@@ -4,7 +4,9 @@ import ConnectionStatus, { type ConnectionStatusType, type FreshnessType } from 
 import StatsCards from './StatsCards';
 import DoctorFilterSelect from './DoctorFilterSelect';
 import type { LegendDoctor } from '../calendar.types';
-import { getActiveLanguageMeta } from '../../../core/language';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { formatWeekdayShort } from '@/utils/formatters';
+import { parseLocalDate } from '@/utils/calendarDate';
 import styles from './AppointmentsHeader.module.css';
 
 // Doctor-filter selection: a specific doctor (employees.id) or every doctor.
@@ -54,15 +56,17 @@ const AppointmentsHeader = ({
     stats
 }: AppointmentsHeaderProps) => {
     const { t } = useTranslation('appointments');
+    const { language } = useLanguage();
 
-    // Compact, weekday-prefixed date — e.g. "Sat, 13-6-2026" / "السبت, 13-6-2026".
-    // The weekday localizes to the active language; day/month/year stay Western
-    // digits (the active locale pins Latin numerals — see core/language.ts).
+    // Compact, weekday-prefixed date — e.g. "Sat, 13-6-2026" / "سبت, 13-6-2026".
+    // The weekday comes from the booking workflow's formatter with the language
+    // passed explicitly: the Arabic short form without "ال", and a live language
+    // toggle re-formats it (it used to read module-scope state through Intl and
+    // printed "الثلاثاء"; audit FE-F11-11a). Day/month/year stay Western digits.
     const formatShortDate = (dateString: string): string => {
         if (!dateString) return t('header.today');
-        const date = new Date(dateString + 'T12:00:00'); // noon avoids TZ date-shift
-        const weekday = date.toLocaleDateString(getActiveLanguageMeta().locale, { weekday: 'short' });
-        return `${weekday}, ${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`;
+        const date = parseLocalDate(dateString);
+        return `${formatWeekdayShort(date, language)}, ${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`;
     };
 
     const handleDateInputChange = (e: ChangeEvent<HTMLInputElement>): void => {
@@ -97,7 +101,6 @@ const AppointmentsHeader = ({
         <div className={styles.header}>
             {/* Stats — left */}
             <StatsCards
-                variant="header"
                 total={stats.total}
                 checkedIn={stats.checkedIn}
                 absent={stats.absent}
@@ -116,7 +119,7 @@ const AppointmentsHeader = ({
                         title={t('header.previousDay')}
                         aria-label={t('header.previousDay')}
                     >
-                        <i className="fas fa-chevron-left"></i>
+                        <i className="fas fa-chevron-left" aria-hidden="true"></i>
                     </button>
                     {/* The label IS the trigger (no separate "Select Date") */}
                     <div className={styles.datePill}>
@@ -139,16 +142,18 @@ const AppointmentsHeader = ({
                         title={t('header.nextDay')}
                         aria-label={t('header.nextDay')}
                     >
-                        <i className="fas fa-chevron-right"></i>
+                        <i className="fas fa-chevron-right" aria-hidden="true"></i>
                     </button>
                 </div>
                 <button
+                    type="button"
                     className={styles.refreshButton}
                     onClick={onRefresh}
                     disabled={isRefreshing}
                     title={t('header.refresh')}
+                    aria-label={t('header.refresh')}
                 >
-                    <i className={`fas fa-sync-alt ${isRefreshing ? styles.spinning : ''}`}></i>
+                    <i className={`fas fa-sync-alt ${isRefreshing ? styles.spinning : ''}`} aria-hidden="true"></i>
                 </button>
             </div>
 
@@ -160,9 +165,10 @@ const AppointmentsHeader = ({
                     onChange={onDoctorChange}
                 />
                 <div className={styles.searchWrapper}>
-                    <i className={`fas fa-search ${styles.searchIcon}`}></i>
+                    <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden="true"></i>
                     <input
                         type="text"
+                        aria-label={t('header.search')}
                         className={styles.searchInput}
                         placeholder={t('header.searchPlaceholder')}
                         value={searchTerm}
@@ -170,11 +176,13 @@ const AppointmentsHeader = ({
                     />
                     {searchTerm && (
                         <button
+                            type="button"
                             className={styles.searchClear}
                             onClick={() => onSearchChange('')}
                             title={t('header.clearSearch')}
+                            aria-label={t('header.clearSearch')}
                         >
-                            <i className="fas fa-times"></i>
+                            <i className="fas fa-times" aria-hidden="true"></i>
                         </button>
                     )}
                 </div>

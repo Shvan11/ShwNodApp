@@ -152,36 +152,6 @@ export async function getConfiguredTimeSlots(): Promise<string[]> {
 }
 
 /**
- * Utilisation statistics for a week/range. (was: ProcCalendarStatsOptimized)
- */
-export async function getCalendarStats(startDate: string, endDate: string): Promise<CalendarStatsRow> {
-  const { rows } = await sql<CalendarStatsRow>`
-    SELECT
-      ${startDate}::date AS "weekStart",
-      ${endDate}::date   AS "weekEnd",
-      COUNT(*)::int      AS "totalSlots",
-      COALESCE(SUM(CASE WHEN slotstatus = 'available' THEN 1 ELSE 0 END), 0)::int AS "availableSlots",
-      COALESCE(SUM(CASE WHEN slotstatus = 'booked'    THEN 1 ELSE 0 END), 0)::int AS "bookedSlots",
-      COALESCE(SUM(CASE WHEN slotstatus = 'past'      THEN 1 ELSE 0 END), 0)::int AS "pastSlots",
-      CASE WHEN COUNT(*) > 0
-        THEN CAST(SUM(CASE WHEN slotstatus = 'booked' THEN 1.0 ELSE 0 END) / COUNT(*) * 100 AS decimal(5,2))
-        ELSE 0 END AS "utilizationPercent"
-    FROM (
-      SELECT
-        CASE
-          WHEN EXISTS (SELECT 1 FROM "appointments" tac WHERE tac."app_date" = tc."app_date") THEN 'booked'
-          WHEN tc."app_date" < LOCALTIMESTAMP THEN 'past'
-          ELSE 'available'
-        END AS slotstatus
-      FROM "calendar" tc
-      WHERE tc."app_date"::date BETWEEN ${startDate}::date AND ${endDate}::date
-        AND EXTRACT(DOW FROM tc."app_date") <> 5
-    ) s
-  `.execute(getKysely());
-  return rows[0];
-}
-
-/**
  * Report whether the calendar extends far enough ahead. (was: ProcEnsureCalendarRange — report only.)
  */
 export async function ensureCalendarRange(daysAhead = 60): Promise<EnsureRangeResult> {

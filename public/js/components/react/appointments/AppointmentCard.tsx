@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocalizedName } from '../../../hooks/useLocalizedName';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { formatClockTime } from '@/utils/formatters';
 import { PATIENT_TYPE_IDS } from '@shared/treatment-taxonomy';
 import type { DailyAppointmentRow } from '@shared/contracts/appointment.contract';
 import type { DoctorColor } from '../calendar.types';
@@ -41,23 +43,15 @@ const AppointmentCard = ({
     onUndoState
 }: AppointmentCardProps) => {
     const { t } = useTranslation('appointments');
+    const { language } = useLanguage();
     const localizedName = useLocalizedName();
 
-    // Format a 24-hour `HH:MM[:SS]` wall-clock time (the contract's `clockTime`)
-    // as 12-hour `h:mm` + the active language's marker (ص/م in Arabic). Digits
-    // stay Western (product decision). The server sends 24-hour on purpose: it
-    // used to send 12-hour with no marker, and this then read every afternoon
-    // stamp as AM (audit FE-F11-1).
-    const formatTime = (timeString: string | null | undefined): string => {
-        if (!timeString) return '';
-
-        const [hourPart, minutes] = timeString.split(':');
-        const hours24 = parseInt(hourPart, 10);
-        if (Number.isNaN(hours24) || minutes === undefined) return timeString;
-
-        const period = hours24 >= 12 ? t('card.pm') : t('card.am');
-        return `${hours24 % 12 || 12}:${minutes} ${period}`;
-    };
+    // A 24-hour `HH:MM[:SS]` wall-clock time (the contract's `clockTime`) as
+    // 12-hour `h:mm` + the active language's marker (ص/م in Arabic), through the
+    // shared formatter the booking picker also uses. The server sends 24-hour on
+    // purpose: it used to send 12-hour with no marker, and every afternoon stamp
+    // read as AM (audit FE-F11-1).
+    const formatTime = (timeString: string): string => formatClockTime(timeString, language);
 
     const navigate = useNavigate();
 

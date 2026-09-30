@@ -314,6 +314,7 @@ export default [
       'public/js/components/react/WorkCard.tsx',
       'public/js/components/react/AppointmentForm.tsx',
       'public/js/components/react/EditAppointmentForm.tsx',
+      'public/js/components/react/BookingForm.tsx',
       'public/js/components/react/SimplifiedCalendarPicker.tsx',
       'public/js/components/react/PatientAppointments.tsx',
       'public/js/components/react/PaymentModal.tsx',

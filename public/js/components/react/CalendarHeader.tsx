@@ -6,15 +6,7 @@
  */
 
 import DoctorFilter from './DoctorFilter';
-
-type ViewMode = 'day' | 'week' | 'month';
-
-interface CalendarStats {
-    utilizationPercent: number;
-    availableSlots: number;
-    bookedSlots: number;
-    totalSlots: number;
-}
+import type { CalendarStats, ViewMode } from './calendar.types';
 
 interface CalendarHeaderProps {
     titleMain: string;
@@ -25,7 +17,10 @@ interface CalendarHeaderProps {
     viewMode: ViewMode;
     onViewModeChange: (mode: ViewMode) => void;
     calendarStats: CalendarStats | null;
-    loading: boolean;
+    /** A read is in flight. The previous data stays on screen meanwhile, and
+     *  nothing here is disabled: the zoom slider used to be disabled, then
+     *  unmounted, under the pointer mid-drag (audit FE-F10-4). */
+    fetching: boolean;
     selectedDoctorId: number | null;
     onDoctorChange: (doctorId: number | null) => void;
     /* Density-zoom (week/day grid only — Month has its own layout). The slider +
@@ -56,7 +51,7 @@ const CalendarHeader = ({
     viewMode,
     onViewModeChange,
     calendarStats,
-    loading,
+    fetching,
     selectedDoctorId,
     onDoctorChange,
     showZoom,
@@ -68,13 +63,19 @@ const CalendarHeader = ({
     onZoomSlider,
     onZoomFit
 }: CalendarHeaderProps) => {
-    const utilization = calendarStats?.utilizationPercent ?? 0;
+    // The server keeps two decimals ("33.33"); the strip shows a whole percent.
+    const utilization = Math.round(calendarStats?.utilizationPercent ?? 0);
 
     return (
         <header className="cal-bar">
             <div className="cal-bar-l">
-                <div className="cal-title">
-                    <span className="cal-title-main">{titleMain}</span>
+                <div className="cal-title" aria-busy={fetching}>
+                    <span className="cal-title-main">
+                        {titleMain}
+                        {fetching && (
+                            <i className="fas fa-circle-notch fa-spin cal-fetching" aria-hidden="true"></i>
+                        )}
+                    </span>
                     {titleSub && <span className="cal-title-sub">{titleSub}</span>}
                 </div>
                 <div className="cal-nav">
@@ -82,7 +83,6 @@ const CalendarHeader = ({
                         type="button"
                         className="cal-nav-btn"
                         onClick={onPreviousWeek}
-                        disabled={loading}
                         aria-label="Previous"
                         title="Previous"
                     >
@@ -92,7 +92,6 @@ const CalendarHeader = ({
                         type="button"
                         className="cal-today"
                         onClick={onTodayClick}
-                        disabled={loading}
                         title="Go to today"
                     >
                         Today
@@ -101,7 +100,6 @@ const CalendarHeader = ({
                         type="button"
                         className="cal-nav-btn"
                         onClick={onNextWeek}
-                        disabled={loading}
                         aria-label="Next"
                         title="Next"
                     >
@@ -143,8 +141,7 @@ const CalendarHeader = ({
                             type="button"
                             className={viewMode === mode ? 'active' : ''}
                             onClick={() => onViewModeChange(mode)}
-                            disabled={loading}
-                            role="tab"
+                                role="tab"
                             aria-selected={viewMode === mode}
                             title={`${label} View`}
                         >
@@ -161,7 +158,7 @@ const CalendarHeader = ({
                                 type="button"
                                 className="cal-zoom-btn"
                                 onClick={onZoomIn}
-                                disabled={loading || dayCount <= minDayCount}
+                                disabled={dayCount <= minDayCount}
                                 aria-label="Zoom in — fewer days"
                                 title="Fewer days"
                             >
@@ -174,15 +171,14 @@ const CalendarHeader = ({
                                 max={maxDayCount}
                                 value={dayCount}
                                 onChange={e => onZoomSlider(Number(e.target.value))}
-                                disabled={loading}
-                                aria-label="Days shown"
+                                        aria-label="Days shown"
                                 title={`${dayCount} day${dayCount === 1 ? '' : 's'} shown`}
                             />
                             <button
                                 type="button"
                                 className="cal-zoom-btn"
                                 onClick={onZoomOut}
-                                disabled={loading || dayCount >= maxDayCount}
+                                disabled={dayCount >= maxDayCount}
                                 aria-label="Zoom out — more days"
                                 title="More days"
                             >
@@ -195,8 +191,7 @@ const CalendarHeader = ({
                                 type="button"
                                 className="cal-zoom-fit"
                                 onClick={onZoomFit}
-                                disabled={loading}
-                                title="Fit all time rows on screen"
+                                        title="Fit all time rows on screen"
                             >
                                 Fit
                             </button>

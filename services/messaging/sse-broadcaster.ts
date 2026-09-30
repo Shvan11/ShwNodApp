@@ -20,7 +20,15 @@ import { buildChairPatientPayload, type ChairPatientPayload } from './chair-payl
 import { log } from '../../utils/logger.js';
 
 const appointmentsClients = new Set<Response>();
-const chairClients = new Map<string, Response>();
+// Every open kiosk stream per chair. A chair may have more than one screen (a
+// patient-facing one and one at the operator's side): it used to be ONE stream
+// per chair, so two kiosks on the same number kept ending each other's stream and
+// reconnecting every few seconds (audit FE-F11-15b).
+const chairClients = new Map<string, Set<Response>>();
+
+function chairStreams(chairId: string): Set<Response> {
+  return chairClients.get(chairId) ?? new Set();
+}
 const chairCurrentPatient = new Map<string, { payload: ChairPatientPayload; loadedAt: number }>();
 // Monotonic per-chair counter — bumped synchronously on every LOAD/CLEAR so an
 // async LOAD that resolves AFTER a later CLEAR (or another LOAD) can detect
@@ -72,17 +80,15 @@ function ensureInitialized(emitter: EventEmitter): void {
     // commit nothing, or we'd resurrect a cleared patient in the cache (12 h TTL).
     if (chairEpoch.get(chairId) !== epoch) return;
     chairCurrentPatient.set(chairId, { payload, loadedAt: Date.now() });
-    const res = chairClients.get(chairId);
-    if (!res) return; // No active kiosk for this chair — payload stays cached for next connect.
-    safeWrite(res, `event: chair_display_patient_loaded\ndata: ${JSON.stringify(payload)}\n\n`);
+    // No active kiosk for this chair — the payload stays cached for the next connect.
+    const frame = `event: chair_display_patient_loaded\ndata: ${JSON.stringify(payload)}\n\n`;
+    for (const res of chairStreams(chairId)) safeWrite(res, frame);
   };
 
   const onChairPatientClear = (chairId: string): void => {
     chairEpoch.set(chairId, (chairEpoch.get(chairId) ?? 0) + 1);
     chairCurrentPatient.delete(chairId);
-    const res = chairClients.get(chairId);
-    if (!res) return;
-    safeWrite(res, 'event: chair_display_patient_cleared\ndata: {}\n\n');
+    for (const res of chairStreams(chairId)) safeWrite(res, 'event: chair_display_patient_cleared\ndata: {}\n\n');
   };
 
   // A background photo render finished — notify every appointments-stream viewer
@@ -116,7 +122,9 @@ function ensureInitialized(emitter: EventEmitter): void {
   // client's liveness watchdog see the transport is alive.
   keepAliveHandle = setInterval(() => {
     for (const res of appointmentsClients) safeWrite(res, PING_FRAME);
-    for (const res of chairClients.values()) safeWrite(res, PING_FRAME);
+    for (const streams of chairClients.values()) {
+      for (const res of streams) safeWrite(res, PING_FRAME);
+    }
   }, KEEP_ALIVE_MS);
   keepAliveHandle.unref();
 
@@ -172,14 +180,13 @@ export function createChairDisplaySseRouter(emitter: EventEmitter): Router {
 
     openStream(req, res);
 
-    // If a previous stream is mapped, end it explicitly so its req.on('close')
-    // can't unmap THIS new connection.
-    const prev = chairClients.get(chairId);
-    if (prev && prev !== res) {
-      try { prev.end(); } catch { /* already gone */ }
+    let streams = chairClients.get(chairId);
+    if (!streams) {
+      streams = new Set();
+      chairClients.set(chairId, streams);
     }
-    chairClients.set(chairId, res);
-    log.debug('SSE chair-display connected', { chairId });
+    streams.add(res);
+    log.debug('SSE chair-display connected', { chairId, streams: streams.size });
 
     // Replay the cached payload — same UX guarantee the WS REGISTER handler provided.
     const stored = chairCurrentPatient.get(chairId);
@@ -190,11 +197,9 @@ export function createChairDisplaySseRouter(emitter: EventEmitter): Router {
     }
 
     req.on('close', () => {
-      // Only delete if the map still points to THIS res — a fast reconnect may
-      // have already replaced it via the prev.end() branch above.
-      if (chairClients.get(chairId) === res) {
-        chairClients.delete(chairId);
-      }
+      const open = chairClients.get(chairId);
+      open?.delete(res);
+      if (open && open.size === 0) chairClients.delete(chairId);
       log.debug('SSE chair-display disconnected', { chairId });
     });
   });
@@ -218,8 +223,10 @@ export function teardownSseBroadcaster(): void {
     try { res.end(); } catch { /* ignore */ }
   }
   appointmentsClients.clear();
-  for (const res of chairClients.values()) {
-    try { res.end(); } catch { /* ignore */ }
+  for (const streams of chairClients.values()) {
+    for (const res of streams) {
+      try { res.end(); } catch { /* ignore */ }
+    }
   }
   chairClients.clear();
   chairCurrentPatient.clear();

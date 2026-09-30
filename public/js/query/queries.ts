@@ -11,7 +11,7 @@
  * This file grows as screens migrate; only the factories currently wired live
  * here.
  */
-import { queryOptions } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 import { fetchJSON } from '@/core/http';
 import * as patientContract from '@shared/contracts/patient.contract';
@@ -1724,7 +1724,14 @@ export const expenseByIdQuery = (id: number | string | null | undefined) =>
     enabled: id != null && id !== '',
   });
 
-/** GET /api/calendar/range?start=&end=&doctorId= — grid (day/week/zoom) window. */
+/**
+ * GET /api/calendar/range?start=&end=&doctorId= — grid (day/week/zoom) window.
+ * `keepPreviousData`: paging, zooming or filtering keeps the current grid (and
+ * the toolbar) on screen until the next window arrives. Without it every new key
+ * started with no data and the page swapped to a full-screen "Loading
+ * Calendar..." — toolbar and the zoom slider under the pointer included (audit
+ * FE-F10-4).
+ */
 export const calendarRangeQuery = (start: string, end: string, doctorId: number | null) =>
   queryOptions({
     queryKey: qk.calendar.range(start, end, doctorId ?? 0),
@@ -1736,35 +1743,34 @@ export const calendarRangeQuery = (start: string, end: string, doctorId: number 
         { signal, schema: calendarContract.range.response }
       );
     },
+    placeholderData: keepPreviousData,
     enabled: !!start && !!end,
   });
 
-/** GET /api/calendar/month?date=&doctorId= — month grid (keyed by the query string). */
-export const calendarMonthQuery = (params: string) =>
+/**
+ * GET /api/calendar/month?date=&doctorId= — the month grid plus the month's own
+ * utilisation (`stats`, audit FE-F10-6). Like the range read, it keeps the
+ * previous month on screen while the next one loads.
+ */
+export const calendarMonthQuery = (date: string, doctorId: number | null) =>
   queryOptions({
-    queryKey: qk.calendar.month(params),
-    queryFn: ({ signal }) =>
-      fetchJSON<z.infer<typeof calendarContract.month.response>>(`/api/calendar/month?${params}`, {
+    queryKey: qk.calendar.month(date, doctorId ?? 0),
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams({ date });
+      if (doctorId) params.append('doctorId', String(doctorId));
+      return fetchJSON<z.infer<typeof calendarContract.month.response>>(`/api/calendar/month?${params}`, {
         signal,
         schema: calendarContract.month.response,
-      }),
-  });
-
-/** GET /api/calendar/stats?date= — month KPI rollup (keyed by the query string). */
-export const calendarStatsQuery = (params: string) =>
-  queryOptions({
-    queryKey: qk.calendar.stats(params),
-    queryFn: ({ signal }) =>
-      fetchJSON<z.infer<typeof calendarContract.stats.response>>(`/api/calendar/stats?${params}`, {
-        signal,
-        schema: calendarContract.stats.response,
-      }),
+      });
+    },
+    placeholderData: keepPreviousData,
+    enabled: !!date,
   });
 
 /** GET /api/calendar/month-availability?startDate=&endDate= — per-day availability map. */
 export const monthAvailabilityQuery = (startDate: string, endDate: string) =>
   queryOptions({
-    queryKey: qk.calendar.availability(0, 0, `${startDate}_${endDate}`),
+    queryKey: qk.calendar.availability(startDate, endDate),
     queryFn: ({ signal }) =>
       fetchJSON<z.infer<typeof calendarContract.monthAvailability.response>>(
         `/api/calendar/month-availability?startDate=${startDate}&endDate=${endDate}`,
@@ -1776,7 +1782,7 @@ export const monthAvailabilityQuery = (startDate: string, endDate: string) =>
 /** GET /api/calendar/available-slots?date= — bookable slots for one day. */
 export const availableSlotsQuery = (date: string) =>
   queryOptions({
-    queryKey: qk.calendar.slots(date, 'all'),
+    queryKey: qk.calendar.slots(date),
     queryFn: ({ signal }) =>
       fetchJSON<z.infer<typeof calendarContract.availableSlots.response>>(
         `/api/calendar/available-slots?date=${date}`,

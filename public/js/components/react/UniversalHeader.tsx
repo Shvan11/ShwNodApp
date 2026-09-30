@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { patientInfoQuery, brandingQuery } from '@/query/queries';
 import { ROLES } from '@shared/auth/roles';
+import { appointmentsPath } from '../../utils/appointmentsDate';
 import TasksBell from './TasksBell';
 import PortalActivityBell from './PortalActivityBell';
 import ApprovalsBell from './ApprovalsBell';
@@ -160,20 +161,8 @@ const UniversalHeader = () => {
     };
 
     const navigateToAppointments = () => {
-        // Restore last viewed date or default to today
-        const lastDate = sessionStorage.getItem('lastAppointmentDate');
-
-        if (lastDate) {
-            navigate(`/appointments?date=${lastDate}`);
-        } else {
-            // Default to today for first visit
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
-            const dateParam = `${year}-${month}-${day}`;
-            navigate(`/appointments?date=${dateParam}`);
-        }
+        // The date the user last picked, or today (FE-F11-8b).
+        navigate(appointmentsPath());
     };
 
     const navigateToPatientManagement = () => {
