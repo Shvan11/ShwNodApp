@@ -5,6 +5,7 @@ import type { MouseEvent, DragEvent } from 'react';
 import { getItem, setItem } from '../core/storage';
 import { useGlobalState } from '../contexts/GlobalStateContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
+import { appointmentsPath } from '../utils/appointmentsDate';
 
 // Dashboard styles - CSS Module
 import styles from './Dashboard.module.css';
@@ -80,19 +81,9 @@ export default function Dashboard() {
     // Prevent page navigation when customize/arrange mode is active
     if (isCustomizeMode) return;
 
-    // Special handling for Appointments - restore last date or default to today
+    // Appointments reopens the date the user last picked, or today.
     if (link === '/appointments') {
-      const lastDate = sessionStorage.getItem('lastAppointmentDate');
-      if (lastDate) {
-        navigate(`/appointments?date=${lastDate}`);
-      } else {
-        // Default to today for first visit
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        navigate(`/appointments?date=${year}-${month}-${day}`);
-      }
+      navigate(appointmentsPath());
     } else {
       navigate(link);
     }

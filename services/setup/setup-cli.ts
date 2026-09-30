@@ -26,6 +26,7 @@ import {
   countUsers,
   createFirstAdmin,
   generateCalendar,
+  ensureVideosFolderOption,
   identityWarnings,
   readIdentity,
   type SetupStep,
@@ -175,6 +176,7 @@ export async function runSetupCli(argv: string[], print: Printer = console.log):
     // 3. Starter vocabularies, then the calendar that needs the time slots.
     steps.push(...(await applyStarterVocabularies()));
     steps.push(await generateCalendar());
+    steps.push(await ensureVideosFolderOption());
 
     print('');
     printSteps(print, steps);

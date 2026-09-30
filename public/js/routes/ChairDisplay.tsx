@@ -1,9 +1,17 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { brandingQuery } from '@/query/queries';
 import AnalogClock from '../components/react/AnalogClock';
-import { VISIBILITY_RESUME_THRESHOLD_MS, CLOSED_STREAM_RELOAD_DELAY_MS } from '../constants/sse-liveness';
+import {
+    VISIBILITY_RESUME_THRESHOLD_MS,
+    CLOSED_STREAM_RELOAD_DELAY_MS,
+    SILENT_STREAM_TIMEOUT_MS,
+    LIVENESS_CHECK_INTERVAL_MS,
+} from '../constants/sse-liveness';
 import { applyResolvedTheme, getStoredThemePreference, resolveTheme } from '../core/theme';
 import { applyLanguageAttributes, getStoredLanguagePreference } from '../core/language';
+import { parseLocalDate } from '../utils/calendarDate';
 import styles from './ChairDisplay.module.css';
 
 interface ImageEntry {
@@ -23,13 +31,14 @@ interface PatientPayload {
 }
 
 /**
- * The latest-visit Summary string is HTML emitted by the ProlatestVisitSum stored
- * procedure (literal `<br>` separators and `<font color=blue>...</font>` for the
- * "Next" line). Parts of it interpolate user-typed visit fields (Others, NextVisit,
- * etc.), so we can't render it verbatim with dangerouslySetInnerHTML.
+ * The latest-visit Summary string is HTML built by the server
+ * (`visit-queries.ts#buildVisitSummary`: literal `<br>` separators and
+ * `<font color=blue>...</font>` for the "Next" line). Parts of it interpolate
+ * user-typed visit fields (Others, NextVisit, etc.), so we can't render it
+ * verbatim with dangerouslySetInnerHTML.
  *
  * Strategy: HTML-escape everything, then re-enable only the small allowlist of
- * tags the SP itself produces. Anything a user typed remains escaped.
+ * tags the builder itself produces. Anything a user typed remains escaped.
  */
 const renderVisitSummary = (raw: string): string => {
     const escaped = raw
@@ -45,16 +54,50 @@ const renderVisitSummary = (raw: string): string => {
         .replace(/&lt;\/font&gt;/gi, '</span>');
 };
 
+/** How long to wait between server probes while the server is still down (grows to the last). */
+const RELOAD_PROBE_DELAYS_MS = [15_000, 30_000, 60_000];
+
+/**
+ * Is the app itself answering? A reload while the server is still down behind
+ * Caddy / the tunnel lands on the proxy's error page, which has no script to try
+ * again, and the kiosk stays there (audit FE-F11-15d). `/health/basic` is
+ * public, so any answer from the app — even with an expired session — is a yes.
+ */
+async function appIsReachable(): Promise<boolean> {
+    try {
+        // eslint-disable-next-line no-restricted-syntax -- liveness probe of the public /health/basic, not an API read: no envelope, no CSRF, must not redirect on 401
+        const res = await fetch('/health/basic', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+/** The idle clock fills half the shorter side, and follows a resize or rotation (FE-F11-15c). */
+const idleClockSize = (): number => Math.min(window.innerHeight * 0.5, window.innerWidth * 0.5);
+
 const ChairDisplay = () => {
     const [searchParams] = useSearchParams();
     const chairParam = searchParams.get('chair');
     const chairId = useMemo(() => (chairParam && /^([1-9]|10)$/.test(chairParam) ? chairParam : null), [chairParam]);
 
     const [connected, setConnected] = useState(false);
+    // The clinic's own name (Settings → General). The idle screen read "Welcome to
+    // Shwan Orthodontics" as a literal on every center's kiosk (audit FE-F11-6).
+    const { data: branding } = useQuery(brandingQuery());
+    const clinicName = branding?.clinicName?.trim() || null;
     const [patient, setPatient] = useState<PatientPayload | null>(null);
     const esRef = useRef<EventSource | null>(null);
     const hiddenSinceRef = useRef<number | null>(null);
     const reloadTimerRef = useRef<number | null>(null);
+    const lastActivityRef = useRef(0);
+    const [clockSize, setClockSize] = useState(idleClockSize);
+
+    useEffect(() => {
+        const onResize = () => setClockSize(idleClockSize());
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
 
     // The kiosk is pinned to LIGHT + LTR regardless of the operator's device
     // theme/language. ChairDisplay lives outside RootLayout (no Theme/Language
@@ -75,9 +118,12 @@ const ChairDisplay = () => {
 
         let cancelled = false;
 
-        // Native EventSource auto-reconnects per the server's `retry: 3000`
-        // directive — no manual reconnect loop or liveness timer needed.
-        // visibilitychange / pageshow handle the silent-NAT-drop case.
+        // Native EventSource auto-reconnects per the server's `retry:` directive.
+        // A transport that goes quiet WITHOUT closing is caught by the liveness
+        // check below: the server pings every 25 s, and a stream silent for
+        // SILENT_STREAM_TIMEOUT_MS is reopened. visibilitychange can't cover it —
+        // a wall kiosk is never hidden — and before the check, a kiosk in that
+        // state kept showing the last patient to whoever sat down next (FE-F11-7).
         const open = () => {
             if (cancelled) return;
             // Tear down any previous handle before opening a new one.
@@ -89,11 +135,17 @@ const ChairDisplay = () => {
             // Same-origin EventSource sends the session cookie automatically.
             const es = new EventSource(`/api/sse/chair-display/${chairId}`);
             esRef.current = es;
+            lastActivityRef.current = Date.now();
 
             es.onopen = () => {
                 if (cancelled) return;
+                lastActivityRef.current = Date.now();
                 setConnected(true);
             };
+
+            es.addEventListener('ping', () => {
+                lastActivityRef.current = Date.now();
+            });
 
             es.onerror = () => {
                 if (cancelled) return;
@@ -102,22 +154,32 @@ const ChairDisplay = () => {
                 setConnected(false);
 
                 // CLOSED comes from an HTTP error response, not a dropped socket
-                // (a dead server leaves it CONNECTING and retrying). Since the
-                // stream became session-authenticated, the realistic cause is an
-                // expired staff session — and EventSource never retries after a
-                // 4xx, so the kiosk would sit on "Reconnecting…" forever. Reload:
-                // the web gate then redirects to /login.html, which is a screen a
-                // human can act on. Delayed + latched so a server-side 5xx storm
-                // can't turn this into a reload loop.
+                // (a dead server leaves it CONNECTING and retrying): an expired
+                // staff session, or a proxy's 502 while the server restarts.
+                // EventSource never retries after either, so reload — but only
+                // once the app answers: the web gate then shows /login.html for an
+                // expired session, and a restarted server simply reconnects. While
+                // it does not answer, probe again with a growing delay and stay on
+                // this page. Latched, so a 5xx storm can't become a reload loop.
                 if (es.readyState === EventSource.CLOSED && reloadTimerRef.current === null) {
-                    reloadTimerRef.current = window.setTimeout(() => {
-                        if (!cancelled) window.location.reload();
-                    }, CLOSED_STREAM_RELOAD_DELAY_MS);
+                    let attempt = 0;
+                    const tryReload = async () => {
+                        if (cancelled) return;
+                        if (await appIsReachable()) {
+                            if (!cancelled) window.location.reload();
+                            return;
+                        }
+                        const delay = RELOAD_PROBE_DELAYS_MS[Math.min(attempt, RELOAD_PROBE_DELAYS_MS.length - 1)];
+                        attempt++;
+                        if (!cancelled) reloadTimerRef.current = window.setTimeout(() => void tryReload(), delay);
+                    };
+                    reloadTimerRef.current = window.setTimeout(() => void tryReload(), CLOSED_STREAM_RELOAD_DELAY_MS);
                 }
             };
 
             es.addEventListener('chair_display_patient_loaded', (evt) => {
                 if (cancelled) return;
+                lastActivityRef.current = Date.now();
                 try {
                     setPatient(JSON.parse((evt as MessageEvent).data) as PatientPayload);
                 } catch {
@@ -127,11 +189,21 @@ const ChairDisplay = () => {
 
             es.addEventListener('chair_display_patient_cleared', () => {
                 if (cancelled) return;
+                lastActivityRef.current = Date.now();
                 setPatient(null);
             });
         };
 
         open();
+
+        const livenessTimer = window.setInterval(() => {
+            const es = esRef.current;
+            if (cancelled || !es || es.readyState !== EventSource.OPEN) return;
+            if (Date.now() - lastActivityRef.current > SILENT_STREAM_TIMEOUT_MS) {
+                setConnected(false);
+                open();
+            }
+        }, LIVENESS_CHECK_INTERVAL_MS);
 
         const handleVisibility = () => {
             if (cancelled) return;
@@ -155,6 +227,7 @@ const ChairDisplay = () => {
 
         return () => {
             cancelled = true;
+            window.clearInterval(livenessTimer);
             document.removeEventListener('visibilitychange', handleVisibility);
             window.removeEventListener('pageshow', handlePageShow);
             if (reloadTimerRef.current !== null) {
@@ -186,8 +259,10 @@ const ChairDisplay = () => {
 
     const visitSummary = patient?.latestVisit?.Summary;
     const visitDate = patient?.latestVisit?.visit_date;
+    // Local midnight for a date-only string: `new Date('YYYY-MM-DD')` is UTC and
+    // read a day early on a kiosk west of UTC (FE-F11-15a).
     const formattedVisitDate = visitDate
-        ? new Date(visitDate).toLocaleDateString(undefined, {
+        ? parseLocalDate(visitDate).toLocaleDateString(undefined, {
               year: 'numeric',
               month: 'short',
               day: 'numeric',
@@ -248,10 +323,10 @@ const ChairDisplay = () => {
             ) : (
                 <div className={styles.idle}>
                     <div className={styles.idleClockWrap}>
-                        <AnalogClock size={Math.min(window.innerHeight * 0.5, window.innerWidth * 0.5)} />
+                        <AnalogClock size={clockSize} />
                     </div>
                     <div className={styles.clinicCaption}>
-                        Welcome to <strong>Shwan Orthodontics</strong>
+                        {clinicName ? <>Welcome to <strong>{clinicName}</strong></> : 'Welcome'}
                     </div>
                 </div>
             )}

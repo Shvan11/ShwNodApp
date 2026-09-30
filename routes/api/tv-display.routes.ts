@@ -25,6 +25,7 @@ import { randomBytes } from 'crypto';
 import { mkdir } from 'fs/promises';
 import { authorize } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
+import { timeouts } from '../../middleware/timeout.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
 import { UploadRejectedError, uploadErrorMessage } from '../../middleware/upload.js';
 import { log } from '../../utils/logger.js';
@@ -188,7 +189,10 @@ router.put(
 );
 
 // POST /api/tv-display/media — multipart upload (field `media`).
-router.post('/tv-display/media', uploadMediaFiles, async (req: Request, res: Response): Promise<void> => {
+// `timeouts.upload`: signage clips are hundreds of MB, and the global 30 s
+// requestTimeout failed every one that took longer to transfer (audit FE-F11-5;
+// the client carries the same 10-minute budget).
+router.post('/tv-display/media', timeouts.upload, uploadMediaFiles, async (req: Request, res: Response): Promise<void> => {
   const files = Array.isArray(req.files) ? req.files : [];
   if (files.length === 0) {
     ErrorResponses.badRequest(res, 'No files received');

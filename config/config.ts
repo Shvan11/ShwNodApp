@@ -146,7 +146,8 @@ const config: AppConfig = {
     port: env.PORT ?? DEFAULT_PORT
   },
   urls: {
-    publicUrl: process.env.PUBLIC_URL || 'https://remote.shwan-orthodontics.com'
+    publicUrl: process.env.PUBLIC_URL || 'https://remote.shwan-orthodontics.com',
+    publicUrlIsDefault: !process.env.PUBLIC_URL
   },
   webceph: {
     partnerApiKey: process.env.WEBCEPH_PARTNER_API_KEY,

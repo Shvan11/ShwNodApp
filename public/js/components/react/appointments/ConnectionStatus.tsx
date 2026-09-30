@@ -13,9 +13,11 @@ interface ConnectionStatusProps {
 
 /**
  * ConnectionStatus Component
- * Honest indicator: only shows "Live" when both the SSE stream is OPEN and the
- * server heartbeat has been received recently. Past/future dates render as
- * "Static" because SSE subscriptions don't apply to non-today views.
+ * Honest indicator: "Live" needs the SSE stream OPEN. The shared channel
+ * (services/sse-channel.ts) reopens a stream that has been silent past two
+ * missed server pings (it then reads "Reconnecting…") and retries one the
+ * browser gave up on (a proxy's 502 during a restart). Past/future dates render
+ * as "Static" because SSE subscriptions don't apply to non-today views.
  */
 const ConnectionStatus = ({ status, freshness, isViewingToday, showFlash = false }: ConnectionStatusProps) => {
     const { t } = useTranslation('appointments');

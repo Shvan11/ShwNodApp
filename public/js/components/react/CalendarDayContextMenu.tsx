@@ -1,10 +1,23 @@
-import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
-import type { CalendarDay, MenuPosition } from './calendar.types';
+import { useRef, type KeyboardEvent } from 'react';
+import { useFloatingMenu, type MenuAnchor } from '../../hooks/useFloatingMenu';
+import { parseLocalDate } from '../../utils/calendarDate';
+import type { CalendarDay } from './calendar.types';
 
 interface CalendarDayContextMenuProps {
-    position: MenuPosition;
+    position: MenuAnchor;
     day: CalendarDay;
+    /** Appointments on the day (the week grid and the month view count them differently). */
+    appointmentCount: number;
     onClose: () => void;
+    /** Omitted when the day is already the one on screen in day view. */
+    onOpenDay?: (day: CalendarDay) => void;
+    /**
+     * Holiday writes go to `/api/admin/lookups/tblHolidays`, which is
+     * `authorize(admin|front_desk)`. For any other role the three actions are not
+     * offered: a clinical user used to fill in the modal and get a 403 at Save
+     * (audit FE-F10-14).
+     */
+    canManageHolidays: boolean;
     onAddHoliday: (day: CalendarDay) => void;
     onEditHoliday: (day: CalendarDay) => void;
     onRemoveHoliday: (day: CalendarDay) => void;
@@ -12,186 +25,104 @@ interface CalendarDayContextMenuProps {
 
 /**
  * CalendarDayContextMenu Component
- * Context menu for calendar day cells
- * Handles holiday management actions (Add/Edit/Remove)
+ * The menu for a day: open it in day view, and the holiday actions
+ * (Add/Edit/Remove). Opened by right-click, by a click or Enter on the week
+ * grid's day header, or from the month view's day panel, so it has a keyboard
+ * and touch path (audit FE-F10-15d).
  */
 const CalendarDayContextMenu = ({
-    position,
+    position: anchor,
     day,
+    appointmentCount,
     onClose,
+    onOpenDay,
+    canManageHolidays,
     onAddHoliday,
     onEditHoliday,
     onRemoveHoliday
 }: CalendarDayContextMenuProps) => {
     const menuRef = useRef<HTMLDivElement>(null);
-    const isHoliday = day?.isHoliday;
+    const { position, onKeyDown } = useFloatingMenu(menuRef, anchor, onClose);
+    const isHoliday = !!day.isHoliday;
 
-    // Close on click outside - use mousedown for more reliable detection
-    useEffect(() => {
-        const handleClickOutside = (event: globalThis.MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-                onClose();
-            }
-        };
+    // Local midnight — `new Date('YYYY-MM-DD')` is UTC, a day early west of UTC (FE-F10-16).
+    const dateLabel = parseLocalDate(day.date).toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+    });
 
-        // Add listener on next frame to avoid catching the opening right-click
-        const frameId = requestAnimationFrame(() => {
-            document.addEventListener('mousedown', handleClickOutside);
-        });
-
-        return () => {
-            cancelAnimationFrame(frameId);
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [onClose]);
-
-    // Close on ESC key
-    useEffect(() => {
-        const handleEscKey = (event: globalThis.KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                onClose();
-            }
-        };
-
-        document.addEventListener('keydown', handleEscKey);
-        return () => {
-            document.removeEventListener('keydown', handleEscKey);
-        };
-    }, [onClose]);
-
-    // Adjust position to keep menu in viewport. Measured after mount in a layout
-    // effect — reading getBoundingClientRect during render hits a null ref on the
-    // first paint, so the clamp never applied and the menu could overflow.
-    const [adjustedPosition, setAdjustedPosition] = useState<MenuPosition>(position);
-    useLayoutEffect(() => {
-        if (!menuRef.current) return;
-        const rect = menuRef.current.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        const next = { ...position };
-        if (position.x + rect.width > viewportWidth - 20) {
-            next.x = viewportWidth - rect.width - 20;
+    const run = (action: (d: CalendarDay) => void) => () => {
+        onClose();
+        action(day);
+    };
+    const activate = (action: () => void) => (e: KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            action();
         }
-        if (position.y + rect.height > viewportHeight - 20) {
-            next.y = viewportHeight - rect.height - 20;
-        }
-        setAdjustedPosition(next);
-    }, [position]);
-
-    const formatDate = (dateStr: string): string => {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString(undefined, {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric'
-        });
     };
 
-    const handleAddHoliday = (e: MouseEvent<HTMLDivElement>) => {
-        e.stopPropagation();
-        onAddHoliday(day);
-        onClose();
-    };
-
-    const handleEditHoliday = (e: MouseEvent<HTMLDivElement>) => {
-        e.stopPropagation();
-        onEditHoliday(day);
-        onClose();
-    };
-
-    const handleRemoveHoliday = (e: MouseEvent<HTMLDivElement>) => {
-        e.stopPropagation();
-        onRemoveHoliday(day);
-        onClose();
-    };
+    const item = (label: string, icon: string, action: () => void, danger = false) => (
+        <div
+            className={`context-menu-item${danger ? ' context-menu-item-danger' : ''}`}
+            role="menuitem"
+            tabIndex={-1}
+            onClick={action}
+            onKeyDown={activate(action)}
+        >
+            <i className={`fas ${icon}`} aria-hidden="true"></i>
+            <span>{label}</span>
+        </div>
+    );
 
     return (
         <div
             ref={menuRef}
             className="calendar-context-menu calendar-day-context-menu"
-            style={{
-                left: `${adjustedPosition.x}px`,
-                top: `${adjustedPosition.y}px`
-            }}
+            role="menu"
+            tabIndex={-1}
+            aria-label={dateLabel}
+            style={{ left: `${position.x}px`, top: `${position.y}px` }}
+            onKeyDown={onKeyDown}
         >
-            {/* Date header */}
             <div className="context-menu-header">
-                <i className="fas fa-calendar-day"></i>
-                <span>{formatDate(day.date)}</span>
+                <i className="fas fa-calendar-day" aria-hidden="true"></i>
+                <span>{dateLabel}</span>
             </div>
 
-            {isHoliday ? (
+            {isHoliday && (
+                <div className="context-menu-info holiday-info">
+                    <i className="fas fa-calendar-times" aria-hidden="true"></i>
+                    <span>{day.holidayName || 'Holiday'}</span>
+                </div>
+            )}
+            {/* A number, never a bare `count && …`: that rendered a stray "0" (FE-F10-15c). */}
+            {appointmentCount > 0 && (
+                <div className="context-menu-info">
+                    <i className="fas fa-calendar-check" aria-hidden="true"></i>
+                    <span>{appointmentCount} appointment{appointmentCount === 1 ? '' : 's'}</span>
+                </div>
+            )}
+
+            {onOpenDay && (
                 <>
-                    {/* Holiday info */}
-                    <div className="context-menu-info holiday-info">
-                        <i className="fas fa-calendar-times"></i>
-                        <span>{day.holidayName || 'Holiday'}</span>
-                    </div>
-
-                    <div className="context-menu-divider"></div>
-
-                    {/* Edit Holiday */}
-                    <div
-                        className="context-menu-item"
-                        role="menuitem"
-                        tabIndex={0}
-                        onClick={handleEditHoliday}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                handleEditHoliday(e as unknown as MouseEvent<HTMLDivElement>);
-                            }
-                        }}
-                    >
-                        <i className="fas fa-edit"></i>
-                        <span>Edit Holiday</span>
-                    </div>
-
-                    {/* Remove Holiday */}
-                    <div
-                        className="context-menu-item context-menu-item-danger"
-                        role="menuitem"
-                        tabIndex={0}
-                        onClick={handleRemoveHoliday}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                handleRemoveHoliday(e as unknown as MouseEvent<HTMLDivElement>);
-                            }
-                        }}
-                    >
-                        <i className="fas fa-trash"></i>
-                        <span>Remove Holiday</span>
-                    </div>
+                    <div className="context-menu-divider" role="separator"></div>
+                    {item('Open day view', 'fa-calendar-day', run(onOpenDay))}
                 </>
-            ) : (
+            )}
+
+            {canManageHolidays && (
                 <>
-                    {/* Appointment count info if any */}
-                    {day.appointmentCount && day.appointmentCount > 0 && (
-                        <div className="context-menu-info">
-                            <i className="fas fa-calendar-check"></i>
-                            <span>{day.appointmentCount} appointment(s)</span>
-                        </div>
+                    <div className="context-menu-divider" role="separator"></div>
+                    {isHoliday ? (
+                        <>
+                            {item('Edit Holiday', 'fa-edit', run(onEditHoliday))}
+                            {item('Remove Holiday', 'fa-trash', run(onRemoveHoliday), true)}
+                        </>
+                    ) : (
+                        item('Mark as Holiday', 'fa-calendar-times', run(onAddHoliday))
                     )}
-
-                    <div className="context-menu-divider"></div>
-
-                    {/* Add Holiday */}
-                    <div
-                        className="context-menu-item"
-                        role="menuitem"
-                        tabIndex={0}
-                        onClick={handleAddHoliday}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                handleAddHoliday(e as unknown as MouseEvent<HTMLDivElement>);
-                            }
-                        }}
-                    >
-                        <i className="fas fa-calendar-times"></i>
-                        <span>Mark as Holiday</span>
-                    </div>
                 </>
             )}
         </div>

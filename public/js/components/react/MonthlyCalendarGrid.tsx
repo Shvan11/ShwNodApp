@@ -12,25 +12,27 @@
  */
 
 import { useState, useEffect, useRef, type MouseEvent } from 'react';
-import type { CalendarDay, CalendarData, CalendarAppointment, CalendarMode } from './calendar.types';
+import type { CalendarDay, CalendarData, CalendarAppointment } from './calendar.types';
 import { formatTime12 } from '../../utils/formatters';
 import { parseLocalDate } from '../../utils/calendarDate';
+import { anchorFrom, type MenuAnchor } from '../../hooks/useFloatingMenu';
 import styles from './MonthlyCalendarGrid.module.css';
 
 interface MonthlyCalendarGridProps {
     calendarData: CalendarData | null;
-    onDayClick?: (day: CalendarDay) => void;
-    onDayContextMenu?: (day: CalendarDay, event: MouseEvent<HTMLDivElement>) => void;
+    onOpenDay: (day: CalendarDay) => void;
+    /** The day's menu (holiday actions); omitted when the user has none to offer. */
+    onDayMenu?: (day: CalendarDay, anchor: MenuAnchor) => void;
     currentDate: Date;
-    mode?: CalendarMode;
 }
+
+const DAY_HEADERS = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'];
 
 const MonthlyCalendarGrid = ({
     calendarData,
-    onDayClick,
-    onDayContextMenu,
-    currentDate,
-    mode: _mode = 'view'
+    onOpenDay,
+    onDayMenu,
+    currentDate
 }: MonthlyCalendarGridProps) => {
     const [expandedDay, setExpandedDay] = useState<string | null>(null);
     const gridRef = useRef<HTMLDivElement>(null);
@@ -56,30 +58,14 @@ const MonthlyCalendarGrid = ({
     }
 
     const { days } = calendarData;
-
-    // Helper to check if date is today
-    const isToday = (date: string): boolean => {
-        const today = new Date();
-        const checkDate = parseLocalDate(date);
-        return today.toDateString() === checkDate.toDateString();
-    };
-
-    // Helper to check if day is in current month
-    const isCurrentMonth = (date: string): boolean => {
-        const checkDate = parseLocalDate(date);
-        const current = parseLocalDate(currentDate);
-        return checkDate.getMonth() === current.getMonth() &&
-               checkDate.getFullYear() === current.getFullYear();
-    };
-
-    // Day headers (starting with Saturday, excluding Friday)
-    const dayHeaders = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'];
+    const current = parseLocalDate(currentDate);
+    const todayString = new Date().toDateString();
 
     return (
         <div className={styles.monthlyCalendarGrid} ref={gridRef}>
-            {/* Day headers */}
+            {/* Day headers (starting with Saturday, excluding Friday) */}
             <div className={styles.monthGridHeader}>
-                {dayHeaders.map(day => (
+                {DAY_HEADERS.map(day => (
                     <div key={day} className={styles.monthDayHeader}>
                         {day}
                     </div>
@@ -89,49 +75,39 @@ const MonthlyCalendarGrid = ({
             {/* Calendar days */}
             <div className={styles.monthGridBody}>
                 {days.map(day => {
+                    const date = parseLocalDate(day.date);
                     const appointmentCount = day.appointmentCount || 0;
-                    const currentMonth = isCurrentMonth(day.date);
-                    const todayClass = isToday(day.date);
+                    const currentMonth =
+                        date.getMonth() === current.getMonth() &&
+                        date.getFullYear() === current.getFullYear();
+                    const isToday = date.toDateString() === todayString;
                     const isHoliday = day.isHoliday || false;
-
                     const isExpanded = expandedDay === day.date;
+                    const appointments = Array.isArray(day.appointments)
+                        ? (day.appointments as CalendarAppointment[])
+                        : [];
 
                     const cellClasses = [
                         styles.monthDayCell,
                         !currentMonth ? styles.otherMonth : '',
-                        todayClass ? styles.today : '',
-                        appointmentCount > 0 ? styles.hasAppointments : '',
+                        isToday ? styles.today : '',
                         isHoliday ? styles.holiday : '',
                         isExpanded ? styles.expanded : ''
                     ].filter(Boolean).join(' ');
 
-                    // Single click to expand/collapse appointment list
-                    const handleClick = () => {
+                    // Click (or Enter) opens the day's panel — every day of the month,
+                    // holidays included: a holiday declared over bookings still lists
+                    // them, and the panel is the keyboard and touch path to day view and
+                    // the day's menu (audit FE-F10-3, FE-F10-15d).
+                    const togglePanel = () => {
                         if (!currentMonth) return;
-                        if (isHoliday) return; // Don't navigate to holiday dates
-
-                        // Toggle expanded state for this day
-                        if (expandedDay === day.date) {
-                            setExpandedDay(null);
-                        } else {
-                            setExpandedDay(day.date);
-                        }
+                        setExpandedDay(isExpanded ? null : day.date);
                     };
 
-                    // Double click to navigate to day view
-                    const handleDoubleClick = () => {
-                        if (!currentMonth) return;
-                        if (isHoliday) return;
-                        if (onDayClick) onDayClick(day);
-                    };
-
-                    // Right-click handler for context menu (holiday management)
                     const handleContextMenu = (event: MouseEvent<HTMLDivElement>) => {
-                        if (!currentMonth) return; // Don't show context menu for other month days
+                        if (!currentMonth || !onDayMenu) return;
                         event.preventDefault();
-                        if (onDayContextMenu) {
-                            onDayContextMenu(day, event);
-                        }
+                        onDayMenu(day, anchorFrom(event));
                     };
 
                     return (
@@ -140,16 +116,20 @@ const MonthlyCalendarGrid = ({
                             className={cellClasses}
                             data-month-cell
                             role="button"
-                            tabIndex={0}
-                            onClick={handleClick}
-                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
-                            onDoubleClick={handleDoubleClick}
+                            tabIndex={currentMonth ? 0 : -1}
+                            aria-expanded={isExpanded}
+                            onClick={togglePanel}
+                            onKeyDown={(e) => {
+                                if (e.target !== e.currentTarget) return;
+                                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePanel(); }
+                            }}
+                            onDoubleClick={() => currentMonth && onOpenDay(day)}
                             onContextMenu={handleContextMenu}
                             title={isHoliday ? day.holidayName ?? undefined : undefined}
                         >
                             {/* Day number */}
                             <div className={styles.monthDayNumber}>
-                                {parseLocalDate(day.date).getDate()}
+                                {date.getDate()}
                             </div>
 
                             {/* Holiday badge */}
@@ -159,41 +139,56 @@ const MonthlyCalendarGrid = ({
                                 </div>
                             )}
 
-                            {/* Appointment badge - Clean neutral styling via CSS */}
-                            {currentMonth && !isHoliday && appointmentCount > 0 && (
-                                <div className={styles.appointmentBadge}>
+                            {/* Appointment badge — on a holiday too, beside the holiday mark */}
+                            {currentMonth && appointmentCount > 0 && (
+                                <div className={`${styles.appointmentBadge} ${isHoliday ? styles.besideHoliday : ''}`}>
                                     {appointmentCount}
                                 </div>
                             )}
 
-                            {/* Expanded appointment list (shows on click) */}
-                            {isExpanded && currentMonth && !isHoliday && appointmentCount > 0 && (
-                                <div className={styles.dayExpandedPanel}>
+                            {isExpanded && currentMonth && (
+                                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- stops the panel's clicks from toggling the cell; its buttons carry their own keyboard handling
+                                <div className={styles.dayExpandedPanel} onClick={e => e.stopPropagation()}>
                                     <div className={styles.expandedHeader}>
-                                        {parseLocalDate(day.date).toLocaleDateString(undefined, {
+                                        {date.toLocaleDateString(undefined, {
                                             weekday: 'short',
                                             month: 'short',
                                             day: 'numeric'
                                         })}
-                                        <span className={styles.expandedCount}>{appointmentCount} appts</span>
+                                        <span className={styles.expandedCount}>
+                                            {isHoliday ? `${day.holidayName || 'Holiday'} · ` : ''}
+                                            {appointmentCount} appt{appointmentCount === 1 ? '' : 's'}
+                                        </span>
                                     </div>
-                                    {day.appointments && Array.isArray(day.appointments) && day.appointments.length > 0 && (
+                                    {appointments.length > 0 && (
                                         <div className={styles.expandedAppointments}>
-                                            {(day.appointments as CalendarAppointment[]).slice(0, 8).map((apt, idx) => (
-                                                <div key={idx} className={styles.expandedAppointment}>
+                                            {appointments.slice(0, 8).map((apt, idx) => (
+                                                <div key={apt.appointment_id ?? idx} className={styles.expandedAppointment}>
                                                     <span className={styles.aptTime}>{formatTime12(apt.time)}</span>
                                                     <span className={styles.aptName}>{apt.patientName || ''}</span>
                                                 </div>
                                             ))}
-                                            {day.appointments.length > 8 && (
+                                            {appointments.length > 8 && (
                                                 <div className={styles.expandedMore}>
-                                                    +{day.appointments.length - 8} more
+                                                    +{appointments.length - 8} more
                                                 </div>
                                             )}
                                         </div>
                                     )}
                                     <div className={styles.expandedAction}>
-                                        Double-click to open day view
+                                        <button type="button" className={styles.panelButton} onClick={() => onOpenDay(day)}>
+                                            <i className="fas fa-calendar-day" aria-hidden="true"></i> Open day view
+                                        </button>
+                                        {onDayMenu && (
+                                            <button
+                                                type="button"
+                                                className={styles.panelButton}
+                                                aria-haspopup="menu"
+                                                onClick={e => onDayMenu(day, anchorFrom(e))}
+                                            >
+                                                <i className="fas fa-calendar-times" aria-hidden="true"></i> Holiday…
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             )}

@@ -5,6 +5,10 @@ import sseAppointments, { type Freshness } from '../services/sse-appointments';
 const PERIODIC_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 // Coalesce reconnect / online bursts that fire in rapid succession.
 const RECOVERY_DEBOUNCE_MS = 1_000;
+// Coalesce a burst of `appointments_updated` frames into one refetch. The
+// server sends one frame per write and coalesces nothing, so eight writes from
+// another desk cost eight day-reads per open board (audit FE-F11-12).
+const UPDATE_COALESCE_MS = 300;
 // Linear backoff (capped) for retrying a failed recovery fetch — covers the
 // boot-storm window where WS upgrades land before REST routes are ready.
 const RECOVERY_RETRY_DELAYS_MS = [3_000, 5_000, 8_000, 10_000];
@@ -220,31 +224,42 @@ export function useAppointmentsSync(
       return dateStr.split('T')[0];
     };
 
-    const handleAppointmentsUpdated = async (payload: unknown) => {
+    let coalesceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const refetch = async (data: AppointmentsUpdatedData) => {
+      // On failure, mirror runRecovery: mark stale and engage the debounced
+      // backoff pipeline so the indicator reflects the gap.
+      try {
+        const result = await callbackRef.current({ ...data, date: currentDate });
+        if (result === false) {
+          throw new Error('refetch returned false');
+        }
+      } catch {
+        sseAppointments.markStale();
+        triggerRecoveryFetch();
+      }
+    };
+
+    const handleAppointmentsUpdated = (payload: unknown) => {
       const data = (payload ?? {}) as AppointmentsUpdatedData;
       const receivedDate = normalizeDate(data.date);
       const expectedDate = normalizeDate(currentDate);
 
       if (receivedDate && receivedDate === expectedDate) {
-        // Direct invocation here (not the debounced path) — broadcasts are
-        // already coalesced server-side and we want minimal latency on the
-        // common case. On failure, mirror runRecovery: mark stale and engage
-        // the debounced backoff pipeline so the indicator reflects the gap.
-        try {
-          const result = await callbackRef.current({ ...data, date: currentDate });
-          if (result === false) {
-            throw new Error('refetch returned false');
-          }
-        } catch {
-          sseAppointments.markStale();
-          triggerRecoveryFetch();
-        }
+        // A short trailing window: the first frame of a burst waits
+        // UPDATE_COALESCE_MS, and every frame inside it shares one refetch.
+        if (coalesceTimer) clearTimeout(coalesceTimer);
+        coalesceTimer = setTimeout(() => {
+          coalesceTimer = null;
+          void refetch(data);
+        }, UPDATE_COALESCE_MS);
       }
     };
 
     sseAppointments.on('appointments_updated', handleAppointmentsUpdated);
 
     return () => {
+      if (coalesceTimer) clearTimeout(coalesceTimer);
       sseAppointments.off('appointments_updated', handleAppointmentsUpdated);
     };
   }, [isViewingToday, currentDate, triggerRecoveryFetch]);

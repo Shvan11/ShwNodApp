@@ -1,70 +1,38 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import { postJSON, type HttpError } from '@/core/http';
 import { isInvalidStateTransition } from '@/query/useApiMutation';
-import { dailyAppointments, type DailyAppointmentsResponse } from '@shared/contracts/appointment.contract';
+import { dailyAppointmentsQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
-
-/**
- * Appointment statistics from API
- */
-export interface AppointmentStats {
-  total: number;
-  checkedIn: number;
-  absent: number;
-  waiting: number;
-}
-
-/**
- * Appointment data from API
- */
-export interface Appointment {
-  appointment_id: number;
-  person_id?: number;
-  patient_name?: string;
-  patient_type?: string | null;
-  patient_type_id?: number | null;
-  app_date?: string | null;
-  app_detail?: string | null;
-  apptime?: string | null;
-  phone?: string | null;
-  [key: string]: unknown;
-}
-
-/**
- * Initial data from loader (the date the loader pre-fetched, used to seed the
- * React Query cache for that key so there's no loading flash on first paint).
- */
-export interface AppointmentsLoaderData {
-  loadedDate?: string;
-  allAppointments?: Appointment[];
-  checkedInAppointments?: Appointment[];
-  stats?: AppointmentStats;
-  error?: string | null;
-  _loaderTimestamp?: number;
-}
+import { useToast } from '@/contexts/ToastContext';
+import type { DailyAppointmentRow } from '@shared/contracts/appointment.contract';
 
 /**
  * Return type for useAppointments hook
  */
 export interface UseAppointmentsReturn {
-  allAppointments: Appointment[];
-  checkedInAppointments: Appointment[];
-  loading: boolean;
+  allAppointments: DailyAppointmentRow[];
+  checkedInAppointments: DailyAppointmentRow[];
+  /** No data for the day yet: the lists show skeletons. */
+  initialLoading: boolean;
+  /**
+   * A click is in flight, or another day's data is on screen while this one
+   * loads: the lists dim and take no clicks. A background refetch (another
+   * desk's write, the 5-minute net) is neither, so it no longer dims the board
+   * or swaps an empty list for skeletons (audit FE-F11-12).
+   */
+  busy: boolean;
+  /** Any read in flight (the refresh button's spinner). */
+  refreshing: boolean;
+  /** The day's READ failed (a failed check-in is a toast, not this). */
   error: string | null;
   loadAppointments: (date: string) => Promise<boolean>;
   checkInPatient: (appointmentId: number, currentDate: string) => Promise<{ success: boolean }>;
   markSeated: (appointmentId: number, currentDate: string) => Promise<{ success: boolean }>;
   markDismissed: (appointmentId: number, currentDate: string) => Promise<{ success: boolean }>;
   undoState: (appointmentId: number, stateToUndo: string, currentDate: string) => Promise<{ success: boolean }>;
-  getStats: () => AppointmentStats;
 }
-
-const EMPTY_STATS: AppointmentStats = { total: 0, checkedIn: 0, absent: 0, waiting: 0 };
-
-/** Query key for a day's appointments — shared with useAppointmentsSync's SSE
- *  invalidation. Delegates to the central qk factory (single source of truth). */
-export const dailyAppointmentsKey = (date: string) => qk.appointments.daily(date);
 
 /** Current time as HH:MM:SS (the state-change payload's `time`). */
 function getCurrentTime(): string {
@@ -72,56 +40,43 @@ function getCurrentTime(): string {
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
 }
 
-/** Fetch one day's appointments, validated at the boundary (audit H11). */
-function fetchDailyAppointments(date: string, signal?: AbortSignal): Promise<DailyAppointmentsResponse> {
-  return fetchJSON<DailyAppointmentsResponse>(`/api/getDailyAppointments?AppsDate=${date}`, {
-    signal,
-    schema: dailyAppointments.response,
-  });
+/** The server's refusal of a forward step on a day that hasn't come yet (FE-F11-4). */
+function isFutureDayRefusal(err: unknown): boolean {
+  const httpErr = err as HttpError | undefined;
+  if (httpErr?.status !== 400) return false;
+  const data = httpErr.data as { details?: { code?: string } } | undefined;
+  return data?.details?.code === 'FUTURE_APPOINTMENT';
 }
+
+type FailKey = 'errors.checkInFailed' | 'errors.seatFailed' | 'errors.dismissFailed' | 'errors.undoFailed';
 
 /**
  * Custom hook for managing appointments data and actions (audit M7/M8).
  *
- * React Query owns the read: keyed by date, so changing the date auto-fetches
- * (with cache), and SSE/reconnect/periodic triggers refetch via
- * `invalidateQueries(dailyAppointmentsKey(date))` — the real fix for the M7 dead
- * cache-key no-op. Abort, retry, and the 30s timeout come from core/http + RQ.
+ * React Query owns the read (`dailyAppointmentsQuery`), keyed by date, so
+ * changing the date auto-fetches (with cache), and SSE/reconnect/periodic
+ * triggers refetch via `invalidateQueries(qk.appointments.daily(date))`. The
+ * route loader writes the same key into the cache before first paint.
  *
  * Mutations stay simple: POST → invalidate (reload) → render. Database is the
  * single source of truth (no optimistic updates / rollback). A stale-view 400
- * (INVALID_STATE_TRANSITION) is recovered silently with a reload, not surfaced.
+ * (INVALID_STATE_TRANSITION) is recovered silently with a reload. Any other
+ * failure is a toast: it used to become the page's `error`, which replaced the
+ * whole board with "Failed to load appointments" until the user navigated away
+ * (audit FE-F11-2).
  *
  * @param date - The day being viewed (the query key).
- * @param initialData - Loader payload; seeds the cache for `initialData.loadedDate`.
  */
-export function useAppointments(
-  date: string,
-  initialData: AppointmentsLoaderData | null = null
-): UseAppointmentsReturn {
+export function useAppointments(date: string): UseAppointmentsReturn {
+  const { t } = useTranslation('appointments');
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [mutating, setMutating] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  // Seed RQ from the loader payload, but only for the exact date it fetched.
-  const seed =
-    initialData && initialData.loadedDate === date && !initialData.error
-      ? {
-          allAppointments: initialData.allAppointments ?? [],
-          checkedInAppointments: initialData.checkedInAppointments ?? [],
-          stats: initialData.stats ?? EMPTY_STATS,
-        }
-      : undefined;
 
   const query = useQuery({
-    queryKey: dailyAppointmentsKey(date),
-    queryFn: ({ signal }) => fetchDailyAppointments(date, signal),
-    enabled: !!date,
-    initialData: seed,
-    initialDataUpdatedAt: seed ? initialData?._loaderTimestamp : undefined,
-    // Keep the previously-selected day's snapshot visible (dimmed via the list's
-    // refreshing state) while a newly-selected date loads, instead of dropping to
-    // skeletons. initialData still takes precedence for the loader-seeded date.
+    ...dailyAppointmentsQuery(date),
+    // Keep the previously-selected day's snapshot visible (dimmed via `busy`)
+    // while a newly-selected date loads, instead of dropping to skeletons.
     placeholderData: keepPreviousData,
   });
 
@@ -133,52 +88,42 @@ export function useAppointments(
   const loadAppointments = useCallback(
     async (d: string): Promise<boolean> => {
       if (!d) return false;
-      await queryClient.invalidateQueries({ queryKey: dailyAppointmentsKey(d) });
-      return queryClient.getQueryState(dailyAppointmentsKey(d))?.status !== 'error';
+      await queryClient.invalidateQueries({ queryKey: qk.appointments.daily(d) });
+      return queryClient.getQueryState(qk.appointments.daily(d))?.status !== 'error';
     },
     [queryClient]
   );
 
-  // The server rejects a forward state transition when the caller's view is
-  // stale (typically a missed SSE DATA_UPDATED). That's not a hard error — the
-  // right recovery is a silent reload of the truth. Returns true if it handled it.
-  const recoverFromConflict = useCallback(
-    async (err: unknown, currentDate: string): Promise<boolean> => {
-      if (!isInvalidStateTransition(err)) return false;
-      window.toast?.warning('Patient state changed — refreshing');
-      await loadAppointments(currentDate);
-      return true;
-    },
-    [loadAppointments]
-  );
-
-  // Shared driver for the four state-change actions: POST → reload → render,
-  // with silent conflict recovery and a friendly error surfaced otherwise.
+  // Shared driver for the four state-change actions: POST → reload → render.
   const runStateChange = useCallback(
     async (
       url: string,
       body: Record<string, unknown>,
       currentDate: string,
-      failMessage: string
+      failKey: FailKey
     ): Promise<{ success: boolean }> => {
       try {
         setMutating(true);
-        setActionError(null);
         await postJSON(url, body);
         await loadAppointments(currentDate);
         return { success: true };
       } catch (err) {
-        if (await recoverFromConflict(err, currentDate)) {
-          return { success: false };
+        if (isInvalidStateTransition(err)) {
+          // The caller's view was stale (typically a missed SSE update): reload
+          // the truth instead of reporting an error.
+          toast.warning(t('errors.stateConflict'));
+          await loadAppointments(currentDate);
+        } else if (isFutureDayRefusal(err)) {
+          toast.error(t('errors.futureDay'));
+        } else {
+          toast.error(t(failKey));
         }
-        console.error(`${failMessage}:`, err);
-        setActionError(httpErrorMessage(err, failMessage));
-        throw err;
+        return { success: false };
       } finally {
         setMutating(false);
       }
     },
-    [loadAppointments, recoverFromConflict]
+    [loadAppointments, toast, t]
   );
 
   const checkInPatient = useCallback(
@@ -187,7 +132,7 @@ export function useAppointments(
         '/api/updateAppointmentState',
         { appointment_id: appointmentId, state: 'present', time: getCurrentTime() },
         currentDate,
-        'Failed to check in patient'
+        'errors.checkInFailed'
       ),
     [runStateChange]
   );
@@ -198,7 +143,7 @@ export function useAppointments(
         '/api/updateAppointmentState',
         { appointment_id: appointmentId, state: 'seated', time: getCurrentTime() },
         currentDate,
-        'Failed to seat patient'
+        'errors.seatFailed'
       ),
     [runStateChange]
   );
@@ -209,7 +154,7 @@ export function useAppointments(
         '/api/updateAppointmentState',
         { appointment_id: appointmentId, state: 'dismissed', time: getCurrentTime() },
         currentDate,
-        'Failed to complete visit'
+        'errors.dismissFailed'
       ),
     [runStateChange]
   );
@@ -220,7 +165,7 @@ export function useAppointments(
         '/api/undoAppointmentState',
         { appointment_id: appointmentId, state: stateToUndo },
         currentDate,
-        `Failed to undo ${stateToUndo}`
+        'errors.undoFailed'
       ),
     [runStateChange]
   );
@@ -228,17 +173,17 @@ export function useAppointments(
   const data = query.data;
 
   return {
-    allAppointments: (data?.allAppointments ?? []) as Appointment[],
-    checkedInAppointments: (data?.checkedInAppointments ?? []) as Appointment[],
-    loading: mutating || query.isFetching,
-    error:
-      actionError ??
-      (query.isError ? httpErrorMessage(query.error, 'Failed to load appointments') : null),
+    allAppointments: data?.allAppointments ?? [],
+    checkedInAppointments: data?.checkedInAppointments ?? [],
+    initialLoading: query.isPending,
+    busy: mutating || query.isPlaceholderData,
+    refreshing: query.isFetching,
+    // Translated, not the server's English text: this renders on the Arabic board.
+    error: query.isError ? t('errors.loadFailed') : null,
     loadAppointments,
     checkInPatient,
     markSeated,
     markDismissed,
     undoState,
-    getStats: () => (data?.stats ?? EMPTY_STATS) as AppointmentStats,
   };
 }

@@ -9,7 +9,7 @@ import { employeesQuery, positionsQuery } from '@/query/queries';
 import type { EmployeeRow } from '@shared/contracts/employee.contract';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
-import { resolveDoctorColor, DEFAULT_PICKER_HEX, NEUTRAL_PICKER_HEX } from './doctorColors';
+import { resolveDoctorColor, NEUTRAL_PICKER_HEX } from './doctorColors';
 import styles from './EmployeeSettings.module.css';
 
 // Row shapes are owned by the employee contract (the single source of truth for
@@ -219,10 +219,11 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         return pos?.position_name ?? 'Unknown';
     };
 
-    // Effective calendar swatch for the table (only meaningful for doctors who
-    // can be assigned appointments).
+    // Effective calendar swatch for the table — only for the calendar's doctors
+    // (active, position Doctor: the one definition the booking forms, the legend
+    // and the server share; audit FE-F10-13).
     const renderColorSwatch = (employee: Employee) => {
-        const color = employee.get_appointments
+        const color = employee.is_active && employee.position_name === 'Doctor'
             ? resolveDoctorColor({
                   id: employee.id,
                   employee_name: employee.employee_name,
@@ -234,7 +235,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             <span
                 className={styles.colorDot}
                 style={{ background: color.fill, borderColor: color.edge }}
-                title={employee.appointment_color || 'Default'}
+                title={employee.appointment_color ?? undefined}
             />
         );
     };
@@ -451,11 +452,11 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                             id="appointment_color"
                                                             name="appointment_color"
                                                             className={styles.colorInput}
-                                                            value={formData.appointment_color || (editingId != null ? DEFAULT_PICKER_HEX[editingId] : undefined) || NEUTRAL_PICKER_HEX}
+                                                            value={formData.appointment_color || NEUTRAL_PICKER_HEX}
                                                             onChange={handleInputChange}
                                                         />
                                                         <span className={styles.colorValue}>
-                                                            {formData.appointment_color ? formData.appointment_color.toUpperCase() : 'Default'}
+                                                            {formData.appointment_color ? formData.appointment_color.toUpperCase() : 'None (neutral)'}
                                                         </span>
                                                         {formData.appointment_color && (
                                                             <button

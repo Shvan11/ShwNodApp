@@ -26,8 +26,6 @@ export interface CalendarAppointment {
     personID?: number | null;
     drID?: number | null;
     time?: string;
-    app_date?: string;
-    person_id?: number | null;
 }
 
 // Time slot info containing appointments
@@ -67,27 +65,8 @@ export interface CalendarStats {
     totalSlots: number;
 }
 
-// Slot data passed between components
-export interface SlotData {
-    date: string;
-    time: string;
-    dayName?: string;
-    appointments?: CalendarAppointment[];
-    slotStatus: 'available' | 'booked' | 'full' | 'past' | string;
-    appointment_id?: number | string;
-    appDetail?: string;
-    patientName?: string;
-}
-
-// Position for context menus
-export interface MenuPosition {
-    x: number;
-    y: number;
-}
-
 // View modes
 export type ViewMode = 'day' | 'week' | 'month';
-export type CalendarMode = 'view' | 'selection';
 
 // Holiday modal data
 export interface ExistingHoliday {

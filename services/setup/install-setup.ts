@@ -19,6 +19,10 @@ import { getKysely } from '../database/kysely.js';
 import { createUser } from '../database/queries/user-queries.js';
 import { fillCalendar } from '../database/queries/calendar-queries.js';
 import { getOptions, upsertOption } from '../database/queries/options-queries.js';
+import { defaultVideosPath } from '../files/clinic-paths.js';
+
+/** The educational-videos folder option (read by services/database/queries/video-queries.ts). */
+const VIDEOS_PATH_OPTION = 'VideosPath';
 import { hashPassword } from '../../middleware/auth.js';
 import { ROLES } from '../../shared/auth/roles.js';
 import { MIN_PASSWORD_LENGTH } from '../../shared/validation.js';
@@ -169,6 +173,23 @@ export async function generateCalendar(): Promise<SetupStep> {
   return DaysAdded > 0
     ? { step: 'Calendar', outcome: 'applied', detail: `${DaysAdded} future slot(s) generated` }
     : { step: 'Calendar', outcome: 'skipped', detail: 'already up to date (or no time slots configured)' };
+}
+
+/**
+ * Give the install a `VideosPath` row, set to the default videos folder under
+ * MACHINE_PATH, when it has none — so the folder is visible and editable in
+ * Settings → General like every other path (audit FE-F11-16). The server falls
+ * back to the same default when the row is missing, so this only makes it
+ * visible; an existing row is never touched.
+ */
+export async function ensureVideosFolderOption(): Promise<SetupStep> {
+  const current = (await getOptions([VIDEOS_PATH_OPTION])).get(VIDEOS_PATH_OPTION);
+  if (current && current.trim()) {
+    return { step: 'Videos folder', outcome: 'skipped', detail: `already set (${current})` };
+  }
+  const value = defaultVideosPath();
+  await upsertOption(VIDEOS_PATH_OPTION, value);
+  return { step: 'Videos folder', outcome: 'applied', detail: value };
 }
 
 // ── Identity + currency ───────────────────────────────────────────────────────

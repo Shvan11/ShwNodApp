@@ -425,15 +425,13 @@ MOUNT   /api
 USE     /api/tv-display  [authorize(admin|front_desk|clinical)]
 GET     /api/tv-display
 PUT     /api/tv-display/settings  [validate(body)]
-POST    /api/tv-display/media  [uploadMediaFiles]
+POST    /api/tv-display/media  [timeout(600000ms) -> uploadMediaFiles]
 DELETE  /api/tv-display/media/:name  [validate(params)]
 PUT     /api/tv-display/playlist  [validate(body)]
 POST    /api/tv-display/command  [validate(body)]
 MOUNT   /api/calendar
-GET     /api/calendar/week  [validate(query)]
 GET     /api/calendar/month  [validate(query)]
 GET     /api/calendar/range  [validate(query)]
-GET     /api/calendar/stats  [validate(query)]
 POST    /api/calendar/regenerate  [authorize(admin|front_desk)]
 GET     /api/calendar/available-slots  [validate(query)]
 GET     /api/calendar/month-availability  [validate(query)]

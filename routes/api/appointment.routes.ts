@@ -226,6 +226,15 @@ router.post(
         });
         return;
       }
+      // A forward step on a day that hasn't come yet (audit FE-F11-4).
+      if (err.message && err.message.includes('[FUTURE_APPOINTMENT]')) {
+        ErrorResponses.badRequest(res, err.message, {
+          code: 'FUTURE_APPOINTMENT',
+          appointment_id: req.body.appointment_id,
+          attempted: req.body.state
+        });
+        return;
+      }
 
       ErrorResponses.internalError(
         res,

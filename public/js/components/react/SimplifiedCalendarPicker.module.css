@@ -119,6 +119,14 @@
     color: var(--color-white);
 }
 
+/* Direction glyphs point the way the month moves: under RTL "previous" sits on
+   the right and must point right (audit FE-F11-11b; postcss-rtlcss flips layout,
+   not icon glyphs). */
+[dir='rtl'] .monthNavBtn i,
+[dir='rtl'] .jumpBtn i {
+    transform: scaleX(-1);
+}
+
 .monthDisplay {
     display: flex;
     flex-direction: column;
@@ -339,6 +347,10 @@
 
 /* Afternoon slots toggle */
 .afternoonToggle {
+    width: 100%;
+    font: inherit;
+    color: inherit;
+    text-align: start;
     background: var(--gray-50);
     border: 2px dashed var(--gray-300);
     border-radius: 8px;

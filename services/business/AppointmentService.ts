@@ -12,10 +12,11 @@
  * encapsulating business rules and validation logic.
  */
 
-import { sql } from 'kysely';
+import { sql, type Transaction } from 'kysely';
 import { log } from '../../utils/logger.js';
 import { toDateOnly } from '../../utils/date.js';
-import { getKysely } from '../database/kysely.js';
+import { getKysely, withPgTransaction, type Database } from '../database/kysely.js';
+import { getMaxAppointmentsPerSlot } from './CalendarViewService.js';
 import {
   getDailyAppointmentsOptimized,
   updatePresent,
@@ -37,7 +38,9 @@ export type AppointmentErrorCode =
   | 'INVALID_PERSON_ID'
   | 'INVALID_STATE_TRANSITION'
   | 'MISSING_DATE'
-  | 'APPOINTMENT_NOT_FOUND';
+  | 'APPOINTMENT_NOT_FOUND'
+  | 'SLOT_FULL'
+  | 'PAST_SLOT';
 
 /**
  * Error details for appointment validation
@@ -203,7 +206,10 @@ function validateAppointmentRequiredFields(
 }
 
 /**
- * Verify that an employee is a doctor
+ * Verify that an employee is a calendar doctor: ACTIVE, position 'Doctor' — the same
+ * set `/api/doctors` lists for the booking forms (audit FE-F10-13). The update path
+ * skips this when the doctor is unchanged, so an appointment whose doctor has since
+ * left stays editable without re-attributing it.
  * @param drID - Doctor/Employee id
  * @returns Doctor information
  * @throws AppointmentValidationError If employee is not a doctor
@@ -215,6 +221,7 @@ async function verifyDoctor(drID: number | string): Promise<DoctorInfo> {
         FROM "employees" e
         INNER JOIN "positions" p ON e."position" = p."id"
         WHERE e."id" = ${parseInt(String(drID), 10)} AND p."position_name" = 'Doctor'
+          AND e."is_active" = true
     `.execute(db);
 
   if (!doctorCheck || doctorCheck.length === 0) {
@@ -269,6 +276,43 @@ async function checkAppointmentConflict(
   }
 
   return null;
+}
+
+/**
+ * Refuse a booking into a slot that already holds `MaxAppointmentsPerSlot`
+ * appointments (owner decision on audit FE-F10-7: the limit is per CLINIC slot,
+ * i.e. per exact `app_date`, whoever the doctor).
+ *
+ * It used to be enforced nowhere on the server: the picker disabled `full` tiles
+ * from a read up to 30 s old, and the calendar drag and the edit form did not look
+ * at all, so two desks taking the last seat both got 200 (runtime: four bookings
+ * into a max-3 slot). Must run INSIDE the booking's transaction: the advisory lock
+ * on the slot's timestamp makes a second desk wait for the first to commit, so its
+ * count sees the first booking. The lock key goes through `::timestamp::text`, so
+ * two spellings of the same moment share one lock.
+ */
+async function assertSlotHasRoom(
+  trx: Transaction<Database>,
+  appDate: string,
+  /** Edit path: the row being moved does not count against its new slot. */
+  excludeAppointmentId?: number
+): Promise<void> {
+  await sql`SELECT pg_advisory_xact_lock(hashtext('appointment-slot:' || (${appDate}::timestamp)::text))`.execute(trx);
+  const max = await getMaxAppointmentsPerSlot();
+  const { rows } = await sql<{ n: number }>`
+        SELECT count(*)::int AS n
+        FROM "appointments"
+        WHERE "app_date" = ${appDate}::timestamp
+          AND (${excludeAppointmentId ?? null}::int IS NULL OR "appointment_id" <> ${excludeAppointmentId ?? null}::int)
+    `.execute(trx);
+  const booked = rows[0]?.n ?? 0;
+  if (booked >= max) {
+    throw new AppointmentValidationError(
+      `This time slot is full (${max} appointments per slot)`,
+      'SLOT_FULL',
+      { maxPerSlot: max, booked }
+    );
+  }
 }
 
 /**
@@ -350,12 +394,18 @@ export async function validateAndCreateAppointment(
   // Check for appointment conflicts
   await checkAppointmentConflict(person_id, app_date);
 
-  // Insert new appointment (+ AppoPatientType trigger, in createAppointment)
-  const { appointment_id: newAppointmentId, app_day: appDay } = await createAppointment({
-    person_id: parseInt(String(person_id), 10),
-    app_date,
-    app_detail,
-    dr_id: parseInt(String(dr_id), 10),
+  // Capacity check + insert in one transaction, under the slot's lock.
+  const { appointment_id: newAppointmentId, app_day: appDay } = await withPgTransaction(async (trx) => {
+    await assertSlotHasRoom(trx, app_date);
+    return createAppointment(
+      {
+        person_id: parseInt(String(person_id), 10),
+        app_date,
+        app_detail,
+        dr_id: parseInt(String(dr_id), 10),
+      },
+      trx
+    );
   });
 
   log.info(
@@ -393,8 +443,8 @@ export async function validateAndUpdateAppointment(
   validateAppointmentRequiredFields(appointmentData);
 
   const db = getKysely();
-  const { rows: existing } = await sql<{ app_day: string | null }>`
-        SELECT "app_day" FROM "appointments" WHERE "appointment_id" = ${appointmentId}
+  const { rows: existing } = await sql<{ app_day: string | null; dr_id: number | null }>`
+        SELECT "app_day", "dr_id" FROM "appointments" WHERE "appointment_id" = ${appointmentId}
     `.execute(db);
 
   if (!existing || existing.length === 0) {
@@ -402,28 +452,56 @@ export async function validateAndUpdateAppointment(
   }
 
   await checkHolidayConflict(app_date);
-  await verifyDoctor(dr_id);
+  // Only a CHANGED doctor must be a current one: keeping a doctor who has since
+  // left is not a re-attribution, and the edit form offers them as "(current)".
+  if (existing[0].dr_id !== parseInt(String(dr_id), 10)) {
+    await verifyDoctor(dr_id);
+  }
   await checkAppointmentConflict(person_id, app_date, appointmentId);
 
-  // Cast the app_date string to timestamp on the PG side to avoid timezone conversion.
-  // RETURNING the generated `app_day` makes the DB the authority on the new day.
-  // This used to be `app_date.split('T')[0]`, which is correct only for the
-  // `YYYY-MM-DDTHH:mm:ss` shape the staff forms happen to send: `app_date` is
-  // deliberately a loose `z.string().min(1)` (this service owns multi-format date
-  // parsing), so a space-separated `'2026-09-10 14:30'` — which PG accepts and
-  // stores fine — yielded the WHOLE string as the broadcast key, and every board
-  // silently ignored the frame.
-  const { rows: updated } = await sql<{ app_day: string }>`
-        UPDATE "appointments"
-        SET "person_id" = ${parseInt(String(person_id), 10)},
-            "app_date" = ${app_date}::timestamp,
-            "app_detail" = ${app_detail},
-            "dr_id" = ${parseInt(String(dr_id), 10)}
-        WHERE "appointment_id" = ${appointmentId}
-        RETURNING "app_day"
-    `.execute(db);
+  return withPgTransaction(async (trx) => {
+    // A move into another slot must find room there (FE-F10-7), and must not land
+    // in the past: the calendar drag used to accept a slot that had already gone,
+    // after which nothing on screen could edit the appointment back (FE-F10-8).
+    // An edit that keeps its slot (a doctor or type change) is not re-checked, so
+    // an appointment in a full or already-passed slot stays editable.
+    const { rows: current } = await sql<{ same_slot: boolean; into_past: boolean }>`
+          SELECT ("app_date" = ${app_date}::timestamp) AS same_slot,
+                 (${app_date}::timestamp < LOCALTIMESTAMP) AS into_past
+          FROM "appointments" WHERE "appointment_id" = ${appointmentId}
+          FOR UPDATE
+      `.execute(trx);
+    if (current[0] && !current[0].same_slot) {
+      if (current[0].into_past) {
+        throw new AppointmentValidationError(
+          'Cannot move an appointment into a time that has already passed',
+          'PAST_SLOT'
+        );
+      }
+      await assertSlotHasRoom(trx, app_date, appointmentId);
+    }
 
-  return { previousDay: existing[0].app_day, newDay: updated[0]?.app_day ?? null };
+
+    // Cast the app_date string to timestamp on the PG side to avoid timezone conversion.
+    // RETURNING the generated `app_day` makes the DB the authority on the new day.
+    // This used to be `app_date.split('T')[0]`, which is correct only for the
+    // `YYYY-MM-DDTHH:mm:ss` shape the staff forms happen to send: `app_date` is
+    // deliberately a loose `z.string().min(1)` (this service owns multi-format date
+    // parsing), so a space-separated `'2026-09-10 14:30'` — which PG accepts and
+    // stores fine — yielded the WHOLE string as the broadcast key, and every board
+    // silently ignored the frame.
+    const { rows: updated } = await sql<{ app_day: string }>`
+          UPDATE "appointments"
+          SET "person_id" = ${parseInt(String(person_id), 10)},
+              "app_date" = ${app_date}::timestamp,
+              "app_detail" = ${app_detail},
+              "dr_id" = ${parseInt(String(dr_id), 10)}
+          WHERE "appointment_id" = ${appointmentId}
+          RETURNING "app_day"
+      `.execute(trx);
+
+    return { previousDay: existing[0].app_day, newDay: updated[0]?.app_day ?? null };
+  });
 }
 
 /**

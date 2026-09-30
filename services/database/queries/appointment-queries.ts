@@ -5,10 +5,14 @@
  * `updatePresent` takes a row lock (SELECT … FOR UPDATE) and applies its state-transition
  * guards inside one transaction, so two terminals can't race the same appointment.
  */
-import { sql } from 'kysely';
-import { getKysely, withPgTransaction } from '../kysely.js';
-import { formatClock12, formatTime12 } from '../../../utils/date.js';
+import { sql, type Kysely } from 'kysely';
+import { getKysely, withPgTransaction, type Database } from '../kysely.js';
+import type {
+  DailyAppointmentRowInput,
+  DailyAppointmentStats,
+} from '../../../shared/contracts/appointment.contract.js';
 import { ORTHO_WORK_TYPE_IDS } from '../../../shared/treatment-taxonomy.js';
+import { toDateOnly } from '../../../utils/date.js';
 
 // type definitions
 interface UpdatePresentResult {
@@ -29,38 +33,26 @@ interface UndoStateResult {
 }
 
 /**
- * Daily appointments optimized result set
+ * Daily appointments result set. The row and stats shapes are the contract's
+ * (`shared/contracts/appointment.contract.ts`), so a field the board reads can
+ * no longer drift from what this query builds.
  */
-export interface DailyAppointmentStats {
-  total: number;
-  checkedIn: number;
-  absent: number;
-  waiting: number;
-  seated?: number;
-  dismissed?: number;
-  present?: number;
-  completed?: number;
-}
-
-// A daily-appointments row: `appointment_id` is typed (matching the contract's
-// looseObject row); the remaining columns ride the index signature. A `type`
-// (not `interface`) so it stays assignable to the contract's looseObject
-// `z.input` — sendData would reject an interface (TS2345, string index sig).
-type DailyAppointmentRow = { appointment_id: number; [key: string]: unknown };
-
 export type DailyAppointmentsOptimizedResult = {
-  allAppointments: DailyAppointmentRow[];
-  checkedInAppointments: DailyAppointmentRow[];
+  allAppointments: DailyAppointmentRowInput[];
+  checkedInAppointments: DailyAppointmentRowInput[];
   stats: DailyAppointmentStats;
 };
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
-/** FORMAT(dt, 'hh:mm' [+ ' tt']) — 12-hour clock, leading-zero hour. */
-const fmtClock = formatClock12;
+/** A `timestamp`'s wall-clock time as 24-hour `HH:MM` (the board formats it). */
+const clockOf = (d: Date): string => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 
-/** Format a PG `time` value ('HH:MM:SS' string) as 'hh:mm' (12-hour leading-zero). */
-const fmtTimeStr = (t: string | null): string | null => formatTime12(t);
+/**
+ * A PG `time` as `HH:MM:SS`. The columns are plain `time`, which can hold
+ * fractional seconds (legacy imports); the contract accepts whole seconds only.
+ */
+const clockOfTime = (t: string | null): string | null => (t ? t.slice(0, 8) : null);
 
 function isMidnight(date: Date): boolean {
   return date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0;
@@ -90,6 +82,14 @@ export async function updatePresent(
 
     if (!row) throw new Error('Appointment not found');
     appDay = row.app_day;
+    // A day that hasn't come yet can't have an arrival (owner decision, audit
+    // FE-F11-4): the board used to offer check-in on every date and this
+    // stamped today's clock onto a future appointment. Past days stay open for
+    // corrections; undo (undoAppointmentState) is never blocked, so a stamp
+    // already on a future row can still be cleared.
+    if (row.app_day && row.app_day > toDateOnly(new Date())) {
+      throw new Error('[FUTURE_APPOINTMENT] This appointment is on a later day; check-in, seat and dismiss open on the day itself');
+    }
     const present = row.present as string | null;
     const seated = row.seated as string | null;
     const dismissed = row.dismissed as string | null;
@@ -177,15 +177,17 @@ export async function getDailyAppointmentsOptimized(
     ])
     .execute();
 
+  // Every time leaves as 24-hour wall-clock; the board formats it with the active
+  // language's AM/PM. The three stamps are PG `time`s ('HH:MM:SS') and go out
+  // untouched. They used to be converted to 12-hour 'hh:mm' with no marker, and
+  // the card then guessed the marker from that hour, so every stamp after noon
+  // read "AM" (audit FE-F11-1).
   const enriched = base.map((r) => {
     const appDate = r.app_date as unknown as Date;
     return {
       ...r,
       appDate,
-      apptime: isMidnight(appDate) ? null : fmtClock(appDate, true),
-      presentTime: fmtTimeStr(r.present as string | null),
-      seatedTime: fmtTimeStr(r.seated as string | null),
-      dismissedTime: fmtTimeStr(r.dismissed as string | null),
+      apptime: isMidnight(appDate) ? null : clockOf(appDate),
     };
   });
 
@@ -212,22 +214,19 @@ export async function getDailyAppointmentsOptimized(
       has_visit: r.hasVisit,
     }));
 
-  // Result set 2: checked-in — present IS NOT NULL, ordered by check-in time.
-  // Sort on the raw 24-h `present` ('HH:MM:SS') value, NOT the 12-h display
-  // string presentTime (13:45→'01:45') which would collate PM check-ins before AM.
+  // Result set 2: checked-in — present IS NOT NULL, ordered by check-in time
+  // (the raw 24-hour 'HH:MM:SS', which collates in clock order).
   const checkedInAppointments = enriched
     .filter((r) => r.present !== null)
-    .sort((a, b) =>
-      ((a.present as string | null) ?? '').localeCompare((b.present as string | null) ?? '')
-    )
+    .sort((a, b) => (a.present ?? '').localeCompare(b.present ?? ''))
     .map((r) => ({
       appointment_id: r.appointment_id,
       person_id: r.person_id,
       dr_id: r.dr_id,
       app_detail: r.app_detail,
-      present_time: r.presentTime,
-      seated_time: r.seatedTime,
-      dismissed_time: r.dismissedTime,
+      present_time: clockOfTime(r.present),
+      seated_time: clockOfTime(r.seated),
+      dismissed_time: clockOfTime(r.dismissed),
       app_date: r.appDate,
       app_cost: r.app_cost,
       apptime: r.apptime,
@@ -271,20 +270,24 @@ export interface AppointmentNotificationRow {
  * @param app_date ISO datetime string ('YYYY-MM-DDTHH:MM:SS'); bound to the `timestamp` column.
  * @param present optional 'HH:MM:SS' check-in time (quick check-in path).
  */
-export async function createAppointment(data: {
-  person_id: number;
-  app_date: string;
-  app_detail: string | null;
-  dr_id: number | null;
-  present?: string | null;
-}): Promise<{ appointment_id: number; app_day: string | null }> {
+export async function createAppointment(
+  data: {
+    person_id: number;
+    app_date: string;
+    app_detail: string | null;
+    dr_id: number | null;
+    present?: string | null;
+  },
+  /** Run inside the caller's transaction (the slot-capacity check holds its lock). */
+  db: Kysely<Database> = getKysely()
+): Promise<{ appointment_id: number; app_day: string | null }> {
   // `app_day` comes back from the INSERT because it is the realtime broadcast key
   // and it is `GENERATED ALWAYS AS ((app_date)::date) STORED` — so the DB, which
   // owns the timestamp→day cast, is the only thing that can compute it correctly
   // for every `app_date` format the service accepts. Callers used to re-derive it
   // in JS (`split('T')[0]`, a hand-rolled toDateOnly, `new Date()`), which agreed
   // with the row only for the shapes the staff UI happens to send.
-  const row = await getKysely()
+  const row = await db
     .insertInto('appointments')
     .values({
       person_id: data.person_id,
@@ -391,8 +394,8 @@ export type AppointmentSummaryRow = {
   appointment_id: number;
   person_id: number;
   app_date: string;
-  app_detail: string;
-  dr_id: number;
+  app_detail: string | null;
+  dr_id: number | null;
   DrName: string | null;
 };
 

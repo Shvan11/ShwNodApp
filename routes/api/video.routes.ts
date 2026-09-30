@@ -25,17 +25,13 @@ import * as videoContract from '../../shared/contracts/video.contract.js';
 
 const router = Router();
 
-// Cache for videos path from database
-let cachedVideosPath: string | null = null;
-
 /**
- * Get the videos upload path, converting for WSL if needed
+ * The videos folder this process writes to (the `VideosPath` option, else the
+ * default under MACHINE_PATH), converted for WSL if needed. Read per upload, not
+ * cached for the life of the process, so a change in Settings applies at once.
  */
 async function getVideosUploadPath(): Promise<string> {
-  if (!cachedVideosPath) {
-    cachedVideosPath = await videoQueries.getVideosPath();
-  }
-  return normalizeVideoDbPath(cachedVideosPath);
+  return normalizeVideoDbPath(await videoQueries.getVideosPath());
 }
 
 // Configure multer for video uploads with disk storage
@@ -43,6 +39,8 @@ const storage = multer.diskStorage({
   destination: async (_req, _file, cb) => {
     try {
       const uploadPath = await getVideosUploadPath();
+      // A new install's default folder does not exist until the first upload.
+      await fsp.mkdir(uploadPath, { recursive: true });
       cb(null, uploadPath);
     } catch (error) {
       cb(error as Error, '');
@@ -251,6 +249,7 @@ router.get('/:id/qr', async (req: Request<VideoIdParams>, res: Response): Promis
       qr: qrResult.qr,
       url: qrResult.url,
       title: video.description,
+      usesDefaultAddress: qrResult.usesDefaultAddress,
     });
   } catch (error) {
     log.error('[Videos] Error generating QR code:', error);

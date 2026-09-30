@@ -45,7 +45,22 @@
 }
 
 .errorMessage i {
-    margin-right: var(--spacing-sm);
+    margin-inline-end: var(--spacing-sm);
+}
+
+.retryButton {
+    margin-inline-start: var(--spacing-md);
+    padding: var(--spacing-xs) var(--spacing-md);
+    border: 1px solid var(--error-red);
+    border-radius: var(--radius-md);
+    background: var(--card-bg);
+    color: var(--error-red);
+    font-size: var(--font-size-base);
+    cursor: pointer;
+}
+
+.retryButton:hover {
+    background: var(--error-100);
 }
 
 /* Responsive */

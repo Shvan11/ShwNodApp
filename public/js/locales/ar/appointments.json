@@ -6,11 +6,11 @@
     "selectDate": "اختر تاريخ الموعد",
     "refresh": "الانتقال إلى اليوم والتحديث",
     "searchPlaceholder": "البحث عن مريض...",
-    "clearSearch": "مسح البحث"
+    "clearSearch": "مسح البحث",
+    "search": "البحث عن مريض"
   },
   "stats": {
     "total": "الإجمالي",
-    "totalAppointments": "إجمالي المواعيد",
     "checkedIn": "الحاضرون",
     "remaining": "المتبقي",
     "waiting": "في الانتظار"
@@ -24,7 +24,8 @@
   },
   "mobile": {
     "all": "الكل ({{count}})",
-    "checkedIn": "الحاضرون ({{count}})"
+    "checkedIn": "الحاضرون ({{count}})",
+    "label": "قوائم المواعيد"
   },
   "filter": {
     "byDoctor": "تصفية حسب الطبيب",
@@ -46,12 +47,9 @@
     "visitNotesRegistered": "تم تسجيل ملاحظات الزيارة ✓",
     "noVisitNotes": "لا توجد ملاحظات زيارة بعد",
     "doctor": "الطبيب: {{name}}",
-    "seatAlt": "إجلاس",
-    "am": "ص",
-    "pm": "م"
+    "seatAlt": "إجلاس"
   },
   "actions": {
-    "checkedIn": "تم تسجيل الوصول",
     "clickToCheckIn": "اضغط لتسجيل الوصول",
     "checkedInUndo": "تم تسجيل الوصول: {{time}} - اضغط للتراجع",
     "cannotUndoSeated": "لا يمكن التراجع: تم إجلاس المريض بالفعل",
@@ -63,7 +61,14 @@
     "notSeatedYet": "لم يتم الإجلاس بعد"
   },
   "errors": {
-    "failedToLoad": "فشل في تحميل المواعيد: {{error}}"
+    "loadFailed": "تعذّر تحميل المواعيد.",
+    "retry": "إعادة المحاولة",
+    "stateConflict": "تغيّرت حالة المريض — جارٍ التحديث",
+    "checkInFailed": "تعذّر تسجيل حضور المريض. يرجى المحاولة مرة أخرى.",
+    "seatFailed": "تعذّر إجلاس المريض. يرجى المحاولة مرة أخرى.",
+    "dismissFailed": "تعذّر إنهاء الزيارة. يرجى المحاولة مرة أخرى.",
+    "undoFailed": "تعذّر التراجع. يرجى المحاولة مرة أخرى.",
+    "futureDay": "هذا الموعد في يوم لاحق. يُسجَّل حضور المريض في يوم موعده."
   },
   "calendar": {
     "daysAheadPlaceholder": "بعد كم يوم...",
@@ -78,7 +83,10 @@
     "slotAvailable": "متاح",
     "holiday": "عطلة",
     "appointmentsCount": "{{count}} مواعيد",
-    "noAppointmentsTooltip": "لا توجد مواعيد"
+    "noAppointmentsTooltip": "لا توجد مواعيد",
+    "previousMonth": "الشهر السابق",
+    "nextMonth": "الشهر التالي",
+    "loadFailed": "تعذّر تحميل الأوقات المتاحة."
   },
   "form": {
     "newTitle": "موعد جديد",
@@ -104,11 +112,14 @@
     "errorSelectType": "اختر نوع الموعد",
     "errorHolidayConflict": "لا يمكن إنشاء الموعد: {{holiday}} يوم عطلة. لا يُسمح بحجز المواعيد في هذا التاريخ.",
     "errorAppointmentConflict": "لدى المريض موعد بالفعل في هذا التاريخ.",
+    "errorSlotFull": "هذا الوقت ممتلئ بالفعل. يرجى اختيار وقت آخر.",
     "errorUnknown": "خطأ غير معروف",
-    "errorUpdateFailed": "فشل تحديث الموعد",
     "waSent": "تم إرسال تأكيد الموعد عبر واتساب!",
     "waFailed": "فشل إرسال رسالة واتساب",
-    "waError": "خطأ في واتساب: {{error}}"
+    "waError": "خطأ في واتساب: {{error}}",
+    "errorPastSlot": "هذا الوقت قد مضى. يرجى اختيار وقت آخر.",
+    "errorInvalidDoctor": "لا يمكن الحجز لهذا الطبيب. يرجى اختيار طبيب آخر.",
+    "currentDoctor": "{{name}} (الحالي)"
   },
   "list": {
     "title": "مواعيد المريض",
@@ -127,6 +138,6 @@
     "confirmDeleteText": "هل أنت متأكد من حذف هذا الموعد؟",
     "cancel": "إلغاء",
     "deleteFailed": "فشل حذف الموعد",
-    "unknownError": "خطأ غير معروف"
+    "deleted": "تم حذف الموعد"
   }
 }

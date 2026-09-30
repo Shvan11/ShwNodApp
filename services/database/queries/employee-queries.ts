@@ -236,18 +236,31 @@ export async function listPositions(): Promise<PositionListRow[]> {
   return rows;
 }
 
+/** A calendar doctor: the selector row plus the doctor's calendar colour. */
+export type CalendarDoctorRow = StaffMemberRow & {
+  appointment_color: string | null;
+};
+
 /**
  * All ACTIVE doctors (employees whose position is 'Doctor'; quit employees are
  * hidden — they only appear on the Settings page).
+ *
+ * This is THE definition of a calendar doctor (owner's call on audit FE-F10-13,
+ * 2026-09-29): the booking forms, the calendar's doctor filter and legend, and the
+ * daily board all read it, and `AppointmentService.verifyDoctor` accepts exactly
+ * this position. The booking lists used to read the `get_appointments` flag
+ * instead, so an Assistant carrying it was offered and then refused with a 400.
+ * Ordered like Settings → Employees (`sort_order`), with each doctor's colour for
+ * the legend and the card tints.
  */
-export async function listActiveDoctors(): Promise<StaffMemberRow[]> {
-  const { rows } = await sql<StaffMemberRow>`
-      SELECT e."id", e."employee_name"
+export async function listActiveDoctors(): Promise<CalendarDoctorRow[]> {
+  const { rows } = await sql<CalendarDoctorRow>`
+      SELECT e."id", e."employee_name", e."appointment_color"
       FROM "employees" e
       INNER JOIN "positions" p ON e."position" = p."id"
       WHERE p."position_name" = 'Doctor'
         AND e."is_active" = true
-      ORDER BY e."employee_name"
+      ORDER BY e."sort_order", e."employee_name"
     `.execute(getKysely());
   return rows;
 }

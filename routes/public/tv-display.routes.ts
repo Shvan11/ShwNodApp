@@ -58,6 +58,7 @@
 import { Router, type Request, type Response } from 'express';
 import fs from 'node:fs';
 import { log } from '../../utils/logger.js';
+import { getOption } from '../../services/database/queries/options-queries.js';
 import { streamFile } from '../../utils/stream-file.js';
 import {
   MIME,
@@ -188,14 +189,32 @@ router.get('/media/:file', async (req: Request<{ file: string }>, res: Response)
  * The full-screen slideshow page. Self-contained HTML+JS (no external assets,
  * no build step) so it is served verbatim and works in the webOS browser.
  */
-router.get('/', (_req: Request, res: Response): void => {
+router.get('/', async (_req: Request, res: Response): Promise<void> => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   // Never cache the shell: the TV browser must pick up page updates on the next
   // (re)launch rather than replaying a stale copy. The page is tiny; the media
   // it references is what's actually large, and that streams on demand.
   res.setHeader('Cache-Control', 'no-store');
-  res.send(PAGE_HTML);
+  // The page title and the empty-playlist placeholder are the clinic's own name
+  // (Settings → General, `CLINIC_NAME`). They were this clinic's name as a
+  // literal, on every center's waiting-room TV (audit FE-F11-6).
+  let clinicName = '';
+  try {
+    clinicName = (await getOption('CLINIC_NAME'))?.trim() ?? '';
+  } catch (error) {
+    log.warn('[TV Display] could not read CLINIC_NAME', { error: (error as Error).message });
+  }
+  res.send(PAGE_HTML.replaceAll('__CLINIC_NAME__', escapeHtml(clinicName)));
 });
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // ---------------------------------------------------------------------------
 // The page. Kept as a template literal (same approach as the public video page)
@@ -209,7 +228,7 @@ const PAGE_HTML = /* html */ `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Shwan Orthodontics</title>
+<title>__CLINIC_NAME__</title>
 <style>
   html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; overflow: hidden; }
   body { cursor: none; }
@@ -237,7 +256,7 @@ const PAGE_HTML = /* html */ `<!DOCTYPE html>
   <img    id="imgA" class="layer" alt="">
   <img    id="imgB" class="layer" alt="">
   <video  id="vid"  class="layer" muted playsinline preload="auto"></video>
-  <div id="placeholder">Shwan Orthodontics</div>
+  <div id="placeholder">__CLINIC_NAME__</div>
   <div id="debug"></div>
 <script>
 (function () {

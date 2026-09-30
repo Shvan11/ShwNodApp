@@ -29,17 +29,40 @@ import {
 // `z.input`. The CLIENT also validates via `useAppointments` ({ schema }).
 // ---------------------------------------------------------------------------
 
+// A 24-hour wall-clock time, `HH:MM` or `HH:MM:SS` (a PG `time`, or the time of
+// a `timestamp`). The CLIENT formats it for display, with the active language's
+// AM/PM marker. It used to leave the server as 12-hour `hh:mm` with no marker,
+// and the card then guessed the marker from that hour, so every stamp after noon
+// read "AM" (audit FE-F11-1). Declared, so a regression to 12-hour fails loud.
+const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, 'Expected a 24-hour HH:MM[:SS] time');
+
+// One row of either list. Every field the daily board reads is declared here
+// (the card's view-model is this type, no hand-written interface or cast); the
+// looseObject tail still carries the rest (`app_date`, `app_cost`).
 const appointmentRowSchema = z.looseObject({
   appointment_id: z.number(),
+  person_id: z.number(),
+  patient_name: z.string().nullable(),
   // Assigned doctor (employees.id), nullable — drives the daily page's doctor
-  // filter + per-doctor card tint. The rest of the row rides the looseObject tail.
+  // filter + per-doctor card tint.
   dr_id: z.number().nullable().optional(),
+  app_detail: z.string().nullable(),
+  // The booked time; null when the appointment has no time (booked at midnight).
+  apptime: clockTime.nullable(),
   // Patient-type lookup: base value + its optional Arabic display name (the card
   // picks one via useLocalizedName). `patient_type_id` is the DERIVED type id — the
   // card hides the badge for ACTIVE_ORTHO by id (rename-proof), not by label text.
   patient_type: z.string().nullable().optional(),
   patient_type_id: z.number().nullable().optional(),
   patient_type_name_ar: z.string().nullable().optional(),
+  hasActiveAlert: z.boolean(),
+  has_visit: z.boolean(),
+  // Checked-in rows only: the three workflow stamps + whether the active work is
+  // orthodontic (the visit-notes marker).
+  present_time: clockTime.nullable().optional(),
+  seated_time: clockTime.nullable().optional(),
+  dismissed_time: clockTime.nullable().optional(),
+  is_ortho_visit: z.boolean().optional(),
 });
 
 const appointmentStatsSchema = z.object({
@@ -57,6 +80,11 @@ export const dailyAppointments = {
   }),
 } as const;
 export type DailyAppointmentsResponse = z.infer<typeof dailyAppointments.response>;
+/** One daily-board row as the client receives it (the card's view-model). */
+export type DailyAppointmentRow = DailyAppointmentsResponse['allAppointments'][number];
+/** The same row as the server may build it (`sendData`'s input side). */
+export type DailyAppointmentRowInput = z.input<typeof appointmentRowSchema>;
+export type DailyAppointmentStats = z.infer<typeof appointmentStatsSchema>;
 
 // ===========================================================================
 // Phase 7 (Wave 2) — the remaining appointment endpoints.
@@ -153,8 +181,25 @@ export type PatientAppointmentsResponse = z.infer<typeof patientAppointments.res
 
 // GET /api/appointments/:appointmentId — { appointment: AppointmentResult }.
 export const appointmentById = {
-  response: z.object({ appointment: z.looseObject({ appointment_id: z.number() }) }),
+  // Every field the edit form seeds from is declared: the form used to trust a
+  // calendar row handed over as router state, which named them `appDetail`/`drID`,
+  // and opened with Doctor and Type blank (audit FE-F10-1). It now always reads
+  // this, and these fields are what it reads.
+  response: z.object({
+    appointment: z.looseObject({
+      appointment_id: z.number(),
+      person_id: z.number(),
+      // Local wall-clock 'YYYY-MM-DDTHH:MM:SS' (to_char), never a UTC ISO string.
+      app_date: z.string(),
+      app_detail: z.string().nullable(),
+      dr_id: z.number().nullable(),
+      // The doctor's name, so the form can still offer a doctor who has since
+      // left as "<name> (current)" (audit FE-F10-13).
+      DrName: z.string().nullable(),
+    }),
+  }),
 } as const;
+export type AppointmentByIdResponse = z.infer<typeof appointmentById.response>;
 
 // POST /api/appointments/quick-checkin — strict body; QuickCheckInResult.
 // Modeled from AppointmentService's QuickCheckInResult (closed → the interface stays

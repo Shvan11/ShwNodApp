@@ -134,6 +134,17 @@ export function isUnderClinicRoot(abs: string): boolean {
 }
 
 /**
+ * Where educational videos live when the `VideosPath` option is not set:
+ * `clinic1/ovideos/` under MACHINE_PATH (this clinic's own row points at the same
+ * place). A fresh install has no such row and no screen to add one, so video
+ * upload used to fail with a generic 500 on every new center (audit FE-F11-16).
+ * Ends with a separator: the video queries append the file name to it.
+ */
+export function defaultVideosPath(): string {
+  return clinicPath('ovideos') + path.sep;
+}
+
+/**
  * Convert a `VideosPath`-style DB path to one this process can open.
  *
  * `VideosPath` stores a LOCAL Windows path (`C:\clinic1\ovideos\…`) because

@@ -11,7 +11,7 @@ import { log } from '../../utils/logger.js';
  */
 export async function generateVideoQRCode(
   videoId: number
-): Promise<{ qr: string; url: string }> {
+): Promise<{ qr: string; url: string; usesDefaultAddress: boolean }> {
   // config.urls.publicUrl carries its own default — never re-default it here, or the
   // deployment's URL lives in two places (this is a per-clinic install, not one domain).
   const shareUrl = `${config.urls.publicUrl}/v/${videoId}`;
@@ -25,7 +25,7 @@ export async function generateVideoQRCode(
         light: '#ffffff',
       },
     });
-    return { qr, url: shareUrl };
+    return { qr, url: shareUrl, usesDefaultAddress: config.urls.publicUrlIsDefault };
   } catch (err) {
     log.error('Failed to generate video QR code', { error: (err as Error).message, videoId });
     throw err;

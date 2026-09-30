@@ -1,25 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { fetchJSON, putJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
-import { videosQuery, videoCategoriesQuery } from '@/query/queries';
+import { videosQuery, videoCategoriesQuery, brandingQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import * as videoContract from '@shared/contracts/video.contract';
 import Modal from '../components/react/Modal';
 import ModalHeader from '../components/react/ModalHeader';
 import styles from './Videos.module.css';
 
-/**
- * Video interface from API
- */
-interface Video {
-  id: number;
-  description: string;
-  Video: string;
-  Image: string;
-  category: number | null;
-  details: string | null;
-}
+type Video = videoContract.VideoRow;
+type QrData = { qr: string; url: string; title: string; usesDefaultAddress: boolean };
 
 /**
  * Video form data for create/edit
@@ -31,11 +23,32 @@ interface VideoFormData {
 }
 
 /**
- * Video category from API
+ * The player's <video>. Unmounting a <video> does not stop its download: the
+ * element lingers until garbage-collected and keeps fetching the stream, so each
+ * video opened and closed kept downloading after the modal was gone (audit
+ * FE-F11-13). The source is set here and emptied on cleanup, which ends the
+ * request. It is not a `src` prop: StrictMode runs setup → cleanup → setup, and
+ * a cleanup that strips a prop-driven `src` leaves the element empty, because
+ * React only writes the attribute when the prop changes.
  */
-interface VideoCategory {
-  id: number;
-  name: string;
+function VideoPlayer({ videoId }: { videoId: number }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    el.src = `/api/videos/${videoId}/stream`;
+    return () => {
+      el.pause();
+      el.removeAttribute('src');
+      el.load();
+    };
+  }, [videoId]);
+  return (
+    // eslint-disable-next-line jsx-a11y/media-has-caption -- user-supplied clinical videos have no caption track
+    <video ref={videoRef} controls autoPlay className={styles.videoPlayer}>
+      Your browser does not support the video tag.
+    </video>
+  );
 }
 
 /**
@@ -44,14 +57,18 @@ interface VideoCategory {
  */
 export default function Videos() {
   const toast = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
 
   // Video list + categories (server state via React Query).
   const { data: videosData, isLoading: loading, error: videosError, refetch } = useQuery(videosQuery());
-  const videos = (videosData ?? []) as Video[];
+  const videos = videosData ?? [];
   const error = videosError ? httpErrorMessage(videosError, 'Failed to load videos') : null;
   const { data: categoriesData } = useQuery(videoCategoriesQuery());
-  const categories = (categoriesData ?? []) as VideoCategory[];
+  const categories = categoriesData ?? [];
+  // The clinic's own name for the printed QR handout (was this clinic's name as a
+  // literal on every center's handout; audit FE-F11-6).
+  const { data: branding } = useQuery(brandingQuery());
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,9 +78,10 @@ export default function Videos() {
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
   const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
-  const [videoToDelete, setVideoToDelete] = useState<Video | null>(null);
+  const deletingRef = useRef(false);
+  // The upload in flight, so closing the form cancels it (FE-F11-13).
+  const uploadAbortRef = useRef<AbortController | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<VideoFormData>({
@@ -77,7 +95,7 @@ export default function Videos() {
 
   // QR Modal state
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
-  const [qrData, setQRData] = useState<{ qr: string; url: string; title: string } | null>(null);
+  const [qrData, setQRData] = useState<QrData | null>(null);
   const [isLoadingQR, setIsLoadingQR] = useState(false);
 
   // Surface a video-load failure with a toast (categories fail silently, as before).
@@ -145,11 +163,36 @@ export default function Videos() {
   };
 
   /**
-   * Open delete confirmation modal
+   * Close the add/edit form. An upload still in flight is cancelled: it used to
+   * finish in the background and then announce "Video uploaded successfully" for
+   * a form the user had dismissed (FE-F11-13).
    */
-  const handleDeleteClick = (video: Video) => {
-    setVideoToDelete(video);
-    setIsDeleteModalOpen(true);
+  const closeForm = () => {
+    uploadAbortRef.current?.abort();
+    uploadAbortRef.current = null;
+    setIsFormModalOpen(false);
+  };
+
+  /**
+   * Delete, through the shared confirm dialog, one request per confirmation.
+   */
+  const handleDeleteClick = async (video: Video) => {
+    if (deletingRef.current) return;
+    const ok = await confirm(
+      `Delete "${video.description}"? The video file and thumbnail will be permanently deleted.`,
+      { title: 'Delete Video', danger: true, confirmText: 'Delete' }
+    );
+    if (!ok || deletingRef.current) return;
+    deletingRef.current = true;
+    try {
+      await deleteJSON(`/api/videos/${video.id}`);
+      toast.success('Video deleted successfully');
+      void queryClient.invalidateQueries({ queryKey: qk.videos.all() });
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to delete video'));
+    } finally {
+      deletingRef.current = false;
+    }
   };
 
   /**
@@ -160,14 +203,14 @@ export default function Videos() {
     setIsQRModalOpen(true);
 
     try {
-      const data = await fetchJSON<{ qr: string; url: string; title: string }>(
-        `/api/videos/${video.id}/qr`,
-        { schema: videoContract.qr.response }
-      );
+      const data = await fetchJSON<QrData>(`/api/videos/${video.id}/qr`, {
+        schema: videoContract.qr.response,
+      });
       setQRData({
         qr: data.qr,
         url: data.url,
         title: data.title,
+        usesDefaultAddress: data.usesDefaultAddress,
       });
     } catch (err) {
       toast.error(httpErrorMessage(err, 'Failed to generate QR code'));
@@ -217,6 +260,8 @@ export default function Videos() {
       s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const safeTitle = esc(qrData.title);
     const safeUrl = esc(qrData.url);
+    const clinicName = branding?.clinicName?.trim();
+    const footer = clinicName ? `<p class="footer">${esc(clinicName)}</p>` : '';
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -244,7 +289,7 @@ export default function Videos() {
           <img src="${qrData.qr}" alt="QR Code" />
           <h2>${safeTitle}</h2>
           <p>${safeUrl}</p>
-          <p class="footer">Shwan Orthodontics</p>
+          ${footer}
           <script>window.onload = () => { window.print(); window.close(); }</script>
         </body>
       </html>
@@ -299,6 +344,8 @@ export default function Videos() {
     }
 
     setIsSubmitting(true);
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
 
     try {
       if (editingVideo) {
@@ -322,35 +369,21 @@ export default function Videos() {
         // 120s to match the server's timeouts.long on this route — an educational
         // video is far more than 30s of LAN transfer, and the funnel's default
         // would abort it client-side mid-upload.
-        await postFormData('/api/videos', uploadData, { timeoutMs: 120000 });
+        await postFormData('/api/videos', uploadData, { timeoutMs: 120000, signal: controller.signal });
 
         toast.success('Video uploaded successfully');
       }
 
       setIsFormModalOpen(false);
-      queryClient.invalidateQueries({ queryKey: qk.videos.all() });
+      void queryClient.invalidateQueries({ queryKey: qk.videos.all() });
     } catch (err) {
-      toast.error(httpErrorMessage(err, 'Failed to save video'));
+      // Cancelled by closing the form: nothing to report.
+      if (!controller.signal.aborted) {
+        toast.error(httpErrorMessage(err, 'Failed to save video'));
+      }
     } finally {
+      if (uploadAbortRef.current === controller) uploadAbortRef.current = null;
       setIsSubmitting(false);
-    }
-  };
-
-  /**
-   * Confirm delete
-   */
-  const handleConfirmDelete = async () => {
-    if (!videoToDelete) return;
-
-    try {
-      await deleteJSON(`/api/videos/${videoToDelete.id}`);
-
-      toast.success('Video deleted successfully');
-      setIsDeleteModalOpen(false);
-      setVideoToDelete(null);
-      queryClient.invalidateQueries({ queryKey: qk.videos.all() });
-    } catch (err) {
-      toast.error(httpErrorMessage(err, 'Failed to delete video'));
     }
   };
 
@@ -471,7 +504,7 @@ export default function Videos() {
                 </button>
                 <button
                   className={`${styles.actionBtn} ${styles.deleteBtn}`}
-                  onClick={() => handleDeleteClick(video)}
+                  onClick={() => void handleDeleteClick(video)}
                   title="Delete"
                 >
                   <i className="fas fa-trash"></i>
@@ -490,39 +523,35 @@ export default function Videos() {
           contentClassName={styles.playerModal}
           ariaLabelledBy="video-player-title"
         >
-          <div className={styles.playerHeader}>
-            <h2 id="video-player-title">{currentVideo.description}</h2>
-            <button className={styles.closeBtn} onClick={handleClosePlayer}>
-              <i className="fas fa-times"></i>
-            </button>
-          </div>
+          {/* The shared title bar: a labelled close button, and the modal's drag grip. */}
+          <ModalHeader
+            title={currentVideo.description}
+            titleId="video-player-title"
+            icon={<i className="fas fa-play-circle" />}
+            onClose={handleClosePlayer}
+          />
           <div className={styles.playerBody}>
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption -- user-supplied clinical videos have no caption track */}
-            <video
-              controls
-              autoPlay
-              className={styles.videoPlayer}
-              src={`/api/videos/${currentVideo.id}/stream`}
-            >
-              Your browser does not support the video tag.
-            </video>
+            <VideoPlayer videoId={currentVideo.id} />
           </div>
         </Modal>
       )}
 
-      {/* Add/Edit Form Modal */}
+      {/* Add/Edit form. Backdrop, Escape, ✕ and Cancel ask before discarding typed
+          details or a chosen file (FE-F11-13). */}
       {isFormModalOpen && (
         <Modal
           isOpen={true}
-          onClose={() => setIsFormModalOpen(false)}
+          onClose={closeForm}
           contentClassName={styles.formModal}
           ariaLabelledBy="video-form-title"
+          unsavedGuard={{ watchInput: true }}
         >
+          {(dismiss) => (<>
             <ModalHeader
               title={editingVideo ? 'Edit Video' : 'Add New Video'}
               titleId="video-form-title"
               icon={<i className={editingVideo ? 'fas fa-edit' : 'fas fa-plus'} />}
-              onClose={() => setIsFormModalOpen(false)}
+              onClose={dismiss}
             />
             <form onSubmit={handleSubmitForm}>
               <div className={styles.modalBody}>
@@ -611,7 +640,7 @@ export default function Videos() {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => setIsFormModalOpen(false)}
+                  onClick={dismiss}
                 >
                   Cancel
                 </button>
@@ -624,48 +653,7 @@ export default function Videos() {
                 </button>
               </div>
             </form>
-        </Modal>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && videoToDelete && (
-        <Modal
-          isOpen={true}
-          onClose={() => setIsDeleteModalOpen(false)}
-          contentClassName={`${styles.formModal} ${styles.deleteModal}`}
-          ariaLabelledBy="video-delete-title"
-        >
-            <ModalHeader
-              title="Delete Video"
-              titleId="video-delete-title"
-              icon={<i className="fas fa-trash" />}
-              variant="danger"
-              onClose={() => setIsDeleteModalOpen(false)}
-            />
-            <div className={styles.modalBody}>
-              <p className={styles.warningText}>
-                <i className="fas fa-exclamation-triangle"></i> Are you sure you want to
-                delete this video?
-              </p>
-              <p>
-                <strong>{videoToDelete.description}</strong>
-              </p>
-              <p className={styles.deleteWarning}>
-                This action cannot be undone. The video file and thumbnail will be
-                permanently deleted.
-              </p>
-            </div>
-            <div className={styles.modalFooter}>
-              <button
-                className="btn btn-secondary"
-                onClick={() => setIsDeleteModalOpen(false)}
-              >
-                Cancel
-              </button>
-              <button className="btn btn-danger" onClick={handleConfirmDelete}>
-                Delete
-              </button>
-            </div>
+          </>)}
         </Modal>
       )}
 
@@ -694,6 +682,13 @@ export default function Videos() {
                 <>
                   <img src={qrData.qr} alt="QR Code" className={styles.qrImage} />
                   <h3 className={styles.qrTitle}>{qrData.title}</h3>
+                  {qrData.usesDefaultAddress && (
+                    <p className={styles.qrWarning} role="alert">
+                      <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>{' '}
+                      This link uses the app&apos;s built-in address, not your clinic&apos;s. Set
+                      PUBLIC_URL on the server to your clinic&apos;s public address before sharing it.
+                    </p>
+                  )}
                   <div className={styles.shareUrlContainer}>
                     <input
                       type="text"

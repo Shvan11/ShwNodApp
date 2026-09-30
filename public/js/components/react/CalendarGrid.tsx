@@ -1,86 +1,39 @@
 /**
  * CalendarGrid Component for Appointment Calendar
  *
- * Renders the week/day grid on a uniform 112px slot system.
- * Row tinting is switchable via TINT_MODE (neutral 'zebra' default, or the
- * 'colorful' golden-angle hue-per-row). Appointment cards pack adaptively
- * (1/2/3/4/5+) and support drag-to-reschedule plus a "+N more" popover for
- * crowded slots.
+ * Renders the week/day grid on a uniform 112px slot system, zebra-banded by
+ * row. Appointment cards pack adaptively (1/2/3/4/5+) and support
+ * drag-to-reschedule plus a "+N more" popover for crowded slots.
  */
 
 import { useEffect } from 'react';
-import type { Dispatch, DragEvent, MouseEvent, Ref, SetStateAction } from 'react';
+import type { Dispatch, DragEvent, KeyboardEvent, MouseEvent, Ref, SetStateAction } from 'react';
 import { to12Hour, formatTime12 } from '../../utils/formatters';
 import { parseLocalDate } from '../../utils/calendarDate';
+import { anchorFrom, type MenuAnchor } from '../../hooks/useFloatingMenu';
 import type {
     CalendarDay,
     CalendarData,
     CalendarAppointment,
     CalendarSlotInfo,
-    SlotData,
     ViewMode,
-    CalendarMode,
     DoctorColor
 } from './calendar.types';
 
-/* ────────────────────────────────────────────────────────────────────────
-   Row tinting — flip TINT_MODE to switch the whole grid.
-   'zebra'    : neutral alternating bands; the time-column label shares its
-                row's shade, so each 30-min row (label + every day cell) reads
-                as one horizontal unit. Easiest to trace a cell back to its
-                time across the 6-day week.
-   'colorful' : 14 golden-angle hues, one per 30-min row (the V4_TIME_TINT map
-                below). Flip back here to restore it — nothing else changes.
-   ──────────────────────────────────────────────────────────────────────── */
-type TintMode = 'zebra' | 'colorful';
-const TINT_MODE: TintMode = 'zebra';
+/* On-the-hour rows tinted, half-hour rows clear. The label shares its row's
+   shade, so each row (label + every day cell) reads as one horizontal band. */
+const zebraFor = (t: string): string => (t.endsWith(':00') ? 'var(--cal-zebra)' : 'transparent');
 
-/* Colourful mode — 14 hues stepped at the golden angle (~137.5°) so every
-   consecutive pair of 30-minute rows sits on opposite sides of the wheel.
-   Also the source of truth for the slot list (CORE_TIME_SLOTS), regardless
-   of the active mode. */
-const V4_TIME_TINT: Record<string, { row: string; label: string }> = {
-    '14:00': { row: 'oklch(96% 0.038 220)', label: 'oklch(86% 0.078 220)' },
-    '14:30': { row: 'oklch(96% 0.038 358)', label: 'oklch(86% 0.078 358)' },
-    '15:00': { row: 'oklch(96% 0.040 135)', label: 'oklch(86% 0.082 135)' },
-    '15:30': { row: 'oklch(96% 0.038 273)', label: 'oklch(86% 0.078 273)' },
-    '16:00': { row: 'oklch(96% 0.040 50)',  label: 'oklch(86% 0.082 50)'  },
-    '16:30': { row: 'oklch(96% 0.040 188)', label: 'oklch(86% 0.082 188)' },
-    '17:00': { row: 'oklch(96% 0.038 325)', label: 'oklch(86% 0.078 325)' },
-    '17:30': { row: 'oklch(96% 0.040 103)', label: 'oklch(86% 0.082 103)' },
-    '18:00': { row: 'oklch(96% 0.038 240)', label: 'oklch(86% 0.078 240)' },
-    '18:30': { row: 'oklch(96% 0.040 18)',  label: 'oklch(86% 0.082 18)'  },
-    '19:00': { row: 'oklch(96% 0.040 155)', label: 'oklch(86% 0.082 155)' },
-    '19:30': { row: 'oklch(96% 0.038 293)', label: 'oklch(86% 0.078 293)' },
-    '20:00': { row: 'oklch(96% 0.040 70)',  label: 'oklch(86% 0.082 70)'  },
-    '20:30': { row: 'oklch(96% 0.040 208)', label: 'oklch(86% 0.082 208)' }
-};
-/* The fixed 14 time rows the week/day grid always renders. Exported so the
-   density-zoom Fit can divide the available board height by the row count. */
-export const CORE_TIME_SLOTS = Object.keys(V4_TIME_TINT);
-
-/* Zebra mode — on-the-hour rows tinted, half-hour rows clear (a proper
-   every-other-row stripe, since slots strictly alternate :00 / :30). Label
-   matches row so the band reads as one unit. */
-const zebraFor = (t: string): { row: string; label: string } => {
-    const shade = t.endsWith(':00') ? 'var(--cal-zebra)' : 'transparent';
-    return { row: shade, label: shade };
-};
-
-const tintFor = (t: string): { row: string; label: string } =>
-    TINT_MODE === 'zebra' ? zebraFor(t) : (V4_TIME_TINT[t] || V4_TIME_TINT['14:00']);
-
-/* Per-doctor card tint now comes from the `doctorColors` prop — resolved from
-   the appointment-eligible doctors (tblEmployees.getAppointments) and their
-   AppointmentColor, see doctorColors.ts — so the grid, the legend, and Employee
-   Settings stay in sync. A drID absent from the map renders neutral white
-   (unassigned, or a deliberately-neutral bucket like "Clinic"). */
+/* Per-doctor card tint comes from the `doctorColors` prop (see doctorColors.ts),
+   so the grid, the legend and Employee Settings stay in sync. A drID absent from
+   the map renders neutral. */
 const EMPTY_DOCTOR_COLORS: Map<number, DoctorColor> = new Map();
 
 export interface DropTarget {
     date: string;
     time: string;
-    isHoliday?: boolean;
+    /** A holiday or a slot already in the past: nothing may be dropped there. */
+    forbidden?: boolean;
 }
 
 export interface MoreMenu {
@@ -90,16 +43,14 @@ export interface MoreMenu {
 
 interface CalendarGridProps {
     calendarData: CalendarData | null;
-    selectedSlot: SlotData | null;
-    onSlotClick: (slot: SlotData, event: MouseEvent<HTMLDivElement>) => void;
     onAppointmentClick: (
         appt: CalendarAppointment,
         date: string,
         time: string,
-        event: MouseEvent<HTMLDivElement>
+        anchor: MenuAnchor
     ) => void;
-    onDayContextMenu?: (day: CalendarDay, event: MouseEvent<HTMLDivElement>) => void;
-    mode?: CalendarMode;
+    /** Right-click, click or Enter on a day header. */
+    onDayMenu: (day: CalendarDay, anchor: MenuAnchor) => void;
     viewMode?: ViewMode;
     doctorColors?: Map<number, DoctorColor>;
     /* When a doctor filter is active the grid goes mostly empty, so collapse it
@@ -115,7 +66,8 @@ interface CalendarGridProps {
         appointmentID: number | string,
         newDate: string,
         newTime: string,
-        appt: CalendarAppointment
+        appt: CalendarAppointment,
+        fromDate: string
     ) => void;
     /* Forwarded onto the scrolling .cal-board so the parent can measure the
        available height/width for Fit-to-screen zoom. */
@@ -139,16 +91,20 @@ const isToday = (date: string): boolean => {
     return today.toDateString() === checkDate.toDateString();
 };
 
-const parseDragId = (id: string): { date: string; time: string; index: number } => {
-    const [date, time, idx] = id.split('|');
-    return { date, time, index: parseInt(idx, 10) };
+const isPastSlot = (date: string, time: string): boolean => new Date(`${date}T${time}:00`) < new Date();
+
+const onActivate = (action: (e: KeyboardEvent<HTMLElement>) => void) => (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        action(e);
+    }
 };
 
 const CalendarGrid = ({
     calendarData,
-    onSlotClick,
     onAppointmentClick,
-    onDayContextMenu,
+    onDayMenu,
     viewMode = 'week',
     doctorColors = EMPTY_DOCTOR_COLORS,
     hideEmptySlots = false,
@@ -171,7 +127,7 @@ const CalendarGrid = ({
             if (target.closest('.cal-popover') || target.closest('.cal-more-cell')) return;
             setMoreMenu(null);
         };
-        const onKeyDown = (e: KeyboardEvent) => {
+        const onKeyDown = (e: globalThis.KeyboardEvent) => {
             if (e.key === 'Escape') setMoreMenu(null);
         };
         document.addEventListener('mousedown', onMouseDown);
@@ -195,17 +151,12 @@ const CalendarGrid = ({
     // Render every day the parent fetched — the column count IS the zoom level
     // (1 for a single day, N for the density-zoom Week). Columns are 1fr so they
     // always fill the width; row height/fonts scale via --cal-row-h/--cal-font-scale.
-    const filteredDays = days;
-    const columnCount = filteredDays.length;
+    const columnCount = days.length;
     const gridTemplateColumns = `var(--cal-grid-time-w) repeat(${columnCount}, 1fr)`;
 
-    // The time rows come from the configured slots the server sent (tbltimes —
-    // reflects add/delete live). CORE_TIME_SLOTS is only a fallback for the brief
-    // pre-load window. Zebra tinting + 12h formatting handle any HH:MM.
-    const timeSlots =
-        calendarData.timeSlots && calendarData.timeSlots.length > 0
-            ? calendarData.timeSlots
-            : CORE_TIME_SLOTS;
+    // The rows are the server's: the configured times plus every time that holds
+    // an appointment (audit FE-F10-2).
+    const timeSlots = calendarData.timeSlots ?? [];
 
     const getSlotAppointments = (day: CalendarDay, time: string): CalendarAppointment[] => {
         const dayAppts = day.appointments as
@@ -214,31 +165,31 @@ const CalendarGrid = ({
         return validOnly(extractAppointments(dayAppts?.[time]));
     };
 
+    const dayTotal = (day: CalendarDay): number =>
+        timeSlots.reduce((sum, t) => sum + getSlotAppointments(day, t).length, 0);
+
     // When the doctor filter is on, drop the time rows that are empty across every
-    // visible day (holidays never count) so the grid collapses to just the booked
-    // rows. Otherwise show the full configured slot list.
+    // visible day so the grid collapses to just the booked rows. Otherwise show
+    // every row.
     const visibleTimeSlots = hideEmptySlots
-        ? timeSlots.filter(time =>
-              filteredDays.some(
-                  day => !day.isHoliday && getSlotAppointments(day, time).length > 0
-              )
-          )
+        ? timeSlots.filter(time => days.some(day => getSlotAppointments(day, time).length > 0))
         : timeSlots;
 
-    const buildSlotData = (
-        day: CalendarDay,
-        time: string,
-        appts: CalendarAppointment[]
-    ): SlotData => ({
-        date: day.date,
-        time,
-        dayName: day.dayName,
-        appointments: appts,
-        slotStatus: appts.length > 0 ? 'booked' : 'available',
-        appointment_id: appts.length > 0 ? appts[0].appointment_id : undefined,
-        appDetail: appts.length > 0 ? appts[0].appDetail ?? undefined : undefined,
-        patientName: appts.length > 0 ? appts[0].patientName ?? undefined : undefined
-    });
+    // The drag payload is the appointment's own id, re-found at drop time. It used
+    // to be `date|time|index`, so a refetch landing mid-drag (the grid now keeps
+    // showing the previous data while it loads) would have moved whoever was then
+    // at that index (audit FE-F10-8).
+    const findAppointment = (
+        id: string
+    ): { appt: CalendarAppointment; date: string; time: string } | null => {
+        for (const day of days) {
+            for (const time of timeSlots) {
+                const appt = getSlotAppointments(day, time).find(a => String(a.appointment_id) === id);
+                if (appt) return { appt, date: day.date, time };
+            }
+        }
+        return null;
+    };
 
     const handleLaneDragStart =
         (dragId: string) => (e: DragEvent<HTMLElement>) => {
@@ -253,14 +204,14 @@ const CalendarGrid = ({
     };
 
     const onSlotDragOver =
-        (date: string, time: string, holiday: boolean) =>
+        (date: string, time: string, forbidden: boolean) =>
         (e: DragEvent<HTMLDivElement>) => {
             e.preventDefault();
-            e.dataTransfer.dropEffect = holiday ? 'none' : 'move';
+            e.dataTransfer.dropEffect = forbidden ? 'none' : 'move';
             setDropTarget(prev =>
                 prev && prev.date === date && prev.time === time
                     ? prev
-                    : { date, time, isHoliday: holiday }
+                    : { date, time, forbidden }
             );
         };
 
@@ -270,15 +221,10 @@ const CalendarGrid = ({
             const id = e.dataTransfer.getData('text/plain') || draggingId;
             handleLaneDragEnd();
             if (!id) return;
-            const src = parseDragId(id);
+            const src = findAppointment(id);
+            if (!src || src.appt.appointment_id == null) return;
             if (src.date === destDate && src.time === destTime) return;
-
-            const srcDay = days.find(d => d.date === src.date);
-            if (!srcDay) return;
-            const appt = getSlotAppointments(srcDay, src.time)[src.index];
-            if (!appt || appt.appointment_id == null) return;
-
-            onReschedule(appt.appointment_id, destDate, destTime, appt);
+            onReschedule(src.appt.appointment_id, destDate, destTime, src.appt, src.date);
         };
 
     const renderLane = (
@@ -288,37 +234,26 @@ const CalendarGrid = ({
         time: string,
         span2: boolean
     ) => {
-        const dragId = `${day.date}|${time}|${index}`;
-        const isPast = new Date(`${day.date}T${time}:00`) < new Date();
+        const dragId = String(appt.appointment_id ?? '');
+        const isPast = isPastSlot(day.date, time);
         const dt = appt.drID != null ? doctorColors.get(appt.drID) : undefined;
         return (
             <div
-                key={index}
+                key={appt.appointment_id ?? index}
                 role="button"
                 tabIndex={0}
                 className={`cal-lane ${span2 ? 'span2' : ''} ${
                     draggingId === dragId ? 'dragging' : ''
                 }`}
                 style={dt ? { background: dt.fill, borderColor: dt.edge } : undefined}
-                draggable={!isPast}
+                draggable={!isPast && !!dragId}
                 onDragStart={handleLaneDragStart(dragId)}
                 onDragEnd={handleLaneDragEnd}
-                onClick={e => {
+                onClick={(e: MouseEvent<HTMLDivElement>) => {
                     e.stopPropagation();
-                    onAppointmentClick(appt, day.date, time, e);
+                    onAppointmentClick(appt, day.date, time, anchorFrom(e));
                 }}
-                onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onAppointmentClick(
-                            appt,
-                            day.date,
-                            time,
-                            e as unknown as MouseEvent<HTMLDivElement>
-                        );
-                    }
-                }}
+                onKeyDown={onActivate(e => onAppointmentClick(appt, day.date, time, anchorFrom(e)))}
                 title={`${appt.patientName || 'Scheduled'}${
                     appt.appDetail ? `\n${appt.appDetail}` : ''
                 }`}
@@ -332,9 +267,7 @@ const CalendarGrid = ({
     const renderSlot = (day: CalendarDay, time: string, appts: CalendarAppointment[]) => {
         const n = appts.length;
 
-        if (n === 0) {
-            return <span className="cal-empty-mark">＋</span>;
-        }
+        if (n === 0) return null;
         if (n === 1) {
             return renderLane(appts[0], 0, day, time, true);
         }
@@ -376,6 +309,7 @@ const CalendarGrid = ({
                 <button
                     type="button"
                     className={`cal-more-cell ${isPopOpen ? 'open' : ''}`}
+                    aria-expanded={isPopOpen}
                     onClick={e => {
                         e.stopPropagation();
                         setMoreMenu(isPopOpen ? null : { date: day.date, time });
@@ -394,6 +328,7 @@ const CalendarGrid = ({
         appts: CalendarAppointment[]
     ) => {
         const hidden = appts.slice(3);
+        const isPast = isPastSlot(day.date, time);
         return (
             // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- container stops mousedown from reaching the click-away dismiss
             <div className="cal-popover" onMouseDown={e => e.stopPropagation()}>
@@ -417,40 +352,29 @@ const CalendarGrid = ({
                 </div>
                 <div className="cal-popover-list">
                     {hidden.map((appt, i) => {
-                        const absIdx = 3 + i;
-                        const dragId = `${day.date}|${time}|${absIdx}`;
-                        const isPast = new Date(`${day.date}T${time}:00`) < new Date();
+                        const dragId = String(appt.appointment_id ?? '');
                         const dt = appt.drID != null ? doctorColors.get(appt.drID) : undefined;
+                        const open = (anchor: MenuAnchor) => {
+                            setMoreMenu(null);
+                            onAppointmentClick(appt, day.date, time, anchor);
+                        };
                         return (
                             <div
-                                key={absIdx}
+                                key={appt.appointment_id ?? i}
                                 role="button"
                                 tabIndex={0}
                                 className={`cal-popover-row ${
                                     draggingId === dragId ? 'dragging' : ''
                                 }`}
                                 style={dt ? { background: dt.fill, borderLeft: `3px solid ${dt.edge}` } : undefined}
-                                draggable={!isPast}
+                                draggable={!isPast && !!dragId}
                                 onDragStart={handleLaneDragStart(dragId)}
                                 onDragEnd={handleLaneDragEnd}
-                                onClick={e => {
+                                onClick={(e: MouseEvent<HTMLDivElement>) => {
                                     e.stopPropagation();
-                                    setMoreMenu(null);
-                                    onAppointmentClick(appt, day.date, time, e);
+                                    open(anchorFrom(e));
                                 }}
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setMoreMenu(null);
-                                        onAppointmentClick(
-                                            appt,
-                                            day.date,
-                                            time,
-                                            e as unknown as MouseEvent<HTMLDivElement>
-                                        );
-                                    }
-                                }}
+                                onKeyDown={onActivate(e => open(anchorFrom(e)))}
                             >
                                 <div className="cal-popover-name">
                                     {appt.patientName || 'Scheduled'}
@@ -468,29 +392,32 @@ const CalendarGrid = ({
 
     return (
         <div className="cal-board" ref={boardRef}>
-            {/* Day headers */}
+            {/* Day headers — right-click, click or Enter opens the day's menu. */}
             <div className="cal-day-headers" style={{ gridTemplateColumns }}>
                 <div className="cal-time-head">
                     <span>TIME</span>
                 </div>
-                {filteredDays.map(day => {
+                {days.map(day => {
                     const holiday = day.isHoliday || false;
-                    const total = timeSlots.reduce(
-                        (sum, t) => sum + getSlotAppointments(day, t).length,
-                        0
-                    );
+                    const total = dayTotal(day);
                     const dateNum = parseLocalDate(day.date).getDate();
-                    const handleContextMenu = (event: MouseEvent<HTMLDivElement>) => {
-                        event.preventDefault();
-                        onDayContextMenu?.(day, event);
-                    };
+                    const openMenu = (e: MouseEvent<HTMLDivElement> | KeyboardEvent<HTMLElement>) =>
+                        onDayMenu(day, anchorFrom(e));
                     return (
                         <div
                             key={day.date}
                             className={`cal-day-head ${isToday(day.date) ? 'today' : ''} ${
                                 holiday ? 'holiday' : ''
                             }`}
-                            onContextMenu={handleContextMenu}
+                            role="button"
+                            tabIndex={0}
+                            aria-haspopup="menu"
+                            onClick={openMenu}
+                            onKeyDown={onActivate(openMenu)}
+                            onContextMenu={e => {
+                                e.preventDefault();
+                                openMenu(e);
+                            }}
                             title={holiday ? `Holiday: ${day.holidayName}` : undefined}
                         >
                             <div className="cal-day-row">
@@ -500,7 +427,9 @@ const CalendarGrid = ({
                                 <span className="cal-day-num">{dateNum}</span>
                             </div>
                             {holiday ? (
-                                <div className="cal-day-tag holiday">Holiday</div>
+                                <div className="cal-day-tag holiday">
+                                    Holiday{total > 0 ? ` · ${total} appt${total === 1 ? '' : 's'}` : ''}
+                                </div>
                             ) : (
                                 <div className="cal-day-tag">
                                     {total} appt{total === 1 ? '' : 's'}
@@ -513,19 +442,18 @@ const CalendarGrid = ({
 
             {/* Grid */}
             <div
-                className={`cal-grid tint-${TINT_MODE} ${viewMode === 'day' ? 'view-day' : ''}`}
+                className={`cal-grid tint-zebra ${viewMode === 'day' ? 'view-day' : ''}`}
                 style={{ gridTemplateColumns }}
             >
                 {/* Time column */}
                 <div className="cal-time-col">
                     {visibleTimeSlots.map(t => {
-                        const tint = tintFor(t);
                         const { hour, minute, meridiem } = to12Hour(t);
                         return (
                             <div
                                 key={t}
                                 className="cal-time-cell"
-                                style={{ background: tint.label }}
+                                style={{ background: zebraFor(t) }}
                             >
                                 <span className="cal-time-h">{hour}</span>
                                 <span className="cal-time-m">{minute}</span>
@@ -536,8 +464,13 @@ const CalendarGrid = ({
                 </div>
 
                 {/* Day columns */}
-                {filteredDays.map(day => {
+                {days.map(day => {
                     const holiday = day.isHoliday || false;
+                    // A holiday declared over existing bookings still shows them —
+                    // the modal says they are NOT cancelled, and this is the screen
+                    // used to move them (audit FE-F10-3). The sash covers the column
+                    // only when there is nothing under it.
+                    const holidayHasAppointments = holiday && dayTotal(day) > 0;
                     return (
                         <div
                             key={day.date}
@@ -545,7 +478,7 @@ const CalendarGrid = ({
                                 holiday ? 'holiday' : ''
                             }`}
                         >
-                            {holiday && (
+                            {holiday && !holidayHasAppointments && (
                                 <div className="cal-holiday-sash">
                                     <div className="cal-holiday-card">
                                         <div className="cal-holiday-eyebrow">Holiday</div>
@@ -557,11 +490,10 @@ const CalendarGrid = ({
                                 </div>
                             )}
                             {visibleTimeSlots.map(time => {
-                                const tint = tintFor(time);
-                                const appts = holiday
-                                    ? []
-                                    : getSlotAppointments(day, time);
-                                const slotData = buildSlotData(day, time, appts);
+                                const appts = getSlotAppointments(day, time);
+                                // Nothing may land on a holiday or in the past; the
+                                // server refuses both too (FE-F10-8).
+                                const forbidden = holiday || isPastSlot(day.date, time);
                                 const isDropTarget =
                                     !!dropTarget &&
                                     dropTarget.date === day.date &&
@@ -576,18 +508,14 @@ const CalendarGrid = ({
                                         className={`cal-slot-wrap ${
                                             isDropTarget ? 'drop-target' : ''
                                         } ${
-                                            isDropTarget && holiday ? 'drop-forbidden' : ''
+                                            isDropTarget && forbidden ? 'drop-forbidden' : ''
                                         } ${isPopOpen ? 'pop-open' : ''}`}
-                                        style={holiday ? undefined : { background: tint.row }}
-                                        onDragOver={onSlotDragOver(day.date, time, holiday)}
-                                        onDrop={
-                                            holiday ? undefined : onSlotDrop(day.date, time)
-                                        }
+                                        style={holiday ? undefined : { background: zebraFor(time) }}
+                                        onDragOver={onSlotDragOver(day.date, time, forbidden)}
+                                        onDrop={forbidden ? undefined : onSlotDrop(day.date, time)}
                                     >
-                                        {!holiday && (
+                                        {(!holiday || appts.length > 0) && (
                                             <div
-                                                role="button"
-                                                tabIndex={0}
                                                 className={`cal-slot count-${
                                                     appts.length === 0
                                                         ? '0'
@@ -595,16 +523,6 @@ const CalendarGrid = ({
                                                           ? 'many'
                                                           : appts.length
                                                 }`}
-                                                onClick={e => onSlotClick(slotData, e)}
-                                                onKeyDown={e => {
-                                                    if (e.key === 'Enter' || e.key === ' ') {
-                                                        e.preventDefault();
-                                                        onSlotClick(
-                                                            slotData,
-                                                            e as unknown as MouseEvent<HTMLDivElement>
-                                                        );
-                                                    }
-                                                }}
                                             >
                                                 {renderSlot(day, time, appts)}
                                             </div>

@@ -16,11 +16,6 @@
 /* No .card:hover — the row is a container, not a control; the name link and
    workflow buttons carry their own hover affordances. */
 
-/* Waiting patient highlight */
-.waiting {
-    composes: card;
-}
-
 /* Fade-in animation — every row fades in TOGETHER (no per-row stagger).
    History: rows used to stagger via `animation-delay` (0→450ms across the first
    ten cards), which dealt them out one-by-one over ~850ms — a "slow to display"

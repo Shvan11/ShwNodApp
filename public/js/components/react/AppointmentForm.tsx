@@ -1,38 +1,13 @@
-import { useState, useEffect, useMemo, useRef, type ChangeEvent, type FormEvent } from 'react';
-import cn from 'classnames';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import type { z } from 'zod';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import SimplifiedCalendarPicker from './SimplifiedCalendarPicker';
+import BookingForm, { type BookingValues } from './BookingForm';
 import { useToast } from '../../contexts/ToastContext';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import { formatAppointmentDateTime } from '@/utils/formatters';
-import * as appointment from '@shared/contracts/appointment.contract';
+import { postJSON } from '@/core/http';
+import { bookingError, refreshAfterBooking, sendAppointmentConfirmation } from './bookingError';
 import { qk } from '@/query/keys';
-import { employeesQuery, appointmentDetailsQuery } from '@/query/queries';
-import styles from './AppointmentForm.module.css';
-
-interface AppointmentFormData {
-    PersonID: number | string;
-    AppDate: string;
-    AppTime: string;
-    AppDetail: string;
-    DrID: string;
-}
-
-interface ValidationErrors {
-    [key: string]: string | null;
-}
-
-interface Doctor {
-    id: number;
-    employee_name: string;
-}
-
-interface AppointmentDetail {
-    id: number;
-    detail: string | null; // details.detail is nullable in the DB
-}
+import * as appointment from '@shared/contracts/appointment.contract';
 
 interface AppointmentFormProps {
     personId?: number | null;
@@ -40,362 +15,61 @@ interface AppointmentFormProps {
     onSuccess?: (result: unknown) => void;
 }
 
-interface ApiErrorResponse {
-    error?: string;
-    code?: string;
-    details?: {
-        code?: string;
-        holidayName?: string;
-    };
-}
-
 /**
- * AppointmentForm Component - CLEAN REWRITE
- *
- * Full-page layout with 3 columns:
- * LEFT: Monthly calendar (from SimplifiedCalendarPicker)
- * MIDDLE: Day schedule (from SimplifiedCalendarPicker)
- * RIGHT: Appointment details form
+ * AppointmentForm — book a new appointment for a patient. The page itself (the
+ * picker and the details column) is the shared `BookingForm`.
  */
-
 const AppointmentForm = ({ personId, onClose, onSuccess }: AppointmentFormProps) => {
     const { t } = useTranslation('appointments');
-    const { language } = useLanguage();
     const toast = useToast();
     const queryClient = useQueryClient();
-    const [formData, setFormData] = useState<AppointmentFormData>({
-        PersonID: personId ?? '',
-        AppDate: '',
-        AppTime: '',
-        AppDetail: '',
-        DrID: ''
-    });
-    const [loading, setLoading] = useState<boolean>(false);
+    const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [validation, setValidation] = useState<ValidationErrors>({});
-    const doctorSelectRef = useRef<HTMLSelectElement>(null);
-    const detailSelectRef = useRef<HTMLSelectElement>(null);
-    const formColumnRef = useRef<HTMLDivElement>(null);
-    const selectedTimeRef = useRef<HTMLDivElement>(null);
-    const flashAnimRef = useRef<Animation | null>(null);
 
-    // Doctors (employees who can receive appointments) + appointment-type options,
-    // both on useQuery so they're cached and shared with the rest of the app.
-    const { data: employeesData } = useQuery(employeesQuery('?getAppointments=true'));
-    // "Clinic" is the most common assignment, so float it to the top of the
-    // dropdown; everyone else keeps the server's SortOrder (Array.sort is stable).
-    const doctors = useMemo<Doctor[]>(() => {
-        const list: Doctor[] = (employeesData?.employees ?? []).slice();
-        list.sort((a, b) => {
-            if (a.employee_name === 'Clinic') return -1;
-            if (b.employee_name === 'Clinic') return 1;
-            return 0;
-        });
-        return list;
-    }, [employeesData]);
-
-    const { data: detailsData } = useQuery(appointmentDetailsQuery());
-    const details: AppointmentDetail[] = detailsData ?? [];
-
-    useEffect(() => {
-        return () => {
-            flashAnimRef.current?.cancel();
-        };
-    }, []);
-
-    const handleInputChange = (e: ChangeEvent<HTMLSelectElement | HTMLInputElement>): void => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        if (validation[name]) {
-            setValidation(prev => ({ ...prev, [name]: null }));
-        }
-        // Keyboard-flow: after Doctor is picked, advance focus to Type if empty
-        if (name === 'DrID' && value && !formData.AppDetail) {
-            setTimeout(() => detailSelectRef.current?.focus(), 0);
-        }
-    };
-
-    const handleDateTimeSelection = (dateTime: Date | string): void => {
-        const date = new Date(dateTime);
-        // Extract date components without timezone conversion to avoid -1 day offset
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-
-        setFormData(prev => ({
-            ...prev,
-            AppDate: `${year}-${month}-${day}`,
-            AppTime: `${hours}:${minutes}`
-        }));
-        setValidation(prev => ({ ...prev, AppDate: null, AppTime: null }));
-
-        // Brief rose flash on .selectedTime — compensates for slot feedback
-        // being scrolled off-screen on mobile, and ties the slot click to
-        // the form readout visually on PC. Driven via Web Animations API
-        // rather than a CSS @keyframes rule so it plays under
-        // prefers-reduced-motion: reduce (it's a color-only flash with no
-        // positional motion, so it doesn't engage the vestibular concerns
-        // the preference is meant to address) without needing !important to
-        // beat reset.css's blanket reduced-motion override. Cancelling the
-        // previous animation keeps rapid re-clicks clean.
-        if (selectedTimeRef.current) {
-            flashAnimRef.current?.cancel();
-            const cs = getComputedStyle(selectedTimeRef.current);
-            const successColor = cs.getPropertyValue('--success-color').trim();
-            const success50 = cs.getPropertyValue('--success-50').trim();
-            const selectionColor = cs.getPropertyValue('--selection-color').trim();
-            const selectionRgb = cs.getPropertyValue('--selection-color-rgb').trim();
-            const selectionTint = `rgba(${selectionRgb}, 0.22)`;
-            flashAnimRef.current = selectedTimeRef.current.animate([
-                { borderColor: successColor, backgroundColor: success50 },
-                { borderColor: selectionColor, backgroundColor: selectionTint, offset: 0.15 },
-                { borderColor: selectionColor, backgroundColor: selectionTint, offset: 0.70 },
-                { borderColor: successColor, backgroundColor: success50 }
-            ], { duration: 600, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' });
-        }
-
-        // Mobile (<=992px, where columns stack): bring the form into view.
-        // On desktop the form is already visible in the right column, so no
-        // page scroll is needed — focus on the un-filled select below
-        // handles intra-column scrolling natively.
-        // html { scroll-behavior: smooth } in reset.css makes both the
-        // scrollIntoView and the focus-scroll smooth, with the
-        // prefers-reduced-motion override in the same file for a11y.
-        if (typeof window !== 'undefined' && window.matchMedia('(max-width: 992px)').matches) {
-            formColumnRef.current?.scrollIntoView({ block: 'start' });
-        }
-
-        // Focus the next un-filled field. The browser's native focus-scroll
-        // brings the select into view (intra-column on desktop, window-level
-        // on mobile where it converges with the scrollIntoView above).
-        setTimeout(() => {
-            if (!formData.DrID) {
-                doctorSelectRef.current?.focus();
-            } else if (!formData.AppDetail) {
-                detailSelectRef.current?.focus();
-            }
-        }, 0);
-    };
-
-    const validateForm = (): boolean => {
-        const errors: ValidationErrors = {};
-        if (!formData.AppDate) errors.AppDate = t('form.errorSelectDate');
-        if (!formData.AppTime) errors.AppTime = t('form.errorSelectTime');
-        if (!formData.DrID) errors.DrID = t('form.errorSelectDoctor');
-        if (!formData.AppDetail) errors.AppDetail = t('form.errorSelectType');
-        setValidation(errors);
-        return Object.keys(errors).length === 0;
-    };
-
-    const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
-        e.preventDefault();
-        if (!validateForm()) return;
-
-        setLoading(true);
+    const handleSubmit = async (values: BookingValues): Promise<void> => {
+        setSubmitting(true);
         setError(null);
-
         try {
-            const appointmentDateTime = `${formData.AppDate}T${formData.AppTime}:00`;
-            const result = await postJSON<{ appointment_id?: number }>(
+            const result = await postJSON<z.infer<typeof appointment.createAppointment.response>>(
                 '/api/appointments',
                 {
-                    person_id: parseInt(String(formData.PersonID), 10),
-                    app_date: appointmentDateTime,
-                    app_detail: formData.AppDetail,
-                    dr_id: parseInt(formData.DrID, 10)
+                    person_id: Number(personId),
+                    app_date: `${values.AppDate}T${values.AppTime}:00`,
+                    app_detail: values.AppDetail,
+                    dr_id: parseInt(values.DrID, 10)
                 },
                 { schema: appointment.createAppointment.response }
             );
 
-            // postJSON throws on non-2xx, so reaching here means the create succeeded.
-            postJSON<{ success: boolean; message?: string }>('/api/wa/send-appointment', {
-                appointmentId: result.appointment_id
-            })
-                .then((waResult) => {
-                    if (waResult.success) {
-                        toast.success(t('form.waSent'));
-                    } else {
-                        toast.warning(waResult.message || t('form.waFailed'));
-                    }
-                })
-                .catch(err => {
-                    toast.error(t('form.waError', { error: httpErrorMessage(err, 'send failed') }));
-                });
-
-            // Refresh the patient's appointment-backed reads (has-appointment flag
-            // on the works screen + the appointments list) so the new appointment
-            // shows immediately — the still-fresh cache (30s staleTime) would
-            // otherwise serve a stale list until a hard refresh.
-            queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
-
-            // …and the calendar's own reads. A booking made from a patient screen
-            // changes slot availability for everyone: `qk.calendar.slots/availability`
-            // back SimplifiedCalendarPicker (the control whose job is to stop a
-            // double-book) and `qk.calendar.range/month/stats` back /calendar, which
-            // subscribes to no SSE and has no refetchInterval. Without this, the 30s
-            // staleTime is exactly long enough to re-offer a slot just taken.
-            queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
-
-            // Only call onSuccess, it will handle navigation
-            // Don't call onClose as it might interfere with navigation
-            if (onSuccess) {
-                onSuccess(result);
-            } else if (onClose) {
-                onClose();
+            if (result.appointment_id != null) {
+                sendAppointmentConfirmation(result.appointment_id, toast, t);
             }
-        } catch (err) {
-            // postJSON throws on non-2xx; the conflict codes ride the thrown
-            // HttpError's parsed body. Appointment/work conflicts route through
-            // ErrorResponses.conflict() (nested details.code); patient routes put
-            // it at the root — read both so the friendly messages fire either way (M1).
-            const errorData = (err as HttpError).data as ApiErrorResponse | undefined;
-            const errorCode = errorData?.code ?? errorData?.details?.code;
+            refreshAfterBooking(queryClient, personId);
 
-            if (errorCode === 'HOLIDAY_CONFLICT') {
-                const holidayName = errorData?.details?.holidayName || t('calendar.holiday');
-                setError(t('form.errorHolidayConflict', { holiday: holidayName }));
-            } else if (errorCode === 'APPOINTMENT_CONFLICT') {
-                setError(t('form.errorAppointmentConflict'));
-            } else {
-                console.error('Error creating appointment:', err);
-                setError(httpErrorMessage(err, t('form.errorUnknown')));
+            // onSuccess navigates; onClose is only the fallback.
+            if (onSuccess) onSuccess(result);
+            else onClose?.();
+        } catch (err) {
+            const { code, message } = bookingError(err, t);
+            setError(message);
+            // The picker's slots are a cached read: after a refusal for a full slot,
+            // show the slot as it really is now.
+            if (code === 'SLOT_FULL') {
+                void queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
             }
         } finally {
-            setLoading(false);
+            setSubmitting(false);
         }
-    };
-
-    const getDateTimeDisplay = (): string => {
-        if (formData.AppDate && formData.AppTime) {
-            return formatAppointmentDateTime(new Date(`${formData.AppDate}T${formData.AppTime}`), language);
-        }
-        return t('form.noTimeSelected');
     };
 
     return (
-        <div className={styles.page}>
-            {/* Page Header */}
-            <header className={styles.pageHeader}>
-                <div>
-                    <h1><i className="fas fa-calendar-plus"></i> {t('form.newTitle')}</h1>
-                    <p>{t('form.patientLabel', { id: personId })}</p>
-                </div>
-                <button className={styles.closeButton} onClick={onClose} title={t('form.close')}>
-                    <i className="fas fa-times"></i>
-                </button>
-            </header>
-
-            {/* Main Content: 3 Columns */}
-            <div className={styles.pageContent}>
-                {/* Calendar Picker (LEFT + MIDDLE columns) */}
-                <SimplifiedCalendarPicker
-                    onSelectDateTime={handleDateTimeSelection}
-                    initialDate={formData.AppDate ? new Date(formData.AppDate) : new Date()}
-                />
-
-                {/* RIGHT COLUMN: Form */}
-                <div className={styles.formColumn} ref={formColumnRef}>
-                    <div className={styles.formHeader}>
-                        <h2><i className="fas fa-clipboard-list"></i> {t('form.detailsHeading')}</h2>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className={styles.form}>
-                        {error && (
-                            <div className={cn(styles.alert, styles.alertError)}>
-                                <i className="fas fa-exclamation-circle"></i>
-                                <span>{error}</span>
-                            </div>
-                        )}
-
-                        <div className={styles.formField}>
-                            <span><i className="fas fa-calendar-check"></i> {t('form.selectedTime')}</span>
-                            <div
-                                ref={selectedTimeRef}
-                                className={cn(styles.selectedTime, {
-                                    [styles.hasValue]: formData.AppDate && formData.AppTime
-                                })}
-                            >
-                                {getDateTimeDisplay()}
-                            </div>
-                            {(validation.AppDate || validation.AppTime) && (
-                                <span className={styles.fieldError}>{validation.AppDate || validation.AppTime}</span>
-                            )}
-                        </div>
-
-                        <div className={styles.formField}>
-                            <label htmlFor="doctor"><i className="fas fa-user-md"></i> {t('form.doctor')}</label>
-                            <select
-                                id="doctor"
-                                name="DrID"
-                                ref={doctorSelectRef}
-                                value={formData.DrID}
-                                onChange={handleInputChange}
-                                className={validation.DrID ? styles.error : ''}
-                            >
-                                <option value="">{t('form.selectDoctor')}</option>
-                                {doctors.filter(d => d.id).map((doctor) => (
-                                    <option key={doctor.id} value={doctor.id}>
-                                        {doctor.employee_name}
-                                    </option>
-                                ))}
-                            </select>
-                            {validation.DrID && <span className={styles.fieldError}>{validation.DrID}</span>}
-                        </div>
-
-                        <div className={styles.formField}>
-                            <label htmlFor="details"><i className="fas fa-notes-medical"></i> {t('form.appointmentType')}</label>
-                            <select
-                                id="details"
-                                name="AppDetail"
-                                ref={detailSelectRef}
-                                value={formData.AppDetail}
-                                onChange={handleInputChange}
-                                className={validation.AppDetail ? styles.error : ''}
-                            >
-                                <option value="">{t('form.selectType')}</option>
-                                {details.filter(d => d.id).map((detail) => (
-                                    <option key={detail.id} value={detail.detail ?? ''}>
-                                        {detail.detail}
-                                    </option>
-                                ))}
-                            </select>
-                            {validation.AppDetail && <span className={styles.fieldError}>{validation.AppDetail}</span>}
-                        </div>
-
-                        <div className={styles.formActions}>
-                            <button
-                                type="button"
-                                className="btn btn-cancel"
-                                onClick={onClose}
-                                disabled={loading}
-                            >
-                                <i className="fas fa-times"></i>
-                                {t('form.cancel')}
-                            </button>
-                            <button
-                                type="submit"
-                                className="btn btn-create"
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                    <>
-                                        <i className="fas fa-spinner fa-spin"></i>
-                                        {t('form.creating')}
-                                    </>
-                                ) : (
-                                    <>
-                                        <i className="fas fa-check"></i>
-                                        {t('form.create')}
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+        <BookingForm
+            personId={personId}
+            submitting={submitting}
+            error={error}
+            onSubmit={values => void handleSubmit(values)}
+            onClose={onClose}
+        />
     );
 };
 

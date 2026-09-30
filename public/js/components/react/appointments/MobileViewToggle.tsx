@@ -19,21 +19,25 @@ interface MobileViewToggleProps {
 const MobileViewToggle = ({ activeView, onViewChange, allCount, checkedInCount }: MobileViewToggleProps) => {
     const { t } = useTranslation('appointments');
     return (
-        <div className={styles.container}>
+        <div className={styles.container} role="group" aria-label={t('mobile.label')}>
             <button
+                type="button"
                 className={activeView === 'all' ? styles.buttonActive : styles.button}
                 data-view="all"
+                aria-pressed={activeView === 'all'}
                 onClick={() => onViewChange('all')}
             >
-                <i className="fas fa-calendar-alt"></i>
+                <i className="fas fa-calendar-alt" aria-hidden="true"></i>
                 <span>{t('mobile.all', { count: allCount })}</span>
             </button>
             <button
+                type="button"
                 className={activeView === 'checked-in' ? styles.buttonActive : styles.button}
                 data-view="checked-in"
+                aria-pressed={activeView === 'checked-in'}
                 onClick={() => onViewChange('checked-in')}
             >
-                <i className="fas fa-user-check"></i>
+                <i className="fas fa-user-check" aria-hidden="true"></i>
                 <span>{t('mobile.checkedIn', { count: checkedInCount })}</span>
             </button>
         </div>

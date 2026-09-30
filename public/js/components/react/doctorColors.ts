@@ -1,12 +1,15 @@
 /**
  * Doctor calendar colours — single source of truth shared by the calendar grid
- * (card tints), the calendar legend, and the Employee Settings colour picker.
+ * (card tints), the calendar legend, the daily board and the Employee Settings
+ * colour picker.
  *
- * The colourable set is data-driven from tblEmployees: any employee with
- * getAppointments = 1 can carry a colour. A doctor's effective colour is:
- *   1. their explicit AppointmentColor (hex picked in Employee Settings), or
- *   2. a built-in default for the historically hand-tuned doctors, or
- *   3. neutral (no tint) — e.g. the generic "Clinic" house bucket.
+ * A doctor's colour is their `appointment_color` (a hex picked in Employee
+ * Settings), or neutral (no tint) when none is set — e.g. the "Clinic" bucket.
+ *
+ * There used to be a third source: built-in defaults keyed by employee id 1 and
+ * 7, this clinic's two original doctors. On every other install id 1 is the
+ * seeded Clinic pseudo-doctor, which then showed up amber (audit FE-F10-11).
+ * Migration 1789460600000 wrote those two colours into this clinic's rows.
  */
 
 import type { DoctorColor, LegendDoctor } from './calendar.types';
@@ -18,22 +21,7 @@ export interface DoctorColorSource {
     appointment_color?: string | null;
 }
 
-/**
- * Built-in defaults for the historically hand-tuned doctors, applied when the
- * employee has no appointment_color set so their calendar look is preserved
- * exactly. Editing the colour in Employee Settings overrides these.
- * Keyed by drID (employees.id). fill = soft card background, edge = border.
- */
-const FIXED_DEFAULT_COLORS: Record<number, DoctorColor> = {
-    7: { fill: 'oklch(94% 0.04 250)', edge: 'oklch(70% 0.12 250)' }, // Rojena — blue
-    1: { fill: 'oklch(94% 0.05 85)',  edge: 'oklch(72% 0.13 85)'  }  // Shwan Elias — amber
-};
-
-/** Seed shown in the Settings colour picker when no custom appointment_color is set. */
-export const DEFAULT_PICKER_HEX: Record<number, string> = {
-    7: '#4f8de0', // ≈ Rojena blue
-    1: '#d8a64b'  // ≈ Shwan amber
-};
+/** Seed shown in the Settings colour picker when no appointment_color is set. */
 export const NEUTRAL_PICKER_HEX = '#8a94a6';
 
 const HEX_RE = /^#([0-9a-fA-F]{6})$/;
@@ -59,23 +47,19 @@ export function hexToDoctorColor(hex: string): DoctorColor | null {
  * neutral (no tint).
  */
 export function resolveDoctorColor(emp: DoctorColorSource): DoctorColor | null {
-    if (emp.appointment_color) {
-        const custom = hexToDoctorColor(emp.appointment_color);
-        if (custom) return custom;
-    }
-    return FIXED_DEFAULT_COLORS[emp.id] ?? null;
+    return emp.appointment_color ? hexToDoctorColor(emp.appointment_color) : null;
 }
 
 export interface DoctorColorResult {
     /** drID → colour for tinting cards. Neutral doctors are intentionally omitted. */
     byId: Map<number, DoctorColor>;
-    /** Every appointment-eligible doctor, in display order, for the legend. */
+    /** Every calendar doctor, in display order, for the legend. */
     legend: LegendDoctor[];
 }
 
 /**
- * Build the card-tint lookup and the legend list from the appointment-eligible
- * doctors (already filtered to getAppointments = 1 by the caller).
+ * Build the card-tint lookup and the legend list from the calendar doctors
+ * (`/api/doctors`: active, position Doctor — see useAppointmentDoctors).
  */
 export function buildDoctorColors(eligible: DoctorColorSource[]): DoctorColorResult {
     const byId = new Map<number, DoctorColor>();

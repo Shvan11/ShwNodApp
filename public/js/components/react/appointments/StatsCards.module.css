@@ -1,14 +1,5 @@
 /* StatsCards.module.css - Statistics cards component */
 
-.container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: var(--spacing-xs);
-    padding: 0 var(--spacing-lg) var(--spacing-md) var(--spacing-lg);
-    max-width: 1400px;
-    margin: 0 auto;
-}
-
 .card {
     background: var(--card-bg);
     border-radius: var(--radius-md);
@@ -149,20 +140,8 @@
     order: 1;
 }
 
-/* Responsive - Tablet */
-@media (max-width: 1024px) {
-    .container {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
 /* Responsive - Mobile */
 @media (max-width: 768px) {
-    .container {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.25rem;
-    }
-
     /* On phones the chips wrapped to two extra header rows and pushed the
        lists below the fold — hide them; the All/Checked-In view toggle
        carries the counts there instead. */
@@ -191,9 +170,5 @@
 
     .label {
         font-size: var(--font-size-xs);
-    }
-
-    .container {
-        grid-template-columns: 1fr;
     }
 }

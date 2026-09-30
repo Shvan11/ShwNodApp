@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from './AnalogClock.module.css';
 
 // Static SVG geometry — same every render, so compute once at module load.
@@ -104,20 +104,12 @@ const AnalogClock = ({ size, showDate = true, className }: AnalogClockProps) => 
     const minuteAngle = ((now.minute + now.second / 60) / 60) * 360;
     const hourAngle = (((now.hour % 12) + now.minute / 60) / 12) * 360;
 
-    // Date label only changes once per day; memo so it isn't re-formatted
-    // on every per-second tick.
-    const dayOfMonth = now.date.getDate();
-    const monthOfYear = now.date.getMonth();
-    const fullYear = now.date.getFullYear();
-    const dateLabel = useMemo(() => {
-        if (!showDate) return null;
-        return now.date.toLocaleDateString(undefined, {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [showDate, dayOfMonth, monthOfYear, fullYear]);
+    // One date format per render (once a second) is nothing. It used to be a
+    // useMemo keyed on the day behind an exhaustive-deps disable, which made React
+    // Compiler skip the whole component (audit FE-F10-20).
+    const dateLabel = showDate
+        ? now.date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+        : null;
 
     return (
         <svg

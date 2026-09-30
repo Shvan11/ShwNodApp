@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import type { DoctorFilter } from './AppointmentsHeader';
@@ -39,7 +39,7 @@ const DoctorFilterSelect = ({ doctors, value, onChange }: DoctorFilterSelectProp
         setCoords({ top: r.bottom + 6, left: Math.max(8, left), width });
     }, []);
 
-    // Close on outside click / Escape; keep anchored on resize.
+    // Close on outside click / Escape (focus back on the trigger); keep anchored on resize.
     useEffect(() => {
         if (!open) return;
         const onDown = (e: MouseEvent) => {
@@ -47,7 +47,12 @@ const DoctorFilterSelect = ({ doctors, value, onChange }: DoctorFilterSelectProp
             if (wrapRef.current?.contains(node) || popRef.current?.contains(node)) return;
             setOpen(false);
         };
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setOpen(false);
+                btnRef.current?.focus();
+            }
+        };
         document.addEventListener('mousedown', onDown);
         document.addEventListener('keydown', onKey);
         window.addEventListener('resize', placeMenu);
@@ -58,6 +63,15 @@ const DoctorFilterSelect = ({ doctors, value, onChange }: DoctorFilterSelectProp
         };
     }, [open, placeMenu]);
 
+    // On open, focus the selected option so the arrow keys start from it
+    // (audit FE-F11-11e: the listbox had no keyboard path at all).
+    useEffect(() => {
+        if (!open || !coords) return;
+        const options = popRef.current?.querySelectorAll<HTMLElement>('[role="option"]');
+        const selected = popRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+        (selected ?? options?.[0])?.focus();
+    }, [open, coords]);
+
     const toggleOpen = () => {
         if (!open) placeMenu();
         setOpen((o) => !o);
@@ -66,6 +80,32 @@ const DoctorFilterSelect = ({ doctors, value, onChange }: DoctorFilterSelectProp
     const selectValue = (v: DoctorFilter) => {
         onChange(v);
         setOpen(false);
+        btnRef.current?.focus();
+    };
+
+    // Arrow keys / Home / End move between options; Tab leaves (and closes).
+    const onMenuKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+        const options = Array.from(popRef.current?.querySelectorAll<HTMLElement>('[role="option"]') ?? []);
+        if (options.length === 0) return;
+        const current = options.indexOf(document.activeElement as HTMLElement);
+        let next: number | null = null;
+        if (e.key === 'ArrowDown') next = (current + 1) % options.length;
+        else if (e.key === 'ArrowUp') next = (current - 1 + options.length) % options.length;
+        else if (e.key === 'Home') next = 0;
+        else if (e.key === 'End') next = options.length - 1;
+        else if (e.key === 'Tab') setOpen(false);
+        if (next !== null) {
+            e.preventDefault();
+            options[next].focus();
+        }
+    };
+
+    // The trigger opens on ArrowDown too, as a native select does.
+    const onTriggerKeyDown = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+        if (e.key === 'ArrowDown' && !open) {
+            e.preventDefault();
+            toggleOpen();
+        }
     };
 
     const selectedDoctor = typeof value === 'number' ? doctors.find((d) => d.id === value) ?? null : null;
@@ -77,6 +117,7 @@ const DoctorFilterSelect = ({ doctors, value, onChange }: DoctorFilterSelectProp
                 ref={btnRef}
                 className={styles.trigger}
                 onClick={toggleOpen}
+                onKeyDown={onTriggerKeyDown}
                 aria-haspopup="listbox"
                 aria-expanded={open}
                 aria-label={t('filter.byDoctor')}
@@ -100,8 +141,10 @@ const DoctorFilterSelect = ({ doctors, value, onChange }: DoctorFilterSelectProp
                 <div
                     className={styles.menu}
                     role="listbox"
+                    tabIndex={-1}
                     aria-label={t('filter.byDoctor')}
                     ref={popRef}
+                    onKeyDown={onMenuKeyDown}
                     style={{ position: 'fixed', top: coords.top, left: coords.left, width: coords.width }}
                 >
                     <button

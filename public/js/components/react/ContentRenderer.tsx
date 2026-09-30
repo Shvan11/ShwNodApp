@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ComponentType } from 'react';
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 /**
  * Each patient sub-page is its own lazy chunk.
@@ -95,6 +95,14 @@ interface ContentRendererProps {
 // other page, not by a flag.
 const ContentRenderer = ({ personId, page = 'photos', params = {} }: ContentRendererProps) => {
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Back one page — or, when this is the first page of the tab (a pasted link,
+    // a bookmark), to `fallback`: `navigate(-1)` there left the app (FE-F10-9).
+    const goBackOr = (fallback: string) => {
+        if (location.key === 'default') navigate(fallback, { replace: true });
+        else navigate(-1);
+    };
     const wildcardParams = useParams<{ '*': string }>();
     const [searchParams] = useSearchParams();
 
@@ -244,10 +252,7 @@ const ContentRenderer = ({ personId, page = 'photos', params = {} }: ContentRend
                 return (
                     <AppointmentForm
                         personId={personId}
-                        onClose={() => {
-                            // Go back to previous page
-                            navigate(-1);
-                        }}
+                        onClose={() => goBackOr(`/patient/${personId}/appointments`)}
                         onSuccess={() => {
                             // Navigate to works page after success
                             if (personId) navigate(`/patient/${personId}/works`);
@@ -256,19 +261,15 @@ const ContentRenderer = ({ personId, page = 'photos', params = {} }: ContentRend
                 );
 
             case 'edit-appointment':
-                // Handle edit-appointment/:appointmentId pattern
+                // edit-appointment/:appointmentId. Both callbacks go back to wherever
+                // Edit was opened from (the calendar or the patient's list); the form
+                // calls exactly one of them.
                 return (
                     <EditAppointmentForm
                         personId={personId}
                         appointmentId={appointmentId}
-                        onClose={() => {
-                            // Go back to previous page
-                            navigate(-1);
-                        }}
-                        onSuccess={() => {
-                            // Go back to previous page after success
-                            navigate(-1);
-                        }}
+                        onClose={() => goBackOr(`/patient/${personId}/appointments`)}
+                        onSuccess={() => goBackOr(`/patient/${personId}/appointments`)}
                     />
                 );
 

@@ -37,6 +37,7 @@ export const TIMEOUTS = {
   SHORT: 10000,             // 10 seconds - quick operations
   MEDIUM: 60000,            // 1 minute - standard operations
   LONG: 120000,             // 2 minutes - file uploads, batch operations
+  UPLOAD: 600000,           // 10 minutes - large media uploads (TV signage clips, up to 1 GB)
   WHATSAPP_SEND: 300000,    // 5 minutes - WhatsApp batch sending
   DATABASE_QUERY: 30000,    // 30 seconds - database query timeout
 } as const;
@@ -129,6 +130,9 @@ export const timeouts = {
 
   // Long operations (2 minutes)
   long: requestTimeout(TIMEOUTS.LONG),
+
+  // Large media uploads (10 minutes)
+  upload: requestTimeout(TIMEOUTS.UPLOAD),
 
   // WhatsApp batch send (5 minutes)
   whatsappSend: requestTimeout(TIMEOUTS.WHATSAPP_SEND),

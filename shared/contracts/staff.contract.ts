@@ -15,9 +15,11 @@ import { z } from 'zod';
 // modeling employee_name lets the selectors read it without an unknown-cast.
 const staffMemberRow = z.looseObject({ id: z.number(), employee_name: z.string() });
 
-// GET /api/doctors — employees with position 'Doctor'.
+// GET /api/doctors — ACTIVE employees with position 'Doctor': the calendar's doctors
+// (booking forms, calendar filter + legend, daily board; audit FE-F10-13), each with
+// the calendar colour picked in Settings → Employees (null = neutral).
 export const doctors = {
-  response: z.array(staffMemberRow),
+  response: z.array(staffMemberRow.extend({ appointment_color: z.string().nullable() })),
 } as const;
 export type DoctorsResponse = z.infer<typeof doctors.response>;
 
